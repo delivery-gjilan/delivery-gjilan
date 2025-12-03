@@ -1,0 +1,27 @@
+type Address {
+  city: String!
+  country: String!
+  street: String!
+}
+
+type Mutation {
+  createUser(address: Address!, id: ID!, name: String!): User!
+}
+
+type Order {
+  id: ID!
+  name: String!
+}
+
+type Query {
+  hello: String!
+  order(id: ID!): Order!
+  user(id: ID!): User!
+  users: [User!]!
+}
+
+type User {
+  address: Address!
+  id: ID!
+  name: String!
+}
