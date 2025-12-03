@@ -1,0 +1,18 @@
+services:
+    db:
+        image: postgres:16
+        restart: always
+        container_name: delivery-gjilan-db-local
+        environment:
+            POSTGRES_USER: postgres
+            PGUSER: postgres
+            POSTGRES_PASSWORD: postgres
+            POSTGRES_DB: delivery-gjilan-db-local
+        volumes:
+            - dbdata:/var/lib/postgresql/data
+        ports:
+            - 8081:5432
+
+volumes:
+    dbdata:
+        driver: local

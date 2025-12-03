@@ -1,0 +1,13 @@
+dist
+pnpm-lock.yaml
+# We will handle graphql schema differently
+*.json
+*.js
+*.mjs
+*.graphql
+.eslintcache
+*.env
+package.json
+*.md
+.prettierrc
+src/generated

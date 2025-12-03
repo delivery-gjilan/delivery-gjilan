@@ -1,8 +1,0 @@
-type Order {
-  id: ID!
-  name: String!
-}
-
-type Query {
-  order(id: ID!): Order!
-}
