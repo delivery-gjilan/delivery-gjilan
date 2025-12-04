@@ -1,7 +1,7 @@
 type User {
     id: ID!
     name: String!
-    address: Address!
+    address: String!
 }
 
 type Query {
@@ -10,11 +10,5 @@ type Query {
 }
 
 type Mutation {
-    createUser(id: ID!, name: String!, address: Address!): User!
-}
-
-type Address {
-    street: String!
-    city: String!
-    country: String!
+    createUser(id: ID!, name: String!, address: String!): User!
 }

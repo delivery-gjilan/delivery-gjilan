@@ -38,5 +38,9 @@ Thumbs.db
 # TypeScript
 *.tsbuildinfo
 
+#databaza
+src/lib/db.ts
+src/lib/utils/db.ts
+
 # Optional: Drizzle (if you have specific generated files you don't want to commit, but usually migrations are committed)
 # drizzle/meta (sometimes people ignore this, but usually it's needed)

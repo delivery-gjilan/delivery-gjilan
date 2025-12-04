@@ -1,12 +1,31 @@
-type Address {
-  city: String!
-  country: String!
-  street: String!
+type Business {
+  businessType: BusinessType!
+  createdAt: String!
+  id: ID!
+  imageUrl: String
+  isActive: Boolean!
+  name: String!
+  updatedAt: String!
+}
+
+enum BusinessType {
+  MARKET
+  PHARMACY
+  RESTAURANT
+}
+
+input CreateBusinessInput {
+  businessType: BusinessType!
+  imageUrl: String
+  name: String!
 }
 
 type Mutation {
+  createBusiness(input: CreateBusinessInput!): Business!
   createOrder(input: OrderInput!): Order!
-  createUser(address: Address!, id: ID!, name: String!): User!
+  createUser(address: String!, id: ID!, name: String!): User!
+  deleteBusiness(id: ID!): Boolean!
+  updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
 }
 
 type Order {
@@ -19,14 +38,23 @@ input OrderInput {
 }
 
 type Query {
+  business(id: ID!): Business
+  businesses: [Business!]!
   hello: String!
   order(id: ID!): Order!
   user(id: ID!): User!
   users: [User!]!
 }
 
+input UpdateBusinessInput {
+  businessType: BusinessType
+  imageUrl: String
+  isActive: Boolean
+  name: String
+}
+
 type User {
-  address: Address!
+  address: String!
   id: ID!
   name: String!
 }

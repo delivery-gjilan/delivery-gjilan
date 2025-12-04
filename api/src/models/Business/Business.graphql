@@ -1,0 +1,41 @@
+enum BusinessType {
+    RESTAURANT
+    MARKET
+    PHARMACY
+}
+
+type Business {
+    id: ID!
+    name: String!
+    imageUrl: String
+    businessType: BusinessType!
+    isActive: Boolean!
+    createdAt: String!
+    updatedAt: String!
+}
+
+extend type Query {
+    businesses: [Business!]!
+    business(id: ID!): Business
+}
+
+input CreateBusinessInput {
+    name: String!
+    imageUrl: String
+    businessType: BusinessType!
+}
+
+input UpdateBusinessInput {
+    name: String
+    imageUrl: String
+    businessType: BusinessType
+    isActive: Boolean
+}
+
+
+extend type Mutation {
+    createBusiness(input: CreateBusinessInput!): Business!
+    updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
+    deleteBusiness(id: ID!): Boolean!
+}
+

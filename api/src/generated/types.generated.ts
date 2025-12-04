@@ -7,6 +7,8 @@ export type MakeOptional<T, K extends keyof T> = Omit<T, K> & { [SubKey in K]?: 
 export type MakeMaybe<T, K extends keyof T> = Omit<T, K> & { [SubKey in K]: Maybe<T[SubKey]> };
 export type MakeEmpty<T extends { [key: string]: unknown }, K extends keyof T> = { [_ in K]?: never };
 export type Incremental<T> = T | { [P in keyof T]?: P extends ' $fragmentName' | '__typename' ? T[P] : never };
+export type Omit<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>;
+export type EnumResolverSignature<T, AllowedValues = any> = { [key in keyof T]?: AllowedValues };
 export type RequireFields<T, K extends keyof T> = Omit<T, K> & { [P in K]-?: NonNullable<T[P]> };
 /** All built-in and custom scalars, mapped to their actual values */
 export type Scalars = {
@@ -17,17 +19,40 @@ export type Scalars = {
   Float: { input: number; output: number; }
 };
 
-export type Address = {
-  __typename?: 'Address';
-  city: Scalars['String']['output'];
-  country: Scalars['String']['output'];
-  street: Scalars['String']['output'];
+export type Business = {
+  __typename?: 'Business';
+  businessType: BusinessType;
+  createdAt: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  imageUrl?: Maybe<Scalars['String']['output']>;
+  isActive: Scalars['Boolean']['output'];
+  name: Scalars['String']['output'];
+  updatedAt: Scalars['String']['output'];
+};
+
+export type BusinessType =
+  | 'MARKET'
+  | 'PHARMACY'
+  | 'RESTAURANT';
+
+export type CreateBusinessInput = {
+  businessType: BusinessType;
+  imageUrl?: InputMaybe<Scalars['String']['input']>;
+  name: Scalars['String']['input'];
 };
 
 export type Mutation = {
   __typename?: 'Mutation';
+  createBusiness: Business;
   createOrder: Order;
   createUser: User;
+  deleteBusiness: Scalars['Boolean']['output'];
+  updateBusiness: Business;
+};
+
+
+export type MutationcreateBusinessArgs = {
+  input: CreateBusinessInput;
 };
 
 
@@ -37,9 +62,20 @@ export type MutationcreateOrderArgs = {
 
 
 export type MutationcreateUserArgs = {
-  address: Address;
+  address: Scalars['String']['input'];
   id: Scalars['ID']['input'];
   name: Scalars['String']['input'];
+};
+
+
+export type MutationdeleteBusinessArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type MutationupdateBusinessArgs = {
+  id: Scalars['ID']['input'];
+  input: UpdateBusinessInput;
 };
 
 export type Order = {
@@ -54,10 +90,17 @@ export type OrderInput = {
 
 export type Query = {
   __typename?: 'Query';
+  business?: Maybe<Business>;
+  businesses: Array<Business>;
   hello: Scalars['String']['output'];
   order: Order;
   user: User;
   users: Array<User>;
+};
+
+
+export type QuerybusinessArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -70,9 +113,16 @@ export type QueryuserArgs = {
   id: Scalars['ID']['input'];
 };
 
+export type UpdateBusinessInput = {
+  businessType?: InputMaybe<BusinessType>;
+  imageUrl?: InputMaybe<Scalars['String']['input']>;
+  isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+};
+
 export type User = {
   __typename?: 'User';
-  address: Address;
+  address: Scalars['String']['output'];
   id: Scalars['ID']['output'];
   name: Scalars['String']['output'];
 };
@@ -148,40 +198,54 @@ export type DirectiveResolverFn<TResult = {}, TParent = {}, TContext = {}, TArgs
 
 /** Mapping between all available schema types and the resolvers types */
 export type ResolversTypes = {
-  Address: ResolverTypeWrapper<Address>;
+  Business: ResolverTypeWrapper<Omit<Business, 'businessType'> & { businessType: ResolversTypes['BusinessType'] }>;
   String: ResolverTypeWrapper<Scalars['String']['output']>;
-  Mutation: ResolverTypeWrapper<{}>;
   ID: ResolverTypeWrapper<Scalars['ID']['output']>;
+  Boolean: ResolverTypeWrapper<Scalars['Boolean']['output']>;
+  BusinessType: ResolverTypeWrapper<'RESTAURANT' | 'MARKET' | 'PHARMACY'>;
+  CreateBusinessInput: CreateBusinessInput;
+  Mutation: ResolverTypeWrapper<{}>;
   Order: ResolverTypeWrapper<Order>;
   OrderInput: OrderInput;
   Query: ResolverTypeWrapper<{}>;
+  UpdateBusinessInput: UpdateBusinessInput;
   User: ResolverTypeWrapper<User>;
-  Boolean: ResolverTypeWrapper<Scalars['Boolean']['output']>;
 };
 
 /** Mapping between all available schema types and the resolvers parents */
 export type ResolversParentTypes = {
-  Address: Address;
+  Business: Business;
   String: Scalars['String']['output'];
-  Mutation: {};
   ID: Scalars['ID']['output'];
+  Boolean: Scalars['Boolean']['output'];
+  CreateBusinessInput: CreateBusinessInput;
+  Mutation: {};
   Order: Order;
   OrderInput: OrderInput;
   Query: {};
+  UpdateBusinessInput: UpdateBusinessInput;
   User: User;
-  Boolean: Scalars['Boolean']['output'];
 };
 
-export type AddressResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Address'] = ResolversParentTypes['Address']> = {
-  city?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
-  country?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
-  street?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+export type BusinessResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Business'] = ResolversParentTypes['Business']> = {
+  businessType?: Resolver<ResolversTypes['BusinessType'], ParentType, ContextType>;
+  createdAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  isActive?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  updatedAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
+export type BusinessTypeResolvers = EnumResolverSignature<{ MARKET?: any, PHARMACY?: any, RESTAURANT?: any }, ResolversTypes['BusinessType']>;
+
 export type MutationResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Mutation'] = ResolversParentTypes['Mutation']> = {
+  createBusiness?: Resolver<ResolversTypes['Business'], ParentType, ContextType, RequireFields<MutationcreateBusinessArgs, 'input'>>;
   createOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationcreateOrderArgs, 'input'>>;
   createUser?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationcreateUserArgs, 'address' | 'id' | 'name'>>;
+  deleteBusiness?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteBusinessArgs, 'id'>>;
+  updateBusiness?: Resolver<ResolversTypes['Business'], ParentType, ContextType, RequireFields<MutationupdateBusinessArgs, 'id' | 'input'>>;
 };
 
 export type OrderResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Order'] = ResolversParentTypes['Order']> = {
@@ -191,6 +255,8 @@ export type OrderResolvers<ContextType = GraphQLContext, ParentType extends Reso
 };
 
 export type QueryResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Query'] = ResolversParentTypes['Query']> = {
+  business?: Resolver<Maybe<ResolversTypes['Business']>, ParentType, ContextType, RequireFields<QuerybusinessArgs, 'id'>>;
+  businesses?: Resolver<Array<ResolversTypes['Business']>, ParentType, ContextType>;
   hello?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   order?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<QueryorderArgs, 'id'>>;
   user?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<QueryuserArgs, 'id'>>;
@@ -198,14 +264,15 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
 };
 
 export type UserResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['User'] = ResolversParentTypes['User']> = {
-  address?: Resolver<ResolversTypes['Address'], ParentType, ContextType>;
+  address?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
 export type Resolvers<ContextType = GraphQLContext> = {
-  Address?: AddressResolvers<ContextType>;
+  Business?: BusinessResolvers<ContextType>;
+  BusinessType?: BusinessTypeResolvers;
   Mutation?: MutationResolvers<ContextType>;
   Order?: OrderResolvers<ContextType>;
   Query?: QueryResolvers<ContextType>;
