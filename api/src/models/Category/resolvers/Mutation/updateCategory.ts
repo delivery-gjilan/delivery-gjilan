@@ -1,0 +1,36 @@
+import type { MutationResolvers } from '../../../../generated/types.generated';
+import { db } from '../../../../lib/utils/db';
+import { categories as categoryTable } from '../../../../../database/schema/categories';
+import { eq } from 'drizzle-orm';
+
+export const updateCategory: NonNullable<MutationResolvers['updateCategory']> = async (_parent, { id, input }) => {
+    const updateData: {
+        name?: string;
+        isActive?: boolean;
+        updatedAt?: string;
+    } = {
+        updatedAt: new Date().toISOString(),
+    };
+
+    if (input.name !== null && input.name !== undefined) updateData.name = input.name;
+    if (input.isActive !== null && input.isActive !== undefined) updateData.isActive = input.isActive;
+
+    const [updated] = await db
+        .update(categoryTable)
+        .set(updateData)
+        .where(eq(categoryTable.id, Number(id)))
+        .returning();
+
+    if (!updated) {
+        throw new Error('Category not found');
+    }
+
+    return {
+        id: updated.id,
+        businessId: updated.businessId,
+        name: updated.name,
+        isActive: updated.isActive!,
+        createdAt: updated.createdAt!,
+        updatedAt: updated.updatedAt!,
+    };
+};
