@@ -1,9 +1,9 @@
 import type { MutationResolvers } from '../../../../generated/types.generated';
 import { db } from '../../../../lib/utils/db';
-import { categories as categoryTable } from '../../../../../database/schema/categories';
+import { productCategories as categoryTable } from '../../../../../database/schema/product_categories';
 import { eq } from 'drizzle-orm';
 
-export const updateCategory: NonNullable<MutationResolvers['updateCategory']> = async (_parent, { id, input }) => {
+export const updateProductCategory: NonNullable<MutationResolvers['updateProductCategory']> = async (_parent, { id, input }) => {
     const updateData: {
         name?: string;
         isActive?: boolean;
@@ -22,7 +22,7 @@ export const updateCategory: NonNullable<MutationResolvers['updateCategory']> = 
         .returning();
 
     if (!updated) {
-        throw new Error('Category not found');
+        throw new Error('ProductCategory not found');
     }
 
     return {

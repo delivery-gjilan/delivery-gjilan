@@ -1,0 +1,29 @@
+type ProductCategory {
+    id: ID!
+    businessId: ID!
+    name: String!
+    isActive: Boolean!
+    createdAt: String!
+    updatedAt: String!
+}
+
+extend type Query {
+    productCategories(businessId: ID!): [ProductCategory!]!
+    productCategory(id: ID!): ProductCategory
+}
+
+input CreateProductCategoryInput {
+    businessId: ID!
+    name: String!
+}
+
+input UpdateProductCategoryInput {
+    name: String
+    isActive: Boolean
+}
+
+extend type Mutation {
+    createProductCategory(input: CreateProductCategoryInput!): ProductCategory!
+    updateProductCategory(id: ID!, input: UpdateProductCategoryInput!): ProductCategory!
+    deleteProductCategory(id: ID!): Boolean!
+}

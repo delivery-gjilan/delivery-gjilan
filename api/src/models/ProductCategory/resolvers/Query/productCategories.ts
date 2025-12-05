@@ -1,9 +1,9 @@
 import type { QueryResolvers } from '../../../../generated/types.generated';
 import { db } from '../../../../lib/utils/db';
-import { categories as categoryTable } from '../../../../../database/schema/categories';
+import { productCategories as categoryTable } from '../../../../../database/schema/product_categories';
 import { eq } from 'drizzle-orm';
 
-export const categories: NonNullable<QueryResolvers['categories']> = async (_parent, { businessId }) => {
+export const productCategories: NonNullable<QueryResolvers['productCategories']> = async (_parent, { businessId }) => {
     let rows;
 
     if (businessId) {

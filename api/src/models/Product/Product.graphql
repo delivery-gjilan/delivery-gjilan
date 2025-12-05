@@ -27,6 +27,7 @@ input CreateProductInput {
     price: Float!
     isOnSale: Boolean
     salePrice: Float
+    isAvailable: Boolean # 🔥 added for consistency
 }
 
 input UpdateProductInput {

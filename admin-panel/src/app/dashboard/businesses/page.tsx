@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "@apollo/client/react";
 import { gql } from "@apollo/client";
 import { useState } from "react";
@@ -77,14 +78,24 @@ const DELETE_BUSINESS = gql`
 --------------------------------------------------------- */
 
 export default function BusinessesPage() {
+  const router = useRouter();
+
   /* --------------------------
      Apollo
   --------------------------- */
-  const { data, loading, refetch } = useQuery<{ businesses: Business[] }>(GET_BUSINESSES);
+  const { data, loading, refetch } = useQuery<{ businesses: Business[] }>(
+    GET_BUSINESSES
+  );
 
-  const [createBusiness] = useMutation<{ createBusiness: Business }>(CREATE_BUSINESS);
-  const [updateBusiness] = useMutation<{ updateBusiness: Business }>(UPDATE_BUSINESS);
-  const [deleteBusiness] = useMutation<{ deleteBusiness: boolean }>(DELETE_BUSINESS);
+  const [createBusiness] = useMutation<{ createBusiness: Business }>(
+    CREATE_BUSINESS
+  );
+  const [updateBusiness] = useMutation<{ updateBusiness: Business }>(
+    UPDATE_BUSINESS
+  );
+  const [deleteBusiness] = useMutation<{ deleteBusiness: boolean }>(
+    DELETE_BUSINESS
+  );
 
   /* --------------------------
      UI State
@@ -129,7 +140,6 @@ export default function BusinessesPage() {
     await refetch();
     setCreateOpen(false);
 
-    // Reset form
     setCreateForm({
       name: "",
       businessType: "RESTAURANT",
@@ -204,11 +214,13 @@ export default function BusinessesPage() {
               <Th>Actions</Th>
             </tr>
           </thead>
+
           <tbody>
             {businesses.map((b) => (
               <tr key={b.id}>
                 <Td>{b.name}</Td>
                 <Td>{b.businessType}</Td>
+
                 <Td>
                   {b.imageUrl ? (
                     <img
@@ -220,6 +232,7 @@ export default function BusinessesPage() {
                     <span className="text-gray-500">No image</span>
                   )}
                 </Td>
+
                 <Td>
                   {b.isActive ? (
                     <span className="text-green-400">Active</span>
@@ -227,8 +240,19 @@ export default function BusinessesPage() {
                     <span className="text-red-400">Inactive</span>
                   )}
                 </Td>
+
                 <Td>
                   <div className="flex gap-2">
+                    <Button
+                      variant="primary"
+                      className="text-xs px-3"
+                      onClick={() =>
+                        router.push(`/dashboard/businesses/${b.id}`)
+                      }
+                    >
+                      View
+                    </Button>
+
                     <Button
                       variant="outline"
                       className="text-xs px-3"
@@ -297,7 +321,11 @@ export default function BusinessesPage() {
             }
           />
 
-          <Button variant="primary" className="w-full mt-2" onClick={handleCreate}>
+          <Button
+            variant="primary"
+            className="w-full mt-2"
+            onClick={handleCreate}
+          >
             Create
           </Button>
         </div>
@@ -342,7 +370,11 @@ export default function BusinessesPage() {
             }
           />
 
-          <Button variant="primary" className="w-full mt-2" onClick={handleEdit}>
+          <Button
+            variant="primary"
+            className="w-full mt-2"
+            onClick={handleEdit}
+          >
             Save Changes
           </Button>
         </div>

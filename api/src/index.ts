@@ -14,6 +14,7 @@ app.use(express.json());
 const yoga = createYoga({
     schema,
     graphqlEndpoint: '/graphql',
+    maskedErrors: false,
 });
 
 app.use(yoga.graphqlEndpoint, yoga);

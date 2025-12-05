@@ -1,6 +1,6 @@
 import { pgTable, serial, varchar, integer, boolean, numeric, timestamp } from 'drizzle-orm/pg-core';
 import { businesses } from './businesses';
-import { categories } from './categories';
+import { productCategories } from './product_categories';
 
 export const products = pgTable('products', {
     id: serial('id').primaryKey(),
@@ -11,7 +11,7 @@ export const products = pgTable('products', {
 
     categoryId: integer('category_id')
         .notNull()
-        .references(() => categories.id, { onDelete: 'cascade' }),
+        .references(() => productCategories.id, { onDelete: 'cascade' }),
 
     name: varchar('name', { length: 255 }).notNull(),
     description: varchar('description', { length: 1000 }),

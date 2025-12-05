@@ -1,7 +1,7 @@
 import { pgTable, serial, varchar, integer, boolean, timestamp } from 'drizzle-orm/pg-core';
 import { businesses } from './businesses';
 
-export const categories = pgTable('categories', {
+export const productCategories = pgTable('product_categories', {
     id: serial('id').primaryKey(),
     businessId: integer('business_id')
         .notNull()
@@ -12,3 +12,4 @@ export const categories = pgTable('categories', {
     createdAt: timestamp('created_at', { mode: 'string' }).defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'string' }).defaultNow(),
 });
+
