@@ -2,7 +2,6 @@
     import type   { Resolvers } from './types.generated';
     import    { business as Query_business } from './../models/Business/resolvers/Query/business';
 import    { businesses as Query_businesses } from './../models/Business/resolvers/Query/businesses';
-import    { hello as Query_hello } from './../models/General/resolvers/Query/hello';
 import    { order as Query_order } from './../models/Order/resolvers/Query/order';
 import    { product as Query_product } from './../models/Product/resolvers/Query/product';
 import    { productCategories as Query_productCategories } from './../models/ProductCategory/resolvers/Query/productCategories';
@@ -27,19 +26,29 @@ import    { updateProduct as Mutation_updateProduct } from './../models/Product/
 import    { updateProductCategory as Mutation_updateProductCategory } from './../models/ProductCategory/resolvers/Mutation/updateProductCategory';
 import    { updateProductVariant as Mutation_updateProductVariant } from './../models/ProductVariant/resolvers/Mutation/updateProductVariant';
 import    { Business } from './../models/Business/resolvers/Business';
+import    { Location } from './../models/General/resolvers/Location';
 import    { Order } from './../models/Order/resolvers/Order';
+import    { OrderBusiness } from './../models/Order/resolvers/OrderBusiness';
+import    { OrderItem } from './../models/Order/resolvers/OrderItem';
 import    { Product } from './../models/Product/resolvers/Product';
 import    { ProductCategory } from './../models/ProductCategory/resolvers/ProductCategory';
 import    { ProductVariant } from './../models/ProductVariant/resolvers/ProductVariant';
 import    { User } from './../models/User/resolvers/User';
+import    { WorkingHours } from './../models/General/resolvers/WorkingHours';
+import    { DateResolver } from 'graphql-scalars';
     export const resolvers: Resolvers = {
-      Query: { business: Query_business,businesses: Query_businesses,hello: Query_hello,order: Query_order,product: Query_product,productCategories: Query_productCategories,productCategory: Query_productCategory,productVariant: Query_productVariant,productVariants: Query_productVariants,products: Query_products,user: Query_user,users: Query_users },
+      Query: { business: Query_business,businesses: Query_businesses,order: Query_order,product: Query_product,productCategories: Query_productCategories,productCategory: Query_productCategory,productVariant: Query_productVariant,productVariants: Query_productVariants,products: Query_products,user: Query_user,users: Query_users },
       Mutation: { createBusiness: Mutation_createBusiness,createOrder: Mutation_createOrder,createProduct: Mutation_createProduct,createProductCategory: Mutation_createProductCategory,createProductVariant: Mutation_createProductVariant,createUser: Mutation_createUser,deleteBusiness: Mutation_deleteBusiness,deleteProduct: Mutation_deleteProduct,deleteProductCategory: Mutation_deleteProductCategory,deleteProductVariant: Mutation_deleteProductVariant,updateBusiness: Mutation_updateBusiness,updateProduct: Mutation_updateProduct,updateProductCategory: Mutation_updateProductCategory,updateProductVariant: Mutation_updateProductVariant },
       
       Business: Business,
+Location: Location,
 Order: Order,
+OrderBusiness: OrderBusiness,
+OrderItem: OrderItem,
 Product: Product,
 ProductCategory: ProductCategory,
 ProductVariant: ProductVariant,
-User: User
+User: User,
+WorkingHours: WorkingHours,
+Date: DateResolver
     }

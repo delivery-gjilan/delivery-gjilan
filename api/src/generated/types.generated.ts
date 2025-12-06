@@ -1,4 +1,4 @@
-import { GraphQLResolveInfo } from 'graphql';
+import { GraphQLResolveInfo, GraphQLScalarType, GraphQLScalarTypeConfig } from 'graphql';
 import { GraphQLContext } from '../graphql/context';
 export type Maybe<T> = T | null | undefined;
 export type InputMaybe<T> = T | null | undefined;
@@ -17,6 +17,7 @@ export type Scalars = {
   Boolean: { input: boolean; output: boolean; }
   Int: { input: number; output: number; }
   Float: { input: number; output: number; }
+  Date: { input: Date | string; output: Date | string; }
 };
 
 export type Business = {
@@ -26,8 +27,11 @@ export type Business = {
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
   isActive: Scalars['Boolean']['output'];
+  isOpen: Scalars['Boolean']['output'];
+  location: Location;
   name: Scalars['String']['output'];
   updatedAt: Scalars['String']['output'];
+  workingHours: WorkingHours;
 };
 
 export type BusinessType =
@@ -64,6 +68,13 @@ export type CreateProductVariantInput = {
   price: Scalars['Float']['input'];
   productId: Scalars['ID']['input'];
   salePrice?: InputMaybe<Scalars['Float']['input']>;
+};
+
+export type Location = {
+  __typename?: 'Location';
+  address: Scalars['String']['output'];
+  latitude: Scalars['Float']['output'];
+  longitude: Scalars['Float']['output'];
 };
 
 export type Mutation = {
@@ -162,13 +173,41 @@ export type MutationupdateProductVariantArgs = {
 
 export type Order = {
   __typename?: 'Order';
+  businesses: Array<OrderBusiness>;
+  deliveryPrice: Scalars['Float']['output'];
+  dropOffLocation: Location;
   id: Scalars['ID']['output'];
-  name: Scalars['String']['output'];
+  orderDate: Scalars['Date']['output'];
+  orderPrice: Scalars['Float']['output'];
+  status: OrderStatus;
+  totalPrice: Scalars['Float']['output'];
+};
+
+export type OrderBusiness = {
+  __typename?: 'OrderBusiness';
+  business: Business;
+  items: Array<OrderItem>;
 };
 
 export type OrderInput = {
   name: Scalars['String']['input'];
 };
+
+export type OrderItem = {
+  __typename?: 'OrderItem';
+  imageUrl?: Maybe<Scalars['String']['output']>;
+  name: Scalars['String']['output'];
+  price: Scalars['Float']['output'];
+  productId: Scalars['ID']['output'];
+  quantity: Scalars['Int']['output'];
+};
+
+export type OrderStatus =
+  | 'ACCEPTED'
+  | 'CANCELLED'
+  | 'DELIVERED'
+  | 'OUT_FOR_DELIVERY'
+  | 'PENDING';
 
 export type Product = {
   __typename?: 'Product';
@@ -213,7 +252,6 @@ export type Query = {
   __typename?: 'Query';
   business?: Maybe<Business>;
   businesses: Array<Business>;
-  hello: Scalars['String']['output'];
   order: Order;
   product?: Maybe<Product>;
   productCategories: Array<ProductCategory>;
@@ -309,6 +347,12 @@ export type User = {
   name: Scalars['String']['output'];
 };
 
+export type WorkingHours = {
+  __typename?: 'WorkingHours';
+  closesAt: Scalars['String']['output'];
+  opensAt: Scalars['String']['output'];
+};
+
 
 
 export type ResolverTypeWrapper<T> = Promise<T> | T;
@@ -390,9 +434,15 @@ export type ResolversTypes = {
   CreateProductInput: CreateProductInput;
   Float: ResolverTypeWrapper<Scalars['Float']['output']>;
   CreateProductVariantInput: CreateProductVariantInput;
+  Date: ResolverTypeWrapper<Scalars['Date']['output']>;
+  Location: ResolverTypeWrapper<Location>;
   Mutation: ResolverTypeWrapper<{}>;
-  Order: ResolverTypeWrapper<Order>;
+  Order: ResolverTypeWrapper<Omit<Order, 'businesses' | 'status'> & { businesses: Array<ResolversTypes['OrderBusiness']>, status: ResolversTypes['OrderStatus'] }>;
+  OrderBusiness: ResolverTypeWrapper<Omit<OrderBusiness, 'business'> & { business: ResolversTypes['Business'] }>;
   OrderInput: OrderInput;
+  OrderItem: ResolverTypeWrapper<OrderItem>;
+  Int: ResolverTypeWrapper<Scalars['Int']['output']>;
+  OrderStatus: ResolverTypeWrapper<'PENDING' | 'ACCEPTED' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED'>;
   Product: ResolverTypeWrapper<Product>;
   ProductCategory: ResolverTypeWrapper<ProductCategory>;
   ProductVariant: ResolverTypeWrapper<ProductVariant>;
@@ -402,6 +452,7 @@ export type ResolversTypes = {
   UpdateProductInput: UpdateProductInput;
   UpdateProductVariantInput: UpdateProductVariantInput;
   User: ResolverTypeWrapper<User>;
+  WorkingHours: ResolverTypeWrapper<WorkingHours>;
 };
 
 /** Mapping between all available schema types and the resolvers parents */
@@ -415,9 +466,14 @@ export type ResolversParentTypes = {
   CreateProductInput: CreateProductInput;
   Float: Scalars['Float']['output'];
   CreateProductVariantInput: CreateProductVariantInput;
+  Date: Scalars['Date']['output'];
+  Location: Location;
   Mutation: {};
-  Order: Order;
+  Order: Omit<Order, 'businesses'> & { businesses: Array<ResolversParentTypes['OrderBusiness']> };
+  OrderBusiness: Omit<OrderBusiness, 'business'> & { business: ResolversParentTypes['Business'] };
   OrderInput: OrderInput;
+  OrderItem: OrderItem;
+  Int: Scalars['Int']['output'];
   Product: Product;
   ProductCategory: ProductCategory;
   ProductVariant: ProductVariant;
@@ -427,6 +483,7 @@ export type ResolversParentTypes = {
   UpdateProductInput: UpdateProductInput;
   UpdateProductVariantInput: UpdateProductVariantInput;
   User: User;
+  WorkingHours: WorkingHours;
 };
 
 export type BusinessResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Business'] = ResolversParentTypes['Business']> = {
@@ -435,12 +492,26 @@ export type BusinessResolvers<ContextType = GraphQLContext, ParentType extends R
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   isActive?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  isOpen?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  location?: Resolver<ResolversTypes['Location'], ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  workingHours?: Resolver<ResolversTypes['WorkingHours'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
 export type BusinessTypeResolvers = EnumResolverSignature<{ MARKET?: any, PHARMACY?: any, RESTAURANT?: any }, ResolversTypes['BusinessType']>;
+
+export interface DateScalarConfig extends GraphQLScalarTypeConfig<ResolversTypes['Date'], any> {
+  name: 'Date';
+}
+
+export type LocationResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Location'] = ResolversParentTypes['Location']> = {
+  address?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  latitude?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  longitude?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
 
 export type MutationResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Mutation'] = ResolversParentTypes['Mutation']> = {
   createBusiness?: Resolver<ResolversTypes['Business'], ParentType, ContextType, RequireFields<MutationcreateBusinessArgs, 'input'>>;
@@ -460,10 +531,33 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
 };
 
 export type OrderResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Order'] = ResolversParentTypes['Order']> = {
+  businesses?: Resolver<Array<ResolversTypes['OrderBusiness']>, ParentType, ContextType>;
+  deliveryPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  dropOffLocation?: Resolver<ResolversTypes['Location'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
-  name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  orderDate?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
+  orderPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  status?: Resolver<ResolversTypes['OrderStatus'], ParentType, ContextType>;
+  totalPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
+
+export type OrderBusinessResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['OrderBusiness'] = ResolversParentTypes['OrderBusiness']> = {
+  business?: Resolver<ResolversTypes['Business'], ParentType, ContextType>;
+  items?: Resolver<Array<ResolversTypes['OrderItem']>, ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type OrderItemResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['OrderItem'] = ResolversParentTypes['OrderItem']> = {
+  imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  price?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  productId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  quantity?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type OrderStatusResolvers = EnumResolverSignature<{ ACCEPTED?: any, CANCELLED?: any, DELIVERED?: any, OUT_FOR_DELIVERY?: any, PENDING?: any }, ResolversTypes['OrderStatus']>;
 
 export type ProductResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Product'] = ResolversParentTypes['Product']> = {
   businessId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
@@ -507,7 +601,6 @@ export type ProductVariantResolvers<ContextType = GraphQLContext, ParentType ext
 export type QueryResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Query'] = ResolversParentTypes['Query']> = {
   business?: Resolver<Maybe<ResolversTypes['Business']>, ParentType, ContextType, RequireFields<QuerybusinessArgs, 'id'>>;
   businesses?: Resolver<Array<ResolversTypes['Business']>, ParentType, ContextType>;
-  hello?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   order?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<QueryorderArgs, 'id'>>;
   product?: Resolver<Maybe<ResolversTypes['Product']>, ParentType, ContextType, RequireFields<QueryproductArgs, 'id'>>;
   productCategories?: Resolver<Array<ResolversTypes['ProductCategory']>, ParentType, ContextType, RequireFields<QueryproductCategoriesArgs, 'businessId'>>;
@@ -526,15 +619,27 @@ export type UserResolvers<ContextType = GraphQLContext, ParentType extends Resol
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
+export type WorkingHoursResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['WorkingHours'] = ResolversParentTypes['WorkingHours']> = {
+  closesAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  opensAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
 export type Resolvers<ContextType = GraphQLContext> = {
   Business?: BusinessResolvers<ContextType>;
   BusinessType?: BusinessTypeResolvers;
+  Date?: GraphQLScalarType;
+  Location?: LocationResolvers<ContextType>;
   Mutation?: MutationResolvers<ContextType>;
   Order?: OrderResolvers<ContextType>;
+  OrderBusiness?: OrderBusinessResolvers<ContextType>;
+  OrderItem?: OrderItemResolvers<ContextType>;
+  OrderStatus?: OrderStatusResolvers;
   Product?: ProductResolvers<ContextType>;
   ProductCategory?: ProductCategoryResolvers<ContextType>;
   ProductVariant?: ProductVariantResolvers<ContextType>;
   Query?: QueryResolvers<ContextType>;
   User?: UserResolvers<ContextType>;
+  WorkingHours?: WorkingHoursResolvers<ContextType>;
 };
 

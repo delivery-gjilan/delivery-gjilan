@@ -1,25 +1,25 @@
-import { pgTable, serial, varchar, integer, boolean, numeric, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, varchar, boolean, numeric, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { businesses } from './businesses';
-import { productCategories } from './product_categories';
+import { productCategories } from './productCategories';
+import { productSubcategories } from './productSubcategories';
 
 export const products = pgTable('products', {
-    id: serial('id').primaryKey(),
+    id: uuid('id').primaryKey().defaultRandom().notNull(),
 
-    businessId: integer('business_id')
+    businessId: uuid('business_id')
         .notNull()
         .references(() => businesses.id, { onDelete: 'cascade' }),
 
-    categoryId: integer('category_id')
+    categoryId: uuid('category_id')
         .notNull()
         .references(() => productCategories.id, { onDelete: 'cascade' }),
-
+    subcategoryId: uuid('sucategory_id').references(() => productSubcategories.id, { onDelete: 'cascade' }),
+    groupId: uuid('group_id'),
     name: varchar('name', { length: 255 }).notNull(),
     description: varchar('description', { length: 1000 }),
 
-    // Base image for product
     imageUrl: varchar('image_url', { length: 500 }),
 
-    // Pricing
     price: numeric('price', { precision: 10, scale: 2 }).notNull(),
     isOnSale: boolean('is_on_sale').default(false),
     salePrice: numeric('sale_price', { precision: 10, scale: 2 }),

@@ -18,6 +18,16 @@ export const createBusiness: NonNullable<MutationResolvers['createBusiness']> = 
         name: created.name,
         imageUrl: created.imageUrl,
         businessType: created.businessType,
+        location: {
+            latitude: 0,
+            longitude: 0,
+            address: "",
+        },
+        workingHours: {
+            opensAt: "08:00",
+            closesAt: "23:00",
+        },
+        isOpen: true,
         isActive: created.isActive!,
         createdAt: created.createdAt!,
         updatedAt: created.updatedAt!,

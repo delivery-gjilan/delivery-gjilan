@@ -4,8 +4,11 @@ type Business {
   id: ID!
   imageUrl: String
   isActive: Boolean!
+  isOpen: Boolean!
+  location: Location!
   name: String!
   updatedAt: String!
+  workingHours: WorkingHours!
 }
 
 enum BusinessType {
@@ -45,6 +48,14 @@ input CreateProductVariantInput {
   salePrice: Float
 }
 
+scalar Date
+
+type Location {
+  address: String!
+  latitude: Float!
+  longitude: Float!
+}
+
 type Mutation {
   createBusiness(input: CreateBusinessInput!): Business!
   createOrder(input: OrderInput!): Order!
@@ -63,12 +74,39 @@ type Mutation {
 }
 
 type Order {
+  businesses: [OrderBusiness!]!
+  deliveryPrice: Float!
+  dropOffLocation: Location!
   id: ID!
-  name: String!
+  orderDate: Date!
+  orderPrice: Float!
+  status: OrderStatus!
+  totalPrice: Float!
+}
+
+type OrderBusiness {
+  business: Business!
+  items: [OrderItem!]!
 }
 
 input OrderInput {
   name: String!
+}
+
+type OrderItem {
+  imageUrl: String
+  name: String!
+  price: Float!
+  productId: ID!
+  quantity: Int!
+}
+
+enum OrderStatus {
+  ACCEPTED
+  CANCELLED
+  DELIVERED
+  OUT_FOR_DELIVERY
+  PENDING
 }
 
 type Product {
@@ -110,7 +148,6 @@ type ProductVariant {
 type Query {
   business(id: ID!): Business
   businesses: [Business!]!
-  hello: String!
   order(id: ID!): Order!
   product(id: ID!): Product
   productCategories(businessId: ID!): [ProductCategory!]!
@@ -157,4 +194,9 @@ type User {
   address: String!
   id: ID!
   name: String!
+}
+
+type WorkingHours {
+  closesAt: String!
+  opensAt: String!
 }

@@ -35,6 +35,16 @@ export const updateBusiness: NonNullable<MutationResolvers['updateBusiness']> = 
         imageUrl: updated.imageUrl,
         businessType: updated.businessType,
         isActive: updated.isActive!,
+        location: {
+            latitude: 0,
+            longitude: 0,
+            address: "",
+        },
+        workingHours: {
+            opensAt: "08:00",
+            closesAt: "23:00",
+        },
+        isOpen: true,
         createdAt: updated.createdAt!,
         updatedAt: updated.updatedAt!,
     };

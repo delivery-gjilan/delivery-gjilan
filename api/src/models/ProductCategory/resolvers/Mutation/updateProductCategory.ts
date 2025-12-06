@@ -1,6 +1,6 @@
 import type { MutationResolvers } from '../../../../generated/types.generated';
 import { db } from '../../../../lib/utils/db';
-import { productCategories as categoryTable } from '../../../../../database/schema/product_categories';
+import { productCategories as categoryTable } from '../../../../../database/schema/productCategories';
 import { eq } from 'drizzle-orm';
 
 export const updateProductCategory: NonNullable<MutationResolvers['updateProductCategory']> = async (_parent, { id, input }) => {

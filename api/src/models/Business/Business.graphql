@@ -10,6 +10,9 @@ type Business {
     imageUrl: String
     businessType: BusinessType!
     isActive: Boolean!
+    location: Location!
+    workingHours: WorkingHours!
+    isOpen: Boolean!
     createdAt: String!
     updatedAt: String!
 }
@@ -32,10 +35,8 @@ input UpdateBusinessInput {
     isActive: Boolean
 }
 
-
 extend type Mutation {
     createBusiness(input: CreateBusinessInput!): Business!
     updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
     deleteBusiness(id: ID!): Boolean!
 }
-

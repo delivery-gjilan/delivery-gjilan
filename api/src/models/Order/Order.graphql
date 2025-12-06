@@ -1,6 +1,33 @@
+enum OrderStatus {
+    PENDING
+    ACCEPTED
+    OUT_FOR_DELIVERY
+    DELIVERED
+    CANCELLED
+}
+
+type OrderBusiness {
+    business: Business!
+    items: [OrderItem!]!
+}
+
+type OrderItem {
+    productId: ID!
+    name: String!
+    imageUrl: String
+    quantity: Int!
+    price: Float!
+}
+
 type Order {
     id: ID!
-    name: String!
+    orderPrice: Float!
+    deliveryPrice: Float!
+    totalPrice: Float!
+    orderDate: Date!
+    status: OrderStatus!
+    dropOffLocation: Location!
+    businesses: [OrderBusiness!]!
 }
 
 type Query {
