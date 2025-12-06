@@ -13,7 +13,7 @@ export const products = pgTable('products', {
     categoryId: uuid('category_id')
         .notNull()
         .references(() => productCategories.id, { onDelete: 'cascade' }),
-    subcategoryId: uuid('sucategory_id').references(() => productSubcategories.id, { onDelete: 'cascade' }),
+    subcategoryId: uuid('subcategory_id').references(() => productSubcategories.id, { onDelete: 'cascade' }),
     groupId: uuid('group_id'),
     name: varchar('name', { length: 255 }).notNull(),
     description: varchar('description', { length: 1000 }),

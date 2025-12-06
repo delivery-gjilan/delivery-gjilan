@@ -40,12 +40,9 @@ input CreateProductInput {
   salePrice: Float
 }
 
-input CreateProductVariantInput {
-  isOnSale: Boolean
+input CreateProductSubcategoryInput {
+  categoryId: ID!
   name: String!
-  price: Float!
-  productId: ID!
-  salePrice: Float
 }
 
 scalar Date
@@ -61,16 +58,16 @@ type Mutation {
   createOrder(input: OrderInput!): Order!
   createProduct(input: CreateProductInput!): Product!
   createProductCategory(input: CreateProductCategoryInput!): ProductCategory!
-  createProductVariant(input: CreateProductVariantInput!): ProductVariant!
+  createProductSubcategory(input: CreateProductSubcategoryInput!): ProductSubcategory!
   createUser(address: String!, id: ID!, name: String!): User!
   deleteBusiness(id: ID!): Boolean!
   deleteProduct(id: ID!): Boolean!
   deleteProductCategory(id: ID!): Boolean!
-  deleteProductVariant(id: ID!): Boolean!
+  deleteProductSubcategory(id: ID!): Boolean!
   updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
   updateProduct(id: ID!, input: UpdateProductInput!): Product!
   updateProductCategory(id: ID!, input: UpdateProductCategoryInput!): ProductCategory!
-  updateProductVariant(id: ID!, input: UpdateProductVariantInput!): ProductVariant!
+  updateProductSubcategory(id: ID!, input: UpdateProductSubcategoryInput!): ProductSubcategory!
 }
 
 type Order {
@@ -133,15 +130,11 @@ type ProductCategory {
   updatedAt: String!
 }
 
-type ProductVariant {
+type ProductSubcategory {
+  categoryId: ID!
   createdAt: String!
   id: ID!
-  isAvailable: Boolean!
-  isOnSale: Boolean!
   name: String!
-  price: Float!
-  productId: ID!
-  salePrice: Float
   updatedAt: String!
 }
 
@@ -152,8 +145,8 @@ type Query {
   product(id: ID!): Product
   productCategories(businessId: ID!): [ProductCategory!]!
   productCategory(id: ID!): ProductCategory
-  productVariant(id: ID!): ProductVariant
-  productVariants(productId: ID): [ProductVariant!]!
+  productSubcategories(categoryId: ID!): [ProductSubcategory!]!
+  productSubcategory(id: ID!): ProductSubcategory
   products(businessId: ID, categoryId: ID): [Product!]!
   user(id: ID!): User!
   users: [User!]!
@@ -182,12 +175,8 @@ input UpdateProductInput {
   salePrice: Float
 }
 
-input UpdateProductVariantInput {
-  isAvailable: Boolean
-  isOnSale: Boolean
+input UpdateProductSubcategoryInput {
   name: String
-  price: Float
-  salePrice: Float
 }
 
 type User {

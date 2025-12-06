@@ -19,7 +19,6 @@ export const createProductCategory: NonNullable<MutationResolvers['createProduct
           id: categoryTable.id,
           businessId: categoryTable.businessId,
           name: categoryTable.name,
-          isActive: categoryTable.isActive,
           createdAt: categoryTable.createdAt,
           updatedAt: categoryTable.updatedAt,
         });
@@ -34,7 +33,6 @@ export const createProductCategory: NonNullable<MutationResolvers['createProduct
         id: created.id,
         businessId: created.businessId,
         name: created.name,
-        isActive: created.isActive ?? true,
         createdAt,
         updatedAt,
       };
