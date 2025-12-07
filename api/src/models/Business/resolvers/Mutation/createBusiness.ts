@@ -1,35 +1,9 @@
-import type { MutationResolvers } from '../../../../generated/types.generated';
-import { db } from '../../../../lib/utils/db';
-import { businesses as businessTable } from '../../../../../database/schema/businesses';
+import type { MutationResolvers } from '@/generated/types.generated';
 
-export const createBusiness: NonNullable<MutationResolvers['createBusiness']> = async (_parent, { input }, _ctx) => {
-    const [created] = await db
-        .insert(businessTable)
-        .values({
-            name: input.name,
-            imageUrl: input.imageUrl ?? null,
-            businessType: input.businessType,
-            isActive: true,
-        })
-        .returning();
-
-    return {
-        id: created.id,
-        name: created.name,
-        imageUrl: created.imageUrl,
-        businessType: created.businessType,
-        location: {
-            latitude: 0,
-            longitude: 0,
-            address: '',
-        },
-        workingHours: {
-            opensAt: '08:00',
-            closesAt: '23:00',
-        },
-        isOpen: true,
-        isActive: created.isActive!,
-        createdAt: created.createdAt!,
-        updatedAt: created.updatedAt!,
-    };
+export const createBusiness: NonNullable<MutationResolvers['createBusiness']> = async (
+    _parent,
+    { input },
+    { businessService },
+) => {
+    return businessService.createBusiness(input);
 };

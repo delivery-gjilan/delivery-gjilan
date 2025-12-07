@@ -1,15 +1,7 @@
-import {
-    pgTable,
-    serial,
-    varchar,
-    boolean,
-    timestamp,
-    pgEnum,
-    doublePrecision,
-    jsonb,
-    integer,
-    uuid,
-} from 'drizzle-orm/pg-core';
+import { relations, sql } from 'drizzle-orm';
+import { pgTable, varchar, boolean, timestamp, pgEnum, doublePrecision, integer, uuid } from 'drizzle-orm/pg-core';
+import { products } from './products';
+import { productCategories } from './productCategories';
 
 export const businessType = pgEnum('business_type', ['MARKET', 'PHARMACY', 'RESTAURANT']);
 
@@ -27,8 +19,21 @@ export const businesses = pgTable('businesses', {
     locationLng: doublePrecision('location_lng').notNull(),
     locationAddress: varchar('location_address', { length: 500 }).notNull(),
     // open and close tell the time in minutes from midnight: Ex: 60 means 01:00
-    open: integer('open').notNull(),
-    close: integer('close').notNull(),
-    createdAt: timestamp('created_at', { mode: 'string' }).defaultNow(),
-    updatedAt: timestamp('updated_at', { mode: 'string' }).defaultNow(),
+    opensAt: integer('opens_at').notNull(),
+    closesAt: integer('closes_at').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+        .default(sql`CURRENT_TIMESTAMP`)
+        .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+        .default(sql`CURRENT_TIMESTAMP`)
+        .notNull()
+        .$onUpdate(() => sql`CURRENT_TIMESTAMP`),
 });
+
+export const businessesRelations = relations(businesses, ({ many }) => ({
+    products: many(products),
+    productCategories: many(productCategories),
+}));
+
+export type DbBusiness = typeof businesses.$inferSelect;
+export type NewDbBusiness = typeof businesses.$inferInsert;

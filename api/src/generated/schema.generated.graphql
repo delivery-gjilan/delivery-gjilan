@@ -1,0 +1,185 @@
+type Business {
+  businessType: BusinessType!
+  createdAt: Date!
+  id: ID!
+  imageUrl: String
+  isActive: Boolean!
+  isOpen: Boolean!
+  location: Location!
+  name: String!
+  updatedAt: Date!
+  workingHours: WorkingHours!
+}
+
+enum BusinessType {
+  MARKET
+  PHARMACY
+  RESTAURANT
+}
+
+input CreateBusinessInput {
+  businessType: BusinessType!
+  imageUrl: String
+  location: LocationInput!
+  name: String!
+  workingHours: WorkingHoursInput!
+}
+
+input CreateProductCategoryInput {
+  businessId: ID!
+  name: String!
+}
+
+input CreateProductInput {
+  businessId: ID!
+  categoryId: ID!
+  description: String
+  imageUrl: String
+  isAvailable: Boolean
+  isOnSale: Boolean
+  name: String!
+  price: Float!
+  salePrice: Float
+  subcategoryId: ID
+}
+
+scalar Date
+
+type Location {
+  address: String!
+  latitude: Float!
+  longitude: Float!
+}
+
+input LocationInput {
+  address: String!
+  latitude: Float!
+  longitude: Float!
+}
+
+type Mutation {
+  createBusiness(input: CreateBusinessInput!): Business!
+  createProduct(input: CreateProductInput!): Product!
+  createProductCategory(input: CreateProductCategoryInput!): ProductCategory!
+  deleteBusiness(id: ID!): Boolean!
+  deleteProduct(id: ID!): Boolean!
+  deleteProductCategory(id: ID!): Boolean!
+  updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
+  updateProduct(id: ID!, input: UpdateProductInput!): Product!
+  updateProductCategory(id: ID!, input: UpdateProductCategoryInput!): ProductCategory!
+}
+
+type Order {
+  businesses: [OrderBusiness!]!
+  deliveryPrice: Float!
+  dropOffLocation: Location!
+  id: ID!
+  orderDate: Date!
+  orderPrice: Float!
+  status: OrderStatus!
+  totalPrice: Float!
+}
+
+type OrderBusiness {
+  business: Business!
+  items: [OrderItem!]!
+}
+
+type OrderItem {
+  imageUrl: String
+  name: String!
+  price: Float!
+  productId: ID!
+  quantity: Int!
+}
+
+enum OrderStatus {
+  ACCEPTED
+  CANCELLED
+  DELIVERED
+  OUT_FOR_DELIVERY
+  PENDING
+}
+
+type Product {
+  businessId: ID!
+  categoryId: ID!
+  createdAt: String!
+  description: String
+  id: ID!
+  imageUrl: String
+  isAvailable: Boolean!
+  isOnSale: Boolean!
+  name: String!
+  price: Float!
+  salePrice: Float
+  updatedAt: String!
+}
+
+type ProductCategory {
+  businessId: ID!
+  createdAt: String!
+  id: ID!
+  isActive: Boolean!
+  name: String!
+  updatedAt: String!
+}
+
+type ProductSubcategory {
+  categoryId: ID!
+  createdAt: String!
+  id: ID!
+  name: String!
+  updatedAt: String!
+}
+
+type Query {
+  business(id: ID!): Business
+  businesses: [Business!]!
+  product(id: ID!): Product
+  productCategories(businessId: ID!): [ProductCategory!]!
+  productCategory(id: ID!): ProductCategory
+  products(businessId: ID!): [Product!]!
+}
+
+input UpdateBusinessInput {
+  businessType: BusinessType
+  imageUrl: String
+  isActive: Boolean
+  location: LocationInput
+  name: String
+  workingHours: WorkingHoursInput
+}
+
+input UpdateProductCategoryInput {
+  isActive: Boolean
+  name: String
+}
+
+input UpdateProductInput {
+  categoryId: ID
+  description: String
+  imageUrl: String
+  isAvailable: Boolean
+  isOnSale: Boolean
+  name: String
+  price: Float
+  salePrice: Float
+  subcategoryId: ID
+}
+
+type User {
+  address: String!
+  id: ID!
+  name: String!
+}
+
+type WorkingHours {
+  closesAt: String!
+  opensAt: String!
+}
+
+input WorkingHoursInput {
+  closesAt: String!
+  opensAt: String!
+}

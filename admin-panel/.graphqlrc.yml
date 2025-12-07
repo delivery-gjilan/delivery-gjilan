@@ -1,0 +1,2 @@
+schema: ../api/src/generated/schema.generated.graphql
+documents: src/**/*.{ts,tsx}

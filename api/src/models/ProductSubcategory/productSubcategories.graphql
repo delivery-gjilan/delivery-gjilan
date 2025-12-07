@@ -1,37 +1,7 @@
-# ============================================
-# PRODUCT SUBCATEGORIES GRAPHQL (FULL FILE)
-# ============================================
-# Matches Drizzle table:
-# id, categoryId, name, createdAt, updatedAt
-# ============================================
-
 type ProductSubcategory {
     id: ID!
     categoryId: ID!
     name: String!
     createdAt: String!
     updatedAt: String!
-}
-
-extend type Query {
-    # All subcategories in a category
-    productSubcategories(categoryId: ID!): [ProductSubcategory!]!
-
-    # One subcategory
-    productSubcategory(id: ID!): ProductSubcategory
-}
-
-input CreateProductSubcategoryInput {
-    categoryId: ID!
-    name: String!
-}
-
-input UpdateProductSubcategoryInput {
-    name: String
-}
-
-extend type Mutation {
-    createProductSubcategory(input: CreateProductSubcategoryInput!): ProductSubcategory!
-    updateProductSubcategory(id: ID!, input: UpdateProductSubcategoryInput!): ProductSubcategory!
-    deleteProductSubcategory(id: ID!): Boolean!
 }

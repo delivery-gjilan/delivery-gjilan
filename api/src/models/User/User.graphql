@@ -3,12 +3,3 @@ type User {
     name: String!
     address: String!
 }
-
-type Query {
-    user(id: ID!): User!
-    # users: [User!]!
-}
-
-# type Mutation {
-#     createUser(id: ID!, name: String!, address: String!): User!
-# }

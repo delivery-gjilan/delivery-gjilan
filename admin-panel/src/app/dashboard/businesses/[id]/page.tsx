@@ -1,7 +1,6 @@
 "use client";
 
 import { useQuery, useMutation } from "@apollo/client/react";
-import { gql } from "@apollo/client";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import ProductsBlock from "@/components/businesses/ProductsBlock";
@@ -11,7 +10,8 @@ import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Modal from "@/components/ui/Modal";
 import CategoriesBlock from "@/components/businesses/CategoriesBlock";
-import { useGetUsersQuery } from "@/graphql/generated/graphql";
+import { graphql } from "@/gql";
+import { BusinessType } from "@/gql/graphql";
 
 /* ----------------------------------
    TYPES
@@ -26,15 +26,11 @@ interface Business {
     createdAt: string;
 }
 
-interface GetBusinessResponse {
-    business: Business | null;
-}
-
 /* ----------------------------------
    GraphQL
 ------------------------------------ */
 
-const GET_BUSINESS = gql`
+const GET_BUSINESS = graphql(`
     query Business($id: ID!) {
         business(id: $id) {
             id
@@ -45,9 +41,9 @@ const GET_BUSINESS = gql`
             createdAt
         }
     }
-`;
+`);
 
-const UPDATE_BUSINESS = gql`
+const UPDATE_BUSINESS = graphql(`
     mutation UpdateBusiness($id: ID!, $input: UpdateBusinessInput!) {
         updateBusiness(id: $id, input: $input) {
             id
@@ -57,7 +53,7 @@ const UPDATE_BUSINESS = gql`
             isActive
         }
     }
-`;
+`);
 
 /* ----------------------------------
    Page Component
@@ -67,13 +63,9 @@ export default function BusinessDetailsPage() {
     const params = useParams();
     const businessId = params.id as string;
 
-    const { data, loading, refetch } = useQuery<GetBusinessResponse>(
-        GET_BUSINESS,
-        { variables: { id: businessId } }
-    );
-
-    const { data: userData } = useGetUsersQuery();
-    console.log(userData);
+    const { data, loading, refetch } = useQuery(GET_BUSINESS, {
+        variables: { id: businessId },
+    });
 
     const [updateBusiness] = useMutation(UPDATE_BUSINESS);
 
@@ -82,16 +74,20 @@ export default function BusinessDetailsPage() {
   ------------------------------ */
     const [editOpen, setEditOpen] = useState(false);
 
-    const [editForm, setEditForm] = useState({
+    const [editForm, setEditForm] = useState<{
+        name: string;
+        businessType: BusinessType;
+        imageUrl: string;
+    }>({
         name: "",
-        businessType: "RESTAURANT",
+        businessType: BusinessType.Restaurant,
         imageUrl: "",
     });
 
     function openEditModal(b: Business) {
         setEditForm({
             name: b.name,
-            businessType: b.businessType,
+            businessType: BusinessType.Restaurant,
             imageUrl: b.imageUrl || "",
         });
 
@@ -219,13 +215,18 @@ export default function BusinessDetailsPage() {
                             onChange={(e) =>
                                 setEditForm({
                                     ...editForm,
-                                    businessType: e.target.value,
+                                    businessType: e.target
+                                        .value as BusinessType,
                                 })
                             }
                         >
-                            <option value="RESTAURANT">Restaurant</option>
-                            <option value="MARKET">Market</option>
-                            <option value="PHARMACY">Pharmacy</option>
+                            <option value={BusinessType.Restaurant}>
+                                Restaurant
+                            </option>
+                            <option value={BusinessType.Market}>Market</option>
+                            <option value={BusinessType.Pharmacy}>
+                                Pharmacy
+                            </option>
                         </Select>
                     </div>
 

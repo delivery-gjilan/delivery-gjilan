@@ -29,15 +29,3 @@ type Order {
     dropOffLocation: Location!
     businesses: [OrderBusiness!]!
 }
-
-# type Query {
-#     order(id: ID!): Order!
-# }
-
-# type Mutation {
-#     createOrder(input: OrderInput!): Order!
-# }
-
-input OrderInput {
-    name: String!
-}

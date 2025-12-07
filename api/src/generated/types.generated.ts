@@ -23,14 +23,14 @@ export type Scalars = {
 export type Business = {
   __typename?: 'Business';
   businessType: BusinessType;
-  createdAt: Scalars['String']['output'];
+  createdAt: Scalars['Date']['output'];
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
   isActive: Scalars['Boolean']['output'];
   isOpen: Scalars['Boolean']['output'];
   location: Location;
   name: Scalars['String']['output'];
-  updatedAt: Scalars['String']['output'];
+  updatedAt: Scalars['Date']['output'];
   workingHours: WorkingHours;
 };
 
@@ -42,7 +42,9 @@ export type BusinessType =
 export type CreateBusinessInput = {
   businessType: BusinessType;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
+  location: LocationInput;
   name: Scalars['String']['input'];
+  workingHours: WorkingHoursInput;
 };
 
 export type CreateProductCategoryInput = {
@@ -60,11 +62,7 @@ export type CreateProductInput = {
   name: Scalars['String']['input'];
   price: Scalars['Float']['input'];
   salePrice?: InputMaybe<Scalars['Float']['input']>;
-};
-
-export type CreateProductSubcategoryInput = {
-  categoryId: Scalars['ID']['input'];
-  name: Scalars['String']['input'];
+  subcategoryId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 export type Location = {
@@ -74,27 +72,71 @@ export type Location = {
   longitude: Scalars['Float']['output'];
 };
 
+export type LocationInput = {
+  address: Scalars['String']['input'];
+  latitude: Scalars['Float']['input'];
+  longitude: Scalars['Float']['input'];
+};
+
 export type Mutation = {
   __typename?: 'Mutation';
-  createProductSubcategory: ProductSubcategory;
-  deleteProductSubcategory: Scalars['Boolean']['output'];
-  updateProductSubcategory: ProductSubcategory;
+  createBusiness: Business;
+  createProduct: Product;
+  createProductCategory: ProductCategory;
+  deleteBusiness: Scalars['Boolean']['output'];
+  deleteProduct: Scalars['Boolean']['output'];
+  deleteProductCategory: Scalars['Boolean']['output'];
+  updateBusiness: Business;
+  updateProduct: Product;
+  updateProductCategory: ProductCategory;
 };
 
 
-export type MutationcreateProductSubcategoryArgs = {
-  input: CreateProductSubcategoryInput;
+export type MutationcreateBusinessArgs = {
+  input: CreateBusinessInput;
 };
 
 
-export type MutationdeleteProductSubcategoryArgs = {
+export type MutationcreateProductArgs = {
+  input: CreateProductInput;
+};
+
+
+export type MutationcreateProductCategoryArgs = {
+  input: CreateProductCategoryInput;
+};
+
+
+export type MutationdeleteBusinessArgs = {
   id: Scalars['ID']['input'];
 };
 
 
-export type MutationupdateProductSubcategoryArgs = {
+export type MutationdeleteProductArgs = {
   id: Scalars['ID']['input'];
-  input: UpdateProductSubcategoryInput;
+};
+
+
+export type MutationdeleteProductCategoryArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type MutationupdateBusinessArgs = {
+  id: Scalars['ID']['input'];
+  input: UpdateBusinessInput;
+};
+
+
+export type MutationupdateProductArgs = {
+  id: Scalars['ID']['input'];
+  input: UpdateProductInput;
+};
+
+
+export type MutationupdateProductCategoryArgs = {
+  id: Scalars['ID']['input'];
+  input: UpdateProductCategoryInput;
 };
 
 export type Order = {
@@ -113,10 +155,6 @@ export type OrderBusiness = {
   __typename?: 'OrderBusiness';
   business: Business;
   items: Array<OrderItem>;
-};
-
-export type OrderInput = {
-  name: Scalars['String']['input'];
 };
 
 export type OrderItem = {
@@ -172,31 +210,46 @@ export type ProductSubcategory = {
 
 export type Query = {
   __typename?: 'Query';
-  productSubcategories: Array<ProductSubcategory>;
-  productSubcategory?: Maybe<ProductSubcategory>;
-  user: User;
+  business?: Maybe<Business>;
+  businesses: Array<Business>;
+  product?: Maybe<Product>;
+  productCategories: Array<ProductCategory>;
+  productCategory?: Maybe<ProductCategory>;
+  products: Array<Product>;
 };
 
 
-export type QueryproductSubcategoriesArgs = {
-  categoryId: Scalars['ID']['input'];
-};
-
-
-export type QueryproductSubcategoryArgs = {
+export type QuerybusinessArgs = {
   id: Scalars['ID']['input'];
 };
 
 
-export type QueryuserArgs = {
+export type QueryproductArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type QueryproductCategoriesArgs = {
+  businessId: Scalars['ID']['input'];
+};
+
+
+export type QueryproductCategoryArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryproductsArgs = {
+  businessId: Scalars['ID']['input'];
 };
 
 export type UpdateBusinessInput = {
   businessType?: InputMaybe<BusinessType>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  location?: InputMaybe<LocationInput>;
   name?: InputMaybe<Scalars['String']['input']>;
+  workingHours?: InputMaybe<WorkingHoursInput>;
 };
 
 export type UpdateProductCategoryInput = {
@@ -213,10 +266,7 @@ export type UpdateProductInput = {
   name?: InputMaybe<Scalars['String']['input']>;
   price?: InputMaybe<Scalars['Float']['input']>;
   salePrice?: InputMaybe<Scalars['Float']['input']>;
-};
-
-export type UpdateProductSubcategoryInput = {
-  name?: InputMaybe<Scalars['String']['input']>;
+  subcategoryId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 export type User = {
@@ -230,6 +280,11 @@ export type WorkingHours = {
   __typename?: 'WorkingHours';
   closesAt: Scalars['String']['output'];
   opensAt: Scalars['String']['output'];
+};
+
+export type WorkingHoursInput = {
+  closesAt: Scalars['String']['input'];
+  opensAt: Scalars['String']['input'];
 };
 
 
@@ -304,21 +359,20 @@ export type DirectiveResolverFn<TResult = {}, TParent = {}, TContext = {}, TArgs
 /** Mapping between all available schema types and the resolvers types */
 export type ResolversTypes = {
   Business: ResolverTypeWrapper<Omit<Business, 'businessType'> & { businessType: ResolversTypes['BusinessType'] }>;
-  String: ResolverTypeWrapper<Scalars['String']['output']>;
   ID: ResolverTypeWrapper<Scalars['ID']['output']>;
+  String: ResolverTypeWrapper<Scalars['String']['output']>;
   Boolean: ResolverTypeWrapper<Scalars['Boolean']['output']>;
   BusinessType: ResolverTypeWrapper<'RESTAURANT' | 'MARKET' | 'PHARMACY'>;
   CreateBusinessInput: CreateBusinessInput;
   CreateProductCategoryInput: CreateProductCategoryInput;
   CreateProductInput: CreateProductInput;
   Float: ResolverTypeWrapper<Scalars['Float']['output']>;
-  CreateProductSubcategoryInput: CreateProductSubcategoryInput;
   Date: ResolverTypeWrapper<Scalars['Date']['output']>;
   Location: ResolverTypeWrapper<Location>;
+  LocationInput: LocationInput;
   Mutation: ResolverTypeWrapper<{}>;
   Order: ResolverTypeWrapper<Omit<Order, 'businesses' | 'status'> & { businesses: Array<ResolversTypes['OrderBusiness']>, status: ResolversTypes['OrderStatus'] }>;
   OrderBusiness: ResolverTypeWrapper<Omit<OrderBusiness, 'business'> & { business: ResolversTypes['Business'] }>;
-  OrderInput: OrderInput;
   OrderItem: ResolverTypeWrapper<OrderItem>;
   Int: ResolverTypeWrapper<Scalars['Int']['output']>;
   OrderStatus: ResolverTypeWrapper<'PENDING' | 'ACCEPTED' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED'>;
@@ -329,28 +383,27 @@ export type ResolversTypes = {
   UpdateBusinessInput: UpdateBusinessInput;
   UpdateProductCategoryInput: UpdateProductCategoryInput;
   UpdateProductInput: UpdateProductInput;
-  UpdateProductSubcategoryInput: UpdateProductSubcategoryInput;
   User: ResolverTypeWrapper<User>;
   WorkingHours: ResolverTypeWrapper<WorkingHours>;
+  WorkingHoursInput: WorkingHoursInput;
 };
 
 /** Mapping between all available schema types and the resolvers parents */
 export type ResolversParentTypes = {
   Business: Business;
-  String: Scalars['String']['output'];
   ID: Scalars['ID']['output'];
+  String: Scalars['String']['output'];
   Boolean: Scalars['Boolean']['output'];
   CreateBusinessInput: CreateBusinessInput;
   CreateProductCategoryInput: CreateProductCategoryInput;
   CreateProductInput: CreateProductInput;
   Float: Scalars['Float']['output'];
-  CreateProductSubcategoryInput: CreateProductSubcategoryInput;
   Date: Scalars['Date']['output'];
   Location: Location;
+  LocationInput: LocationInput;
   Mutation: {};
   Order: Omit<Order, 'businesses'> & { businesses: Array<ResolversParentTypes['OrderBusiness']> };
   OrderBusiness: Omit<OrderBusiness, 'business'> & { business: ResolversParentTypes['Business'] };
-  OrderInput: OrderInput;
   OrderItem: OrderItem;
   Int: Scalars['Int']['output'];
   Product: Product;
@@ -360,21 +413,21 @@ export type ResolversParentTypes = {
   UpdateBusinessInput: UpdateBusinessInput;
   UpdateProductCategoryInput: UpdateProductCategoryInput;
   UpdateProductInput: UpdateProductInput;
-  UpdateProductSubcategoryInput: UpdateProductSubcategoryInput;
   User: User;
   WorkingHours: WorkingHours;
+  WorkingHoursInput: WorkingHoursInput;
 };
 
 export type BusinessResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Business'] = ResolversParentTypes['Business']> = {
   businessType?: Resolver<ResolversTypes['BusinessType'], ParentType, ContextType>;
-  createdAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  createdAt?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   isActive?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   isOpen?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   location?: Resolver<ResolversTypes['Location'], ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
-  updatedAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  updatedAt?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
   workingHours?: Resolver<ResolversTypes['WorkingHours'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
@@ -393,9 +446,15 @@ export type LocationResolvers<ContextType = GraphQLContext, ParentType extends R
 };
 
 export type MutationResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Mutation'] = ResolversParentTypes['Mutation']> = {
-  createProductSubcategory?: Resolver<ResolversTypes['ProductSubcategory'], ParentType, ContextType, RequireFields<MutationcreateProductSubcategoryArgs, 'input'>>;
-  deleteProductSubcategory?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteProductSubcategoryArgs, 'id'>>;
-  updateProductSubcategory?: Resolver<ResolversTypes['ProductSubcategory'], ParentType, ContextType, RequireFields<MutationupdateProductSubcategoryArgs, 'id' | 'input'>>;
+  createBusiness?: Resolver<ResolversTypes['Business'], ParentType, ContextType, RequireFields<MutationcreateBusinessArgs, 'input'>>;
+  createProduct?: Resolver<ResolversTypes['Product'], ParentType, ContextType, RequireFields<MutationcreateProductArgs, 'input'>>;
+  createProductCategory?: Resolver<ResolversTypes['ProductCategory'], ParentType, ContextType, RequireFields<MutationcreateProductCategoryArgs, 'input'>>;
+  deleteBusiness?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteBusinessArgs, 'id'>>;
+  deleteProduct?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteProductArgs, 'id'>>;
+  deleteProductCategory?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteProductCategoryArgs, 'id'>>;
+  updateBusiness?: Resolver<ResolversTypes['Business'], ParentType, ContextType, RequireFields<MutationupdateBusinessArgs, 'id' | 'input'>>;
+  updateProduct?: Resolver<ResolversTypes['Product'], ParentType, ContextType, RequireFields<MutationupdateProductArgs, 'id' | 'input'>>;
+  updateProductCategory?: Resolver<ResolversTypes['ProductCategory'], ParentType, ContextType, RequireFields<MutationupdateProductCategoryArgs, 'id' | 'input'>>;
 };
 
 export type OrderResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Order'] = ResolversParentTypes['Order']> = {
@@ -463,9 +522,12 @@ export type ProductSubcategoryResolvers<ContextType = GraphQLContext, ParentType
 };
 
 export type QueryResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Query'] = ResolversParentTypes['Query']> = {
-  productSubcategories?: Resolver<Array<ResolversTypes['ProductSubcategory']>, ParentType, ContextType, RequireFields<QueryproductSubcategoriesArgs, 'categoryId'>>;
-  productSubcategory?: Resolver<Maybe<ResolversTypes['ProductSubcategory']>, ParentType, ContextType, RequireFields<QueryproductSubcategoryArgs, 'id'>>;
-  user?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<QueryuserArgs, 'id'>>;
+  business?: Resolver<Maybe<ResolversTypes['Business']>, ParentType, ContextType, RequireFields<QuerybusinessArgs, 'id'>>;
+  businesses?: Resolver<Array<ResolversTypes['Business']>, ParentType, ContextType>;
+  product?: Resolver<Maybe<ResolversTypes['Product']>, ParentType, ContextType, RequireFields<QueryproductArgs, 'id'>>;
+  productCategories?: Resolver<Array<ResolversTypes['ProductCategory']>, ParentType, ContextType, RequireFields<QueryproductCategoriesArgs, 'businessId'>>;
+  productCategory?: Resolver<Maybe<ResolversTypes['ProductCategory']>, ParentType, ContextType, RequireFields<QueryproductCategoryArgs, 'id'>>;
+  products?: Resolver<Array<ResolversTypes['Product']>, ParentType, ContextType, RequireFields<QueryproductsArgs, 'businessId'>>;
 };
 
 export type UserResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['User'] = ResolversParentTypes['User']> = {

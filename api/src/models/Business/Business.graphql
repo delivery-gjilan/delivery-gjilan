@@ -13,30 +13,34 @@ type Business {
     location: Location!
     workingHours: WorkingHours!
     isOpen: Boolean!
-    createdAt: String!
-    updatedAt: String!
+    createdAt: Date!
+    updatedAt: Date!
 }
 
-# extend type Query {
-#     businesses: [Business!]!
-#     business(id: ID!): Business
-# }
+type Query {
+    businesses: [Business!]!
+    business(id: ID!): Business
+}
 
 input CreateBusinessInput {
     name: String!
     imageUrl: String
     businessType: BusinessType!
+    location: LocationInput!
+    workingHours: WorkingHoursInput!
 }
 
 input UpdateBusinessInput {
     name: String
     imageUrl: String
     businessType: BusinessType
+    location: LocationInput
+    workingHours: WorkingHoursInput
     isActive: Boolean
 }
 
-# extend type Mutation {
-#     createBusiness(input: CreateBusinessInput!): Business!
-#     updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
-#     deleteBusiness(id: ID!): Boolean!
-# }
+type Mutation {
+    createBusiness(input: CreateBusinessInput!): Business!
+    updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
+    deleteBusiness(id: ID!): Boolean!
+}

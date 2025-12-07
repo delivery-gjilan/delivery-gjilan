@@ -1,0 +1,17 @@
+{
+    "name": "delivery-gjilan",
+    "version": "1.0.0",
+    "private": true,
+    "workspaces": [
+        "admin-panel",
+        "api",
+        "mobile-customer",
+        "mobile-driver"
+    ],
+    "scripts": {
+        "install:all": "npm install"
+    },
+    "devDependencies": {
+        "@0no-co/graphqlsp": "^1.12.16"
+    }
+}

@@ -6,7 +6,18 @@ type Location {
     address: String!
 }
 
+input LocationInput {
+    latitude: Float!
+    longitude: Float!
+    address: String!
+}
+
 type WorkingHours {
+    opensAt: String! # "08:00"
+    closesAt: String! # "23:00"
+}
+
+input WorkingHoursInput {
     opensAt: String! # "08:00"
     closesAt: String! # "23:00"
 }
