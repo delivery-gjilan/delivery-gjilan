@@ -10,7 +10,6 @@ import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Modal from '@/components/ui/Modal';
 import CategoriesBlock from '@/components/businesses/CategoriesBlock';
-import { graphql } from '@/gql';
 import { BusinessType } from '@/gql/graphql';
 import { GET_BUSINESS, UPDATE_BUSINESS } from '@/graphql/operations/businesses';
 
