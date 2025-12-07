@@ -1,17 +1,18 @@
-"use client";
+'use client';
 
-import { useQuery, useMutation } from "@apollo/client/react";
-import { useParams } from "next/navigation";
-import { useState } from "react";
-import ProductsBlock from "@/components/businesses/ProductsBlock";
+import { useQuery, useMutation } from '@apollo/client/react';
+import { useParams } from 'next/navigation';
+import { useState } from 'react';
+import ProductsBlock from '@/components/businesses/ProductsBlock';
 
-import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
-import Select from "@/components/ui/Select";
-import Modal from "@/components/ui/Modal";
-import CategoriesBlock from "@/components/businesses/CategoriesBlock";
-import { graphql } from "@/gql";
-import { BusinessType } from "@/gql/graphql";
+import Button from '@/components/ui/Button';
+import Input from '@/components/ui/Input';
+import Select from '@/components/ui/Select';
+import Modal from '@/components/ui/Modal';
+import CategoriesBlock from '@/components/businesses/CategoriesBlock';
+import { graphql } from '@/gql';
+import { BusinessType } from '@/gql/graphql';
+import { GET_BUSINESS, UPDATE_BUSINESS } from '@/graphql/operations/businesses';
 
 /* ----------------------------------
    TYPES
@@ -29,31 +30,6 @@ interface Business {
 /* ----------------------------------
    GraphQL
 ------------------------------------ */
-
-const GET_BUSINESS = graphql(`
-    query Business($id: ID!) {
-        business(id: $id) {
-            id
-            name
-            imageUrl
-            businessType
-            isActive
-            createdAt
-        }
-    }
-`);
-
-const UPDATE_BUSINESS = graphql(`
-    mutation UpdateBusiness($id: ID!, $input: UpdateBusinessInput!) {
-        updateBusiness(id: $id, input: $input) {
-            id
-            name
-            businessType
-            imageUrl
-            isActive
-        }
-    }
-`);
 
 /* ----------------------------------
    Page Component
@@ -79,16 +55,16 @@ export default function BusinessDetailsPage() {
         businessType: BusinessType;
         imageUrl: string;
     }>({
-        name: "",
+        name: '',
         businessType: BusinessType.Restaurant,
-        imageUrl: "",
+        imageUrl: '',
     });
 
     function openEditModal(b: Business) {
         setEditForm({
             name: b.name,
             businessType: BusinessType.Restaurant,
-            imageUrl: b.imageUrl || "",
+            imageUrl: b.imageUrl || '',
         });
 
         setEditOpen(true);
@@ -114,8 +90,7 @@ export default function BusinessDetailsPage() {
      LOADING / ERRORS
   ------------------------------ */
     if (loading) return <p className="text-gray-400">Loading...</p>;
-    if (!data?.business)
-        return <p className="text-red-400">Business not found.</p>;
+    if (!data?.business) return <p className="text-red-400">Business not found.</p>;
 
     const b = data.business;
 
@@ -123,8 +98,7 @@ export default function BusinessDetailsPage() {
         <div className="text-white space-y-10 p-4">
             {/* HEADER */}
             <h1 className="text-3xl font-semibold">
-                Business Details —{" "}
-                <span className="text-purple-400">{b.name}</span>
+                Business Details — <span className="text-purple-400">{b.name}</span>
             </h1>
 
             {/* PRODUCTS BLOCK */}
@@ -138,29 +112,20 @@ export default function BusinessDetailsPage() {
                 <h2 className="text-xl font-semibold mb-4">Business Info</h2>
 
                 <div className="flex items-start gap-6">
-                    {b.imageUrl && (
-                        <img
-                            src={b.imageUrl}
-                            alt={b.name}
-                            className="w-32 h-32 object-cover rounded-lg"
-                        />
-                    )}
+                    {b.imageUrl && <img src={b.imageUrl} alt={b.name} className="w-32 h-32 object-cover rounded-lg" />}
 
                     <div className="space-y-2">
                         <p>
-                            <span className="text-gray-400">Name:</span>{" "}
-                            <span className="font-semibold">{b.name}</span>
+                            <span className="text-gray-400">Name:</span> <span className="font-semibold">{b.name}</span>
                         </p>
 
                         <p>
-                            <span className="text-gray-400">Type:</span>{" "}
-                            <span className="font-semibold">
-                                {b.businessType}
-                            </span>
+                            <span className="text-gray-400">Type:</span>{' '}
+                            <span className="font-semibold">{b.businessType}</span>
                         </p>
 
                         <p>
-                            <span className="text-gray-400">Status:</span>{" "}
+                            <span className="text-gray-400">Status:</span>{' '}
                             {b.isActive ? (
                                 <span className="text-green-400">Active</span>
                             ) : (
@@ -168,9 +133,7 @@ export default function BusinessDetailsPage() {
                             )}
                         </p>
 
-                        <p className="text-gray-400 text-sm">
-                            Created at: {new Date(b.createdAt).toLocaleString()}
-                        </p>
+                        <p className="text-gray-400 text-sm">Created at: {new Date(b.createdAt).toLocaleString()}</p>
                     </div>
                 </div>
 
@@ -184,16 +147,10 @@ export default function BusinessDetailsPage() {
             {/* ------------------------------------
           EDIT MODAL
       ------------------------------------ */}
-            <Modal
-                open={editOpen}
-                onClose={() => setEditOpen(false)}
-                title="Edit Business"
-            >
+            <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Edit Business">
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Business Name
-                        </label>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Business Name</label>
                         <Input
                             placeholder="Business name"
                             value={editForm.name}
@@ -207,33 +164,24 @@ export default function BusinessDetailsPage() {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Business Type
-                        </label>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Business Type</label>
                         <Select
                             value={editForm.businessType}
                             onChange={(e) =>
                                 setEditForm({
                                     ...editForm,
-                                    businessType: e.target
-                                        .value as BusinessType,
+                                    businessType: e.target.value as BusinessType,
                                 })
                             }
                         >
-                            <option value={BusinessType.Restaurant}>
-                                Restaurant
-                            </option>
+                            <option value={BusinessType.Restaurant}>Restaurant</option>
                             <option value={BusinessType.Market}>Market</option>
-                            <option value={BusinessType.Pharmacy}>
-                                Pharmacy
-                            </option>
+                            <option value={BusinessType.Pharmacy}>Pharmacy</option>
                         </Select>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Image URL
-                        </label>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Image URL</label>
                         <Input
                             placeholder="Image URL"
                             value={editForm.imageUrl}
@@ -246,11 +194,7 @@ export default function BusinessDetailsPage() {
                         />
                     </div>
 
-                    <Button
-                        variant="primary"
-                        className="w-full mt-2"
-                        onClick={handleEdit}
-                    >
+                    <Button variant="primary" className="w-full mt-2" onClick={handleEdit}>
                         Save Changes
                     </Button>
                 </div>

@@ -1,4 +1,4 @@
-import { graphql } from "@/gql";
+import { graphql } from '@/gql';
 
 export const GET_BUSINESS_PRODUCTS_AND_CATEGORIES = graphql(`
     query ProductsAndCategories($businessId: ID!) {

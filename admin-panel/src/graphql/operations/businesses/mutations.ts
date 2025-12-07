@@ -1,4 +1,4 @@
-import { graphql } from "@/gql";
+import { graphql } from '@/gql';
 
 export const CREATE_BUSINESS = graphql(`
     mutation CreateBusiness($input: CreateBusinessInput!) {

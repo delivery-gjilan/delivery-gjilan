@@ -1,5 +1,5 @@
 dist
-package -lock.json
+package-lock.json
 # We will handle graphql schema differently
 *.json
 *.js

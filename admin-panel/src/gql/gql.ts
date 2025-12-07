@@ -14,11 +14,11 @@ import { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/
  * Learn more about it here: https://the-guild.dev/graphql/codegen/plugins/presets/preset-client#reducing-bundle-size
  */
 type Documents = {
-    "\n    query Business($id: ID!) {\n        business(id: $id) {\n            id\n            name\n            imageUrl\n            businessType\n            isActive\n            createdAt\n        }\n    }\n": typeof types.BusinessDocument,
-    "\n    mutation UpdateBusiness($id: ID!, $input: UpdateBusinessInput!) {\n        updateBusiness(id: $id, input: $input) {\n            id\n            name\n            businessType\n            imageUrl\n            isActive\n        }\n    }\n": typeof types.UpdateBusinessDocument,
     "\n    mutation CreateBusiness($input: CreateBusinessInput!) {\n        createBusiness(input: $input) {\n            id\n            name\n            businessType\n            imageUrl\n            isActive\n        }\n    }\n": typeof types.CreateBusinessDocument,
+    "\n    mutation UpdateBusiness($id: ID!, $input: UpdateBusinessInput!) {\n        updateBusiness(id: $id, input: $input) {\n            id\n            name\n            businessType\n            imageUrl\n            isActive\n        }\n    }\n": typeof types.UpdateBusinessDocument,
     "\n    mutation DeleteBusiness($id: ID!) {\n        deleteBusiness(id: $id)\n    }\n": typeof types.DeleteBusinessDocument,
-    "\n    query GetBusinesses {\n        businesses {\n            id\n            name\n            imageUrl\n            businessType\n            isActive\n            createdAt\n            updatedAt\n        }\n    }\n": typeof types.GetBusinessesDocument,
+    "\n    query Business($id: ID!) {\n        business(id: $id) {\n            id\n            name\n            imageUrl\n            businessType\n            isActive\n            createdAt\n        }\n    }\n": typeof types.BusinessDocument,
+    "\n    query Businesses {\n        businesses {\n            id\n            name\n            imageUrl\n            businessType\n            isActive\n            createdAt\n            updatedAt\n        }\n    }\n": typeof types.BusinessesDocument,
     "\n    mutation CreateProductCategory($input: CreateProductCategoryInput!) {\n        createProductCategory(input: $input) {\n            id\n            name\n            isActive\n        }\n    }\n": typeof types.CreateProductCategoryDocument,
     "\n    mutation UpdateProductCategory(\n        $id: ID!\n        $input: UpdateProductCategoryInput!\n    ) {\n        updateProductCategory(id: $id, input: $input) {\n            id\n            name\n            isActive\n        }\n    }\n": typeof types.UpdateProductCategoryDocument,
     "\n    mutation DeleteProductCategory($id: ID!) {\n        deleteProductCategory(id: $id)\n    }\n": typeof types.DeleteProductCategoryDocument,
@@ -29,11 +29,11 @@ type Documents = {
     "\n    query ProductsAndCategories($businessId: ID!) {\n        productCategories(businessId: $businessId) {\n            id\n            name\n        }\n        products(businessId: $businessId) {\n            id\n            categoryId\n            name\n            description\n            price\n            imageUrl\n            isOnSale\n            salePrice\n            isAvailable\n        }\n    }\n": typeof types.ProductsAndCategoriesDocument,
 };
 const documents: Documents = {
-    "\n    query Business($id: ID!) {\n        business(id: $id) {\n            id\n            name\n            imageUrl\n            businessType\n            isActive\n            createdAt\n        }\n    }\n": types.BusinessDocument,
-    "\n    mutation UpdateBusiness($id: ID!, $input: UpdateBusinessInput!) {\n        updateBusiness(id: $id, input: $input) {\n            id\n            name\n            businessType\n            imageUrl\n            isActive\n        }\n    }\n": types.UpdateBusinessDocument,
     "\n    mutation CreateBusiness($input: CreateBusinessInput!) {\n        createBusiness(input: $input) {\n            id\n            name\n            businessType\n            imageUrl\n            isActive\n        }\n    }\n": types.CreateBusinessDocument,
+    "\n    mutation UpdateBusiness($id: ID!, $input: UpdateBusinessInput!) {\n        updateBusiness(id: $id, input: $input) {\n            id\n            name\n            businessType\n            imageUrl\n            isActive\n        }\n    }\n": types.UpdateBusinessDocument,
     "\n    mutation DeleteBusiness($id: ID!) {\n        deleteBusiness(id: $id)\n    }\n": types.DeleteBusinessDocument,
-    "\n    query GetBusinesses {\n        businesses {\n            id\n            name\n            imageUrl\n            businessType\n            isActive\n            createdAt\n            updatedAt\n        }\n    }\n": types.GetBusinessesDocument,
+    "\n    query Business($id: ID!) {\n        business(id: $id) {\n            id\n            name\n            imageUrl\n            businessType\n            isActive\n            createdAt\n        }\n    }\n": types.BusinessDocument,
+    "\n    query Businesses {\n        businesses {\n            id\n            name\n            imageUrl\n            businessType\n            isActive\n            createdAt\n            updatedAt\n        }\n    }\n": types.BusinessesDocument,
     "\n    mutation CreateProductCategory($input: CreateProductCategoryInput!) {\n        createProductCategory(input: $input) {\n            id\n            name\n            isActive\n        }\n    }\n": types.CreateProductCategoryDocument,
     "\n    mutation UpdateProductCategory(\n        $id: ID!\n        $input: UpdateProductCategoryInput!\n    ) {\n        updateProductCategory(id: $id, input: $input) {\n            id\n            name\n            isActive\n        }\n    }\n": types.UpdateProductCategoryDocument,
     "\n    mutation DeleteProductCategory($id: ID!) {\n        deleteProductCategory(id: $id)\n    }\n": types.DeleteProductCategoryDocument,
@@ -61,7 +61,7 @@ export function graphql(source: string): unknown;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n    query Business($id: ID!) {\n        business(id: $id) {\n            id\n            name\n            imageUrl\n            businessType\n            isActive\n            createdAt\n        }\n    }\n"): (typeof documents)["\n    query Business($id: ID!) {\n        business(id: $id) {\n            id\n            name\n            imageUrl\n            businessType\n            isActive\n            createdAt\n        }\n    }\n"];
+export function graphql(source: "\n    mutation CreateBusiness($input: CreateBusinessInput!) {\n        createBusiness(input: $input) {\n            id\n            name\n            businessType\n            imageUrl\n            isActive\n        }\n    }\n"): (typeof documents)["\n    mutation CreateBusiness($input: CreateBusinessInput!) {\n        createBusiness(input: $input) {\n            id\n            name\n            businessType\n            imageUrl\n            isActive\n        }\n    }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -69,15 +69,15 @@ export function graphql(source: "\n    mutation UpdateBusiness($id: ID!, $input:
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n    mutation CreateBusiness($input: CreateBusinessInput!) {\n        createBusiness(input: $input) {\n            id\n            name\n            businessType\n            imageUrl\n            isActive\n        }\n    }\n"): (typeof documents)["\n    mutation CreateBusiness($input: CreateBusinessInput!) {\n        createBusiness(input: $input) {\n            id\n            name\n            businessType\n            imageUrl\n            isActive\n        }\n    }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
 export function graphql(source: "\n    mutation DeleteBusiness($id: ID!) {\n        deleteBusiness(id: $id)\n    }\n"): (typeof documents)["\n    mutation DeleteBusiness($id: ID!) {\n        deleteBusiness(id: $id)\n    }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n    query GetBusinesses {\n        businesses {\n            id\n            name\n            imageUrl\n            businessType\n            isActive\n            createdAt\n            updatedAt\n        }\n    }\n"): (typeof documents)["\n    query GetBusinesses {\n        businesses {\n            id\n            name\n            imageUrl\n            businessType\n            isActive\n            createdAt\n            updatedAt\n        }\n    }\n"];
+export function graphql(source: "\n    query Business($id: ID!) {\n        business(id: $id) {\n            id\n            name\n            imageUrl\n            businessType\n            isActive\n            createdAt\n        }\n    }\n"): (typeof documents)["\n    query Business($id: ID!) {\n        business(id: $id) {\n            id\n            name\n            imageUrl\n            businessType\n            isActive\n            createdAt\n        }\n    }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n    query Businesses {\n        businesses {\n            id\n            name\n            imageUrl\n            businessType\n            isActive\n            createdAt\n            updatedAt\n        }\n    }\n"): (typeof documents)["\n    query Businesses {\n        businesses {\n            id\n            name\n            imageUrl\n            businessType\n            isActive\n            createdAt\n            updatedAt\n        }\n    }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
