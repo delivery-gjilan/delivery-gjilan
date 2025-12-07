@@ -17,10 +17,10 @@ type Business {
     updatedAt: String!
 }
 
-extend type Query {
-    businesses: [Business!]!
-    business(id: ID!): Business
-}
+# extend type Query {
+#     businesses: [Business!]!
+#     business(id: ID!): Business
+# }
 
 input CreateBusinessInput {
     name: String!
@@ -35,8 +35,8 @@ input UpdateBusinessInput {
     isActive: Boolean
 }
 
-extend type Mutation {
-    createBusiness(input: CreateBusinessInput!): Business!
-    updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
-    deleteBusiness(id: ID!): Boolean!
-}
+# extend type Mutation {
+#     createBusiness(input: CreateBusinessInput!): Business!
+#     updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
+#     deleteBusiness(id: ID!): Boolean!
+# }

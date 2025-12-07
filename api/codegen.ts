@@ -10,6 +10,17 @@ const config: CodegenConfig = {
                 contextType: '../graphql/context#GraphQLContext',
             },
         }),
+        '../admin-panel/src/graphql/generated/graphql.tsx': {
+            plugins: ['typescript', 'typescript-operations', 'typescript-react-apollo'],
+            documents: '../admin-panel/src/graphql/operations/**/*.graphql',
+            config: {
+                withHooks: true,
+                withHOC: false,
+                withComponent: false,
+                apolloReactCommonImportFrom: '@apollo/client/react',
+                apolloReactHooksImportFrom: '@apollo/client/react',
+            },
+        },
     },
 };
 

@@ -38,11 +38,11 @@ export const updateBusiness: NonNullable<MutationResolvers['updateBusiness']> = 
         location: {
             latitude: 0,
             longitude: 0,
-            address: "",
+            address: '',
         },
         workingHours: {
-            opensAt: "08:00",
-            closesAt: "23:00",
+            opensAt: '08:00',
+            closesAt: '23:00',
         },
         isOpen: true,
         createdAt: updated.createdAt!,

@@ -30,13 +30,13 @@ type Order {
     businesses: [OrderBusiness!]!
 }
 
-type Query {
-    order(id: ID!): Order!
-}
+# type Query {
+#     order(id: ID!): Order!
+# }
 
-type Mutation {
-    createOrder(input: OrderInput!): Order!
-}
+# type Mutation {
+#     createOrder(input: OrderInput!): Order!
+# }
 
 input OrderInput {
     name: String!

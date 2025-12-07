@@ -13,10 +13,10 @@ type Product {
     updatedAt: String!
 }
 
-extend type Query {
-    products(businessId: ID, categoryId: ID): [Product!]!
-    product(id: ID!): Product
-}
+# extend type Query {
+#     products(businessId: ID, categoryId: ID): [Product!]!
+#     product(id: ID!): Product
+# }
 
 input CreateProductInput {
     businessId: ID!
@@ -41,8 +41,8 @@ input UpdateProductInput {
     isAvailable: Boolean
 }
 
-extend type Mutation {
-    createProduct(input: CreateProductInput!): Product!
-    updateProduct(id: ID!, input: UpdateProductInput!): Product!
-    deleteProduct(id: ID!): Boolean!
-}
+# extend type Mutation {
+#     createProduct(input: CreateProductInput!): Product!
+#     updateProduct(id: ID!, input: UpdateProductInput!): Product!
+#     deleteProduct(id: ID!): Boolean!
+# }

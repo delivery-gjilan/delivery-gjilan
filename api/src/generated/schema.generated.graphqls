@@ -54,19 +54,8 @@ type Location {
 }
 
 type Mutation {
-  createBusiness(input: CreateBusinessInput!): Business!
-  createOrder(input: OrderInput!): Order!
-  createProduct(input: CreateProductInput!): Product!
-  createProductCategory(input: CreateProductCategoryInput!): ProductCategory!
   createProductSubcategory(input: CreateProductSubcategoryInput!): ProductSubcategory!
-  createUser(address: String!, id: ID!, name: String!): User!
-  deleteBusiness(id: ID!): Boolean!
-  deleteProduct(id: ID!): Boolean!
-  deleteProductCategory(id: ID!): Boolean!
   deleteProductSubcategory(id: ID!): Boolean!
-  updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
-  updateProduct(id: ID!, input: UpdateProductInput!): Product!
-  updateProductCategory(id: ID!, input: UpdateProductCategoryInput!): ProductCategory!
   updateProductSubcategory(id: ID!, input: UpdateProductSubcategoryInput!): ProductSubcategory!
 }
 
@@ -139,17 +128,9 @@ type ProductSubcategory {
 }
 
 type Query {
-  business(id: ID!): Business
-  businesses: [Business!]!
-  order(id: ID!): Order!
-  product(id: ID!): Product
-  productCategories(businessId: ID!): [ProductCategory!]!
-  productCategory(id: ID!): ProductCategory
   productSubcategories(categoryId: ID!): [ProductSubcategory!]!
   productSubcategory(id: ID!): ProductSubcategory
-  products(businessId: ID, categoryId: ID): [Product!]!
   user(id: ID!): User!
-  users: [User!]!
 }
 
 input UpdateBusinessInput {
