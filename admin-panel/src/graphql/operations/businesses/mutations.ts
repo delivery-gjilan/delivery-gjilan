@@ -1,6 +1,6 @@
-import { graphql } from '@/gql';
+import { gql } from '@apollo/client';
 
-export const CREATE_BUSINESS = graphql(`
+export const CREATE_BUSINESS = gql`
     mutation CreateBusiness($input: CreateBusinessInput!) {
         createBusiness(input: $input) {
             id
@@ -10,9 +10,9 @@ export const CREATE_BUSINESS = graphql(`
             isActive
         }
     }
-`);
+`;
 
-export const UPDATE_BUSINESS = graphql(`
+export const UPDATE_BUSINESS = gql`
     mutation UpdateBusiness($id: ID!, $input: UpdateBusinessInput!) {
         updateBusiness(id: $id, input: $input) {
             id
@@ -22,10 +22,10 @@ export const UPDATE_BUSINESS = graphql(`
             isActive
         }
     }
-`);
+`;
 
-export const DELETE_BUSINESS = graphql(`
+export const DELETE_BUSINESS = gql`
     mutation DeleteBusiness($id: ID!) {
         deleteBusiness(id: $id)
     }
-`);
+`;

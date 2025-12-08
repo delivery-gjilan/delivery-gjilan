@@ -8,7 +8,7 @@ const workingHoursSchema = z.object({
 
 const createBusinessSchema = z.object({
     name: z.string().min(1, 'Name is required'),
-    imageUrl: z.url().optional().nullable(),
+    imageUrl: z.string().optional().nullable(),
     businessType: z.enum(['RESTAURANT', 'MARKET', 'PHARMACY']),
     location: z.object({
         latitude: z.number(),
@@ -20,7 +20,7 @@ const createBusinessSchema = z.object({
 
 const updateBusinessSchema = z.object({
     name: z.string().min(1, 'Name is required').optional(),
-    imageUrl: z.url().optional().nullable(),
+    imageUrl: z.string().optional().nullable(),
     businessType: z.enum(['RESTAURANT', 'MARKET', 'PHARMACY']).optional(),
     location: z
         .object({
