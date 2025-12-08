@@ -1,12 +1,13 @@
 import { SUPPORTED_LANGUAGES } from '@/utils/constants';
-import { Environment, isEnv } from '@/utils/environment';
 import { translationSchema } from './schema';
 import fs from 'node:fs';
 import path from 'node:path';
 
-if (!isEnv(Environment.DEV)) {
-    console.error('This script can only be run in development mode');
-    process.exit(2);
+// Skip validation if not in dev mode
+const isDev = process.env.NODE_ENV !== 'production';
+if (!isDev) {
+    console.log('Skipping translation validation in production mode');
+    process.exit(0);
 }
 
 const base = __dirname;

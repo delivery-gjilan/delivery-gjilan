@@ -19,53 +19,35 @@
             }
         }
     },
-    "transactions": {
-        "create": {
-            "title": "Transaksion i Ri",
-            "amount": "Shuma",
-            "expense": "Shpenzim",
-            "income": "Të Ardhura",
-            "description": "Përshkrimi",
-            "description_placeholder": "Për çfarë është kjo?",
-            "tags": "Etiketat",
-            "tags_placeholder": "Shto një etiketë...",
-            "success": "Transaksioni u Ruajt!",
-            "save": "Ruaj Transaksionin"
-        },
-        "list": {
-            "empty_title": "Ende asnjë transaksion",
-            "empty_description": "Filloni duke shtuar transaksionin tuaj të parë!"
-        },
-        "details": {
-            "title": "Detajet e Transaksionit",
-            "not_found": "Transaksioni nuk u gjet",
-            "go_back": "Kthehu",
-            "date_time": "DATA & ORA",
-            "type": "LLOJI",
-            "tags": "ETIKETAT"
-        }
+    "home": {
+        "title": "Restorante",
+        "subtitle": "Zgjidhni nga partnerët tanë"
+    },
+    "orders": {
+        "title": "Porosinë e Mia",
+        "subtitle": "Ndiqni dorëzimet tuaja",
+        "empty": "Ende asnjë porosi",
+        "items": "Artikuj",
+        "total": "Totali"
     },
     "profile": {
-        "title": "Profili dhe Cilësimet",
-        "seed_db": "Mbush Bazen e te Dhenave (Dev)",
-        "seed_warning": "Kujdes: Kjo do të fshijë të gjitha të dhënat ekzistuese.",
-        "language_toggle": "Ndrysho Gjuhën",
-        "current_language": "Gjuha Aktuale: Shqip"
+        "title": "Llogaria",
+        "account_section": "Llogaria e Përdoruesit",
+        "email": "Email",
+        "phone": "Telefoni",
+        "language": "Gjuha",
+        "app_version": "Versioni i Aplikacionit",
+        "logout": "Dalje",
+        "logout_confirm": "A jeni i sigurt se dëshironi të dilni?"
     },
     "tabs": {
         "home": "Kreu",
-        "analytics": "Analitika",
-        "create": "Krijo Transaksion",
+        "orders": "Porosite",
+        "create": "Krijo",
         "profile": "Profili"
     },
-    "home": {
-        "title": "Transaksionet",
-        "subtitle": "Aktiviteti juaj financiar i fundit"
-    },
-    "account": {
-        "total_balance": "Bilanci Total",
-        "income": "Të Ardhura",
-        "expenses": "Shpenzime",
-        "vs_last_month": "muajin e kaluar"
+    "restaurant": {
+        "title": "Produktet",
+        "add_to_cart": "Shto në Shportë"
     }
 }
