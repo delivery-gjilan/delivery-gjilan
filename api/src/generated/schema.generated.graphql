@@ -84,7 +84,7 @@ type Mutation {
   deleteBusiness(id: ID!): Boolean!
   deleteProduct(id: ID!): Boolean!
   deleteProductCategory(id: ID!): Boolean!
-  initiateSignup(input: InitiateSignupInput!): SignupStepResponse!
+  initiateSignup(input: InitiateSignupInput!): AuthResponse!
   login(input: LoginInput!): AuthResponse!
   submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
   updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
@@ -184,7 +184,6 @@ type SignupStepResponse {
 
 input SubmitPhoneNumberInput {
   phoneNumber: String!
-  userId: ID!
 }
 
 input UpdateBusinessInput {
@@ -227,12 +226,10 @@ type User {
 
 input VerifyEmailInput {
   code: String!
-  userId: ID!
 }
 
 input VerifyPhoneInput {
   code: String!
-  userId: ID!
 }
 
 type WorkingHours {

@@ -1,5 +1,5 @@
 {
-  "id": "e0b00de0-b312-438b-83f3-f4a714c99263",
+  "id": "3c6751ab-ddf2-4df9-9760-40f8da3e6681",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -543,11 +543,17 @@
           "primaryKey": false,
           "notNull": true
         },
-        "name": {
-          "name": "name",
+        "first_name": {
+          "name": "first_name",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
+        },
+        "last_name": {
+          "name": "last_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
         },
         "address": {
           "name": "address",

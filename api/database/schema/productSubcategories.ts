@@ -20,7 +20,10 @@ export const productSubcategories = pgTable('product_subcategories', {
 
 export const productSubcategoriesRelations = relations(productSubcategories, ({ one, many }) => ({
     products: many(products),
-    productCategory: one(productCategories),
+    productCategory: one(productCategories, {
+        fields: [productSubcategories.categoryId],
+        references: [productCategories.id],
+    }),
 }));
 
 export type DbProductSubcategory = typeof productSubcategories.$inferSelect;

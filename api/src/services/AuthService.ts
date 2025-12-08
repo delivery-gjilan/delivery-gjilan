@@ -16,14 +16,9 @@ export class AuthService {
     }
 
     /**
-     * Step 1: Initiate signup - Create user and generate email verification code
+     * Step 1: Initiate signup - Create user, generate email verification code, and return JWT token
      */
-    async initiateSignup(
-        firstName: string,
-        lastName: string,
-        email: string,
-        password: string,
-    ): Promise<SignupStepResponse> {
+    async initiateSignup(firstName: string, lastName: string, email: string, password: string): Promise<AuthResponse> {
         // Check if user already exists
         const existingUser = await this.authRepository.findByEmail(email);
         if (existingUser) {
@@ -43,9 +38,12 @@ export class AuthService {
         // In a real app, you would send this code via email
         console.log(`Email verification code for ${email}: ${verificationCode}`);
 
+        // Generate JWT token for authenticated signup steps
+        const token = this.generateJWT(user.id);
+
         return {
-            userId: user.id,
-            currentStep: 'EMAIL_SENT',
+            token,
+            user,
             message: `Verification code sent to ${email}. Please check your email.`,
         };
     }
@@ -125,10 +123,7 @@ export class AuthService {
             throw new Error('Invalid email or password');
         }
 
-        // Check if signup is completed
-        if (user.signupStep !== 'COMPLETED') {
-            throw new Error('Please complete the signup process first');
-        }
+        // Allow login at any signup stage - user will be redirected based on signupStep
 
         // Verify password
         const isPasswordValid = await comparePassword(password, user.password);

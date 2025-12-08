@@ -6,10 +6,17 @@ import { GraphQLContext } from '../context';
  * Directive transformer for @skipAuth
  * Validates that userId exists in context for protected fields
  * Skips validation if field has @skipAuth directive
+ * Only applies to Query, Mutation, and Subscription root fields
  */
 export function skipAuthDirective(schema: GraphQLSchema, directiveName = 'skipAuth'): GraphQLSchema {
     return mapSchema(schema, {
-        [MapperKind.OBJECT_FIELD]: (fieldConfig) => {
+        [MapperKind.OBJECT_FIELD]: (fieldConfig, fieldName, typeName) => {
+            // Only check authentication for Query, Mutation, and Subscription fields
+            // Skip nested object type fields
+            if (typeName !== 'Query' && typeName !== 'Mutation' && typeName !== 'Subscription') {
+                return fieldConfig;
+            }
+
             // Check if field has @skipAuth directive
             const skipAuthDirective = getDirective(schema, fieldConfig, directiveName)?.[0];
 

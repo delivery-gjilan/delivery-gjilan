@@ -105,7 +105,7 @@ export type Mutation = {
   deleteBusiness: Scalars['Boolean']['output'];
   deleteProduct: Scalars['Boolean']['output'];
   deleteProductCategory: Scalars['Boolean']['output'];
-  initiateSignup: SignupStepResponse;
+  initiateSignup: AuthResponse;
   login: AuthResponse;
   submitPhoneNumber: SignupStepResponse;
   updateBusiness: Business;
@@ -309,7 +309,6 @@ export type SignupStepResponse = {
 
 export type SubmitPhoneNumberInput = {
   phoneNumber: Scalars['String']['input'];
-  userId: Scalars['ID']['input'];
 };
 
 export type UpdateBusinessInput = {
@@ -353,12 +352,10 @@ export type User = {
 
 export type VerifyEmailInput = {
   code: Scalars['String']['input'];
-  userId: Scalars['ID']['input'];
 };
 
 export type VerifyPhoneInput = {
   code: Scalars['String']['input'];
-  userId: Scalars['ID']['input'];
 };
 
 export type WorkingHours = {
@@ -563,7 +560,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   deleteBusiness?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteBusinessArgs, 'id'>>;
   deleteProduct?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteProductArgs, 'id'>>;
   deleteProductCategory?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteProductCategoryArgs, 'id'>>;
-  initiateSignup?: Resolver<ResolversTypes['SignupStepResponse'], ParentType, ContextType, RequireFields<MutationinitiateSignupArgs, 'input'>>;
+  initiateSignup?: Resolver<ResolversTypes['AuthResponse'], ParentType, ContextType, RequireFields<MutationinitiateSignupArgs, 'input'>>;
   login?: Resolver<ResolversTypes['AuthResponse'], ParentType, ContextType, RequireFields<MutationloginArgs, 'input'>>;
   submitPhoneNumber?: Resolver<ResolversTypes['SignupStepResponse'], ParentType, ContextType, RequireFields<MutationsubmitPhoneNumberArgs, 'input'>>;
   updateBusiness?: Resolver<ResolversTypes['Business'], ParentType, ContextType, RequireFields<MutationupdateBusinessArgs, 'id' | 'input'>>;

@@ -38,17 +38,14 @@ input InitiateSignupInput {
 }
 
 input VerifyEmailInput {
-    userId: ID!
     code: String!
 }
 
 input SubmitPhoneNumberInput {
-    userId: ID!
     phoneNumber: String!
 }
 
 input VerifyPhoneInput {
-    userId: ID!
     code: String!
 }
 
@@ -62,9 +59,9 @@ type Query {
 }
 
 type Mutation {
-    initiateSignup(input: InitiateSignupInput!): SignupStepResponse! @skipAuth
-    verifyEmail(input: VerifyEmailInput!): SignupStepResponse! @skipAuth
-    submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse! @skipAuth
-    verifyPhone(input: VerifyPhoneInput!): SignupStepResponse! @skipAuth
+    initiateSignup(input: InitiateSignupInput!): AuthResponse! @skipAuth
+    verifyEmail(input: VerifyEmailInput!): SignupStepResponse!
+    submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
+    verifyPhone(input: VerifyPhoneInput!): SignupStepResponse!
     login(input: LoginInput!): AuthResponse! @skipAuth
 }
