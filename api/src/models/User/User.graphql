@@ -6,6 +6,12 @@ enum SignupStep {
     COMPLETED
 }
 
+enum UserRole {
+    CUSTOMER
+    DRIVER
+    SUPER_ADMIN
+}
+
 type User {
     id: ID!
     email: String!
@@ -16,6 +22,7 @@ type User {
     emailVerified: Boolean!
     phoneVerified: Boolean!
     signupStep: SignupStep!
+    role: UserRole!
 }
 
 type SignupStepResponse {

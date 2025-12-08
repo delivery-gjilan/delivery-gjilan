@@ -3,6 +3,8 @@ import { businesses, NewDbBusiness } from './schema/businesses';
 import { productCategories, NewDbProductCategory } from './schema/productCategories';
 import { productSubcategories, NewDbProductSubcategory } from './schema/productSubcategories';
 import { products, NewDbProduct } from './schema/products';
+import { users } from './schema/users';
+import { hashPassword } from '@/lib/utils/authUtils';
 import { faker } from '@faker-js/faker';
 
 async function seed() {
@@ -15,8 +17,24 @@ async function seed() {
     await db.delete(productSubcategories);
     await db.delete(productCategories);
     await db.delete(businesses);
+    await db.delete(users);
 
     console.log('🧹 Cleared existing data');
+
+    // Create super admin user
+    const hashedPassword = await hashPassword('12345678');
+    await db.insert(users).values({
+        firstName: 'Admin',
+        lastName: 'Admin',
+        email: 'admin@admin.com',
+        password: hashedPassword,
+        role: 'SUPER_ADMIN',
+        emailVerified: true,
+        phoneVerified: true,
+        signupStep: 'COMPLETED',
+    });
+
+    console.log('👤 Created super admin user (admin@admin.com / 12345678)');
 
     const businessesData: NewDbBusiness[] = [];
     const categoriesData: NewDbProductCategory[] = [];

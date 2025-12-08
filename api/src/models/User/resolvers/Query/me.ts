@@ -24,5 +24,6 @@ export const me: NonNullable<QueryResolvers['me']> = async (_parent, _args, { au
         emailVerified: user.emailVerified,
         phoneVerified: user.phoneVerified,
         signupStep: user.signupStep,
+        role: user.role,
     };
 };

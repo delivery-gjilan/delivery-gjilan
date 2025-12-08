@@ -347,8 +347,14 @@ export type User = {
   lastName: Scalars['String']['output'];
   phoneNumber?: Maybe<Scalars['String']['output']>;
   phoneVerified: Scalars['Boolean']['output'];
+  role: UserRole;
   signupStep: SignupStep;
 };
+
+export type UserRole =
+  | 'CUSTOMER'
+  | 'DRIVER'
+  | 'SUPER_ADMIN';
 
 export type VerifyEmailInput = {
   code: Scalars['String']['input'];
@@ -471,7 +477,8 @@ export type ResolversTypes = {
   UpdateBusinessInput: UpdateBusinessInput;
   UpdateProductCategoryInput: UpdateProductCategoryInput;
   UpdateProductInput: UpdateProductInput;
-  User: ResolverTypeWrapper<Omit<User, 'signupStep'> & { signupStep: ResolversTypes['SignupStep'] }>;
+  User: ResolverTypeWrapper<Omit<User, 'role' | 'signupStep'> & { role: ResolversTypes['UserRole'], signupStep: ResolversTypes['SignupStep'] }>;
+  UserRole: ResolverTypeWrapper<'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN'>;
   VerifyEmailInput: VerifyEmailInput;
   VerifyPhoneInput: VerifyPhoneInput;
   WorkingHours: ResolverTypeWrapper<WorkingHours>;
@@ -662,9 +669,12 @@ export type UserResolvers<ContextType = GraphQLContext, ParentType extends Resol
   lastName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   phoneNumber?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   phoneVerified?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  role?: Resolver<ResolversTypes['UserRole'], ParentType, ContextType>;
   signupStep?: Resolver<ResolversTypes['SignupStep'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
+
+export type UserRoleResolvers = EnumResolverSignature<{ CUSTOMER?: any, DRIVER?: any, SUPER_ADMIN?: any }, ResolversTypes['UserRole']>;
 
 export type WorkingHoursResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['WorkingHours'] = ResolversParentTypes['WorkingHours']> = {
   closesAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
@@ -690,6 +700,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   SignupStep?: SignupStepResolvers;
   SignupStepResponse?: SignupStepResponseResolvers<ContextType>;
   User?: UserResolvers<ContextType>;
+  UserRole?: UserRoleResolvers;
   WorkingHours?: WorkingHoursResolvers<ContextType>;
 };
 

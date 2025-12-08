@@ -14,6 +14,7 @@ export const login: NonNullable<MutationResolvers['login']> = async (_parent, { 
             emailVerified: result.user.emailVerified,
             phoneVerified: result.user.phoneVerified,
             signupStep: result.user.signupStep,
+            role: result.user.role,
         },
         message: result.message,
     };

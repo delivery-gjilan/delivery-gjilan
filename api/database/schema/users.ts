@@ -1,7 +1,7 @@
 import { pgTable, uuid, text, timestamp, boolean, pgEnum } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
-import { SignupStep } from '@/generated/types.generated';
+import { SignupStep, UserRole } from '@/generated/types.generated';
 
 const signupStepValues = [
     'INITIAL',
@@ -11,7 +11,10 @@ const signupStepValues = [
     'COMPLETED',
 ] as const satisfies SignupStep[];
 
+const userRoleValues = ['CUSTOMER', 'DRIVER', 'SUPER_ADMIN'] as const satisfies UserRole[];
+
 export const signupStepEnum = pgEnum('signup_step', signupStepValues);
+export const userRoleEnum = pgEnum('user_role', userRoleValues);
 
 export const users = pgTable('users', {
     id: uuid('id').primaryKey().defaultRandom().notNull(),
@@ -24,6 +27,7 @@ export const users = pgTable('users', {
     emailVerified: boolean('email_verified').default(false).notNull(),
     phoneVerified: boolean('phone_verified').default(false).notNull(),
     signupStep: signupStepEnum('signup_step').default('INITIAL').notNull(),
+    role: userRoleEnum('role').default('CUSTOMER').notNull(),
     emailVerificationCode: text('email_verification_code'),
     phoneVerificationCode: text('phone_verification_code'),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })

@@ -221,7 +221,14 @@ type User {
   lastName: String!
   phoneNumber: String
   phoneVerified: Boolean!
+  role: UserRole!
   signupStep: SignupStep!
+}
+
+enum UserRole {
+  CUSTOMER
+  DRIVER
+  SUPER_ADMIN
 }
 
 input VerifyEmailInput {
