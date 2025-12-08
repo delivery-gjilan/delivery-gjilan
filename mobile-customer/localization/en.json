@@ -19,53 +19,35 @@
             }
         }
     },
-    "transactions": {
-        "create": {
-            "title": "New Transaction",
-            "amount": "Amount",
-            "expense": "Expense",
-            "income": "Income",
-            "description": "Description",
-            "description_placeholder": "What is this for?",
-            "tags": "Tags",
-            "tags_placeholder": "Add a tag...",
-            "success": "Transaction Saved!",
-            "save": "Save Transaction"
-        },
-        "list": {
-            "empty_title": "No transactions yet",
-            "empty_description": "Start by adding your first transaction!"
-        },
-        "details": {
-            "title": "Transaction Details",
-            "not_found": "Transaction not found",
-            "go_back": "Go Back",
-            "date_time": "DATE & TIME",
-            "type": "TYPE",
-            "tags": "TAGS"
-        }
+    "home": {
+        "title": "Restaurants",
+        "subtitle": "Choose from our partners"
+    },
+    "orders": {
+        "title": "My Orders",
+        "subtitle": "Track your deliveries",
+        "empty": "No orders yet",
+        "items": "Items",
+        "total": "Total"
     },
     "profile": {
-        "title": "Profile & Settings",
-        "seed_db": "Seed Database (Dev)",
-        "seed_warning": "Warning: This will delete all existing data.",
-        "language_toggle": "Change Language",
-        "current_language": "Current Language: English"
+        "title": "Account",
+        "account_section": "User Account",
+        "email": "Email",
+        "phone": "Phone",
+        "language": "Language",
+        "app_version": "App Version",
+        "logout": "Logout",
+        "logout_confirm": "Are you sure you want to logout?"
     },
     "tabs": {
         "home": "Home",
-        "analytics": "Analytics",
+        "orders": "Orders",
         "create": "Create",
         "profile": "Profile"
     },
-    "home": {
-        "title": "Transactions",
-        "subtitle": "Your recent financial activity"
-    },
-    "account": {
-        "total_balance": "Total Balance",
-        "income": "Income",
-        "expenses": "Expenses",
-        "vs_last_month": "vs last month"
+    "restaurant": {
+        "title": "Products",
+        "add_to_cart": "Add to Cart"
     }
 }
