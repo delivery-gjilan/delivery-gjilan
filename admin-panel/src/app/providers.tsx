@@ -9,8 +9,8 @@ const client = createApolloClient();
 
 export function Providers({ children }: { children: React.ReactNode }) {
     return (
-        <AuthProvider>
-            <ApolloProvider client={client}>{children}</ApolloProvider>
-        </AuthProvider>
+        <ApolloProvider client={client}>
+            <AuthProvider>{children}</AuthProvider>
+        </ApolloProvider>
     );
 }

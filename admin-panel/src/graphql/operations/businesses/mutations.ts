@@ -8,6 +8,7 @@ export const CREATE_BUSINESS = gql`
             businessType
             imageUrl
             isActive
+            
         }
     }
 `;
@@ -19,7 +20,7 @@ export const UPDATE_BUSINESS = gql`
             name
             businessType
             imageUrl
-            isActive
+            isActive   
         }
     }
 `;

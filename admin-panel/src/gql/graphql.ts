@@ -17,6 +17,13 @@ export type Scalars = {
   Date: { input: any; output: any; }
 };
 
+export type AuthResponse = {
+  __typename?: 'AuthResponse';
+  message: Scalars['String']['output'];
+  token: Scalars['String']['output'];
+  user: User;
+};
+
 export type Business = {
   __typename?: 'Business';
   businessType: BusinessType;
@@ -63,6 +70,13 @@ export type CreateProductInput = {
   subcategoryId?: InputMaybe<Scalars['ID']['input']>;
 };
 
+export type InitiateSignupInput = {
+  email: Scalars['String']['input'];
+  firstName: Scalars['String']['input'];
+  lastName: Scalars['String']['input'];
+  password: Scalars['String']['input'];
+};
+
 export type Location = {
   __typename?: 'Location';
   address: Scalars['String']['output'];
@@ -76,6 +90,11 @@ export type LocationInput = {
   longitude: Scalars['Float']['input'];
 };
 
+export type LoginInput = {
+  email: Scalars['String']['input'];
+  password: Scalars['String']['input'];
+};
+
 export type Mutation = {
   __typename?: 'Mutation';
   cancelOrder: Order;
@@ -85,10 +104,15 @@ export type Mutation = {
   deleteBusiness: Scalars['Boolean']['output'];
   deleteProduct: Scalars['Boolean']['output'];
   deleteProductCategory: Scalars['Boolean']['output'];
+  initiateSignup: AuthResponse;
+  login: AuthResponse;
+  submitPhoneNumber: SignupStepResponse;
   updateBusiness: Business;
   updateOrderStatus: Order;
   updateProduct: Product;
   updateProductCategory: ProductCategory;
+  verifyEmail: SignupStepResponse;
+  verifyPhone: SignupStepResponse;
 };
 
 
@@ -127,6 +151,21 @@ export type MutationDeleteProductCategoryArgs = {
 };
 
 
+export type MutationInitiateSignupArgs = {
+  input: InitiateSignupInput;
+};
+
+
+export type MutationLoginArgs = {
+  input: LoginInput;
+};
+
+
+export type MutationSubmitPhoneNumberArgs = {
+  input: SubmitPhoneNumberInput;
+};
+
+
 export type MutationUpdateBusinessArgs = {
   id: Scalars['ID']['input'];
   input: UpdateBusinessInput;
@@ -148,6 +187,16 @@ export type MutationUpdateProductArgs = {
 export type MutationUpdateProductCategoryArgs = {
   id: Scalars['ID']['input'];
   input: UpdateProductCategoryInput;
+};
+
+
+export type MutationVerifyEmailArgs = {
+  input: VerifyEmailInput;
+};
+
+
+export type MutationVerifyPhoneArgs = {
+  input: VerifyPhoneInput;
 };
 
 export type Order = {
@@ -224,6 +273,7 @@ export type Query = {
   __typename?: 'Query';
   business?: Maybe<Business>;
   businesses: Array<Business>;
+  me?: Maybe<User>;
   order?: Maybe<Order>;
   orders: Array<Order>;
   ordersByStatus: Array<Order>;
@@ -268,6 +318,25 @@ export type QueryProductsArgs = {
   businessId: Scalars['ID']['input'];
 };
 
+export enum SignupStep {
+  Completed = 'COMPLETED',
+  EmailSent = 'EMAIL_SENT',
+  EmailVerified = 'EMAIL_VERIFIED',
+  Initial = 'INITIAL',
+  PhoneSent = 'PHONE_SENT'
+}
+
+export type SignupStepResponse = {
+  __typename?: 'SignupStepResponse';
+  currentStep: SignupStep;
+  message: Scalars['String']['output'];
+  userId: Scalars['ID']['output'];
+};
+
+export type SubmitPhoneNumberInput = {
+  phoneNumber: Scalars['String']['input'];
+};
+
 export type UpdateBusinessInput = {
   businessType?: InputMaybe<BusinessType>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
@@ -296,9 +365,30 @@ export type UpdateProductInput = {
 
 export type User = {
   __typename?: 'User';
-  address: Scalars['String']['output'];
+  address?: Maybe<Scalars['String']['output']>;
+  email: Scalars['String']['output'];
+  emailVerified: Scalars['Boolean']['output'];
+  firstName: Scalars['String']['output'];
   id: Scalars['ID']['output'];
-  name: Scalars['String']['output'];
+  lastName: Scalars['String']['output'];
+  phoneNumber?: Maybe<Scalars['String']['output']>;
+  phoneVerified: Scalars['Boolean']['output'];
+  role: UserRole;
+  signupStep: SignupStep;
+};
+
+export enum UserRole {
+  Customer = 'CUSTOMER',
+  Driver = 'DRIVER',
+  SuperAdmin = 'SUPER_ADMIN'
+}
+
+export type VerifyEmailInput = {
+  code: Scalars['String']['input'];
+};
+
+export type VerifyPhoneInput = {
+  code: Scalars['String']['input'];
 };
 
 export type WorkingHours = {
@@ -311,6 +401,14 @@ export type WorkingHoursInput = {
   closesAt: Scalars['String']['input'];
   opensAt: Scalars['String']['input'];
 };
+
+export type LoginMutationVariables = Exact<{
+  email: Scalars['String']['input'];
+  password: Scalars['String']['input'];
+}>;
+
+
+export type LoginMutation = { __typename?: 'Mutation', login: { __typename?: 'AuthResponse', token: string, message: string, user: { __typename?: 'User', firstName: string, lastName: string, role: UserRole } } };
 
 export type CreateBusinessMutationVariables = Exact<{
   input: CreateBusinessInput;
@@ -439,6 +537,7 @@ export type ProductsAndCategoriesQueryVariables = Exact<{
 export type ProductsAndCategoriesQuery = { __typename?: 'Query', productCategories: Array<{ __typename?: 'ProductCategory', id: string, name: string }>, products: Array<{ __typename?: 'Product', id: string, categoryId: string, name: string, description?: string | null, price: number, imageUrl?: string | null, isOnSale: boolean, salePrice?: number | null, isAvailable: boolean }> };
 
 
+export const LoginDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"Login"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"email"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"password"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"login"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"email"},"value":{"kind":"Variable","name":{"kind":"Name","value":"email"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"password"},"value":{"kind":"Variable","name":{"kind":"Name","value":"password"}}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"token"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"role"}}]}},{"kind":"Field","name":{"kind":"Name","value":"message"}}]}}]}}]} as unknown as DocumentNode<LoginMutation, LoginMutationVariables>;
 export const CreateBusinessDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateBusiness"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateBusinessInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createBusiness"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"businessType"}},{"kind":"Field","name":{"kind":"Name","value":"imageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}}]}}]}}]} as unknown as DocumentNode<CreateBusinessMutation, CreateBusinessMutationVariables>;
 export const UpdateBusinessDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateBusiness"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateBusinessInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateBusiness"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"businessType"}},{"kind":"Field","name":{"kind":"Name","value":"imageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}}]}}]}}]} as unknown as DocumentNode<UpdateBusinessMutation, UpdateBusinessMutationVariables>;
 export const DeleteBusinessDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteBusiness"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteBusiness"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}]}}]} as unknown as DocumentNode<DeleteBusinessMutation, DeleteBusinessMutationVariables>;

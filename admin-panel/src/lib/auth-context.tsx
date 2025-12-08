@@ -1,11 +1,14 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { useMutation } from "@apollo/client/react";
+import { LOGIN_MUTATION } from "@/graphql/operations/auth/login";
 
 interface Admin {
     id: string;
     email: string;
     name: string;
+    role?: string | null;
 }
 
 interface AuthContextType {
@@ -18,26 +21,24 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock admin credentials for testing
-const MOCK_ADMIN = {
-    email: "admin@delivery-gjilan.com",
-    password: "admin123",
-};
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [admin, setAdmin] = useState<Admin | null>(null);
     const [loading, setLoading] = useState(true);
+    const [loginMutation] = useMutation(LOGIN_MUTATION);
 
     // Check if user is already logged in on mount
     useEffect(() => {
         const checkAuth = async () => {
             try {
+                const token = localStorage.getItem("authToken");
                 const adminData = localStorage.getItem("adminData");
-                if (adminData) {
+
+                if (token && adminData) {
                     setAdmin(JSON.parse(adminData));
                 }
             } catch (error) {
                 console.error("Auth check failed:", error);
+                localStorage.removeItem("authToken");
                 localStorage.removeItem("adminData");
             } finally {
                 setLoading(false);
@@ -50,24 +51,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const login = async (email: string, password: string) => {
         setLoading(true);
         try {
-            // Mock login - replace with actual API call when backend is ready
-            if (email === MOCK_ADMIN.email && password === MOCK_ADMIN.password) {
-                const adminData: Admin = {
-                    id: "1",
-                    email: email,
-                    name: "Admin",
-                };
-                localStorage.setItem("adminData", JSON.stringify(adminData));
-                setAdmin(adminData);
-            } else {
-                throw new Error("Invalid email or password");
+            const { data } = await loginMutation({
+                variables: { email, password },
+            });
+
+            const loginResult = data?.login;
+            if (!loginResult || !loginResult.token) {
+                throw new Error(loginResult?.message || "Login failed");
             }
+
+            const fullName = `${loginResult.user?.firstName ?? ""} ${loginResult.user?.lastName ?? ""}`.trim();
+
+            const adminData: Admin = {
+                id: "self",
+                email,
+                name: fullName || email,
+                role: loginResult.user?.role ?? null,
+            };
+
+            localStorage.setItem("authToken", loginResult.token);
+            localStorage.setItem("adminData", JSON.stringify(adminData));
+            setAdmin(adminData);
         } finally {
             setLoading(false);
         }
     };
 
     const logout = () => {
+        localStorage.removeItem("authToken");
         localStorage.removeItem("adminData");
         setAdmin(null);
     };
