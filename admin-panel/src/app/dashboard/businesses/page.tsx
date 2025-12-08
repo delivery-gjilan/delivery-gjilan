@@ -44,6 +44,10 @@ interface Business {
     workingHours?: WorkingHours;
 }
 
+interface GetBusinessesData {
+    businesses: Business[];
+}
+
 /* ---------------------------------------------------------
    PAGE
 --------------------------------------------------------- */
@@ -54,7 +58,7 @@ export default function BusinessesPage() {
     /* --------------------------
      Apollo
   --------------------------- */
-    const { data, loading, refetch } = useQuery(GET_BUSINESSES);
+    const { data, loading, refetch } = useQuery<GetBusinessesData>(GET_BUSINESSES);
 
     const [createBusiness] = useMutation(CREATE_BUSINESS);
     const [updateBusiness] = useMutation(UPDATE_BUSINESS);
@@ -70,6 +74,16 @@ export default function BusinessesPage() {
     const [deleteId, setDeleteId] = useState<string | null>(null);
 
     const [selected, setSelected] = useState<Business | null>(null);
+    const [searchQuery, setSearchQuery] = useState("");
+
+    /* --------------------------
+     Upload State
+  --------------------------- */
+    const [createImageFile, setCreateImageFile] = useState<File | null>(null);
+    const [createImagePreview, setCreateImagePreview] = useState<string | null>(null);
+    const [editImageFile, setEditImageFile] = useState<File | null>(null);
+    const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
+    const [uploadingImage, setUploadingImage] = useState(false);
 
     /* --------------------------
      Form State
@@ -109,18 +123,79 @@ export default function BusinessesPage() {
      Handlers
   --------------------------- */
 
+    // Image upload handler
+    async function uploadImage(file: File, folder: string): Promise<string | null> {
+        const formData = new FormData();
+        formData.append('image', file);
+        formData.append('folder', folder);
+
+        try {
+            const response = await fetch('http://localhost:4000/api/upload/image', {
+                method: 'POST',
+                body: formData,
+            });
+
+            const data = await response.json();
+            if (data.success && data.url) {
+                return data.url;
+            }
+            throw new Error(data.error || 'Upload failed');
+        } catch (error) {
+            console.error('Image upload error:', error);
+            alert('Failed to upload image');
+            return null;
+        }
+    }
+
+    function handleCreateImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        if (file) {
+            setCreateImageFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setCreateImagePreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function handleEditImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        if (file) {
+            setEditImageFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setEditImagePreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
     async function handleCreate() {
         if (!createForm.name.trim() || !createForm.location.address.trim()) {
             alert("Please fill in all required fields");
             return;
         }
 
+        setUploadingImage(true);
+        let imageUrl = createForm.imageUrl;
+
+        // Upload image if file is selected
+        if (createImageFile) {
+            const uploadedUrl = await uploadImage(createImageFile, 'businesses');
+            if (uploadedUrl) {
+                imageUrl = uploadedUrl;
+            }
+        }
+
+        setUploadingImage(false);
+
         await createBusiness({
             variables: {
                 input: {
                     name: createForm.name,
                     businessType: createForm.businessType,
-                    imageUrl: createForm.imageUrl || null,
+                    imageUrl: imageUrl || null,
                     location: {
                         latitude: createForm.location.latitude,
                         longitude: createForm.location.longitude,
@@ -151,6 +226,8 @@ export default function BusinessesPage() {
                 closesAt: "23:00",
             },
         });
+        setCreateImageFile(null);
+        setCreateImagePreview(null);
     }
 
     function openEditModal(business: Business) {
@@ -169,6 +246,8 @@ export default function BusinessesPage() {
                 closesAt: business.workingHours?.closesAt || "23:00",
             },
         });
+        setEditImageFile(null);
+        setEditImagePreview(business.imageUrl || null);
         setEditOpen(true);
     }
 
@@ -180,13 +259,26 @@ export default function BusinessesPage() {
             return;
         }
 
+        setUploadingImage(true);
+        let imageUrl = editForm.imageUrl;
+
+        // Upload new image if file is selected
+        if (editImageFile) {
+            const uploadedUrl = await uploadImage(editImageFile, 'businesses');
+            if (uploadedUrl) {
+                imageUrl = uploadedUrl;
+            }
+        }
+
+        setUploadingImage(false);
+
         await updateBusiness({
             variables: {
                 id: selected.id,
                 input: {
                     name: editForm.name,
                     businessType: editForm.businessType,
-                    imageUrl: editForm.imageUrl || null,
+                    imageUrl: imageUrl || null,
                     location: {
                         latitude: editForm.location.latitude,
                         longitude: editForm.location.longitude,
@@ -221,6 +313,16 @@ export default function BusinessesPage() {
     }
 
     const businesses: Business[] = data?.businesses || [];
+    
+    // Filter businesses based on search query
+    const filteredBusinesses = businesses.filter((business) => {
+        const query = searchQuery.toLowerCase();
+        return (
+            business.name.toLowerCase().includes(query) ||
+            business.businessType.toLowerCase().includes(query) ||
+            business.location?.address.toLowerCase().includes(query)
+        );
+    });
 
     return (
         <div className="text-white">
@@ -229,6 +331,15 @@ export default function BusinessesPage() {
                 <Button variant="primary" onClick={() => setCreateOpen(true)}>
                     + Create Business
                 </Button>
+            </div>
+
+            {/* SEARCH BAR */}
+            <div className="mb-4">
+                <Input
+                    placeholder="Search businesses by name, type, or address..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                />
             </div>
 
             {/* TABLE */}
@@ -245,7 +356,16 @@ export default function BusinessesPage() {
                     </thead>
 
                     <tbody>
-                        {businesses.map((b) => (
+                        {filteredBusinesses.length === 0 ? (
+                            <tr>
+                                <Td colSpan={5}>
+                                    <div className="text-center text-gray-500 py-4">
+                                        No businesses found
+                                    </div>
+                                </Td>
+                            </tr>
+                        ) : (
+                            filteredBusinesses.map((b) => (
                             <tr key={b.id}>
                                 <Td>{b.name}</Td>
                                 <Td>{b.businessType}</Td>
@@ -308,7 +428,8 @@ export default function BusinessesPage() {
                                     </div>
                                 </Td>
                             </tr>
-                        ))}
+                        ))
+                        )}
                     </tbody>
                 </Table>
 
@@ -365,18 +486,23 @@ export default function BusinessesPage() {
 
                     <div>
                         <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Image URL (optional)
+                            Business Image (optional)
                         </label>
-                        <Input
-                            placeholder="e.g., https://example.com/image.jpg"
-                            value={createForm.imageUrl}
-                            onChange={(e) =>
-                                setCreateForm({
-                                    ...createForm,
-                                    imageUrl: e.target.value,
-                                })
-                            }
+                        <input
+                            type="file"
+                            accept="image/jpeg,image/jpg,image/png,image/webp"
+                            onChange={handleCreateImageChange}
+                            className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
                         />
+                        {createImagePreview && (
+                            <div className="mt-2">
+                                <img
+                                    src={createImagePreview}
+                                    alt="Preview"
+                                    className="h-32 w-32 object-cover rounded"
+                                />
+                            </div>
+                        )}
                     </div>
 
                     <div>
@@ -494,8 +620,9 @@ export default function BusinessesPage() {
                         variant="primary"
                         className="w-full mt-2"
                         onClick={handleCreate}
+                        disabled={uploadingImage}
                     >
-                        Create Business
+                        {uploadingImage ? "Uploading..." : "Create Business"}
                     </Button>
                 </div>
             </Modal>
@@ -543,18 +670,23 @@ export default function BusinessesPage() {
 
                     <div>
                         <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Image URL (optional)
+                            Business Image (optional)
                         </label>
-                        <Input
-                            placeholder="e.g., https://example.com/image.jpg"
-                            value={editForm.imageUrl}
-                            onChange={(e) =>
-                                setEditForm({
-                                    ...editForm,
-                                    imageUrl: e.target.value,
-                                })
-                            }
+                        <input
+                            type="file"
+                            accept="image/jpeg,image/jpg,image/png,image/webp"
+                            onChange={handleEditImageChange}
+                            className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
                         />
+                        {editImagePreview && (
+                            <div className="mt-2">
+                                <img
+                                    src={editImagePreview}
+                                    alt="Preview"
+                                    className="h-32 w-32 object-cover rounded"
+                                />
+                            </div>
+                        )}
                     </div>
 
                     <div>
@@ -672,8 +804,9 @@ export default function BusinessesPage() {
                         variant="primary"
                         className="w-full mt-2"
                         onClick={handleEdit}
+                        disabled={uploadingImage}
                     >
-                        Save Changes
+                        {uploadingImage ? "Uploading..." : "Save Changes"}
                     </Button>
                 </div>
             </Modal>

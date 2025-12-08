@@ -9,6 +9,7 @@ import { ProductCategoryRepository } from '@/repositories/ProductCategoryReposit
 import { ProductCategoryService } from '@/services/ProductCategoryService';
 import { ProductRepository } from '@/repositories/ProductRepository';
 import { ProductService } from '@/services/ProductService';
+import uploadRoutes from './routes/uploadRoutes';
 
 console.log(process.env.DB_URL);
 
@@ -17,6 +18,9 @@ const port = process.env.PORT || 4000;
 
 app.use(cors());
 app.use(express.json());
+
+// Upload routes (REST API)
+app.use('/api/upload', uploadRoutes);
 
 const yoga = createYoga({
     schema,

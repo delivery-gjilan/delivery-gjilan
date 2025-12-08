@@ -12,9 +12,9 @@ export function Th({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function Td({ children }: { children: React.ReactNode }) {
+export function Td({ children, colSpan }: { children: React.ReactNode; colSpan?: number }) {
   return (
-    <td className="px-4 py-3 text-gray-200 border-b border-gray-800 text-sm">
+    <td className="px-4 py-3 text-gray-200 border-b border-gray-800 text-sm" colSpan={colSpan}>
       {children}
     </td>
   );
