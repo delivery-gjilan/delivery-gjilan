@@ -1,3 +1,9 @@
+type AuthResponse {
+  message: String!
+  token: String!
+  user: User!
+}
+
 type Business {
   businessType: BusinessType!
   createdAt: Date!
@@ -45,6 +51,11 @@ input CreateProductInput {
 
 scalar Date
 
+input InitiateSignupInput {
+  email: String!
+  password: String!
+}
+
 type Location {
   address: String!
   latitude: Float!
@@ -57,6 +68,11 @@ input LocationInput {
   longitude: Float!
 }
 
+input LoginInput {
+  email: String!
+  password: String!
+}
+
 type Mutation {
   createBusiness(input: CreateBusinessInput!): Business!
   createProduct(input: CreateProductInput!): Product!
@@ -64,9 +80,14 @@ type Mutation {
   deleteBusiness(id: ID!): Boolean!
   deleteProduct(id: ID!): Boolean!
   deleteProductCategory(id: ID!): Boolean!
+  initiateSignup(input: InitiateSignupInput!): SignupStepResponse!
+  login(input: LoginInput!): AuthResponse!
+  submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
   updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
   updateProduct(id: ID!, input: UpdateProductInput!): Product!
   updateProductCategory(id: ID!, input: UpdateProductCategoryInput!): ProductCategory!
+  verifyEmail(input: VerifyEmailInput!): SignupStepResponse!
+  verifyPhone(input: VerifyPhoneInput!): SignupStepResponse!
 }
 
 type Order {
@@ -136,10 +157,30 @@ type ProductSubcategory {
 type Query {
   business(id: ID!): Business
   businesses: [Business!]!
+  me: User
   product(id: ID!): Product
   productCategories(businessId: ID!): [ProductCategory!]!
   productCategory(id: ID!): ProductCategory
   products(businessId: ID!): [Product!]!
+}
+
+enum SignupStep {
+  COMPLETED
+  EMAIL_SENT
+  EMAIL_VERIFIED
+  INITIAL
+  PHONE_SENT
+}
+
+type SignupStepResponse {
+  currentStep: SignupStep!
+  message: String!
+  userId: ID!
+}
+
+input SubmitPhoneNumberInput {
+  phoneNumber: String!
+  userId: ID!
 }
 
 input UpdateBusinessInput {
@@ -169,9 +210,24 @@ input UpdateProductInput {
 }
 
 type User {
-  address: String!
+  address: String
+  email: String!
+  emailVerified: Boolean!
   id: ID!
-  name: String!
+  name: String
+  phoneNumber: String
+  phoneVerified: Boolean!
+  signupStep: SignupStep!
+}
+
+input VerifyEmailInput {
+  code: String!
+  userId: ID!
+}
+
+input VerifyPhoneInput {
+  code: String!
+  userId: ID!
 }
 
 type WorkingHours {

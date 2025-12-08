@@ -9,6 +9,8 @@ import { ProductCategoryRepository } from '@/repositories/ProductCategoryReposit
 import { ProductCategoryService } from '@/services/ProductCategoryService';
 import { ProductRepository } from '@/repositories/ProductRepository';
 import { ProductService } from '@/services/ProductService';
+import { AuthRepository } from '@/repositories/AuthRepository';
+import { AuthService } from '@/services/AuthService';
 
 console.log(process.env.DB_URL);
 
@@ -34,12 +36,16 @@ const yoga = createYoga({
         const productRepository = new ProductRepository(db);
         const productService = new ProductService(productRepository);
 
+        const authRepository = new AuthRepository(db);
+        const authService = new AuthService(authRepository);
+
         return {
             ...initialContext,
             db,
             businessService,
             productCategoryService,
             productService,
+            authService,
         };
     },
 });

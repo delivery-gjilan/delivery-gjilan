@@ -2,19 +2,18 @@ import { relations, sql } from 'drizzle-orm';
 import { pgTable, varchar, boolean, timestamp, pgEnum, doublePrecision, integer, uuid } from 'drizzle-orm/pg-core';
 import { products } from './products';
 import { productCategories } from './productCategories';
+import { BusinessType } from '@/generated/types.generated';
 
-export const businessType = pgEnum('business_type', ['MARKET', 'PHARMACY', 'RESTAURANT']);
+const businessTypeValues = ['MARKET', 'PHARMACY', 'RESTAURANT'] as const satisfies BusinessType[];
+
+export const businessType = pgEnum('business_type', businessTypeValues);
 
 export const businesses = pgTable('businesses', {
     id: uuid('id').primaryKey().defaultRandom().notNull(),
-
     name: varchar('name', { length: 255 }).notNull(),
     imageUrl: varchar('image_url', { length: 500 }),
-
     businessType: businessType('business_type').notNull(),
-
     isActive: boolean('is_active').default(true),
-
     locationLat: doublePrecision('location_lat').notNull(),
     locationLng: doublePrecision('location_lng').notNull(),
     locationAddress: varchar('location_address', { length: 500 }).notNull(),

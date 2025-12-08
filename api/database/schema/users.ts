@@ -1,11 +1,30 @@
-import { pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, boolean, pgEnum } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
+import { SignupStep } from '@/generated/types.generated';
+
+const signupStepValues = [
+    'INITIAL',
+    'EMAIL_SENT',
+    'EMAIL_VERIFIED',
+    'PHONE_SENT',
+    'COMPLETED',
+] as const satisfies SignupStep[];
+
+export const signupStepEnum = pgEnum('signup_step', signupStepValues);
+
 export const users = pgTable('users', {
-    id: serial('id').primaryKey(),
-    name: text('name').notNull(),
+    id: uuid('id').primaryKey().defaultRandom().notNull(),
     email: text('email').notNull().unique(),
-    address: text('address').notNull(),
+    password: text('password').notNull(),
+    name: text('name'),
+    address: text('address'),
+    phoneNumber: text('phone_number'),
+    emailVerified: boolean('email_verified').default(false).notNull(),
+    phoneVerified: boolean('phone_verified').default(false).notNull(),
+    signupStep: signupStepEnum('signup_step').default('INITIAL').notNull(),
+    emailVerificationCode: text('email_verification_code'),
+    phoneVerificationCode: text('phone_verification_code'),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull(),
