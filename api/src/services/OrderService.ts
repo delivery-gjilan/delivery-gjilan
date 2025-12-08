@@ -59,7 +59,7 @@ export class OrderService {
                         name: business.name,
                         businessType: business.businessType,
                         imageUrl: business.imageUrl || undefined,
-                        isActive: business.isActive,
+                        isActive: business.isActive ?? true,
                         location: {
                             latitude: business.locationLat,
                             longitude: business.locationLng,
