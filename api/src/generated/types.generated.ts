@@ -80,6 +80,7 @@ export type LocationInput = {
 
 export type Mutation = {
   __typename?: 'Mutation';
+  cancelOrder: Order;
   createBusiness: Business;
   createProduct: Product;
   createProductCategory: ProductCategory;
@@ -87,8 +88,14 @@ export type Mutation = {
   deleteProduct: Scalars['Boolean']['output'];
   deleteProductCategory: Scalars['Boolean']['output'];
   updateBusiness: Business;
+  updateOrderStatus: Order;
   updateProduct: Product;
   updateProductCategory: ProductCategory;
+};
+
+
+export type MutationcancelOrderArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -125,6 +132,12 @@ export type MutationdeleteProductCategoryArgs = {
 export type MutationupdateBusinessArgs = {
   id: Scalars['ID']['input'];
   input: UpdateBusinessInput;
+};
+
+
+export type MutationupdateOrderStatusArgs = {
+  id: Scalars['ID']['input'];
+  status: OrderStatus;
 };
 
 
@@ -212,6 +225,9 @@ export type Query = {
   __typename?: 'Query';
   business?: Maybe<Business>;
   businesses: Array<Business>;
+  order?: Maybe<Order>;
+  orders: Array<Order>;
+  ordersByStatus: Array<Order>;
   product?: Maybe<Product>;
   productCategories: Array<ProductCategory>;
   productCategory?: Maybe<ProductCategory>;
@@ -221,6 +237,16 @@ export type Query = {
 
 export type QuerybusinessArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type QueryorderArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryordersByStatusArgs = {
+  status: OrderStatus;
 };
 
 
@@ -446,6 +472,7 @@ export type LocationResolvers<ContextType = GraphQLContext, ParentType extends R
 };
 
 export type MutationResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Mutation'] = ResolversParentTypes['Mutation']> = {
+  cancelOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationcancelOrderArgs, 'id'>>;
   createBusiness?: Resolver<ResolversTypes['Business'], ParentType, ContextType, RequireFields<MutationcreateBusinessArgs, 'input'>>;
   createProduct?: Resolver<ResolversTypes['Product'], ParentType, ContextType, RequireFields<MutationcreateProductArgs, 'input'>>;
   createProductCategory?: Resolver<ResolversTypes['ProductCategory'], ParentType, ContextType, RequireFields<MutationcreateProductCategoryArgs, 'input'>>;
@@ -453,6 +480,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   deleteProduct?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteProductArgs, 'id'>>;
   deleteProductCategory?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteProductCategoryArgs, 'id'>>;
   updateBusiness?: Resolver<ResolversTypes['Business'], ParentType, ContextType, RequireFields<MutationupdateBusinessArgs, 'id' | 'input'>>;
+  updateOrderStatus?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationupdateOrderStatusArgs, 'id' | 'status'>>;
   updateProduct?: Resolver<ResolversTypes['Product'], ParentType, ContextType, RequireFields<MutationupdateProductArgs, 'id' | 'input'>>;
   updateProductCategory?: Resolver<ResolversTypes['ProductCategory'], ParentType, ContextType, RequireFields<MutationupdateProductCategoryArgs, 'id' | 'input'>>;
 };
@@ -524,6 +552,9 @@ export type ProductSubcategoryResolvers<ContextType = GraphQLContext, ParentType
 export type QueryResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Query'] = ResolversParentTypes['Query']> = {
   business?: Resolver<Maybe<ResolversTypes['Business']>, ParentType, ContextType, RequireFields<QuerybusinessArgs, 'id'>>;
   businesses?: Resolver<Array<ResolversTypes['Business']>, ParentType, ContextType>;
+  order?: Resolver<Maybe<ResolversTypes['Order']>, ParentType, ContextType, RequireFields<QueryorderArgs, 'id'>>;
+  orders?: Resolver<Array<ResolversTypes['Order']>, ParentType, ContextType>;
+  ordersByStatus?: Resolver<Array<ResolversTypes['Order']>, ParentType, ContextType, RequireFields<QueryordersByStatusArgs, 'status'>>;
   product?: Resolver<Maybe<ResolversTypes['Product']>, ParentType, ContextType, RequireFields<QueryproductArgs, 'id'>>;
   productCategories?: Resolver<Array<ResolversTypes['ProductCategory']>, ParentType, ContextType, RequireFields<QueryproductCategoriesArgs, 'businessId'>>;
   productCategory?: Resolver<Maybe<ResolversTypes['ProductCategory']>, ParentType, ContextType, RequireFields<QueryproductCategoryArgs, 'id'>>;

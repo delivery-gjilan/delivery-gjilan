@@ -29,3 +29,14 @@ type Order {
     dropOffLocation: Location!
     businesses: [OrderBusiness!]!
 }
+
+type Query {
+    orders: [Order!]!
+    order(id: ID!): Order
+    ordersByStatus(status: OrderStatus!): [Order!]!
+}
+
+type Mutation {
+    updateOrderStatus(id: ID!, status: OrderStatus!): Order!
+    cancelOrder(id: ID!): Order!
+}

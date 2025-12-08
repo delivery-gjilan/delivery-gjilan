@@ -58,6 +58,7 @@ input LocationInput {
 }
 
 type Mutation {
+  cancelOrder(id: ID!): Order!
   createBusiness(input: CreateBusinessInput!): Business!
   createProduct(input: CreateProductInput!): Product!
   createProductCategory(input: CreateProductCategoryInput!): ProductCategory!
@@ -65,6 +66,7 @@ type Mutation {
   deleteProduct(id: ID!): Boolean!
   deleteProductCategory(id: ID!): Boolean!
   updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
+  updateOrderStatus(id: ID!, status: OrderStatus!): Order!
   updateProduct(id: ID!, input: UpdateProductInput!): Product!
   updateProductCategory(id: ID!, input: UpdateProductCategoryInput!): ProductCategory!
 }
@@ -136,6 +138,9 @@ type ProductSubcategory {
 type Query {
   business(id: ID!): Business
   businesses: [Business!]!
+  order(id: ID!): Order
+  orders: [Order!]!
+  ordersByStatus(status: OrderStatus!): [Order!]!
   product(id: ID!): Product
   productCategories(businessId: ID!): [ProductCategory!]!
   productCategory(id: ID!): ProductCategory

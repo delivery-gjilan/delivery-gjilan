@@ -2,10 +2,14 @@
     import type   { Resolvers } from './types.generated';
     import    { business as Query_business } from './../models/Business/resolvers/Query/business';
 import    { businesses as Query_businesses } from './../models/Business/resolvers/Query/businesses';
+import    { order as Query_order } from './../models/Order/resolvers/Query/order';
+import    { orders as Query_orders } from './../models/Order/resolvers/Query/orders';
+import    { ordersByStatus as Query_ordersByStatus } from './../models/Order/resolvers/Query/ordersByStatus';
 import    { product as Query_product } from './../models/Product/resolvers/Query/product';
 import    { productCategories as Query_productCategories } from './../models/ProductCategory/resolvers/Query/productCategories';
 import    { productCategory as Query_productCategory } from './../models/ProductCategory/resolvers/Query/productCategory';
 import    { products as Query_products } from './../models/Product/resolvers/Query/products';
+import    { cancelOrder as Mutation_cancelOrder } from './../models/Order/resolvers/Mutation/cancelOrder';
 import    { createBusiness as Mutation_createBusiness } from './../models/Business/resolvers/Mutation/createBusiness';
 import    { createProduct as Mutation_createProduct } from './../models/Product/resolvers/Mutation/createProduct';
 import    { createProductCategory as Mutation_createProductCategory } from './../models/ProductCategory/resolvers/Mutation/createProductCategory';
@@ -13,6 +17,7 @@ import    { deleteBusiness as Mutation_deleteBusiness } from './../models/Busine
 import    { deleteProduct as Mutation_deleteProduct } from './../models/Product/resolvers/Mutation/deleteProduct';
 import    { deleteProductCategory as Mutation_deleteProductCategory } from './../models/ProductCategory/resolvers/Mutation/deleteProductCategory';
 import    { updateBusiness as Mutation_updateBusiness } from './../models/Business/resolvers/Mutation/updateBusiness';
+import    { updateOrderStatus as Mutation_updateOrderStatus } from './../models/Order/resolvers/Mutation/updateOrderStatus';
 import    { updateProduct as Mutation_updateProduct } from './../models/Product/resolvers/Mutation/updateProduct';
 import    { updateProductCategory as Mutation_updateProductCategory } from './../models/ProductCategory/resolvers/Mutation/updateProductCategory';
 import    { Business } from './../models/Business/resolvers/Business';
@@ -27,8 +32,8 @@ import    { User } from './../models/User/resolvers/User';
 import    { WorkingHours } from './../models/General/resolvers/WorkingHours';
 import    { DateResolver } from 'graphql-scalars';
     export const resolvers: Resolvers = {
-      Query: { business: Query_business,businesses: Query_businesses,product: Query_product,productCategories: Query_productCategories,productCategory: Query_productCategory,products: Query_products },
-      Mutation: { createBusiness: Mutation_createBusiness,createProduct: Mutation_createProduct,createProductCategory: Mutation_createProductCategory,deleteBusiness: Mutation_deleteBusiness,deleteProduct: Mutation_deleteProduct,deleteProductCategory: Mutation_deleteProductCategory,updateBusiness: Mutation_updateBusiness,updateProduct: Mutation_updateProduct,updateProductCategory: Mutation_updateProductCategory },
+      Query: { business: Query_business,businesses: Query_businesses,order: Query_order,orders: Query_orders,ordersByStatus: Query_ordersByStatus,product: Query_product,productCategories: Query_productCategories,productCategory: Query_productCategory,products: Query_products },
+      Mutation: { cancelOrder: Mutation_cancelOrder,createBusiness: Mutation_createBusiness,createProduct: Mutation_createProduct,createProductCategory: Mutation_createProductCategory,deleteBusiness: Mutation_deleteBusiness,deleteProduct: Mutation_deleteProduct,deleteProductCategory: Mutation_deleteProductCategory,updateBusiness: Mutation_updateBusiness,updateOrderStatus: Mutation_updateOrderStatus,updateProduct: Mutation_updateProduct,updateProductCategory: Mutation_updateProductCategory },
       
       Business: Business,
 Location: Location,
