@@ -1,0 +1,42 @@
+import { mapSchema, getDirective, MapperKind } from '@graphql-tools/utils';
+import { GraphQLSchema, defaultFieldResolver, GraphQLError } from 'graphql';
+import { GraphQLContext } from '../context';
+
+/**
+ * Directive transformer for @skipAuth
+ * Validates that userId exists in context for protected fields
+ * Skips validation if field has @skipAuth directive
+ */
+export function skipAuthDirective(schema: GraphQLSchema, directiveName = 'skipAuth'): GraphQLSchema {
+    return mapSchema(schema, {
+        [MapperKind.OBJECT_FIELD]: (fieldConfig) => {
+            // Check if field has @skipAuth directive
+            const skipAuthDirective = getDirective(schema, fieldConfig, directiveName)?.[0];
+
+            if (skipAuthDirective) {
+                // Field is public, no authentication required
+                return fieldConfig;
+            }
+
+            // Field is protected, wrap resolver with authentication check
+            const { resolve = defaultFieldResolver } = fieldConfig;
+
+            fieldConfig.resolve = async function (source, args, context: GraphQLContext, info) {
+                // Check if userId exists in context
+                if (!context.userData?.userId) {
+                    throw new GraphQLError('Authentication required', {
+                        extensions: {
+                            code: 'UNAUTHENTICATED',
+                            http: { status: 401 },
+                        },
+                    });
+                }
+
+                // User is authenticated, proceed with original resolver
+                return resolve(source, args, context, info);
+            };
+
+            return fieldConfig;
+        },
+    });
+}

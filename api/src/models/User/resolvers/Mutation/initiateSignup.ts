@@ -5,10 +5,10 @@ export const initiateSignup: NonNullable<MutationResolvers['initiateSignup']> = 
     { input },
     { authService },
 ) => {
-    const result = await authService.initiateSignup(input.email, input.password);
+    const result = await authService.initiateSignup(input.firstName, input.lastName, input.email, input.password);
     return {
-        userId: result.userId.toString(),
-        currentStep: result.currentStep as 'INITIAL' | 'EMAIL_SENT' | 'EMAIL_VERIFIED' | 'PHONE_SENT' | 'COMPLETED',
+        userId: result.userId,
+        currentStep: result.currentStep,
         message: result.message,
     };
 };

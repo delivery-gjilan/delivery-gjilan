@@ -6,10 +6,12 @@ import { eq } from 'drizzle-orm';
 export class AuthRepository {
     constructor(private db: DbType) {}
 
-    async createUser(email: string, hashedPassword: string): Promise<DbUser> {
+    async createUser(firstName: string, lastName: string, email: string, hashedPassword: string): Promise<DbUser> {
         const [user] = await this.db
             .insert(users)
             .values({
+                firstName,
+                lastName,
                 email,
                 password: hashedPassword,
                 signupStep: 'INITIAL',

@@ -1,3 +1,5 @@
+directive @skipAuth on FIELD_DEFINITION
+
 type AuthResponse {
   message: String!
   token: String!
@@ -53,6 +55,8 @@ scalar Date
 
 input InitiateSignupInput {
   email: String!
+  firstName: String!
+  lastName: String!
   password: String!
 }
 
@@ -213,8 +217,9 @@ type User {
   address: String
   email: String!
   emailVerified: Boolean!
+  firstName: String!
   id: ID!
-  name: String
+  lastName: String!
   phoneNumber: String
   phoneVerified: Boolean!
   signupStep: SignupStep!

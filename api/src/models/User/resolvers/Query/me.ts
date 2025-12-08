@@ -15,13 +15,14 @@ export const me: NonNullable<QueryResolvers['me']> = async (_parent, _args, { au
     }
 
     return {
-        id: user.id.toString(),
+        id: user.id,
         email: user.email,
-        name: user.name || null,
+        firstName: user.firstName,
+        lastName: user.lastName,
         address: user.address || null,
         phoneNumber: user.phoneNumber || null,
         emailVerified: user.emailVerified,
         phoneVerified: user.phoneVerified,
-        signupStep: user.signupStep as 'INITIAL' | 'EMAIL_SENT' | 'EMAIL_VERIFIED' | 'PHONE_SENT' | 'COMPLETED',
+        signupStep: user.signupStep,
     };
 };

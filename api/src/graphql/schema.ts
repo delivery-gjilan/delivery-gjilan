@@ -1,8 +1,14 @@
 import { createSchema } from 'graphql-yoga';
 import { resolvers } from '../generated/resolvers.generated';
 import { typeDefs } from '../generated/typeDefs.generated';
+import { skipAuthDirective } from './directives/skipAuthDirective';
 
-export const schema = createSchema({
+let schema = createSchema({
     typeDefs,
     resolvers,
 });
+
+// Apply skipAuth directive transformer
+schema = skipAuthDirective(schema);
+
+export { schema };

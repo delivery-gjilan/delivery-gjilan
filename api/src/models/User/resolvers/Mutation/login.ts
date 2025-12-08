@@ -5,19 +5,15 @@ export const login: NonNullable<MutationResolvers['login']> = async (_parent, { 
     return {
         token: result.token,
         user: {
-            id: result.user.id.toString(),
+            id: result.user.id,
             email: result.user.email,
-            name: result.user.name || null,
+            firstName: result.user.firstName,
+            lastName: result.user.lastName,
             address: result.user.address || null,
             phoneNumber: result.user.phoneNumber || null,
             emailVerified: result.user.emailVerified,
             phoneVerified: result.user.phoneVerified,
-            signupStep: result.user.signupStep as
-                | 'INITIAL'
-                | 'EMAIL_SENT'
-                | 'EMAIL_VERIFIED'
-                | 'PHONE_SENT'
-                | 'COMPLETED',
+            signupStep: result.user.signupStep,
         },
         message: result.message,
     };

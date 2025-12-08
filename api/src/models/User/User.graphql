@@ -9,7 +9,8 @@ enum SignupStep {
 type User {
     id: ID!
     email: String!
-    name: String
+    firstName: String!
+    lastName: String!
     address: String
     phoneNumber: String
     emailVerified: Boolean!
@@ -30,6 +31,8 @@ type AuthResponse {
 }
 
 input InitiateSignupInput {
+    firstName: String!
+    lastName: String!
     email: String!
     password: String!
 }
@@ -59,9 +62,9 @@ type Query {
 }
 
 type Mutation {
-    initiateSignup(input: InitiateSignupInput!): SignupStepResponse!
-    verifyEmail(input: VerifyEmailInput!): SignupStepResponse!
-    submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
-    verifyPhone(input: VerifyPhoneInput!): SignupStepResponse!
-    login(input: LoginInput!): AuthResponse!
+    initiateSignup(input: InitiateSignupInput!): SignupStepResponse! @skipAuth
+    verifyEmail(input: VerifyEmailInput!): SignupStepResponse! @skipAuth
+    submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse! @skipAuth
+    verifyPhone(input: VerifyPhoneInput!): SignupStepResponse! @skipAuth
+    login(input: LoginInput!): AuthResponse! @skipAuth
 }

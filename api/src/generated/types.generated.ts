@@ -74,6 +74,8 @@ export type CreateProductInput = {
 
 export type InitiateSignupInput = {
   email: Scalars['String']['input'];
+  firstName: Scalars['String']['input'];
+  lastName: Scalars['String']['input'];
   password: Scalars['String']['input'];
 };
 
@@ -341,8 +343,9 @@ export type User = {
   address?: Maybe<Scalars['String']['output']>;
   email: Scalars['String']['output'];
   emailVerified: Scalars['Boolean']['output'];
+  firstName: Scalars['String']['output'];
   id: Scalars['ID']['output'];
-  name?: Maybe<Scalars['String']['output']>;
+  lastName: Scalars['String']['output'];
   phoneNumber?: Maybe<Scalars['String']['output']>;
   phoneVerified: Scalars['Boolean']['output'];
   signupStep: SignupStep;
@@ -515,6 +518,10 @@ export type ResolversParentTypes = {
   WorkingHoursInput: WorkingHoursInput;
 };
 
+export type skipAuthDirectiveArgs = { };
+
+export type skipAuthDirectiveResolver<Result, Parent, ContextType = GraphQLContext, Args = skipAuthDirectiveArgs> = DirectiveResolverFn<Result, Parent, ContextType, Args>;
+
 export type AuthResponseResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['AuthResponse'] = ResolversParentTypes['AuthResponse']> = {
   message?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   token?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
@@ -653,8 +660,9 @@ export type UserResolvers<ContextType = GraphQLContext, ParentType extends Resol
   address?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   email?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   emailVerified?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  firstName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
-  name?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  lastName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   phoneNumber?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   phoneVerified?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   signupStep?: Resolver<ResolversTypes['SignupStep'], ParentType, ContextType>;
@@ -688,3 +696,6 @@ export type Resolvers<ContextType = GraphQLContext> = {
   WorkingHours?: WorkingHoursResolvers<ContextType>;
 };
 
+export type DirectiveResolvers<ContextType = GraphQLContext> = {
+  skipAuth?: skipAuthDirectiveResolver<any, any, ContextType>;
+};

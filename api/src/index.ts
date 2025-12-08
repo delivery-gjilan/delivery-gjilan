@@ -2,17 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { createYoga } from 'graphql-yoga';
 import { schema } from './graphql/schema';
-import { getDB } from '@/database';
-import { BusinessRepository } from '@/repositories/BusinessRepository';
-import { BusinessService } from '@/services/BusinessService';
-import { ProductCategoryRepository } from '@/repositories/ProductCategoryRepository';
-import { ProductCategoryService } from '@/services/ProductCategoryService';
-import { ProductRepository } from '@/repositories/ProductRepository';
-import { ProductService } from '@/services/ProductService';
-import { AuthRepository } from '@/repositories/AuthRepository';
-import { AuthService } from '@/services/AuthService';
-
-console.log(process.env.DB_URL);
+import { createContext } from './graphql/createContext';
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -24,30 +14,7 @@ const yoga = createYoga({
     schema,
     graphqlEndpoint: '/graphql',
     maskedErrors: false,
-    context: async (initialContext) => {
-        const db = await getDB();
-
-        const businessRepository = new BusinessRepository(db);
-        const businessService = new BusinessService(businessRepository);
-
-        const productCategoryRepository = new ProductCategoryRepository(db);
-        const productCategoryService = new ProductCategoryService(productCategoryRepository);
-
-        const productRepository = new ProductRepository(db);
-        const productService = new ProductService(productRepository);
-
-        const authRepository = new AuthRepository(db);
-        const authService = new AuthService(authRepository);
-
-        return {
-            ...initialContext,
-            db,
-            businessService,
-            productCategoryService,
-            productService,
-            authService,
-        };
-    },
+    context: createContext,
 });
 
 app.use(yoga.graphqlEndpoint, yoga);

@@ -7,6 +7,9 @@ import { AuthService } from '@/services/AuthService';
 
 export interface ApiContextInterface {
     db: DbType;
+    userData: {
+        userId?: string;
+    };
     businessService: BusinessService;
     productCategoryService: ProductCategoryService;
     productService: ProductService;

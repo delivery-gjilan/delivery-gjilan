@@ -18,7 +18,12 @@ export class AuthService {
     /**
      * Step 1: Initiate signup - Create user and generate email verification code
      */
-    async initiateSignup(email: string, password: string): Promise<SignupStepResponse> {
+    async initiateSignup(
+        firstName: string,
+        lastName: string,
+        email: string,
+        password: string,
+    ): Promise<SignupStepResponse> {
         // Check if user already exists
         const existingUser = await this.authRepository.findByEmail(email);
         if (existingUser) {
@@ -29,7 +34,7 @@ export class AuthService {
         const hashedPassword = await hashPassword(password);
 
         // Create user
-        const user = await this.authRepository.createUser(email, hashedPassword);
+        const user = await this.authRepository.createUser(firstName, lastName, email, hashedPassword);
 
         // Generate and set email verification code
         const verificationCode = generateVerificationCode();
