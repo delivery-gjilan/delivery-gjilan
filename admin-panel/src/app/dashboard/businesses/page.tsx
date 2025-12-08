@@ -12,6 +12,7 @@ import { Table, Th, Td } from "@/components/ui/Table";
 import {
     CREATE_BUSINESS,
     DELETE_BUSINESS,
+    GET_BUSINESS,
     GET_BUSINESSES,
     UPDATE_BUSINESS,
 } from "@/graphql/operations/businesses";
@@ -22,12 +23,29 @@ import {
 
 type BusinessType = "RESTAURANT" | "MARKET" | "PHARMACY";
 
+interface Location {
+    latitude: number;
+    longitude: number;
+    address: string;
+}
+
+interface WorkingHours {
+    opensAt: string;
+    closesAt: string;
+}
+
 interface Business {
     id: string;
     name: string;
     businessType: BusinessType;
     imageUrl?: string | null;
     isActive: boolean;
+    location?: Location;
+    workingHours?: WorkingHours;
+}
+
+interface GetBusinessesData {
+    businesses: Business[];
 }
 
 /* ---------------------------------------------------------
@@ -40,19 +58,13 @@ export default function BusinessesPage() {
     /* --------------------------
      Apollo
   --------------------------- */
-    const { data, loading, refetch } = useQuery<{ businesses: Business[] }>(
-        GET_BUSINESSES
-    );
+    const { data, loading, refetch } = useQuery<GetBusinessesData>(GET_BUSINESSES);
 
-    const [createBusiness] = useMutation<{ createBusiness: Business }>(
-        CREATE_BUSINESS
-    );
-    const [updateBusiness] = useMutation<{ updateBusiness: Business }>(
-        UPDATE_BUSINESS
-    );
-    const [deleteBusiness] = useMutation<{ deleteBusiness: boolean }>(
-        DELETE_BUSINESS
-    );
+    const [createBusiness] = useMutation(CREATE_BUSINESS);
+    const [updateBusiness] = useMutation(UPDATE_BUSINESS);
+    const [deleteBusiness] = useMutation(DELETE_BUSINESS);
+
+    const [getBusinessDetails] = useMutation(GET_BUSINESS);
 
     /* --------------------------
      UI State
@@ -62,6 +74,16 @@ export default function BusinessesPage() {
     const [deleteId, setDeleteId] = useState<string | null>(null);
 
     const [selected, setSelected] = useState<Business | null>(null);
+    const [searchQuery, setSearchQuery] = useState("");
+
+    /* --------------------------
+     Upload State
+  --------------------------- */
+    const [createImageFile, setCreateImageFile] = useState<File | null>(null);
+    const [createImagePreview, setCreateImagePreview] = useState<string | null>(null);
+    const [editImageFile, setEditImageFile] = useState<File | null>(null);
+    const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
+    const [uploadingImage, setUploadingImage] = useState(false);
 
     /* --------------------------
      Form State
@@ -71,25 +93,118 @@ export default function BusinessesPage() {
         name: "",
         businessType: "RESTAURANT" as BusinessType,
         imageUrl: "",
+        location: {
+            latitude: 0,
+            longitude: 0,
+            address: "",
+        },
+        workingHours: {
+            opensAt: "08:00",
+            closesAt: "23:00",
+        },
     });
 
     const [editForm, setEditForm] = useState({
         name: "",
         businessType: "RESTAURANT" as BusinessType,
         imageUrl: "",
+        location: {
+            latitude: 0,
+            longitude: 0,
+            address: "",
+        },
+        workingHours: {
+            opensAt: "08:00",
+            closesAt: "23:00",
+        },
     });
 
     /* --------------------------
      Handlers
   --------------------------- */
 
+    // Image upload handler
+    async function uploadImage(file: File, folder: string): Promise<string | null> {
+        const formData = new FormData();
+        formData.append('image', file);
+        formData.append('folder', folder);
+
+        try {
+            const response = await fetch('http://localhost:4000/api/upload/image', {
+                method: 'POST',
+                body: formData,
+            });
+
+            const data = await response.json();
+            if (data.success && data.url) {
+                return data.url;
+            }
+            throw new Error(data.error || 'Upload failed');
+        } catch (error) {
+            console.error('Image upload error:', error);
+            alert('Failed to upload image');
+            return null;
+        }
+    }
+
+    function handleCreateImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        if (file) {
+            setCreateImageFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setCreateImagePreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function handleEditImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        if (file) {
+            setEditImageFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setEditImagePreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
     async function handleCreate() {
+        if (!createForm.name.trim() || !createForm.location.address.trim()) {
+            alert("Please fill in all required fields");
+            return;
+        }
+
+        setUploadingImage(true);
+        let imageUrl = createForm.imageUrl;
+
+        // Upload image if file is selected
+        if (createImageFile) {
+            const uploadedUrl = await uploadImage(createImageFile, 'businesses');
+            if (uploadedUrl) {
+                imageUrl = uploadedUrl;
+            }
+        }
+
+        setUploadingImage(false);
+
         await createBusiness({
             variables: {
                 input: {
                     name: createForm.name,
                     businessType: createForm.businessType,
-                    imageUrl: createForm.imageUrl || null,
+                    imageUrl: imageUrl || null,
+                    location: {
+                        latitude: createForm.location.latitude,
+                        longitude: createForm.location.longitude,
+                        address: createForm.location.address,
+                    },
+                    workingHours: {
+                        opensAt: createForm.workingHours.opensAt,
+                        closesAt: createForm.workingHours.closesAt,
+                    },
                 },
             },
         });
@@ -101,7 +216,18 @@ export default function BusinessesPage() {
             name: "",
             businessType: "RESTAURANT",
             imageUrl: "",
+            location: {
+                latitude: 0,
+                longitude: 0,
+                address: "",
+            },
+            workingHours: {
+                opensAt: "08:00",
+                closesAt: "23:00",
+            },
         });
+        setCreateImageFile(null);
+        setCreateImagePreview(null);
     }
 
     function openEditModal(business: Business) {
@@ -110,12 +236,41 @@ export default function BusinessesPage() {
             name: business.name,
             businessType: business.businessType,
             imageUrl: business.imageUrl || "",
+            location: {
+                latitude: business.location?.latitude || 0,
+                longitude: business.location?.longitude || 0,
+                address: business.location?.address || "",
+            },
+            workingHours: {
+                opensAt: business.workingHours?.opensAt || "08:00",
+                closesAt: business.workingHours?.closesAt || "23:00",
+            },
         });
+        setEditImageFile(null);
+        setEditImagePreview(business.imageUrl || null);
         setEditOpen(true);
     }
 
     async function handleEdit() {
         if (!selected) return;
+        
+        if (!editForm.name.trim() || !editForm.location.address.trim()) {
+            alert("Please fill in all required fields");
+            return;
+        }
+
+        setUploadingImage(true);
+        let imageUrl = editForm.imageUrl;
+
+        // Upload new image if file is selected
+        if (editImageFile) {
+            const uploadedUrl = await uploadImage(editImageFile, 'businesses');
+            if (uploadedUrl) {
+                imageUrl = uploadedUrl;
+            }
+        }
+
+        setUploadingImage(false);
 
         await updateBusiness({
             variables: {
@@ -123,7 +278,16 @@ export default function BusinessesPage() {
                 input: {
                     name: editForm.name,
                     businessType: editForm.businessType,
-                    imageUrl: editForm.imageUrl || null,
+                    imageUrl: imageUrl || null,
+                    location: {
+                        latitude: editForm.location.latitude,
+                        longitude: editForm.location.longitude,
+                        address: editForm.location.address,
+                    },
+                    workingHours: {
+                        opensAt: editForm.workingHours.opensAt,
+                        closesAt: editForm.workingHours.closesAt,
+                    },
                 },
             },
         });
@@ -149,6 +313,16 @@ export default function BusinessesPage() {
     }
 
     const businesses: Business[] = data?.businesses || [];
+    
+    // Filter businesses based on search query
+    const filteredBusinesses = businesses.filter((business) => {
+        const query = searchQuery.toLowerCase();
+        return (
+            business.name.toLowerCase().includes(query) ||
+            business.businessType.toLowerCase().includes(query) ||
+            business.location?.address.toLowerCase().includes(query)
+        );
+    });
 
     return (
         <div className="text-white">
@@ -157,6 +331,15 @@ export default function BusinessesPage() {
                 <Button variant="primary" onClick={() => setCreateOpen(true)}>
                     + Create Business
                 </Button>
+            </div>
+
+            {/* SEARCH BAR */}
+            <div className="mb-4">
+                <Input
+                    placeholder="Search businesses by name, type, or address..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                />
             </div>
 
             {/* TABLE */}
@@ -173,7 +356,16 @@ export default function BusinessesPage() {
                     </thead>
 
                     <tbody>
-                        {businesses.map((b) => (
+                        {filteredBusinesses.length === 0 ? (
+                            <tr>
+                                <Td colSpan={5}>
+                                    <div className="text-center text-gray-500 py-4">
+                                        No businesses found
+                                    </div>
+                                </Td>
+                            </tr>
+                        ) : (
+                            filteredBusinesses.map((b) => (
                             <tr key={b.id}>
                                 <Td>{b.name}</Td>
                                 <Td>{b.businessType}</Td>
@@ -236,7 +428,8 @@ export default function BusinessesPage() {
                                     </div>
                                 </Td>
                             </tr>
-                        ))}
+                        ))
+                        )}
                     </tbody>
                 </Table>
 
@@ -256,48 +449,180 @@ export default function BusinessesPage() {
                 title="Create Business"
             >
                 <div className="space-y-4">
-                    <Input
-                        placeholder="Business name"
-                        value={createForm.name}
-                        onChange={(e) =>
-                            setCreateForm({
-                                ...createForm,
-                                name: e.target.value,
-                            })
-                        }
-                    />
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                            Business Name *
+                        </label>
+                        <Input
+                            placeholder="e.g., My Restaurant"
+                            value={createForm.name}
+                            onChange={(e) =>
+                                setCreateForm({
+                                    ...createForm,
+                                    name: e.target.value,
+                                })
+                            }
+                        />
+                    </div>
 
-                    <Select
-                        value={createForm.businessType}
-                        onChange={(e) =>
-                            setCreateForm({
-                                ...createForm,
-                                businessType: e.target.value as BusinessType,
-                            })
-                        }
-                    >
-                        <option value="RESTAURANT">Restaurant</option>
-                        <option value="MARKET">Market</option>
-                        <option value="PHARMACY">Pharmacy</option>
-                    </Select>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                            Business Type *
+                        </label>
+                        <Select
+                            value={createForm.businessType}
+                            onChange={(e) =>
+                                setCreateForm({
+                                    ...createForm,
+                                    businessType: e.target.value as BusinessType,
+                                })
+                            }
+                        >
+                            <option value="RESTAURANT">Restaurant</option>
+                            <option value="MARKET">Market</option>
+                            <option value="PHARMACY">Pharmacy</option>
+                        </Select>
+                    </div>
 
-                    <Input
-                        placeholder="Image URL (optional)"
-                        value={createForm.imageUrl}
-                        onChange={(e) =>
-                            setCreateForm({
-                                ...createForm,
-                                imageUrl: e.target.value,
-                            })
-                        }
-                    />
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                            Business Image (optional)
+                        </label>
+                        <input
+                            type="file"
+                            accept="image/jpeg,image/jpg,image/png,image/webp"
+                            onChange={handleCreateImageChange}
+                            className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
+                        />
+                        {createImagePreview && (
+                            <div className="mt-2">
+                                <img
+                                    src={createImagePreview}
+                                    alt="Preview"
+                                    className="h-32 w-32 object-cover rounded"
+                                />
+                            </div>
+                        )}
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                            Address *
+                        </label>
+                        <Input
+                            placeholder="e.g., 123 Main Street, City"
+                            value={createForm.location.address}
+                            onChange={(e) =>
+                                setCreateForm({
+                                    ...createForm,
+                                    location: {
+                                        ...createForm.location,
+                                        address: e.target.value,
+                                    },
+                                })
+                            }
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-2">
+                            Location Coordinates
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">
+                                    Latitude
+                                </label>
+                                <Input
+                                    placeholder="e.g., 41.3874"
+                                    type="number"
+                                    step="0.000001"
+                                    value={createForm.location.latitude}
+                                    onChange={(e) =>
+                                        setCreateForm({
+                                            ...createForm,
+                                            location: {
+                                                ...createForm.location,
+                                                latitude: parseFloat(e.target.value) || 0,
+                                            },
+                                        })
+                                    }
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">
+                                    Longitude
+                                </label>
+                                <Input
+                                    placeholder="e.g., 21.1432"
+                                    type="number"
+                                    step="0.000001"
+                                    value={createForm.location.longitude}
+                                    onChange={(e) =>
+                                        setCreateForm({
+                                            ...createForm,
+                                            location: {
+                                                ...createForm.location,
+                                                longitude: parseFloat(e.target.value) || 0,
+                                            },
+                                        })
+                                    }
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-2">
+                            Working Hours *
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">
+                                    Opens At
+                                </label>
+                                <Input
+                                    type="time"
+                                    value={createForm.workingHours.opensAt}
+                                    onChange={(e) =>
+                                        setCreateForm({
+                                            ...createForm,
+                                            workingHours: {
+                                                ...createForm.workingHours,
+                                                opensAt: e.target.value,
+                                            },
+                                        })
+                                    }
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">
+                                    Closes At
+                                </label>
+                                <Input
+                                    type="time"
+                                    value={createForm.workingHours.closesAt}
+                                    onChange={(e) =>
+                                        setCreateForm({
+                                            ...createForm,
+                                            workingHours: {
+                                                ...createForm.workingHours,
+                                                closesAt: e.target.value,
+                                            },
+                                        })
+                                    }
+                                />
+                            </div>
+                        </div>
+                    </div>
 
                     <Button
                         variant="primary"
                         className="w-full mt-2"
                         onClick={handleCreate}
+                        disabled={uploadingImage}
                     >
-                        Create
+                        {uploadingImage ? "Uploading..." : "Create Business"}
                     </Button>
                 </div>
             </Modal>
@@ -311,45 +636,177 @@ export default function BusinessesPage() {
                 title="Edit Business"
             >
                 <div className="space-y-4">
-                    <Input
-                        placeholder="Business name"
-                        value={editForm.name}
-                        onChange={(e) =>
-                            setEditForm({ ...editForm, name: e.target.value })
-                        }
-                    />
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                            Business Name *
+                        </label>
+                        <Input
+                            placeholder="e.g., My Restaurant"
+                            value={editForm.name}
+                            onChange={(e) =>
+                                setEditForm({ ...editForm, name: e.target.value })
+                            }
+                        />
+                    </div>
 
-                    <Select
-                        value={editForm.businessType}
-                        onChange={(e) =>
-                            setEditForm({
-                                ...editForm,
-                                businessType: e.target.value as BusinessType,
-                            })
-                        }
-                    >
-                        <option value="RESTAURANT">Restaurant</option>
-                        <option value="MARKET">Market</option>
-                        <option value="PHARMACY">Pharmacy</option>
-                    </Select>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                            Business Type *
+                        </label>
+                        <Select
+                            value={editForm.businessType}
+                            onChange={(e) =>
+                                setEditForm({
+                                    ...editForm,
+                                    businessType: e.target.value as BusinessType,
+                                })
+                            }
+                        >
+                            <option value="RESTAURANT">Restaurant</option>
+                            <option value="MARKET">Market</option>
+                            <option value="PHARMACY">Pharmacy</option>
+                        </Select>
+                    </div>
 
-                    <Input
-                        placeholder="Image URL (optional)"
-                        value={editForm.imageUrl}
-                        onChange={(e) =>
-                            setEditForm({
-                                ...editForm,
-                                imageUrl: e.target.value,
-                            })
-                        }
-                    />
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                            Business Image (optional)
+                        </label>
+                        <input
+                            type="file"
+                            accept="image/jpeg,image/jpg,image/png,image/webp"
+                            onChange={handleEditImageChange}
+                            className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
+                        />
+                        {editImagePreview && (
+                            <div className="mt-2">
+                                <img
+                                    src={editImagePreview}
+                                    alt="Preview"
+                                    className="h-32 w-32 object-cover rounded"
+                                />
+                            </div>
+                        )}
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                            Address *
+                        </label>
+                        <Input
+                            placeholder="e.g., 123 Main Street, City"
+                            value={editForm.location.address}
+                            onChange={(e) =>
+                                setEditForm({
+                                    ...editForm,
+                                    location: {
+                                        ...editForm.location,
+                                        address: e.target.value,
+                                    },
+                                })
+                            }
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-2">
+                            Location Coordinates
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">
+                                    Latitude
+                                </label>
+                                <Input
+                                    placeholder="e.g., 41.3874"
+                                    type="number"
+                                    step="0.000001"
+                                    value={editForm.location.latitude}
+                                    onChange={(e) =>
+                                        setEditForm({
+                                            ...editForm,
+                                            location: {
+                                                ...editForm.location,
+                                                latitude: parseFloat(e.target.value) || 0,
+                                            },
+                                        })
+                                    }
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">
+                                    Longitude
+                                </label>
+                                <Input
+                                    placeholder="e.g., 21.1432"
+                                    type="number"
+                                    step="0.000001"
+                                    value={editForm.location.longitude}
+                                    onChange={(e) =>
+                                        setEditForm({
+                                            ...editForm,
+                                            location: {
+                                                ...editForm.location,
+                                                longitude: parseFloat(e.target.value) || 0,
+                                            },
+                                        })
+                                    }
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-2">
+                            Working Hours *
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">
+                                    Opens At
+                                </label>
+                                <Input
+                                    type="time"
+                                    value={editForm.workingHours.opensAt}
+                                    onChange={(e) =>
+                                        setEditForm({
+                                            ...editForm,
+                                            workingHours: {
+                                                ...editForm.workingHours,
+                                                opensAt: e.target.value,
+                                            },
+                                        })
+                                    }
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">
+                                    Closes At
+                                </label>
+                                <Input
+                                    type="time"
+                                    value={editForm.workingHours.closesAt}
+                                    onChange={(e) =>
+                                        setEditForm({
+                                            ...editForm,
+                                            workingHours: {
+                                                ...editForm.workingHours,
+                                                closesAt: e.target.value,
+                                            },
+                                        })
+                                    }
+                                />
+                            </div>
+                        </div>
+                    </div>
 
                     <Button
                         variant="primary"
                         className="w-full mt-2"
                         onClick={handleEdit}
+                        disabled={uploadingImage}
                     >
-                        Save Changes
+                        {uploadingImage ? "Uploading..." : "Save Changes"}
                     </Button>
                 </div>
             </Modal>

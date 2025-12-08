@@ -1,18 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation } from "@apollo/client/react";
 
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import { Table, Th, Td } from "@/components/ui/Table";
 import {
-    CREATE_CATEGORY,
-    DELETE_CATEGORY,
-    GET_CATEGORIES,
-    UPDATE_CATEGORY,
-} from "@/graphql/operations/productCategories";
+    useCategories,
+    useCreateCategory,
+    useUpdateCategory,
+    useDeleteCategory,
+} from "@/lib/hooks/useProductCategories";
 
 /* --------------------------
    Types
@@ -24,122 +23,117 @@ interface ProductCategory {
     isActive: boolean;
 }
 
-interface CategoriesQueryResponse {
-    productCategories: ProductCategory[];
-}
-
 export default function CategoriesBlock({
     businessId,
 }: {
     businessId: string;
 }) {
-    /* -----------------------------
-     GraphQL
-  ------------------------------ */
+    /* =============================================
+     Hooks
+    ============================================== */
 
-    /* -----------------------------
-     Query
-  ------------------------------ */
+    const { categories, loading, error, refetch } = useCategories(businessId);
+    const { create: createCategory, loading: createLoading, error: createError } = useCreateCategory();
+    const { update: updateCategory, loading: updateLoading, error: updateError } = useUpdateCategory();
+    const { delete: deleteCategory, loading: deleteLoading, error: deleteError } = useDeleteCategory();
 
-    const { data, loading, refetch } = useQuery<CategoriesQueryResponse>(
-        GET_CATEGORIES,
-        { variables: { businessId } }
-    );
-
-    const [createCategory] = useMutation(CREATE_CATEGORY);
-    const [updateCategory] = useMutation(UPDATE_CATEGORY);
-    const [deleteCategory] = useMutation(DELETE_CATEGORY);
-
-    /* -----------------------------
+    /* =============================================
      Local UI State
-  ------------------------------ */
+    ============================================== */
 
     const [createOpen, setCreateOpen] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [deleteId, setDeleteId] = useState<string | null>(null);
 
-    // forms
     const [createForm, setCreateForm] = useState({ name: "" });
-
     const [editForm, setEditForm] = useState({
         id: "",
         name: "",
         isActive: true,
     });
 
-    /* -----------------------------
-     Create
-  ------------------------------ */
+    /* =============================================
+     Handlers
+    ============================================== */
 
-    async function handleCreate() {
-        await createCategory({
-            variables: {
-                input: {
-                    businessId,
-                    name: createForm.name,
-                },
-            },
+    const handleCreate = async () => {
+        if (!createForm.name.trim()) {
+            alert("Please enter a category name");
+            return;
+        }
+
+        const { success, error } = await createCategory({
+            businessId,
+            name: createForm.name,
         });
 
-        await refetch();
-        setCreateOpen(false);
-        setCreateForm({ name: "" });
-    }
+        if (success) {
+            await refetch();
+            setCreateOpen(false);
+            setCreateForm({ name: "" });
+        } else {
+            alert(`Error creating category: ${error}`);
+        }
+    };
 
-    /* -----------------------------
-     Edit
-  ------------------------------ */
-
-    function openEditModal(cat: ProductCategory) {
+    const openEditModal = (cat: ProductCategory) => {
         setEditForm({
             id: cat.id,
             name: cat.name,
             isActive: cat.isActive,
         });
         setEditOpen(true);
-    }
+    };
 
-    async function handleEdit() {
-        await updateCategory({
-            variables: {
-                id: editForm.id,
-                input: {
-                    name: editForm.name,
-                    isActive: editForm.isActive,
-                },
-            },
+    const handleEdit = async () => {
+        if (!editForm.name.trim()) {
+            alert("Please enter a category name");
+            return;
+        }
+
+        const { success, error } = await updateCategory(editForm.id, {
+            name: editForm.name,
+            isActive: editForm.isActive,
         });
 
-        await refetch();
-        setEditOpen(false);
-    }
+        if (success) {
+            await refetch();
+            setEditOpen(false);
+        } else {
+            alert(`Error updating category: ${error}`);
+        }
+    };
 
-    /* -----------------------------
-     Delete
-  ------------------------------ */
-
-    async function handleDelete() {
+    const handleDelete = async () => {
         if (!deleteId) return;
 
-        await deleteCategory({ variables: { id: deleteId } });
-        await refetch();
-        setDeleteId(null);
-    }
+        const { success, error } = await deleteCategory(deleteId);
 
-    /* -----------------------------
+        if (success) {
+            await refetch();
+            setDeleteId(null);
+        } else {
+            alert(`Error deleting category: ${error}`);
+        }
+    };
+
+    /* =============================================
      Render
-  ------------------------------ */
+    ============================================== */
 
     if (loading) return <p className="text-gray-400">Loading categories...</p>;
-
-    const categories = data?.productCategories ?? [];
+    if (error) return <p className="text-red-400">Error: {error}</p>;
 
     return (
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-semibold">Categories</h2>
-                <Button variant="primary" onClick={() => setCreateOpen(true)}>
-                    + Add Category
+                <Button 
+                    variant="primary" 
+                    onClick={() => setCreateOpen(true)}
+                    disabled={createLoading}
+                >
+                    {createLoading ? "Adding..." : "+ Add Category"}
                 </Button>
             </div>
 
@@ -173,6 +167,7 @@ export default function CategoriesBlock({
                                     <Button
                                         variant="outline"
                                         onClick={() => openEditModal(c)}
+                                        disabled={updateLoading}
                                     >
                                         Edit
                                     </Button>
@@ -180,6 +175,7 @@ export default function CategoriesBlock({
                                     <Button
                                         variant="danger"
                                         onClick={() => setDeleteId(c.id)}
+                                        disabled={deleteLoading}
                                     >
                                         Delete
                                     </Button>
@@ -196,9 +192,9 @@ export default function CategoriesBlock({
                 </p>
             )}
 
-            {/* -----------------------------
-          MODALS
-      ------------------------------ */}
+            {/* =============================================
+             MODALS
+            ============================================== */}
 
             {/* CREATE */}
             <Modal
@@ -220,12 +216,17 @@ export default function CategoriesBlock({
                         />
                     </div>
 
+                    {createError && (
+                        <p className="text-red-400 text-sm">{createError}</p>
+                    )}
+
                     <Button
                         variant="primary"
                         className="w-full"
                         onClick={handleCreate}
+                        disabled={createLoading}
                     >
-                        Save
+                        {createLoading ? "Saving..." : "Save"}
                     </Button>
                 </div>
             </Modal>
@@ -253,12 +254,17 @@ export default function CategoriesBlock({
                         />
                     </div>
 
+                    {updateError && (
+                        <p className="text-red-400 text-sm">{updateError}</p>
+                    )}
+
                     <Button
                         variant="primary"
                         className="w-full"
                         onClick={handleEdit}
+                        disabled={updateLoading}
                     >
-                        Save Changes
+                        {updateLoading ? "Saving..." : "Save Changes"}
                     </Button>
                 </div>
             </Modal>
@@ -273,12 +279,24 @@ export default function CategoriesBlock({
                     Are you sure you want to delete this category?
                 </p>
 
+                {deleteError && (
+                    <p className="text-red-400 text-sm mb-4">{deleteError}</p>
+                )}
+
                 <div className="flex justify-end gap-3">
-                    <Button variant="outline" onClick={() => setDeleteId(null)}>
+                    <Button 
+                        variant="outline" 
+                        onClick={() => setDeleteId(null)}
+                        disabled={deleteLoading}
+                    >
                         Cancel
                     </Button>
-                    <Button variant="danger" onClick={handleDelete}>
-                        Delete
+                    <Button 
+                        variant="danger" 
+                        onClick={handleDelete}
+                        disabled={deleteLoading}
+                    >
+                        {deleteLoading ? "Deleting..." : "Delete"}
                     </Button>
                 </div>
             </Modal>

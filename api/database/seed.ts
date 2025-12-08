@@ -3,9 +3,12 @@ import { businesses, NewDbBusiness } from './schema/businesses';
 import { productCategories, NewDbProductCategory } from './schema/productCategories';
 import { productSubcategories, NewDbProductSubcategory } from './schema/productSubcategories';
 import { products, NewDbProduct } from './schema/products';
+import { orders, NewDbOrder } from './schema/orders';
+import { orderItems, NewDbOrderItem } from './schema/orderItems';
 import { users } from './schema/users';
 import { hashPassword } from '@/lib/utils/authUtils';
 import { faker } from '@faker-js/faker';
+import { OrderStatus } from '@/generated/types.generated';
 
 async function seed() {
     console.log('🌱 Seeding database...');
@@ -16,6 +19,8 @@ async function seed() {
     await db.delete(products);
     await db.delete(productSubcategories);
     await db.delete(productCategories);
+    await db.delete(orderItems);
+    await db.delete(orders);
     await db.delete(businesses);
     await db.delete(users);
 
@@ -122,10 +127,45 @@ async function seed() {
         await db.insert(products).values(productsData);
     }
 
+    // Create 5 sample orders with different statuses
+    const orderStatuses: OrderStatus[] = ['PENDING', 'ACCEPTED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'];
+    const allProducts = await db.select().from(products);
+
+    for (let i = 0; i < 5; i++) {
+        const orderPrice = parseFloat((Math.random() * 100 + 20).toFixed(2));
+        const deliveryPrice = parseFloat((Math.random() * 10 + 2).toFixed(2));
+
+        const order: NewDbOrder = {
+            price: orderPrice,
+            deliveryPrice: deliveryPrice,
+            status: orderStatuses[i],
+            dropoffLat: faker.location.latitude(),
+            dropoffLng: faker.location.longitude(),
+            dropoffAddress: faker.location.streetAddress(),
+            orderDate: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
+        };
+
+        const [createdOrder] = await db.insert(orders).values(order).returning();
+
+        // Add 2-5 random products to each order as items
+        const numItems = faker.number.int({ min: 2, max: 5 });
+        const selectedProducts = faker.helpers.shuffle(allProducts).slice(0, numItems);
+
+        const orderItemsData: NewDbOrderItem[] = selectedProducts.map((product) => ({
+            orderId: createdOrder.id,
+            productId: product.id,
+            price: product.price,
+            quantity: faker.number.int({ min: 1, max: 3 }),
+        }));
+
+        await db.insert(orderItems).values(orderItemsData);
+    }
+
     console.log(`Seeded ${businessesData.length} businesses`);
     console.log(`Seeded ${categoriesData.length} categories`);
     console.log(`Seeded ${subcategoriesData.length} subcategories`);
     console.log(`Seeded ${productsData.length} products`);
+    console.log('Seeded 5 orders with items');
     console.log('Seeding complete!');
     process.exit(0);
 }

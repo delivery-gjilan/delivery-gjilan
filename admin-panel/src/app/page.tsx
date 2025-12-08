@@ -1,12 +1,33 @@
-// src/app/page.tsx
+"use client";
 
-export default function HomePage() {
-  return (
-    <div className="p-6">
-      <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-      <p className="text-muted-foreground mt-2">
-        Welcome! Choose a section from the sidebar.
-      </p>
-    </div>
-  );
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
+import LoginPage from "@/app/login/page";
+
+export default function RootPage() {
+    const router = useRouter();
+    const { isAuthenticated, loading } = useAuth();
+
+    useEffect(() => {
+        if (!loading && !isAuthenticated) {
+            router.push("/login");
+        } else if (!loading && isAuthenticated) {
+            router.push("/dashboard");
+        }
+    }, [isAuthenticated, loading, router]);
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-gray-950">
+                <div className="text-white">Loading...</div>
+            </div>
+        );
+    }
+
+    if (!isAuthenticated) {
+        return <LoginPage />;
+    }
+
+    return null;
 }

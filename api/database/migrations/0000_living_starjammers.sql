@@ -1,6 +1,7 @@
 CREATE TYPE "public"."business_type" AS ENUM('MARKET', 'PHARMACY', 'RESTAURANT');--> statement-breakpoint
 CREATE TYPE "public"."order_status" AS ENUM('PENDING', 'ACCEPTED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED');--> statement-breakpoint
 CREATE TYPE "public"."signup_step" AS ENUM('INITIAL', 'EMAIL_SENT', 'EMAIL_VERIFIED', 'PHONE_SENT', 'COMPLETED');--> statement-breakpoint
+CREATE TYPE "public"."user_role" AS ENUM('CUSTOMER', 'DRIVER', 'SUPER_ADMIN');--> statement-breakpoint
 CREATE TABLE "businesses" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" varchar(255) NOT NULL,
@@ -83,6 +84,7 @@ CREATE TABLE "users" (
 	"email_verified" boolean DEFAULT false NOT NULL,
 	"phone_verified" boolean DEFAULT false NOT NULL,
 	"signup_step" "signup_step" DEFAULT 'INITIAL' NOT NULL,
+	"role" "user_role" DEFAULT 'CUSTOMER' NOT NULL,
 	"email_verification_code" text,
 	"phone_verification_code" text,
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,

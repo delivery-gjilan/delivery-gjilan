@@ -1,6 +1,6 @@
-import { graphql } from '@/gql';
+import { gql } from '@apollo/client';
 
-export const GET_BUSINESS = graphql(`
+export const GET_BUSINESS = gql`
     query Business($id: ID!) {
         business(id: $id) {
             id
@@ -8,12 +8,21 @@ export const GET_BUSINESS = graphql(`
             imageUrl
             businessType
             isActive
+            location {
+                latitude
+                longitude
+                address
+            }
+            workingHours {
+                opensAt
+                closesAt
+            }
             createdAt
         }
     }
-`);
+`;
 
-export const GET_BUSINESSES = graphql(`
+export const GET_BUSINESSES = gql`
     query Businesses {
         businesses {
             id
@@ -21,8 +30,17 @@ export const GET_BUSINESSES = graphql(`
             imageUrl
             businessType
             isActive
+            location {
+                latitude
+                longitude
+                address
+            }
+            workingHours {
+                opensAt
+                closesAt
+            }
             createdAt
             updatedAt
         }
     }
-`);
+`;

@@ -1,5 +1,5 @@
 {
-  "id": "3c6751ab-ddf2-4df9-9760-40f8da3e6681",
+  "id": "f0a0294a-93e9-49a1-a664-b1f1e4c9e7b6",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -589,6 +589,14 @@
           "notNull": true,
           "default": "'INITIAL'"
         },
+        "role": {
+          "name": "role",
+          "type": "user_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'CUSTOMER'"
+        },
         "email_verification_code": {
           "name": "email_verification_code",
           "type": "text",
@@ -663,6 +671,15 @@
         "EMAIL_VERIFIED",
         "PHONE_SENT",
         "COMPLETED"
+      ]
+    },
+    "public.user_role": {
+      "name": "user_role",
+      "schema": "public",
+      "values": [
+        "CUSTOMER",
+        "DRIVER",
+        "SUPER_ADMIN"
       ]
     }
   },

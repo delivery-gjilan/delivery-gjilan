@@ -1,7 +1,5 @@
 "use client";
 
-import { gql } from "@apollo/client";
-import { useQuery, useMutation } from "@apollo/client/react";
 import { useState, useMemo } from "react";
 
 import Button from "@/components/ui/Button";
@@ -10,19 +8,16 @@ import Select from "@/components/ui/Select";
 import Modal from "@/components/ui/Modal";
 import { Table, Th, Td } from "@/components/ui/Table";
 import {
-    CREATE_PRODUCT,
-    DELETE_PRODUCT,
-    GET_BUSINESS_PRODUCTS_AND_CATEGORIES,
-    UPDATE_PRODUCT,
-} from "@/graphql/operations/products";
+    useProducts,
+    useCreateProduct,
+    useUpdateProduct,
+    useDeleteProduct,
+} from "@/lib/hooks/useProducts";
+import type { CreateProductInput, UpdateProductInput } from "@/gql/graphql";
 
-/* ----------------------------------------------------
-   GRAPHQL
----------------------------------------------------- */
-
-/* ----------------------------------------------------
+/* ===============================================
    TYPES
----------------------------------------------------- */
+=============================================== */
 
 interface Category {
     id: string;
@@ -41,164 +36,304 @@ interface Product {
     isAvailable: boolean;
 }
 
-/* ----------------------------------------------------
+/* ===============================================
    COMPONENT
----------------------------------------------------- */
+=============================================== */
 
 export default function ProductsBlock({ businessId }: { businessId: string }) {
-    const { data, loading, refetch } = useQuery<{
-        productCategories: Category[];
-        products: Product[];
-    }>(GET_BUSINESS_PRODUCTS_AND_CATEGORIES, {
-        variables: { businessId },
-    });
+    const { products, categories, loading, error, refetch } = useProducts(businessId);
+    const { create: createProduct, loading: createLoading, error: createError } = useCreateProduct();
+    const { update: updateProduct, loading: updateLoading, error: updateError } = useUpdateProduct();
+    const { delete: deleteProduct, loading: deleteLoading, error: deleteError } = useDeleteProduct();
 
-    /* ------------------- UI STATE ------------------- */
+    /* ===============================================
+     UI STATE
+    =============================================== */
 
     const [createOpen, setCreateOpen] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [deleteId, setDeleteId] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState("");
 
-    /* ------------------- FORM STATE ------------------- */
+    /* ===============================================
+     UPLOAD STATE
+    =============================================== */
 
-    const [createForm, setCreateForm] = useState({
+    const [createImageFile, setCreateImageFile] = useState<File | null>(null);
+    const [createImagePreview, setCreateImagePreview] = useState<string | null>(null);
+    const [editImageFile, setEditImageFile] = useState<File | null>(null);
+    const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
+    const [uploadingImage, setUploadingImage] = useState(false);
+
+    /* ===============================================
+     FORM STATE
+    =============================================== */
+
+    const [createForm, setCreateForm] = useState<CreateProductInput & { id?: string }>({
+        businessId,
         categoryId: "",
         name: "",
         description: "",
         imageUrl: "",
-        price: "",
+        price: 0,
         isOnSale: false,
-        salePrice: "",
+        salePrice: undefined,
     });
 
-    const [editForm, setEditForm] = useState({
+    const [editForm, setEditForm] = useState<UpdateProductInput & { id: string }>({
         id: "",
         categoryId: "",
         name: "",
         description: "",
         imageUrl: "",
-        price: "",
+        price: 0,
         isOnSale: false,
-        salePrice: "",
+        salePrice: undefined,
         isAvailable: true,
     });
 
-    const [createProduct] = useMutation(CREATE_PRODUCT);
-    const [updateProduct] = useMutation(UPDATE_PRODUCT);
-    const [deleteProduct] = useMutation(DELETE_PRODUCT);
-
-    /* ------------------- GROUPING ------------------- */
+    /* ===============================================
+     GROUPING
+    =============================================== */
 
     const grouped = useMemo(() => {
-        if (!data) return {};
-
-        const categories = data.productCategories;
-        const products = data.products;
-
         const groups: Record<string, Product[]> = {};
 
         categories.forEach((c) => {
             groups[c.id] = [];
         });
 
-        products.forEach((p) => {
+        // Filter products based on search query
+        const filteredProducts = products.filter((p) => {
+            const query = searchQuery.toLowerCase();
+            return (
+                p.name.toLowerCase().includes(query) ||
+                p.description?.toLowerCase().includes(query) ||
+                categories.find(c => c.id === p.categoryId)?.name.toLowerCase().includes(query)
+            );
+        });
+
+        filteredProducts.forEach((p) => {
             if (!groups[p.categoryId]) groups[p.categoryId] = [];
             groups[p.categoryId].push(p);
         });
 
         return groups;
-    }, [data]);
+    }, [products, categories, searchQuery]);
 
-    /* ------------------- HANDLERS ------------------- */
+    /* ===============================================
+     HANDLERS
+    =============================================== */
 
-    async function handleCreate() {
-        await createProduct({
-            variables: {
-                input: {
-                    businessId,
-                    categoryId: createForm.categoryId,
-                    name: createForm.name,
-                    description: createForm.description,
-                    imageUrl: createForm.imageUrl || null,
-                    price: parseFloat(createForm.price),
-                    isOnSale: createForm.isOnSale,
-                    salePrice: createForm.isOnSale
-                        ? parseFloat(createForm.salePrice)
-                        : null,
-                },
-            },
-        });
+    // Image upload handler
+    async function uploadImage(file: File, folder: string): Promise<string | null> {
+        const formData = new FormData();
+        formData.append('image', file);
+        formData.append('folder', folder);
 
-        setCreateOpen(false);
-        await refetch();
+        try {
+            const response = await fetch('http://localhost:4000/api/upload/image', {
+                method: 'POST',
+                body: formData,
+            });
+
+            const data = await response.json();
+            if (data.success && data.url) {
+                return data.url;
+            }
+            throw new Error(data.error || 'Upload failed');
+        } catch (error) {
+            console.error('Image upload error:', error);
+            alert('Failed to upload image');
+            return null;
+        }
     }
 
-    function openEditModal(p: Product) {
+    function handleCreateImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        if (file) {
+            setCreateImageFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setCreateImagePreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function handleEditImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        if (file) {
+            setEditImageFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setEditImagePreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    const handleCreate = async () => {
+        if (!createForm.categoryId || !createForm.name || !createForm.price) {
+            alert("Please fill in all required fields");
+            return;
+        }
+
+        setUploadingImage(true);
+        let imageUrl = createForm.imageUrl;
+
+        // Upload image if file is selected
+        if (createImageFile) {
+            const uploadedUrl = await uploadImage(createImageFile, 'products');
+            if (uploadedUrl) {
+                imageUrl = uploadedUrl;
+            }
+        }
+
+        setUploadingImage(false);
+
+        const input: CreateProductInput = {
+            businessId,
+            categoryId: createForm.categoryId,
+            name: createForm.name,
+            description: createForm.description || undefined,
+            imageUrl: imageUrl || undefined,
+            price: Number(createForm.price),
+            isOnSale: createForm.isOnSale,
+            salePrice: createForm.isOnSale ? Number(createForm.salePrice) : undefined,
+        };
+
+        const { success, error } = await createProduct(input);
+
+        if (success) {
+            await refetch();
+            setCreateOpen(false);
+            setCreateForm({
+                businessId,
+                categoryId: "",
+                name: "",
+                description: "",
+                imageUrl: "",
+                price: 0,
+                isOnSale: false,
+                salePrice: undefined,
+            });
+            setCreateImageFile(null);
+            setCreateImagePreview(null);
+        } else {
+            alert(`Error creating product: ${error}`);
+        }
+    };
+
+    const openEditModal = (p: Product) => {
         setEditForm({
             id: p.id,
             categoryId: p.categoryId,
             name: p.name,
             description: p.description || "",
             imageUrl: p.imageUrl || "",
-            price: String(p.price),
+            price: p.price,
             isOnSale: p.isOnSale,
-            salePrice: p.salePrice ? String(p.salePrice) : "",
+            salePrice: p.salePrice || undefined,
             isAvailable: p.isAvailable,
         });
-
+        setEditImageFile(null);
+        setEditImagePreview(p.imageUrl || null);
         setEditOpen(true);
-    }
+    };
 
-    async function handleEdit() {
-        await updateProduct({
-            variables: {
-                id: editForm.id,
-                input: {
-                    categoryId: editForm.categoryId,
-                    name: editForm.name,
-                    description: editForm.description,
-                    imageUrl: editForm.imageUrl || null,
-                    price: parseFloat(editForm.price),
-                    isOnSale: editForm.isOnSale,
-                    salePrice: editForm.isOnSale
-                        ? parseFloat(editForm.salePrice)
-                        : null,
-                    isAvailable: editForm.isAvailable,
-                },
-            },
-        });
+    const handleEdit = async () => {
+        if (!editForm.categoryId || !editForm.name || !editForm.price) {
+            alert("Please fill in all required fields");
+            return;
+        }
 
-        setEditOpen(false);
-        await refetch();
-    }
+        setUploadingImage(true);
+        let imageUrl = editForm.imageUrl;
 
-    async function handleDelete() {
+        // Upload new image if file is selected
+        if (editImageFile) {
+            const uploadedUrl = await uploadImage(editImageFile, 'products');
+            if (uploadedUrl) {
+                imageUrl = uploadedUrl;
+            }
+        }
+
+        setUploadingImage(false);
+
+        const { id, ...input } = editForm;
+        const updateInput: UpdateProductInput = {
+            categoryId: input.categoryId,
+            name: input.name,
+            description: input.description || undefined,
+            imageUrl: imageUrl || undefined,
+            price: Number(input.price),
+            isOnSale: input.isOnSale,
+            salePrice: input.isOnSale ? Number(input.salePrice) : undefined,
+            isAvailable: input.isAvailable,
+        };
+
+        const { success, error } = await updateProduct(id, updateInput);
+
+        if (success) {
+            await refetch();
+            setEditOpen(false);
+        } else {
+            alert(`Error updating product: ${error}`);
+        }
+    };
+
+    const handleDelete = async () => {
         if (!deleteId) return;
 
-        await deleteProduct({ variables: { id: deleteId } });
-        setDeleteId(null);
-        await refetch();
-    }
+        const { success, error } = await deleteProduct(deleteId);
 
-    /* ------------------- UI ------------------- */
+        if (success) {
+            await refetch();
+            setDeleteId(null);
+        } else {
+            alert(`Error deleting product: ${error}`);
+        }
+    };
+
+    /* ===============================================
+     RENDER
+    =============================================== */
 
     if (loading) {
         return <p className="text-gray-400">Loading products...</p>;
     }
 
-    const categories = data?.productCategories || [];
+    if (error) {
+        return <p className="text-red-400">Error: {error}</p>;
+    }
 
     return (
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-semibold">Products</h2>
 
-                <Button variant="primary" onClick={() => setCreateOpen(true)}>
-                    + Add Product
+                <Button 
+                    variant="primary" 
+                    onClick={() => setCreateOpen(true)}
+                    disabled={createLoading}
+                >
+                    {createLoading ? "Adding..." : "+ Add Product"}
                 </Button>
             </div>
 
-            {/* ------------------- CATEGORY GROUPS ------------------- */}
+            {/* SEARCH BAR */}
+            <div className="mb-6">
+                <Input
+                    placeholder="Search products by name, description, or category..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                />
+            </div>
+
+            {/* ===============================================
+             CATEGORY GROUPS
+            =============================================== */}
 
             {categories.map((cat) => {
                 const items = grouped[cat.id] || [];
@@ -279,6 +414,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                         onClick={() =>
                                                             openEditModal(p)
                                                         }
+                                                        disabled={updateLoading}
                                                     >
                                                         Edit
                                                     </Button>
@@ -289,6 +425,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                         onClick={() =>
                                                             setDeleteId(p.id)
                                                         }
+                                                        disabled={deleteLoading}
                                                     >
                                                         Delete
                                                     </Button>
@@ -303,7 +440,9 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                 );
             })}
 
-            {/* ------------------- CREATE MODAL ------------------- */}
+            {/* ===============================================
+             CREATE MODAL
+            =============================================== */}
 
             <Modal
                 open={createOpen}
@@ -313,7 +452,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Category
+                            Category *
                         </label>
                         <Select
                             value={createForm.categoryId}
@@ -335,7 +474,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
 
                     <div>
                         <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Product Name
+                            Product Name *
                         </label>
                         <Input
                             placeholder="Product name"
@@ -355,7 +494,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                         </label>
                         <Input
                             placeholder="Description (optional)"
-                            value={createForm.description}
+                            value={createForm.description ?? ""}
                             onChange={(e) =>
                                 setCreateForm({
                                     ...createForm,
@@ -367,23 +506,28 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
 
                     <div>
                         <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Image URL
+                            Product Image
                         </label>
-                        <Input
-                            placeholder="Image URL (optional)"
-                            value={createForm.imageUrl}
-                            onChange={(e) =>
-                                setCreateForm({
-                                    ...createForm,
-                                    imageUrl: e.target.value,
-                                })
-                            }
+                        <input
+                            type="file"
+                            accept="image/jpeg,image/jpg,image/png,image/webp"
+                            onChange={handleCreateImageChange}
+                            className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
                         />
+                        {createImagePreview && (
+                            <div className="mt-2">
+                                <img
+                                    src={createImagePreview}
+                                    alt="Preview"
+                                    className="h-32 w-32 object-cover rounded"
+                                />
+                            </div>
+                        )}
                     </div>
 
                     <div>
                         <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Price
+                            Price *
                         </label>
                         <Input
                             placeholder="Price"
@@ -393,7 +537,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                             onChange={(e) =>
                                 setCreateForm({
                                     ...createForm,
-                                    price: e.target.value,
+                                    price: Number(e.target.value),
                                 })
                             }
                         />
@@ -402,7 +546,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     <div className="flex items-center gap-2">
                         <input
                             type="checkbox"
-                            checked={createForm.isOnSale}
+                            checked={createForm.isOnSale ?? false}
                             onChange={(e) =>
                                 setCreateForm({
                                     ...createForm,
@@ -422,28 +566,35 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                 placeholder="Sale Price"
                                 type="number"
                                 step="0.01"
-                                value={createForm.salePrice}
+                                value={createForm.salePrice || ""}
                                 onChange={(e) =>
                                     setCreateForm({
                                         ...createForm,
-                                        salePrice: e.target.value,
+                                        salePrice: e.target.value ? Number(e.target.value) : undefined,
                                     })
                                 }
                             />
                         </div>
                     )}
 
+                    {createError && (
+                        <p className="text-red-400 text-sm">{createError}</p>
+                    )}
+
                     <Button
                         variant="primary"
                         className="w-full"
                         onClick={handleCreate}
+                        disabled={createLoading || uploadingImage}
                     >
-                        Save
+                        {uploadingImage ? "Uploading..." : createLoading ? "Saving..." : "Save"}
                     </Button>
                 </div>
             </Modal>
 
-            {/* ------------------- EDIT MODAL ------------------- */}
+            {/* ===============================================
+             EDIT MODAL
+            =============================================== */}
 
             <Modal
                 open={editOpen}
@@ -453,10 +604,10 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Category
+                            Category *
                         </label>
                         <Select
-                            value={editForm.categoryId}
+                            value={editForm.categoryId ?? ""}
                             onChange={(e) =>
                                 setEditForm({
                                     ...editForm,
@@ -474,11 +625,11 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
 
                     <div>
                         <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Product Name
+                            Product Name *
                         </label>
                         <Input
                             placeholder="Product name"
-                            value={editForm.name}
+                            value={editForm.name ?? ""}
                             onChange={(e) =>
                                 setEditForm({
                                     ...editForm,
@@ -494,7 +645,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                         </label>
                         <Input
                             placeholder="Description"
-                            value={editForm.description}
+                            value={editForm.description ?? ""}
                             onChange={(e) =>
                                 setEditForm({
                                     ...editForm,
@@ -506,33 +657,38 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
 
                     <div>
                         <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Image URL
+                            Product Image
                         </label>
-                        <Input
-                            placeholder="Image URL"
-                            value={editForm.imageUrl}
-                            onChange={(e) =>
-                                setEditForm({
-                                    ...editForm,
-                                    imageUrl: e.target.value,
-                                })
-                            }
+                        <input
+                            type="file"
+                            accept="image/jpeg,image/jpg,image/png,image/webp"
+                            onChange={handleEditImageChange}
+                            className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
                         />
+                        {editImagePreview && (
+                            <div className="mt-2">
+                                <img
+                                    src={editImagePreview}
+                                    alt="Preview"
+                                    className="h-32 w-32 object-cover rounded"
+                                />
+                            </div>
+                        )}
                     </div>
 
                     <div>
                         <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Price
+                            Price *
                         </label>
                         <Input
                             placeholder="Price"
                             type="number"
                             step="0.01"
-                            value={editForm.price}
+                            value={editForm.price ?? 0}
                             onChange={(e) =>
                                 setEditForm({
                                     ...editForm,
-                                    price: e.target.value,
+                                    price: Number(e.target.value),
                                 })
                             }
                         />
@@ -541,7 +697,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     <div className="flex items-center gap-2">
                         <input
                             type="checkbox"
-                            checked={editForm.isOnSale}
+                            checked={editForm.isOnSale ?? false}
                             onChange={(e) =>
                                 setEditForm({
                                     ...editForm,
@@ -561,11 +717,11 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                 placeholder="Sale Price"
                                 type="number"
                                 step="0.01"
-                                value={editForm.salePrice}
+                                value={editForm.salePrice || ""}
                                 onChange={(e) =>
                                     setEditForm({
                                         ...editForm,
-                                        salePrice: e.target.value,
+                                        salePrice: e.target.value ? Number(e.target.value) : undefined,
                                     })
                                 }
                             />
@@ -575,7 +731,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     <div className="flex items-center gap-2">
                         <input
                             type="checkbox"
-                            checked={editForm.isAvailable}
+                            checked={editForm.isAvailable ?? true}
                             onChange={(e) =>
                                 setEditForm({
                                     ...editForm,
@@ -586,17 +742,24 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                         <span className="text-gray-300">Available</span>
                     </div>
 
+                    {updateError && (
+                        <p className="text-red-400 text-sm">{updateError}</p>
+                    )}
+
                     <Button
                         variant="primary"
                         className="w-full"
                         onClick={handleEdit}
+                        disabled={updateLoading || uploadingImage}
                     >
-                        Save Changes
+                        {uploadingImage ? "Uploading..." : updateLoading ? "Saving..." : "Save Changes"}
                     </Button>
                 </div>
             </Modal>
 
-            {/* ------------------- DELETE MODAL ------------------- */}
+            {/* ===============================================
+             DELETE MODAL
+            =============================================== */}
 
             <Modal
                 open={deleteId !== null}
@@ -607,12 +770,24 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     Are you sure you want to delete this product?
                 </p>
 
+                {deleteError && (
+                    <p className="text-red-400 text-sm mb-4">{deleteError}</p>
+                )}
+
                 <div className="flex justify-end gap-3">
-                    <Button variant="outline" onClick={() => setDeleteId(null)}>
+                    <Button 
+                        variant="outline" 
+                        onClick={() => setDeleteId(null)}
+                        disabled={deleteLoading}
+                    >
                         Cancel
                     </Button>
-                    <Button variant="danger" onClick={handleDelete}>
-                        Delete
+                    <Button 
+                        variant="danger" 
+                        onClick={handleDelete}
+                        disabled={deleteLoading}
+                    >
+                        {deleteLoading ? "Deleting..." : "Delete"}
                     </Button>
                 </div>
             </Modal>
