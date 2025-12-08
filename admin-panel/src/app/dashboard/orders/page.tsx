@@ -75,11 +75,50 @@ export default function OrdersPage() {
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [statusFilter, setStatusFilter] = useState<OrderStatus | "ALL">("ALL");
+    const [dateFilter, setDateFilter] = useState<"ALL" | "TODAY" | "CUSTOM">("ALL");
+    const [startDate, setStartDate] = useState<string>("");
+    const [endDate, setEndDate] = useState<string>("");
     const [newStatus, setNewStatus] = useState<OrderStatus>("ACCEPTED");
 
-    const filteredOrders = statusFilter === "ALL" 
-        ? (orders as Order[])
-        : (orders as Order[]).filter(o => o.status === statusFilter);
+    // Get today's date range
+    const getTodayRange = () => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(today);
+        endOfDay.setHours(23, 59, 59, 999);
+        return { start: today, end: endOfDay };
+    };
+
+    // Filter orders by status and date
+    const filteredOrders = (orders as Order[]).filter(order => {
+        // Status filter
+        if (statusFilter !== "ALL" && order.status !== statusFilter) {
+            return false;
+        }
+
+        // Date filter
+        const orderDate = new Date(order.orderDate);
+        
+        if (dateFilter === "TODAY") {
+            const { start, end } = getTodayRange();
+            if (orderDate < start || orderDate > end) {
+                return false;
+            }
+        } else if (dateFilter === "CUSTOM") {
+            if (startDate) {
+                const start = new Date(startDate);
+                start.setHours(0, 0, 0, 0);
+                if (orderDate < start) return false;
+            }
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+                if (orderDate > end) return false;
+            }
+        }
+
+        return true;
+    });
 
     const handleStatusChange = async (order: Order) => {
         const result = await updateStatus(order.id, newStatus);
@@ -114,18 +153,23 @@ export default function OrdersPage() {
 
     return (
         <div className="text-white">
-            <div className="mb-6 flex justify-between items-center">
+            <div className="mb-6">
                 <h1 className="text-2xl font-semibold">Orders</h1>
-                <div className="flex items-center gap-4">
+            </div>
+
+            {/* FILTERS */}
+            <div className="mb-6 bg-gray-900 border border-gray-800 rounded-xl p-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    {/* Status Filter */}
                     <div>
                         <label className="block text-sm font-medium text-gray-400 mb-2">
-                            Filter by Status
+                            Status
                         </label>
                         <Select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value as OrderStatus | "ALL")}
                         >
-                            <option value="ALL">All Orders</option>
+                            <option value="ALL">All Statuses</option>
                             <option value="PENDING">Pending</option>
                             <option value="ACCEPTED">Accepted</option>
                             <option value="OUT_FOR_DELIVERY">Out for Delivery</option>
@@ -133,10 +177,64 @@ export default function OrdersPage() {
                             <option value="CANCELLED">Cancelled</option>
                         </Select>
                     </div>
-                    <div className="text-sm text-gray-400">
-                        {filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""}
+
+                    {/* Date Filter */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-2">
+                            Date Range
+                        </label>
+                        <Select
+                            value={dateFilter}
+                            onChange={(e) => {
+                                const value = e.target.value as "ALL" | "TODAY" | "CUSTOM";
+                                setDateFilter(value);
+                                if (value !== "CUSTOM") {
+                                    setStartDate("");
+                                    setEndDate("");
+                                }
+                            }}
+                        >
+                            <option value="ALL">All Time</option>
+                            <option value="TODAY">Today</option>
+                            <option value="CUSTOM">Custom Range</option>
+                        </Select>
+                    </div>
+
+                    {/* Results Count */}
+                    <div className="flex items-end">
+                        <div className="text-sm text-gray-400 pb-2">
+                            Showing {filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""}
+                        </div>
                     </div>
                 </div>
+
+                {/* Custom Date Range Inputs */}
+                {dateFilter === "CUSTOM" && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-800">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-400 mb-2">
+                                Start Date
+                            </label>
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-400 mb-2">
+                                End Date
+                            </label>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white"
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* ORDERS TABLE */}
@@ -155,7 +253,16 @@ export default function OrdersPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredOrders.map((order) => (
+                        {filteredOrders.length === 0 ? (
+                            <tr>
+                                <Td colSpan={8}>
+                                    <div className="text-center text-gray-500 py-8">
+                                        No orders found
+                                    </div>
+                                </Td>
+                            </tr>
+                        ) : (
+                            filteredOrders.map((order) => (
                             <tr key={order.id}>
                                 <Td>
                                     <span className="font-mono text-xs">
@@ -211,15 +318,10 @@ export default function OrdersPage() {
                                     </div>
                                 </Td>
                             </tr>
-                        ))}
+                        ))
+                        )}
                     </tbody>
                 </Table>
-
-                {filteredOrders.length === 0 && (
-                    <p className="text-gray-400 text-center py-6">
-                        No orders found.
-                    </p>
-                )}
             </div>
 
             {/* ORDER DETAILS MODAL */}
