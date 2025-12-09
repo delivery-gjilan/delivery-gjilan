@@ -171,4 +171,50 @@ export class AuthService {
         const user = await this.authRepository.findById(userId);
         return user || null;
     }
+
+    /**
+     * Create user directly with role (for admin use) - bypasses verification steps
+     */
+    async createUser(
+        firstName: string,
+        lastName: string,
+        email: string,
+        password: string,
+        role: 'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN',
+    ): Promise<AuthResponse> {
+        // Check if user already exists
+        const existingUser = await this.authRepository.findByEmail(email);
+        if (existingUser) {
+            throw new Error('User with this email already exists');
+        }
+
+        // Hash password
+        const hashedPassword = await hashPassword(password);
+
+        // Create user with role and completed status
+        const user = await this.authRepository.createUserWithRole(firstName, lastName, email, hashedPassword, role);
+
+        // Generate JWT token
+        const token = this.generateJWT(user.id);
+
+        return {
+            token,
+            user,
+            message: `User created successfully as ${role}`,
+        };
+    }
+
+    /**
+     * Fetch all users
+     */
+    async getAllUsers(): Promise<DbUser[]> {
+        return this.authRepository.findAllUsers();
+    }
+
+    /**
+     * Fetch only drivers
+     */
+    async getDrivers(): Promise<DbUser[]> {
+        return this.authRepository.findDrivers();
+    }
 }

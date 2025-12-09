@@ -6,7 +6,7 @@ export const CREATE_USER_MUTATION = gql`
     $password: String!
     $firstName: String!
     $lastName: String!
-    $role: String!
+    $role: UserRole!
   ) {
     createUser(
       input: {
@@ -17,11 +17,14 @@ export const CREATE_USER_MUTATION = gql`
         role: $role
       }
     ) {
-      id
-      email
-      firstName
-      lastName
-      role
+      token
+      user {
+        id
+        email
+        firstName
+        lastName
+        role
+      }
       message
     }
   }

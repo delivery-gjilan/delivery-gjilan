@@ -103,4 +103,35 @@ export class AuthRepository {
         const [user] = await this.db.update(users).set({ phoneNumber }).where(eq(users.id, userId)).returning();
         return user;
     }
+
+    async createUserWithRole(
+        firstName: string,
+        lastName: string,
+        email: string,
+        hashedPassword: string,
+        role: 'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN',
+    ): Promise<DbUser> {
+        const [user] = await this.db
+            .insert(users)
+            .values({
+                firstName,
+                lastName,
+                email,
+                password: hashedPassword,
+                role,
+                signupStep: 'COMPLETED',
+                emailVerified: true,
+                phoneVerified: false,
+            })
+            .returning();
+        return user;
+    }
+
+    async findAllUsers(): Promise<DbUser[]> {
+        return this.db.select().from(users);
+    }
+
+    async findDrivers(): Promise<DbUser[]> {
+        return this.db.select().from(users).where(eq(users.role, 'DRIVER'));
+    }
 }

@@ -72,6 +72,14 @@ export type CreateProductInput = {
   subcategoryId?: InputMaybe<Scalars['ID']['input']>;
 };
 
+export type CreateUserInput = {
+  email: Scalars['String']['input'];
+  firstName: Scalars['String']['input'];
+  lastName: Scalars['String']['input'];
+  password: Scalars['String']['input'];
+  role: UserRole;
+};
+
 export type InitiateSignupInput = {
   email: Scalars['String']['input'];
   firstName: Scalars['String']['input'];
@@ -103,6 +111,7 @@ export type Mutation = {
   createBusiness: Business;
   createProduct: Product;
   createProductCategory: ProductCategory;
+  createUser: AuthResponse;
   deleteBusiness: Scalars['Boolean']['output'];
   deleteProduct: Scalars['Boolean']['output'];
   deleteProductCategory: Scalars['Boolean']['output'];
@@ -135,6 +144,11 @@ export type MutationcreateProductArgs = {
 
 export type MutationcreateProductCategoryArgs = {
   input: CreateProductCategoryInput;
+};
+
+
+export type MutationcreateUserArgs = {
+  input: CreateUserInput;
 };
 
 
@@ -274,6 +288,7 @@ export type Query = {
   __typename?: 'Query';
   business?: Maybe<Business>;
   businesses: Array<Business>;
+  drivers: Array<User>;
   me?: Maybe<User>;
   order?: Maybe<Order>;
   orders: Array<Order>;
@@ -282,6 +297,7 @@ export type Query = {
   productCategories: Array<ProductCategory>;
   productCategory?: Maybe<ProductCategory>;
   products: Array<Product>;
+  users: Array<User>;
 };
 
 
@@ -482,6 +498,7 @@ export type ResolversTypes = {
   CreateProductCategoryInput: CreateProductCategoryInput;
   CreateProductInput: CreateProductInput;
   Float: ResolverTypeWrapper<Scalars['Float']['output']>;
+  CreateUserInput: CreateUserInput;
   Date: ResolverTypeWrapper<Scalars['Date']['output']>;
   InitiateSignupInput: InitiateSignupInput;
   Location: ResolverTypeWrapper<Location>;
@@ -522,6 +539,7 @@ export type ResolversParentTypes = {
   CreateProductCategoryInput: CreateProductCategoryInput;
   CreateProductInput: CreateProductInput;
   Float: Scalars['Float']['output'];
+  CreateUserInput: CreateUserInput;
   Date: Scalars['Date']['output'];
   InitiateSignupInput: InitiateSignupInput;
   Location: Location;
@@ -591,6 +609,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   createBusiness?: Resolver<ResolversTypes['Business'], ParentType, ContextType, RequireFields<MutationcreateBusinessArgs, 'input'>>;
   createProduct?: Resolver<ResolversTypes['Product'], ParentType, ContextType, RequireFields<MutationcreateProductArgs, 'input'>>;
   createProductCategory?: Resolver<ResolversTypes['ProductCategory'], ParentType, ContextType, RequireFields<MutationcreateProductCategoryArgs, 'input'>>;
+  createUser?: Resolver<ResolversTypes['AuthResponse'], ParentType, ContextType, RequireFields<MutationcreateUserArgs, 'input'>>;
   deleteBusiness?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteBusinessArgs, 'id'>>;
   deleteProduct?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteProductArgs, 'id'>>;
   deleteProductCategory?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteProductCategoryArgs, 'id'>>;
@@ -672,6 +691,7 @@ export type ProductSubcategoryResolvers<ContextType = GraphQLContext, ParentType
 export type QueryResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Query'] = ResolversParentTypes['Query']> = {
   business?: Resolver<Maybe<ResolversTypes['Business']>, ParentType, ContextType, RequireFields<QuerybusinessArgs, 'id'>>;
   businesses?: Resolver<Array<ResolversTypes['Business']>, ParentType, ContextType>;
+  drivers?: Resolver<Array<ResolversTypes['User']>, ParentType, ContextType>;
   me?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
   order?: Resolver<Maybe<ResolversTypes['Order']>, ParentType, ContextType, RequireFields<QueryorderArgs, 'id'>>;
   orders?: Resolver<Array<ResolversTypes['Order']>, ParentType, ContextType>;
@@ -680,6 +700,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   productCategories?: Resolver<Array<ResolversTypes['ProductCategory']>, ParentType, ContextType, RequireFields<QueryproductCategoriesArgs, 'businessId'>>;
   productCategory?: Resolver<Maybe<ResolversTypes['ProductCategory']>, ParentType, ContextType, RequireFields<QueryproductCategoryArgs, 'id'>>;
   products?: Resolver<Array<ResolversTypes['Product']>, ParentType, ContextType, RequireFields<QueryproductsArgs, 'businessId'>>;
+  users?: Resolver<Array<ResolversTypes['User']>, ParentType, ContextType>;
 };
 
 export type SignupStepResolvers = EnumResolverSignature<{ COMPLETED?: any, EMAIL_SENT?: any, EMAIL_VERIFIED?: any, INITIAL?: any, PHONE_SENT?: any }, ResolversTypes['SignupStep']>;

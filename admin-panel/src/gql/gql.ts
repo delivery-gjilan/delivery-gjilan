@@ -33,6 +33,9 @@ type Documents = {
     "\n    mutation UpdateProduct($id: ID!, $input: UpdateProductInput!) {\n        updateProduct(id: $id, input: $input) {\n            id\n        }\n    }\n": typeof types.UpdateProductDocument,
     "\n    mutation DeleteProduct($id: ID!) {\n        deleteProduct(id: $id)\n    }\n": typeof types.DeleteProductDocument,
     "\n    query ProductsAndCategories($businessId: ID!) {\n        productCategories(businessId: $businessId) {\n            id\n            name\n        }\n        products(businessId: $businessId) {\n            id\n            categoryId\n            name\n            description\n            price\n            imageUrl\n            isOnSale\n            salePrice\n            isAvailable\n        }\n    }\n": typeof types.ProductsAndCategoriesDocument,
+    "\n  mutation CreateUser(\n    $email: String!\n    $password: String!\n    $firstName: String!\n    $lastName: String!\n    $role: UserRole!\n  ) {\n    createUser(\n      input: {\n        email: $email\n        password: $password\n        firstName: $firstName\n        lastName: $lastName\n        role: $role\n      }\n    ) {\n      token\n      user {\n        id\n        email\n        firstName\n        lastName\n        role\n      }\n      message\n    }\n  }\n": typeof types.CreateUserDocument,
+    "\n  query Users {\n    users {\n      id\n      email\n      firstName\n      lastName\n      role\n    }\n  }\n": typeof types.UsersDocument,
+    "\n  query Drivers {\n    drivers {\n      id\n      email\n      firstName\n      lastName\n      role\n    }\n  }\n": typeof types.DriversDocument,
 };
 const documents: Documents = {
     "\n  mutation Login($email: String!, $password: String!) {\n    login(input: { email: $email, password: $password }) {\n      token\n      user {\n        firstName\n        lastName\n        role\n      }\n      message\n    }\n  }\n": types.LoginDocument,
@@ -54,6 +57,9 @@ const documents: Documents = {
     "\n    mutation UpdateProduct($id: ID!, $input: UpdateProductInput!) {\n        updateProduct(id: $id, input: $input) {\n            id\n        }\n    }\n": types.UpdateProductDocument,
     "\n    mutation DeleteProduct($id: ID!) {\n        deleteProduct(id: $id)\n    }\n": types.DeleteProductDocument,
     "\n    query ProductsAndCategories($businessId: ID!) {\n        productCategories(businessId: $businessId) {\n            id\n            name\n        }\n        products(businessId: $businessId) {\n            id\n            categoryId\n            name\n            description\n            price\n            imageUrl\n            isOnSale\n            salePrice\n            isAvailable\n        }\n    }\n": types.ProductsAndCategoriesDocument,
+    "\n  mutation CreateUser(\n    $email: String!\n    $password: String!\n    $firstName: String!\n    $lastName: String!\n    $role: UserRole!\n  ) {\n    createUser(\n      input: {\n        email: $email\n        password: $password\n        firstName: $firstName\n        lastName: $lastName\n        role: $role\n      }\n    ) {\n      token\n      user {\n        id\n        email\n        firstName\n        lastName\n        role\n      }\n      message\n    }\n  }\n": types.CreateUserDocument,
+    "\n  query Users {\n    users {\n      id\n      email\n      firstName\n      lastName\n      role\n    }\n  }\n": types.UsersDocument,
+    "\n  query Drivers {\n    drivers {\n      id\n      email\n      firstName\n      lastName\n      role\n    }\n  }\n": types.DriversDocument,
 };
 
 /**
@@ -146,6 +152,18 @@ export function graphql(source: "\n    mutation DeleteProduct($id: ID!) {\n     
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n    query ProductsAndCategories($businessId: ID!) {\n        productCategories(businessId: $businessId) {\n            id\n            name\n        }\n        products(businessId: $businessId) {\n            id\n            categoryId\n            name\n            description\n            price\n            imageUrl\n            isOnSale\n            salePrice\n            isAvailable\n        }\n    }\n"): (typeof documents)["\n    query ProductsAndCategories($businessId: ID!) {\n        productCategories(businessId: $businessId) {\n            id\n            name\n        }\n        products(businessId: $businessId) {\n            id\n            categoryId\n            name\n            description\n            price\n            imageUrl\n            isOnSale\n            salePrice\n            isAvailable\n        }\n    }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation CreateUser(\n    $email: String!\n    $password: String!\n    $firstName: String!\n    $lastName: String!\n    $role: UserRole!\n  ) {\n    createUser(\n      input: {\n        email: $email\n        password: $password\n        firstName: $firstName\n        lastName: $lastName\n        role: $role\n      }\n    ) {\n      token\n      user {\n        id\n        email\n        firstName\n        lastName\n        role\n      }\n      message\n    }\n  }\n"): (typeof documents)["\n  mutation CreateUser(\n    $email: String!\n    $password: String!\n    $firstName: String!\n    $lastName: String!\n    $role: UserRole!\n  ) {\n    createUser(\n      input: {\n        email: $email\n        password: $password\n        firstName: $firstName\n        lastName: $lastName\n        role: $role\n      }\n    ) {\n      token\n      user {\n        id\n        email\n        firstName\n        lastName\n        role\n      }\n      message\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query Users {\n    users {\n      id\n      email\n      firstName\n      lastName\n      role\n    }\n  }\n"): (typeof documents)["\n  query Users {\n    users {\n      id\n      email\n      firstName\n      lastName\n      role\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query Drivers {\n    drivers {\n      id\n      email\n      firstName\n      lastName\n      role\n    }\n  }\n"): (typeof documents)["\n  query Drivers {\n    drivers {\n      id\n      email\n      firstName\n      lastName\n      role\n    }\n  }\n"];
 
 export function graphql(source: string) {
   return (documents as any)[source] ?? {};

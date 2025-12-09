@@ -51,6 +51,14 @@ input CreateProductInput {
   subcategoryId: ID
 }
 
+input CreateUserInput {
+  email: String!
+  firstName: String!
+  lastName: String!
+  password: String!
+  role: UserRole!
+}
+
 scalar Date
 
 input InitiateSignupInput {
@@ -82,6 +90,7 @@ type Mutation {
   createBusiness(input: CreateBusinessInput!): Business!
   createProduct(input: CreateProductInput!): Product!
   createProductCategory(input: CreateProductCategoryInput!): ProductCategory!
+  createUser(input: CreateUserInput!): AuthResponse!
   deleteBusiness(id: ID!): Boolean!
   deleteProduct(id: ID!): Boolean!
   deleteProductCategory(id: ID!): Boolean!
@@ -163,6 +172,7 @@ type ProductSubcategory {
 type Query {
   business(id: ID!): Business
   businesses: [Business!]!
+  drivers: [User!]!
   me: User
   order(id: ID!): Order
   orders: [Order!]!
@@ -171,6 +181,7 @@ type Query {
   productCategories(businessId: ID!): [ProductCategory!]!
   productCategory(id: ID!): ProductCategory
   products(businessId: ID!): [Product!]!
+  users: [User!]!
 }
 
 enum SignupStep {

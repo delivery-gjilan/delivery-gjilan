@@ -61,8 +61,18 @@ input LoginInput {
     password: String!
 }
 
+input CreateUserInput {
+    email: String!
+    password: String!
+    firstName: String!
+    lastName: String!
+    role: UserRole!
+}
+
 type Query {
     me: User
+    users: [User!]!
+    drivers: [User!]!
 }
 
 type Mutation {
@@ -71,4 +81,5 @@ type Mutation {
     submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
     verifyPhone(input: VerifyPhoneInput!): SignupStepResponse!
     login(input: LoginInput!): AuthResponse! @skipAuth
+    createUser(input: CreateUserInput!): AuthResponse!
 }
