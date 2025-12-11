@@ -32,13 +32,6 @@ export default function TabLayout() {
                 }}
             />
 
-            <Tabs.Screen
-                name="analytics"
-                options={{
-                    title: t.tabs.analytics,
-                    tabBarIcon: ({ color, size }) => <Ionicons name="bar-chart" size={size} color={color} />,
-                }}
-            />
 
             <Tabs.Screen
                 name="add"

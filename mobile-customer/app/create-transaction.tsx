@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { CreateTransactionForm } from '@/modules/transactions/components/CreateTransactionForm';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,11 +18,10 @@ export default function CreateTransactionScreen() {
                     <Pressable onPress={() => router.back()} className="p-2 bg-card rounded-full">
                         <Ionicons name="close" size={24} color={theme.colors.text} />
                     </Pressable>
-                    <Text className="text-foreground text-xl font-bold">{t.transactions.create.title}</Text>
+                    <Text className="text-foreground text-xl font-bold">HAHA</Text>
                     <View className="w-10" />
                 </View>
 
-                <CreateTransactionForm />
             </View>
         </SafeAreaView>
     );

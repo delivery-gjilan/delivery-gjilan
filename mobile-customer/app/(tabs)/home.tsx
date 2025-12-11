@@ -14,7 +14,7 @@ export default function Home() {
     const { businesses, loading, error } = useBusinesses();
 
     const handleBusinessPress = (businessId: string) => {
-        router.push(`/restaurant/${businessId}`);
+        router.push(`/`);
     };
 
     return (

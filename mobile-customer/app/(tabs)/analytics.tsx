@@ -24,7 +24,7 @@ export default function OrdersRoute() {
     };
 
     const handleOrderPress = (orderId: string) => {
-        router.push(`/order/${orderId}`);
+        router.push(`/`);
     };
 
     return (
@@ -45,7 +45,6 @@ export default function OrdersRoute() {
                     </View>
                 ) : error ? (
                     <View className="flex-1 justify-center items-center px-4">
-                        <Text style={{ color: theme.colors.error }}>Error loading orders</Text>
                         <TouchableOpacity
                             className="mt-4 px-4 py-2 rounded-lg"
                             style={{ backgroundColor: theme.colors.primary }}

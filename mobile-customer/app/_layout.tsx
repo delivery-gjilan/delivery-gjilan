@@ -5,7 +5,7 @@ import '../global.css';
 import { useAppSetup } from '@/hooks/useAppSetup';
 import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ApolloProvider } from '@apollo/client';
+import { ApolloProvider } from '@apollo/client/react';
 import client from '@/lib/graphql/apolloClient';
 
 export default function RootLayout() {
