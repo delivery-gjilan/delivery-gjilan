@@ -3,7 +3,7 @@
     "main": "expo-router/entry",
     "version": "1.0.0",
     "scripts": {
-        "start": "expo start",
+        "start": "graphql-codegen & expo start",
         "start:validated": "npm run validate:translations && expo start",
         "android": "expo start --android",
         "ios": "expo start --ios",
@@ -13,6 +13,7 @@
         "lint:eslint": "eslint .",
         "format": "prettier --check .",
         "format:fix": "prettier --write .",
+        "codegen": "graphql-codegen --config codegen.ts",
         "validate:translations": "dotenv -e .env tsx localization/validate.ts"
     },
     "dependencies": {
@@ -62,6 +63,8 @@
     },
     "devDependencies": {
         "@faker-js/faker": "^10.1.0",
+        "@graphql-codegen/cli": "^6.1.0",
+        "@parcel/watcher": "^2.5.1",
         "@types/react": "~19.1.0",
         "@typescript-eslint/eslint-plugin": "^8.48.0",
         "@typescript-eslint/parser": "^8.48.0",

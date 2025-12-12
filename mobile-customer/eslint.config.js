@@ -6,42 +6,43 @@ const typescriptESLint = require('@typescript-eslint/eslint-plugin');
 const typescriptESLintParser = require('@typescript-eslint/parser');
 
 module.exports = defineConfig([
-  expoConfig,
-  eslintPluginPrettierRecommended,
-  {
-    plugins: {
-      '@typescript-eslint': typescriptESLint,
-    },
-    languageOptions: {
-      parser: typescriptESLintParser,
-      parserOptions: {
-        project: true,
-      },
-    },
-    ignores: [
-      'dist/*',
-      '.expo/**',
-      '.vscode/**',
-      'assets/**',
-      'node_modules/**',
-      '*.config.js',
-      '*.d.ts',
-      '*.css',
-      '*.json',
-      '*.md',
-      'babel.config.js',
-      'eslint.config.js',
-      'metro.config.js',
-      'tailwind.config.js',
-    ],
-    rules: {
-      '@typescript-eslint/no-explicit-any': 'error',
-      'max-len': [
-        'error',
-        {
-          code: 120,
+    expoConfig,
+    eslintPluginPrettierRecommended,
+    {
+        plugins: {
+            '@typescript-eslint': typescriptESLint,
         },
-      ]
+        languageOptions: {
+            parser: typescriptESLintParser,
+            parserOptions: {
+                project: true,
+            },
+        },
+        ignores: [
+            'dist/*',
+            '.expo/**',
+            '.vscode/**',
+            'assets/**',
+            'node_modules/**',
+            '*.config.js',
+            '*.d.ts',
+            '*.css',
+            '*.json',
+            '*.md',
+            'babel.config.js',
+            'eslint.config.js',
+            'metro.config.js',
+            'tailwind.config.js',
+            'src/gql/**', // Ignore generated GraphQL files
+        ],
+        rules: {
+            '@typescript-eslint/no-explicit-any': 'error',
+            'max-len': [
+                'error',
+                {
+                    code: 120,
+                },
+            ],
+        },
     },
-  },
 ]);
