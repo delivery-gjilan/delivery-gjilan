@@ -1,5 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import type { SignupStep, UserRole } from '@/types/graphql.generated';
 
 export interface AuthUser {
@@ -26,52 +25,12 @@ export const useAuth = () => {
 
     const [user, setUser] = useState<AuthUser | null>(null);
     const [token, setToken] = useState<string | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [signupError, setSignupError] = useState<string | null>(null);
 
-    const mounted = useRef(true);
-    // Removed Apollo client and mutations
-
-    // Restore token and user from AsyncStorage on mount
-    useEffect(() => {
-        const restoreToken = async () => {
-            try {
-                const storedToken = await AsyncStorage.getItem('authToken');
-                const storedUser = await AsyncStorage.getItem('authUser');
-
-                if (mounted.current) {
-                    if (storedToken && storedUser) {
-                        setToken(storedToken);
-                        setUser(JSON.parse(storedUser));
-                    }
-                    setLoading(false);
-                }
-            } catch (error) {
-                console.error('Failed to restore token:', error);
-                if (mounted.current) {
-                    setLoading(false);
-                }
-            }
-        };
-
-        restoreToken();
-
-        return () => {
-            mounted.current = false;
-        };
-    }, []);
-
-    const saveTokenAndUser = useCallback(async (newToken: string, newUser: AuthUser) => {
-        try {
-            await AsyncStorage.setItem('authToken', newToken);
-            await AsyncStorage.setItem('authUser', JSON.stringify(newUser));
-            if (mounted.current) {
-                setToken(newToken);
-                setUser(newUser);
-            }
-        } catch (error) {
-            console.error('Failed to save token:', error);
-        }
+    const saveTokenAndUser = useCallback((newToken: string, newUser: AuthUser) => {
+        setToken(newToken);
+        setUser(newUser);
     }, []);
 
     const initiateSignup = useCallback(
@@ -166,44 +125,35 @@ export const useAuth = () => {
         async (email: string, _password: string) => {
             setSignupError(null);
 
-            // If a user exists, reuse it; otherwise create a completed mock user
-            const existingUser = user ?? {
+            // Create a fresh in-progress user to force signup flow
+            const newUser: AuthUser = {
                 id: generateId(),
                 email,
                 firstName: 'Mock',
                 lastName: 'User',
-                phoneNumber: '+10000000000',
+                phoneNumber: null,
                 address: null as unknown as string | undefined,
-                emailVerified: true,
-                phoneVerified: true,
-                signupStep: 'COMPLETED' as SignupStep,
+                emailVerified: false,
+                phoneVerified: false,
+                signupStep: 'EMAIL_SENT',
                 role: 'CUSTOMER' as UserRole,
             };
 
-            await saveTokenAndUser('mock-token', existingUser as AuthUser);
+            saveTokenAndUser('mock-token', newUser);
 
             return {
                 token: 'mock-token',
-                user: existingUser,
+                user: newUser,
                 message: 'Login simulated (mock)',
             };
         },
-        [saveTokenAndUser, user]
+        [saveTokenAndUser]
     );
 
     const logout = useCallback(async () => {
-        try {
-            await AsyncStorage.removeItem('authToken');
-            await AsyncStorage.removeItem('authUser');
-            if (mounted.current) {
-                setToken(null);
-                setUser(null);
-                setSignupError(null);
-            }
-            // No remote cache to clear in mock mode
-        } catch (error) {
-            console.error('Failed to logout:', error);
-        }
+        setToken(null);
+        setUser(null);
+        setSignupError(null);
     }, []);
 
     return {

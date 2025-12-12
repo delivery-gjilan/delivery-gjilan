@@ -16,6 +16,22 @@ export enum OrderStatus {
   CANCELLED = 'CANCELLED',
 }
 
+// Auth-related enums for mock flows
+export enum SignupStep {
+  INITIAL = 'INITIAL',
+  EMAIL_SENT = 'EMAIL_SENT',
+  EMAIL_VERIFIED = 'EMAIL_VERIFIED',
+  PHONE_SENT = 'PHONE_SENT',
+  PHONE_VERIFIED = 'PHONE_VERIFIED',
+  COMPLETED = 'COMPLETED',
+}
+
+export enum UserRole {
+  CUSTOMER = 'CUSTOMER',
+  DRIVER = 'DRIVER',
+  BUSINESS = 'BUSINESS',
+}
+
 // Types
 export interface Location {
   latitude: number;
