@@ -1,6 +1,6 @@
 import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { useState } from 'react';
 import { useRouter, type Href } from 'expo-router';
 

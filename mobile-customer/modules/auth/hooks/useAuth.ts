@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { SignupStep, UserRole } from '@/types/graphql.generated';
+import { SignupStep, UserRole } from '@/types/graphql.generated';
 
 export interface AuthUser {
     id: string;
@@ -46,7 +46,7 @@ export const useAuth = () => {
                 address: null as unknown as string | undefined, // keep shape aligned
                 emailVerified: false,
                 phoneVerified: false,
-                signupStep: 'EMAIL_SENT',
+                signupStep: SignupStep.EMAIL_SENT,
                 role: 'CUSTOMER' as UserRole,
             } as AuthUser;
 
@@ -65,7 +65,7 @@ export const useAuth = () => {
             setSignupError(null);
             if (!user) throw new Error('No user in progress');
 
-            const updatedUser = { ...user, emailVerified: true, signupStep: 'EMAIL_VERIFIED' as SignupStep };
+            const updatedUser = { ...user, emailVerified: true, signupStep: SignupStep.EMAIL_VERIFIED };
             await saveTokenAndUser(token ?? 'mock-token', updatedUser);
 
             return {
@@ -85,7 +85,7 @@ export const useAuth = () => {
             const updatedUser = {
                 ...user,
                 phoneNumber,
-                signupStep: 'PHONE_SENT' as SignupStep,
+                signupStep: SignupStep.PHONE_SENT,
             };
 
             await saveTokenAndUser(token ?? 'mock-token', updatedUser);
@@ -107,7 +107,7 @@ export const useAuth = () => {
             const updatedUser = {
                 ...user,
                 phoneVerified: true,
-                signupStep: 'COMPLETED' as SignupStep,
+                signupStep: SignupStep.COMPLETED,
             };
 
             await saveTokenAndUser(token ?? 'mock-token', updatedUser);
@@ -135,7 +135,7 @@ export const useAuth = () => {
                 address: null as unknown as string | undefined,
                 emailVerified: false,
                 phoneVerified: false,
-                signupStep: 'EMAIL_SENT',
+                signupStep: SignupStep.EMAIL_SENT,
                 role: 'CUSTOMER' as UserRole,
             };
 
@@ -167,7 +167,7 @@ export const useAuth = () => {
         verifyPhone,
         login,
         logout,
-        isAuthenticated: !!user && user.signupStep === 'COMPLETED',
-        isSigningUp: !!user && user.signupStep !== 'COMPLETED',
+        isAuthenticated: !!user && user.signupStep === SignupStep.COMPLETED,
+        isSigningUp: !!user && user.signupStep !== SignupStep.COMPLETED,
     };
 };

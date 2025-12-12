@@ -1,5 +1,5 @@
 import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { SignupStep } from '@/types/graphql.generated';
