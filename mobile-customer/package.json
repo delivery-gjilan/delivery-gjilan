@@ -3,8 +3,8 @@
     "main": "expo-router/entry",
     "version": "1.0.0",
     "scripts": {
-        "start": "graphql-codegen & expo start",
-        "start:validated": "npm run validate:translations && expo start",
+        "prestart": "npm run validate:translations",
+        "start": "graphql-codegen --watch > logs/codegen.log 2>&1 & expo start",
         "android": "expo start --android",
         "ios": "expo start --ios",
         "web": "expo start --web",
@@ -14,7 +14,8 @@
         "format": "prettier --check .",
         "format:fix": "prettier --write .",
         "codegen": "graphql-codegen --config codegen.ts",
-        "validate:translations": "dotenv -e .env tsx localization/validate.ts"
+        "validate:translations": "dotenv -e .env tsx localization/validate.ts",
+        "typecheck": "tsc --noEmit"
     },
     "dependencies": {
         "@apollo/client": "^4.0.9",
@@ -38,7 +39,6 @@
         "expo-linking": "~8.0.8",
         "expo-router": "~6.0.14",
         "expo-splash-screen": "~31.0.10",
-        "expo-sqlite": "~16.0.9",
         "expo-status-bar": "~3.0.8",
         "expo-symbols": "~1.0.7",
         "expo-system-ui": "~6.0.8",

@@ -23,14 +23,6 @@ export default function RootLayout() {
             <SafeAreaProvider>
                 <Stack screenOptions={{ headerShown: false }}>
                     <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                    <Stack.Screen
-                        name="create-transaction"
-                        options={{
-                            headerShown: false,
-                            animation: 'slide_from_bottom',
-                            gestureDirection: 'vertical',
-                        }}
-                    />
                 </Stack>
             </SafeAreaProvider>
         </ThemeProvider>

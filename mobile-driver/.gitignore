@@ -50,3 +50,6 @@ app-example
 *.swo
 *.swn
 .*.sw?
+
+
+logs

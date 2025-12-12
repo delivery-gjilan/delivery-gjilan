@@ -16,6 +16,7 @@ package.json
 README.md
 tailwind.config.js
 tsconfig.json
+gql
 *.json
 *.md
 *.js

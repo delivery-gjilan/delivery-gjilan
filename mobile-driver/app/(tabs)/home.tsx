@@ -3,8 +3,6 @@ import { View, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
-import { TransactionList } from '@/modules/transactions/components/TransactionList';
-import { FinancialSummaryCard } from '@/modules/account/components/FinancialSummaryCard';
 
 export default function Home() {
     const theme = useTheme();
@@ -21,8 +19,6 @@ export default function Home() {
                         {t.home.subtitle}
                     </Text>
                 </View>
-
-                <TransactionList ListHeaderComponent={<FinancialSummaryCard />} />
             </View>
         </SafeAreaView>
     );
