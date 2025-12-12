@@ -4,7 +4,8 @@
     "version": "1.0.0",
     "scripts": {
         "prestart": "npm run validate:translations",
-        "start": "expo start",
+        "codegen": "graphql-codegen --config codegen.ts",
+        "start": "graphql-codegen --watch & expo start",
         "android": "expo start --android",
         "ios": "expo start --ios",
         "web": "expo start --web",
@@ -59,6 +60,8 @@
     },
     "devDependencies": {
         "@faker-js/faker": "^10.1.0",
+        "@graphql-codegen/cli": "^6.1.0",
+        "@parcel/watcher": "^2.5.1",
         "@types/react": "~19.1.0",
         "@typescript-eslint/eslint-plugin": "^8.48.0",
         "@typescript-eslint/parser": "^8.48.0",

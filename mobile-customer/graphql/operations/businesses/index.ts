@@ -1,1 +1,1 @@
-export { GET_BUSINESSES, GET_BUSINESS } from './queries';
+export * from './queries';

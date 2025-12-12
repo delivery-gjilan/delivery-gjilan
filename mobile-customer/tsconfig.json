@@ -1,23 +1,24 @@
 {
-  "extends": "expo/tsconfig.base",
-  "compilerOptions": {
-    "moduleResolution": "bundler",
-    "module": "esnext",
-    "strict": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "paths": {
-      "@/*": [
-        "./*"
-      ]
+    "extends": "expo/tsconfig.base",
+    "compilerOptions": {
+        "moduleResolution": "bundler",
+        "module": "esnext",
+        "strict": true,
+        "skipLibCheck": true,
+        "esModuleInterop": true,
+        "plugins": [
+            {
+                "name": "@0no-co/graphqlsp",
+                "schema": "../api/src/generated/schema.generated.graphql",
+                "templateIsCallExpression": true,
+                "shouldCheckForColocatedFragments": true,
+                "trackFieldUsage": true
+            }
+        ],
+        "paths": {
+            "@/*": ["./*"]
+        },
+        "noUncheckedIndexedAccess": true
     },
-    "noUncheckedIndexedAccess": true
-  },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts",
-    "nativewind-env.d.ts"
-  ]
+    "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "nativewind-env.d.ts"]
 }

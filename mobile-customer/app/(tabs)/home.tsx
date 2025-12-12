@@ -37,7 +37,7 @@ export default function Home() {
                     <View className="flex-1 justify-center items-center px-4">
                         <Text style={{ color: theme.colors.text }}>Error loading restaurants</Text>
                         <Text className="text-sm mt-2" style={{ color: theme.colors.subtext }}>
-                            {(error as any).message || 'Something went wrong'}
+                            {error.message || 'Something went wrong'}
                         </Text>
                     </View>
                 ) : (
@@ -55,16 +55,11 @@ export default function Home() {
                                     {item.imageUrl ? (
                                         <Text>{item.name}</Text>
                                     ) : (
-                                        <Text style={{ color: theme.colors.subtext }}>
-                                            {item.name}
-                                        </Text>
+                                        <Text style={{ color: theme.colors.subtext }}>{item.name}</Text>
                                     )}
                                 </View>
                                 <View className="p-3">
-                                    <Text
-                                        className="text-lg font-semibold"
-                                        style={{ color: theme.colors.text }}
-                                    >
+                                    <Text className="text-lg font-semibold" style={{ color: theme.colors.text }}>
                                         {item.name}
                                     </Text>
                                     <Text className="text-sm mt-1" style={{ color: theme.colors.subtext }}>
@@ -74,9 +69,7 @@ export default function Home() {
                                         <View
                                             className="w-2 h-2 rounded-full mr-2"
                                             style={{
-                                                backgroundColor: item.isOpen
-                                                    ? '#10b981'
-                                                    : '#ef4444',
+                                                backgroundColor: item.isOpen ? '#10b981' : '#ef4444',
                                             }}
                                         />
                                         <Text className="text-xs" style={{ color: theme.colors.subtext }}>

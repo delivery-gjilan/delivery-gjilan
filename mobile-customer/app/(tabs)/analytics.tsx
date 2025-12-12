@@ -70,10 +70,7 @@ export default function OrdersRoute() {
                             >
                                 <View className="flex-row justify-between items-start mb-2">
                                     <View className="flex-1">
-                                        <Text
-                                            className="text-sm"
-                                            style={{ color: theme.colors.subtext }}
-                                        >
+                                        <Text className="text-sm" style={{ color: theme.colors.subtext }}>
                                             Order #{item.id.slice(0, 8)}
                                         </Text>
                                         <Text className="text-xs mt-1" style={{ color: theme.colors.subtext }}>
@@ -99,10 +96,7 @@ export default function OrdersRoute() {
                                             Items: {item.businesses.reduce((acc, b) => acc + b.items.length, 0)}
                                         </Text>
                                     </View>
-                                    <Text
-                                        className="text-lg font-bold"
-                                        style={{ color: theme.colors.text }}
-                                    >
+                                    <Text className="text-lg font-bold" style={{ color: theme.colors.text }}>
                                         ${item.totalPrice.toFixed(2)}
                                     </Text>
                                 </View>
