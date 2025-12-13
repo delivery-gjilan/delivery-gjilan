@@ -180,6 +180,8 @@ type Query {
   product(id: ID!): Product
   productCategories(businessId: ID!): [ProductCategory!]!
   productCategory(id: ID!): ProductCategory
+  productSubcategories(categoryId: ID!): [ProductSubcategory!]!
+  productSubcategory(id: ID!): ProductSubcategory
   products(businessId: ID!): [Product!]!
   users: [User!]!
 }

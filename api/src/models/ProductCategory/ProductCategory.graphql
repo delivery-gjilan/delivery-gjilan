@@ -7,8 +7,8 @@ type ProductCategory {
     updatedAt: String!
 }
 type Query {
-    productCategories(businessId: ID!): [ProductCategory!]!
-    productCategory(id: ID!): ProductCategory
+    productCategories(businessId: ID!): [ProductCategory!]! @skipAuth
+    productCategory(id: ID!): ProductCategory @skipAuth
 }
 
 input CreateProductCategoryInput {

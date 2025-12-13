@@ -19,7 +19,7 @@ type Business {
 
 type Query {
     businesses: [Business!]! @skipAuth
-    business(id: ID!): Business
+    business(id: ID!): Business @skipAuth
 }
 
 input CreateBusinessInput {

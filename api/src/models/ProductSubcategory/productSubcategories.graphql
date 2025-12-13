@@ -5,3 +5,8 @@ type ProductSubcategory {
     createdAt: String!
     updatedAt: String!
 }
+
+type Query {
+    productSubcategories(categoryId: ID!): [ProductSubcategory!]! @skipAuth
+    productSubcategory(id: ID!): ProductSubcategory @skipAuth
+}

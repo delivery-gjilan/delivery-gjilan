@@ -296,6 +296,8 @@ export type Query = {
   product?: Maybe<Product>;
   productCategories: Array<ProductCategory>;
   productCategory?: Maybe<ProductCategory>;
+  productSubcategories: Array<ProductSubcategory>;
+  productSubcategory?: Maybe<ProductSubcategory>;
   products: Array<Product>;
   users: Array<User>;
 };
@@ -327,6 +329,16 @@ export type QueryproductCategoriesArgs = {
 
 
 export type QueryproductCategoryArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryproductSubcategoriesArgs = {
+  categoryId: Scalars['ID']['input'];
+};
+
+
+export type QueryproductSubcategoryArgs = {
   id: Scalars['ID']['input'];
 };
 
@@ -699,6 +711,8 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   product?: Resolver<Maybe<ResolversTypes['Product']>, ParentType, ContextType, RequireFields<QueryproductArgs, 'id'>>;
   productCategories?: Resolver<Array<ResolversTypes['ProductCategory']>, ParentType, ContextType, RequireFields<QueryproductCategoriesArgs, 'businessId'>>;
   productCategory?: Resolver<Maybe<ResolversTypes['ProductCategory']>, ParentType, ContextType, RequireFields<QueryproductCategoryArgs, 'id'>>;
+  productSubcategories?: Resolver<Array<ResolversTypes['ProductSubcategory']>, ParentType, ContextType, RequireFields<QueryproductSubcategoriesArgs, 'categoryId'>>;
+  productSubcategory?: Resolver<Maybe<ResolversTypes['ProductSubcategory']>, ParentType, ContextType, RequireFields<QueryproductSubcategoryArgs, 'id'>>;
   products?: Resolver<Array<ResolversTypes['Product']>, ParentType, ContextType, RequireFields<QueryproductsArgs, 'businessId'>>;
   users?: Resolver<Array<ResolversTypes['User']>, ParentType, ContextType>;
 };

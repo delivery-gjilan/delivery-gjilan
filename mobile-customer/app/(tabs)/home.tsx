@@ -14,7 +14,11 @@ export default function Home() {
     const { businesses, loading, error } = useBusinesses();
 
     const handleBusinessPress = (businessId: string) => {
-        router.push(`/`);
+        // @ts-ignore - dynamic route not in type definitions yet
+        router.push({
+            pathname: '/business/[id]',
+            params: { id: businessId },
+        } as any);
     };
 
     return (
