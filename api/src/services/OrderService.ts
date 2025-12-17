@@ -1,4 +1,6 @@
-import { OrderRepository, orderRepository } from '@/repositories/OrderRepository';
+import { OrderRepository } from '@/repositories/OrderRepository';
+import { AuthRepository } from '@/repositories/AuthRepository';
+import { ProductRepository } from '@/repositories/ProductRepository';
 import { getDB } from '@/database';
 import {
     orderItems as orderItemsTable,
@@ -6,11 +8,75 @@ import {
     businesses as businessesTable,
 } from '@/database/schema';
 import { eq } from 'drizzle-orm';
-import type { Order, OrderBusiness, OrderItem, OrderStatus } from '@/generated/types.generated';
+import type { Order, OrderBusiness, OrderItem, OrderStatus, CreateOrderInput } from '@/generated/types.generated';
 import type { DbOrder } from '@/database/schema/orders';
 
 export class OrderService {
-    constructor(private orderRepository: OrderRepository) {}
+    constructor(
+        private orderRepository: OrderRepository,
+        private authRepository: AuthRepository,
+        private productRepository: ProductRepository,
+    ) {}
+
+    async createOrder(userId: string, input: CreateOrderInput): Promise<Order> {
+        // 1. Validate User
+        const user = await this.authRepository.findById(userId);
+        if (!user) {
+            throw new Error('User not found');
+        }
+
+        if (user.signupStep !== 'COMPLETED') {
+            throw new Error('User has not completed signup process');
+        }
+
+        // 2. Validate Products and Calculate Totals
+        let calculatedItemsTotal = 0;
+        const itemsToCreate = [];
+
+        for (const itemInput of input.items) {
+            const product = await this.productRepository.findById(itemInput.productId);
+            if (!product) {
+                throw new Error(`Product with ID ${itemInput.productId} not found`);
+            }
+            if (!product.isAvailable) {
+                throw new Error(`Product ${product.name} is currently unavailable`);
+            }
+
+            // Use DB price for security, or validate input price
+            // Here taking DB price to be safe
+            const price = Number(product.isOnSale && product.salePrice ? product.salePrice : product.price);
+            console.log(price, itemInput.quantity);
+            calculatedItemsTotal += price * itemInput.quantity;
+
+            itemsToCreate.push({
+                productId: itemInput.productId,
+                quantity: itemInput.quantity,
+                price: price, // Store the price at time of purchase
+            });
+        }
+
+        console.log('prices,', calculatedItemsTotal, input.deliveryPrice);
+        // 3. Create Order
+        const totalOrderPrice = calculatedItemsTotal + input.deliveryPrice;
+
+        // Verify total price matches client input (allow small float error)
+        if (Math.abs(totalOrderPrice - input.totalPrice) > 0.01) {
+            throw new Error(`Price mismatch: Calculated ${totalOrderPrice}, provided ${input.totalPrice}`);
+        }
+
+        const orderData = {
+            price: calculatedItemsTotal,
+            deliveryPrice: input.deliveryPrice,
+            status: 'PENDING' as const,
+            dropoffLat: input.dropOffLocation.latitude,
+            dropoffLng: input.dropOffLocation.longitude,
+            dropoffAddress: input.dropOffLocation.address,
+        };
+
+        const createdOrder = await this.orderRepository.create(orderData, itemsToCreate);
+
+        return this.mapToOrder(createdOrder);
+    }
 
     private async mapToOrder(dbOrder: DbOrder): Promise<Order> {
         const db = await getDB();
@@ -130,4 +196,4 @@ export class OrderService {
     }
 }
 
-export const orderService = new OrderService(orderRepository);
+// export const orderService = new OrderService(orderRepository);

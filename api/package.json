@@ -56,16 +56,19 @@
         "@graphql-tools/schema": "^10.0.30",
         "@graphql-tools/utils": "^10.11.0",
         "@types/multer": "^2.0.0",
+        "@types/ws": "^8.18.1",
         "bcrypt": "^6.0.0",
         "cors": "^2.8.5",
         "dotenv": "^17.2.3",
         "drizzle-orm": "^0.44.7",
         "express": "^5.2.1",
         "graphql": "^16.12.0",
+        "graphql-ws": "^6.0.6",
         "graphql-yoga": "^5.17.1",
         "jsonwebtoken": "^9.0.3",
         "multer": "^2.0.2",
         "pg": "^8.16.3",
+        "ws": "^8.18.3",
         "zod": "^4.1.13"
     }
 }

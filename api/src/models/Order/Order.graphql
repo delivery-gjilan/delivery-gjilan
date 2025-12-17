@@ -39,4 +39,22 @@ type Query {
 type Mutation {
     updateOrderStatus(id: ID!, status: OrderStatus!): Order!
     cancelOrder(id: ID!): Order!
+    createOrder(input: CreateOrderInput!): Order!
+}
+
+type Subscription {
+    orderStatusUpdated(orderId: ID!): Order!
+}
+
+input CreateOrderInput {
+    items: [CreateOrderItemInput!]!
+    dropOffLocation: LocationInput!
+    deliveryPrice: Float!
+    totalPrice: Float! # For validation/check
+}
+
+input CreateOrderItemInput {
+    productId: ID!
+    quantity: Int!
+    price: Float! # For validation/check
 }

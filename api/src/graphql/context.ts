@@ -4,6 +4,8 @@ import { BusinessService } from '@/services/BusinessService';
 import { ProductCategoryService } from '@/services/ProductCategoryService';
 import { ProductService } from '@/services/ProductService';
 import { AuthService } from '@/services/AuthService';
+import { OrderService } from '@/services/OrderService';
+import { PubSub } from '@/lib/pubsub';
 
 export interface ApiContextInterface {
     db: DbType;
@@ -14,6 +16,8 @@ export interface ApiContextInterface {
     productCategoryService: ProductCategoryService;
     productService: ProductService;
     authService: AuthService;
+    orderService: OrderService;
+    pubsub: PubSub;
 }
 
 export interface GraphQLContext extends YogaInitialContext, ApiContextInterface {}

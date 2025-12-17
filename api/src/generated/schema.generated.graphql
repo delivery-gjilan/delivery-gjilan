@@ -33,6 +33,19 @@ input CreateBusinessInput {
   workingHours: WorkingHoursInput!
 }
 
+input CreateOrderInput {
+  deliveryPrice: Float!
+  dropOffLocation: LocationInput!
+  items: [CreateOrderItemInput!]!
+  totalPrice: Float!
+}
+
+input CreateOrderItemInput {
+  price: Float!
+  productId: ID!
+  quantity: Int!
+}
+
 input CreateProductCategoryInput {
   businessId: ID!
   name: String!
@@ -88,6 +101,7 @@ input LoginInput {
 type Mutation {
   cancelOrder(id: ID!): Order!
   createBusiness(input: CreateBusinessInput!): Business!
+  createOrder(input: CreateOrderInput!): Order!
   createProduct(input: CreateProductInput!): Product!
   createProductCategory(input: CreateProductCategoryInput!): ProductCategory!
   createUser(input: CreateUserInput!): AuthResponse!
@@ -200,6 +214,10 @@ type SignupStepResponse {
 
 input SubmitPhoneNumberInput {
   phoneNumber: String!
+}
+
+type Subscription {
+  orderStatusUpdated(orderId: ID!): Order!
 }
 
 input UpdateBusinessInput {

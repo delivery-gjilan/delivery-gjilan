@@ -14,6 +14,7 @@ import    { products as Query_products } from './../models/Product/resolvers/Que
 import    { users as Query_users } from './../models/User/resolvers/Query/users';
 import    { cancelOrder as Mutation_cancelOrder } from './../models/Order/resolvers/Mutation/cancelOrder';
 import    { createBusiness as Mutation_createBusiness } from './../models/Business/resolvers/Mutation/createBusiness';
+import    { createOrder as Mutation_createOrder } from './../models/Order/resolvers/Mutation/createOrder';
 import    { createProduct as Mutation_createProduct } from './../models/Product/resolvers/Mutation/createProduct';
 import    { createProductCategory as Mutation_createProductCategory } from './../models/ProductCategory/resolvers/Mutation/createProductCategory';
 import    { createUser as Mutation_createUser } from './../models/User/resolvers/Mutation/createUser';
@@ -29,6 +30,7 @@ import    { updateProduct as Mutation_updateProduct } from './../models/Product/
 import    { updateProductCategory as Mutation_updateProductCategory } from './../models/ProductCategory/resolvers/Mutation/updateProductCategory';
 import    { verifyEmail as Mutation_verifyEmail } from './../models/User/resolvers/Mutation/verifyEmail';
 import    { verifyPhone as Mutation_verifyPhone } from './../models/User/resolvers/Mutation/verifyPhone';
+import    { orderStatusUpdated as Subscription_orderStatusUpdated } from './../models/Order/resolvers/Subscription/orderStatusUpdated';
 import    { AuthResponse } from './../models/User/resolvers/AuthResponse';
 import    { Business } from './../models/Business/resolvers/Business';
 import    { Location } from './../models/General/resolvers/Location';
@@ -44,8 +46,8 @@ import    { WorkingHours } from './../models/General/resolvers/WorkingHours';
 import    { DateResolver } from 'graphql-scalars';
     export const resolvers: Resolvers = {
       Query: { business: Query_business,businesses: Query_businesses,drivers: Query_drivers,me: Query_me,order: Query_order,orders: Query_orders,ordersByStatus: Query_ordersByStatus,product: Query_product,productCategories: Query_productCategories,productCategory: Query_productCategory,products: Query_products,users: Query_users },
-      Mutation: { cancelOrder: Mutation_cancelOrder,createBusiness: Mutation_createBusiness,createProduct: Mutation_createProduct,createProductCategory: Mutation_createProductCategory,createUser: Mutation_createUser,deleteBusiness: Mutation_deleteBusiness,deleteProduct: Mutation_deleteProduct,deleteProductCategory: Mutation_deleteProductCategory,initiateSignup: Mutation_initiateSignup,login: Mutation_login,submitPhoneNumber: Mutation_submitPhoneNumber,updateBusiness: Mutation_updateBusiness,updateOrderStatus: Mutation_updateOrderStatus,updateProduct: Mutation_updateProduct,updateProductCategory: Mutation_updateProductCategory,verifyEmail: Mutation_verifyEmail,verifyPhone: Mutation_verifyPhone },
-      
+      Mutation: { cancelOrder: Mutation_cancelOrder,createBusiness: Mutation_createBusiness,createOrder: Mutation_createOrder,createProduct: Mutation_createProduct,createProductCategory: Mutation_createProductCategory,createUser: Mutation_createUser,deleteBusiness: Mutation_deleteBusiness,deleteProduct: Mutation_deleteProduct,deleteProductCategory: Mutation_deleteProductCategory,initiateSignup: Mutation_initiateSignup,login: Mutation_login,submitPhoneNumber: Mutation_submitPhoneNumber,updateBusiness: Mutation_updateBusiness,updateOrderStatus: Mutation_updateOrderStatus,updateProduct: Mutation_updateProduct,updateProductCategory: Mutation_updateProductCategory,verifyEmail: Mutation_verifyEmail,verifyPhone: Mutation_verifyPhone },
+      Subscription: { orderStatusUpdated: Subscription_orderStatusUpdated },
       AuthResponse: AuthResponse,
 Business: Business,
 Location: Location,

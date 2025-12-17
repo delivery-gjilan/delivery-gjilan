@@ -54,6 +54,19 @@ export type CreateBusinessInput = {
   workingHours: WorkingHoursInput;
 };
 
+export type CreateOrderInput = {
+  deliveryPrice: Scalars['Float']['input'];
+  dropOffLocation: LocationInput;
+  items: Array<CreateOrderItemInput>;
+  totalPrice: Scalars['Float']['input'];
+};
+
+export type CreateOrderItemInput = {
+  price: Scalars['Float']['input'];
+  productId: Scalars['ID']['input'];
+  quantity: Scalars['Int']['input'];
+};
+
 export type CreateProductCategoryInput = {
   businessId: Scalars['ID']['input'];
   name: Scalars['String']['input'];
@@ -109,6 +122,7 @@ export type Mutation = {
   __typename?: 'Mutation';
   cancelOrder: Order;
   createBusiness: Business;
+  createOrder: Order;
   createProduct: Product;
   createProductCategory: ProductCategory;
   createUser: AuthResponse;
@@ -134,6 +148,11 @@ export type MutationcancelOrderArgs = {
 
 export type MutationcreateBusinessArgs = {
   input: CreateBusinessInput;
+};
+
+
+export type MutationcreateOrderArgs = {
+  input: CreateOrderInput;
 };
 
 
@@ -353,6 +372,16 @@ export type SubmitPhoneNumberInput = {
   phoneNumber: Scalars['String']['input'];
 };
 
+export type Subscription = {
+  __typename?: 'Subscription';
+  orderStatusUpdated: Order;
+};
+
+
+export type SubscriptionorderStatusUpdatedArgs = {
+  orderId: Scalars['ID']['input'];
+};
+
 export type UpdateBusinessInput = {
   businessType?: InputMaybe<BusinessType>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
@@ -495,9 +524,12 @@ export type ResolversTypes = {
   Boolean: ResolverTypeWrapper<Scalars['Boolean']['output']>;
   BusinessType: ResolverTypeWrapper<'MARKET' | 'PHARMACY' | 'RESTAURANT'>;
   CreateBusinessInput: CreateBusinessInput;
+  CreateOrderInput: CreateOrderInput;
+  Float: ResolverTypeWrapper<Scalars['Float']['output']>;
+  CreateOrderItemInput: CreateOrderItemInput;
+  Int: ResolverTypeWrapper<Scalars['Int']['output']>;
   CreateProductCategoryInput: CreateProductCategoryInput;
   CreateProductInput: CreateProductInput;
-  Float: ResolverTypeWrapper<Scalars['Float']['output']>;
   CreateUserInput: CreateUserInput;
   Date: ResolverTypeWrapper<Scalars['Date']['output']>;
   InitiateSignupInput: InitiateSignupInput;
@@ -508,7 +540,6 @@ export type ResolversTypes = {
   Order: ResolverTypeWrapper<Omit<Order, 'businesses' | 'status'> & { businesses: Array<ResolversTypes['OrderBusiness']>, status: ResolversTypes['OrderStatus'] }>;
   OrderBusiness: ResolverTypeWrapper<Omit<OrderBusiness, 'business'> & { business: ResolversTypes['Business'] }>;
   OrderItem: ResolverTypeWrapper<OrderItem>;
-  Int: ResolverTypeWrapper<Scalars['Int']['output']>;
   OrderStatus: ResolverTypeWrapper<'PENDING' | 'ACCEPTED' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED'>;
   Product: ResolverTypeWrapper<Product>;
   ProductCategory: ResolverTypeWrapper<ProductCategory>;
@@ -517,6 +548,7 @@ export type ResolversTypes = {
   SignupStep: ResolverTypeWrapper<'INITIAL' | 'EMAIL_SENT' | 'EMAIL_VERIFIED' | 'PHONE_SENT' | 'COMPLETED'>;
   SignupStepResponse: ResolverTypeWrapper<Omit<SignupStepResponse, 'currentStep'> & { currentStep: ResolversTypes['SignupStep'] }>;
   SubmitPhoneNumberInput: SubmitPhoneNumberInput;
+  Subscription: ResolverTypeWrapper<{}>;
   UpdateBusinessInput: UpdateBusinessInput;
   UpdateProductCategoryInput: UpdateProductCategoryInput;
   UpdateProductInput: UpdateProductInput;
@@ -536,9 +568,12 @@ export type ResolversParentTypes = {
   ID: Scalars['ID']['output'];
   Boolean: Scalars['Boolean']['output'];
   CreateBusinessInput: CreateBusinessInput;
+  CreateOrderInput: CreateOrderInput;
+  Float: Scalars['Float']['output'];
+  CreateOrderItemInput: CreateOrderItemInput;
+  Int: Scalars['Int']['output'];
   CreateProductCategoryInput: CreateProductCategoryInput;
   CreateProductInput: CreateProductInput;
-  Float: Scalars['Float']['output'];
   CreateUserInput: CreateUserInput;
   Date: Scalars['Date']['output'];
   InitiateSignupInput: InitiateSignupInput;
@@ -549,13 +584,13 @@ export type ResolversParentTypes = {
   Order: Omit<Order, 'businesses'> & { businesses: Array<ResolversParentTypes['OrderBusiness']> };
   OrderBusiness: Omit<OrderBusiness, 'business'> & { business: ResolversParentTypes['Business'] };
   OrderItem: OrderItem;
-  Int: Scalars['Int']['output'];
   Product: Product;
   ProductCategory: ProductCategory;
   ProductSubcategory: ProductSubcategory;
   Query: {};
   SignupStepResponse: SignupStepResponse;
   SubmitPhoneNumberInput: SubmitPhoneNumberInput;
+  Subscription: {};
   UpdateBusinessInput: UpdateBusinessInput;
   UpdateProductCategoryInput: UpdateProductCategoryInput;
   UpdateProductInput: UpdateProductInput;
@@ -607,6 +642,7 @@ export type LocationResolvers<ContextType = GraphQLContext, ParentType extends R
 export type MutationResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Mutation'] = ResolversParentTypes['Mutation']> = {
   cancelOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationcancelOrderArgs, 'id'>>;
   createBusiness?: Resolver<ResolversTypes['Business'], ParentType, ContextType, RequireFields<MutationcreateBusinessArgs, 'input'>>;
+  createOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationcreateOrderArgs, 'input'>>;
   createProduct?: Resolver<ResolversTypes['Product'], ParentType, ContextType, RequireFields<MutationcreateProductArgs, 'input'>>;
   createProductCategory?: Resolver<ResolversTypes['ProductCategory'], ParentType, ContextType, RequireFields<MutationcreateProductCategoryArgs, 'input'>>;
   createUser?: Resolver<ResolversTypes['AuthResponse'], ParentType, ContextType, RequireFields<MutationcreateUserArgs, 'input'>>;
@@ -712,6 +748,10 @@ export type SignupStepResponseResolvers<ContextType = GraphQLContext, ParentType
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
+export type SubscriptionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Subscription'] = ResolversParentTypes['Subscription']> = {
+  orderStatusUpdated?: SubscriptionResolver<ResolversTypes['Order'], "orderStatusUpdated", ParentType, ContextType, RequireFields<SubscriptionorderStatusUpdatedArgs, 'orderId'>>;
+};
+
 export type UserResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['User'] = ResolversParentTypes['User']> = {
   address?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   email?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
@@ -751,6 +791,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   Query?: QueryResolvers<ContextType>;
   SignupStep?: SignupStepResolvers;
   SignupStepResponse?: SignupStepResponseResolvers<ContextType>;
+  Subscription?: SubscriptionResolvers<ContextType>;
   User?: UserResolvers<ContextType>;
   UserRole?: UserRoleResolvers;
   WorkingHours?: WorkingHoursResolvers<ContextType>;

@@ -39,10 +39,7 @@ export default function Profile() {
 
                 <View className="flex-1 px-4 pt-6">
                     {/* User Info Card */}
-                    <View
-                        className="rounded-lg p-4 mb-6"
-                        style={{ backgroundColor: theme.colors.card }}
-                    >
+                    <View className="rounded-lg p-4 mb-6" style={{ backgroundColor: theme.colors.card }}>
                         <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
                             User Account
                         </Text>

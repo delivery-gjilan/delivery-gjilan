@@ -32,7 +32,6 @@ export default function TabLayout() {
                 }}
             />
 
-
             <Tabs.Screen
                 name="add"
                 options={{
@@ -56,6 +55,13 @@ export default function TabLayout() {
                 options={{
                     title: t.tabs.profile,
                     tabBarIcon: ({ color, size }) => <Ionicons name="person" size={size} color={color} />,
+                }}
+            />
+            <Tabs.Screen
+                name="subscription-test"
+                options={{
+                    title: 'hahaah',
+                    tabBarIcon: ({ color, size }) => <Ionicons name="accessibility" size={size} color={color} />,
                 }}
             />
         </Tabs>

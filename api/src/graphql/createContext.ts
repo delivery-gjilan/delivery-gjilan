@@ -11,6 +11,10 @@ import { AuthRepository } from '@/repositories/AuthRepository';
 import { AuthService } from '@/services/AuthService';
 import { GraphQLContext } from './context';
 
+import { OrderRepository } from '@/repositories/OrderRepository';
+import { OrderService } from '@/services/OrderService';
+import { pubsub } from '@/lib/pubsub';
+
 /**
  * Extracts and verifies JWT token from request Authorization header
  * Returns userData with userId if token is valid, empty object otherwise
@@ -60,12 +64,14 @@ export async function createContext(initialContext: YogaInitialContext): Promise
     const productCategoryRepository = new ProductCategoryRepository(db);
     const productRepository = new ProductRepository(db);
     const authRepository = new AuthRepository(db);
+    const orderRepository = new OrderRepository();
 
     // Initialize services
     const businessService = new BusinessService(businessRepository);
     const productCategoryService = new ProductCategoryService(productCategoryRepository);
     const productService = new ProductService(productRepository);
     const authService = new AuthService(authRepository);
+    const orderService = new OrderService(orderRepository, authRepository, productRepository);
 
     return {
         ...initialContext,
@@ -75,5 +81,7 @@ export async function createContext(initialContext: YogaInitialContext): Promise
         productCategoryService,
         productService,
         authService,
+        orderService,
+        pubsub,
     };
 }

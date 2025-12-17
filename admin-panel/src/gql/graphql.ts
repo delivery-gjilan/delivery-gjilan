@@ -52,6 +52,19 @@ export type CreateBusinessInput = {
   workingHours: WorkingHoursInput;
 };
 
+export type CreateOrderInput = {
+  deliveryPrice: Scalars['Float']['input'];
+  dropOffLocation: LocationInput;
+  items: Array<CreateOrderItemInput>;
+  totalPrice: Scalars['Float']['input'];
+};
+
+export type CreateOrderItemInput = {
+  price: Scalars['Float']['input'];
+  productId: Scalars['ID']['input'];
+  quantity: Scalars['Int']['input'];
+};
+
 export type CreateProductCategoryInput = {
   businessId: Scalars['ID']['input'];
   name: Scalars['String']['input'];
@@ -107,6 +120,7 @@ export type Mutation = {
   __typename?: 'Mutation';
   cancelOrder: Order;
   createBusiness: Business;
+  createOrder: Order;
   createProduct: Product;
   createProductCategory: ProductCategory;
   createUser: AuthResponse;
@@ -132,6 +146,11 @@ export type MutationCancelOrderArgs = {
 
 export type MutationCreateBusinessArgs = {
   input: CreateBusinessInput;
+};
+
+
+export type MutationCreateOrderArgs = {
+  input: CreateOrderInput;
 };
 
 

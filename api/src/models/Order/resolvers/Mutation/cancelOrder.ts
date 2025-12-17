@@ -1,6 +1,5 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
-import { orderService } from './../../../../services/OrderService';
 
-export const cancelOrder: NonNullable<MutationResolvers['cancelOrder']> = async (_parent, { id }) => {
+export const cancelOrder: NonNullable<MutationResolvers['cancelOrder']> = async (_parent, { id }, { orderService }) => {
     return await orderService.cancelOrder(id);
 };
