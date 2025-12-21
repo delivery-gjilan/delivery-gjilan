@@ -16,14 +16,29 @@ import { OrderService } from '@/services/OrderService';
 import { pubsub } from '@/lib/pubsub';
 
 /**
- * Extracts and verifies JWT token from request Authorization header
+ * Extracts and verifies JWT token from request Authorization header or WebSocket connection params
  * Returns userData with userId if token is valid, empty object otherwise
  * Non-blocking: continues gracefully if token is missing or invalid
  */
-function extractUserData(request: Request): { userId?: string } {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractUserData(context: YogaInitialContext & { connectionParams?: any; req?: any }): { userId?: string } {
     try {
-        // Extract Authorization header
-        const authHeader = request.headers.get('authorization');
+        let authHeader: string | null | undefined = null;
+
+        // 1. Try to get from connectionParams (WebSocket)
+        if (context.connectionParams) {
+            authHeader = context.connectionParams.Authorization || context.connectionParams.authorization;
+        }
+
+        // 2. If not found, try to get from request headers (HTTP or WebSocket Upgrade)
+        // Check both 'request' (Fetch API) and 'req' (Node API)
+        if (!authHeader) {
+            if (context.request) {
+                authHeader = context.request.headers.get('authorization');
+            } else if (context.req && context.req.headers) {
+                authHeader = context.req.headers['authorization'];
+            }
+        }
 
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             return {};
@@ -54,7 +69,9 @@ function extractUserData(request: Request): { userId?: string } {
  */
 export async function createContext(initialContext: YogaInitialContext): Promise<GraphQLContext> {
     // Extract user data from request
-    const userData = extractUserData(initialContext.request);
+    const userData = extractUserData(initialContext);
+    console.log('Request', initialContext.request?.clone().body);
+    console.log('UserData', userData);
 
     // Initialize database connection
     const db = await getDB();

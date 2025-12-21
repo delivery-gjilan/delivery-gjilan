@@ -1,4 +1,4 @@
-import { ApolloClient, InMemoryCache, HttpLink, ApolloLink, split } from '@apollo/client';
+import { ApolloClient, InMemoryCache, HttpLink, ApolloLink } from '@apollo/client';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { SetContextLink } from '@apollo/client/link/context';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
@@ -48,7 +48,7 @@ const wsLink = new GraphQLWsLink(
     }),
 );
 
-const splitLink = split(
+const splitLink = ApolloLink.split(
     ({ query }) => {
         const definition = getMainDefinition(query);
         return definition.kind === 'OperationDefinition' && definition.operation === 'subscription';

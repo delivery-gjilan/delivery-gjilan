@@ -43,7 +43,7 @@ type Mutation {
 }
 
 type Subscription {
-    orderStatusUpdated(orderId: ID!): Order!
+    orderStatusUpdated(orderId: ID!): Order! @skipAuth
 }
 
 input CreateOrderInput {

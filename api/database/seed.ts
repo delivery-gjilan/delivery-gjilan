@@ -7,12 +7,11 @@ import { orders, NewDbOrder } from './schema/orders';
 import { orderItems, NewDbOrderItem } from './schema/orderItems';
 import { users } from './schema/users';
 import { hashPassword } from '@/lib/utils/authUtils';
-import { faker } from '@faker-js/faker';
 import { OrderStatus } from '@/generated/types.generated';
 
 async function seed() {
     console.log('🌱 Seeding database...');
-
+    const { faker } = await import('@faker-js/faker');
     const db = await getDB();
 
     // Clear existing data
