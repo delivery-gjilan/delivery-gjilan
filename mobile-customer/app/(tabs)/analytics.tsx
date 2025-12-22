@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
-import { useOrders } from '@/hooks/useOrders';
+import { useOrders } from '@/modules/orders/hooks/useOrders';
 
 export default function OrdersRoute() {
     const theme = useTheme();

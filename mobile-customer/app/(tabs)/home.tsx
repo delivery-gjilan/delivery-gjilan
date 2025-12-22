@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
-import { useBusinesses } from '@/hooks/useBusinesses';
+import { useBusinesses } from '@/modules/businesses/hooks/useBusinesses';
 import { useCartActions } from '@/modules/cart';
 
 export default function Home() {
