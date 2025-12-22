@@ -34,6 +34,16 @@ export default function RootLayout() {
                                 gestureDirection: 'vertical',
                             }}
                         />
+                        <Stack.Screen
+                            name="cart"
+                            options={{
+                                presentation: 'modal',
+                                animation: 'slide_from_bottom',
+                                gestureDirection: 'vertical',
+                                gestureEnabled: true,
+                                headerShown: false,
+                            }}
+                        />
                     </Stack>
                 </SafeAreaProvider>
             </ThemeProvider>

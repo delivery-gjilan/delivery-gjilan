@@ -6,15 +6,28 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useBusinesses } from '@/hooks/useBusinesses';
+import { useCartActions } from '@/modules/cart';
 
 export default function Home() {
     const theme = useTheme();
     const { t } = useTranslations();
     const router = useRouter();
     const { businesses, loading, error } = useBusinesses();
+    const { addItem } = useCartActions();
 
     const handleBusinessPress = (businessId: string) => {
         router.push(`/`);
+    };
+
+    const handleAddTestProduct = () => {
+        addItem({
+            productId: 'f068c4f7-6bed-41e4-99f8-44dbec4381c5',
+            businessId: 'c1633028-5798-4615-9b32-6945f693ae5a',
+            name: 'Test Product',
+            price: 796.39,
+            imageUrl: 'https://picsum.photos/seed/elLvhj/1813/3687',
+            quantity: 1,
+        });
     };
 
     return (
@@ -27,6 +40,15 @@ export default function Home() {
                     <Text className="text-base mt-1" style={{ color: theme.colors.subtext }}>
                         {t.home.subtitle || 'Choose from our partners'}
                     </Text>
+
+                    {/* Test Button */}
+                    <TouchableOpacity
+                        onPress={handleAddTestProduct}
+                        className="bg-primary py-3 px-4 rounded-lg mt-4"
+                        activeOpacity={0.8}
+                    >
+                        <Text className="text-white font-semibold text-center">🛒 Add Test Product to Cart</Text>
+                    </TouchableOpacity>
                 </View>
 
                 {loading ? (
