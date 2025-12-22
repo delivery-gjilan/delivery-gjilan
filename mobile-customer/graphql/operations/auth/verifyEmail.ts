@@ -1,2 +1,11 @@
-// Mock placeholder for UI-only flow; no network call performed
-export const VERIFY_EMAIL_MUTATION = 'VERIFY_EMAIL_MUTATION_MOCK';
+import { graphql } from '@/gql';
+
+export const VERIFY_EMAIL_MUTATION = graphql(`
+    mutation VerifyEmail($input: VerifyEmailInput!) {
+        verifyEmail(input: $input) {
+            userId
+            currentStep
+            message
+        }
+    }
+`);

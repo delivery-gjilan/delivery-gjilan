@@ -3,24 +3,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { Button } from '@/components/Button';
+import { useAuth } from '@/modules/auth/hooks/useAuth';
 
 export default function Profile() {
     const theme = useTheme();
     const { languageChoice, setLanguageChoice } = useTranslations();
-
-    const handleLogout = () => {
-        Alert.alert('Logout', 'Are you sure you want to logout?', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Logout',
-                style: 'destructive',
-                onPress: () => {
-                    // TODO: Implement logout
-                    Alert.alert('Logged out', 'You have been logged out.');
-                },
-            },
-        ]);
-    };
+    const { logout, isAuthenticated } = useAuth();
 
     const handleChangeLanguage = () => {
         const newLanguage = languageChoice === 'en' ? 'al' : 'en';
@@ -80,15 +68,17 @@ export default function Profile() {
                     </View>
 
                     {/* Logout Button */}
-                    <Button
-                        title="Logout"
-                        onPress={handleLogout}
-                        style={{
-                            backgroundColor: '#ef4444',
-                            marginTop: 'auto',
-                            marginBottom: 20,
-                        }}
-                    />
+                    {isAuthenticated && (
+                        <Button
+                            title="Logout"
+                            onPress={logout}
+                            style={{
+                                backgroundColor: '#ef4444',
+                                marginTop: 'auto',
+                                marginBottom: 20,
+                            }}
+                        />
+                    )}
                 </View>
             </View>
         </SafeAreaView>

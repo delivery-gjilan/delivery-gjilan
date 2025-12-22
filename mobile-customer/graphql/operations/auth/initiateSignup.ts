@@ -1,4 +1,21 @@
-// import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-// Mock placeholder for UI-only flow; no network call performed
-export const INITIATE_SIGNUP_MUTATION = 'INITIATE_SIGNUP_MUTATION_MOCK';
+export const INITIATE_SIGNUP_MUTATION = graphql(`
+    mutation InitiateSignup($input: InitiateSignupInput!) {
+        initiateSignup(input: $input) {
+            token
+            user {
+                id
+                email
+                firstName
+                lastName
+                signupStep
+                emailVerified
+                phoneVerified
+                phoneNumber
+                role
+            }
+            message
+        }
+    }
+`);

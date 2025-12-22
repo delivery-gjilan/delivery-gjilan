@@ -13,8 +13,16 @@ const logLink = new ApolloLink((operation, forward) => {
     return forward(operation);
 });
 
-const authLink = new SetContextLink(({ headers }) => {
-    const token = useAuthStore.getState().token;
+const authLink = new SetContextLink(async ({ headers }) => {
+    // Try to get token from Zustand store first (faster)
+    let token = useAuthStore.getState().token;
+
+    // If not in store, try secure storage (fallback)
+    if (!token) {
+        const { getToken } = await import('../../utils/secureTokenStore');
+        token = await getToken();
+    }
+
     return {
         headers: {
             ...headers,
@@ -34,13 +42,6 @@ const wsUrl = httpUrl.replace(/^http/, 'ws');
 const wsLink = new GraphQLWsLink(
     createClient({
         url: wsUrl,
-        connectionParams: () => {
-            const token = useAuthStore.getState().token;
-            console.log('[WS] Connecting with token:', token ? 'Present' : 'None');
-            return {
-                Authorization: token ? `Bearer ${token}` : undefined,
-            };
-        },
         on: {
             connected: () => console.log('[WS] Connected'),
             error: (err) => console.error('[WS] Error', err),

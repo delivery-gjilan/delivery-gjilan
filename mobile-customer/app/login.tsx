@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useRouter, type Href } from 'expo-router';
 
 export default function LoginScreen() {
-    const { login, loading, signupError } = useAuth();
+    const { login, loading } = useAuth();
     const router = useRouter();
 
     const [email, setEmail] = useState('');
@@ -21,14 +21,16 @@ export default function LoginScreen() {
         setError(null);
         try {
             const result = await login(email, password);
-            setEmail('');
-            setPassword('');
+            if (result) {
+                setEmail('');
+                setPassword('');
 
-            // Navigate based on signup step
-            if (result.user.signupStep === 'COMPLETED') {
-                router.replace('/(tabs)/home');
-            } else {
-                router.replace('/signup' as Href);
+                // Navigate based on signup step
+                if (result.user.signupStep === 'COMPLETED') {
+                    router.replace('/(tabs)/home');
+                } else {
+                    router.replace('/signup' as Href);
+                }
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Login failed');
@@ -45,9 +47,9 @@ export default function LoginScreen() {
 
                 <View className="px-6 py-6">
                     {/* Error Message */}
-                    {(error || signupError) && (
+                    {error && (
                         <View className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                            <Text className="text-red-600 font-medium">{error || signupError}</Text>
+                            <Text className="text-red-600 font-medium">{error}</Text>
                         </View>
                     )}
 
@@ -101,8 +103,7 @@ export default function LoginScreen() {
                         }}
                     >
                         <Text className="text-center text-gray-600">
-                            Don't have an account?{' '}
-                            <Text className="text-blue-600 font-semibold">Sign up</Text>
+                            Don&apos;t have an account? <Text className="text-blue-600 font-semibold">Sign up</Text>
                         </Text>
                     </TouchableOpacity>
                 </View>

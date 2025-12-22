@@ -1,2 +1,11 @@
-// Mock placeholder for UI-only flow; no network call performed
-export const VERIFY_PHONE_MUTATION = 'VERIFY_PHONE_MUTATION_MOCK';
+import { graphql } from '@/gql';
+
+export const VERIFY_PHONE_MUTATION = graphql(`
+    mutation VerifyPhone($input: VerifyPhoneInput!) {
+        verifyPhone(input: $input) {
+            userId
+            currentStep
+            message
+        }
+    }
+`);

@@ -1,6 +1,6 @@
 {
     "name": "mobile-customer",
-    "main": "expo-router/entry",
+    "main": "index.tsx",
     "version": "1.0.0",
     "scripts": {
         "prestart": "npm run validate:translations",
@@ -38,6 +38,7 @@
         "expo-linear-gradient": "~15.0.7",
         "expo-linking": "~8.0.8",
         "expo-router": "~6.0.14",
+        "expo-secure-store": "^15.0.8",
         "expo-splash-screen": "~31.0.10",
         "expo-status-bar": "~3.0.8",
         "expo-symbols": "~1.0.7",
@@ -66,7 +67,7 @@
         "@faker-js/faker": "^10.1.0",
         "@graphql-codegen/cli": "^6.1.0",
         "@parcel/watcher": "^2.5.1",
-        "@types/react": "~19.1.0",
+        "@types/react": "^19.1.17",
         "@typescript-eslint/eslint-plugin": "^8.48.0",
         "@typescript-eslint/parser": "^8.48.0",
         "dotenv-cli": "^11.0.0",

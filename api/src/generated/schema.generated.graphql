@@ -110,6 +110,7 @@ type Mutation {
   deleteProductCategory(id: ID!): Boolean!
   initiateSignup(input: InitiateSignupInput!): AuthResponse!
   login(input: LoginInput!): AuthResponse!
+  resendEmailVerification: SignupStepResponse!
   submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
   updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
   updateOrderStatus(id: ID!, status: OrderStatus!): Order!

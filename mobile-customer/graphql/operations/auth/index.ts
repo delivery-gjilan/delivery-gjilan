@@ -4,3 +4,4 @@ export { SUBMIT_PHONE_NUMBER_MUTATION } from './submitPhoneNumber';
 export { VERIFY_PHONE_MUTATION } from './verifyPhone';
 export { ME_QUERY } from './me';
 export { LOGIN_MUTATION } from './login';
+export { RESEND_EMAIL_VERIFICATION_MUTATION } from './resendEmailVerification';

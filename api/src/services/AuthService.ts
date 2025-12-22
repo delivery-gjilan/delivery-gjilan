@@ -66,6 +66,34 @@ export class AuthService {
     }
 
     /**
+     * Resend email verification code
+     */
+    async resendEmailVerification(userId: string): Promise<SignupStepResponse> {
+        const user = await this.authRepository.findById(userId);
+
+        if (!user) {
+            throw new Error('User not found');
+        }
+
+        if (user.emailVerified) {
+            throw new Error('Email is already verified');
+        }
+
+        // Generate and set new email verification code
+        const verificationCode = generateVerificationCode();
+        await this.authRepository.setEmailVerificationCode(user.id, verificationCode);
+
+        // In a real app, you would send this code via email
+        console.log(`Email verification code for ${user.email}: ${verificationCode}`);
+
+        return {
+            userId: user.id,
+            currentStep: user.signupStep as SignupStepResponse['currentStep'],
+            message: `Verification code resent to ${user.email}. Please check your email.`,
+        };
+    }
+
+    /**
      * Step 3: Submit phone number and generate verification code
      */
     async submitPhoneNumber(userId: string, phoneNumber: string): Promise<SignupStepResponse> {
@@ -75,8 +103,13 @@ export class AuthService {
             throw new Error('User not found');
         }
 
-        if (user.signupStep !== 'EMAIL_VERIFIED') {
+        if (!user.emailVerified) {
             throw new Error('Please verify your email first');
+        }
+
+        // Allow resubmission if phone not verified yet
+        if (user.phoneVerified) {
+            throw new Error('Phone number is already verified');
         }
 
         // Set phone number

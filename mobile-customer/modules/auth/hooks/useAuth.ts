@@ -1,173 +1,146 @@
-import { SignupStep, UserRole } from '@/gql/graphql';
-import { useState, useCallback } from 'react';
-
-export interface AuthUser {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    address?: string | null;
-    phoneNumber?: string | null;
-    emailVerified: boolean;
-    phoneVerified: boolean;
-    signupStep: SignupStep;
-    role: UserRole;
-}
-
-interface SignupStepResponse {
-    userId: string;
-    currentStep: SignupStep;
-    message: string;
-}
+import { User } from '@/gql/graphql';
+import { useMutation } from '@apollo/client/react';
+import { useAuthStore } from '@/store/authStore';
+import { saveToken, deleteToken } from '@/utils/secureTokenStore';
+import {
+    INITIATE_SIGNUP_MUTATION,
+    VERIFY_EMAIL_MUTATION,
+    SUBMIT_PHONE_NUMBER_MUTATION,
+    VERIFY_PHONE_MUTATION,
+    LOGIN_MUTATION,
+    RESEND_EMAIL_VERIFICATION_MUTATION,
+} from '@/graphql/operations/auth';
 
 export const useAuth = () => {
-    const generateId = () => Math.random().toString(36).slice(2);
+    const {
+        user,
+        token,
+        isAuthenticated,
+        needsSignupCompletion,
+        login: storeLogin,
+        logout: storeLogout,
+        updateUser,
+    } = useAuthStore();
 
-    const [user, setUser] = useState<AuthUser | null>(null);
-    const [token, setToken] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [signupError, setSignupError] = useState<string | null>(null);
-
-    const saveTokenAndUser = useCallback((newToken: string, newUser: AuthUser) => {
-        setToken(newToken);
-        setUser(newUser);
-    }, []);
-
-    const initiateSignup = useCallback(
-        async (email: string, password: string, firstName: string, lastName: string) => {
-            setSignupError(null);
-
-            const mockUser: AuthUser = {
-                id: generateId(),
-                email,
-                firstName,
-                lastName,
-                phoneNumber: null,
-                address: null as unknown as string | undefined, // keep shape aligned
-                emailVerified: false,
-                phoneVerified: false,
-                signupStep: SignupStep.EmailSent,
-                role: 'CUSTOMER' as UserRole,
-            } as AuthUser;
-
-            await saveTokenAndUser('mock-token', mockUser);
-            return {
-                token: 'mock-token',
-                user: mockUser,
-                message: 'Mock signup started. Use code 123456 to verify email.',
-            };
-        },
-        [saveTokenAndUser],
+    // Mutations
+    const [initiateSignupMutation, { loading: initiateSignupLoading }] = useMutation(INITIATE_SIGNUP_MUTATION);
+    const [verifyEmailMutation, { loading: verifyEmailLoading }] = useMutation(VERIFY_EMAIL_MUTATION);
+    const [submitPhoneNumberMutation, { loading: submitPhoneLoading }] = useMutation(SUBMIT_PHONE_NUMBER_MUTATION);
+    const [verifyPhoneMutation, { loading: verifyPhoneLoading }] = useMutation(VERIFY_PHONE_MUTATION);
+    const [loginMutation, { loading: loginLoading }] = useMutation(LOGIN_MUTATION);
+    const [resendEmailVerificationMutation, { loading: resendEmailLoading }] = useMutation(
+        RESEND_EMAIL_VERIFICATION_MUTATION,
     );
 
-    const verifyEmail = useCallback(
-        async (_code: string): Promise<SignupStepResponse> => {
-            setSignupError(null);
-            if (!user) throw new Error('No user in progress');
+    const initiateSignup = async (email: string, password: string, firstName: string, lastName: string) => {
+        const { data } = await initiateSignupMutation({
+            variables: {
+                input: { email, password, firstName, lastName },
+            },
+        });
 
-            const updatedUser = { ...user, emailVerified: true, signupStep: SignupStep.EmailVerified };
-            await saveTokenAndUser(token ?? 'mock-token', updatedUser);
+        if (data?.initiateSignup) {
+            const { token, user } = data.initiateSignup;
+            await saveToken(token);
+            storeLogin(token, user as User);
+        }
 
-            return {
-                userId: updatedUser.id,
-                currentStep: updatedUser.signupStep,
-                message: 'Email verified (mock). Use phone code 123456 next.',
-            };
-        },
-        [token, user, saveTokenAndUser],
-    );
+        return data?.initiateSignup;
+    };
 
-    const submitPhoneNumber = useCallback(
-        async (phoneNumber: string): Promise<SignupStepResponse> => {
-            setSignupError(null);
-            if (!user) throw new Error('No user in progress');
+    const verifyEmail = async (code: string) => {
+        const { data } = await verifyEmailMutation({
+            variables: { input: { code } },
+        });
 
-            const updatedUser = {
-                ...user,
-                phoneNumber,
-                signupStep: SignupStep.PhoneSent,
-            };
+        // Fetch updated user after verification
+        if (data?.verifyEmail && user) {
+            const updatedUser = { ...user, emailVerified: true, signupStep: data.verifyEmail.currentStep };
+            updateUser(updatedUser as User);
+        }
 
-            await saveTokenAndUser(token ?? 'mock-token', updatedUser);
+        return data?.verifyEmail;
+    };
 
-            return {
-                userId: updatedUser.id,
-                currentStep: updatedUser.signupStep,
-                message: `Phone saved (mock). Code 123456 sent to ${phoneNumber}.`,
-            };
-        },
-        [token, user, saveTokenAndUser],
-    );
+    const submitPhoneNumber = async (phoneNumber: string) => {
+        const { data } = await submitPhoneNumberMutation({
+            variables: { input: { phoneNumber } },
+        });
 
-    const verifyPhone = useCallback(
-        async (_code: string): Promise<SignupStepResponse> => {
-            setSignupError(null);
-            if (!user) throw new Error('No user in progress');
+        // Update user with phone number
+        if (data?.submitPhoneNumber && user) {
+            const updatedUser = { ...user, phoneNumber, signupStep: data.submitPhoneNumber.currentStep };
+            updateUser(updatedUser as User);
+        }
 
-            const updatedUser = {
-                ...user,
-                phoneVerified: true,
-                signupStep: SignupStep.Completed,
-            };
+        return data?.submitPhoneNumber;
+    };
 
-            await saveTokenAndUser(token ?? 'mock-token', updatedUser);
+    const verifyPhone = async (code: string) => {
+        const { data } = await verifyPhoneMutation({
+            variables: { input: { code } },
+        });
 
-            return {
-                userId: updatedUser.id,
-                currentStep: updatedUser.signupStep,
-                message: 'Phone verified (mock). Signup completed.',
-            };
-        },
-        [token, user, saveTokenAndUser],
-    );
+        // Update user after phone verification
+        if (data?.verifyPhone && user) {
+            const updatedUser = { ...user, phoneVerified: true, signupStep: data.verifyPhone.currentStep };
+            updateUser(updatedUser as User);
+        }
 
-    const login = useCallback(
-        async (email: string, _password: string) => {
-            setSignupError(null);
+        return data?.verifyPhone;
+    };
 
-            // Create a fresh in-progress user to force signup flow
-            const newUser: AuthUser = {
-                id: generateId(),
-                email,
-                firstName: 'Mock',
-                lastName: 'User',
-                phoneNumber: null,
-                address: null as unknown as string | undefined,
-                emailVerified: false,
-                phoneVerified: false,
-                signupStep: SignupStep.EmailSent,
-                role: 'CUSTOMER' as UserRole,
-            };
+    const login = async (email: string, password: string) => {
+        const { data } = await loginMutation({
+            variables: { input: { email, password } },
+        });
 
-            saveTokenAndUser('mock-token', newUser);
+        if (data?.login) {
+            const { token, user } = data.login;
+            await saveToken(token);
+            storeLogin(token, user as User);
+        }
 
-            return {
-                token: 'mock-token',
-                user: newUser,
-                message: 'Login simulated (mock)',
-            };
-        },
-        [saveTokenAndUser],
-    );
+        return data?.login;
+    };
 
-    const logout = useCallback(async () => {
-        setToken(null);
-        setUser(null);
-        setSignupError(null);
-    }, []);
+    const resendEmailVerification = async () => {
+        const { data } = await resendEmailVerificationMutation();
+        return data?.resendEmailVerification;
+    };
+
+    const resendPhoneVerification = () => {
+        // Go back to phone input step by updating user's signup step
+        if (user) {
+            const updatedUser = { ...user, signupStep: 'EMAIL_VERIFIED' as const };
+            updateUser(updatedUser as User);
+        }
+    };
+
+    const logout = async () => {
+        await deleteToken();
+        storeLogout();
+    };
 
     return {
         user,
         token,
-        loading,
-        signupError,
+        isAuthenticated,
+        needsSignupCompletion,
+        loading:
+            initiateSignupLoading ||
+            verifyEmailLoading ||
+            submitPhoneLoading ||
+            verifyPhoneLoading ||
+            loginLoading ||
+            resendEmailLoading,
         initiateSignup,
         verifyEmail,
         submitPhoneNumber,
         verifyPhone,
         login,
         logout,
-        isAuthenticated: !!user && user.signupStep === SignupStep.Completed,
-        isSigningUp: !!user && user.signupStep !== SignupStep.Completed,
+        resendEmailVerification,
+        resendPhoneVerification,
     };
 };

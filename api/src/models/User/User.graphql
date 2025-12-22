@@ -78,6 +78,7 @@ type Query {
 type Mutation {
     initiateSignup(input: InitiateSignupInput!): AuthResponse! @skipAuth
     verifyEmail(input: VerifyEmailInput!): SignupStepResponse!
+    resendEmailVerification: SignupStepResponse!
     submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
     verifyPhone(input: VerifyPhoneInput!): SignupStepResponse!
     login(input: LoginInput!): AuthResponse! @skipAuth

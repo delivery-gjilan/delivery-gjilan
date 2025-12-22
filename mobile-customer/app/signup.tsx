@@ -4,8 +4,6 @@ import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { SignupStep } from '@/gql/graphql';
 
-type StepType = 'account' | 'email' | 'phone' | 'verification';
-
 const STEP_CONFIG: Record<SignupStep, { number: number; title: string; description: string }> = {
     INITIAL: { number: 1, title: 'Create Account', description: 'Enter your basic information' },
     EMAIL_SENT: { number: 2, title: 'Verify Email', description: 'Check your email for the verification code' },
@@ -15,7 +13,16 @@ const STEP_CONFIG: Record<SignupStep, { number: number; title: string; descripti
 };
 
 export default function SignupScreen() {
-    const { user, initiateSignup, verifyEmail, submitPhoneNumber, verifyPhone, signupError } = useAuth();
+    const {
+        user,
+        initiateSignup,
+        verifyEmail,
+        submitPhoneNumber,
+        verifyPhone,
+        resendEmailVerification,
+        resendPhoneVerification,
+        loading: authLoading,
+    } = useAuth();
     const router = useRouter();
 
     // Step 1: Account details
@@ -93,7 +100,7 @@ export default function SignupScreen() {
         setLoading(true);
         try {
             await submitPhoneNumber(phoneNumber);
-            setPhoneNumber('');
+            // Don't clear phone number - keep it for potential resubmission
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to submit phone number');
         } finally {
@@ -291,10 +298,22 @@ export default function SignupScreen() {
                             )}
                         </TouchableOpacity>
 
-                        <TouchableOpacity className="py-3 mt-3">
-                            <Text className="text-blue-600 text-center font-semibold">
-                                Didn&apos;t receive the code?
-                            </Text>
+                        <TouchableOpacity
+                            className="py-3 mt-3"
+                            onPress={async () => {
+                                setLoading(true);
+                                try {
+                                    await resendEmailVerification();
+                                    setError(null);
+                                } catch (err) {
+                                    setError(err instanceof Error ? err.message : 'Failed to resend code');
+                                } finally {
+                                    setLoading(false);
+                                }
+                            }}
+                            disabled={loading}
+                        >
+                            <Text className="text-blue-600 text-center font-semibold">Resend Code</Text>
                         </TouchableOpacity>
                     </View>
                 )}
@@ -370,10 +389,15 @@ export default function SignupScreen() {
                             )}
                         </TouchableOpacity>
 
-                        <TouchableOpacity className="py-3 mt-3">
-                            <Text className="text-blue-600 text-center font-semibold">
-                                Didn&apos;t receive the code?
-                            </Text>
+                        <TouchableOpacity
+                            className="py-3 mt-3"
+                            onPress={() => {
+                                resendPhoneVerification();
+                                setPhoneCode('');
+                            }}
+                            disabled={loading}
+                        >
+                            <Text className="text-blue-600 text-center font-semibold">Change Phone Number</Text>
                         </TouchableOpacity>
                     </View>
                 )}
