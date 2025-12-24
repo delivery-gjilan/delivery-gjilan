@@ -13,8 +13,8 @@ type Product {
     updatedAt: String!
 }
 type Query {
-    products(businessId: ID!): [Product!]!
-    product(id: ID!): Product
+    products(businessId: ID!): [Product!]! @skipAuth
+    product(id: ID!): Product @skipAuth
 }
 
 input CreateProductInput {

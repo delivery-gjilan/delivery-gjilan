@@ -8,6 +8,7 @@ import { ApolloProvider } from '@apollo/client/react';
 import client from '@/lib/graphql/apolloClient';
 import { useAuthInitialization } from '@/hooks/useAuthInitialization';
 import LoadingScreen from '@/components/LoadingScreen';
+import { CartFloatingBar } from '@/modules/cart';
 
 // Inner component that uses Apollo Client (must be inside ApolloProvider)
 function AppContent() {
@@ -27,14 +28,8 @@ function AppContent() {
                     <Stack.Screen name="signup" options={{ headerShown: false }} />
                     <Stack.Screen name="login" options={{ headerShown: false }} />
                     <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                    <Stack.Screen
-                        name="create-transaction"
-                        options={{
-                            headerShown: false,
-                            animation: 'slide_from_bottom',
-                            gestureDirection: 'vertical',
-                        }}
-                    />
+                    <Stack.Screen name="business/[businessId]" options={{ headerShown: false }} />
+                    <Stack.Screen name="product/[productId]" options={{ headerShown: false }} />
                     <Stack.Screen
                         name="cart"
                         options={{
@@ -46,6 +41,7 @@ function AppContent() {
                         }}
                     />
                 </Stack>
+                <CartFloatingBar />
             </SafeAreaProvider>
         </ThemeProvider>
     );
