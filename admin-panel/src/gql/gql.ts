@@ -14,7 +14,7 @@ import { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/
  * Learn more about it here: https://the-guild.dev/graphql/codegen/plugins/presets/preset-client#reducing-bundle-size
  */
 type Documents = {
-    "\n  mutation Login($email: String!, $password: String!) {\n    login(input: { email: $email, password: $password }) {\n      token\n      user {\n        firstName\n        lastName\n        role\n      }\n      message\n    }\n  }\n": typeof types.LoginDocument,
+    "\n    mutation Login($email: String!, $password: String!) {\n        login(input: { email: $email, password: $password }) {\n            token\n            user {\n                firstName\n                lastName\n                role\n            }\n            message\n        }\n    }\n": typeof types.LoginDocument,
     "\n    mutation CreateBusiness($input: CreateBusinessInput!) {\n        createBusiness(input: $input) {\n            id\n            name\n            businessType\n            imageUrl\n            isActive\n            \n        }\n    }\n": typeof types.CreateBusinessDocument,
     "\n    mutation UpdateBusiness($id: ID!, $input: UpdateBusinessInput!) {\n        updateBusiness(id: $id, input: $input) {\n            id\n            name\n            businessType\n            imageUrl\n            isActive   \n        }\n    }\n": typeof types.UpdateBusinessDocument,
     "\n    mutation DeleteBusiness($id: ID!) {\n        deleteBusiness(id: $id)\n    }\n": typeof types.DeleteBusinessDocument,
@@ -38,7 +38,7 @@ type Documents = {
     "\n  query Drivers {\n    drivers {\n      id\n      email\n      firstName\n      lastName\n      role\n    }\n  }\n": typeof types.DriversDocument,
 };
 const documents: Documents = {
-    "\n  mutation Login($email: String!, $password: String!) {\n    login(input: { email: $email, password: $password }) {\n      token\n      user {\n        firstName\n        lastName\n        role\n      }\n      message\n    }\n  }\n": types.LoginDocument,
+    "\n    mutation Login($email: String!, $password: String!) {\n        login(input: { email: $email, password: $password }) {\n            token\n            user {\n                firstName\n                lastName\n                role\n            }\n            message\n        }\n    }\n": types.LoginDocument,
     "\n    mutation CreateBusiness($input: CreateBusinessInput!) {\n        createBusiness(input: $input) {\n            id\n            name\n            businessType\n            imageUrl\n            isActive\n            \n        }\n    }\n": types.CreateBusinessDocument,
     "\n    mutation UpdateBusiness($id: ID!, $input: UpdateBusinessInput!) {\n        updateBusiness(id: $id, input: $input) {\n            id\n            name\n            businessType\n            imageUrl\n            isActive   \n        }\n    }\n": types.UpdateBusinessDocument,
     "\n    mutation DeleteBusiness($id: ID!) {\n        deleteBusiness(id: $id)\n    }\n": types.DeleteBusinessDocument,
@@ -79,7 +79,7 @@ export function graphql(source: string): unknown;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  mutation Login($email: String!, $password: String!) {\n    login(input: { email: $email, password: $password }) {\n      token\n      user {\n        firstName\n        lastName\n        role\n      }\n      message\n    }\n  }\n"): (typeof documents)["\n  mutation Login($email: String!, $password: String!) {\n    login(input: { email: $email, password: $password }) {\n      token\n      user {\n        firstName\n        lastName\n        role\n      }\n      message\n    }\n  }\n"];
+export function graphql(source: "\n    mutation Login($email: String!, $password: String!) {\n        login(input: { email: $email, password: $password }) {\n            token\n            user {\n                firstName\n                lastName\n                role\n            }\n            message\n        }\n    }\n"): (typeof documents)["\n    mutation Login($email: String!, $password: String!) {\n        login(input: { email: $email, password: $password }) {\n            token\n            user {\n                firstName\n                lastName\n                role\n            }\n            message\n        }\n    }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

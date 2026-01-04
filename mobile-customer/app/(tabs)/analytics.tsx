@@ -24,7 +24,7 @@ export default function OrdersRoute() {
     };
 
     const handleOrderPress = (orderId: string) => {
-        router.push(`/`);
+        router.push(`/orders/${orderId}`);
     };
 
     return (

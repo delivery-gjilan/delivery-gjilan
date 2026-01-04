@@ -129,6 +129,7 @@ export type Mutation = {
   deleteProductCategory: Scalars['Boolean']['output'];
   initiateSignup: AuthResponse;
   login: AuthResponse;
+  resendEmailVerification: SignupStepResponse;
   submitPhoneNumber: SignupStepResponse;
   updateBusiness: Business;
   updateOrderStatus: Order;
@@ -315,6 +316,7 @@ export type Query = {
   productCategories: Array<ProductCategory>;
   productCategory?: Maybe<ProductCategory>;
   products: Array<Product>;
+  uncompletedOrders: Array<Order>;
   users: Array<User>;
 };
 
@@ -370,6 +372,26 @@ export type SignupStepResponse = {
 
 export type SubmitPhoneNumberInput = {
   phoneNumber: Scalars['String']['input'];
+};
+
+export type Subscription = {
+  __typename?: 'Subscription';
+  orderStatusUpdated: Order;
+  userOrdersUpdated: Array<Order>;
+};
+
+
+export type SubscriptionOrderStatusUpdatedArgs = {
+  orderId: Scalars['ID']['input'];
+};
+
+
+export type SubscriptionUserOrdersUpdatedArgs = {
+  input: SubscriptionInput;
+};
+
+export type SubscriptionInput = {
+  token: Scalars['String']['input'];
 };
 
 export type UpdateBusinessInput = {
