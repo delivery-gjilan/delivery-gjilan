@@ -8,12 +8,16 @@ import { ApolloProvider } from '@apollo/client/react';
 import client from '@/lib/graphql/apolloClient';
 import { useAuthInitialization } from '@/hooks/useAuthInitialization';
 import LoadingScreen from '@/components/LoadingScreen';
-import { CartFloatingBar } from '@/modules/cart';
+import { FloatingBars } from '@/components/FloatingBars';
+import { useActiveOrdersTracking } from '@/hooks/useActiveOrdersTracking';
 
 // Inner component that uses Apollo Client (must be inside ApolloProvider)
 function AppContent() {
     const { loading } = useAuthInitialization();
     const theme = useTheme();
+
+    // Track active orders (query + subscription)
+    useActiveOrdersTracking();
 
     // Show loading screen during auth initialization
     if (loading) {
@@ -40,8 +44,28 @@ function AppContent() {
                             headerShown: false,
                         }}
                     />
+                    <Stack.Screen
+                        name="orders/active"
+                        options={{
+                            presentation: 'modal',
+                            animation: 'slide_from_bottom',
+                            gestureDirection: 'vertical',
+                            gestureEnabled: true,
+                            headerShown: false,
+                        }}
+                    />
+                    <Stack.Screen
+                        name="orders/[orderId]"
+                        options={{
+                            presentation: 'modal',
+                            animation: 'slide_from_bottom',
+                            gestureDirection: 'vertical',
+                            gestureEnabled: true,
+                            headerShown: false,
+                        }}
+                    />
                 </Stack>
-                <CartFloatingBar />
+                <FloatingBars />
             </SafeAreaProvider>
         </ThemeProvider>
     );

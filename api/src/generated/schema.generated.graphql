@@ -196,6 +196,7 @@ type Query {
   productCategories(businessId: ID!): [ProductCategory!]!
   productCategory(id: ID!): ProductCategory
   products(businessId: ID!): [Product!]!
+  uncompletedOrders: [Order!]!
   users: [User!]!
 }
 
@@ -219,6 +220,11 @@ input SubmitPhoneNumberInput {
 
 type Subscription {
   orderStatusUpdated(orderId: ID!): Order!
+  userOrdersUpdated(input: SubscriptionInput!): [Order!]!
+}
+
+input SubscriptionInput {
+  token: String!
 }
 
 input UpdateBusinessInput {

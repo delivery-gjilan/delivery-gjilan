@@ -73,6 +73,9 @@ export const GET_ORDER = graphql(`
                         opensAt
                         closesAt
                     }
+                    createdAt
+                    updatedAt
+                    isOpen
                 }
                 items {
                     productId
@@ -115,6 +118,52 @@ export const GET_ORDERS_BY_STATUS = graphql(`
                     workingHours {
                         opensAt
                         closesAt
+                    }
+                }
+                items {
+                    productId
+                    name
+                    imageUrl
+                    quantity
+                    price
+                }
+            }
+        }
+    }
+`);
+
+export const UNCOMPLETED_ORDERS = graphql(`
+    query UncompletedOrders {
+        uncompletedOrders {
+            id
+            orderPrice
+            deliveryPrice
+            totalPrice
+            orderDate
+            status
+            dropOffLocation {
+                latitude
+                longitude
+                address
+            }
+            businesses {
+                business {
+                    id
+                    name
+                    imageUrl
+                    businessType
+                    createdAt
+                    updatedAt
+                    isActive
+                    isOpen
+                    location {
+                        address
+                        longitude
+                        latitude
+                    }
+                    workingHours {
+                        closesAt
+                        opensAt
                     }
                 }
                 items {

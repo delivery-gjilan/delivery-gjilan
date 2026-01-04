@@ -317,6 +317,7 @@ export type Query = {
   productCategories: Array<ProductCategory>;
   productCategory?: Maybe<ProductCategory>;
   products: Array<Product>;
+  uncompletedOrders: Array<Order>;
   users: Array<User>;
 };
 
@@ -376,11 +377,21 @@ export type SubmitPhoneNumberInput = {
 export type Subscription = {
   __typename?: 'Subscription';
   orderStatusUpdated: Order;
+  userOrdersUpdated: Array<Order>;
 };
 
 
 export type SubscriptionorderStatusUpdatedArgs = {
   orderId: Scalars['ID']['input'];
+};
+
+
+export type SubscriptionuserOrdersUpdatedArgs = {
+  input: SubscriptionInput;
+};
+
+export type SubscriptionInput = {
+  token: Scalars['String']['input'];
 };
 
 export type UpdateBusinessInput = {
@@ -550,6 +561,7 @@ export type ResolversTypes = {
   SignupStepResponse: ResolverTypeWrapper<Omit<SignupStepResponse, 'currentStep'> & { currentStep: ResolversTypes['SignupStep'] }>;
   SubmitPhoneNumberInput: SubmitPhoneNumberInput;
   Subscription: ResolverTypeWrapper<{}>;
+  SubscriptionInput: SubscriptionInput;
   UpdateBusinessInput: UpdateBusinessInput;
   UpdateProductCategoryInput: UpdateProductCategoryInput;
   UpdateProductInput: UpdateProductInput;
@@ -592,6 +604,7 @@ export type ResolversParentTypes = {
   SignupStepResponse: SignupStepResponse;
   SubmitPhoneNumberInput: SubmitPhoneNumberInput;
   Subscription: {};
+  SubscriptionInput: SubscriptionInput;
   UpdateBusinessInput: UpdateBusinessInput;
   UpdateProductCategoryInput: UpdateProductCategoryInput;
   UpdateProductInput: UpdateProductInput;
@@ -738,6 +751,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   productCategories?: Resolver<Array<ResolversTypes['ProductCategory']>, ParentType, ContextType, RequireFields<QueryproductCategoriesArgs, 'businessId'>>;
   productCategory?: Resolver<Maybe<ResolversTypes['ProductCategory']>, ParentType, ContextType, RequireFields<QueryproductCategoryArgs, 'id'>>;
   products?: Resolver<Array<ResolversTypes['Product']>, ParentType, ContextType, RequireFields<QueryproductsArgs, 'businessId'>>;
+  uncompletedOrders?: Resolver<Array<ResolversTypes['Order']>, ParentType, ContextType>;
   users?: Resolver<Array<ResolversTypes['User']>, ParentType, ContextType>;
 };
 
@@ -752,6 +766,7 @@ export type SignupStepResponseResolvers<ContextType = GraphQLContext, ParentType
 
 export type SubscriptionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Subscription'] = ResolversParentTypes['Subscription']> = {
   orderStatusUpdated?: SubscriptionResolver<ResolversTypes['Order'], "orderStatusUpdated", ParentType, ContextType, RequireFields<SubscriptionorderStatusUpdatedArgs, 'orderId'>>;
+  userOrdersUpdated?: SubscriptionResolver<Array<ResolversTypes['Order']>, "userOrdersUpdated", ParentType, ContextType, RequireFields<SubscriptionuserOrdersUpdatedArgs, 'input'>>;
 };
 
 export type UserResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['User'] = ResolversParentTypes['User']> = {

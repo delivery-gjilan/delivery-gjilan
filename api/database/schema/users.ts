@@ -1,17 +1,14 @@
 import { pgTable, uuid, text, timestamp, boolean, pgEnum } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 
 import { SignupStep, UserRole } from '@/generated/types.generated';
+import { orders } from './orders';
 
-const signupStepValues = [
-    'INITIAL',
-    'EMAIL_SENT',
-    'EMAIL_VERIFIED',
-    'PHONE_SENT',
-    'COMPLETED',
-] as const satisfies SignupStep[];
+const signupStepValues = ['INITIAL', 'EMAIL_SENT', 'EMAIL_VERIFIED', 'PHONE_SENT', 'COMPLETED'] as const;
+[...signupStepValues] satisfies SignupStep[];
 
-const userRoleValues = ['CUSTOMER', 'DRIVER', 'SUPER_ADMIN'] as const satisfies UserRole[];
+const userRoleValues = ['CUSTOMER', 'DRIVER', 'SUPER_ADMIN'] as const;
+[...userRoleValues] satisfies UserRole[];
 
 export const signupStepEnum = pgEnum('signup_step', signupStepValues);
 export const userRoleEnum = pgEnum('user_role', userRoleValues);
@@ -38,6 +35,10 @@ export const users = pgTable('users', {
         .notNull()
         .$onUpdate(() => sql`CURRENT_TIMESTAMP`),
 });
+
+export const usersRelations = relations(users, ({ many }) => ({
+    orders: many(orders),
+}));
 
 export type DbUser = typeof users.$inferSelect;
 export type NewDbUser = typeof users.$inferInsert;

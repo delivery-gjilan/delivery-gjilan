@@ -7,5 +7,7 @@ export const createOrder: NonNullable<MutationResolvers['createOrder']> = async 
     if (!userData.userId) {
         throw new Error('Unauthorized');
     }
-    return await orderService.createOrder(userData.userId, input);
+    const order = await orderService.createOrder(userData.userId, input);
+    await orderService.publishUserOrders(userData.userId!);
+    return order;
 };

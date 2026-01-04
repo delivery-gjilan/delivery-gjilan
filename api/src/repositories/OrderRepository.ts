@@ -28,10 +28,25 @@ export class OrderRepository {
         return result[0] || null;
     }
 
+    async findUncompletedOrdersByUserId(userId: string): Promise<DbOrder[]> {
+        console.log('ID e userit', userId);
+        const db = await getDB();
+        const result = await db.query.orders.findMany({
+            where: (tbl, { and, eq, notInArray }) =>
+                and(eq(tbl.userId, userId), notInArray(tbl.status, ['DELIVERED', 'CANCELLED'] as OrderStatus[])),
+            orderBy: (tbl, { asc }) => [asc(tbl.createdAt)],
+        });
+        console.log('rezultatet', result);
+        return result;
+    }
+
     async create(
         orderData: typeof ordersTable.$inferInsert,
         itemsData: Omit<NewDbOrderItem, 'orderId'>[],
-    ): Promise<DbOrder> {
+    ): Promise<DbOrder | null> {
+        if (itemsData.length === 0) {
+            return null;
+        }
         const db = await getDB();
 
         return await db.transaction(async (tx) => {
@@ -39,15 +54,16 @@ export class OrderRepository {
             const [createdOrder] = await tx.insert(ordersTable).values(orderData).returning();
 
             // Create order items
-            if (itemsData.length > 0) {
+            if (createdOrder) {
                 const itemsWithOrderId = itemsData.map((item) => ({
                     ...item,
                     orderId: createdOrder.id,
                 }));
                 await tx.insert(orderItemsTable).values(itemsWithOrderId);
+                return createdOrder;
+            } else {
+                return null;
             }
-
-            return createdOrder;
         });
     }
 }

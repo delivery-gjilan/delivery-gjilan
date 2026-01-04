@@ -27,7 +27,9 @@ async function seed() {
 
     // Create super admin user
     const hashedPassword = await hashPassword('12345678');
+    const adminUserId = faker.string.uuid();
     await db.insert(users).values({
+        id: adminUserId,
         firstName: 'Admin',
         lastName: 'Admin',
         email: 'admin@admin.com',
@@ -135,6 +137,7 @@ async function seed() {
         const deliveryPrice = parseFloat((Math.random() * 10 + 2).toFixed(2));
 
         const order: NewDbOrder = {
+            userId: adminUserId,
             price: orderPrice,
             deliveryPrice: deliveryPrice,
             status: orderStatuses[i],

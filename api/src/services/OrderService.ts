@@ -10,12 +10,15 @@ import {
 import { eq } from 'drizzle-orm';
 import type { Order, OrderBusiness, OrderItem, OrderStatus, CreateOrderInput } from '@/generated/types.generated';
 import type { DbOrder } from '@/database/schema/orders';
+import { PubSub, publish, subscribe, topics } from '@/lib/pubsub';
+import { GraphQLError } from 'graphql';
 
 export class OrderService {
     constructor(
         private orderRepository: OrderRepository,
         private authRepository: AuthRepository,
         private productRepository: ProductRepository,
+        private pubsub: PubSub,
     ) {}
 
     async createOrder(userId: string, input: CreateOrderInput): Promise<Order> {
@@ -66,6 +69,7 @@ export class OrderService {
 
         const orderData = {
             price: calculatedItemsTotal,
+            userId,
             deliveryPrice: input.deliveryPrice,
             status: 'PENDING' as const,
             dropoffLat: input.dropOffLocation.latitude,
@@ -74,6 +78,10 @@ export class OrderService {
         };
 
         const createdOrder = await this.orderRepository.create(orderData, itemsToCreate);
+
+        if (!createdOrder) {
+            throw new GraphQLError('Fix the error messages');
+        }
 
         return this.mapToOrder(createdOrder);
     }
@@ -193,6 +201,40 @@ export class OrderService {
 
     async cancelOrder(id: string): Promise<Order> {
         return this.updateOrderStatus(id, 'CANCELLED');
+    }
+
+    subscribeToOrderUpdates(userId: string): ReturnType<typeof subscribe> {
+        return subscribe(this.pubsub, topics.ordersByUserChanged(userId));
+    }
+
+    async publishUserOrders(userId: string) {
+        const userOrders = await this.orderRepository.findUncompletedOrdersByUserId(userId);
+        const orders: Order[] = [];
+        for (const dbOrder of userOrders) {
+            const order = await this.mapToOrder(dbOrder);
+            orders.push(order);
+        }
+        console.log(
+            'haha orders haha',
+            orders.map((o) => ({
+                id: o.id,
+                status: o.status,
+            })),
+        );
+        publish(this.pubsub, topics.ordersByUserChanged(userId), {
+            userId,
+            orders,
+        });
+    }
+
+    async getUserUncompletedOrders(userId: string) {
+        const userOrders = await this.orderRepository.findUncompletedOrdersByUserId(userId);
+        const orders: Order[] = [];
+        for (const dbOrder of userOrders) {
+            const order = await this.mapToOrder(dbOrder);
+            orders.push(order);
+        }
+        return orders;
     }
 }
 

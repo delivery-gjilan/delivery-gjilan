@@ -21,3 +21,7 @@ input WorkingHoursInput {
     opensAt: String! # "08:00"
     closesAt: String! # "23:00"
 }
+
+input SubscriptionInput {
+    token: String!
+}

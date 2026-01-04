@@ -14,6 +14,7 @@ import { GraphQLContext } from './context';
 import { OrderRepository } from '@/repositories/OrderRepository';
 import { OrderService } from '@/services/OrderService';
 import { pubsub } from '@/lib/pubsub';
+import { decodeJwtToken } from '@/lib/utils/authUtils';
 
 /**
  * Extracts and verifies JWT token from request Authorization header or WebSocket connection params
@@ -47,15 +48,7 @@ function extractUserData(context: YogaInitialContext & { connectionParams?: any;
         // Extract token (remove 'Bearer ' prefix)
         const token = authHeader.substring(7);
 
-        // Get JWT secret
-        const secret = process.env.JWT_SECRET;
-        if (!secret) {
-            console.error('JWT_SECRET is not defined in environment variables');
-            return {};
-        }
-
-        // Verify and decode token
-        const decoded = jwt.verify(token, secret) as { userId: string };
+        const decoded = decodeJwtToken(token);
 
         return { userId: decoded.userId };
     } catch (error) {
@@ -88,7 +81,7 @@ export async function createContext(initialContext: YogaInitialContext): Promise
     const productCategoryService = new ProductCategoryService(productCategoryRepository);
     const productService = new ProductService(productRepository);
     const authService = new AuthService(authRepository);
-    const orderService = new OrderService(orderRepository, authRepository, productRepository);
+    const orderService = new OrderService(orderRepository, authRepository, productRepository, pubsub);
 
     return {
         ...initialContext,

@@ -34,6 +34,7 @@ type Query {
     orders: [Order!]!
     order(id: ID!): Order
     ordersByStatus(status: OrderStatus!): [Order!]!
+    uncompletedOrders: [Order!]!
 }
 
 type Mutation {
@@ -44,6 +45,7 @@ type Mutation {
 
 type Subscription {
     orderStatusUpdated(orderId: ID!): Order! @skipAuth
+    userOrdersUpdated(input: SubscriptionInput!): [Order!]! @skipAuth
 }
 
 input CreateOrderInput {

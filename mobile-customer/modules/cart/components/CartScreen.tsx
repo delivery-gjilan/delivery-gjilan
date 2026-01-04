@@ -1,17 +1,43 @@
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
 import { useCart } from '../hooks/useCart';
 import { useCartActions } from '../hooks/useCartActions';
+import { useCreateOrder } from '../hooks/useCreateOrder';
+import { useUserLocation } from '@/hooks/useUserLocation';
 
 export const CartScreen = () => {
     const router = useRouter();
     const theme = useTheme();
     const { items, total, isEmpty } = useCart();
     const { updateQuantity, removeItem } = useCartActions();
+    const { createOrder, loading: orderLoading } = useCreateOrder();
+    const { location } = useUserLocation();
+
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    const deliveryPrice = 2.0;
+    const finalTotal = total + deliveryPrice;
+
+    const handleCheckout = async () => {
+        if (!location) {
+            Alert.alert('Location Required', 'Please enable location services to proceed with checkout.');
+            return;
+        }
+
+        setIsProcessing(true);
+        try {
+            await createOrder();
+            // Navigation happens in the hook
+        } catch (err) {
+            Alert.alert('Order Failed', 'Unable to create order. Please try again.', [{ text: 'OK' }]);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
 
     if (isEmpty) {
         return (
@@ -150,21 +176,57 @@ export const CartScreen = () => {
                     backgroundColor: theme.colors.card,
                 }}
             >
+                {/* Price Breakdown */}
+                <View className="gap-2 mb-3">
+                    <View className="flex-row justify-between items-center">
+                        <Text className="text-base" style={{ color: theme.colors.subtext }}>
+                            Subtotal
+                        </Text>
+                        <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
+                            €{total.toFixed(2)}
+                        </Text>
+                    </View>
+                    <View className="flex-row justify-between items-center">
+                        <Text className="text-base" style={{ color: theme.colors.subtext }}>
+                            Delivery
+                        </Text>
+                        <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
+                            €{deliveryPrice.toFixed(2)}
+                        </Text>
+                    </View>
+                </View>
+
+                {/* Divider */}
+                <View className="h-px mb-3" style={{ backgroundColor: theme.colors.border }} />
+
+                {/* Total */}
                 <View className="flex-row justify-between items-center mb-4">
                     <Text className="text-lg font-semibold" style={{ color: theme.colors.text }}>
                         Total
                     </Text>
                     <Text className="text-2xl font-bold" style={{ color: theme.colors.primary }}>
-                        €{total.toFixed(2)}
+                        €{finalTotal.toFixed(2)}
                     </Text>
                 </View>
-
+                {/* Checkout Button */}
                 <TouchableOpacity
                     className="py-4 rounded-xl items-center"
-                    style={{ backgroundColor: theme.colors.primary }}
+                    style={{
+                        backgroundColor: isProcessing ? theme.colors.border : theme.colors.primary,
+                        opacity: !location || isProcessing ? 0.5 : 1,
+                    }}
                     activeOpacity={0.8}
+                    onPress={handleCheckout}
+                    disabled={!location || isProcessing}
                 >
-                    <Text className="text-white font-bold text-lg">Proceed to Checkout</Text>
+                    {isProcessing ? (
+                        <View className="flex-row items-center gap-2">
+                            <ActivityIndicator size="small" color="white" />
+                            <Text className="text-white font-bold text-lg">Processing...</Text>
+                        </View>
+                    ) : (
+                        <Text className="text-white font-bold text-lg">Proceed to Checkout</Text>
+                    )}
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
