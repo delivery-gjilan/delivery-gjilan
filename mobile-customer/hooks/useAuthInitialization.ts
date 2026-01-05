@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { getToken } from '@/utils/secureTokenStore';
 import { useLazyQuery } from '@apollo/client/react';
@@ -12,6 +12,7 @@ import { SignupStep } from '@/gql/graphql';
  */
 export function useAuthInitialization() {
     const router = useRouter();
+    const isInitializingRef = useRef(true);
     const [isInitializing, setIsInitializing] = useState(true);
     const { setToken, setUser, setLoading, logout } = useAuthStore();
 
@@ -19,66 +20,57 @@ export function useAuthInitialization() {
         fetchPolicy: 'network-only',
     });
 
+    const logoutAndNavigate = useCallback(() => {
+        logout();
+        router.replace('/auth-selection');
+    }, [logout, router]);
+
     useEffect(() => {
-        async function initializeAuth() {
-            try {
-                console.log('Initializing auth...');
-                console.log(data, error, loading);
-                setLoading(true);
-
-                // Load token from secure storage
-                const token = await getToken();
-
-                if (!token) {
-                    // No token found, user is not authenticated
-                    setIsInitializing(false);
-                    setLoading(false);
-                    router.push('/auth-selection');
-                    return;
-                }
-
-                // Set token in store
-                setToken(token);
-
-                // Fetch user data
-                await fetchMe();
-            } catch (err) {
-                console.error('Error initializing auth:', err);
-                // Clear auth state on error
-                logout();
-                setIsInitializing(false);
-                setLoading(false);
-            }
+        // const token = await getToken();
+        // setToken(token);
+        // logout();
+        // setLoading(true);
+        // setUser(data.me);
+        // router.replace('/auth-selection');
+        // router.replace('/(tabs)/home');
+        if (!isInitializingRef.current) {
+            return;
         }
 
-        initializeAuth();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    // Update user when query completes
-    useEffect(() => {
-        if (data?.me && !loading) {
-            setUser(data.me);
-            setIsInitializing(false);
-            setLoading(false);
-            if (data.me.signupStep === SignupStep.Completed) {
-                router.push('/(tabs)/home');
+        const initializeAuth = async () => {
+            const token = await getToken();
+            if (!token) {
+                logoutAndNavigate();
             } else {
-                router.push('/signup');
+                setToken(token);
+                setLoading(true);
+                fetchMe();
             }
-        } else if (error) {
-            // Invalid token or network error
-            console.error('Error fetching user:', error);
-            logout();
+            isInitializingRef.current = false;
             setIsInitializing(false);
-            setLoading(false);
-        }
+        };
+        initializeAuth();
+    }, [fetchMe, logoutAndNavigate, setLoading, setToken]);
 
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [data, error]);
+    useEffect(() => {
+        if (loading || error || !data?.me) return;
+        setUser(data.me);
+
+        if (data.me.signupStep === SignupStep.Completed) {
+            router.replace('/(tabs)/home');
+        } else {
+            router.replace('/signup');
+        }
+    }, [data?.me, error, loading, router, setUser]);
+
+    useEffect(() => {
+        if (error) {
+            logoutAndNavigate();
+        }
+    }, [error, logoutAndNavigate]);
 
     return {
-        loading,
+        isInitializing,
         error,
     };
 }

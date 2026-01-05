@@ -6,28 +6,22 @@ import { useAppSetup } from '@/hooks/useAppSetup';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ApolloProvider } from '@apollo/client/react';
 import client from '@/lib/graphql/apolloClient';
-import { useAuthInitialization } from '@/hooks/useAuthInitialization';
 import LoadingScreen from '@/components/LoadingScreen';
 import { FloatingBars } from '@/components/FloatingBars';
 import { useActiveOrdersTracking } from '@/hooks/useActiveOrdersTracking';
 
 // Inner component that uses Apollo Client (must be inside ApolloProvider)
 function AppContent() {
-    const { loading } = useAuthInitialization();
     const theme = useTheme();
 
     // Track active orders (query + subscription)
     useActiveOrdersTracking();
 
-    // Show loading screen during auth initialization
-    if (loading) {
-        return <LoadingScreen />;
-    }
-
     return (
         <ThemeProvider value={theme}>
             <SafeAreaProvider>
                 <Stack screenOptions={{ headerShown: false }}>
+                    <Stack.Screen name="index" options={{ headerShown: false }} />
                     <Stack.Screen name="auth-selection" options={{ headerShown: false }} />
                     <Stack.Screen name="signup" options={{ headerShown: false }} />
                     <Stack.Screen name="login" options={{ headerShown: false }} />

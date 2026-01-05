@@ -25,7 +25,7 @@ const OrderStatusTimeline = ({ status }: { status: string }) => {
 
     return (
         <View className="bg-white dark:bg-gray-800 p-4 rounded-xl mb-4">
-            <Text className="text-lg font-bold text-text-primary mb-4">Order Status</Text>
+            <Text className="text-lg font-bold text-foreground mb-4">Order Status</Text>
             {statuses.map((s, index) => {
                 const isActive = index <= currentIndex;
                 const isCurrent = s.key === status;

@@ -1,5 +1,9 @@
-import { Redirect } from 'expo-router';
+import LoadingScreen from '@/components/LoadingScreen';
+import { useAuthInitialization } from '@/hooks/useAuthInitialization';
 
 export default function Index() {
-    return <Redirect href="/signup" />;
+    useAuthInitialization();
+    // Auth initialization in _layout.tsx will handle routing
+    // This screen should never be visible as auth init redirects immediately
+    return <LoadingScreen />;
 }
