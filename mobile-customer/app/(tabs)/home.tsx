@@ -1,11 +1,13 @@
 import React from 'react';
-import { View, Text, FlatList, ActivityIndicator, Animated } from 'react-native';
+import { View, Text, ActivityIndicator, Animated, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useBusinesses } from '@/modules/business/hooks/useBusinesses';
 import { RestaurantCard } from '@/modules/business/components/RestaurantCard';
+import { PromoSlider, PromoBanner } from '@/components/PromoSlider';
+import { Categories } from '@/components/Categories';
 
 export default function Home() {
     const theme = useTheme();
@@ -13,7 +15,33 @@ export default function Home() {
     const router = useRouter();
     const { businesses, loading, error } = useBusinesses();
     const headerFadeAnim = React.useRef(new Animated.Value(0)).current;
-
+    // Demo promotional banners
+    const promoBanners: PromoBanner[] = [
+        {
+            id: '1',
+            imageUrl: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&q=80', // Pizza promo
+            type: 'image',
+            onPress: () => console.log('Promo 1 pressed'),
+        },
+        {
+            id: '2',
+            imageUrl: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80', // Food promo
+            type: 'image',
+            onPress: () => console.log('Promo 2 pressed'),
+        },
+        {
+            id: '3',
+            imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&q=80', // Healthy promo
+            type: 'image',
+            onPress: () => console.log('Promo 3 pressed'),
+        },
+        {
+            id: '4',
+            imageUrl: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80', // Delicious food
+            type: 'image',
+            onPress: () => console.log('Promo 4 pressed'),
+        },
+    ];
     React.useEffect(() => {
         Animated.timing(headerFadeAnim, {
             toValue: 1,
@@ -78,44 +106,59 @@ export default function Home() {
                 </Animated.View>
 
                 {loading ? (
-                    <View className="flex-1 justify-center items-center">
+                    <View className="flex-1 justify-center items-center py-20">
                         <ActivityIndicator size="large" color={theme.colors.primary} />
                     </View>
                 ) : error ? (
-                    <View className="flex-1 justify-center items-center px-4">
+                    <View className="flex-1 justify-center items-center px-4 py-20">
                         <Text style={{ color: theme.colors.text }}>Error loading restaurants</Text>
                         <Text className="text-sm mt-2" style={{ color: theme.colors.subtext }}>
                             {error.message || 'Something went wrong'}
                         </Text>
                     </View>
                 ) : (
-                    <FlatList
-                        data={businesses}
-                        keyExtractor={(item) => item.id}
-                        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20 }}
-                        showsVerticalScrollIndicator={false}
-                        renderItem={({ item, index }) => {
-                            const metadata = getRestaurantMetadata(index);
-                            return (
-                                <RestaurantCard
-                                    id={item.id}
-                                    name={item.name}
-                                    imageUrl={item.imageUrl}
-                                    businessType={item.businessType}
-                                    isOpen={item.isOpen}
-                                    onPress={handleBusinessPress}
-                                    deliveryFee={metadata.deliveryFee}
-                                    deliveryTime={metadata.deliveryTime}
-                                    rating={metadata.rating}
-                                    priceRange={metadata.priceRange}
-                                    description={metadata.description}
-                                    discount={metadata.discount}
-                                    isNew={metadata.isNew}
-                                    isSponsored={metadata.isSponsored}
-                                />
-                            );
-                        }}
-                    />
+                    <ScrollView showsVerticalScrollIndicator={false}>
+                        {/* Categories */}
+                        <View className="mb-6">
+                            <Categories />
+                        </View>
+
+                        {/* Promotional Slider */}
+                        <View className="mb-6">
+                            <PromoSlider banners={promoBanners} />
+                        </View>
+
+                        {/* Restaurants Section */}
+                        <View className="px-4">
+                            <Text className="text-xl font-bold mb-4" style={{ color: theme.colors.text }}>
+                                Restaurants
+                            </Text>
+
+                            {/* Restaurant Cards */}
+                            {businesses?.map((item, index) => {
+                                const metadata = getRestaurantMetadata(index);
+                                return (
+                                    <RestaurantCard
+                                        key={item.id}
+                                        id={item.id}
+                                        name={item.name}
+                                        imageUrl={item.imageUrl}
+                                        businessType={item.businessType}
+                                        isOpen={item.isOpen}
+                                        onPress={handleBusinessPress}
+                                        deliveryFee={metadata.deliveryFee}
+                                        deliveryTime={metadata.deliveryTime}
+                                        rating={metadata.rating}
+                                        priceRange={metadata.priceRange}
+                                        description={metadata.description}
+                                        discount={metadata.discount}
+                                        isNew={metadata.isNew}
+                                        isSponsored={metadata.isSponsored}
+                                    />
+                                );
+                            })}
+                        </View>
+                    </ScrollView>
                 )}
             </View>
         </SafeAreaView>
