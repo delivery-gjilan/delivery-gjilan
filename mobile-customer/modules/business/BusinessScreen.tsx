@@ -1,4 +1,4 @@
-import { View, ActivityIndicator, Text } from 'react-native';
+import { View, Text } from 'react-native';
 import Animated, { useSharedValue, useAnimatedScrollHandler } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
@@ -7,6 +7,7 @@ import { useProducts } from './hooks/useProducts';
 import { BusinessHeader } from './components/BusinessHeader';
 import { ProductsList } from './components/ProductsList';
 import { ErrorMessage } from './components/ErrorMessage';
+import { BusinessHeaderSkeleton, ProductCardSkeleton } from '@/components/Skeleton';
 
 interface BusinessScreenProps {
     businessId: string;
@@ -30,10 +31,23 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
 
     if (isLoading) {
         return (
-            <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }}>
-                <View className="flex-1 items-center justify-center">
-                    <ActivityIndicator size="large" color={theme.colors.primary} />
-                </View>
+            <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }} edges={['bottom']}>
+                <Animated.ScrollView
+                    showsVerticalScrollIndicator={false}
+                    scrollEventThrottle={16}
+                    onScroll={scrollHandler}
+                >
+                    <BusinessHeaderSkeleton />
+
+                    <View className="px-4 py-6">
+                        <Text className="text-2xl font-bold mb-4" style={{ color: theme.colors.text }}>
+                            Menu
+                        </Text>
+                        {[1, 2, 3, 4, 5, 6].map((i) => (
+                            <ProductCardSkeleton key={i} />
+                        ))}
+                    </View>
+                </Animated.ScrollView>
             </SafeAreaView>
         );
     }

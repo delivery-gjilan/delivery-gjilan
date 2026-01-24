@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ActivityIndicator, Animated, ScrollView } from 'react-native';
+import { View, Text, Animated, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
@@ -8,6 +8,7 @@ import { useBusinesses } from '@/modules/business/hooks/useBusinesses';
 import { RestaurantCard } from '@/modules/business/components/RestaurantCard';
 import { PromoSlider, PromoBanner } from '@/components/PromoSlider';
 import { Categories } from '@/components/Categories';
+import { RestaurantCardSkeleton } from '@/components/Skeleton';
 
 export default function Home() {
     const theme = useTheme();
@@ -106,9 +107,27 @@ export default function Home() {
                 </Animated.View>
 
                 {loading ? (
-                    <View className="flex-1 justify-center items-center py-20">
-                        <ActivityIndicator size="large" color={theme.colors.primary} />
-                    </View>
+                    <ScrollView showsVerticalScrollIndicator={false}>
+                        {/* Categories Skeleton */}
+                        <View className="mb-6">
+                            <Categories />
+                        </View>
+
+                        {/* Promotional Slider Skeleton */}
+                        <View className="mb-6">
+                            <PromoSlider banners={promoBanners} />
+                        </View>
+
+                        {/* Restaurants Skeleton */}
+                        <View className="px-4">
+                            <Text className="text-xl font-bold mb-4" style={{ color: theme.colors.text }}>
+                                Restaurants
+                            </Text>
+                            {[1, 2, 3, 4].map((i) => (
+                                <RestaurantCardSkeleton key={i} />
+                            ))}
+                        </View>
+                    </ScrollView>
                 ) : error ? (
                     <View className="flex-1 justify-center items-center px-4 py-20">
                         <Text style={{ color: theme.colors.text }}>Error loading restaurants</Text>
