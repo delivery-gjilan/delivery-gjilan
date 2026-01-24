@@ -9,13 +9,13 @@ import { RestaurantCard } from '@/modules/business/components/RestaurantCard';
 import { PromoSlider, PromoBanner } from '@/components/PromoSlider';
 import { Categories } from '@/components/Categories';
 import { RestaurantCardSkeleton } from '@/components/Skeleton';
+import { WoltHeader } from '@/components/WoltHeader';
 
 export default function Home() {
     const theme = useTheme();
     const { t } = useTranslations();
     const router = useRouter();
     const { businesses, loading, error } = useBusinesses();
-    const headerFadeAnim = React.useRef(new Animated.Value(0)).current;
     // Demo promotional banners
     const promoBanners: PromoBanner[] = [
         {
@@ -43,13 +43,6 @@ export default function Home() {
             onPress: () => console.log('Promo 4 pressed'),
         },
     ];
-    React.useEffect(() => {
-        Animated.timing(headerFadeAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-        }).start();
-    }, [headerFadeAnim]);
 
     const handleBusinessPress = (businessId: string) => {
         router.push(`/business/${businessId}`);
@@ -82,29 +75,15 @@ export default function Home() {
     };
 
     return (
-        <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }}>
+        <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }} edges={['top']}>
             <View className="flex-1">
-                <Animated.View
-                    className="px-4 pt-4 pb-4"
-                    style={{
-                        opacity: headerFadeAnim,
-                        transform: [
-                            {
-                                translateY: headerFadeAnim.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: [-20, 0],
-                                }),
-                            },
-                        ],
-                    }}
-                >
-                    <Text className="text-3xl font-bold" style={{ color: theme.colors.text }}>
-                        {t.home.title || 'Restaurants'}
-                    </Text>
-                    <Text className="text-base mt-1" style={{ color: theme.colors.subtext }}>
-                        {t.home.subtitle || 'Choose from our partners'}
-                    </Text>
-                </Animated.View>
+                {/* Wolt-style Header */}
+                <WoltHeader
+                    location="Pristina"
+                    onPressLocation={() => console.log('Open location selector')}
+                    onPressProfile={() => router.push('/profile')}
+                    onPressNotifications={() => console.log('Open notifications')}
+                />
 
                 {loading ? (
                     <ScrollView showsVerticalScrollIndicator={false}>
