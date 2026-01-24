@@ -17,7 +17,7 @@ export default function TabLayout() {
                     tabBarStyle: {
                         backgroundColor: theme.colors.card,
                         borderTopColor: theme.colors.border,
-                        height: 54 + insets.bottom,
+                        height: 48 + insets.bottom,
                     },
                     tabBarActiveTintColor: theme.colors.primary,
                     tabBarInactiveTintColor: theme.colors.subtext,
@@ -26,22 +26,22 @@ export default function TabLayout() {
                 <Tabs.Screen
                     name="home"
                     options={{
-                        title: t.tabs.home,
-                        tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
+                        title: 'Restaurants',
+                        tabBarIcon: ({ color, size }) => <Ionicons name="restaurant" size={size} color={color} />,
                     }}
                 />
                 <Tabs.Screen
                     name="profile"
                     options={{
-                        title: t.tabs.profile,
-                        tabBarIcon: ({ color, size }) => <Ionicons name="person" size={size} color={color} />,
+                        title: 'Market',
+                        tabBarIcon: ({ color, size }) => <Ionicons name="cart" size={size} color={color} />,
                     }}
                 />
                 <Tabs.Screen
                     name="analytics"
                     options={{
-                        title: 'Analytics',
-                        tabBarIcon: ({ color, size }) => <Ionicons name="newspaper" size={size} color={color} />,
+                        title: 'Profile',
+                        tabBarIcon: ({ color, size }) => <Ionicons name="person" size={size} color={color} />,
                     }}
                 />
             </Tabs>
