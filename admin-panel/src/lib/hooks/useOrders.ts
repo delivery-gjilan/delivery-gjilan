@@ -89,7 +89,6 @@ export function useOrdersByStatus(status: string): UseOrdersByStatusResult {
 export function useUpdateOrderStatus(): UseUpdateOrderStatusResult {
     const [mutate, { loading, error }] = useMutation(UPDATE_ORDER_STATUS, {
         refetchQueries: [{ query: GET_ORDERS }],
-        awaitRefetchQueries: true,
     });
 
     return {
@@ -109,7 +108,6 @@ export function useUpdateOrderStatus(): UseUpdateOrderStatusResult {
 export function useCancelOrder(): UseCancelOrderResult {
     const [mutate, { loading, error }] = useMutation(CANCEL_ORDER, {
         refetchQueries: [{ query: GET_ORDERS }],
-        awaitRefetchQueries: true,
     });
 
     return {

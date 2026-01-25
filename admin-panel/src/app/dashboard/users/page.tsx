@@ -155,7 +155,7 @@ export default function UsersPage() {
                                 className="text-gray-400 hover:text-white"
                                 aria-label="Close create user modal"
                             >
-                                ✕
+                                &times;
                             </button>
                         </div>
 
@@ -213,7 +213,7 @@ export default function UsersPage() {
                                     name="password"
                                     value={formData.password}
                                     onChange={handleInputChange}
-                                    placeholder="••••••••"
+                                    placeholder="Password"
                                     required
                                     minLength={6}
                                 />

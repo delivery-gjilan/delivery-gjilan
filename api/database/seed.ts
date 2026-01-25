@@ -131,126 +131,6 @@ const RESTAURANTS_DATA = [
             },
         ],
     },
-    {
-        name: 'Fresh Market',
-        type: 'MARKET' as const,
-        image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&q=80',
-        opensAt: 420, // 07:00
-        closesAt: 1260, // 21:00
-        categories: [
-            {
-                name: 'Groceries',
-                products: [
-                    { name: 'Fresh Milk 1L', price: 1.99, image: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=800&q=80', desc: 'Organic whole milk' },
-                    { name: 'White Bread', price: 2.49, image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&q=80', desc: 'Freshly baked daily' },
-                    { name: 'Farm Eggs (12)', price: 3.99, image: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=800&q=80', desc: 'Free-range chicken eggs' },
-                    { name: 'Cheddar Cheese 200g', price: 4.49, image: 'https://images.unsplash.com/photo-1618164436241-4473940d1f5c?w=800&q=80', desc: 'Aged cheddar' },
-                    { name: 'Butter 250g', price: 3.49, image: 'https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?w=800&q=80', desc: 'Unsalted butter' },
-                    { name: 'Tomatoes 1kg', price: 2.99, image: 'https://images.unsplash.com/photo-1592841200221-a6898f307baa?w=800&q=80', desc: 'Fresh ripe tomatoes' },
-                    { name: 'Bananas 1kg', price: 1.49, image: 'https://images.unsplash.com/photo-1603833665858-e61d17a86224?w=800&q=80', desc: 'Yellow bananas' },
-                    { name: 'Chicken Breast 500g', price: 5.99, image: 'https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=800&q=80', desc: 'Fresh chicken breast' },
-                    { name: 'Pasta 500g', price: 1.99, image: 'https://images.unsplash.com/photo-1551462147-37cbd8be161a?w=800&q=80', desc: 'Italian spaghetti' },
-                    { name: 'Olive Oil 500ml', price: 6.99, image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=800&q=80', desc: 'Extra virgin olive oil' },
-                ],
-            },
-        ],
-    },
-    {
-        name: 'Health Pharmacy',
-        type: 'PHARMACY' as const,
-        image: 'https://images.unsplash.com/photo-1585435557343-3b092031a831?w=800&q=80',
-        opensAt: 480, // 08:00
-        closesAt: 1200, // 20:00
-        categories: [
-            {
-                name: 'Medicines',
-                products: [
-                    { name: 'Paracetamol 500mg', price: 4.99, image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=800&q=80', desc: 'Pain relief tablets' },
-                    { name: 'Ibuprofen 400mg', price: 5.49, image: 'https://images.unsplash.com/photo-1587854692152-cbe660dbde88?w=800&q=80', desc: 'Anti-inflammatory' },
-                    { name: 'Vitamin C 1000mg', price: 8.99, image: 'https://images.unsplash.com/photo-1550572017-edd951aa8f72?w=800&q=80', desc: 'Immune support' },
-                    { name: 'Multivitamins', price: 12.99, image: 'https://images.unsplash.com/photo-1607619056574-7b8d3ee536b2?w=800&q=80', desc: 'Daily vitamins' },
-                    { name: 'First Aid Kit', price: 15.99, image: 'https://images.unsplash.com/photo-1603398938378-e54eab446dde?w=800&q=80', desc: 'Complete first aid supplies' },
-                    { name: 'Cough Syrup', price: 6.99, image: 'https://images.unsplash.com/photo-1631549916768-4119b2e5f926?w=800&q=80', desc: 'Cough relief' },
-                    { name: 'Hand Sanitizer 500ml', price: 3.99, image: 'https://images.unsplash.com/photo-1584483766114-2cea6facdf57?w=800&q=80', desc: 'Antibacterial gel' },
-                    { name: 'Face Masks (50 pack)', price: 9.99, image: 'https://images.unsplash.com/photo-1584634430851-86dbd8c2c1a7?w=800&q=80', desc: 'Disposable masks' },
-                    { name: 'Digital Thermometer', price: 14.99, image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=800&q=80', desc: 'Quick-read thermometer' },
-                    { name: 'Blood Pressure Monitor', price: 39.99, image: 'https://images.unsplash.com/photo-1615486511484-92e172cc4fe0?w=800&q=80', desc: 'Digital BP monitor' },
-                ],
-            },
-        ],
-    },
-    {
-        name: 'Breakfast Club',
-        type: 'RESTAURANT' as const,
-        image: 'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=800&q=80',
-        opensAt: 360, // 06:00
-        closesAt: 840, // 14:00
-        categories: [
-            {
-                name: 'Breakfast',
-                products: [
-                    { name: 'Pancake Stack', price: 7.99, image: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=800&q=80', desc: 'Fluffy pancakes, syrup, butter' },
-                    { name: 'French Toast', price: 8.49, image: 'https://images.unsplash.com/photo-1484723091739-30a097e8f929?w=800&q=80', desc: 'Cinnamon, powdered sugar' },
-                    { name: 'Eggs Benedict', price: 11.99, image: 'https://images.unsplash.com/photo-1608039829572-78524f79c4c7?w=800&q=80', desc: 'Poached eggs, hollandaise' },
-                    { name: 'Avocado Toast', price: 9.99, image: 'https://images.unsplash.com/photo-1541519227354-08fa5d50c44d?w=800&q=80', desc: 'Smashed avocado, sourdough' },
-                    { name: 'Breakfast Burrito', price: 10.49, image: 'https://images.unsplash.com/photo-1626700051175-6818013e1d4f?w=800&q=80', desc: 'Eggs, bacon, cheese, salsa' },
-                    { name: 'Omelette', price: 9.49, image: 'https://images.unsplash.com/photo-1612874742237-6526221588e3?w=800&q=80', desc: 'Three eggs, choice of fillings' },
-                    { name: 'Granola Bowl', price: 8.99, image: 'https://images.unsplash.com/photo-1590301157890-4810ed352733?w=800&q=80', desc: 'Yogurt, granola, fresh berries' },
-                    { name: 'Bagel & Cream Cheese', price: 5.99, image: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&q=80', desc: 'Fresh bagel, spread' },
-                    { name: 'Waffles', price: 8.99, image: 'https://images.unsplash.com/photo-1562376552-0d160a2f238d?w=800&q=80', desc: 'Belgian waffles, toppings' },
-                    { name: 'Full English Breakfast', price: 13.99, image: 'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=800&q=80', desc: 'Eggs, bacon, sausage, beans, toast' },
-                ],
-            },
-        ],
-    },
-    {
-        name: 'Dessert Paradise',
-        type: 'RESTAURANT' as const,
-        image: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=800&q=80',
-        opensAt: 600, // 10:00
-        closesAt: 1380, // 23:00
-        categories: [
-            {
-                name: 'Desserts',
-                products: [
-                    { name: 'Chocolate Cake', price: 6.99, image: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&q=80', desc: 'Rich chocolate layer cake' },
-                    { name: 'Cheesecake', price: 7.49, image: 'https://images.unsplash.com/photo-1533134486753-c833f0ed4866?w=800&q=80', desc: 'New York style cheesecake' },
-                    { name: 'Tiramisu', price: 7.99, image: 'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=800&q=80', desc: 'Classic Italian dessert' },
-                    { name: 'Apple Pie', price: 6.49, image: 'https://images.unsplash.com/photo-1535920527002-b35e96722eb9?w=800&q=80', desc: 'Homemade apple pie, vanilla ice cream' },
-                    { name: 'Brownies', price: 5.99, image: 'https://images.unsplash.com/photo-1607920591413-4ec007e70023?w=800&q=80', desc: 'Fudgy chocolate brownies' },
-                    { name: 'Crème Brûlée', price: 8.49, image: 'https://images.unsplash.com/photo-1470124182917-cc6e71b22ecc?w=800&q=80', desc: 'Vanilla custard, caramelized sugar' },
-                    { name: 'Macarons (6 pack)', price: 9.99, image: 'https://images.unsplash.com/photo-1569864358642-9d1684040f43?w=800&q=80', desc: 'Assorted French macarons' },
-                    { name: 'Ice Cream Sundae', price: 6.99, image: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=800&q=80', desc: 'Three scoops, toppings, whipped cream' },
-                    { name: 'Lava Cake', price: 8.99, image: 'https://images.unsplash.com/photo-1624353365286-3f8d62daad51?w=800&q=80', desc: 'Molten chocolate center' },
-                    { name: 'Panna Cotta', price: 7.49, image: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=800&q=80', desc: 'Vanilla cream, berry compote' },
-                ],
-            },
-        ],
-    },
-    {
-        name: 'Asian Fusion',
-        type: 'RESTAURANT' as const,
-        image: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?w=800&q=80',
-        opensAt: 660, // 11:00
-        closesAt: 1380, // 23:00
-        categories: [
-            {
-                name: 'Asian Cuisine',
-                products: [
-                    { name: 'Pad Thai', price: 11.99, image: 'https://images.unsplash.com/photo-1559314809-0d155014e29e?w=800&q=80', desc: 'Rice noodles, shrimp, peanuts' },
-                    { name: 'Chicken Teriyaki', price: 12.49, image: 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=800&q=80', desc: 'Grilled chicken, teriyaki sauce' },
-                    { name: 'Beef Pho', price: 10.99, image: 'https://images.unsplash.com/photo-1591814468924-caf88d1232e1?w=800&q=80', desc: 'Vietnamese beef noodle soup' },
-                    { name: 'Spring Rolls', price: 7.99, image: 'https://images.unsplash.com/photo-1594756202469-9ff9799b2e4e?w=800&q=80', desc: 'Fresh vegetables, rice paper' },
-                    { name: 'Fried Rice', price: 9.99, image: 'https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=800&q=80', desc: 'Egg fried rice, vegetables' },
-                    { name: 'Tom Yum Soup', price: 8.99, image: 'https://images.unsplash.com/photo-1561043433-aaf687c4cf04?w=800&q=80', desc: 'Spicy Thai soup, shrimp' },
-                    { name: 'Dumplings (8 pcs)', price: 9.49, image: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=800&q=80', desc: 'Steamed pork dumplings' },
-                    { name: 'Korean BBQ Bowl', price: 13.99, image: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?w=800&q=80', desc: 'Marinated beef, rice, kimchi' },
-                    { name: 'Ramen Bowl', price: 11.49, image: 'https://images.unsplash.com/photo-1557872943-16a5ac26437e?w=800&q=80', desc: 'Tonkotsu broth, pork, egg' },
-                    { name: 'Curry Chicken', price: 12.99, image: 'https://images.unsplash.com/photo-1588166524941-3bf61a9c41db?w=800&q=80', desc: 'Thai green curry, coconut milk' },
-                ],
-            },
-        ],
-    },
 ];
 
 async function seed() {
@@ -286,6 +166,47 @@ async function seed() {
 
     console.log('👤 Created super admin user (admin@admin.com / 12345678)');
 
+    // Create specific customer user for testing
+    const specificCustomerId = faker.string.uuid();
+    const specificCustomerPassword = await hashPassword('12345678');
+    await db.insert(users).values({
+        id: specificCustomerId,
+        firstName: 'Art',
+        lastName: 'Shabani',
+        email: 'artshabani2002@gmail.com',
+        password: specificCustomerPassword,
+        role: 'CUSTOMER',
+        emailVerified: true,
+        phoneVerified: true,
+        signupStep: 'COMPLETED',
+    });
+
+    console.log('👤 Created test customer user (artshabani2002@gmail.com / 12345678)');
+
+    // Create additional test customer users
+    const customerUsers = [specificCustomerId]; // Include the specific customer
+    for (let i = 0; i < 2; i++) {
+        const customerId = faker.string.uuid();
+        const customerPassword = await hashPassword('12345678');
+        await db.insert(users).values({
+            id: customerId,
+            firstName: faker.person.firstName(),
+            lastName: faker.person.lastName(),
+            email: faker.internet.email(),
+            password: customerPassword,
+            role: 'CUSTOMER',
+            emailVerified: true,
+            phoneVerified: true,
+            signupStep: 'COMPLETED',
+        });
+        customerUsers.push(customerId);
+    }
+
+    console.log('👥 Created 3 test customer users total');
+
+    // Store created businesses and their products
+    const createdBusinesses: Array<{ id: string; name: string; products: Array<{ id: string; name: string; price: number }> }> = [];
+
     // Create restaurants with products
     for (const restaurantData of RESTAURANTS_DATA) {
         const business: NewDbBusiness = {
@@ -303,6 +224,8 @@ async function seed() {
         const [createdBusiness] = await db.insert(businesses).values(business).returning();
         console.log(`🏪 Created business: ${createdBusiness.name}`);
 
+        const businessProducts: Array<{ id: string; name: string; price: number }> = [];
+
         // Create categories and products
         for (const categoryData of restaurantData.categories) {
             const category: NewDbProductCategory = {
@@ -313,7 +236,7 @@ async function seed() {
             const [createdCategory] = await db.insert(productCategories).values(category).returning();
 
             // Create products for this category
-            const productPromises = categoryData.products.map((productData) => {
+            for (const productData of categoryData.products) {
                 const isOnSale = Math.random() > 0.7;
                 const product: NewDbProduct = {
                     businessId: createdBusiness.id,
@@ -327,12 +250,82 @@ async function seed() {
                     isOnSale: isOnSale,
                     salePrice: isOnSale ? productData.price * 0.85 : null,
                 };
-                return db.insert(products).values(product);
-            });
+                const [createdProduct] = await db.insert(products).values(product).returning();
+                businessProducts.push({
+                    id: createdProduct.id,
+                    name: createdProduct.name,
+                    price: createdProduct.price,
+                });
+            }
 
-            await Promise.all(productPromises);
             console.log(`  📦 Added ${categoryData.products.length} products to ${categoryData.name}`);
         }
+
+        createdBusinesses.push({
+            id: createdBusiness.id,
+            name: createdBusiness.name,
+            products: businessProducts,
+        });
+    }
+
+    // Create 3 test orders, each from a single restaurant
+    console.log('\n📝 Creating test orders...');
+    
+    const orderStatuses: OrderStatus[] = ['PENDING', 'ACCEPTED', 'OUT_FOR_DELIVERY'];
+    const now = new Date();
+
+    for (let i = 0; i < 3; i++) {
+        const customerUserId = customerUsers[i];
+        const selectedBusiness = createdBusinesses[i % createdBusinesses.length];
+        
+        // Select 2-4 random products from this business
+        const numProducts = 2 + Math.floor(Math.random() * 3); // 2-4 products
+        const selectedProducts = faker.helpers.shuffle(selectedBusiness.products).slice(0, numProducts);
+        
+        // Calculate order totals
+        let price = 0;
+        const orderItemsData: NewDbOrderItem[] = [];
+        
+        selectedProducts.forEach((product) => {
+            const quantity = 1 + Math.floor(Math.random() * 3); // 1-3 quantity
+            const itemPrice = product.price * quantity;
+            price += itemPrice;
+            
+            orderItemsData.push({
+                productId: product.id,
+                quantity: quantity,
+                price: product.price,
+            });
+        });
+        
+        const deliveryPrice = 2.5;
+        const totalPrice = price + deliveryPrice;
+        
+        // Create order with timestamp offset (most recent first)
+        const orderDate = new Date(now.getTime() - (i * 60 * 60 * 1000)); // Each order 1 hour apart
+        
+        const order: NewDbOrder = {
+            userId: customerUserId,
+            price: price,
+            deliveryPrice: deliveryPrice,
+            dropoffLat: 42.6629 + (Math.random() - 0.5) * 0.05,
+            dropoffLng: 21.4694 + (Math.random() - 0.5) * 0.05,
+            dropoffAddress: faker.location.streetAddress(),
+            status: orderStatuses[i],
+            orderDate: orderDate.toISOString(),
+        };
+        
+        const [createdOrder] = await db.insert(orders).values(order).returning();
+        
+        // Link order items to the order
+        for (const itemData of orderItemsData) {
+            await db.insert(orderItems).values({
+                ...itemData,
+                orderId: createdOrder.id,
+            });
+        }
+        
+        console.log(`  📋 Order ${i + 1}: ${selectedBusiness.name} - ${selectedProducts.length} items - $${totalPrice.toFixed(2)} - ${orderStatuses[i]}`);
     }
 
     console.log('\n✅ Database seeded successfully!');
@@ -340,7 +333,11 @@ async function seed() {
     console.log(`  - ${RESTAURANTS_DATA.length} businesses created`);
     console.log(`  - Each with 10 curated products`);
     console.log(`  - Total products: ${RESTAURANTS_DATA.length * 10}`);
-    console.log('\n🔐 Admin credentials: admin@admin.com / 12345678\n');
+    console.log(`  - 3 test customer users created`);
+    console.log(`  - 3 test orders created (each from a single restaurant)`);
+    console.log('\n🔐 Credentials:');
+    console.log('  Admin: admin@admin.com / 12345678');
+    console.log('  Customer: artshabani2002@gmail.com / 12345678\n');
 }
 
 seed()
