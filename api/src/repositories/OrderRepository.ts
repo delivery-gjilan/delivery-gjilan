@@ -1,6 +1,6 @@
 import { getDB } from '@/database';
 import { orders as ordersTable, orderItems as orderItemsTable } from '@/database/schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import type { DbOrder } from '@/database/schema/orders';
 import type { NewDbOrderItem } from '@/database/schema/orderItems';
 import { OrderStatus } from '@/generated/types.generated';
@@ -20,6 +20,12 @@ export class OrderRepository {
     async findByStatus(status: OrderStatus): Promise<DbOrder[]> {
         const db = await getDB();
         return await db.select().from(ordersTable).where(eq(ordersTable.status, status));
+    }
+
+    async findByIds(ids: string[]): Promise<DbOrder[]> {
+        if (ids.length === 0) return [];
+        const db = await getDB();
+        return await db.select().from(ordersTable).where(inArray(ordersTable.id, ids));
     }
 
     async updateStatus(id: string, status: OrderStatus): Promise<DbOrder | null> {

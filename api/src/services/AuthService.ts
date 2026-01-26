@@ -39,7 +39,7 @@ export class AuthService {
         console.log(`Email verification code for ${email}: ${verificationCode}`);
 
         // Generate JWT token for authenticated signup steps
-        const token = this.generateJWT(user.id);
+        const token = await this.generateJWT(user.id);
 
         return {
             token,
@@ -165,7 +165,7 @@ export class AuthService {
         }
 
         // Generate JWT token (eternal - no expiration)
-        const token = this.generateJWT(user.id);
+        const token = await this.generateJWT(user.id);
 
         return {
             token,
@@ -177,10 +177,12 @@ export class AuthService {
     /**
      * Generate JWT token without expiration
      */
-    generateJWT(userId: string): string {
+    async generateJWT(userId: string): Promise<string> {
         const secret = this.getJwtSecret();
-        // No expiresIn option = eternal token
-        return jwt.sign({ userId }, secret);
+        const user = await this.authRepository.findById(userId);
+        if (!user) throw new Error('User not found');
+        // Include role in JWT token
+        return jwt.sign({ userId, role: user.role }, secret);
     }
 
     /**
@@ -213,7 +215,8 @@ export class AuthService {
         lastName: string,
         email: string,
         password: string,
-        role: 'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN',
+        role: 'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN' | 'BUSINESS_ADMIN',
+        businessId?: string,
     ): Promise<AuthResponse> {
         // Check if user already exists
         const existingUser = await this.authRepository.findByEmail(email);
@@ -221,14 +224,26 @@ export class AuthService {
             throw new Error('User with this email already exists');
         }
 
+        // Validate businessId for BUSINESS_ADMIN role
+        if (role === 'BUSINESS_ADMIN' && !businessId) {
+            throw new Error('Business ID is required for BUSINESS_ADMIN role');
+        }
+
         // Hash password
         const hashedPassword = await hashPassword(password);
 
         // Create user with role and completed status
-        const user = await this.authRepository.createUserWithRole(firstName, lastName, email, hashedPassword, role);
+        const user = await this.authRepository.createUserWithRole(
+            firstName,
+            lastName,
+            email,
+            hashedPassword,
+            role,
+            businessId,
+        );
 
         // Generate JWT token
-        const token = this.generateJWT(user.id);
+        const token = await this.generateJWT(user.id);
 
         return {
             token,

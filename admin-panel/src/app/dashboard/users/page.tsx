@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import { useQuery, useMutation } from "@apollo/client/react";
 import { USERS_QUERY } from "@/graphql/operations/users/queries";
 import { CREATE_USER_MUTATION } from "@/graphql/operations/users/mutations";
+import { GET_BUSINESSES } from "@/graphql/operations/businesses/queries";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
@@ -17,8 +18,17 @@ interface UserItem {
     role: string;
 }
 
+interface BusinessItem {
+    id: string;
+    name: string;
+}
+
 interface UsersResponse {
     users: UserItem[];
+}
+
+interface BusinessesResponse {
+    businesses: BusinessItem[];
 }
 
 interface CreateUserResponse {
@@ -34,6 +44,7 @@ export default function UsersPage() {
     const isSuperAdmin = admin?.role === "SUPER_ADMIN";
 
     const { data, loading, error, refetch } = useQuery<UsersResponse>(USERS_QUERY);
+    const { data: businessesData } = useQuery<BusinessesResponse>(GET_BUSINESSES);
     const [createUser, { loading: creating }] = useMutation<CreateUserResponse>(CREATE_USER_MUTATION, {
         onCompleted: () => {
             refetch();
@@ -47,6 +58,7 @@ export default function UsersPage() {
         firstName: "",
         lastName: "",
         role: "CUSTOMER",
+        businessId: "",
     });
     const [formError, setFormError] = useState("");
     const [formSuccess, setFormSuccess] = useState("");
@@ -64,13 +76,14 @@ export default function UsersPage() {
                     firstName: formData.firstName,
                     lastName: formData.lastName,
                     role: formData.role,
+                    businessId: formData.businessId || null,
                 },
             });
 
             if (created && created.createUser) {
                 setFormSuccess(created.createUser.message || "User created successfully");
                 setShowModal(false);
-                setFormData({ email: "", password: "", firstName: "", lastName: "", role: "CUSTOMER" });
+                setFormData({ email: "", password: "", firstName: "", lastName: "", role: "CUSTOMER", businessId: "" });
             }
         } catch (err) {
             setFormError(err instanceof Error ? err.message : "Failed to create user");
@@ -165,9 +178,25 @@ export default function UsersPage() {
                                 <Select name="role" value={formData.role} onChange={handleInputChange} required>
                                     <option value="CUSTOMER">Customer</option>
                                     <option value="DRIVER">Driver</option>
+                                    <option value="BUSINESS_ADMIN">Business Admin</option>
                                     <option value="SUPER_ADMIN">Super Admin</option>
                                 </Select>
                             </div>
+
+                            {formData.role === "BUSINESS_ADMIN" && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">Business *</label>
+                                    <Select name="businessId" value={formData.businessId} onChange={handleInputChange} required>
+                                        <option value="">Select a business</option>
+                                        {businessesData?.businesses?.map((business) => (
+                                            <option key={business.id} value={business.id}>
+                                                {business.name}
+                                            </option>
+                                        ))}
+                                    </Select>
+                                    <p className="text-xs text-gray-500 mt-1">Required for Business Admin role</p>
+                                </div>
+                            )}
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <div>

@@ -10,6 +10,7 @@ enum UserRole {
     CUSTOMER
     DRIVER
     SUPER_ADMIN
+    BUSINESS_ADMIN
 }
 
 type User {
@@ -23,6 +24,8 @@ type User {
     phoneVerified: Boolean!
     signupStep: SignupStep!
     role: UserRole!
+    businessId: ID
+    business: Business
 }
 
 type SignupStepResponse {
@@ -67,6 +70,7 @@ input CreateUserInput {
     firstName: String!
     lastName: String!
     role: UserRole!
+    businessId: ID
 }
 
 type Query {

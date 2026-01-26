@@ -86,6 +86,7 @@ export type CreateProductInput = {
 };
 
 export type CreateUserInput = {
+  businessId?: InputMaybe<Scalars['ID']['input']>;
   email: Scalars['String']['input'];
   firstName: Scalars['String']['input'];
   lastName: Scalars['String']['input'];
@@ -423,6 +424,8 @@ export type UpdateProductInput = {
 export type User = {
   __typename?: 'User';
   address?: Maybe<Scalars['String']['output']>;
+  business?: Maybe<Business>;
+  businessId?: Maybe<Scalars['ID']['output']>;
   email: Scalars['String']['output'];
   emailVerified: Scalars['Boolean']['output'];
   firstName: Scalars['String']['output'];
@@ -435,6 +438,7 @@ export type User = {
 };
 
 export type UserRole =
+  | 'BUSINESS_ADMIN'
   | 'CUSTOMER'
   | 'DRIVER'
   | 'SUPER_ADMIN';
@@ -565,8 +569,8 @@ export type ResolversTypes = {
   UpdateBusinessInput: UpdateBusinessInput;
   UpdateProductCategoryInput: UpdateProductCategoryInput;
   UpdateProductInput: UpdateProductInput;
-  User: ResolverTypeWrapper<Omit<User, 'role' | 'signupStep'> & { role: ResolversTypes['UserRole'], signupStep: ResolversTypes['SignupStep'] }>;
-  UserRole: ResolverTypeWrapper<'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN'>;
+  User: ResolverTypeWrapper<Omit<User, 'business' | 'role' | 'signupStep'> & { business?: Maybe<ResolversTypes['Business']>, role: ResolversTypes['UserRole'], signupStep: ResolversTypes['SignupStep'] }>;
+  UserRole: ResolverTypeWrapper<'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN' | 'BUSINESS_ADMIN'>;
   VerifyEmailInput: VerifyEmailInput;
   VerifyPhoneInput: VerifyPhoneInput;
   WorkingHours: ResolverTypeWrapper<WorkingHours>;
@@ -608,7 +612,7 @@ export type ResolversParentTypes = {
   UpdateBusinessInput: UpdateBusinessInput;
   UpdateProductCategoryInput: UpdateProductCategoryInput;
   UpdateProductInput: UpdateProductInput;
-  User: User;
+  User: Omit<User, 'business'> & { business?: Maybe<ResolversParentTypes['Business']> };
   VerifyEmailInput: VerifyEmailInput;
   VerifyPhoneInput: VerifyPhoneInput;
   WorkingHours: WorkingHours;
@@ -771,6 +775,8 @@ export type SubscriptionResolvers<ContextType = GraphQLContext, ParentType exten
 
 export type UserResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['User'] = ResolversParentTypes['User']> = {
   address?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  business?: Resolver<Maybe<ResolversTypes['Business']>, ParentType, ContextType>;
+  businessId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   email?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   emailVerified?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   firstName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
@@ -783,7 +789,7 @@ export type UserResolvers<ContextType = GraphQLContext, ParentType extends Resol
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
-export type UserRoleResolvers = EnumResolverSignature<{ CUSTOMER?: any, DRIVER?: any, SUPER_ADMIN?: any }, ResolversTypes['UserRole']>;
+export type UserRoleResolvers = EnumResolverSignature<{ BUSINESS_ADMIN?: any, CUSTOMER?: any, DRIVER?: any, SUPER_ADMIN?: any }, ResolversTypes['UserRole']>;
 
 export type WorkingHoursResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['WorkingHours'] = ResolversParentTypes['WorkingHours']> = {
   closesAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;

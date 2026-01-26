@@ -7,6 +7,7 @@ export const CREATE_USER_MUTATION = gql`
     $firstName: String!
     $lastName: String!
     $role: UserRole!
+    $businessId: ID
   ) {
     createUser(
       input: {
@@ -15,6 +16,7 @@ export const CREATE_USER_MUTATION = gql`
         firstName: $firstName
         lastName: $lastName
         role: $role
+        businessId: $businessId
       }
     ) {
       token
@@ -24,6 +26,7 @@ export const CREATE_USER_MUTATION = gql`
         firstName
         lastName
         role
+        businessId
       }
       message
     }

@@ -236,6 +236,41 @@ export class OrderService {
         }
         return orders;
     }
+
+    async getOrdersByBusinessId(businessId: string): Promise<Order[]> {
+        const db = getDB();
+        
+        // Get all orders that contain items from this business
+        const ordersWithBusinessItems = await db
+            .selectDistinct({ orderId: orderItemsTable.orderId })
+            .from(orderItemsTable)
+            .innerJoin(productsTable, eq(orderItemsTable.productId, productsTable.id))
+            .where(eq(productsTable.businessId, businessId));
+
+        const orderIds = ordersWithBusinessItems.map(row => row.orderId);
+        
+        if (orderIds.length === 0) {
+            return [];
+        }
+
+        const dbOrders = await this.orderRepository.findByIds(orderIds);
+        return Promise.all(dbOrders.map((order) => this.mapToOrder(order)));
+    }
+
+    async orderContainsBusiness(orderId: string, businessId: string): Promise<boolean> {
+        const db = getDB();
+        
+        // Check if any items in this order belong to the business
+        const result = await db
+            .select({ count: orderItemsTable.orderId })
+            .from(orderItemsTable)
+            .innerJoin(productsTable, eq(orderItemsTable.productId, productsTable.id))
+            .where(eq(orderItemsTable.orderId, orderId))
+            .where(eq(productsTable.businessId, businessId))
+            .limit(1);
+
+        return result.length > 0;
+    }
 }
 
 // export const orderService = new OrderService(orderRepository);

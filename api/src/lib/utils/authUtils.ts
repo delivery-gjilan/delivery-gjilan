@@ -23,7 +23,7 @@ export function generateVerificationCode(): string {
     return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-export function decodeJwtToken(token: string): { userId: string } {
+export function decodeJwtToken(token: string): { userId: string; role?: string } {
     // Get JWT secret
     const secret = process.env.JWT_SECRET;
     if (!secret) {
@@ -32,7 +32,7 @@ export function decodeJwtToken(token: string): { userId: string } {
     }
 
     // Verify and decode token
-    const decoded = jwt.verify(token, secret) as { userId: string };
+    const decoded = jwt.verify(token, secret) as { userId: string; role?: string };
 
-    return { userId: decoded.userId };
+    return { userId: decoded.userId, role: decoded.role };
 }

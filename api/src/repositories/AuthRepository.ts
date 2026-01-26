@@ -109,7 +109,8 @@ export class AuthRepository {
         lastName: string,
         email: string,
         hashedPassword: string,
-        role: 'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN',
+        role: 'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN' | 'BUSINESS_ADMIN',
+        businessId?: string,
     ): Promise<DbUser> {
         const [user] = await this.db
             .insert(users)
@@ -119,6 +120,7 @@ export class AuthRepository {
                 email,
                 password: hashedPassword,
                 role,
+                businessId,
                 signupStep: 'COMPLETED',
                 emailVerified: true,
                 phoneVerified: false,
