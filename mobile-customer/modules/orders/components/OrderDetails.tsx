@@ -85,21 +85,17 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
             // Clear the cart
             clearCart();
             
-            // Show success alert and navigate back to home (closing all modals)
-            Alert.alert(
-                '🎉 Order Delivered!',
-                'Your order has been successfully delivered. Thank you for your order!',
-                [
-                    {
-                        text: 'OK',
-                        onPress: () => {
-                            // Navigate to home tab, which will close all modals
-                            router.replace('/(tabs)/home');
-                        },
-                    },
-                ],
-                { cancelable: false }
-            );
+            // Immediately navigate to home to close all modals
+            router.replace('/(tabs)/home');
+            
+            // Show success alert after a brief delay to ensure navigation completes
+            setTimeout(() => {
+                Alert.alert(
+                    '🎉 Order Delivered!',
+                    'Your order has been successfully delivered. Thank you for your order!',
+                    [{ text: 'OK' }]
+                );
+            }, 300);
         }
         
         if (order) {
