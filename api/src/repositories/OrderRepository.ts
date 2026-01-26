@@ -28,6 +28,11 @@ export class OrderRepository {
         return await db.select().from(ordersTable).where(inArray(ordersTable.id, ids));
     }
 
+    async findByUserId(userId: string): Promise<DbOrder[]> {
+        const db = await getDB();
+        return await db.select().from(ordersTable).where(eq(ordersTable.userId, userId));
+    }
+
     async updateStatus(id: string, status: OrderStatus): Promise<DbOrder | null> {
         const db = await getDB();
         const result = await db.update(ordersTable).set({ status }).where(eq(ordersTable.id, id)).returning();

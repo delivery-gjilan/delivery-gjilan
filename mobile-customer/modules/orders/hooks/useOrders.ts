@@ -28,6 +28,7 @@ export function useOrders() {
         onData: ({ client, data: subData }) => {
             if (subData?.data?.userOrdersUpdated) {
                 const orders = subData.data.userOrdersUpdated;
+                console.log('[useOrders] Subscription received orders:', orders.length);
                 
                 // Update Apollo cache
                 client.writeQuery({
@@ -39,6 +40,7 @@ export function useOrders() {
                 const activeOrders = orders.filter(
                     (order: any) => order.status !== 'DELIVERED' && order.status !== 'CANCELLED'
                 );
+                console.log('[useOrders] Filtered active orders:', activeOrders.length);
                 setActiveOrders(activeOrders);
             }
         },
@@ -50,6 +52,7 @@ export function useOrders() {
             const activeOrders = (data.orders as any[]).filter(
                 (order) => order.status !== 'DELIVERED' && order.status !== 'CANCELLED'
             );
+            console.log('[useOrders] Query data - Total orders:', data.orders.length, 'Active:', activeOrders.length);
             setActiveOrders(activeOrders);
         }
     }, [data, setActiveOrders]);

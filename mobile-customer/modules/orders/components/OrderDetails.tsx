@@ -1,10 +1,12 @@
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Order } from '@/gql/graphql';
 import { Image } from 'expo-image';
+import { useEffect, useRef } from 'react';
+import { useCartActions } from '@/modules/cart';
 
 interface OrderDetailsProps {
     order: Order | null;
@@ -74,6 +76,36 @@ const OrderStatusTimeline = ({ status }: { status: string }) => {
 export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const router = useRouter();
     const theme = useTheme();
+    const prevStatusRef = useRef<string | null>(null);
+    const { clearCart } = useCartActions();
+
+    // Detect when order status changes to DELIVERED
+    useEffect(() => {
+        if (order && prevStatusRef.current !== null && prevStatusRef.current !== 'DELIVERED' && order.status === 'DELIVERED') {
+            // Clear the cart
+            clearCart();
+            
+            // Show success alert and navigate back to home (closing all modals)
+            Alert.alert(
+                '🎉 Order Delivered!',
+                'Your order has been successfully delivered. Thank you for your order!',
+                [
+                    {
+                        text: 'OK',
+                        onPress: () => {
+                            // Navigate to home tab, which will close all modals
+                            router.replace('/(tabs)/home');
+                        },
+                    },
+                ],
+                { cancelable: false }
+            );
+        }
+        
+        if (order) {
+            prevStatusRef.current = order.status;
+        }
+    }, [order?.status, router, clearCart]);
 
     if (loading) {
         return (

@@ -1,5 +1,6 @@
 import { useMutation } from '@apollo/client/react';
 import { router } from 'expo-router';
+import { Alert } from 'react-native';
 import { CREATE_ORDER } from '@/graphql/operations/orders';
 import { useCart } from './useCart';
 import { useCartActions } from './useCartActions';
@@ -48,8 +49,18 @@ export function useCreateOrder() {
             // Clear cart after successful order
             clearCart();
 
-            // Navigate to active orders page instead of specific order
-            router.push('/orders/active');
+            // Show success popup and redirect to home
+            Alert.alert(
+                '🎉 Order Placed!',
+                'Your order has been placed successfully. You can track it from the active order banner.',
+                [
+                    {
+                        text: 'OK',
+                        onPress: () => router.replace('/(tabs)/home'),
+                    },
+                ],
+                { cancelable: false }
+            );
 
             return result.data?.createOrder;
         } catch (err) {

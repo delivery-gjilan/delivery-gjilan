@@ -221,19 +221,12 @@ export class OrderService {
     }
 
     async publishUserOrders(userId: string) {
-        const userOrders = await this.orderRepository.findUncompletedOrdersByUserId(userId);
+        const userOrders = await this.orderRepository.findByUserId(userId);
         const orders: Order[] = [];
         for (const dbOrder of userOrders) {
             const order = await this.mapToOrder(dbOrder);
             orders.push(order);
         }
-        console.log(
-            'haha orders haha',
-            orders.map((o) => ({
-                id: o.id,
-                status: o.status,
-            })),
-        );
         publish(this.pubsub, topics.ordersByUserChanged(userId), {
             userId,
             orders,
