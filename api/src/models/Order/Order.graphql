@@ -46,6 +46,7 @@ type Mutation {
 type Subscription {
     orderStatusUpdated(orderId: ID!): Order! @skipAuth
     userOrdersUpdated(input: SubscriptionInput!): [Order!]! @skipAuth
+    allOrdersUpdated: [Order!]! @skipAuth
 }
 
 input CreateOrderInput {

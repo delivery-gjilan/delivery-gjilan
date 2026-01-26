@@ -29,6 +29,8 @@ export const users = pgTable('users', {
     businessId: uuid('business_id').references(() => businesses.id, { onDelete: 'set null' }),
     emailVerificationCode: text('email_verification_code'),
     phoneVerificationCode: text('phone_verification_code'),
+    adminNote: text('admin_note'),
+    flagColor: text('flag_color').default('yellow'),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull(),

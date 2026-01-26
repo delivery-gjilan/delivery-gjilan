@@ -9,5 +9,6 @@ export const createOrder: NonNullable<MutationResolvers['createOrder']> = async 
     }
     const order = await orderService.createOrder(userData.userId, input);
     await orderService.publishUserOrders(userData.userId!);
+    await orderService.publishAllOrders(); // For admin real-time updates
     return order;
 };

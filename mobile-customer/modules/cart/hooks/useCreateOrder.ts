@@ -48,10 +48,8 @@ export function useCreateOrder() {
             // Clear cart after successful order
             clearCart();
 
-            // Navigate to order confirmation or orders page
-            if (result.data?.createOrder?.id) {
-                router.push(`/orders/${result.data.createOrder.id}`);
-            }
+            // Navigate to active orders page instead of specific order
+            router.push('/orders/active');
 
             return result.data?.createOrder;
         } catch (err) {

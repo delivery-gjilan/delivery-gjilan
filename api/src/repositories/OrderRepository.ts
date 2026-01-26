@@ -46,6 +46,16 @@ export class OrderRepository {
         return result;
     }
 
+    async findUncompleted(): Promise<DbOrder[]> {
+        const db = await getDB();
+        const result = await db.query.orders.findMany({
+            where: (tbl, { notInArray }) =>
+                notInArray(tbl.status, ['DELIVERED', 'CANCELLED'] as OrderStatus[]),
+            orderBy: (tbl, { asc }) => [asc(tbl.createdAt)],
+        });
+        return result;
+    }
+
     async create(
         orderData: typeof ordersTable.$inferInsert,
         itemsData: Omit<NewDbOrderItem, 'orderId'>[],

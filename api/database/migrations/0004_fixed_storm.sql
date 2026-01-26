@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "flag_color" text DEFAULT 'yellow';

@@ -4,8 +4,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
 import {
-  LayoutDashboard,
   ClipboardList,
   Store,
   Package,
@@ -14,6 +14,7 @@ import {
   Tag,
   Percent,
   Users,
+  UserCog,
   BarChart3,
   Settings,
   ChevronLeft,
@@ -21,27 +22,34 @@ import {
 } from "lucide-react";
 
 const menu = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Orders", href: "/dashboard/orders", icon: ClipboardList, badge: true },
+  { name: "Orders", href: "/dashboard/orders", icon: ClipboardList, businessAdminVisible: true },
+  { name: "Products", href: "/dashboard/products", icon: Package, businessAdminVisible: true },
+  { name: "Deals", href: "/dashboard/deals", icon: Percent, businessAdminVisible: true },
+  { name: "Statistics", href: "/dashboard/statistics", icon: BarChart3, businessAdminVisible: true },
+  { name: "Settings", href: "/dashboard/settings", icon: Settings, businessAdminVisible: true },
   { name: "Businesses", href: "/dashboard/businesses", icon: Store, superAdminOnly: true },
-  { name: "Products", href: "/dashboard/products", icon: Package },
   { name: "Drivers", href: "/dashboard/drivers", icon: Truck, superAdminOnly: true },
-  { name: "Map", href: "/dashboard/map", icon: Map },
-  { name: "Promotions", href: "/dashboard/promotions", icon: Tag },
-  { name: "Deals", href: "/dashboard/deals", icon: Percent },
+  { name: "Map", href: "/dashboard/map", icon: Map, superAdminOnly: true },
+  { name: "Promotions", href: "/dashboard/promotions", icon: Tag, superAdminOnly: true },
+  { name: "Admins", href: "/dashboard/admins", icon: UserCog, superAdminOnly: true },
   { name: "Users", href: "/dashboard/users", icon: Users, superAdminOnly: true },
-  { name: "Statistics", href: "/dashboard/statistics", icon: BarChart3 },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const { admin } = useAuth();
 
-  // TODO: Replace with actual role from auth context
-  const isSuperAdmin = true;
+  const isSuperAdmin = admin?.role === "SUPER_ADMIN";
+  const isBusinessAdmin = admin?.role === "BUSINESS_ADMIN";
 
-  const filteredMenu = menu.filter(item => !item.superAdminOnly || isSuperAdmin);
+  const filteredMenu = menu.filter(item => {
+    // Super admin sees everything
+    if (isSuperAdmin) return true;
+    // Business admin only sees items marked as businessAdminVisible
+    if (isBusinessAdmin) return item.businessAdminVisible;
+    return false;
+  });
 
   return (
     <aside 
@@ -66,9 +74,7 @@ export default function Sidebar() {
       <nav className="space-y-1 flex-1 overflow-y-auto">
         {filteredMenu.map((item) => {
           const Icon = item.icon;
-          const active = item.href === "/dashboard" 
-            ? pathname === "/dashboard"
-            : pathname.startsWith(item.href);
+          const active = pathname.startsWith(item.href);
 
           return (
             <Link

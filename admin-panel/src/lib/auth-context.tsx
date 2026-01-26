@@ -60,6 +60,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 throw new Error(loginResult?.message || "Login failed");
             }
 
+            // Only allow admins to access admin panel
+            const userRole = loginResult.user?.role;
+            if (userRole !== "BUSINESS_ADMIN" && userRole !== "SUPER_ADMIN") {
+                throw new Error("Access denied. Only administrators can access this panel.");
+            }
+
             const fullName = `${loginResult.user?.firstName ?? ""} ${loginResult.user?.lastName ?? ""}`.trim();
 
             const adminData: Admin = {

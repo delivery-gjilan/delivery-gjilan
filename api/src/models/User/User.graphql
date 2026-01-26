@@ -26,6 +26,8 @@ type User {
     role: UserRole!
     businessId: ID
     business: Business
+    adminNote: String
+    flagColor: String
 }
 
 type SignupStepResponse {
@@ -73,6 +75,14 @@ input CreateUserInput {
     businessId: ID
 }
 
+input UpdateUserInput {
+    id: ID!
+    firstName: String!
+    lastName: String!
+    role: UserRole!
+    businessId: ID
+}
+
 type Query {
     me: User
     users: [User!]!
@@ -87,4 +97,7 @@ type Mutation {
     verifyPhone(input: VerifyPhoneInput!): SignupStepResponse!
     login(input: LoginInput!): AuthResponse! @skipAuth
     createUser(input: CreateUserInput!): AuthResponse!
+    updateUser(input: UpdateUserInput!): User!
+    deleteUser(id: ID!): Boolean!
+    updateUserNote(userId: ID!, note: String, flagColor: String): User!
 }

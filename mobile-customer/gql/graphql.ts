@@ -84,6 +84,7 @@ export type CreateProductInput = {
 };
 
 export type CreateUserInput = {
+  businessId?: InputMaybe<Scalars['ID']['input']>;
   email: Scalars['String']['input'];
   firstName: Scalars['String']['input'];
   lastName: Scalars['String']['input'];
@@ -376,6 +377,7 @@ export type SubmitPhoneNumberInput = {
 
 export type Subscription = {
   __typename?: 'Subscription';
+  allOrdersUpdated: Array<Order>;
   orderStatusUpdated: Order;
   userOrdersUpdated: Array<Order>;
 };
@@ -423,6 +425,8 @@ export type UpdateProductInput = {
 export type User = {
   __typename?: 'User';
   address?: Maybe<Scalars['String']['output']>;
+  business?: Maybe<Business>;
+  businessId?: Maybe<Scalars['ID']['output']>;
   email: Scalars['String']['output'];
   emailVerified: Scalars['Boolean']['output'];
   firstName: Scalars['String']['output'];
@@ -435,6 +439,7 @@ export type User = {
 };
 
 export enum UserRole {
+  BusinessAdmin = 'BUSINESS_ADMIN',
   Customer = 'CUSTOMER',
   Driver = 'DRIVER',
   SuperAdmin = 'SUPER_ADMIN'

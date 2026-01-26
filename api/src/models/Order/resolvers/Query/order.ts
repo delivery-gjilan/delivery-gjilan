@@ -9,29 +9,29 @@ export const order: NonNullable<QueryResolvers['order']> = async (_parent, { id 
         });
     }
 
-    const order = await orderService.getOrderById(id);
+    const dbOrder = await orderService.orderRepository.findById(id);
 
-    if (!order) {
+    if (!dbOrder) {
         throw new GraphQLError('Order not found', {
             extensions: { code: 'NOT_FOUND' },
         });
     }
 
-    // Check authorization based on role
+    // Check authorization based on role BEFORE mapping (using dbOrder.userId)
     switch (userData.role) {
         case 'SUPER_ADMIN':
         case 'DRIVER':
             // Super admins and drivers can see any order
-            return order;
+            break;
 
         case 'CUSTOMER':
             // Customers can only see their own orders
-            if (order.userId !== userData.userId) {
+            if (dbOrder.userId !== userData.userId) {
                 throw new GraphQLError('Forbidden: You can only view your own orders', {
                     extensions: { code: 'FORBIDDEN' },
                 });
             }
-            return order;
+            break;
 
         case 'BUSINESS_ADMIN':
             // Business admins can only see orders that contain items from their business
@@ -41,17 +41,20 @@ export const order: NonNullable<QueryResolvers['order']> = async (_parent, { id 
                 });
             }
             // Check if order contains items from the admin's business
-            const hasBusinessItems = await orderService.orderContainsBusiness(order.id, userData.businessId);
+            const hasBusinessItems = await orderService.orderContainsBusiness(dbOrder.id, userData.businessId);
             if (!hasBusinessItems) {
                 throw new GraphQLError('Forbidden: You can only view orders from your business', {
                     extensions: { code: 'FORBIDDEN' },
                 });
             }
-            return order;
+            break;
 
         default:
             throw new GraphQLError('Invalid user role', {
                 extensions: { code: 'FORBIDDEN' },
             });
     }
+
+    // Authorization passed, now map and return the order
+    return orderService.mapToOrderPublic(dbOrder);
 };

@@ -109,6 +109,7 @@ type Mutation {
   deleteBusiness(id: ID!): Boolean!
   deleteProduct(id: ID!): Boolean!
   deleteProductCategory(id: ID!): Boolean!
+  deleteUser(id: ID!): Boolean!
   initiateSignup(input: InitiateSignupInput!): AuthResponse!
   login(input: LoginInput!): AuthResponse!
   resendEmailVerification: SignupStepResponse!
@@ -117,6 +118,8 @@ type Mutation {
   updateOrderStatus(id: ID!, status: OrderStatus!): Order!
   updateProduct(id: ID!, input: UpdateProductInput!): Product!
   updateProductCategory(id: ID!, input: UpdateProductCategoryInput!): ProductCategory!
+  updateUser(input: UpdateUserInput!): User!
+  updateUserNote(flagColor: String, note: String, userId: ID!): User!
   verifyEmail(input: VerifyEmailInput!): SignupStepResponse!
   verifyPhone(input: VerifyPhoneInput!): SignupStepResponse!
 }
@@ -220,6 +223,7 @@ input SubmitPhoneNumberInput {
 }
 
 type Subscription {
+  allOrdersUpdated: [Order!]!
   orderStatusUpdated(orderId: ID!): Order!
   userOrdersUpdated(input: SubscriptionInput!): [Order!]!
 }
@@ -254,13 +258,23 @@ input UpdateProductInput {
   subcategoryId: ID
 }
 
+input UpdateUserInput {
+  businessId: ID
+  firstName: String!
+  id: ID!
+  lastName: String!
+  role: UserRole!
+}
+
 type User {
   address: String
+  adminNote: String
   business: Business
   businessId: ID
   email: String!
   emailVerified: Boolean!
   firstName: String!
+  flagColor: String
   id: ID!
   lastName: String!
   phoneNumber: String

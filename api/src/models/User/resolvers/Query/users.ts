@@ -13,5 +13,8 @@ export const users: NonNullable<QueryResolvers['users']> = async (_parent, _arg,
         phoneVerified: user.phoneVerified,
         signupStep: user.signupStep,
         role: user.role,
+        businessId: user.businessId || null,
+        adminNote: user.adminNote || null,
+        flagColor: user.flagColor || 'yellow',
     }));
 };

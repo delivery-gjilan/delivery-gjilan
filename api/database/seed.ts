@@ -268,73 +268,12 @@ async function seed() {
         });
     }
 
-    // Create 3 test orders, each from a single restaurant
-    console.log('\n📝 Creating test orders...');
-    
-    const orderStatuses: OrderStatus[] = ['PENDING', 'ACCEPTED', 'OUT_FOR_DELIVERY'];
-    const now = new Date();
-
-    for (let i = 0; i < 3; i++) {
-        const customerUserId = customerUsers[i];
-        const selectedBusiness = createdBusinesses[i % createdBusinesses.length];
-        
-        // Select 2-4 random products from this business
-        const numProducts = 2 + Math.floor(Math.random() * 3); // 2-4 products
-        const selectedProducts = faker.helpers.shuffle(selectedBusiness.products).slice(0, numProducts);
-        
-        // Calculate order totals
-        let price = 0;
-        const orderItemsData: NewDbOrderItem[] = [];
-        
-        selectedProducts.forEach((product) => {
-            const quantity = 1 + Math.floor(Math.random() * 3); // 1-3 quantity
-            const itemPrice = product.price * quantity;
-            price += itemPrice;
-            
-            orderItemsData.push({
-                productId: product.id,
-                quantity: quantity,
-                price: product.price,
-            });
-        });
-        
-        const deliveryPrice = 2.5;
-        const totalPrice = price + deliveryPrice;
-        
-        // Create order with timestamp offset (most recent first)
-        const orderDate = new Date(now.getTime() - (i * 60 * 60 * 1000)); // Each order 1 hour apart
-        
-        const order: NewDbOrder = {
-            userId: customerUserId,
-            price: price,
-            deliveryPrice: deliveryPrice,
-            dropoffLat: 42.6629 + (Math.random() - 0.5) * 0.05,
-            dropoffLng: 21.4694 + (Math.random() - 0.5) * 0.05,
-            dropoffAddress: faker.location.streetAddress(),
-            status: orderStatuses[i],
-            orderDate: orderDate.toISOString(),
-        };
-        
-        const [createdOrder] = await db.insert(orders).values(order).returning();
-        
-        // Link order items to the order
-        for (const itemData of orderItemsData) {
-            await db.insert(orderItems).values({
-                ...itemData,
-                orderId: createdOrder.id,
-            });
-        }
-        
-        console.log(`  📋 Order ${i + 1}: ${selectedBusiness.name} - ${selectedProducts.length} items - $${totalPrice.toFixed(2)} - ${orderStatuses[i]}`);
-    }
-
     console.log('\n✅ Database seeded successfully!');
     console.log('\n📊 Summary:');
     console.log(`  - ${RESTAURANTS_DATA.length} businesses created`);
     console.log(`  - Each with 10 curated products`);
     console.log(`  - Total products: ${RESTAURANTS_DATA.length * 10}`);
     console.log(`  - 3 test customer users created`);
-    console.log(`  - 3 test orders created (each from a single restaurant)`);
     console.log('\n🔐 Credentials:');
     console.log('  Admin: admin@admin.com / 12345678');
     console.log('  Customer: artshabani2002@gmail.com / 12345678\n');

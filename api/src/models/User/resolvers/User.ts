@@ -4,6 +4,6 @@ export const User: UserResolvers = {
         if (!parent.businessId) {
             return null;
         }
-        return businessService.getBusinessById(parent.businessId);
+        return businessService.getBusiness(parent.businessId);
     },
 };

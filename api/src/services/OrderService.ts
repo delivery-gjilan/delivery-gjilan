@@ -14,12 +14,16 @@ import { PubSub, publish, subscribe, topics } from '@/lib/pubsub';
 import { GraphQLError } from 'graphql';
 
 export class OrderService {
+    public orderRepository: OrderRepository; // Made public for resolver access
+
     constructor(
-        private orderRepository: OrderRepository,
+        orderRepository: OrderRepository,
         private authRepository: AuthRepository,
         private productRepository: ProductRepository,
         private pubsub: PubSub,
-    ) {}
+    ) {
+        this.orderRepository = orderRepository;
+    }
 
     async createOrder(userId: string, input: CreateOrderInput): Promise<Order> {
         // 1. Validate User
@@ -169,6 +173,11 @@ export class OrderService {
         };
     }
 
+    // Public method for resolvers to map orders after authorization
+    async mapToOrderPublic(dbOrder: DbOrder): Promise<Order> {
+        return this.mapToOrder(dbOrder);
+    }
+
     private minutesToTimeString(minutes: number): string {
         const h = Math.floor(minutes / 60);
         const m = minutes % 60;
@@ -207,6 +216,10 @@ export class OrderService {
         return subscribe(this.pubsub, topics.ordersByUserChanged(userId));
     }
 
+    subscribeToAllOrders(): ReturnType<typeof subscribe> {
+        return subscribe(this.pubsub, topics.allOrdersChanged());
+    }
+
     async publishUserOrders(userId: string) {
         const userOrders = await this.orderRepository.findUncompletedOrdersByUserId(userId);
         const orders: Order[] = [];
@@ -223,6 +236,19 @@ export class OrderService {
         );
         publish(this.pubsub, topics.ordersByUserChanged(userId), {
             userId,
+            orders,
+        });
+    }
+
+    async publishAllOrders() {
+        // Fetch ALL orders (not just uncompleted) to show both active and completed
+        const allOrders = await this.orderRepository.findAll();
+        const orders: Order[] = [];
+        for (const dbOrder of allOrders) {
+            const order = await this.mapToOrder(dbOrder);
+            orders.push(order);
+        }
+        publish(this.pubsub, topics.allOrdersChanged(), {
             orders,
         });
     }
