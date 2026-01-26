@@ -159,6 +159,7 @@ export class OrderService {
 
         return {
             id: dbOrder.id,
+            userId: dbOrder.userId,
             orderPrice: dbOrder.price,
             deliveryPrice: dbOrder.deliveryPrice,
             totalPrice: dbOrder.price + dbOrder.deliveryPrice,

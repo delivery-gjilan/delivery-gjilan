@@ -7,7 +7,7 @@ export const Order: OrderResolvers = {
         }
         
         try {
-            const user = await authService.authRepository.getUserById(parent.userId);
+            const user = await authService.authRepository.findById(parent.userId);
             return user || null;
         } catch (error) {
             console.error('Error fetching user for order:', error);

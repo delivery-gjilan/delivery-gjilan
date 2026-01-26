@@ -305,6 +305,7 @@ export default function OrdersPage() {
                                 <Th>Order ID</Th>
                                 <Th>Timestamp</Th>
                                 <Th>Customer</Th>
+                                <Th>Business</Th>
                                 <Th>Status</Th>
                                 <Th>Total</Th>
                                 <Th>Actions</Th>
@@ -313,7 +314,7 @@ export default function OrdersPage() {
                         <tbody>
                             {activeOrders.length === 0 ? (
                                 <tr>
-                                    <Td colSpan={6}>
+                                    <Td colSpan={7}>
                                         <div className="text-center text-neutral-500 py-8">
                                             {searchOrderId || searchUserName ? "No active orders found matching your search" : "No active orders"}
                                         </div>
@@ -322,6 +323,7 @@ export default function OrdersPage() {
                             ) : (
                                 activeOrders.map((order) => {
                                     const nextStatus = STATUS_FLOW[order.status];
+                                    const businessNames = order.businesses.map(b => b.business.name).join(", ");
                                     return (
                                     <tr key={order.id}>
                                         <Td>
@@ -353,6 +355,11 @@ export default function OrdersPage() {
                                             ) : (
                                                 <span className="text-neutral-500 text-sm">N/A</span>
                                             )}
+                                        </Td>
+                                        <Td>
+                                            <div className="text-sm text-white">
+                                                {businessNames}
+                                            </div>
                                         </Td>
                                         <Td>
                                             <div className="flex items-center gap-2">
@@ -417,6 +424,7 @@ export default function OrdersPage() {
                             <Th>Order ID</Th>
                             <Th>Timestamp</Th>
                             <Th>Customer</Th>
+                            <Th>Business</Th>
                             <Th>Status</Th>
                             <Th>Total</Th>
                             <Th>Actions</Th>
@@ -425,14 +433,16 @@ export default function OrdersPage() {
                     <tbody>
                         {completedOrders.length === 0 ? (
                             <tr>
-                                <Td colSpan={6}>
+                                <Td colSpan={7}>
                                     <div className="text-center text-neutral-500 py-8">
                                         {searchOrderId || searchUserName ? "No completed orders found matching your search" : "No completed orders"}
                                     </div>
                                 </Td>
                             </tr>
                         ) : (
-                            completedOrders.map((order) => (
+                            completedOrders.map((order) => {
+                                const businessNames = order.businesses.map(b => b.business.name).join(", ");
+                                return (
                                 <tr key={order.id}>
                                     <Td>
                                         <span className="font-mono text-xs text-white">
@@ -465,6 +475,11 @@ export default function OrdersPage() {
                                         )}
                                     </Td>
                                     <Td>
+                                        <div className="text-sm text-white">
+                                            {businessNames}
+                                        </div>
+                                    </Td>
+                                    <Td>
                                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[order.status].bg} ${STATUS_COLORS[order.status].text} ${STATUS_COLORS[order.status].border} border inline-block`}>
                                             {STATUS_LABELS[order.status]}
                                         </span>
@@ -482,7 +497,7 @@ export default function OrdersPage() {
                                         </Button>
                                     </Td>
                                 </tr>
-                            ))
+                            )})
                         )}
                     </tbody>
                 </Table>

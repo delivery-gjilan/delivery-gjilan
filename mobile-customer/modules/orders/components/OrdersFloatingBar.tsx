@@ -15,6 +15,10 @@ export const OrdersFloatingBar = () => {
     // Since we only support 1 active order, take the first one
     const activeOrder = activeOrders[0];
 
+    // Get business names
+    const businessNames = activeOrder.businesses.map(b => b.business.name).join(', ');
+    const displayBusinessName = businessNames.length > 25 ? businessNames.substring(0, 25) + '...' : businessNames;
+
     // Determine status text and color
     const getStatusInfo = (status: string) => {
         switch (status) {
@@ -42,9 +46,9 @@ export const OrdersFloatingBar = () => {
                 <View className="bg-white/20 p-2 rounded-full">
                     <Ionicons name="receipt-outline" size={20} color="white" />
                 </View>
-                <View>
+                <View className="flex-1">
                     <Text className="text-white font-semibold text-base">Active Order</Text>
-                    <Text className="text-white/80 text-xs">Tap to track</Text>
+                    <Text className="text-white/80 text-xs" numberOfLines={1}>{displayBusinessName}</Text>
                 </View>
             </View>
             <View className="flex-row items-center space-x-1">
