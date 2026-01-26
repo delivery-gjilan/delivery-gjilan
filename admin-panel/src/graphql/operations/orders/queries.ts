@@ -9,6 +9,12 @@ export const GET_ORDERS = gql`
             totalPrice
             orderDate
             status
+            user {
+                id
+                firstName
+                lastName
+                email
+            }
             dropOffLocation {
                 latitude
                 longitude

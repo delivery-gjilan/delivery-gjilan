@@ -45,24 +45,13 @@ async function extractUserData(context: YogaInitialContext & { connectionParams?
             return {};
         }
 
-        // Extract token (remove 'Bearer ' prefix)
         const token = authHeader.substring(7);
-
         const decoded = decodeJwtToken(token);
-
-        // Fetch user from database to get businessId
-        const db = await getDB();
-        const authRepository = new AuthRepository(db);
-        const user = await authRepository.findById(decoded.userId);
-
-        if (!user) {
-            return {};
-        }
 
         return { 
             userId: decoded.userId, 
             role: decoded.role,
-            businessId: user.businessId || undefined
+            businessId: decoded.businessId || undefined
         };
     } catch (error) {
         // Token verification failed - continue without userId

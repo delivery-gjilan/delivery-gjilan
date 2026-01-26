@@ -50,9 +50,9 @@ export interface UseCancelOrderResult {
 }
 
 export function useOrders(): UseOrdersResult {
-    // Initial query to load data
+    // Initial query to load data - use network-only to avoid stale cache
     const { data, loading, error, refetch } = useQuery(GET_ORDERS, {
-        fetchPolicy: 'cache-and-network',
+        fetchPolicy: 'network-only', // Changed from 'cache-and-network' to always fetch fresh data
     });
 
     // Real-time subscription for updates - automatically updates cache

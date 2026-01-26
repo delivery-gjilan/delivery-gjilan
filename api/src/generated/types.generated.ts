@@ -266,6 +266,7 @@ export type Order = {
   orderPrice: Scalars['Float']['output'];
   status: OrderStatus;
   totalPrice: Scalars['Float']['output'];
+  user?: Maybe<User>;
 };
 
 export type OrderBusiness = {
@@ -584,7 +585,7 @@ export type ResolversTypes = {
   LocationInput: LocationInput;
   LoginInput: LoginInput;
   Mutation: ResolverTypeWrapper<{}>;
-  Order: ResolverTypeWrapper<Omit<Order, 'businesses' | 'status'> & { businesses: Array<ResolversTypes['OrderBusiness']>, status: ResolversTypes['OrderStatus'] }>;
+  Order: ResolverTypeWrapper<Omit<Order, 'businesses' | 'status' | 'user'> & { businesses: Array<ResolversTypes['OrderBusiness']>, status: ResolversTypes['OrderStatus'], user?: Maybe<ResolversTypes['User']> }>;
   OrderBusiness: ResolverTypeWrapper<Omit<OrderBusiness, 'business'> & { business: ResolversTypes['Business'] }>;
   OrderItem: ResolverTypeWrapper<OrderItem>;
   OrderStatus: ResolverTypeWrapper<'PENDING' | 'ACCEPTED' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED'>;
@@ -630,7 +631,7 @@ export type ResolversParentTypes = {
   LocationInput: LocationInput;
   LoginInput: LoginInput;
   Mutation: {};
-  Order: Omit<Order, 'businesses'> & { businesses: Array<ResolversParentTypes['OrderBusiness']> };
+  Order: Omit<Order, 'businesses' | 'user'> & { businesses: Array<ResolversParentTypes['OrderBusiness']>, user?: Maybe<ResolversParentTypes['User']> };
   OrderBusiness: Omit<OrderBusiness, 'business'> & { business: ResolversParentTypes['Business'] };
   OrderItem: OrderItem;
   Product: Product;
@@ -724,6 +725,7 @@ export type OrderResolvers<ContextType = GraphQLContext, ParentType extends Reso
   orderPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   status?: Resolver<ResolversTypes['OrderStatus'], ParentType, ContextType>;
   totalPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  user?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 

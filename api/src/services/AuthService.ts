@@ -181,8 +181,7 @@ export class AuthService {
         const secret = this.getJwtSecret();
         const user = await this.authRepository.findById(userId);
         if (!user) throw new Error('User not found');
-        // Include role in JWT token
-        return jwt.sign({ userId, role: user.role }, secret);
+        return jwt.sign({ userId, role: user.role, businessId: user.businessId }, secret);
     }
 
     /**

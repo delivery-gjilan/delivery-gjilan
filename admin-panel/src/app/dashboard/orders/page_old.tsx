@@ -159,6 +159,13 @@ export default function OrdersPage() {
 
     return (
         <div className="text-white">
+            <div className="mb-6">
+                <h1 className="text-2xl font-semibold">Orders</h1>
+                <p className="text-sm text-neutral-400 mt-1">
+                    Manage and track all customer orders
+                </p>
+            </div>
+
             {/* SEARCH SECTION - Only for Super Admin */}
             {isSuperAdmin && (
                 <div className="mb-4 flex items-center gap-3">
@@ -300,105 +307,104 @@ export default function OrdersPage() {
                 ) : (
                     /* TABLE VIEW FOR SUPER ADMIN */
                     <Table>
-                        <thead>
+                    <thead>
+                        <tr>
+                            <Th>Order ID</Th>
+                            <Th>Timestamp</Th>
+                            <Th>Customer</Th>
+                            <Th>Status</Th>
+                            <Th>Total</Th>
+                            <Th>Actions</Th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {activeOrders.length === 0 ? (
                             <tr>
-                                <Th>Order ID</Th>
-                                <Th>Timestamp</Th>
-                                <Th>Customer</Th>
-                                <Th>Status</Th>
-                                <Th>Total</Th>
-                                <Th>Actions</Th>
+                                <Td colSpan={6}>
+                                    <div className="text-center text-neutral-500 py-8">
+                                        {searchOrderId || searchUserName ? "No active orders found matching your search" : "No active orders"}
+                                    </div>
+                                </Td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            {activeOrders.length === 0 ? (
-                                <tr>
-                                    <Td colSpan={6}>
-                                        <div className="text-center text-neutral-500 py-8">
-                                            {searchOrderId || searchUserName ? "No active orders found matching your search" : "No active orders"}
+                        ) : (
+                            activeOrders.map((order) => {
+                                const nextStatus = STATUS_FLOW[order.status];
+                                return (
+                                <tr key={order.id}>
+                                    <Td>
+                                        <span className="font-mono text-xs text-white">
+                                            {order.id}
+                                        </span>
+                                    </Td>
+                                    <Td>
+                                        <div className="text-sm">
+                                            <div className="text-white">{new Date(order.orderDate).toLocaleDateString()}</div>
+                                            <div className="text-neutral-400 text-xs">
+                                                {new Date(order.orderDate).toLocaleTimeString([], {
+                                                    hour: "2-digit",
+                                                    minute: "2-digit",
+                                                })}
+                                            </div>
                                         </div>
                                     </Td>
-                                </tr>
-                            ) : (
-                                activeOrders.map((order) => {
-                                    const nextStatus = STATUS_FLOW[order.status];
-                                    return (
-                                    <tr key={order.id}>
-                                        <Td>
-                                            <span className="font-mono text-xs text-white">
-                                                {order.id}
-                                            </span>
-                                        </Td>
-                                        <Td>
+                                    <Td>
+                                        {order.user ? (
                                             <div className="text-sm">
-                                                <div className="text-white">{new Date(order.orderDate).toLocaleDateString()}</div>
+                                                <div className="text-white font-medium">
+                                                    {order.user.firstName} {order.user.lastName}
+                                                </div>
                                                 <div className="text-neutral-400 text-xs">
-                                                    {new Date(order.orderDate).toLocaleTimeString([], {
-                                                        hour: "2-digit",
-                                                        minute: "2-digit",
-                                                    })}
+                                                    {order.user.email}
                                                 </div>
                                             </div>
-                                        </Td>
-                                        <Td>
-                                            {order.user ? (
-                                                <div className="text-sm">
-                                                    <div className="text-white font-medium">
-                                                        {order.user.firstName} {order.user.lastName}
-                                                    </div>
-                                                    <div className="text-neutral-400 text-xs">
-                                                        {order.user.email}
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <span className="text-neutral-500 text-sm">N/A</span>
-                                            )}
-                                        </Td>
-                                        <Td>
-                                            <div className="flex items-center gap-2">
-                                                {nextStatus && (
-                                                    <Button
-                                                        size="sm"
-                                                        onClick={() => handleNextStatus(order)}
-                                                        disabled={updateLoading}
-                                                        className="whitespace-nowrap"
-                                                    >
-                                                        {STATUS_LABELS[nextStatus]}
-                                                        <ArrowRight size={14} className="ml-1" />
-                                                    </Button>
-                                                )}
-                                                <Select
-                                                    value={order.status}
-                                                    onChange={(e) => handleStatusChange(order.id, e.target.value as OrderStatus)}
+                                        ) : (
+                                            <span className="text-neutral-500 text-sm">N/A</span>
+                                        )}
+                                    </Td>
+                                    <Td>
+                                        <div className="flex items-center gap-2">
+                                            {nextStatus && (
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() => handleNextStatus(order)}
                                                     disabled={updateLoading}
-                                                    className={`text-xs font-medium ${STATUS_COLORS[order.status].bg} ${STATUS_COLORS[order.status].text} ${STATUS_COLORS[order.status].border} border`}
+                                                    className="whitespace-nowrap"
                                                 >
-                                                    <option value="PENDING">Pending</option>
-                                                    <option value="ACCEPTED">Accepted</option>
-                                                    <option value="OUT_FOR_DELIVERY">Out for Delivery</option>
-                                                    <option value="DELIVERED">Delivered</option>
-                                                    <option value="CANCELLED">Cancelled</option>
-                                                </Select>
-                                            </div>
-                                        </Td>
-                                        <Td>
-                                            <span className="font-semibold text-white">${order.totalPrice.toFixed(2)}</span>
-                                        </Td>
-                                        <Td>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => openDetails(order)}
+                                                    {STATUS_LABELS[nextStatus]}
+                                                    <ArrowRight size={14} className="ml-1" />
+                                                </Button>
+                                            )}
+                                            <Select
+                                                value={order.status}
+                                                onChange={(e) => handleStatusChange(order.id, e.target.value as OrderStatus)}
+                                                disabled={updateLoading}
+                                                className={`text-xs font-medium ${STATUS_COLORS[order.status].bg} ${STATUS_COLORS[order.status].text} ${STATUS_COLORS[order.status].border} border`}
                                             >
-                                                View Details
-                                            </Button>
-                                        </Td>
-                                    </tr>
-                                )})
-                            )}
-                        </tbody>
-                    </Table>
-                )}
+                                                <option value="PENDING">Pending</option>
+                                                <option value="ACCEPTED">Accepted</option>
+                                                <option value="OUT_FOR_DELIVERY">Out for Delivery</option>
+                                                <option value="DELIVERED">Delivered</option>
+                                                <option value="CANCELLED">Cancelled</option>
+                                            </Select>
+                                        </div>
+                                    </Td>
+                                    <Td>
+                                        <span className="font-semibold text-white">${order.totalPrice.toFixed(2)}</span>
+                                    </Td>
+                                    <Td>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => openDetails(order)}
+                                        >
+                                            View Details
+                                        </Button>
+                                    </Td>
+                                </tr>
+                            )})
+                        )}
+                    </tbody>
+                </Table>
             </div>
 
             {/* COMPLETED ORDERS SECTION */}
@@ -489,7 +495,7 @@ export default function OrdersPage() {
             </div>
             )}
 
-            {/* ORDER DETAILS MODAL */}
+            {/* ORDER DETAILS MODAL */
             <Modal
                 open={detailsOpen}
                 onClose={() => setDetailsOpen(false)}
