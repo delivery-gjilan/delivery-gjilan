@@ -13,7 +13,7 @@ export default function RootPage() {
         if (!loading && !isAuthenticated) {
             router.push("/login");
         } else if (!loading && isAuthenticated) {
-            router.push("/dashboard");
+            router.push("/dashboard/orders");
         }
     }, [isAuthenticated, loading, router]);
 

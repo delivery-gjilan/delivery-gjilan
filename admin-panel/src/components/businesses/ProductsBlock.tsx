@@ -380,13 +380,13 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
 
                                             <Td>{p.name}</Td>
 
-                                            <Td>€{p.price.toFixed(2)}</Td>
+                                            <Td>${p.price.toFixed(2)}</Td>
 
                                             <Td>
                                                 {p.isOnSale &&
                                                 p.salePrice != null ? (
                                                     <span className="text-green-400">
-                                                        €
+                                                        $
                                                         {p.salePrice.toFixed(2)}
                                                     </span>
                                                 ) : (
@@ -401,7 +401,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                     </span>
                                                 ) : (
                                                     <span className="text-red-400">
-                                                        Hidden
+                                                        $
                                                     </span>
                                                 )}
                                             </Td>

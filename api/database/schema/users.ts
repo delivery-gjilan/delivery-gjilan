@@ -3,11 +3,12 @@ import { relations, sql } from 'drizzle-orm';
 
 import { SignupStep, UserRole } from '@/generated/types.generated';
 import { orders } from './orders';
+import { businesses } from './businesses';
 
 const signupStepValues = ['INITIAL', 'EMAIL_SENT', 'EMAIL_VERIFIED', 'PHONE_SENT', 'COMPLETED'] as const;
 [...signupStepValues] satisfies SignupStep[];
 
-const userRoleValues = ['CUSTOMER', 'DRIVER', 'SUPER_ADMIN'] as const;
+const userRoleValues = ['CUSTOMER', 'DRIVER', 'SUPER_ADMIN', 'BUSINESS_ADMIN'] as const;
 [...userRoleValues] satisfies UserRole[];
 
 export const signupStepEnum = pgEnum('signup_step', signupStepValues);
@@ -25,8 +26,11 @@ export const users = pgTable('users', {
     phoneVerified: boolean('phone_verified').default(false).notNull(),
     signupStep: signupStepEnum('signup_step').default('INITIAL').notNull(),
     role: userRoleEnum('role').default('CUSTOMER').notNull(),
+    businessId: uuid('business_id').references(() => businesses.id, { onDelete: 'set null' }),
     emailVerificationCode: text('email_verification_code'),
     phoneVerificationCode: text('phone_verification_code'),
+    adminNote: text('admin_note'),
+    flagColor: text('flag_color').default('yellow'),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull(),
@@ -36,8 +40,12 @@ export const users = pgTable('users', {
         .$onUpdate(() => sql`CURRENT_TIMESTAMP`),
 });
 
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ many, one }) => ({
     orders: many(orders),
+    business: one(businesses, {
+        fields: [users.businessId],
+        references: [businesses.id],
+    }),
 }));
 
 export type DbUser = typeof users.$inferSelect;

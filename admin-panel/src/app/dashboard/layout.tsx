@@ -20,7 +20,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-950">
+      <div className="flex items-center justify-center h-screen bg-[#0a0a0a]">
         <div className="text-white">Loading...</div>
       </div>
     );
@@ -31,7 +31,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-gray-950">
+    <div className="flex h-screen w-full overflow-hidden bg-[#0a0a0a]">
       {/* Sidebar */}
       <Sidebar />
 
@@ -40,7 +40,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <Topbar />
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto p-6 bg-gray-900">
+        <main className="flex-1 overflow-y-auto p-6 bg-[#0a0a0a]">
           {children}
         </main>
       </div>

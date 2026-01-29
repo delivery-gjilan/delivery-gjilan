@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQuery } from '@apollo/client/react';
+import { useMutation, useQuery, useSubscription } from '@apollo/client/react';
 import {
     GET_ORDERS,
     GET_ORDER,
@@ -8,6 +8,7 @@ import {
     UPDATE_ORDER_STATUS,
     CANCEL_ORDER,
 } from '@/graphql/operations/orders';
+import { ALL_ORDERS_SUBSCRIPTION } from '@/graphql/operations/orders/subscriptions';
 
 export interface UseOrdersResult {
     orders: any[];
@@ -49,7 +50,25 @@ export interface UseCancelOrderResult {
 }
 
 export function useOrders(): UseOrdersResult {
-    const { data, loading, error, refetch } = useQuery(GET_ORDERS);
+    // Initial query to load data - use network-only to avoid stale cache
+    const { data, loading, error, refetch } = useQuery(GET_ORDERS, {
+        fetchPolicy: 'network-only', // Changed from 'cache-and-network' to always fetch fresh data
+    });
+
+    // Real-time subscription for updates - automatically updates cache
+    useSubscription(ALL_ORDERS_SUBSCRIPTION, {
+        onData: ({ client, data: subData }) => {
+            if (subData?.data?.allOrdersUpdated) {
+                // Update the cache with new orders data
+                client.writeQuery({
+                    query: GET_ORDERS,
+                    data: {
+                        orders: subData.data.allOrdersUpdated,
+                    },
+                });
+            }
+        },
+    });
 
     return {
         orders: (data as any)?.orders || [],
@@ -87,10 +106,7 @@ export function useOrdersByStatus(status: string): UseOrdersByStatusResult {
 }
 
 export function useUpdateOrderStatus(): UseUpdateOrderStatusResult {
-    const [mutate, { loading, error }] = useMutation(UPDATE_ORDER_STATUS, {
-        refetchQueries: [{ query: GET_ORDERS }],
-        awaitRefetchQueries: true,
-    });
+    const [mutate, { loading, error }] = useMutation(UPDATE_ORDER_STATUS);
 
     return {
         update: async (id, status) => {
@@ -107,10 +123,7 @@ export function useUpdateOrderStatus(): UseUpdateOrderStatusResult {
 }
 
 export function useCancelOrder(): UseCancelOrderResult {
-    const [mutate, { loading, error }] = useMutation(CANCEL_ORDER, {
-        refetchQueries: [{ query: GET_ORDERS }],
-        awaitRefetchQueries: true,
-    });
+    const [mutate, { loading, error }] = useMutation(CANCEL_ORDER);
 
     return {
         cancel: async (id) => {

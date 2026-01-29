@@ -2,6 +2,7 @@ import { User } from '@/gql/graphql';
 import { useMutation } from '@apollo/client/react';
 import { useAuthStore } from '@/store/authStore';
 import { saveToken, deleteToken } from '@/utils/secureTokenStore';
+import { useRouter } from 'expo-router';
 import {
     INITIATE_SIGNUP_MUTATION,
     VERIFY_EMAIL_MUTATION,
@@ -12,6 +13,7 @@ import {
 } from '@/graphql/operations/auth';
 
 export const useAuth = () => {
+    const router = useRouter();
     const {
         user,
         token,
@@ -118,8 +120,19 @@ export const useAuth = () => {
     };
 
     const logout = async () => {
-        await deleteToken();
-        storeLogout();
+        try {
+            await deleteToken();
+            storeLogout();
+            // Force navigation to auth selection screen
+            if (typeof window !== 'undefined') {
+                // Using replace to prevent going back
+                router.replace('/auth-selection');
+            }
+        } catch (error) {
+            console.error('Logout error:', error);
+            // Still logout even if there's an error
+            storeLogout();
+        }
     };
 
     return {

@@ -6,13 +6,59 @@ import {
     GET_ORDERS_BY_STATUS,
     UPDATE_ORDER_STATUS,
 } from '@/graphql/operations/orders';
-import { useMutation, useQuery } from '@apollo/client/react';
+import { USER_ORDERS_UPDATED } from '@/graphql/operations/orders/subscriptions';
+import { useMutation, useQuery, useSubscription } from '@apollo/client/react';
+import { useAuthStore } from '@/store/authStore';
+import { useActiveOrdersStore } from '../store/activeOrdersStore';
+import { useEffect } from 'react';
 
 export function useOrders() {
-    const { data, loading, error, refetch } = useQuery(GET_ORDERS);
+    const token = useAuthStore((state) => state.token);
+    const setActiveOrders = useActiveOrdersStore((state) => state.setActiveOrders);
+    
+    // Initial query to load data
+    const { data, loading, error, refetch } = useQuery(GET_ORDERS, {
+        fetchPolicy: 'cache-and-network',
+    });
+
+    // Real-time subscription for updates - automatically updates cache AND store
+    useSubscription(USER_ORDERS_UPDATED, {
+        variables: { input: { token: token || '' } },
+        skip: !token,
+        onData: ({ client, data: subData }) => {
+            if (subData?.data?.userOrdersUpdated) {
+                const orders = subData.data.userOrdersUpdated;
+                console.log('[useOrders] Subscription received orders:', orders.length);
+                
+                // Update Apollo cache
+                client.writeQuery({
+                    query: GET_ORDERS,
+                    data: { orders },
+                });
+
+                // Update Zustand store with active orders
+                const activeOrders = orders.filter(
+                    (order: any) => order.status !== 'DELIVERED' && order.status !== 'CANCELLED'
+                );
+                console.log('[useOrders] Filtered active orders:', activeOrders.length);
+                setActiveOrders(activeOrders);
+            }
+        },
+    });
+
+    // Update store when data changes
+    useEffect(() => {
+        if (data?.orders) {
+            const activeOrders = (data.orders as any[]).filter(
+                (order) => order.status !== 'DELIVERED' && order.status !== 'CANCELLED'
+            );
+            console.log('[useOrders] Query data - Total orders:', data.orders.length, 'Active:', activeOrders.length);
+            setActiveOrders(activeOrders);
+        }
+    }, [data, setActiveOrders]);
 
     return {
-        orders: data?.orders || [],
+        orders: (data as any)?.orders || [],
         loading,
         error,
         refetch,

@@ -8,6 +8,14 @@ export const USERS_QUERY = gql`
       firstName
       lastName
       role
+      phoneNumber
+      address
+      adminNote
+      flagColor
+      business {
+        id
+        name
+      }
     }
   }
 `;

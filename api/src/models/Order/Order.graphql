@@ -26,6 +26,7 @@ type Order {
     totalPrice: Float!
     orderDate: Date!
     status: OrderStatus!
+    user: User
     dropOffLocation: Location!
     businesses: [OrderBusiness!]!
 }
@@ -46,6 +47,7 @@ type Mutation {
 type Subscription {
     orderStatusUpdated(orderId: ID!): Order! @skipAuth
     userOrdersUpdated(input: SubscriptionInput!): [Order!]! @skipAuth
+    allOrdersUpdated: [Order!]! @skipAuth
 }
 
 input CreateOrderInput {

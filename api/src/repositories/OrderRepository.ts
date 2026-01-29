@@ -1,6 +1,6 @@
 import { getDB } from '@/database';
 import { orders as ordersTable, orderItems as orderItemsTable } from '@/database/schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import type { DbOrder } from '@/database/schema/orders';
 import type { NewDbOrderItem } from '@/database/schema/orderItems';
 import { OrderStatus } from '@/generated/types.generated';
@@ -22,6 +22,17 @@ export class OrderRepository {
         return await db.select().from(ordersTable).where(eq(ordersTable.status, status));
     }
 
+    async findByIds(ids: string[]): Promise<DbOrder[]> {
+        if (ids.length === 0) return [];
+        const db = await getDB();
+        return await db.select().from(ordersTable).where(inArray(ordersTable.id, ids));
+    }
+
+    async findByUserId(userId: string): Promise<DbOrder[]> {
+        const db = await getDB();
+        return await db.select().from(ordersTable).where(eq(ordersTable.userId, userId));
+    }
+
     async updateStatus(id: string, status: OrderStatus): Promise<DbOrder | null> {
         const db = await getDB();
         const result = await db.update(ordersTable).set({ status }).where(eq(ordersTable.id, id)).returning();
@@ -37,6 +48,16 @@ export class OrderRepository {
             orderBy: (tbl, { asc }) => [asc(tbl.createdAt)],
         });
         console.log('rezultatet', result);
+        return result;
+    }
+
+    async findUncompleted(): Promise<DbOrder[]> {
+        const db = await getDB();
+        const result = await db.query.orders.findMany({
+            where: (tbl, { notInArray }) =>
+                notInArray(tbl.status, ['DELIVERED', 'CANCELLED'] as OrderStatus[]),
+            orderBy: (tbl, { asc }) => [asc(tbl.createdAt)],
+        });
         return result;
     }
 

@@ -2,11 +2,11 @@
 
 import { SelectHTMLAttributes } from "react";
 
-export default function Select({ children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
+export default function Select({ children, className = "", ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
       {...props}
-      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-600 transition"
+      className={`w-full px-3 py-2 bg-[#0a0a0a] border border-[#262626] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition ${className}`}
     >
       {children}
     </select>

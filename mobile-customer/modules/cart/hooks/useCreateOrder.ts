@@ -1,18 +1,31 @@
 import { useMutation } from '@apollo/client/react';
 import { router } from 'expo-router';
+import { Alert } from 'react-native';
 import { CREATE_ORDER } from '@/graphql/operations/orders';
 import { useCart } from './useCart';
 import { useCartActions } from './useCartActions';
 import { useUserLocation } from '@/hooks/useUserLocation';
+import { useActiveOrdersStore } from '@/modules/orders/store/activeOrdersStore';
 
 export function useCreateOrder() {
     const { items, total } = useCart();
     const { clearCart } = useCartActions();
     const { location } = useUserLocation();
+    const { hasActiveOrders } = useActiveOrdersStore();
 
     const [createOrderMutation, { loading, error }] = useMutation(CREATE_ORDER);
 
     const createOrder = async () => {
+        // Check if user already has an active order
+        if (hasActiveOrders) {
+            Alert.alert(
+                '⚠️ Active Order Exists',
+                'You already have an active order. Please wait for it to be delivered before placing a new order.',
+                [{ text: 'OK' }]
+            );
+            throw new Error('Active order exists');
+        }
+
         if (items.length === 0) {
             throw new Error('Cart is empty');
         }
@@ -48,10 +61,17 @@ export function useCreateOrder() {
             // Clear cart after successful order
             clearCart();
 
-            // Navigate to order confirmation or orders page
-            if (result.data?.createOrder?.id) {
-                router.push(`/orders/${result.data.createOrder.id}`);
-            }
+            // Immediately navigate to home to close cart screen
+            router.replace('/(tabs)/home');
+
+            // Show success popup after a brief delay to ensure navigation completes
+            setTimeout(() => {
+                Alert.alert(
+                    '🎉 Order Placed!',
+                    'Your order has been placed successfully. You can track it from the active order banner.',
+                    [{ text: 'OK' }]
+                );
+            }, 300);
 
             return result.data?.createOrder;
         } catch (err) {

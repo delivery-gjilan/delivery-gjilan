@@ -23,16 +23,13 @@ export function generateVerificationCode(): string {
     return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-export function decodeJwtToken(token: string): { userId: string } {
-    // Get JWT secret
+export function decodeJwtToken(token: string): { userId: string; role?: string; businessId?: string | null } {
     const secret = process.env.JWT_SECRET;
     if (!secret) {
         console.error('JWT_SECRET is not defined in environment variables');
         throw new Error('JWT_SECRET is not defined in environment variables');
     }
 
-    // Verify and decode token
-    const decoded = jwt.verify(token, secret) as { userId: string };
-
-    return { userId: decoded.userId };
+    const decoded = jwt.verify(token, secret) as { userId: string; role?: string; businessId?: string | null };
+    return { userId: decoded.userId, role: decoded.role, businessId: decoded.businessId };
 }

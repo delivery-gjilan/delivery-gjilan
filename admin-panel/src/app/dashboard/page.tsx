@@ -1,11 +1,18 @@
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
 export default function DashboardHome() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/dashboard/orders");
+  }, [router]);
+
   return (
-    <div>
-      <h1 className="text-3xl font-bold text-white">Dashboard Overview</h1>
-      <p className="text-gray-400 mt-2 text-base">
-        Welcome to the Delivery Gjilan Admin Panel.
-      </p>
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="text-neutral-400">Redirecting to Orders...</div>
     </div>
   );
 }
-

@@ -18,11 +18,11 @@ import { decodeJwtToken } from '@/lib/utils/authUtils';
 
 /**
  * Extracts and verifies JWT token from request Authorization header or WebSocket connection params
- * Returns userData with userId if token is valid, empty object otherwise
+ * Returns userData with userId and role if token is valid, empty object otherwise
  * Non-blocking: continues gracefully if token is missing or invalid
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractUserData(context: YogaInitialContext & { connectionParams?: any; req?: any }): { userId?: string } {
+async function extractUserData(context: YogaInitialContext & { connectionParams?: any; req?: any }): Promise<{ userId?: string; role?: string; businessId?: string }> {
     try {
         let authHeader: string | null | undefined = null;
 
@@ -45,12 +45,14 @@ function extractUserData(context: YogaInitialContext & { connectionParams?: any;
             return {};
         }
 
-        // Extract token (remove 'Bearer ' prefix)
         const token = authHeader.substring(7);
-
         const decoded = decodeJwtToken(token);
 
-        return { userId: decoded.userId };
+        return { 
+            userId: decoded.userId, 
+            role: decoded.role,
+            businessId: decoded.businessId || undefined
+        };
     } catch (error) {
         // Token verification failed - continue without userId
         return {};
@@ -62,7 +64,7 @@ function extractUserData(context: YogaInitialContext & { connectionParams?: any;
  */
 export async function createContext(initialContext: YogaInitialContext): Promise<GraphQLContext> {
     // Extract user data from request
-    const userData = extractUserData(initialContext);
+    const userData = await extractUserData(initialContext);
     console.log('Request', initialContext.request?.clone().body);
     console.log('UserData', userData);
 

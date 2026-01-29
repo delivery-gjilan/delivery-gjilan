@@ -7,6 +7,7 @@ export const CREATE_USER_MUTATION = gql`
     $firstName: String!
     $lastName: String!
     $role: UserRole!
+    $businessId: ID
   ) {
     createUser(
       input: {
@@ -15,6 +16,7 @@ export const CREATE_USER_MUTATION = gql`
         firstName: $firstName
         lastName: $lastName
         role: $role
+        businessId: $businessId
       }
     ) {
       token
@@ -24,8 +26,55 @@ export const CREATE_USER_MUTATION = gql`
         firstName
         lastName
         role
+        businessId
       }
       message
+    }
+  }
+`;
+
+export const UPDATE_USER_MUTATION = gql`
+  mutation UpdateUser(
+    $id: ID!
+    $firstName: String!
+    $lastName: String!
+    $role: UserRole!
+    $businessId: ID
+  ) {
+    updateUser(
+      input: {
+        id: $id
+        firstName: $firstName
+        lastName: $lastName
+        role: $role
+        businessId: $businessId
+      }
+    ) {
+      id
+      email
+      firstName
+      lastName
+      role
+      business {
+        id
+        name
+      }
+    }
+  }
+`;
+
+export const DELETE_USER_MUTATION = gql`
+  mutation DeleteUser($id: ID!) {
+    deleteUser(id: $id)
+  }
+`;
+
+export const UPDATE_USER_NOTE_MUTATION = gql`
+  mutation UpdateUserNote($userId: ID!, $note: String, $flagColor: String) {
+    updateUserNote(userId: $userId, note: $note, flagColor: $flagColor) {
+      id
+      adminNote
+      flagColor
     }
   }
 `;

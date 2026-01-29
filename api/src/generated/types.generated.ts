@@ -86,6 +86,7 @@ export type CreateProductInput = {
 };
 
 export type CreateUserInput = {
+  businessId?: InputMaybe<Scalars['ID']['input']>;
   email: Scalars['String']['input'];
   firstName: Scalars['String']['input'];
   lastName: Scalars['String']['input'];
@@ -129,6 +130,7 @@ export type Mutation = {
   deleteBusiness: Scalars['Boolean']['output'];
   deleteProduct: Scalars['Boolean']['output'];
   deleteProductCategory: Scalars['Boolean']['output'];
+  deleteUser: Scalars['Boolean']['output'];
   initiateSignup: AuthResponse;
   login: AuthResponse;
   resendEmailVerification: SignupStepResponse;
@@ -137,6 +139,8 @@ export type Mutation = {
   updateOrderStatus: Order;
   updateProduct: Product;
   updateProductCategory: ProductCategory;
+  updateUser: User;
+  updateUserNote: User;
   verifyEmail: SignupStepResponse;
   verifyPhone: SignupStepResponse;
 };
@@ -187,6 +191,11 @@ export type MutationdeleteProductCategoryArgs = {
 };
 
 
+export type MutationdeleteUserArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
 export type MutationinitiateSignupArgs = {
   input: InitiateSignupInput;
 };
@@ -226,6 +235,18 @@ export type MutationupdateProductCategoryArgs = {
 };
 
 
+export type MutationupdateUserArgs = {
+  input: UpdateUserInput;
+};
+
+
+export type MutationupdateUserNoteArgs = {
+  flagColor?: InputMaybe<Scalars['String']['input']>;
+  note?: InputMaybe<Scalars['String']['input']>;
+  userId: Scalars['ID']['input'];
+};
+
+
 export type MutationverifyEmailArgs = {
   input: VerifyEmailInput;
 };
@@ -245,6 +266,7 @@ export type Order = {
   orderPrice: Scalars['Float']['output'];
   status: OrderStatus;
   totalPrice: Scalars['Float']['output'];
+  user?: Maybe<User>;
 };
 
 export type OrderBusiness = {
@@ -376,6 +398,7 @@ export type SubmitPhoneNumberInput = {
 
 export type Subscription = {
   __typename?: 'Subscription';
+  allOrdersUpdated: Array<Order>;
   orderStatusUpdated: Order;
   userOrdersUpdated: Array<Order>;
 };
@@ -420,12 +443,24 @@ export type UpdateProductInput = {
   subcategoryId?: InputMaybe<Scalars['ID']['input']>;
 };
 
+export type UpdateUserInput = {
+  businessId?: InputMaybe<Scalars['ID']['input']>;
+  firstName: Scalars['String']['input'];
+  id: Scalars['ID']['input'];
+  lastName: Scalars['String']['input'];
+  role: UserRole;
+};
+
 export type User = {
   __typename?: 'User';
   address?: Maybe<Scalars['String']['output']>;
+  adminNote?: Maybe<Scalars['String']['output']>;
+  business?: Maybe<Business>;
+  businessId?: Maybe<Scalars['ID']['output']>;
   email: Scalars['String']['output'];
   emailVerified: Scalars['Boolean']['output'];
   firstName: Scalars['String']['output'];
+  flagColor?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
   lastName: Scalars['String']['output'];
   phoneNumber?: Maybe<Scalars['String']['output']>;
@@ -435,6 +470,7 @@ export type User = {
 };
 
 export type UserRole =
+  | 'BUSINESS_ADMIN'
   | 'CUSTOMER'
   | 'DRIVER'
   | 'SUPER_ADMIN';
@@ -549,7 +585,7 @@ export type ResolversTypes = {
   LocationInput: LocationInput;
   LoginInput: LoginInput;
   Mutation: ResolverTypeWrapper<{}>;
-  Order: ResolverTypeWrapper<Omit<Order, 'businesses' | 'status'> & { businesses: Array<ResolversTypes['OrderBusiness']>, status: ResolversTypes['OrderStatus'] }>;
+  Order: ResolverTypeWrapper<Omit<Order, 'businesses' | 'status' | 'user'> & { businesses: Array<ResolversTypes['OrderBusiness']>, status: ResolversTypes['OrderStatus'], user?: Maybe<ResolversTypes['User']> }>;
   OrderBusiness: ResolverTypeWrapper<Omit<OrderBusiness, 'business'> & { business: ResolversTypes['Business'] }>;
   OrderItem: ResolverTypeWrapper<OrderItem>;
   OrderStatus: ResolverTypeWrapper<'PENDING' | 'ACCEPTED' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED'>;
@@ -565,8 +601,9 @@ export type ResolversTypes = {
   UpdateBusinessInput: UpdateBusinessInput;
   UpdateProductCategoryInput: UpdateProductCategoryInput;
   UpdateProductInput: UpdateProductInput;
-  User: ResolverTypeWrapper<Omit<User, 'role' | 'signupStep'> & { role: ResolversTypes['UserRole'], signupStep: ResolversTypes['SignupStep'] }>;
-  UserRole: ResolverTypeWrapper<'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN'>;
+  UpdateUserInput: UpdateUserInput;
+  User: ResolverTypeWrapper<Omit<User, 'business' | 'role' | 'signupStep'> & { business?: Maybe<ResolversTypes['Business']>, role: ResolversTypes['UserRole'], signupStep: ResolversTypes['SignupStep'] }>;
+  UserRole: ResolverTypeWrapper<'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN' | 'BUSINESS_ADMIN'>;
   VerifyEmailInput: VerifyEmailInput;
   VerifyPhoneInput: VerifyPhoneInput;
   WorkingHours: ResolverTypeWrapper<WorkingHours>;
@@ -594,7 +631,7 @@ export type ResolversParentTypes = {
   LocationInput: LocationInput;
   LoginInput: LoginInput;
   Mutation: {};
-  Order: Omit<Order, 'businesses'> & { businesses: Array<ResolversParentTypes['OrderBusiness']> };
+  Order: Omit<Order, 'businesses' | 'user'> & { businesses: Array<ResolversParentTypes['OrderBusiness']>, user?: Maybe<ResolversParentTypes['User']> };
   OrderBusiness: Omit<OrderBusiness, 'business'> & { business: ResolversParentTypes['Business'] };
   OrderItem: OrderItem;
   Product: Product;
@@ -608,7 +645,8 @@ export type ResolversParentTypes = {
   UpdateBusinessInput: UpdateBusinessInput;
   UpdateProductCategoryInput: UpdateProductCategoryInput;
   UpdateProductInput: UpdateProductInput;
-  User: User;
+  UpdateUserInput: UpdateUserInput;
+  User: Omit<User, 'business'> & { business?: Maybe<ResolversParentTypes['Business']> };
   VerifyEmailInput: VerifyEmailInput;
   VerifyPhoneInput: VerifyPhoneInput;
   WorkingHours: WorkingHours;
@@ -663,6 +701,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   deleteBusiness?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteBusinessArgs, 'id'>>;
   deleteProduct?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteProductArgs, 'id'>>;
   deleteProductCategory?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteProductCategoryArgs, 'id'>>;
+  deleteUser?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteUserArgs, 'id'>>;
   initiateSignup?: Resolver<ResolversTypes['AuthResponse'], ParentType, ContextType, RequireFields<MutationinitiateSignupArgs, 'input'>>;
   login?: Resolver<ResolversTypes['AuthResponse'], ParentType, ContextType, RequireFields<MutationloginArgs, 'input'>>;
   resendEmailVerification?: Resolver<ResolversTypes['SignupStepResponse'], ParentType, ContextType>;
@@ -671,6 +710,8 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   updateOrderStatus?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationupdateOrderStatusArgs, 'id' | 'status'>>;
   updateProduct?: Resolver<ResolversTypes['Product'], ParentType, ContextType, RequireFields<MutationupdateProductArgs, 'id' | 'input'>>;
   updateProductCategory?: Resolver<ResolversTypes['ProductCategory'], ParentType, ContextType, RequireFields<MutationupdateProductCategoryArgs, 'id' | 'input'>>;
+  updateUser?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationupdateUserArgs, 'input'>>;
+  updateUserNote?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationupdateUserNoteArgs, 'userId'>>;
   verifyEmail?: Resolver<ResolversTypes['SignupStepResponse'], ParentType, ContextType, RequireFields<MutationverifyEmailArgs, 'input'>>;
   verifyPhone?: Resolver<ResolversTypes['SignupStepResponse'], ParentType, ContextType, RequireFields<MutationverifyPhoneArgs, 'input'>>;
 };
@@ -684,6 +725,7 @@ export type OrderResolvers<ContextType = GraphQLContext, ParentType extends Reso
   orderPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   status?: Resolver<ResolversTypes['OrderStatus'], ParentType, ContextType>;
   totalPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  user?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -765,15 +807,20 @@ export type SignupStepResponseResolvers<ContextType = GraphQLContext, ParentType
 };
 
 export type SubscriptionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Subscription'] = ResolversParentTypes['Subscription']> = {
+  allOrdersUpdated?: SubscriptionResolver<Array<ResolversTypes['Order']>, "allOrdersUpdated", ParentType, ContextType>;
   orderStatusUpdated?: SubscriptionResolver<ResolversTypes['Order'], "orderStatusUpdated", ParentType, ContextType, RequireFields<SubscriptionorderStatusUpdatedArgs, 'orderId'>>;
   userOrdersUpdated?: SubscriptionResolver<Array<ResolversTypes['Order']>, "userOrdersUpdated", ParentType, ContextType, RequireFields<SubscriptionuserOrdersUpdatedArgs, 'input'>>;
 };
 
 export type UserResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['User'] = ResolversParentTypes['User']> = {
   address?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  adminNote?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  business?: Resolver<Maybe<ResolversTypes['Business']>, ParentType, ContextType>;
+  businessId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   email?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   emailVerified?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   firstName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  flagColor?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   lastName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   phoneNumber?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
@@ -783,7 +830,7 @@ export type UserResolvers<ContextType = GraphQLContext, ParentType extends Resol
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
-export type UserRoleResolvers = EnumResolverSignature<{ CUSTOMER?: any, DRIVER?: any, SUPER_ADMIN?: any }, ResolversTypes['UserRole']>;
+export type UserRoleResolvers = EnumResolverSignature<{ BUSINESS_ADMIN?: any, CUSTOMER?: any, DRIVER?: any, SUPER_ADMIN?: any }, ResolversTypes['UserRole']>;
 
 export type WorkingHoursResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['WorkingHours'] = ResolversParentTypes['WorkingHours']> = {
   closesAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;

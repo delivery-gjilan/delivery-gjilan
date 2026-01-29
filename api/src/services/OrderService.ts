@@ -7,19 +7,23 @@ import {
     products as productsTable,
     businesses as businessesTable,
 } from '@/database/schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import type { Order, OrderBusiness, OrderItem, OrderStatus, CreateOrderInput } from '@/generated/types.generated';
 import type { DbOrder } from '@/database/schema/orders';
 import { PubSub, publish, subscribe, topics } from '@/lib/pubsub';
 import { GraphQLError } from 'graphql';
 
 export class OrderService {
+    public orderRepository: OrderRepository; // Made public for resolver access
+
     constructor(
-        private orderRepository: OrderRepository,
+        orderRepository: OrderRepository,
         private authRepository: AuthRepository,
         private productRepository: ProductRepository,
         private pubsub: PubSub,
-    ) {}
+    ) {
+        this.orderRepository = orderRepository;
+    }
 
     async createOrder(userId: string, input: CreateOrderInput): Promise<Order> {
         // 1. Validate User
@@ -155,6 +159,7 @@ export class OrderService {
 
         return {
             id: dbOrder.id,
+            userId: dbOrder.userId,
             orderPrice: dbOrder.price,
             deliveryPrice: dbOrder.deliveryPrice,
             totalPrice: dbOrder.price + dbOrder.deliveryPrice,
@@ -167,6 +172,11 @@ export class OrderService {
             },
             businesses: businessOrderList,
         };
+    }
+
+    // Public method for resolvers to map orders after authorization
+    async mapToOrderPublic(dbOrder: DbOrder): Promise<Order> {
+        return this.mapToOrder(dbOrder);
     }
 
     private minutesToTimeString(minutes: number): string {
@@ -207,22 +217,32 @@ export class OrderService {
         return subscribe(this.pubsub, topics.ordersByUserChanged(userId));
     }
 
+    subscribeToAllOrders(): ReturnType<typeof subscribe> {
+        return subscribe(this.pubsub, topics.allOrdersChanged());
+    }
+
     async publishUserOrders(userId: string) {
-        const userOrders = await this.orderRepository.findUncompletedOrdersByUserId(userId);
+        const userOrders = await this.orderRepository.findByUserId(userId);
         const orders: Order[] = [];
         for (const dbOrder of userOrders) {
             const order = await this.mapToOrder(dbOrder);
             orders.push(order);
         }
-        console.log(
-            'haha orders haha',
-            orders.map((o) => ({
-                id: o.id,
-                status: o.status,
-            })),
-        );
         publish(this.pubsub, topics.ordersByUserChanged(userId), {
             userId,
+            orders,
+        });
+    }
+
+    async publishAllOrders() {
+        // Fetch ALL orders (not just uncompleted) to show both active and completed
+        const allOrders = await this.orderRepository.findAll();
+        const orders: Order[] = [];
+        for (const dbOrder of allOrders) {
+            const order = await this.mapToOrder(dbOrder);
+            orders.push(order);
+        }
+        publish(this.pubsub, topics.allOrdersChanged(), {
             orders,
         });
     }
@@ -235,6 +255,47 @@ export class OrderService {
             orders.push(order);
         }
         return orders;
+    }
+
+    async getOrdersByBusinessId(businessId: string): Promise<Order[]> {
+        try {
+            // Get all orders
+            const allOrders = await this.getAllOrders();
+            
+            // Filter orders that contain at least one item from this business
+            const filteredOrders: Order[] = [];
+            
+            for (const order of allOrders) {
+                // Check if any business in the order matches the businessId
+                const hasBusinessItems = order.businesses.some(
+                    orderBusiness => orderBusiness.business.id === businessId
+                );
+                
+                if (hasBusinessItems) {
+                    filteredOrders.push(order);
+                }
+            }
+            
+            return filteredOrders;
+        } catch (error) {
+            console.error('[OrderService] Error filtering orders by businessId:', error);
+            throw error;
+        }
+    }
+
+    async orderContainsBusiness(orderId: string, businessId: string): Promise<boolean> {
+        try {
+            const order = await this.getOrderById(orderId);
+            if (!order) return false;
+            
+            // Check if any business in the order matches the businessId
+            return order.businesses.some(
+                orderBusiness => orderBusiness.business.id === businessId
+            );
+        } catch (error) {
+            console.error('[OrderService] Error checking if order contains business:', error);
+            return false;
+        }
     }
 }
 

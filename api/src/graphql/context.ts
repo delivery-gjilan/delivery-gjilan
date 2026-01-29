@@ -11,6 +11,8 @@ export interface ApiContextInterface {
     db: DbType;
     userData: {
         userId?: string;
+        role?: string;
+        businessId?: string;
     };
     businessService: BusinessService;
     productCategoryService: ProductCategoryService;

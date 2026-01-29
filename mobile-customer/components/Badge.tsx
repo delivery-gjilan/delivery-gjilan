@@ -26,7 +26,7 @@ export function Badge({ label, onRemove, variant = 'default', active = false, cl
             disabled={!onRemove && !props.onPress}
             {...props}
         >
-            <Text className={cn('text-foreground mr-1', active && 'text-white')}>{label}</Text>
+            <Text className={cn('text-{} mr-1', active && 'text-white')}>{label}</Text>
             {onRemove && (
                 <Pressable onPress={onRemove}>
                     <Ionicons name="close-circle" size={16} color={active ? 'white' : theme.colors.text} />

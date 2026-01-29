@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Image, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Platform, Image } from 'react-native';
 import { router } from 'expo-router';
 import { Product } from '@/gql/graphql';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,67 +17,114 @@ export function ProductCard({ product }: ProductCardProps) {
         router.push(`/product/${product.id}`);
     };
 
+    const effectivePrice = product.isOnSale && product.salePrice ? product.salePrice : product.price;
+    const hasDiscount = product.isOnSale && product.salePrice;
+    const discountPercent = hasDiscount
+        ? Math.round(((product.price - product.salePrice!) / product.price) * 100)
+        : 0;
+
     return (
         <TouchableOpacity
             onPress={handlePress}
-            activeOpacity={0.7}
-            className="bg-card rounded-2xl overflow-hidden border border-border"
+            activeOpacity={0.95}
+            className="mb-4 rounded-2xl overflow-hidden"
+            style={{
+                backgroundColor: theme.colors.card,
+                ...(Platform.OS === 'ios' && {
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.08,
+                    shadowRadius: 4,
+                }),
+                ...(Platform.OS === 'android' && {
+                    elevation: 2,
+                }),
+            }}
         >
-            <View className="flex-row">
-                {/* Product Image */}
-                <View className="w-32 h-32 bg-background">
+            <View className="flex-row" style={{ minHeight: 112 }}>
+                {/* Product Image - Fixed Container */}
+                <View
+                    className="relative"
+                    style={{
+                        width: 112,
+                        height: 112,
+                        flexShrink: 0, // Prevent image from shrinking
+                    }}
+                >
                     {product.imageUrl ? (
-                        <Image source={{ uri: product.imageUrl }} className="w-full h-full" resizeMode="cover" />
+                        <Image
+                            source={{ uri: product.imageUrl }}
+                            style={{ width: 112, height: 112 }}
+                            resizeMode="cover"
+                        />
                     ) : (
-                        <View className="w-full h-full items-center justify-center">
-                            <Ionicons name="image-outline" size={32} color={theme.colors.subtext} />
+                        <View
+                            className="w-full h-full items-center justify-center"
+                            style={{ backgroundColor: theme.colors.background }}
+                        >
+                            <Ionicons name="restaurant-outline" size={40} color={theme.colors.subtext} />
+                        </View>
+                    )}
+
+                    {/* Discount Badge */}
+                    {hasDiscount && (
+                        <View className="absolute top-2 left-2 bg-red-500 px-2 py-1 rounded-md">
+                            <Text className="text-white text-xs font-bold">-{discountPercent}%</Text>
+                        </View>
+                    )}
+
+                    {/* Unavailable Overlay */}
+                    {!product.isAvailable && (
+                        <View className="absolute inset-0 bg-black/60 items-center justify-center">
+                            <Text className="text-white text-xs font-semibold">Unavailable</Text>
                         </View>
                     )}
                 </View>
 
-                {/* Product Info */}
-                <View className="flex-1 p-4 justify-between">
-                    <View>
-                        <View className="flex-row items-start justify-between mb-1">
-                            <Text className="text-foreground text-lg font-semibold flex-1" numberOfLines={2}>
-                                {product.name}
-                            </Text>
-                            {!product.isAvailable && (
-                                <View className="bg-expense px-2 py-1 rounded ml-2">
-                                    <Text className="text-white text-xs font-medium">Unavailable</Text>
-                                </View>
-                            )}
-                        </View>
+                {/* Product Info - Separate Container (No Overlap) */}
+                <View className="flex-1 p-3" style={{ minWidth: 0 }}>
+                    {/* Text Content */}
+                    <View className="flex-1">
+                        <Text
+                            className="text-base font-bold mb-1"
+                            style={{ color: theme.colors.text }}
+                            numberOfLines={2}
+                            ellipsizeMode="tail"
+                        >
+                            {product.name}
+                        </Text>
 
                         {product.description && (
-                            <Text className="text-subtext text-sm" numberOfLines={2}>
+                            <Text
+                                className="text-xs leading-4"
+                                style={{ color: theme.colors.subtext }}
+                                numberOfLines={2}
+                                ellipsizeMode="tail"
+                            >
                                 {product.description}
                             </Text>
                         )}
                     </View>
 
                     {/* Price Section and Cart Controls */}
-                    <View className="flex-row items-center justify-between mt-2">
-                        <View className="flex-row items-center gap-2 flex-1">
-                            {product.isOnSale && product.salePrice ? (
-                                <View className="flex-row items-center gap-2 flex-wrap">
-                                    <Text className="text-expense text-xl font-bold">
-                                        ${product.salePrice.toFixed(2)}
-                                    </Text>
-                                    <Text className="text-subtext text-sm line-through">
-                                        ${product.price.toFixed(2)}
-                                    </Text>
-                                    <View className="bg-expense px-2 py-1 rounded">
-                                        <Text className="text-white text-xs font-semibold">SALE</Text>
-                                    </View>
-                                </View>
-                            ) : (
-                                <Text className="text-primary text-xl font-bold">${product.price.toFixed(2)}</Text>
+                    <View className="flex-row items-center justify-between" style={{ marginTop: 8, minHeight: 32 }}>
+                        <View className="flex-row items-baseline" style={{ gap: 8, flexShrink: 1 }}>
+                            <Text className="text-lg font-bold" style={{ color: theme.colors.primary }}>
+                                €{effectivePrice.toFixed(2)}
+                            </Text>
+                            {hasDiscount && (
+                                <Text className="text-xs line-through" style={{ color: theme.colors.subtext }}>
+                                    €{product.price.toFixed(2)}
+                                </Text>
                             )}
                         </View>
 
                         {/* Cart Controls */}
-                        {product.isAvailable && <CartControls product={product} />}
+                        {product.isAvailable && (
+                            <View style={{ flexShrink: 0, marginLeft: 8 }}>
+                                <CartControls product={product} />
+                            </View>
+                        )}
                     </View>
                 </View>
             </View>

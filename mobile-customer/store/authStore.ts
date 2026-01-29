@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { User } from '@/gql/graphql';
+import { deleteToken } from '@/utils/secureTokenStore';
 
 interface AuthState {
     token: string | null;
@@ -47,13 +48,15 @@ export const useAuthStore = create<AuthState>()(
                     needsSignupCompletion: user.signupStep !== 'COMPLETED',
                 }),
 
-            logout: () =>
+            logout: async () => {
+                await deleteToken();
                 set({
                     token: null,
                     user: null,
                     isAuthenticated: false,
                     needsSignupCompletion: false,
-                }),
+                });
+            },
 
             updateUser: (user) =>
                 set({

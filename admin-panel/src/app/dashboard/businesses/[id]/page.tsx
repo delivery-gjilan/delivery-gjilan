@@ -97,7 +97,7 @@ export default function BusinessDetailsPage() {
         <div className="text-white space-y-10 p-4">
             {/* HEADER */}
             <h1 className="text-3xl font-semibold">
-                Business Details — <span className="text-purple-400">{b.name}</span>
+                Business Details - <span className="text-purple-400">{b.name}</span>
             </h1>
 
             {/* PRODUCTS BLOCK */}
