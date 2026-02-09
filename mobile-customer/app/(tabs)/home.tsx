@@ -145,7 +145,8 @@ export default function Home() {
                                         isOpen={item.isOpen}
                                         onPress={handleBusinessPress}
                                         deliveryFee={metadata.deliveryFee}
-                                        deliveryTime={metadata.deliveryTime}
+                                        avgPrepTimeMinutes={(item as any).avgPrepTimeMinutes}
+                                        prepTimeOverrideMinutes={(item as any).prepTimeOverrideMinutes}
                                         rating={metadata.rating}
                                         priceRange={metadata.priceRange}
                                         description={metadata.description}

@@ -35,7 +35,8 @@ interface RestaurantCardProps {
     onPress: (id: string) => void;
     description?: string;
     deliveryFee?: number;
-    deliveryTime?: string;
+    avgPrepTimeMinutes?: number | null;
+    prepTimeOverrideMinutes?: number | null;
     rating?: number;
     priceRange?: string;
     discount?: number;
@@ -52,7 +53,8 @@ export function RestaurantCard({
     onPress,
     description,
     deliveryFee = 1.1,
-    deliveryTime = '35-45',
+    avgPrepTimeMinutes,
+    prepTimeOverrideMinutes,
     rating = 8.6,
     priceRange = '$$$$',
     discount,
@@ -88,6 +90,14 @@ export function RestaurantCard({
             }),
         ]).start();
     }, [fadeAnim, scaleAnim, slideAnim]);
+
+    const basePrepTime =
+        typeof prepTimeOverrideMinutes === 'number' && prepTimeOverrideMinutes > 0
+            ? prepTimeOverrideMinutes
+            : typeof avgPrepTimeMinutes === 'number' && avgPrepTimeMinutes > 0
+              ? avgPrepTimeMinutes
+              : null;
+    const prepTimeLabel = basePrepTime ? `${basePrepTime}-${basePrepTime + 10}` : '—';
 
     const handleFavoritePress = () => {
         // Favorite animation
@@ -199,7 +209,7 @@ export function RestaurantCard({
                     {/* Delivery Time Pill */}
                     <View className="px-3 py-1.5 rounded-lg" style={{ backgroundColor: theme.colors.background }}>
                         <Text className="text-sm font-semibold" style={{ color: theme.colors.primary }}>
-                            {deliveryTime} min
+                            {prepTimeLabel} min
                         </Text>
                     </View>
                 </View>

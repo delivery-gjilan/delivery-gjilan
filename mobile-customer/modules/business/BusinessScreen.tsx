@@ -68,6 +68,13 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
         );
     }
 
+    const avgPrepTimeMinutes = (business as any)?.avgPrepTimeMinutes ?? null;
+    const overridePrepTimeMinutes = (business as any)?.prepTimeOverrideMinutes ?? null;
+    const isBusyOverride =
+        typeof overridePrepTimeMinutes === 'number' &&
+        overridePrepTimeMinutes > 0 &&
+        (typeof avgPrepTimeMinutes !== 'number' || overridePrepTimeMinutes !== avgPrepTimeMinutes);
+
     return (
         <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }} edges={['bottom']}>
             <Animated.ScrollView
@@ -79,6 +86,16 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
 
                 {/* Content starts immediately after header */}
                 <View className="px-4 py-6">
+                    {isBusyOverride && (
+                        <View className="bg-yellow-100 border border-yellow-200 rounded-xl p-4 mb-4">
+                            <Text className="text-yellow-900 font-semibold mb-1">
+                                Restaurant is busy right now
+                            </Text>
+                            <Text className="text-yellow-900">
+                                Food is going to take about {overridePrepTimeMinutes} min.
+                            </Text>
+                        </View>
+                    )}
                     <Text className="text-2xl font-bold mb-4" style={{ color: theme.colors.text }}>
                         Menu
                     </Text>

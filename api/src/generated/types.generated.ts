@@ -29,6 +29,7 @@ export type AuthResponse = {
 
 export type Business = {
   __typename?: 'Business';
+  avgPrepTimeMinutes: Scalars['Int']['output'];
   businessType: BusinessType;
   createdAt: Scalars['Date']['output'];
   id: Scalars['ID']['output'];
@@ -37,6 +38,7 @@ export type Business = {
   isOpen: Scalars['Boolean']['output'];
   location: Location;
   name: Scalars['String']['output'];
+  prepTimeOverrideMinutes?: Maybe<Scalars['Int']['output']>;
   updatedAt: Scalars['Date']['output'];
   workingHours: WorkingHours;
 };
@@ -47,6 +49,7 @@ export type BusinessType =
   | 'RESTAURANT';
 
 export type CreateBusinessInput = {
+  avgPrepTimeMinutes?: InputMaybe<Scalars['Int']['input']>;
   businessType: BusinessType;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   location: LocationInput;
@@ -289,7 +292,8 @@ export type OrderStatus =
   | 'CANCELLED'
   | 'DELIVERED'
   | 'OUT_FOR_DELIVERY'
-  | 'PENDING';
+  | 'PENDING'
+  | 'READY';
 
 export type Product = {
   __typename?: 'Product';
@@ -418,11 +422,13 @@ export type SubscriptionInput = {
 };
 
 export type UpdateBusinessInput = {
+  avgPrepTimeMinutes?: InputMaybe<Scalars['Int']['input']>;
   businessType?: InputMaybe<BusinessType>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
   location?: InputMaybe<LocationInput>;
   name?: InputMaybe<Scalars['String']['input']>;
+  prepTimeOverrideMinutes?: InputMaybe<Scalars['Int']['input']>;
   workingHours?: InputMaybe<WorkingHoursInput>;
 };
 
@@ -568,6 +574,7 @@ export type ResolversTypes = {
   AuthResponse: ResolverTypeWrapper<Omit<AuthResponse, 'user'> & { user: ResolversTypes['User'] }>;
   String: ResolverTypeWrapper<Scalars['String']['output']>;
   Business: ResolverTypeWrapper<Omit<Business, 'businessType'> & { businessType: ResolversTypes['BusinessType'] }>;
+  Int: ResolverTypeWrapper<Scalars['Int']['output']>;
   ID: ResolverTypeWrapper<Scalars['ID']['output']>;
   Boolean: ResolverTypeWrapper<Scalars['Boolean']['output']>;
   BusinessType: ResolverTypeWrapper<'MARKET' | 'PHARMACY' | 'RESTAURANT'>;
@@ -575,7 +582,6 @@ export type ResolversTypes = {
   CreateOrderInput: CreateOrderInput;
   Float: ResolverTypeWrapper<Scalars['Float']['output']>;
   CreateOrderItemInput: CreateOrderItemInput;
-  Int: ResolverTypeWrapper<Scalars['Int']['output']>;
   CreateProductCategoryInput: CreateProductCategoryInput;
   CreateProductInput: CreateProductInput;
   CreateUserInput: CreateUserInput;
@@ -588,7 +594,7 @@ export type ResolversTypes = {
   Order: ResolverTypeWrapper<Omit<Order, 'businesses' | 'status' | 'user'> & { businesses: Array<ResolversTypes['OrderBusiness']>, status: ResolversTypes['OrderStatus'], user?: Maybe<ResolversTypes['User']> }>;
   OrderBusiness: ResolverTypeWrapper<Omit<OrderBusiness, 'business'> & { business: ResolversTypes['Business'] }>;
   OrderItem: ResolverTypeWrapper<OrderItem>;
-  OrderStatus: ResolverTypeWrapper<'PENDING' | 'ACCEPTED' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED'>;
+  OrderStatus: ResolverTypeWrapper<'PENDING' | 'ACCEPTED' | 'READY' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED'>;
   Product: ResolverTypeWrapper<Product>;
   ProductCategory: ResolverTypeWrapper<ProductCategory>;
   ProductSubcategory: ResolverTypeWrapper<ProductSubcategory>;
@@ -615,13 +621,13 @@ export type ResolversParentTypes = {
   AuthResponse: Omit<AuthResponse, 'user'> & { user: ResolversParentTypes['User'] };
   String: Scalars['String']['output'];
   Business: Business;
+  Int: Scalars['Int']['output'];
   ID: Scalars['ID']['output'];
   Boolean: Scalars['Boolean']['output'];
   CreateBusinessInput: CreateBusinessInput;
   CreateOrderInput: CreateOrderInput;
   Float: Scalars['Float']['output'];
   CreateOrderItemInput: CreateOrderItemInput;
-  Int: Scalars['Int']['output'];
   CreateProductCategoryInput: CreateProductCategoryInput;
   CreateProductInput: CreateProductInput;
   CreateUserInput: CreateUserInput;
@@ -665,6 +671,7 @@ export type AuthResponseResolvers<ContextType = GraphQLContext, ParentType exten
 };
 
 export type BusinessResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Business'] = ResolversParentTypes['Business']> = {
+  avgPrepTimeMinutes?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   businessType?: Resolver<ResolversTypes['BusinessType'], ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
@@ -673,6 +680,7 @@ export type BusinessResolvers<ContextType = GraphQLContext, ParentType extends R
   isOpen?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   location?: Resolver<ResolversTypes['Location'], ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  prepTimeOverrideMinutes?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
   workingHours?: Resolver<ResolversTypes['WorkingHours'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
@@ -744,7 +752,7 @@ export type OrderItemResolvers<ContextType = GraphQLContext, ParentType extends 
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
-export type OrderStatusResolvers = EnumResolverSignature<{ ACCEPTED?: any, CANCELLED?: any, DELIVERED?: any, OUT_FOR_DELIVERY?: any, PENDING?: any }, ResolversTypes['OrderStatus']>;
+export type OrderStatusResolvers = EnumResolverSignature<{ ACCEPTED?: any, CANCELLED?: any, DELIVERED?: any, OUT_FOR_DELIVERY?: any, PENDING?: any, READY?: any }, ResolversTypes['OrderStatus']>;
 
 export type ProductResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Product'] = ResolversParentTypes['Product']> = {
   businessId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;

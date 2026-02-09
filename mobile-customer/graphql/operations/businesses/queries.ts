@@ -8,6 +8,8 @@ export const GET_BUSINESSES = graphql(`
             imageUrl
             businessType
             isActive
+            avgPrepTimeMinutes
+            prepTimeOverrideMinutes
             location {
                 latitude
                 longitude
@@ -32,6 +34,8 @@ export const GET_BUSINESS = graphql(`
             imageUrl
             businessType
             isActive
+            avgPrepTimeMinutes
+            prepTimeOverrideMinutes
             location {
                 latitude
                 longitude

@@ -26,6 +26,8 @@ export const OrdersFloatingBar = () => {
                 return { text: 'PENDING', color: '#F59E0B' }; // Amber
             case 'ACCEPTED':
                 return { text: 'ACCEPTED', color: '#3B82F6' }; // Blue
+            case 'READY':
+                return { text: 'READY', color: '#2563EB' }; // Blue
             case 'OUT_FOR_DELIVERY':
                 return { text: 'OUT FOR DELIVERY', color: '#8B5CF6' }; // Purple
             default:

@@ -15,6 +15,8 @@ const OrderStatusBadge = ({ status }: { status: string }) => {
                 return theme.colors.notification;
             case 'ACCEPTED':
                 return theme.colors.income;
+            case 'READY':
+                return theme.colors.income;
             case 'OUT_FOR_DELIVERY':
                 return theme.colors.income;
             default:

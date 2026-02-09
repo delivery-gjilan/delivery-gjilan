@@ -1,6 +1,7 @@
 enum OrderStatus {
     PENDING
     ACCEPTED
+    READY
     OUT_FOR_DELIVERY
     DELIVERED
     CANCELLED

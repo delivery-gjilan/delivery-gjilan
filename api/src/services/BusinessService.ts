@@ -29,6 +29,8 @@ export class BusinessService {
                 opensAt: this.minutesToTimeString(business.opensAt),
                 closesAt: this.minutesToTimeString(business.closesAt),
             },
+            avgPrepTimeMinutes: business.avgPrepTimeMinutes,
+            prepTimeOverrideMinutes: business.prepTimeOverrideMinutes ?? null,
             isActive: business.isActive ?? true,
             createdAt: new Date(business.createdAt),
             updatedAt: new Date(business.updatedAt),
@@ -51,6 +53,7 @@ export class BusinessService {
             locationAddress: validatedInput.location.address,
             opensAt: open,
             closesAt: close,
+            avgPrepTimeMinutes: validatedInput.avgPrepTimeMinutes ?? 20,
             isActive: true,
         });
 

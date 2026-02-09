@@ -14,7 +14,7 @@ import { Package, Store, Search, ArrowRight, Clock, CheckCircle2, Eye, EyeOff, M
    TYPES
 --------------------------------------------------------- */
 
-type OrderStatus = "PENDING" | "ACCEPTED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED";
+type OrderStatus = "PENDING" | "ACCEPTED" | "READY" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED";
 
 interface OrderItem {
     productId: string;
@@ -59,6 +59,7 @@ interface Order {
 const STATUS_COLORS: Record<OrderStatus, { bg: string; text: string; border: string }> = {
     PENDING: { bg: "bg-amber-500/10", text: "text-amber-400", border: "border-amber-500/30" },
     ACCEPTED: { bg: "bg-cyan-500/10", text: "text-cyan-400", border: "border-cyan-500/30" },
+    READY: { bg: "bg-blue-500/10", text: "text-blue-400", border: "border-blue-500/30" },
     OUT_FOR_DELIVERY: { bg: "bg-purple-500/10", text: "text-purple-400", border: "border-purple-500/30" },
     DELIVERED: { bg: "bg-green-500/10", text: "text-green-400", border: "border-green-500/30" },
     CANCELLED: { bg: "bg-red-500/10", text: "text-red-400", border: "border-red-500/30" },
@@ -66,7 +67,8 @@ const STATUS_COLORS: Record<OrderStatus, { bg: string; text: string; border: str
 
 const STATUS_FLOW: Record<OrderStatus, OrderStatus | null> = {
     PENDING: "ACCEPTED",
-    ACCEPTED: "OUT_FOR_DELIVERY",
+    ACCEPTED: "READY",
+    READY: "OUT_FOR_DELIVERY",
     OUT_FOR_DELIVERY: "DELIVERED",
     DELIVERED: null,
     CANCELLED: null,
@@ -75,6 +77,7 @@ const STATUS_FLOW: Record<OrderStatus, OrderStatus | null> = {
 const STATUS_LABELS: Record<OrderStatus, string> = {
     PENDING: "Pending",
     ACCEPTED: "Accepted",
+    READY: "Ready",
     OUT_FOR_DELIVERY: "Out for Delivery",
     DELIVERED: "Delivered",
     CANCELLED: "Cancelled",
@@ -94,6 +97,7 @@ export default function OrdersPage() {
     const [searchOrderId, setSearchOrderId] = useState<string>("");
     const [searchUserName, setSearchUserName] = useState<string>("");
     const [showCompleted, setShowCompleted] = useState(false);
+    const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
 
     const isSuperAdmin = admin?.role === "SUPER_ADMIN";
     const isBusinessAdmin = admin?.role === "BUSINESS_ADMIN";
@@ -138,14 +142,33 @@ export default function OrdersPage() {
     }, [filteredOrders]);
 
     const handleNextStatus = async (order: Order) => {
-        const nextStatus = STATUS_FLOW[order.status];
+        const nextStatus = isBusinessAdmin
+            ? order.status === "PENDING"
+                ? "ACCEPTED"
+                : order.status === "ACCEPTED"
+                  ? "READY"
+                  : null
+            : STATUS_FLOW[order.status];
+
         if (!nextStatus) return;
-        
-        await updateStatus(order.id, nextStatus);
+
+        setUpdatingOrderId(order.id);
+        const result = await updateStatus(order.id, nextStatus);
+        setUpdatingOrderId(null);
+
+        if (!result.success) {
+            alert(result.error || "Failed to update order status.");
+        }
     };
 
     const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
-        await updateStatus(orderId, newStatus);
+        setUpdatingOrderId(orderId);
+        const result = await updateStatus(orderId, newStatus);
+        setUpdatingOrderId(null);
+
+        if (!result.success) {
+            alert(result.error || "Failed to update order status.");
+        }
     };
 
     const openDetails = (order: Order) => {
@@ -218,7 +241,12 @@ export default function OrdersPage() {
                             </div>
                         ) : (
                             activeOrders.map((order) => {
-                                const nextStatus = STATUS_FLOW[order.status];
+                                const nextStatus =
+                                    order.status === "PENDING"
+                                        ? "ACCEPTED"
+                                        : order.status === "ACCEPTED"
+                                          ? "READY"
+                                          : null;
                                 return (
                                     <div key={order.id} className="bg-[#161616] border border-[#262626] rounded-lg p-4 hover:border-[#404040] transition-colors">
                                         {/* Order Header */}
@@ -278,7 +306,7 @@ export default function OrdersPage() {
                                                     <Button
                                                         size="sm"
                                                         onClick={() => handleNextStatus(order)}
-                                                        disabled={updateLoading}
+                                                        disabled={updateLoading && updatingOrderId === order.id}
                                                     >
                                                         {STATUS_LABELS[nextStatus]}
                                                     </Button>
@@ -367,7 +395,7 @@ export default function OrdersPage() {
                                                     <Button
                                                         size="sm"
                                                         onClick={() => handleNextStatus(order)}
-                                                        disabled={updateLoading}
+                                                        disabled={updateLoading && updatingOrderId === order.id}
                                                         className="whitespace-nowrap"
                                                     >
                                                         {STATUS_LABELS[nextStatus]}
@@ -377,11 +405,12 @@ export default function OrdersPage() {
                                                 <Select
                                                     value={order.status}
                                                     onChange={(e) => handleStatusChange(order.id, e.target.value as OrderStatus)}
-                                                    disabled={updateLoading}
+                                                    disabled={updateLoading && updatingOrderId === order.id}
                                                     className={`text-xs font-medium ${STATUS_COLORS[order.status].bg} ${STATUS_COLORS[order.status].text} ${STATUS_COLORS[order.status].border} border`}
                                                 >
                                                     <option value="PENDING">Pending</option>
                                                     <option value="ACCEPTED">Accepted</option>
+                                                    <option value="READY">Ready</option>
                                                     <option value="OUT_FOR_DELIVERY">Out for Delivery</option>
                                                     <option value="DELIVERED">Delivered</option>
                                                     <option value="CANCELLED">Cancelled</option>

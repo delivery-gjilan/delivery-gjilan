@@ -12,6 +12,8 @@ type Business {
     isActive: Boolean!
     location: Location!
     workingHours: WorkingHours!
+    avgPrepTimeMinutes: Int!
+    prepTimeOverrideMinutes: Int
     isOpen: Boolean!
     createdAt: Date!
     updatedAt: Date!
@@ -28,6 +30,7 @@ input CreateBusinessInput {
     businessType: BusinessType!
     location: LocationInput!
     workingHours: WorkingHoursInput!
+    avgPrepTimeMinutes: Int
 }
 
 input UpdateBusinessInput {
@@ -37,6 +40,8 @@ input UpdateBusinessInput {
     location: LocationInput
     workingHours: WorkingHoursInput
     isActive: Boolean
+    avgPrepTimeMinutes: Int
+    prepTimeOverrideMinutes: Int
 }
 
 type Mutation {

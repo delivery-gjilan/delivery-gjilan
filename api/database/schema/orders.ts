@@ -4,7 +4,7 @@ import { orderItems } from './orderItems';
 import { OrderStatus } from '@/generated/types.generated';
 import { users } from './users';
 
-const orderStatusValues = ['PENDING', 'ACCEPTED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'] as const;
+const orderStatusValues = ['PENDING', 'ACCEPTED', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'] as const;
 [...orderStatusValues] satisfies OrderStatus[];
 export const orderStatus = pgEnum('order_status', orderStatusValues);
 

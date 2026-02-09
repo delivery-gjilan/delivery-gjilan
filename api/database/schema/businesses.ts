@@ -20,6 +20,8 @@ export const businesses = pgTable('businesses', {
     // open and close tell the time in minutes from midnight: Ex: 60 means 01:00
     opensAt: integer('opens_at').notNull(),
     closesAt: integer('closes_at').notNull(),
+    avgPrepTimeMinutes: integer('avg_prep_time_minutes').notNull().default(20),
+    prepTimeOverrideMinutes: integer('prep_time_override_minutes'),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull(),

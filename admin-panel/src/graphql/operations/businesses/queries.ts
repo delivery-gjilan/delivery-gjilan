@@ -8,6 +8,8 @@ export const GET_BUSINESS = gql`
             imageUrl
             businessType
             isActive
+            avgPrepTimeMinutes
+            prepTimeOverrideMinutes
             location {
                 latitude
                 longitude
@@ -30,6 +32,8 @@ export const GET_BUSINESSES = gql`
             imageUrl
             businessType
             isActive
+            avgPrepTimeMinutes
+            prepTimeOverrideMinutes
             location {
                 latitude
                 longitude

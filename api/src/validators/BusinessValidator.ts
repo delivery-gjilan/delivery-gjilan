@@ -16,6 +16,7 @@ const createBusinessSchema = z.object({
         address: z.string(),
     }),
     workingHours: workingHoursSchema,
+    avgPrepTimeMinutes: z.number().int().min(1).max(240).optional(),
 });
 
 const updateBusinessSchema = z.object({
@@ -31,6 +32,8 @@ const updateBusinessSchema = z.object({
         .optional(),
     workingHours: workingHoursSchema.optional(),
     isActive: z.boolean().optional(),
+    avgPrepTimeMinutes: z.number().int().min(1).max(240).optional(),
+    prepTimeOverrideMinutes: z.number().int().min(1).max(240).optional().nullable(),
 });
 
 export class BusinessValidator {

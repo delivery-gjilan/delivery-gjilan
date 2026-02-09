@@ -8,6 +8,8 @@ export const CREATE_BUSINESS = gql`
             businessType
             imageUrl
             isActive
+            avgPrepTimeMinutes
+            prepTimeOverrideMinutes
             
         }
     }
@@ -20,7 +22,9 @@ export const UPDATE_BUSINESS = gql`
             name
             businessType
             imageUrl
-            isActive   
+            isActive
+            avgPrepTimeMinutes
+            prepTimeOverrideMinutes
         }
     }
 `;
