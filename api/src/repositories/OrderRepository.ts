@@ -39,6 +39,16 @@ export class OrderRepository {
         return result[0] || null;
     }
 
+    async updateStatusAndDriver(id: string, status: OrderStatus, driverId: string): Promise<DbOrder | null> {
+        const db = await getDB();
+        const result = await db
+            .update(ordersTable)
+            .set({ status, driverId })
+            .where(eq(ordersTable.id, id))
+            .returning();
+        return result[0] || null;
+    }
+
     async findUncompletedOrdersByUserId(userId: string): Promise<DbOrder[]> {
         console.log('ID e userit', userId);
         const db = await getDB();

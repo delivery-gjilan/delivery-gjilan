@@ -28,6 +28,12 @@ export const DRIVERS_QUERY = gql`
       firstName
       lastName
       role
+      driverLocation {
+        latitude
+        longitude
+        address
+      }
+      driverLocationUpdatedAt
     }
   }
 `;

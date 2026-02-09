@@ -28,6 +28,7 @@ type Order {
     orderDate: Date!
     status: OrderStatus!
     user: User
+    driver: User
     dropOffLocation: Location!
     businesses: [OrderBusiness!]!
 }

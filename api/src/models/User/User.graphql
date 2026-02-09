@@ -28,6 +28,8 @@ type User {
     business: Business
     adminNote: String
     flagColor: String
+    driverLocation: Location
+    driverLocationUpdatedAt: Date
 }
 
 type SignupStepResponse {
@@ -100,4 +102,5 @@ type Mutation {
     updateUser(input: UpdateUserInput!): User!
     deleteUser(id: ID!): Boolean!
     updateUserNote(userId: ID!, note: String, flagColor: String): User!
+    updateDriverLocation(latitude: Float!, longitude: Float!): User!
 }

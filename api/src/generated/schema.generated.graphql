@@ -118,6 +118,7 @@ type Mutation {
   resendEmailVerification: SignupStepResponse!
   submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
   updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
+  updateDriverLocation(latitude: Float!, longitude: Float!): User!
   updateOrderStatus(id: ID!, status: OrderStatus!): Order!
   updateProduct(id: ID!, input: UpdateProductInput!): Product!
   updateProductCategory(id: ID!, input: UpdateProductCategoryInput!): ProductCategory!
@@ -130,6 +131,7 @@ type Mutation {
 type Order {
   businesses: [OrderBusiness!]!
   deliveryPrice: Float!
+  driver: User
   dropOffLocation: Location!
   id: ID!
   orderDate: Date!
@@ -278,6 +280,8 @@ type User {
   adminNote: String
   business: Business
   businessId: ID
+  driverLocation: Location
+  driverLocationUpdatedAt: Date
   email: String!
   emailVerified: Boolean!
   firstName: String!

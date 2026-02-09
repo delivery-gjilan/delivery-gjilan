@@ -150,11 +150,27 @@ export class AuthRepository {
             businessId?: string | null;
             adminNote?: string | null;
             flagColor?: string | null;
+            driverLat?: number | null;
+            driverLng?: number | null;
+            driverLocationUpdatedAt?: string | null;
         }
     ): Promise<DbUser | undefined> {
         const [user] = await this.db
             .update(users)
             .set(data)
+            .where(eq(users.id, userId))
+            .returning();
+        return user;
+    }
+
+    async updateDriverLocation(userId: string, latitude: number, longitude: number): Promise<DbUser | undefined> {
+        const [user] = await this.db
+            .update(users)
+            .set({
+                driverLat: latitude,
+                driverLng: longitude,
+                driverLocationUpdatedAt: new Date().toISOString(),
+            })
             .where(eq(users.id, userId))
             .returning();
         return user;

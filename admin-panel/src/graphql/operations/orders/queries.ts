@@ -14,6 +14,7 @@ export const GET_ORDERS = gql`
                 firstName
                 lastName
                 email
+                address
             }
             dropOffLocation {
                 latitude

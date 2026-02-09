@@ -5,6 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Order } from '@/gql/graphql';
 import { Image } from 'expo-image';
+import { gql } from '@apollo/client';
+import { useQuery } from '@apollo/client/react';
 import { useEffect, useRef, useState } from 'react';
 import { useCartActions } from '@/modules/cart';
 
@@ -21,6 +23,29 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const [isEditingAddress, setIsEditingAddress] = useState(false);
     const [addressDraft, setAddressDraft] = useState('');
     const [addressOverride, setAddressOverride] = useState<string | null>(null);
+
+    const { data: driverData, refetch: refetchDriver } = useQuery(
+        gql`
+            query GetOrderDriver($id: ID!) {
+                order(id: $id) {
+                    id
+                    status
+                    driver {
+                        id
+                        firstName
+                        lastName
+                        phoneNumber
+                    }
+                }
+            }
+        `,
+        {
+            variables: { id: order?.id ?? '' },
+            skip: !order?.id,
+            fetchPolicy: 'cache-and-network',
+            notifyOnNetworkStatusChange: true,
+        },
+    );
 
     // Detect when order status changes to DELIVERED
     useEffect(() => {
@@ -51,6 +76,13 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
             setAddressDraft(order.dropOffLocation.address);
         }
     }, [order?.dropOffLocation?.address]);
+
+    useEffect(() => {
+        if (!order?.id) return;
+        if (order.status === 'OUT_FOR_DELIVERY' || order.status === 'DELIVERED') {
+            refetchDriver();
+        }
+    }, [order?.id, order?.status, refetchDriver]);
 
     if (loading) {
         return (
@@ -91,7 +123,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
 
     const statusLabel = formatStatus(order.status);
     const displayAddress = addressOverride ?? order.dropOffLocation.address;
-    const driver = (order as any)?.driver ?? (order as any)?.assignedDriver ?? (order as any)?.courier ?? null;
+    const driver = (driverData as any)?.order?.driver ?? (order as any)?.driver ?? (order as any)?.assignedDriver ?? (order as any)?.courier ?? null;
     const driverName = driver?.firstName ? `${driver.firstName} ${driver?.lastName || ''}`.trim() : null;
     const driverPhone = driver?.phone || driver?.phoneNumber || driver?.mobile || null;
     const driverVehicle = driver?.vehicle || driver?.vehicleType || null;

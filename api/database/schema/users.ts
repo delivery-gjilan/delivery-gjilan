@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, boolean, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, boolean, pgEnum, doublePrecision } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 
 import { SignupStep, UserRole } from '@/generated/types.generated';
@@ -31,6 +31,9 @@ export const users = pgTable('users', {
     phoneVerificationCode: text('phone_verification_code'),
     adminNote: text('admin_note'),
     flagColor: text('flag_color').default('yellow'),
+    driverLat: doublePrecision('driver_lat'),
+    driverLng: doublePrecision('driver_lng'),
+    driverLocationUpdatedAt: timestamp('driver_location_updated_at', { withTimezone: true, mode: 'string' }),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull(),

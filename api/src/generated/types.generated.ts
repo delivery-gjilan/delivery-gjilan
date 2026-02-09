@@ -139,6 +139,7 @@ export type Mutation = {
   resendEmailVerification: SignupStepResponse;
   submitPhoneNumber: SignupStepResponse;
   updateBusiness: Business;
+  updateDriverLocation: User;
   updateOrderStatus: Order;
   updateProduct: Product;
   updateProductCategory: ProductCategory;
@@ -220,6 +221,12 @@ export type MutationupdateBusinessArgs = {
 };
 
 
+export type MutationupdateDriverLocationArgs = {
+  latitude: Scalars['Float']['input'];
+  longitude: Scalars['Float']['input'];
+};
+
+
 export type MutationupdateOrderStatusArgs = {
   id: Scalars['ID']['input'];
   status: OrderStatus;
@@ -263,6 +270,7 @@ export type Order = {
   __typename?: 'Order';
   businesses: Array<OrderBusiness>;
   deliveryPrice: Scalars['Float']['output'];
+  driver?: Maybe<User>;
   dropOffLocation: Location;
   id: Scalars['ID']['output'];
   orderDate: Scalars['Date']['output'];
@@ -463,6 +471,8 @@ export type User = {
   adminNote?: Maybe<Scalars['String']['output']>;
   business?: Maybe<Business>;
   businessId?: Maybe<Scalars['ID']['output']>;
+  driverLocation?: Maybe<Location>;
+  driverLocationUpdatedAt?: Maybe<Scalars['Date']['output']>;
   email: Scalars['String']['output'];
   emailVerified: Scalars['Boolean']['output'];
   firstName: Scalars['String']['output'];
@@ -591,7 +601,7 @@ export type ResolversTypes = {
   LocationInput: LocationInput;
   LoginInput: LoginInput;
   Mutation: ResolverTypeWrapper<{}>;
-  Order: ResolverTypeWrapper<Omit<Order, 'businesses' | 'status' | 'user'> & { businesses: Array<ResolversTypes['OrderBusiness']>, status: ResolversTypes['OrderStatus'], user?: Maybe<ResolversTypes['User']> }>;
+  Order: ResolverTypeWrapper<Omit<Order, 'businesses' | 'driver' | 'status' | 'user'> & { businesses: Array<ResolversTypes['OrderBusiness']>, driver?: Maybe<ResolversTypes['User']>, status: ResolversTypes['OrderStatus'], user?: Maybe<ResolversTypes['User']> }>;
   OrderBusiness: ResolverTypeWrapper<Omit<OrderBusiness, 'business'> & { business: ResolversTypes['Business'] }>;
   OrderItem: ResolverTypeWrapper<OrderItem>;
   OrderStatus: ResolverTypeWrapper<'PENDING' | 'ACCEPTED' | 'READY' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED'>;
@@ -637,7 +647,7 @@ export type ResolversParentTypes = {
   LocationInput: LocationInput;
   LoginInput: LoginInput;
   Mutation: {};
-  Order: Omit<Order, 'businesses' | 'user'> & { businesses: Array<ResolversParentTypes['OrderBusiness']>, user?: Maybe<ResolversParentTypes['User']> };
+  Order: Omit<Order, 'businesses' | 'driver' | 'user'> & { businesses: Array<ResolversParentTypes['OrderBusiness']>, driver?: Maybe<ResolversParentTypes['User']>, user?: Maybe<ResolversParentTypes['User']> };
   OrderBusiness: Omit<OrderBusiness, 'business'> & { business: ResolversParentTypes['Business'] };
   OrderItem: OrderItem;
   Product: Product;
@@ -715,6 +725,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   resendEmailVerification?: Resolver<ResolversTypes['SignupStepResponse'], ParentType, ContextType>;
   submitPhoneNumber?: Resolver<ResolversTypes['SignupStepResponse'], ParentType, ContextType, RequireFields<MutationsubmitPhoneNumberArgs, 'input'>>;
   updateBusiness?: Resolver<ResolversTypes['Business'], ParentType, ContextType, RequireFields<MutationupdateBusinessArgs, 'id' | 'input'>>;
+  updateDriverLocation?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationupdateDriverLocationArgs, 'latitude' | 'longitude'>>;
   updateOrderStatus?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationupdateOrderStatusArgs, 'id' | 'status'>>;
   updateProduct?: Resolver<ResolversTypes['Product'], ParentType, ContextType, RequireFields<MutationupdateProductArgs, 'id' | 'input'>>;
   updateProductCategory?: Resolver<ResolversTypes['ProductCategory'], ParentType, ContextType, RequireFields<MutationupdateProductCategoryArgs, 'id' | 'input'>>;
@@ -727,6 +738,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
 export type OrderResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Order'] = ResolversParentTypes['Order']> = {
   businesses?: Resolver<Array<ResolversTypes['OrderBusiness']>, ParentType, ContextType>;
   deliveryPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  driver?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
   dropOffLocation?: Resolver<ResolversTypes['Location'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   orderDate?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
@@ -825,6 +837,8 @@ export type UserResolvers<ContextType = GraphQLContext, ParentType extends Resol
   adminNote?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   business?: Resolver<Maybe<ResolversTypes['Business']>, ParentType, ContextType>;
   businessId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
+  driverLocation?: Resolver<Maybe<ResolversTypes['Location']>, ParentType, ContextType>;
+  driverLocationUpdatedAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   email?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   emailVerified?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   firstName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;

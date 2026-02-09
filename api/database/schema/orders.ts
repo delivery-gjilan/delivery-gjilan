@@ -13,6 +13,7 @@ export const orders = pgTable('orders', {
     userId: uuid('user_id')
         .notNull()
         .references(() => users.id, { onDelete: 'cascade' }),
+    driverId: uuid('driver_id').references(() => users.id, { onDelete: 'set null' }),
     price: numeric('price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
     deliveryPrice: numeric('delivery_price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
     status: orderStatus('status').notNull(),
@@ -33,6 +34,10 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
     orderItems: many(orderItems),
     user: one(users, {
         fields: [orders.userId],
+        references: [users.id],
+    }),
+    driver: one(users, {
+        fields: [orders.driverId],
         references: [users.id],
     }),
 }));

@@ -157,6 +157,8 @@ export class OrderService {
             }
         }
 
+        const driverUser = dbOrder.driverId ? await this.authRepository.findById(dbOrder.driverId) : null;
+
         return {
             id: dbOrder.id,
             userId: dbOrder.userId,
@@ -165,6 +167,24 @@ export class OrderService {
             totalPrice: dbOrder.price + dbOrder.deliveryPrice,
             orderDate: new Date(dbOrder.orderDate || new Date()),
             status: dbOrder.status as OrderStatus,
+            driver: driverUser
+                ? {
+                      id: driverUser.id,
+                      email: driverUser.email,
+                      firstName: driverUser.firstName,
+                      lastName: driverUser.lastName,
+                      address: driverUser.address || undefined,
+                      phoneNumber: driverUser.phoneNumber || undefined,
+                      emailVerified: driverUser.emailVerified,
+                      phoneVerified: driverUser.phoneVerified,
+                      signupStep: driverUser.signupStep,
+                      role: driverUser.role,
+                      businessId: driverUser.businessId || undefined,
+                      business: undefined,
+                      adminNote: driverUser.adminNote || undefined,
+                      flagColor: driverUser.flagColor || undefined,
+                  }
+                : undefined,
             dropOffLocation: {
                 latitude: dbOrder.dropoffLat,
                 longitude: dbOrder.dropoffLng,
@@ -203,6 +223,14 @@ export class OrderService {
 
     async updateOrderStatus(id: string, status: OrderStatus): Promise<Order> {
         const updated = await this.orderRepository.updateStatus(id, status);
+        if (!updated) {
+            throw new Error('Order not found');
+        }
+        return this.mapToOrder(updated);
+    }
+
+    async updateOrderStatusWithDriver(id: string, status: OrderStatus, driverId: string): Promise<Order> {
+        const updated = await this.orderRepository.updateStatusAndDriver(id, status, driverId);
         if (!updated) {
             throw new Error('Order not found');
         }

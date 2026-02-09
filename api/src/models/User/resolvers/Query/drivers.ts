@@ -13,5 +13,8 @@ export const drivers: NonNullable<QueryResolvers['drivers']> = async (_parent, _
         phoneVerified: user.phoneVerified,
         signupStep: user.signupStep,
         role: user.role,
+        driverLat: user.driverLat || null,
+        driverLng: user.driverLng || null,
+        driverLocationUpdatedAt: user.driverLocationUpdatedAt || null,
     }));
 };
