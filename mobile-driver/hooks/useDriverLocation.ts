@@ -6,7 +6,7 @@ import { UPDATE_DRIVER_LOCATION } from '@/graphql/operations/driverLocation';
 import { useAuthStore } from '@/store/authStore';
 
 const SIMULATE_DRIVER_LOCATION = true;
-const SIM_STEP_MS = 20000;
+const SIM_STEP_MS = 5000;
 const SIM_RADIUS_METERS = 120;
 
 export function useDriverLocation() {
@@ -69,8 +69,8 @@ export function useDriverLocation() {
             subscriptionRef.current = await Location.watchPositionAsync(
                 {
                     accuracy: Location.Accuracy.Balanced,
-                    timeInterval: 20000,
-                    distanceInterval: 50,
+                    timeInterval: 5000,
+                    distanceInterval: 15,
                 },
                 (location) => {
                     if (!isActive) return;

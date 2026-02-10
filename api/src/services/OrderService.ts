@@ -230,9 +230,9 @@ export class OrderService {
     }
 
     async updateOrderStatusWithDriver(id: string, status: OrderStatus, driverId: string): Promise<Order> {
-        const updated = await this.orderRepository.updateStatusAndDriver(id, status, driverId);
+        const updated = await this.orderRepository.updateStatusAndDriver(id, status, driverId, 'READY');
         if (!updated) {
-            throw new Error('Order not found');
+            throw new Error('Order already assigned or not ready');
         }
         return this.mapToOrder(updated);
     }

@@ -39,6 +39,45 @@ export const GET_ORDERS = gql`
     }
 `;
 
+export const GET_ORDER = gql`
+    query GetOrder($id: ID!) {
+        order(id: $id) {
+            id
+            orderDate
+            status
+            orderPrice
+            deliveryPrice
+            totalPrice
+            dropOffLocation {
+                latitude
+                longitude
+                address
+            }
+            businesses {
+                business {
+                    id
+                    name
+                    location {
+                        latitude
+                        longitude
+                        address
+                    }
+                }
+                items {
+                    name
+                    quantity
+                }
+            }
+            user {
+                id
+                firstName
+                lastName
+                phoneNumber
+            }
+        }
+    }
+`;
+
 export const UPDATE_ORDER_STATUS = gql`
     mutation UpdateOrderStatus($id: ID!, $status: OrderStatus!) {
         updateOrderStatus(id: $id, status: $status) {

@@ -1,6 +1,6 @@
 import { getDB } from '@/database';
 import { orders as ordersTable, orderItems as orderItemsTable } from '@/database/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type { DbOrder } from '@/database/schema/orders';
 import type { NewDbOrderItem } from '@/database/schema/orderItems';
 import { OrderStatus } from '@/generated/types.generated';
@@ -39,13 +39,18 @@ export class OrderRepository {
         return result[0] || null;
     }
 
-    async updateStatusAndDriver(id: string, status: OrderStatus, driverId: string): Promise<DbOrder | null> {
+    async updateStatusAndDriver(
+        id: string,
+        status: OrderStatus,
+        driverId: string,
+        expectedStatus?: OrderStatus,
+    ): Promise<DbOrder | null> {
         const db = await getDB();
-        const result = await db
-            .update(ordersTable)
-            .set({ status, driverId })
-            .where(eq(ordersTable.id, id))
-            .returning();
+        const whereClause = expectedStatus
+            ? and(eq(ordersTable.id, id), eq(ordersTable.status, expectedStatus), isNull(ordersTable.driverId))
+            : and(eq(ordersTable.id, id), isNull(ordersTable.driverId));
+
+        const result = await db.update(ordersTable).set({ status, driverId }).where(whereClause).returning();
         return result[0] || null;
     }
 

@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { View, Text, ScrollView, Modal, Pressable, Switch } from 'react-native';
+import { View, Text, ScrollView, Modal, Pressable, Switch, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
@@ -8,10 +8,13 @@ import { ALL_ORDERS_UPDATED, GET_ORDERS, UPDATE_ORDER_STATUS } from '@/graphql/o
 import { Button } from '@/components/Button';
 import { calculateRouteDistance } from '@/utils/mapbox';
 import { useAuthStore } from '@/store/authStore';
+import { useRouter } from 'expo-router';
+import * as Location from 'expo-location';
 
 export default function Home() {
     const theme = useTheme();
     const { t } = useTranslations();
+    const router = useRouter();
 
     const isOnline = useAuthStore((state) => state.isOnline);
     const setOnline = useAuthStore((state) => state.setOnline);
@@ -49,9 +52,70 @@ export default function Home() {
     const activeOrders = useMemo(() => {
         const orders = (data as any)?.orders || [];
         return orders.filter((order: any) =>
-            order.status === 'READY' || order.status === 'OUT_FOR_DELIVERY'
+            order.status !== 'DELIVERED' && order.status !== 'CANCELLED'
         );
     }, [data]);
+
+    const getPickupLocation = (order: any) => {
+        const business = order?.businesses?.[0]?.business;
+        if (!business?.location) return null;
+        return {
+            latitude: Number(business.location.latitude),
+            longitude: Number(business.location.longitude),
+        };
+    };
+
+    const getDropoffLocation = (order: any) => {
+        const drop = order?.dropOffLocation;
+        if (!drop) return null;
+        return {
+            latitude: Number(drop.latitude),
+            longitude: Number(drop.longitude),
+        };
+    };
+
+    const openNavigation = async (order: any) => {
+        const pickup = getPickupLocation(order);
+        const dropoff = getDropoffLocation(order);
+        if (!dropoff) return;
+
+        const permission = await Location.requestForegroundPermissionsAsync();
+        if (permission.status !== 'granted') return;
+
+        const current = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+        });
+
+        const origin = `${current.coords.latitude},${current.coords.longitude}`;
+        const destination = `${dropoff.latitude},${dropoff.longitude}`;
+        const waypoint = pickup ? `${pickup.latitude},${pickup.longitude}` : null;
+
+        const base = 'https://www.google.com/maps/dir/?api=1';
+        const googleUrl = waypoint
+            ? `${base}&origin=${origin}&destination=${destination}&waypoints=${waypoint}&travelmode=driving&dir_action=navigate`
+            : `${base}&origin=${origin}&destination=${destination}&travelmode=driving&dir_action=navigate`;
+
+        const googleScheme = waypoint
+            ? `comgooglemaps://?saddr=${origin}&daddr=${destination}&waypoints=${waypoint}&directionsmode=driving`
+            : `comgooglemaps://?saddr=${origin}&daddr=${destination}&directionsmode=driving`;
+
+        if (Platform.OS === 'ios') {
+            const canOpenGoogle = await Linking.canOpenURL('comgooglemaps://');
+            if (canOpenGoogle) {
+                await Linking.openURL(googleScheme);
+                return;
+            }
+
+            const appleUrl = waypoint
+                ? `maps://?saddr=${origin}&daddr=${waypoint}+to:${destination}&dirflg=d`
+                : `maps://?saddr=${origin}&daddr=${destination}&dirflg=d`;
+            await Linking.openURL(appleUrl);
+            return;
+        }
+
+        const canOpenGoogle = await Linking.canOpenURL(googleScheme);
+        await Linking.openURL(canOpenGoogle ? googleScheme : googleUrl);
+    };
 
     // Calculate distances for all active orders
     useEffect(() => {
@@ -100,6 +164,13 @@ export default function Home() {
         try {
             await updateStatus({ variables: { id, status } });
             await refetch();
+            if (status === 'OUT_FOR_DELIVERY') {
+                const order = activeOrders.find((o: any) => o.id === id);
+                if (order) {
+                    await openNavigation(order);
+                }
+                router.push({ pathname: '/order-map', params: { orderId: id } });
+            }
         } catch (err) {
             console.error(err);
         } finally {
@@ -253,6 +324,12 @@ export default function Home() {
                                                 loading={updating && updatingId === order.id}
                                             />
                                         )}
+                                        <Button
+                                            title="View Map"
+                                            size="sm"
+                                            variant="outline"
+                                            onPress={() => router.push({ pathname: '/order-map', params: { orderId: order.id } })}
+                                        />
                                     </View>
                                 </View>
                             );

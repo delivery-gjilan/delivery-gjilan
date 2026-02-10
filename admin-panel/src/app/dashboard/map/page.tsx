@@ -9,7 +9,7 @@ import { GET_DELIVERY_ZONES } from "@/graphql/operations/deliveryZones/queries";
 import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
 import { GET_ORDERS } from "@/graphql/operations/orders/queries";
 import { ALL_ORDERS_SUBSCRIPTION } from "@/graphql/operations/orders/subscriptions";
-import { ASSIGN_DRIVER_TO_ORDER } from "@/graphql/operations/orders";
+import { ASSIGN_DRIVER_TO_ORDER, UPDATE_ORDER_STATUS } from "@/graphql/operations/orders";
 import { calculateRouteDistance } from "@/lib/utils/mapbox";
 
 const DEFAULT_CENTER = {
@@ -92,10 +92,14 @@ export default function MapPage() {
   const [now, setNow] = useState(Date.now());
   const [driverTracks, setDriverTracks] = useState<Record<string, any>>({});
   const [assignDriver] = useMutation(ASSIGN_DRIVER_TO_ORDER);
+  const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS);
   const [assigningDriverOrderId, setAssigningDriverOrderId] = useState<string | null>(null);
+  const [updatingStatusOrderId, setUpdatingStatusOrderId] = useState<string | null>(null);
   const [orderDistances, setOrderDistances] = useState<Record<string, { distanceKm: number; durationMin: number }>>({});
   const [orderRouteDistances, setOrderRouteDistances] = useState<Record<string, number | null>>({});
   const orderDistanceInFlight = useRef<Set<string>>(new Set());
+  const [freshOrderIds, setFreshOrderIds] = useState<string[]>([]);
+  const prevOrderIdsRef = useRef<Set<string>>(new Set());
 
   const businesses = useMemo(() => {
     if (USE_CUSTOM_BUSINESSES) return CUSTOM_BUSINESSES;
@@ -132,6 +136,25 @@ export default function MapPage() {
       ),
     [orders]
   );
+
+  useEffect(() => {
+    const currentIds = new Set(activeOrders.map((order: any) => order.id));
+    const prevIds = prevOrderIdsRef.current;
+    const newIds = activeOrders
+      .filter((order: any) => !prevIds.has(order.id))
+      .map((order: any) => order.id);
+
+    if (newIds.length) {
+      setFreshOrderIds((prev) => Array.from(new Set([...prev, ...newIds])));
+      newIds.forEach((id) => {
+        setTimeout(() => {
+          setFreshOrderIds((prev) => prev.filter((orderId) => orderId !== id));
+        }, 6000);
+      });
+    }
+
+    prevOrderIdsRef.current = currentIds;
+  }, [activeOrders]);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 120);
@@ -318,6 +341,24 @@ export default function MapPage() {
       alert(error.message || "Failed to assign driver");
     } finally {
       setAssigningDriverOrderId(null);
+    }
+  };
+
+  const handleUpdateStatus = async (orderId: string, status: string, event: React.ChangeEvent<HTMLSelectElement>) => {
+    event.stopPropagation();
+    setUpdatingStatusOrderId(orderId);
+    try {
+      await updateOrderStatus({
+        variables: {
+          id: orderId,
+          status,
+        },
+        refetchQueries: ['GetOrders'],
+      });
+    } catch (error: any) {
+      alert(error.message || "Failed to update status");
+    } finally {
+      setUpdatingStatusOrderId(null);
     }
   };
 
@@ -573,94 +614,84 @@ export default function MapPage() {
           .pulse-strong-ring {
             animation: strongPulse 0.95s ease-in-out infinite;
           }
+          @keyframes listFlash {
+            0%, 100% { background-color: rgba(251, 191, 36, 0.05); }
+            50% { background-color: rgba(251, 191, 36, 0.18); }
+          }
+          .order-flash {
+            animation: listFlash 1.6s ease-in-out infinite;
+            border-color: rgba(251, 191, 36, 0.35);
+          }
         `}</style>
 
         {selectedBusiness && null}
 
-        <div className="absolute right-4 top-4 bottom-4 w-80 bg-[#0a0a0a] border border-[#262626] rounded-lg p-4 overflow-y-auto">
-          <div className="mb-6">
-            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-              <MapPin size={18} />
-              Drivers
-            </h3>
-
-            {drivers.length === 0 && (
-              <div className="text-neutral-500 text-sm">No drivers online.</div>
-            )}
-
-            <div className="space-y-3">
-              {drivers.map((driver: any) => (
-                <button
-                  key={`driver-${driver.id}`}
-                  onClick={() => {
-                    setSelectedDriverId(driver.id);
-                    focusDriver(driver);
-                  }}
-                  className={`w-full text-left bg-[#161616] border border-[#262626] rounded-lg p-3 hover:bg-[#1c1c1c] transition ${
-                    selectedDriverId === driver.id ? "border-emerald-500/60" : ""
-                  }`}
-                >
-                  <div className="font-medium text-white">
-                    {driver.firstName} {driver.lastName}
-                  </div>
-                  <div className="text-xs text-neutral-400 mt-1">
-                    {driver.driverLocationUpdatedAt
-                      ? "Live location"
-                      : "No location yet"}
-                  </div>
-                </button>
-              ))}
-            </div>
+        <div className="absolute right-0 top-0 bottom-0 w-[360px] bg-[#0a0a0a]/95 border-l border-[#262626] p-4 overflow-y-auto">
+          <div className="mb-4">
+            <h3 className="text-white font-semibold text-sm tracking-wide uppercase">Orders</h3>
           </div>
-
-          <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-            <MapPin size={18} />
-            Orders
-          </h3>
 
           {activeOrders.length === 0 && (
             <div className="text-neutral-500 text-sm">No active orders.</div>
           )}
 
-          <div className="space-y-3">
+          <div className="space-y-2">
             {activeOrders.map((order: any) => {
               const businessNames = order.businesses
                 .map((b: any) => b.business.name)
                 .join(", ");
-              const distance = orderDistances[order.id];
-              const distanceLabel = distance
-                ? `${distance.distanceKm.toFixed(1)} km`
+              const routeDistance = orderRouteDistances[order.id];
+              const fallbackDistance = orderDistances[order.id]?.distanceKm;
+              const distanceValue = Number.isFinite(routeDistance)
+                ? routeDistance
+                : Number.isFinite(fallbackDistance)
+                ? fallbackDistance
+                : null;
+              const distanceLabel = distanceValue !== null
+                ? `${distanceValue.toFixed(1)} km`
                 : "Calculating...";
+              const isPending = order.status === "PENDING";
               return (
                 <div
                   key={order.id}
-                  className="bg-[#161616] border border-[#262626] rounded-lg p-3 hover:bg-[#1c1c1c] transition"
+                  className={`bg-[#111111] border border-[#1f1f1f] rounded-md p-2.5 hover:bg-[#161616] transition ${
+                    isPending ? "order-flash" : ""
+                  }`}
                 >
                   <button
                     onClick={() => focusOrder(order)}
-                    className="w-full text-left mb-2"
+                    className="w-full text-left"
                   >
-                    <div className="font-medium text-white">{businessNames}</div>
-                    <div className="text-xs text-neutral-400 mt-1 line-clamp-2">
+                    <div className="text-sm font-semibold text-white truncate">{businessNames}</div>
+                    <div className="text-[11px] text-neutral-400 mt-1 line-clamp-2">
                       {order.dropOffLocation?.address || "No dropoff address"}
                     </div>
-                    <div className="text-[10px] text-neutral-500 mt-2">
-                      Status: {order.status}
-                    </div>
-                    <div className="text-[10px] text-cyan-400 mt-1 font-medium">
-                      📍 {distanceLabel}
+                    <div className="text-[10px] text-neutral-500 mt-1">
+                      {order.status} · 📍 {distanceLabel}
                     </div>
                   </button>
-                  <div className="mt-2 pt-2 border-t border-[#262626]">
-                    <label className="text-[10px] text-neutral-400 block mb-1">Assign Driver</label>
+                  <div className="mt-2 flex items-center gap-2">
+                    <select
+                      value={order.status}
+                      onChange={(e) => handleUpdateStatus(order.id, e.target.value, e)}
+                      disabled={updatingStatusOrderId === order.id}
+                      className="flex-1 text-[11px] bg-[#0a0a0a] border border-[#262626] rounded px-2 py-1 text-white"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <option value="PENDING">Pending</option>
+                      <option value="READY">Ready</option>
+                      <option value="OUT_FOR_DELIVERY">Out for delivery</option>
+                      <option value="DELIVERED">Delivered</option>
+                      <option value="CANCELLED">Cancelled</option>
+                    </select>
                     <select
                       value={order.driver?.id || ""}
                       onChange={(e) => handleAssignDriver(order.id, e.target.value || null, e as any)}
                       disabled={assigningDriverOrderId === order.id}
-                      className="w-full text-xs bg-[#0a0a0a] border border-[#262626] rounded px-2 py-1 text-white"
+                      className="flex-1 text-[11px] bg-[#0a0a0a] border border-[#262626] rounded px-2 py-1 text-white"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <option value="">Unassigned</option>
+                      <option value="">Driver</option>
                       {drivers.map((driver: any) => (
                         <option key={driver.id} value={driver.id}>
                           {driver.firstName} {driver.lastName}
@@ -671,6 +702,36 @@ export default function MapPage() {
                 </div>
               );
             })}
+          </div>
+
+          <div className="mt-6">
+            <h3 className="text-white font-semibold text-sm tracking-wide uppercase">Drivers</h3>
+
+            {drivers.length === 0 && (
+              <div className="text-neutral-500 text-xs mt-2">No drivers online.</div>
+            )}
+
+            <div className="space-y-2 mt-2">
+              {drivers.map((driver: any) => (
+                <button
+                  key={`driver-${driver.id}`}
+                  onClick={() => {
+                    setSelectedDriverId(driver.id);
+                    focusDriver(driver);
+                  }}
+                  className={`w-full text-left bg-[#111111] border border-[#1f1f1f] rounded-md px-2 py-2 hover:bg-[#161616] transition ${
+                    selectedDriverId === driver.id ? "border-emerald-500/60" : ""
+                  }`}
+                >
+                  <div className="text-sm font-semibold text-white">
+                    {driver.firstName} {driver.lastName}
+                  </div>
+                  <div className="text-[10px] text-neutral-500 mt-0.5">
+                    {driver.driverLocationUpdatedAt ? "Live location" : "No location yet"}
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
