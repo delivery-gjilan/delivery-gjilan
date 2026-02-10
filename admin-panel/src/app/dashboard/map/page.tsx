@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@apollo/client/react";
+import { useQuery, useSubscription, useMutation } from "@apollo/client/react";
 import Map, { Marker } from "react-map-gl/mapbox";
 import { MapPin } from "lucide-react";
 import { GET_BUSINESSES } from "@/graphql/operations/businesses/queries";
 import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
 import { GET_ORDERS } from "@/graphql/operations/orders/queries";
+import { ALL_ORDERS_SUBSCRIPTION } from "@/graphql/operations/orders/subscriptions";
+import { ASSIGN_DRIVER_TO_ORDER } from "@/graphql/operations/orders";
+import { calculateRouteDistance } from "@/lib/utils/mapbox";
 
 const DEFAULT_CENTER = {
   latitude: 42.4635,
@@ -21,7 +24,7 @@ const GJILAN_BOUNDS: [[number, number], [number, number]] = [
 const MIN_ZOOM = 11.5;
 const MAX_ZOOM = 17;
 
-const USE_CUSTOM_BUSINESSES = true;
+const USE_CUSTOM_BUSINESSES = false;
 
 const ORIENTATION_POI_CLASSES = [
   "hospital",
@@ -70,13 +73,27 @@ export default function MapPage() {
   const { data: driversData } = useQuery<any>(DRIVERS_QUERY, {
     pollInterval: 5000,
   });
+  
+  // Real-time order updates via WebSocket subscription
+  const { data: subscriptionData } = useSubscription<any>(ALL_ORDERS_SUBSCRIPTION);
   const { data: ordersData } = useQuery<any>(GET_ORDERS, {
-    pollInterval: 20000,
+    fetchPolicy: 'cache-and-network',
   });
+  
+  // Use subscription data if available, otherwise fall back to query data
+  const orders = useMemo(
+    () => subscriptionData?.allOrdersUpdated ?? ordersData?.orders ?? [],
+    [subscriptionData, ordersData]
+  );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const mapRef = useRef<any>(null);
   const [now, setNow] = useState(Date.now());
   const [driverTracks, setDriverTracks] = useState<Record<string, any>>({});
+  const [assignDriver] = useMutation(ASSIGN_DRIVER_TO_ORDER);
+  const [assigningDriverOrderId, setAssigningDriverOrderId] = useState<string | null>(null);
+  const [orderDistances, setOrderDistances] = useState<Record<string, { distanceKm: number; durationMin: number }>>({});
+  const [orderRouteDistances, setOrderRouteDistances] = useState<Record<string, number | null>>({});
+  const orderDistanceInFlight = useRef<Set<string>>(new Set());
 
   const businesses = useMemo(() => {
     if (USE_CUSTOM_BUSINESSES) return CUSTOM_BUSINESSES;
@@ -104,7 +121,7 @@ export default function MapPage() {
 
   const selectedBusiness = businesses.find((b: any) => b.id === selectedId) ?? null;
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
-  const orders = useMemo(() => ordersData?.orders ?? [], [ordersData]);
+  
   const activeOrders = useMemo(
     () =>
       orders.filter(
@@ -144,6 +161,49 @@ export default function MapPage() {
       return next;
     });
   }, [drivers, now]);
+
+  // Calculate distances for all active orders
+  useEffect(() => {
+    const calculateDistances = async () => {
+      for (const order of activeOrders) {
+        if (orderDistances[order.id]) continue; // Already calculated
+        
+        // Get first business location (pickup)
+        const firstBusiness = order.businesses?.[0]?.business;
+        if (!firstBusiness?.location) {
+          console.log('No business location for order:', order.id);
+          continue;
+        }
+        
+        const pickup = {
+          longitude: firstBusiness.location.longitude,
+          latitude: firstBusiness.location.latitude,
+        };
+        
+        const dropoff = {
+          longitude: order.dropOffLocation.longitude,
+          latitude: order.dropOffLocation.latitude,
+        };
+        
+        console.log('Calculating distance for order:', order.id, 'from:', pickup, 'to:', dropoff);
+        
+        try {
+          const distance = await calculateRouteDistance(pickup, dropoff);
+          console.log('Distance result:', distance);
+          if (distance) {
+            setOrderDistances((prev) => ({
+              ...prev,
+              [order.id]: distance,
+            }));
+          }
+        } catch (error) {
+          console.error('Error calculating distance for order:', order.id, error);
+        }
+      }
+    };
+    
+    calculateDistances();
+  }, [activeOrders.map((o: any) => o.id).join(',')]);
 
   const getInterpolatedPosition = (track: any, timestamp: number) => {
     const { from, to, start, end } = track;
@@ -190,6 +250,72 @@ export default function MapPage() {
       zoom: 14,
       essential: true,
     });
+  };
+
+  const getOrderPickupLocation = (order: any) => {
+    const businessWithLocation = order?.businesses
+      ?.map((b: any) => b.business)
+      ?.find((b: any) => b?.location?.latitude && b?.location?.longitude);
+    return businessWithLocation?.location || null;
+  };
+
+  const fetchRouteDistanceKm = async (from: any, to: any) => {
+    if (!MAPBOX_TOKEN) return null;
+    const fromLat = Number(from?.latitude);
+    const fromLng = Number(from?.longitude);
+    const toLat = Number(to?.latitude);
+    const toLng = Number(to?.longitude);
+    if (!isValidLatLng(fromLat, fromLng) || !isValidLatLng(toLat, toLng)) return null;
+
+    const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=false&geometries=geojson&access_token=${MAPBOX_TOKEN}`;
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const data = await response.json();
+    const meters = data?.routes?.[0]?.distance;
+    if (!Number.isFinite(meters)) return null;
+    return Math.round((meters / 1000) * 10) / 10;
+  };
+
+  useEffect(() => {
+    if (!MAPBOX_TOKEN) return;
+    activeOrders.forEach((order: any) => {
+      if (orderRouteDistances[order.id] !== undefined) return;
+      if (orderDistanceInFlight.current.has(order.id)) return;
+
+      const pickup = getOrderPickupLocation(order);
+      const drop = order?.dropOffLocation;
+      if (!pickup || !drop) return;
+
+      orderDistanceInFlight.current.add(order.id);
+      fetchRouteDistanceKm(pickup, drop)
+        .then((distance) => {
+          setOrderRouteDistances((prev) => ({
+            ...prev,
+            [order.id]: distance,
+          }));
+        })
+        .finally(() => {
+          orderDistanceInFlight.current.delete(order.id);
+        });
+    });
+  }, [activeOrders, orderRouteDistances]);
+
+  const handleAssignDriver = async (orderId: string, driverId: string | null, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setAssigningDriverOrderId(orderId);
+    try {
+      await assignDriver({
+        variables: {
+          id: orderId,
+          driverId: driverId || null,
+        },
+        refetchQueries: ['GetOrders'],
+      });
+    } catch (error: any) {
+      alert(error.message || "Failed to assign driver");
+    } finally {
+      setAssigningDriverOrderId(null);
+    }
   };
 
   const tuneLandmarkLabels = () => {
@@ -309,8 +435,11 @@ export default function MapPage() {
                   <div className="bg-red-600 text-white text-[11px] px-2 py-1 rounded-lg shadow opacity-0 group-hover:opacity-100 transition max-w-[220px] text-center">
                     {itemsText}
                   </div>
-                  <div className="w-4 h-4 rounded-full bg-red-600 border-2 border-white shadow" />
-                  <div className="w-0 h-0 border-l-4 border-r-4 border-t-6 border-l-transparent border-r-transparent border-t-red-600 -mt-1" />
+                  <MapPin
+                    size={22}
+                    className="text-red-600 drop-shadow"
+                    strokeWidth={2.2}
+                  />
                 </div>
               </Marker>
             );
@@ -369,20 +498,48 @@ export default function MapPage() {
               const businessNames = order.businesses
                 .map((b: any) => b.business.name)
                 .join(", ");
+              const distance = orderDistances[order.id];
+              const distanceLabel = distance
+                ? `${distance.distanceKm.toFixed(1)} km`
+                : "Calculating...";
               return (
-                <button
+                <div
                   key={order.id}
-                  onClick={() => focusOrder(order)}
-                  className="w-full text-left bg-[#161616] border border-[#262626] rounded-lg p-3 hover:bg-[#1c1c1c] transition"
+                  className="bg-[#161616] border border-[#262626] rounded-lg p-3 hover:bg-[#1c1c1c] transition"
                 >
-                  <div className="font-medium text-white">{businessNames}</div>
-                  <div className="text-xs text-neutral-400 mt-1 line-clamp-2">
-                    {order.dropOffLocation?.address || "No dropoff address"}
+                  <button
+                    onClick={() => focusOrder(order)}
+                    className="w-full text-left mb-2"
+                  >
+                    <div className="font-medium text-white">{businessNames}</div>
+                    <div className="text-xs text-neutral-400 mt-1 line-clamp-2">
+                      {order.dropOffLocation?.address || "No dropoff address"}
+                    </div>
+                    <div className="text-[10px] text-neutral-500 mt-2">
+                      Status: {order.status}
+                    </div>
+                    <div className="text-[10px] text-cyan-400 mt-1 font-medium">
+                      📍 {distanceLabel}
+                    </div>
+                  </button>
+                  <div className="mt-2 pt-2 border-t border-[#262626]">
+                    <label className="text-[10px] text-neutral-400 block mb-1">Assign Driver</label>
+                    <select
+                      value={order.driver?.id || ""}
+                      onChange={(e) => handleAssignDriver(order.id, e.target.value || null, e as any)}
+                      disabled={assigningDriverOrderId === order.id}
+                      className="w-full text-xs bg-[#0a0a0a] border border-[#262626] rounded px-2 py-1 text-white"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <option value="">Unassigned</option>
+                      {drivers.map((driver: any) => (
+                        <option key={driver.id} value={driver.id}>
+                          {driver.firstName} {driver.lastName}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <div className="text-[10px] text-neutral-500 mt-2">
-                    Status: {order.status}
-                  </div>
-                </button>
+                </div>
               );
             })}
           </div>

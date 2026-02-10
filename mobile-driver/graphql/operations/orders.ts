@@ -18,6 +18,11 @@ export const GET_ORDERS = gql`
                 business {
                     id
                     name
+                    location {
+                        latitude
+                        longitude
+                        address
+                    }
                 }
                 items {
                     name
@@ -61,6 +66,11 @@ export const ALL_ORDERS_UPDATED = gql`
                 business {
                     id
                     name
+                    location {
+                        latitude
+                        longitude
+                        address
+                    }
                 }
                 items {
                     name

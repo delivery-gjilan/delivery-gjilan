@@ -124,6 +124,7 @@ export type LoginInput = {
 
 export type Mutation = {
   __typename?: 'Mutation';
+  assignDriverToOrder: Order;
   cancelOrder: Order;
   createBusiness: Business;
   createOrder: Order;
@@ -147,6 +148,12 @@ export type Mutation = {
   updateUserNote: User;
   verifyEmail: SignupStepResponse;
   verifyPhone: SignupStepResponse;
+};
+
+
+export type MutationassignDriverToOrderArgs = {
+  driverId?: InputMaybe<Scalars['ID']['input']>;
+  id: Scalars['ID']['input'];
 };
 
 
@@ -710,6 +717,7 @@ export type LocationResolvers<ContextType = GraphQLContext, ParentType extends R
 };
 
 export type MutationResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Mutation'] = ResolversParentTypes['Mutation']> = {
+  assignDriverToOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationassignDriverToOrderArgs, 'id'>>;
   cancelOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationcancelOrderArgs, 'id'>>;
   createBusiness?: Resolver<ResolversTypes['Business'], ParentType, ContextType, RequireFields<MutationcreateBusinessArgs, 'input'>>;
   createOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationcreateOrderArgs, 'input'>>;

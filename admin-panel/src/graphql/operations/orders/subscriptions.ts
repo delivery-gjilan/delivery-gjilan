@@ -19,6 +19,11 @@ export const ORDERS_SUBSCRIPTION = gql`
                     id
                     name
                     businessType
+                    location {
+                        latitude
+                        longitude
+                        address
+                    }
                 }
                 items {
                     productId
@@ -42,6 +47,13 @@ export const ALL_ORDERS_SUBSCRIPTION = gql`
             orderDate
             status
             user {
+                id
+                firstName
+                lastName
+                email
+                address
+            }
+            driver {
                 id
                 firstName
                 lastName

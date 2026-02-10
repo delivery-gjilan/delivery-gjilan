@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import { Table, Th, Td } from "@/components/ui/Table";
@@ -8,7 +9,9 @@ import Select from "@/components/ui/Select";
 import Input from "@/components/ui/Input";
 import { useOrders, useUpdateOrderStatus } from "@/lib/hooks/useOrders";
 import { useAuth } from "@/lib/auth-context";
-import { Package, Store, Search, ArrowRight, Clock, CheckCircle2, Eye, EyeOff, MapPin } from "lucide-react";
+import { ASSIGN_DRIVER_TO_ORDER } from "@/graphql/operations/orders";
+import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
+import { Package, Store, Search, ArrowRight, Clock, CheckCircle2, Eye, EyeOff, MapPin, User } from "lucide-react";
 
 /* ---------------------------------------------------------
    TYPES
@@ -54,6 +57,12 @@ interface Order {
         lastName: string;
         email: string;
     };
+    driver?: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+    } | null;
 }
 
 const STATUS_COLORS: Record<OrderStatus, { bg: string; text: string; border: string }> = {
@@ -91,6 +100,8 @@ export default function OrdersPage() {
     const { orders, loading } = useOrders();
     const { update: updateStatus, loading: updateLoading } = useUpdateOrderStatus();
     const { admin } = useAuth();
+    const { data: driversData } = useQuery(DRIVERS_QUERY, { pollInterval: 10000 });
+    const [assignDriver] = useMutation(ASSIGN_DRIVER_TO_ORDER);
 
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
@@ -98,6 +109,9 @@ export default function OrdersPage() {
     const [searchUserName, setSearchUserName] = useState<string>("");
     const [showCompleted, setShowCompleted] = useState(false);
     const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+    const [assigningDriverOrderId, setAssigningDriverOrderId] = useState<string | null>(null);
+
+    const drivers = useMemo(() => driversData?.drivers ?? [], [driversData]);
 
     const isSuperAdmin = admin?.role === "SUPER_ADMIN";
     const isBusinessAdmin = admin?.role === "BUSINESS_ADMIN";
@@ -174,6 +188,23 @@ export default function OrdersPage() {
     const openDetails = (order: Order) => {
         setSelectedOrder(order);
         setDetailsOpen(true);
+    };
+
+    const handleAssignDriver = async (orderId: string, driverId: string | null) => {
+        setAssigningDriverOrderId(orderId);
+        try {
+            await assignDriver({
+                variables: {
+                    id: orderId,
+                    driverId: driverId || null,
+                },
+                refetchQueries: ['GetOrders'],
+            });
+        } catch (error: any) {
+            alert(error.message || "Failed to assign driver");
+        } finally {
+            setAssigningDriverOrderId(null);
+        }
     };
 
     if (loading) {
@@ -334,6 +365,7 @@ export default function OrdersPage() {
                                 <Th>Timestamp</Th>
                                 <Th>Customer</Th>
                                 <Th>Business</Th>
+                                <Th>Driver</Th>
                                 <Th>Status</Th>
                                 <Th>Total</Th>
                                 <Th>Actions</Th>
@@ -342,7 +374,7 @@ export default function OrdersPage() {
                         <tbody>
                             {activeOrders.length === 0 ? (
                                 <tr>
-                                    <Td colSpan={7}>
+                                    <Td colSpan={8}>
                                         <div className="text-center text-neutral-500 py-8">
                                             {searchOrderId || searchUserName ? "No active orders found matching your search" : "No active orders"}
                                         </div>
@@ -388,6 +420,21 @@ export default function OrdersPage() {
                                             <div className="text-sm text-white">
                                                 {businessNames}
                                             </div>
+                                        </Td>
+                                        <Td>
+                                            <Select
+                                                value={order.driver?.id || ""}
+                                                onChange={(e) => handleAssignDriver(order.id, e.target.value || null)}
+                                                disabled={assigningDriverOrderId === order.id}
+                                                className="text-xs"
+                                            >
+                                                <option value="">Unassigned</option>
+                                                {drivers.map((driver: any) => (
+                                                    <option key={driver.id} value={driver.id}>
+                                                        {driver.firstName} {driver.lastName}
+                                                    </option>
+                                                ))}
+                                            </Select>
                                         </Td>
                                         <Td>
                                             <div className="flex items-center gap-2">
@@ -454,6 +501,7 @@ export default function OrdersPage() {
                             <Th>Timestamp</Th>
                             <Th>Customer</Th>
                             <Th>Business</Th>
+                            <Th>Driver</Th>
                             <Th>Status</Th>
                             <Th>Total</Th>
                             <Th>Actions</Th>
@@ -462,7 +510,7 @@ export default function OrdersPage() {
                     <tbody>
                         {completedOrders.length === 0 ? (
                             <tr>
-                                <Td colSpan={7}>
+                                <Td colSpan={8}>
                                     <div className="text-center text-neutral-500 py-8">
                                         {searchOrderId || searchUserName ? "No completed orders found matching your search" : "No completed orders"}
                                     </div>
@@ -507,6 +555,17 @@ export default function OrdersPage() {
                                         <div className="text-sm text-white">
                                             {businessNames}
                                         </div>
+                                    </Td>
+                                    <Td>
+                                        {order.driver ? (
+                                            <div className="text-sm">
+                                                <div className="text-white font-medium">
+                                                    {order.driver.firstName} {order.driver.lastName}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <span className="text-neutral-500 text-sm">Unassigned</span>
+                                        )}
                                     </Td>
                                     <Td>
                                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[order.status].bg} ${STATUS_COLORS[order.status].text} ${STATUS_COLORS[order.status].border} border inline-block`}>
@@ -564,6 +623,23 @@ export default function OrdersPage() {
                                 </div>
                             </div>
                         )}
+
+                        {/* Driver Info */}
+                        <div className="bg-[#0a0a0a] border border-[#262626] rounded-lg p-4">
+                            <div className="text-xs text-neutral-400 mb-2">Assigned Driver</div>
+                            {selectedOrder.driver ? (
+                                <>
+                                    <div className="text-white font-medium">
+                                        {selectedOrder.driver.firstName} {selectedOrder.driver.lastName}
+                                    </div>
+                                    <div className="text-sm text-neutral-400 mt-1">
+                                        {selectedOrder.driver.email}
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="text-neutral-500">No driver assigned</div>
+                            )}
+                        </div>
 
                         {/* Businesses & Products */}
                         <div className="space-y-4">

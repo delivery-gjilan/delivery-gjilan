@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { View, Text, ScrollView, Modal, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
@@ -7,6 +7,7 @@ import { useMutation, useQuery, useSubscription } from '@apollo/client/react';
 import { ALL_ORDERS_UPDATED, GET_ORDERS, UPDATE_ORDER_STATUS } from '@/graphql/operations/orders';
 import { Button } from '@/components/Button';
 import { useDriverLocation } from '@/hooks/useDriverLocation';
+import { calculateRouteDistance } from '@/utils/mapbox';
 
 export default function Home() {
     const theme = useTheme();
@@ -15,6 +16,7 @@ export default function Home() {
     useDriverLocation();
     const [newOrder, setNewOrder] = useState<any | null>(null);
     const seenOrderIds = useRef<Set<string>>(new Set());
+    const [orderDistances, setOrderDistances] = useState<Record<string, { distanceKm: number; durationMin: number }>>({});
 
     const { data, loading, error, refetch } = useQuery(GET_ORDERS, {
         fetchPolicy: 'network-only',
@@ -49,6 +51,48 @@ export default function Home() {
             order.status === 'READY' || order.status === 'OUT_FOR_DELIVERY'
         );
     }, [data]);
+
+    // Calculate distances for all active orders
+    useEffect(() => {
+        const calculateDistances = async () => {
+            for (const order of activeOrders) {
+                if (orderDistances[order.id]) continue; // Already calculated
+                
+                // Get first business location (pickup)
+                const firstBusiness = order.businesses?.[0]?.business;
+                if (!firstBusiness?.location) continue;
+                
+                console.log('Calculating distance for order:', order.id);
+                console.log('Pickup location:', firstBusiness.location);
+                console.log('Drop-off location:', order.dropOffLocation);
+                
+                const pickup = {
+                    longitude: firstBusiness.location.longitude,
+                    latitude: firstBusiness.location.latitude,
+                };
+                
+                const dropoff = {
+                    longitude: order.dropOffLocation.longitude,
+                    latitude: order.dropOffLocation.latitude,
+                };
+                
+                try {
+                    const distance = await calculateRouteDistance(pickup, dropoff);
+                    console.log('Distance result:', distance);
+                    if (distance) {
+                        setOrderDistances((prev) => ({
+                            ...prev,
+                            [order.id]: distance,
+                        }));
+                    }
+                } catch (error) {
+                    console.error('Error calculating distance:', error);
+                }
+            }
+        };
+
+        calculateDistances();
+    }, [activeOrders.map((o: any) => o.id).join(',')]);
 
     const handleUpdate = async (id: string, status: string) => {
         setUpdatingId(id);
@@ -90,10 +134,14 @@ export default function Home() {
                                 Distance
                             </Text>
                             <Text className="text-2xl font-bold" style={{ color: theme.colors.text }}>
-                                3.2 km
+                                {newOrder && orderDistances[newOrder.id]
+                                    ? `${orderDistances[newOrder.id].distanceKm.toFixed(1)} km`
+                                    : 'Calculating...'}
                             </Text>
                             <Text className="text-xs mt-1" style={{ color: theme.colors.subtext }}>
-                                Estimated 8 min
+                                {newOrder && orderDistances[newOrder.id]
+                                    ? `Estimated ${Math.round(orderDistances[newOrder.id].durationMin)} min`
+                                    : 'Please wait...'}
                             </Text>
                         </View>
 
@@ -169,6 +217,11 @@ export default function Home() {
                                     <Text className="text-xs mt-1" style={{ color: theme.colors.subtext }}>
                                         {totalItems} item{totalItems !== 1 ? 's' : ''} · Status: {order.status}
                                     </Text>
+                                    {orderDistances[order.id] && (
+                                        <Text className="text-xs mt-1 font-semibold" style={{ color: theme.colors.income }}>
+                                            📍 {orderDistances[order.id].distanceKm.toFixed(1)} km · ~{Math.round(orderDistances[order.id].durationMin)} min
+                                        </Text>
+                                    )}
 
                                     <View className="flex-row gap-2 mt-3">
                                         {order.status === 'READY' && (

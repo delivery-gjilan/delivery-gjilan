@@ -237,6 +237,14 @@ export class OrderService {
         return this.mapToOrder(updated);
     }
 
+    async assignDriverToOrder(id: string, driverId: string | null): Promise<Order> {
+        const updated = await this.orderRepository.assignDriver(id, driverId);
+        if (!updated) {
+            throw new Error('Order not found');
+        }
+        return this.mapToOrder(updated);
+    }
+
     async cancelOrder(id: string): Promise<Order> {
         return this.updateOrderStatus(id, 'CANCELLED');
     }

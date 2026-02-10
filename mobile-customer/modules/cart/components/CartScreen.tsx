@@ -30,7 +30,7 @@ export const CartScreen = () => {
 
         setIsProcessing(true);
         try {
-            await createOrder();
+            await createOrder(location);
             // Navigation happens in the hook
         } catch (err) {
             Alert.alert('Order Failed', 'Unable to create order. Please try again.', [{ text: 'OK' }]);

@@ -4,18 +4,16 @@ import { Alert } from 'react-native';
 import { CREATE_ORDER } from '@/graphql/operations/orders';
 import { useCart } from './useCart';
 import { useCartActions } from './useCartActions';
-import { useUserLocation } from '@/hooks/useUserLocation';
 import { useActiveOrdersStore } from '@/modules/orders/store/activeOrdersStore';
 
 export function useCreateOrder() {
     const { items, total } = useCart();
     const { clearCart } = useCartActions();
-    const { location } = useUserLocation();
     const { hasActiveOrders } = useActiveOrdersStore();
 
     const [createOrderMutation, { loading, error }] = useMutation(CREATE_ORDER);
 
-    const createOrder = async () => {
+    const createOrder = async (location: { latitude: number; longitude: number; address: string } | null) => {
         // Check if user already has an active order
         if (hasActiveOrders) {
             Alert.alert(

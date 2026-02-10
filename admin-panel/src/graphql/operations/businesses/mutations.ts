@@ -10,7 +10,15 @@ export const CREATE_BUSINESS = gql`
             isActive
             avgPrepTimeMinutes
             prepTimeOverrideMinutes
-            
+            location {
+                latitude
+                longitude
+                address
+            }
+            workingHours {
+                opensAt
+                closesAt
+            }
         }
     }
 `;
@@ -25,6 +33,15 @@ export const UPDATE_BUSINESS = gql`
             isActive
             avgPrepTimeMinutes
             prepTimeOverrideMinutes
+            location {
+                latitude
+                longitude
+                address
+            }
+            workingHours {
+                opensAt
+                closesAt
+            }
         }
     }
 `;

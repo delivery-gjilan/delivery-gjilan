@@ -46,3 +46,18 @@ export const CANCEL_ORDER = gql`
         }
     }
 `;
+
+export const ASSIGN_DRIVER_TO_ORDER = gql`
+    mutation AssignDriverToOrder($id: ID!, $driverId: ID) {
+        assignDriverToOrder(id: $id, driverId: $driverId) {
+            id
+            driver {
+                id
+                firstName
+                lastName
+                email
+            }
+            status
+        }
+    }
+`;

@@ -103,6 +103,7 @@ input LoginInput {
 }
 
 type Mutation {
+  assignDriverToOrder(driverId: ID, id: ID!): Order!
   cancelOrder(id: ID!): Order!
   createBusiness(input: CreateBusinessInput!): Business!
   createOrder(input: CreateOrderInput!): Order!

@@ -42,6 +42,7 @@ type Query {
 
 type Mutation {
     updateOrderStatus(id: ID!, status: OrderStatus!): Order!
+    assignDriverToOrder(id: ID!, driverId: ID): Order!
     cancelOrder(id: ID!): Order!
     createOrder(input: CreateOrderInput!): Order!
 }
