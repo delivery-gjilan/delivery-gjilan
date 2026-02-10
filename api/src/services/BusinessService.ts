@@ -20,6 +20,7 @@ export class BusinessService {
     private mapToBusiness(business: DbBusiness): Business {
         return {
             ...business,
+            phoneNumber: business.phoneNumber ?? null,
             location: {
                 latitude: business.locationLat,
                 longitude: business.locationLng,
@@ -46,6 +47,7 @@ export class BusinessService {
 
         const createdBusiness = await this.businessRepository.create({
             name: validatedInput.name,
+            phoneNumber: validatedInput.phoneNumber ?? null,
             imageUrl: validatedInput.imageUrl,
             businessType: validatedInput.businessType,
             locationLat: validatedInput.location.latitude,

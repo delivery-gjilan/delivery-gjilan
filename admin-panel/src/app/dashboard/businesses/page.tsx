@@ -37,6 +37,7 @@ interface WorkingHours {
 interface Business {
     id: string;
     name: string;
+    phoneNumber?: string | null;
     businessType: BusinessType;
     imageUrl?: string | null;
     isActive: boolean;
@@ -91,6 +92,7 @@ export default function BusinessesPage() {
 
     const [createForm, setCreateForm] = useState({
         name: "",
+        phoneNumber: "",
         businessType: "RESTAURANT" as BusinessType,
         imageUrl: "",
         location: {
@@ -106,6 +108,7 @@ export default function BusinessesPage() {
 
     const [editForm, setEditForm] = useState({
         name: "",
+        phoneNumber: "",
         businessType: "RESTAURANT" as BusinessType,
         imageUrl: "",
         location: {
@@ -194,6 +197,7 @@ export default function BusinessesPage() {
             variables: {
                 input: {
                     name: createForm.name,
+                    phoneNumber: createForm.phoneNumber.trim() || null,
                     businessType: createForm.businessType,
                     imageUrl: imageUrl || null,
                     location: {
@@ -214,6 +218,7 @@ export default function BusinessesPage() {
 
         setCreateForm({
             name: "",
+            phoneNumber: "",
             businessType: "RESTAURANT",
             imageUrl: "",
             location: {
@@ -234,6 +239,7 @@ export default function BusinessesPage() {
         setSelected(business);
         setEditForm({
             name: business.name,
+            phoneNumber: business.phoneNumber || "",
             businessType: business.businessType,
             imageUrl: business.imageUrl || "",
             location: {
@@ -277,6 +283,7 @@ export default function BusinessesPage() {
                 id: selected.id,
                 input: {
                     name: editForm.name,
+                    phoneNumber: editForm.phoneNumber.trim() || null,
                     businessType: editForm.businessType,
                     imageUrl: imageUrl || null,
                     location: {
@@ -467,6 +474,38 @@ export default function BusinessesPage() {
 
                     <div>
                         <label className="block text-sm font-medium text-gray-400 mb-1">
+                            Phone Number
+                        </label>
+                        <Input
+                            placeholder="e.g., +383 44 123 456"
+                            value={createForm.phoneNumber}
+                            onChange={(e) =>
+                                setCreateForm({
+                                    ...createForm,
+                                    phoneNumber: e.target.value,
+                                })
+                            }
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                            Phone Number
+                        </label>
+                        <Input
+                            placeholder="e.g., +383 44 123 456"
+                            value={createForm.phoneNumber}
+                            onChange={(e) =>
+                                setCreateForm({
+                                    ...createForm,
+                                    phoneNumber: e.target.value,
+                                })
+                            }
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">
                             Business Type *
                         </label>
                         <Select
@@ -479,6 +518,22 @@ export default function BusinessesPage() {
                             }
                         >
                             <option value="RESTAURANT">Restaurant</option>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                            Phone Number
+                        </label>
+                        <Input
+                            placeholder="e.g., +383 44 123 456"
+                            value={editForm.phoneNumber}
+                            onChange={(e) =>
+                                setEditForm({
+                                    ...editForm,
+                                    phoneNumber: e.target.value,
+                                })
+                            }
+                        />
+                    </div>
                             <option value="MARKET">Market</option>
                             <option value="PHARMACY">Pharmacy</option>
                         </Select>
@@ -645,6 +700,22 @@ export default function BusinessesPage() {
                             value={editForm.name}
                             onChange={(e) =>
                                 setEditForm({ ...editForm, name: e.target.value })
+                            }
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                            Phone Number
+                        </label>
+                        <Input
+                            placeholder="e.g., +383 44 123 456"
+                            value={editForm.phoneNumber}
+                            onChange={(e) =>
+                                setEditForm({
+                                    ...editForm,
+                                    phoneNumber: e.target.value,
+                                })
                             }
                         />
                     </div>

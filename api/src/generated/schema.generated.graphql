@@ -16,6 +16,7 @@ type Business {
   isOpen: Boolean!
   location: Location!
   name: String!
+  phoneNumber: String
   prepTimeOverrideMinutes: Int
   updatedAt: Date!
   workingHours: WorkingHours!
@@ -33,7 +34,18 @@ input CreateBusinessInput {
   imageUrl: String
   location: LocationInput!
   name: String!
+  phoneNumber: String
   workingHours: WorkingHoursInput!
+}
+
+input CreateDeliveryZoneInput {
+  color: String
+  description: String
+  feeDelta: Float!
+  geometry: String!
+  isActive: Boolean
+  name: String!
+  priority: Int
 }
 
 input CreateOrderInput {
@@ -78,6 +90,21 @@ input CreateUserInput {
 
 scalar Date
 
+scalar DateTime
+
+type DeliveryZone {
+  color: String!
+  createdAt: DateTime!
+  description: String
+  feeDelta: Float!
+  geometry: String!
+  id: ID!
+  isActive: Boolean!
+  name: String!
+  priority: Int!
+  updatedAt: DateTime!
+}
+
 input InitiateSignupInput {
   email: String!
   firstName: String!
@@ -106,11 +133,13 @@ type Mutation {
   assignDriverToOrder(driverId: ID, id: ID!): Order!
   cancelOrder(id: ID!): Order!
   createBusiness(input: CreateBusinessInput!): Business!
+  createDeliveryZone(input: CreateDeliveryZoneInput!): DeliveryZone!
   createOrder(input: CreateOrderInput!): Order!
   createProduct(input: CreateProductInput!): Product!
   createProductCategory(input: CreateProductCategoryInput!): ProductCategory!
   createUser(input: CreateUserInput!): AuthResponse!
   deleteBusiness(id: ID!): Boolean!
+  deleteDeliveryZone(id: ID!): Boolean!
   deleteProduct(id: ID!): Boolean!
   deleteProductCategory(id: ID!): Boolean!
   deleteUser(id: ID!): Boolean!
@@ -119,6 +148,7 @@ type Mutation {
   resendEmailVerification: SignupStepResponse!
   submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
   updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
+  updateDeliveryZone(id: ID!, input: UpdateDeliveryZoneInput!): DeliveryZone!
   updateDriverLocation(latitude: Float!, longitude: Float!): User!
   updateOrderStatus(id: ID!, status: OrderStatus!): Order!
   updateProduct(id: ID!, input: UpdateProductInput!): Product!
@@ -199,6 +229,9 @@ type ProductSubcategory {
 type Query {
   business(id: ID!): Business
   businesses: [Business!]!
+  calculateDeliveryFee(baseDeliveryFee: Float!, latitude: Float!, longitude: Float!): ZoneFeeResult!
+  deliveryZone(id: ID!): DeliveryZone
+  deliveryZones: [DeliveryZone!]!
   drivers: [User!]!
   me: User
   order(id: ID!): Order
@@ -247,8 +280,19 @@ input UpdateBusinessInput {
   isActive: Boolean
   location: LocationInput
   name: String
+  phoneNumber: String
   prepTimeOverrideMinutes: Int
   workingHours: WorkingHoursInput
+}
+
+input UpdateDeliveryZoneInput {
+  color: String
+  description: String
+  feeDelta: Float
+  geometry: String
+  isActive: Boolean
+  name: String
+  priority: Int
 }
 
 input UpdateProductCategoryInput {
@@ -318,4 +362,10 @@ type WorkingHours {
 input WorkingHoursInput {
   closesAt: String!
   opensAt: String!
+}
+
+type ZoneFeeResult {
+  baseDeliveryFee: Float!
+  totalFee: Float!
+  zone: DeliveryZone
 }

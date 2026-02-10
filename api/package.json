@@ -55,6 +55,8 @@
         "@aws-sdk/client-s3": "^3.947.0",
         "@graphql-tools/schema": "^10.0.30",
         "@graphql-tools/utils": "^10.11.0",
+        "@mapbox/mapbox-gl-draw": "^1.5.1",
+        "@types/mapbox__mapbox-gl-draw": "^1.4.9",
         "@types/multer": "^2.0.0",
         "@types/ws": "^8.18.1",
         "bcrypt": "^6.0.0",

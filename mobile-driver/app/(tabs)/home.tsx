@@ -1,19 +1,20 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { View, Text, ScrollView, Modal, Pressable } from 'react-native';
+import { View, Text, ScrollView, Modal, Pressable, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useMutation, useQuery, useSubscription } from '@apollo/client/react';
 import { ALL_ORDERS_UPDATED, GET_ORDERS, UPDATE_ORDER_STATUS } from '@/graphql/operations/orders';
 import { Button } from '@/components/Button';
-import { useDriverLocation } from '@/hooks/useDriverLocation';
 import { calculateRouteDistance } from '@/utils/mapbox';
+import { useAuthStore } from '@/store/authStore';
 
 export default function Home() {
     const theme = useTheme();
     const { t } = useTranslations();
 
-    useDriverLocation();
+    const isOnline = useAuthStore((state) => state.isOnline);
+    const setOnline = useAuthStore((state) => state.setOnline);
     const [newOrder, setNewOrder] = useState<any | null>(null);
     const seenOrderIds = useRef<Set<string>>(new Set());
     const [orderDistances, setOrderDistances] = useState<Record<string, { distanceKm: number; durationMin: number }>>({});
@@ -167,10 +168,21 @@ export default function Home() {
                 </View>
             </Modal>
             <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 20 }}>
-                <View className="px-4 pt-4 pb-2">
+                <View className="px-4 pt-4 pb-2 flex-row items-center justify-between">
                     <Text className="text-2xl font-bold" style={{ color: theme.colors.text }}>
                         Deliveries
                     </Text>
+                    <View className="flex-row items-center gap-2">
+                        <Text className="text-sm" style={{ color: theme.colors.subtext }}>
+                            {isOnline ? 'Online' : 'Offline'}
+                        </Text>
+                        <Switch
+                            value={isOnline}
+                            onValueChange={setOnline}
+                            trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                            thumbColor={isOnline ? '#ffffff' : '#f4f3f4'}
+                        />
+                    </View>
                 </View>
 
                 <View className="px-4 mt-4">

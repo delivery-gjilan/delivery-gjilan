@@ -13,6 +13,8 @@ import { GraphQLContext } from './context';
 
 import { OrderRepository } from '@/repositories/OrderRepository';
 import { OrderService } from '@/services/OrderService';
+import { DeliveryZoneRepository } from '@/repositories/DeliveryZoneRepository';
+import { DeliveryZoneService } from '@/services/DeliveryZoneService';
 import { pubsub } from '@/lib/pubsub';
 import { decodeJwtToken } from '@/lib/utils/authUtils';
 
@@ -77,6 +79,7 @@ export async function createContext(initialContext: YogaInitialContext): Promise
     const productRepository = new ProductRepository(db);
     const authRepository = new AuthRepository(db);
     const orderRepository = new OrderRepository();
+    const deliveryZoneRepository = new DeliveryZoneRepository(db);
 
     // Initialize services
     const businessService = new BusinessService(businessRepository);
@@ -84,6 +87,7 @@ export async function createContext(initialContext: YogaInitialContext): Promise
     const productService = new ProductService(productRepository);
     const authService = new AuthService(authRepository);
     const orderService = new OrderService(orderRepository, authRepository, productRepository, pubsub);
+    const deliveryZoneService = new DeliveryZoneService(deliveryZoneRepository);
 
     return {
         ...initialContext,
@@ -94,6 +98,7 @@ export async function createContext(initialContext: YogaInitialContext): Promise
         productService,
         authService,
         orderService,
+        deliveryZoneService,
         pubsub,
     };
 }

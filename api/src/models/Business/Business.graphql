@@ -7,6 +7,7 @@ enum BusinessType {
 type Business {
     id: ID!
     name: String!
+    phoneNumber: String
     imageUrl: String
     businessType: BusinessType!
     isActive: Boolean!
@@ -26,6 +27,7 @@ type Query {
 
 input CreateBusinessInput {
     name: String!
+    phoneNumber: String
     imageUrl: String
     businessType: BusinessType!
     location: LocationInput!
@@ -35,6 +37,7 @@ input CreateBusinessInput {
 
 input UpdateBusinessInput {
     name: String
+    phoneNumber: String
     imageUrl: String
     businessType: BusinessType
     location: LocationInput

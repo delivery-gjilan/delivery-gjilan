@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useSubscription, useMutation } from "@apollo/client/react";
-import Map, { Marker } from "react-map-gl/mapbox";
+import Map, { Marker, Source, Layer } from "react-map-gl/mapbox";
 import { MapPin } from "lucide-react";
 import { GET_BUSINESSES } from "@/graphql/operations/businesses/queries";
+import { GET_DELIVERY_ZONES } from "@/graphql/operations/deliveryZones/queries";
 import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
 import { GET_ORDERS } from "@/graphql/operations/orders/queries";
 import { ALL_ORDERS_SUBSCRIPTION } from "@/graphql/operations/orders/subscriptions";
@@ -70,6 +71,7 @@ const isValidLatLng = (lat: number, lng: number) =>
 
 export default function MapPage() {
   const { data, loading } = useQuery<any>(GET_BUSINESSES);
+  const { data: zonesData } = useQuery<any>(GET_DELIVERY_ZONES);
   const { data: driversData } = useQuery<any>(DRIVERS_QUERY, {
     pollInterval: 5000,
   });
@@ -101,6 +103,7 @@ export default function MapPage() {
   }, [data]);
 
   const drivers = useMemo(() => driversData?.drivers ?? [], [driversData]);
+  const zones = useMemo(() => zonesData?.deliveryZones ?? [], [zonesData]);
 
   const center = useMemo(() => {
     if (!businesses.length) return DEFAULT_CENTER;
@@ -360,6 +363,31 @@ export default function MapPage() {
           onLoad={tuneLandmarkLabels}
           onStyleData={tuneLandmarkLabels}
         >
+          {zones.map((zone: any) => {
+            try {
+              const geom = JSON.parse(zone.geometry);
+              return (
+                <Source
+                  key={`zone-${zone.id}`}
+                  id={`zone-${zone.id}`}
+                  type="geojson"
+                  data={{ type: "Feature", properties: {}, geometry: geom }}
+                >
+                  <Layer
+                    id={`zone-fill-${zone.id}`}
+                    type="fill"
+                    paint={{
+                      "fill-color": zone.color || "#3b82f6",
+                      "fill-opacity": 0.08,
+                    }}
+                  />
+                </Source>
+              );
+            } catch {
+              return null;
+            }
+          })}
+
           {businesses.map((business: any) => {
             const location = business.location;
             const lat = Number(location?.latitude);
@@ -420,9 +448,24 @@ export default function MapPage() {
             if (!isValidLatLng(lat, lng)) return null;
 
             const items = order.businesses
-              ?.flatMap((b: any) => b.items || [])
-              ?.map((item: any) => `${item.name} x${item.quantity}`) || [];
-            const itemsText = items.length ? items.join(', ') : 'Items unavailable';
+              ?.flatMap((b: any) => b.items || []) || [];
+            const businessNames = order.businesses
+              ?.map((b: any) => b.business?.name)
+              ?.filter(Boolean)
+              ?.join(', ');
+            const businessPhones = order.businesses
+              ?.map((b: any) => b.business?.phoneNumber)
+              ?.filter(Boolean)
+              ?.join(' / ');
+            const customerName = order.user
+              ? `${order.user.firstName || ''} ${order.user.lastName || ''}`.trim()
+              : 'Unknown customer';
+            const customerPhone = order.user?.phoneNumber || null;
+            const orderIdShort = order.id ? order.id.slice(0, 6) : 'order';
+            const isPending = order.status === 'PENDING';
+
+            const visibleItems = items.slice(0, 4);
+            const extraItems = items.length - visibleItems.length;
 
             return (
               <Marker
@@ -431,20 +474,106 @@ export default function MapPage() {
                 longitude={lng}
                 anchor="bottom"
               >
-                <div className="flex flex-col items-center group">
-                  <div className="bg-red-600 text-white text-[11px] px-2 py-1 rounded-lg shadow opacity-0 group-hover:opacity-100 transition max-w-[220px] text-center">
-                    {itemsText}
+                <div className="relative flex flex-col items-center">
+                  <div className="relative flex items-center justify-center peer">
+                    {isPending && (
+                      <span className="absolute inline-flex h-10 w-10 rounded-full bg-amber-400/70 pulse-strong-ring peer-hover:opacity-0 transition-opacity" />
+                    )}
+                    <MapPin
+                      size={22}
+                      className="text-red-600 drop-shadow"
+                      strokeWidth={2.2}
+                    />
                   </div>
-                  <MapPin
-                    size={22}
-                    className="text-red-600 drop-shadow"
-                    strokeWidth={2.2}
-                  />
+
+                  <div className="absolute bottom-full mb-2 bg-[#0b0b0b] border border-[#2a2a2a] text-white px-3 py-3 rounded-xl shadow-xl opacity-0 transition w-[360px] pointer-events-none peer-hover:opacity-100">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-[11px] font-semibold">Order #{orderIdShort}</div>
+                      <div className="text-[10px] px-2 py-0.5 rounded-full bg-[#1f2937] text-amber-300 font-semibold">
+                        {order.status}
+                      </div>
+                    </div>
+
+                    {businessNames && (
+                      <div className="text-[11px] text-neutral-300 mt-2">
+                        <span className="text-amber-300 font-semibold">Business:</span>{" "}
+                        <span className="font-semibold text-white">{businessNames}</span>
+                      </div>
+                    )}
+                    {businessPhones && (
+                      <div className="text-[11px] text-neutral-300 mt-1">
+                        <span className="text-amber-300 font-semibold">Business Phone:</span>{" "}
+                        <span className="font-semibold text-white">{businessPhones}</span>
+                      </div>
+                    )}
+                    <div className="text-[11px] text-neutral-300 mt-1">
+                      <span className="text-amber-300 font-semibold">Customer:</span>{" "}
+                      <span className="font-semibold text-white">{customerName}</span>
+                    </div>
+                    {customerPhone && (
+                      <div className="text-[11px] text-neutral-300 mt-1">
+                        <span className="text-amber-300 font-semibold">Phone:</span>{" "}
+                        <span className="font-semibold text-white">{customerPhone}</span>
+                      </div>
+                    )}
+                    {drop?.address && (
+                      <div className="text-[11px] text-neutral-300 mt-1">
+                        <span className="text-amber-300 font-semibold">Address:</span>{" "}
+                        <span className="font-semibold text-white">{drop.address}</span>
+                      </div>
+                    )}
+
+                    {visibleItems.length > 0 && (
+                      <div className="mt-3">
+                        <div className="text-[10px] text-amber-300 font-semibold mb-2">Items</div>
+                        <div className="grid grid-cols-3 gap-2">
+                          {visibleItems.map((item: any, index: number) => (
+                            <div key={`${item.productId || item.name}-${index}`} className="flex items-center gap-2">
+                              {item.imageUrl ? (
+                                <img
+                                  src={item.imageUrl}
+                                  alt={item.name}
+                                  className="h-8 w-8 rounded-md object-cover border border-[#262626]"
+                                />
+                              ) : (
+                                <div className="h-8 w-8 rounded-md bg-[#1f2937] border border-[#262626]" />
+                              )}
+                              <div className="text-[10px] text-neutral-300 leading-tight">
+                                <div className="line-clamp-1 font-semibold text-white">{item.name}</div>
+                                <div className="text-neutral-500 font-semibold">x{item.quantity}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {extraItems > 0 && (
+                          <div className="text-[10px] text-neutral-500 mt-2">
+                            +{extraItems} more item{extraItems > 1 ? 's' : ''}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </Marker>
             );
           })}
         </Map>
+
+        <style jsx global>{`
+          @keyframes strongPulse {
+            0%, 100% {
+              transform: scale(0.9);
+              opacity: 0.6;
+            }
+            50% {
+              transform: scale(1.3);
+              opacity: 0.95;
+            }
+          }
+          .pulse-strong-ring {
+            animation: strongPulse 0.95s ease-in-out infinite;
+          }
+        `}</style>
 
         {selectedBusiness && null}
 

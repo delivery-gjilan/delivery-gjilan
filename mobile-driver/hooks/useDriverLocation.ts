@@ -11,6 +11,7 @@ const SIM_RADIUS_METERS = 120;
 
 export function useDriverLocation() {
     const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+    const isOnline = useAuthStore((state) => state.isOnline);
     const [updateDriverLocation] = useMutation(UPDATE_DRIVER_LOCATION);
     const subscriptionRef = useRef<Location.LocationSubscription | null>(null);
     const simIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -20,13 +21,12 @@ export function useDriverLocation() {
         let isActive = true;
 
         (async () => {
+            if (!isAuthenticated || !isOnline) return;
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
                 Alert.alert('Location Required', 'Enable location to show drivers on the map.');
                 return;
             }
-
-            if (!isAuthenticated) return;
 
             try {
                 const current = await Location.getCurrentPositionAsync({
@@ -95,5 +95,5 @@ export function useDriverLocation() {
                 simIntervalRef.current = null;
             }
         };
-    }, [isAuthenticated, updateDriverLocation]);
+    }, [isAuthenticated, isOnline, updateDriverLocation]);
 }

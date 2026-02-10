@@ -11,6 +11,7 @@ export const businessType = pgEnum('business_type', businessTypeValues);
 export const businesses = pgTable('businesses', {
     id: uuid('id').primaryKey().defaultRandom().notNull(),
     name: varchar('name', { length: 255 }).notNull(),
+    phoneNumber: varchar('phone_number', { length: 32 }),
     imageUrl: varchar('image_url', { length: 500 }),
     businessType: businessType('business_type').notNull(),
     isActive: boolean('is_active').default(true),

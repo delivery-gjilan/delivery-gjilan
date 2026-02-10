@@ -5,6 +5,7 @@ export const GET_BUSINESS = gql`
         business(id: $id) {
             id
             name
+            phoneNumber
             imageUrl
             businessType
             isActive
@@ -29,6 +30,7 @@ export const GET_BUSINESSES = gql`
         businesses {
             id
             name
+            phoneNumber
             imageUrl
             businessType
             isActive

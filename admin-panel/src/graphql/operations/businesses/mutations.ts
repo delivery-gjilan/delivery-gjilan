@@ -5,6 +5,7 @@ export const CREATE_BUSINESS = gql`
         createBusiness(input: $input) {
             id
             name
+            phoneNumber
             businessType
             imageUrl
             isActive
@@ -28,6 +29,7 @@ export const UPDATE_BUSINESS = gql`
         updateBusiness(id: $id, input: $input) {
             id
             name
+            phoneNumber
             businessType
             imageUrl
             isActive

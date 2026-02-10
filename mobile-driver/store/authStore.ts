@@ -9,10 +9,12 @@ interface AuthState {
     user: User | null;
     isLoading: boolean;
     isAuthenticated: boolean;
+    isOnline: boolean;
 
     setToken: (token: string) => void;
     setUser: (user: User | null) => void;
     setLoading: (loading: boolean) => void;
+    setOnline: (online: boolean) => void;
     login: (token: string, user: User) => void;
     logout: () => void;
 }
@@ -26,6 +28,7 @@ export const useAuthStore = create<AuthState>()(
             user: null,
             isLoading: false,
             isAuthenticated: false,
+            isOnline: true,
 
             setToken: (token) => set({ token }),
 
@@ -37,11 +40,14 @@ export const useAuthStore = create<AuthState>()(
 
             setLoading: (isLoading) => set({ isLoading }),
 
+            setOnline: (isOnline) => set({ isOnline }),
+
             login: (token, user) =>
                 set({
                     token,
                     user,
                     isAuthenticated: isDriver(user),
+                    isOnline: true,
                 }),
 
             logout: async () => {
@@ -50,6 +56,7 @@ export const useAuthStore = create<AuthState>()(
                     token: null,
                     user: null,
                     isAuthenticated: false,
+                    isOnline: false,
                 });
             },
         }),
@@ -59,6 +66,7 @@ export const useAuthStore = create<AuthState>()(
             partialize: (state) => ({
                 token: state.token,
                 user: state.user,
+                isOnline: state.isOnline,
             }),
         }
     )

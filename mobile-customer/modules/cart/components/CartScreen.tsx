@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+
 import { useTheme } from '@/hooks/useTheme';
 import { useCart } from '../hooks/useCart';
 import { useCartActions } from '../hooks/useCartActions';
 import { useCreateOrder } from '../hooks/useCreateOrder';
 import { useUserLocation } from '@/hooks/useUserLocation';
+import { useLazyQuery } from '@apollo/client/react';
+import { CALCULATE_DELIVERY_FEE } from '@/graphql/operations/deliveryZones';
 
 export const CartScreen = () => {
     const router = useRouter();
@@ -18,8 +21,32 @@ export const CartScreen = () => {
     const { location } = useUserLocation();
 
     const [isProcessing, setIsProcessing] = useState(false);
+    const [deliveryPrice, setDeliveryPrice] = useState(2.0); // Base delivery fee
+    const [deliveryZone, setDeliveryZone] = useState<string | null>(null);
 
-    const deliveryPrice = 2.0;
+    const [calculateFee, { data: feeData, loading: feeLoading }] = useLazyQuery(CALCULATE_DELIVERY_FEE);
+
+    // Calculate delivery fee when location changes
+    useEffect(() => {
+        if (location?.latitude && location?.longitude) {
+            calculateFee({
+                variables: {
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                    baseDeliveryFee: 2.0, // Base fee
+                },
+            });
+        }
+    }, [location?.latitude, location?.longitude, calculateFee]);
+
+    // Update delivery price based on zone calculation
+    useEffect(() => {
+        if (feeData?.calculateDeliveryFee) {
+            setDeliveryPrice(feeData.calculateDeliveryFee.totalFee);
+            setDeliveryZone(feeData.calculateDeliveryFee.zone?.name || null);
+        }
+    }, [feeData]);
+
     const finalTotal = total + deliveryPrice;
 
     const handleCheckout = async () => {
@@ -187,9 +214,19 @@ export const CartScreen = () => {
                         </Text>
                     </View>
                     <View className="flex-row justify-between items-center">
-                        <Text className="text-base" style={{ color: theme.colors.subtext }}>
-                            Delivery
-                        </Text>
+                        <View className="flex-row items-center gap-1">
+                            <Text className="text-base" style={{ color: theme.colors.subtext }}>
+                                Delivery
+                            </Text>
+                            {deliveryZone && (
+                                <Text className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: theme.colors.primary + '20', color: theme.colors.primary }}>
+                                    {deliveryZone}
+                                </Text>
+                            )}
+                            {feeLoading && (
+                                <ActivityIndicator size="small" color={theme.colors.subtext} />
+                            )}
+                        </View>
                         <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
                             €{deliveryPrice.toFixed(2)}
                         </Text>

@@ -15,6 +15,7 @@ export const GET_ORDERS = gql`
                 lastName
                 email
                 address
+                phoneNumber
             }
             driver {
                 id
@@ -31,6 +32,7 @@ export const GET_ORDERS = gql`
                 business {
                     id
                     name
+                    phoneNumber
                     businessType
                     location {
                         latitude
@@ -59,6 +61,14 @@ export const GET_ORDER = gql`
             totalPrice
             orderDate
             status
+            user {
+                id
+                firstName
+                lastName
+                email
+                address
+                phoneNumber
+            }
             dropOffLocation {
                 latitude
                 longitude
@@ -68,6 +78,7 @@ export const GET_ORDER = gql`
                 business {
                     id
                     name
+                    phoneNumber
                     businessType
                     location {
                         latitude
@@ -105,6 +116,7 @@ export const GET_ORDERS_BY_STATUS = gql`
                 business {
                     id
                     name
+                    phoneNumber
                     businessType
                     location {
                         latitude
