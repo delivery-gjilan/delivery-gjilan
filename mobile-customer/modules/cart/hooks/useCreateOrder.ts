@@ -13,7 +13,11 @@ export function useCreateOrder() {
 
     const [createOrderMutation, { loading, error }] = useMutation(CREATE_ORDER);
 
-    const createOrder = async (location: { latitude: number; longitude: number; address: string } | null) => {
+    const createOrder = async (
+        location: { latitude: number; longitude: number; address: string } | null,
+        deliveryPrice = 2.0,
+        discountAmount = 0,
+    ) => {
         // Check if user already has an active order
         if (hasActiveOrders) {
             Alert.alert(
@@ -32,13 +36,13 @@ export function useCreateOrder() {
             throw new Error('Location is required');
         }
 
-        const deliveryPrice = 2.0; // Fixed for now
-
         const orderItems = items.map((item) => ({
             productId: item.productId,
             quantity: item.quantity,
             price: item.price,
         }));
+
+        const normalizedDiscount = Math.min(discountAmount, total + deliveryPrice);
 
         try {
             const result = await createOrderMutation({
@@ -51,7 +55,7 @@ export function useCreateOrder() {
                             address: location.address,
                         },
                         deliveryPrice,
-                        totalPrice: total + deliveryPrice,
+                        totalPrice: total + deliveryPrice - normalizedDiscount,
                     },
                 },
             });

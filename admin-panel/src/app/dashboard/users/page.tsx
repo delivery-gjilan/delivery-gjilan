@@ -237,19 +237,19 @@ export default function UsersPage() {
         });
     };
 
-    // Filter to show only customers and drivers
-    const filteredUsers = data?.users?.filter(user => user.role === 'CUSTOMER' || user.role === 'DRIVER') || [];
+    // Filter to show only customers (drivers are managed in Drivers section)
+    const filteredUsers = data?.users?.filter(user => user.role === 'CUSTOMER') || [];
 
     return (
         <div className="text-white">
             <div className="mb-6 flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-semibold">Users</h1>
-                    <p className="text-gray-400 mt-1">View and manage customers and drivers.</p>
+                    <p className="text-gray-400 mt-1">Manage customer accounts. To manage drivers, go to the Drivers section.</p>
                 </div>
                 {isSuperAdmin && (
-                    <Button onClick={() => setShowModal(true)} className="bg-purple-600 hover:bg-purple-700">
-                        Create User
+                    <Button onClick={() => setShowModal(true)} className="bg-blue-600 hover:bg-blue-700">
+                        Create Customer
                     </Button>
                 )}
             </div>
@@ -362,16 +362,10 @@ export default function UsersPage() {
                 <Modal
                     open={showModal}
                     onClose={handleCloseModal}
-                    title={editingUser ? "Edit User" : "Create User"}
+                    title={editingUser ? "Edit User" : "Create Customer"}
                 >
                     <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">User Type *</label>
-                            <Select name="role" value={formData.role} onChange={handleInputChange} required>
-                                <option value="CUSTOMER">Customer</option>
-                                <option value="DRIVER">Driver</option>
-                            </Select>
-                        </div>
+                        <input type="hidden" name="role" value="CUSTOMER" />
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
@@ -454,7 +448,7 @@ export default function UsersPage() {
                                 type="submit"
                                 disabled={creating || updating}
                             >
-                                {(creating || updating) ? (editingUser ? "Updating..." : "Creating...") : (editingUser ? "Update User" : "Create User")}
+                                {(creating || updating) ? (editingUser ? "Updating..." : "Creating...") : (editingUser ? "Update Customer" : "Create Customer")}
                             </Button>
                         </div>
                     </form>

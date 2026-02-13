@@ -5,7 +5,7 @@ import { useMutation } from '@apollo/client/react';
 import { UPDATE_DRIVER_LOCATION } from '@/graphql/operations/driverLocation';
 import { useAuthStore } from '@/store/authStore';
 
-const SIMULATE_DRIVER_LOCATION = true;
+const SIMULATE_DRIVER_LOCATION = false; // Set to false for real GPS tracking
 const SIM_STEP_MS = 5000;
 const SIM_RADIUS_METERS = 120;
 
@@ -21,27 +21,63 @@ export function useDriverLocation() {
         let isActive = true;
 
         (async () => {
-            if (!isAuthenticated || !isOnline) return;
-            const { status } = await Location.requestForegroundPermissionsAsync();
-            if (status !== 'granted') {
-                Alert.alert('Location Required', 'Enable location to show drivers on the map.');
+            console.log('[DriverLocation] useEffect triggered', { isAuthenticated, isOnline });
+            
+            if (!isAuthenticated) {
+                console.log('[DriverLocation] not authenticated, skipping');
                 return;
             }
+            
+            if (!isOnline) {
+                console.log('[DriverLocation] not online, skipping location tracking');
+                return;
+            }
+            
+            // Request foreground permissions
+            try {
+                console.log('[DriverLocation] requesting foreground permissions');
+                const { status } = await Location.requestForegroundPermissionsAsync();
+                console.log('[DriverLocation] foreground permission status:', status);
+                if (status !== 'granted') {
+                    Alert.alert('Location Required', 'Enable location to show drivers on the map.');
+                    return;
+                }
+            } catch (permErr) {
+                console.warn('[DriverLocation] foreground permission error:', permErr);
+                return;
+            }
+            
+            // Request background permissions for continuous tracking during deliveries
+            // NOTE: Do NOT await this - request it in the background without blocking the location watch
+            // In Expo Go, permission requests can cause the app to exit if awaited
+            Location.requestBackgroundPermissionsAsync().then((result) => {
+                console.log('[DriverLocation] background permission status:', result.status);
+                if (result.status !== 'granted') {
+                    console.warn('[DriverLocation] Background location not granted - location will stop when app is backgrounded');
+                }
+            }).catch((bgErr) => {
+                console.warn('[DriverLocation] Failed to request background permission:', bgErr);
+            });
 
             try {
+                console.log('[DriverLocation] getting current position');
                 const current = await Location.getCurrentPositionAsync({
                     accuracy: Location.Accuracy.Balanced,
                 });
-                await updateDriverLocation({
+                console.log('[DriverLocation] got position', { lat: current.coords.latitude, lng: current.coords.longitude });
+                
+                const result = await updateDriverLocation({
                     variables: {
                         latitude: current.coords.latitude,
                         longitude: current.coords.longitude,
                     },
                 });
+                console.log('[DriverLocation] initial location update sent', result);
 
                 if (__DEV__ && SIMULATE_DRIVER_LOCATION) {
                     const baseLat = current.coords.latitude;
                     const baseLng = current.coords.longitude;
+                    console.log('[DriverLocation] starting simulation mode');
 
                     simIntervalRef.current = setInterval(() => {
                         if (!isActive) return;
@@ -63,27 +99,43 @@ export function useDriverLocation() {
                     return;
                 }
             } catch (err) {
-                console.warn('[DriverLocation] initial update failed', err);
+                console.error('[DriverLocation] initial update failed', err);
+                return;
             }
 
+            console.log('[DriverLocation] starting position watch');
             subscriptionRef.current = await Location.watchPositionAsync(
                 {
-                    accuracy: Location.Accuracy.Balanced,
-                    timeInterval: 5000,
-                    distanceInterval: 15,
+                    accuracy: Location.Accuracy.High,
+                    timeInterval: 3000, // Update every 3 seconds
+                    distanceInterval: 0, // Update on EVERY location change (no minimum distance)
                 },
                 (location) => {
                     if (!isActive) return;
+                    console.log('[DriverLocation] position update received', { 
+                        lat: location.coords.latitude, 
+                        lng: location.coords.longitude,
+                        timestamp: new Date().toISOString()
+                    });
                     updateDriverLocation({
                         variables: {
                             latitude: location.coords.latitude,
                             longitude: location.coords.longitude,
                         },
+                    }).then((result) => {
+                        console.log('[DriverLocation] location mutation succeeded', {
+                            updatedAt: (result.data as any)?.updateDriverLocation?.driverLocationUpdatedAt
+                        });
                     }).catch((err) => {
-                        console.warn('[DriverLocation] update failed', err);
+                        console.error('[DriverLocation] location mutation FAILED', {
+                            message: err.message,
+                            errors: err.graphQLErrors?.map((e: any) => e.message),
+                            networkError: err.networkError
+                        });
                     });
                 },
             );
+            console.log('[DriverLocation] position watch started');
         })();
 
         return () => {

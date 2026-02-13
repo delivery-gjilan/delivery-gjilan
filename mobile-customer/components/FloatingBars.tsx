@@ -21,9 +21,9 @@ export const FloatingBars = () => {
     // Calculate bottom position based on whether tab bar is visible
     const getBottomPosition = () => {
         if (Platform.OS === 'ios') {
-            return isOnTabRoute ? 90 + insets.bottom : 20 + insets.bottom;
+            return isOnTabRoute ? 64 + insets.bottom : 20 + insets.bottom;
         }
-        return isOnTabRoute ? 70 + insets.bottom : 20 + insets.bottom;
+        return isOnTabRoute ? 56 + insets.bottom : 20 + insets.bottom;
     };
 
     return (

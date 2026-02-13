@@ -11,11 +11,18 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "We use your location to show drivers on the map."
+        "NSLocationWhenInUseUsageDescription": "We use your location to show drivers on the map.",
+        "NSLocationAlwaysUsageDescription": "We need your location even when the app is closed to track deliveries.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location in the background to track deliveries in real-time.",
+        "UIBackgroundModes": ["location"]
       }
     },
     "android": {
-      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+      "permissions": [
+        "ACCESS_FINE_LOCATION", 
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

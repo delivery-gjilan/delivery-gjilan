@@ -1,10 +1,11 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { GraphQLError } from 'graphql';
+import { pubsub, publish, topics } from '@/lib/pubsub';
 
 export const updateDriverLocation: NonNullable<MutationResolvers['updateDriverLocation']> = async (
         _parent,
         { latitude, longitude },
-        { authService, userData },
+        { authService, driverService, userData },
 ) => {
         if (!userData.userId) {
                 throw new GraphQLError('Unauthorized', { extensions: { code: 'UNAUTHORIZED' } });
@@ -14,10 +15,26 @@ export const updateDriverLocation: NonNullable<MutationResolvers['updateDriverLo
                 throw new GraphQLError('Only drivers can update location', { extensions: { code: 'FORBIDDEN' } });
         }
 
-        const updated = await authService.authRepository.updateDriverLocation(userData.userId, latitude, longitude);
-        if (!updated) {
+        if (!driverService) {
+                throw new GraphQLError('Driver services unavailable', { extensions: { code: 'SERVICE_UNAVAILABLE' } });
+        }
+
+        const driver = await driverService.updateLocation(userData.userId, latitude, longitude);
+        if (!driver) {
                 throw new GraphQLError('Driver not found', { extensions: { code: 'NOT_FOUND' } });
         }
 
-        return updated;
+        // BACKWARD COMPATIBILITY: Keep users table in sync
+        await authService.authRepository.updateDriverLocation(userData.userId, latitude, longitude);
+
+        // Publish driver updates for real-time dashboards
+        try {
+                const drivers = await authService.authRepository.findDrivers();
+                publish(pubsub, topics.allDriversChanged(), { drivers });
+        } catch (error) {
+                console.error('Failed to publish driver update:', error);
+        }
+
+        const user = await authService.authRepository.findById(userData.userId);
+        return user;
 };

@@ -1,0 +1,70 @@
+"""
+Connection status for drivers:
+- CONNECTED: Actively sending heartbeats
+- STALE: No heartbeat for 15 seconds (warning state)
+- LOST: No heartbeat for 30 seconds (offline state)
+- DISCONNECTED: Subscription closed or never connected
+"""
+enum DriverConnectionStatus {
+    CONNECTED
+    STALE
+    LOST
+    DISCONNECTED
+}
+
+type DriverConnection {
+    """User's preference: "I want to work" toggle"""
+    onlinePreference: Boolean!
+    
+    """System-calculated: current connection state"""
+    connectionStatus: DriverConnectionStatus!
+    
+    """Last timestamp when driver sent a heartbeat (every 5s)"""
+    lastHeartbeatAt: Date
+    
+    """Last timestamp when location was written to DB (throttled to every 10s)"""
+    lastLocationUpdate: Date
+    
+    """Timestamp when driver was marked as DISCONNECTED"""
+    disconnectedAt: Date
+}
+
+"""Result of driver heartbeat mutation"""
+type DriverHeartbeatResult {
+    """Whether heartbeat was processed successfully"""
+    success: Boolean!
+    
+    """Current connection status after processing"""
+    connectionStatus: DriverConnectionStatus!
+    
+    """Whether location was actually written to DB (throttled)"""
+    locationUpdated: Boolean!
+    
+    """Server timestamp when heartbeat was processed"""
+    lastHeartbeatAt: Date!
+}
+
+# Extended User type with new driver connection data
+extend type User {
+    driverConnection: DriverConnection
+}
+
+extend type Mutation {
+    """
+    Driver heartbeat - call every 5 seconds while online.
+    Updates lastHeartbeatAt and connectionStatus to CONNECTED.
+    Location is throttled: only written if >10s since last write OR moved >5m.
+    """
+    driverHeartbeat(
+        latitude: Float!
+        longitude: Float!
+    ): DriverHeartbeatResult!
+    
+    """Admin mutation to manually set connection status (for testing/recovery)"""
+    adminSetDriverConnectionStatus(driverId: ID!, status: DriverConnectionStatus!): User!
+}
+
+# Per-driver subscription (optional - for more granular updates)
+extend type Subscription {
+    driverConnectionStatusChanged(driverId: ID!): DriverConnection! @skipAuth
+}

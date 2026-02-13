@@ -176,6 +176,17 @@ export class AuthRepository {
         return user;
     }
 
+    async updateDriverOnlineStatus(userId: string, isOnline: boolean): Promise<DbUser | undefined> {
+        const [user] = await this.db
+            .update(users)
+            .set({
+                isOnline: isOnline,
+            })
+            .where(eq(users.id, userId))
+            .returning();
+        return user;
+    }
+
     async deleteUser(userId: string): Promise<boolean> {
         const result = await this.db.delete(users).where(eq(users.id, userId)).returning();
         return result.length > 0;

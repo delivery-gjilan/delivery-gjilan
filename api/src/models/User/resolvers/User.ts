@@ -1,23 +1,49 @@
 import type { UserResolvers } from './../../../generated/types.generated';
-export const User: UserResolvers = {
+export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'businessId'|'driverLocation'|'driverLocationUpdatedAt'|'email'|'emailVerified'|'firstName'|'flagColor'|'id'|'imageUrl'|'isOnline'|'lastName'|'phoneNumber'|'phoneVerified'|'role'|'signupStep'|'__isTypeOf'> = {
     business: async (parent, _args, { businessService }) => {
         if (!parent.businessId) {
             return null;
         }
         return businessService.getBusiness(parent.businessId);
     },
-    driverLocation: (parent) => {
-        if (!parent.driverLat || !parent.driverLng) {
+    driverLocation: async (parent, _args, { driverService }) => {
+        if (parent.driverLat && parent.driverLng) {
+            return {
+                latitude: parent.driverLat,
+                longitude: parent.driverLng,
+                address: 'Driver location',
+            };
+        }
+
+        if (parent.role !== 'DRIVER' || !driverService) {
             return null;
         }
-        return {
-            latitude: parent.driverLat,
-            longitude: parent.driverLng,
-            address: 'Driver location',
-        };
+
+        try {
+            const driver = await driverService.getDriverWithConnection(parent.id);
+            if (!driver?.driverLat || !driver?.driverLng) {
+                return null;
+            }
+            return {
+                latitude: driver.driverLat,
+                longitude: driver.driverLng,
+                address: 'Driver location',
+            };
+        } catch (error) {
+            console.error('[User.driverLocation] Error resolving driver location:', error);
+            return null;
+        }
     },
-    driverLocationUpdatedAt: (parent) => {
-        const value = parent.driverLocationUpdatedAt;
+    driverLocationUpdatedAt: async (parent, _args, { driverService }) => {
+        let value = parent.driverLocationUpdatedAt;
+        if (!value && parent.role === 'DRIVER' && driverService) {
+            try {
+                const driver = await driverService.getDriverWithConnection(parent.id);
+                value = driver?.lastLocationUpdate ?? null;
+            } catch (error) {
+                console.error('[User.driverLocationUpdatedAt] Error resolving driver location timestamp:', error);
+            }
+        }
         if (!value) return null;
         if (value instanceof Date) return value;
         if (typeof value === 'string') {
@@ -29,5 +55,35 @@ export const User: UserResolvers = {
             return isNaN(parsed.getTime()) ? null : parsed;
         }
         return null;
+    },
+    driverConnection: async (parent, _args, { driverService }) => {
+        // Only drivers have connection info
+        if (parent.role !== 'DRIVER') {
+            return null;
+        }
+
+        if (!driverService) {
+            return null;
+        }
+
+        try {
+            const driver = await driverService.getDriverWithConnection(parent.id);
+            if (!driver) {
+                return null;
+            }
+
+            return {
+                onlinePreference: driver.onlinePreference,
+                connectionStatus: driver.connectionStatus,
+                lastLocationUpdate: driver.lastLocationUpdate
+                    ? driver.lastLocationUpdate instanceof Date
+                        ? driver.lastLocationUpdate
+                        : new Date(driver.lastLocationUpdate)
+                    : null,
+            };
+        } catch (error) {
+            console.error('[User.driverConnection] Error resolving driver connection:', error);
+            return null;
+        }
     },
 };

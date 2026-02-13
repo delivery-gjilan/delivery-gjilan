@@ -28,6 +28,8 @@ type User {
     business: Business
     adminNote: String
     flagColor: String
+    imageUrl: String
+    isOnline: Boolean!
     driverLocation: Location
     driverLocationUpdatedAt: Date
 }
@@ -103,4 +105,10 @@ type Mutation {
     deleteUser(id: ID!): Boolean!
     updateUserNote(userId: ID!, note: String, flagColor: String): User!
     updateDriverLocation(latitude: Float!, longitude: Float!): User!
+    adminUpdateDriverLocation(driverId: ID!, latitude: Float!, longitude: Float!): User!
+    updateDriverOnlineStatus(isOnline: Boolean!): User!
+}
+
+type Subscription {
+    driversUpdated: [User!]! @skipAuth
 }

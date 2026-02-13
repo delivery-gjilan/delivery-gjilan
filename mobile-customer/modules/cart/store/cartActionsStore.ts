@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { useCartDataStore } from './cartDataStore';
+import { useCartAnimationStore } from './cartAnimationStore';
 import { CartItem } from '../types';
+import * as Haptics from 'expo-haptics';
 
 interface CartActionsStore {
     addItem: (item: CartItem) => void;
@@ -25,6 +27,10 @@ export const useCartActionsStore = create<CartActionsStore>((set) => ({
 
             return { items: [...state.items, item] };
         });
+        
+        // Trigger animation and haptic feedback
+        useCartAnimationStore.getState().triggerAnimation();
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     },
     removeItem: (productId) => {
         useCartDataStore.setState((state) => ({

@@ -6,6 +6,7 @@ import { ProductService } from '@/services/ProductService';
 import { AuthService } from '@/services/AuthService';
 import { OrderService } from '@/services/OrderService';
 import { DeliveryZoneService } from '@/services/DeliveryZoneService';
+import { DriverService } from '@/services/DriverService';
 import { PubSub } from '@/lib/pubsub';
 
 export interface ApiContextInterface {
@@ -21,6 +22,7 @@ export interface ApiContextInterface {
     authService: AuthService;
     orderService: OrderService;
     deliveryZoneService: DeliveryZoneService;
+    driverService?: DriverService;
     pubsub: PubSub;
 }
 

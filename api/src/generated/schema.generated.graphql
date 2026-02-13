@@ -105,6 +105,54 @@ type DeliveryZone {
   updatedAt: DateTime!
 }
 
+type DriverConnection {
+  """System-calculated: current connection state"""
+  connectionStatus: DriverConnectionStatus!
+
+  """Timestamp when driver was marked as DISCONNECTED"""
+  disconnectedAt: Date
+
+  """Last timestamp when driver sent a heartbeat (every 5s)"""
+  lastHeartbeatAt: Date
+
+  """
+  Last timestamp when location was written to DB (throttled to every 10s)
+  """
+  lastLocationUpdate: Date
+
+  """User's preference: "I want to work" toggle"""
+  onlinePreference: Boolean!
+}
+
+"""
+Connection status for drivers:
+- CONNECTED: Actively sending heartbeats
+- STALE: No heartbeat for 15 seconds (warning state)
+- LOST: No heartbeat for 30 seconds (offline state)
+- DISCONNECTED: Subscription closed or never connected
+"""
+enum DriverConnectionStatus {
+  CONNECTED
+  DISCONNECTED
+  LOST
+  STALE
+}
+
+"""Result of driver heartbeat mutation"""
+type DriverHeartbeatResult {
+  """Current connection status after processing"""
+  connectionStatus: DriverConnectionStatus!
+
+  """Server timestamp when heartbeat was processed"""
+  lastHeartbeatAt: Date!
+
+  """Whether location was actually written to DB (throttled)"""
+  locationUpdated: Boolean!
+
+  """Whether heartbeat was processed successfully"""
+  success: Boolean!
+}
+
 input InitiateSignupInput {
   email: String!
   firstName: String!
@@ -130,6 +178,11 @@ input LoginInput {
 }
 
 type Mutation {
+  """
+  Admin mutation to manually set connection status (for testing/recovery)
+  """
+  adminSetDriverConnectionStatus(driverId: ID!, status: DriverConnectionStatus!): User!
+  adminUpdateDriverLocation(driverId: ID!, latitude: Float!, longitude: Float!): User!
   assignDriverToOrder(driverId: ID, id: ID!): Order!
   cancelOrder(id: ID!): Order!
   createBusiness(input: CreateBusinessInput!): Business!
@@ -143,6 +196,13 @@ type Mutation {
   deleteProduct(id: ID!): Boolean!
   deleteProductCategory(id: ID!): Boolean!
   deleteUser(id: ID!): Boolean!
+
+  """
+  Driver heartbeat - call every 5 seconds while online.
+  Updates lastHeartbeatAt and connectionStatus to CONNECTED.
+  Location is throttled: only written if >10s since last write OR moved >5m.
+  """
+  driverHeartbeat(latitude: Float!, longitude: Float!): DriverHeartbeatResult!
   initiateSignup(input: InitiateSignupInput!): AuthResponse!
   login(input: LoginInput!): AuthResponse!
   resendEmailVerification: SignupStepResponse!
@@ -150,6 +210,7 @@ type Mutation {
   updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
   updateDeliveryZone(id: ID!, input: UpdateDeliveryZoneInput!): DeliveryZone!
   updateDriverLocation(latitude: Float!, longitude: Float!): User!
+  updateDriverOnlineStatus(isOnline: Boolean!): User!
   updateOrderStatus(id: ID!, status: OrderStatus!): Order!
   updateProduct(id: ID!, input: UpdateProductInput!): Product!
   updateProductCategory(id: ID!, input: UpdateProductCategoryInput!): ProductCategory!
@@ -265,6 +326,8 @@ input SubmitPhoneNumberInput {
 
 type Subscription {
   allOrdersUpdated: [Order!]!
+  driverConnectionStatusChanged(driverId: ID!): DriverConnection!
+  driversUpdated: [User!]!
   orderStatusUpdated(orderId: ID!): Order!
   userOrdersUpdated(input: SubscriptionInput!): [Order!]!
 }
@@ -325,6 +388,7 @@ type User {
   adminNote: String
   business: Business
   businessId: ID
+  driverConnection: DriverConnection
   driverLocation: Location
   driverLocationUpdatedAt: Date
   email: String!
@@ -332,6 +396,8 @@ type User {
   firstName: String!
   flagColor: String
   id: ID!
+  imageUrl: String
+  isOnline: Boolean!
   lastName: String!
   phoneNumber: String
   phoneVerified: Boolean!

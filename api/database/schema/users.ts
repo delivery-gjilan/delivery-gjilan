@@ -31,6 +31,8 @@ export const users = pgTable('users', {
     phoneVerificationCode: text('phone_verification_code'),
     adminNote: text('admin_note'),
     flagColor: text('flag_color').default('yellow'),
+    imageUrl: text('image_url'),
+    isOnline: boolean('is_online').default(true).notNull(),
     driverLat: doublePrecision('driver_lat'),
     driverLng: doublePrecision('driver_lng'),
     driverLocationUpdatedAt: timestamp('driver_location_updated_at', { withTimezone: true, mode: 'string' }),

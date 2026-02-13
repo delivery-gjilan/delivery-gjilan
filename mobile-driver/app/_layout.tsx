@@ -3,10 +3,13 @@ import '../global.css';
 import { useAppSetup } from '@/hooks/useAppSetup';
 import { ActivityIndicator, View } from 'react-native';
 import Providers from '@/lib/graphql/providers';
-import { useDriverLocation } from '@/hooks/useDriverLocation';
+import { useDriverHeartbeat } from '@/hooks/useDriverHeartbeat';
 
 function AppContent() {
-    useDriverLocation();
+    // Use heartbeat hook for connection tracking and location updates
+    // Sends heartbeat every 5 seconds with GPS location
+    // Location writes are throttled server-side (every 10s or 5m movement)
+    useDriverHeartbeat();
 
     return (
         <Stack screenOptions={{ headerShown: false }}>

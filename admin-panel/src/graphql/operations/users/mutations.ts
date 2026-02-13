@@ -78,3 +78,27 @@ export const UPDATE_USER_NOTE_MUTATION = gql`
     }
   }
 `;
+
+export const ADMIN_UPDATE_DRIVER_LOCATION = gql`
+  mutation AdminUpdateDriverLocation($driverId: ID!, $latitude: Float!, $longitude: Float!) {
+    adminUpdateDriverLocation(driverId: $driverId, latitude: $latitude, longitude: $longitude) {
+      id
+      driverLocation {
+        latitude
+        longitude
+        address
+      }
+      driverLocationUpdatedAt
+    }
+  }
+`;
+export const UPDATE_DRIVER_ONLINE_STATUS = gql`
+  mutation UpdateDriverOnlineStatus($isOnline: Boolean!) {
+    updateDriverOnlineStatus(isOnline: $isOnline) {
+      id
+      isOnline
+      firstName
+      lastName
+    }
+  }
+`;

@@ -17,6 +17,7 @@ import { DeliveryZoneRepository } from '@/repositories/DeliveryZoneRepository';
 import { DeliveryZoneService } from '@/services/DeliveryZoneService';
 import { pubsub } from '@/lib/pubsub';
 import { decodeJwtToken } from '@/lib/utils/authUtils';
+import { getDriverServices, initializeDriverServices } from '@/services/driverServices.init';
 
 /**
  * Extracts and verifies JWT token from request Authorization header or WebSocket connection params
@@ -89,6 +90,22 @@ export async function createContext(initialContext: YogaInitialContext): Promise
     const orderService = new OrderService(orderRepository, authRepository, productRepository, pubsub);
     const deliveryZoneService = new DeliveryZoneService(deliveryZoneRepository);
 
+    // Get driver services (initialized on server startup)
+    let driverService;
+    try {
+        const { driverService: ds } = getDriverServices();
+        driverService = ds;
+    } catch (error) {
+        console.warn('Driver services not yet initialized, initializing lazily');
+        try {
+            const { driverService: ds } = await initializeDriverServices();
+            driverService = ds;
+        } catch (initError) {
+            console.warn('Driver services failed to initialize');
+            driverService = undefined;
+        }
+    }
+
     return {
         ...initialContext,
         db,
@@ -99,6 +116,7 @@ export async function createContext(initialContext: YogaInitialContext): Promise
         authService,
         orderService,
         deliveryZoneService,
+        driverService,
         pubsub,
     };
 }

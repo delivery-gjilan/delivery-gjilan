@@ -264,4 +264,25 @@ export class AuthService {
     async getDrivers(): Promise<DbUser[]> {
         return this.authRepository.findDrivers();
     }
+
+    /**
+     * Get user by ID
+     */
+    async getUserById(userId: string): Promise<DbUser | undefined> {
+        return this.authRepository.findById(userId);
+    }
+
+    /**
+     * Update user fields
+     */
+    async updateUser(userId: string, data: Partial<Omit<DbUser, 'id' | 'createdAt'>>): Promise<DbUser | undefined> {
+        return this.authRepository.updateUser(userId, data);
+    }
+
+    /**
+     * Update driver online status (for backward compatibility)
+     */
+    async updateDriverOnlineStatus(userId: string, isOnline: boolean): Promise<void> {
+        await this.authRepository.updateDriverOnlineStatus(userId, isOnline);
+    }
 }

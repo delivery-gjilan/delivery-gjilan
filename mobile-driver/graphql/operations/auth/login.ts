@@ -14,6 +14,11 @@ export const LOGIN_MUTATION = gql`
                 emailVerified
                 phoneVerified
                 phoneNumber
+                driverConnection {
+                    onlinePreference
+                    connectionStatus
+                    lastLocationUpdate
+                }
             }
             message
         }

@@ -6,12 +6,23 @@ import { createContext } from './graphql/createContext';
 import uploadRoutes from './routes/uploadRoutes';
 import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/use/ws';
+import { initializeDriverServices, shutdownDriverServices } from '@/services/driverServices.init';
 
 const app = express();
 const port = process.env.PORT || 4000;
 
 app.use(cors());
 app.use(express.json());
+
+// Basic request logging for visibility in dev
+app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+        const durationMs = Date.now() - start;
+        console.log(`[${res.statusCode}] ${req.method} ${req.originalUrl} ${durationMs}ms`);
+    });
+    next();
+});
 
 // Upload routes (REST API)
 app.use('/api/upload', uploadRoutes);
@@ -28,8 +39,15 @@ const yoga = createYoga({
 
 app.use(yoga.graphqlEndpoint, yoga);
 
-const httpServer = app.listen(port, () => {
+const httpServer = app.listen(port, async () => {
     console.log(`Server is running on http://localhost:${port}/graphql`);
+    
+    // Initialize driver services (heartbeat checker)
+    try {
+        await initializeDriverServices();
+    } catch (error) {
+        console.error('Failed to initialize driver services:', error);
+    }
 });
 
 const wsServer = new WebSocketServer({
@@ -74,3 +92,19 @@ useServer(
     },
     wsServer,
 );
+
+// Shutdown handler
+process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down gracefully');
+    shutdownDriverServices();
+    process.exit(0);
+});
+
+process.on('unhandledRejection', (error) => {
+    console.error('Unhandled promise rejection:', error);
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught exception:', error);
+    process.exit(1);
+});

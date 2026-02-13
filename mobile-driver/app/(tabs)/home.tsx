@@ -3,8 +3,10 @@ import { View, Text, ScrollView, Modal, Pressable, Switch, Linking, Platform } f
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
+import { useAuth } from '@/hooks/useAuth';
 import { useMutation, useQuery, useSubscription } from '@apollo/client/react';
 import { ALL_ORDERS_UPDATED, GET_ORDERS, UPDATE_ORDER_STATUS } from '@/graphql/operations/orders';
+import { UPDATE_DRIVER_ONLINE_STATUS } from '@/graphql/operations/driverLocation';
 import { Button } from '@/components/Button';
 import { calculateRouteDistance } from '@/utils/mapbox';
 import { useAuthStore } from '@/store/authStore';
@@ -15,12 +17,15 @@ export default function Home() {
     const theme = useTheme();
     const { t } = useTranslations();
     const router = useRouter();
+    const { logout } = useAuth();
 
     const isOnline = useAuthStore((state) => state.isOnline);
     const setOnline = useAuthStore((state) => state.setOnline);
+    const setUser = useAuthStore((state) => state.setUser);
     const [newOrder, setNewOrder] = useState<any | null>(null);
     const seenOrderIds = useRef<Set<string>>(new Set());
     const [orderDistances, setOrderDistances] = useState<Record<string, { distanceKm: number; durationMin: number }>>({});
+    const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
 
     const { data, loading, error, refetch } = useQuery(GET_ORDERS, {
         fetchPolicy: 'network-only',
@@ -48,6 +53,29 @@ export default function Home() {
 
     const [updateStatus, { loading: updating }] = useMutation(UPDATE_ORDER_STATUS);
     const [updatingId, setUpdatingId] = useState<string | null>(null);
+    const [updateOnlineStatus, { loading: updatingStatus }] = useMutation(UPDATE_DRIVER_ONLINE_STATUS);
+    
+    const handleOnlineStatusChange = async (newStatus: boolean) => {
+        try {
+            setOnline(newStatus); // Optimistic update
+            const result = await updateOnlineStatus({
+                variables: { isOnline: newStatus },
+            });
+            
+            const updatedUser = (result.data as any)?.updateDriverOnlineStatus;
+            if (updatedUser) {
+                // Update the full user object so persistence includes the updated driverConnection
+                setUser(updatedUser);
+                // setOnline will be recalculated in setUser based on driverConnection.onlinePreference
+                console.log('[HandleOnlineToggle] Updated user with new preference', {
+                    onlinePreference: updatedUser.driverConnection?.onlinePreference
+                });
+            }
+        } catch (err) {
+            console.error('[HandleOnlineToggle] Failed to update online status:', err);
+            setOnline(!newStatus); // Revert on failure
+        }
+    };
 
     const activeOrders = useMemo(() => {
         const orders = (data as any)?.orders || [];
@@ -181,6 +209,18 @@ export default function Home() {
     const businessNamesForOrder = (order: any) =>
         order.businesses.map((b: any) => b.business.name).join(', ');
 
+    const itemsForOrder = (order: any) =>
+        order.businesses.flatMap((b: any) => b.items || []);
+
+    const handleLogout = async () => {
+        try {
+            await logout();
+            router.replace('/login');
+        } catch (err) {
+            console.error('[Logout] Failed:', err);
+        }
+    };
+
     return (
         <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }}>
             <Modal
@@ -238,18 +278,120 @@ export default function Home() {
                     </View>
                 </View>
             </Modal>
+            <Modal
+                visible={!!selectedOrder}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setSelectedOrder(null)}
+            >
+                <View className="flex-1 items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
+                    <View className="w-[92%] rounded-3xl p-6" style={{ backgroundColor: theme.colors.card }}>
+                        <Text className="text-xs uppercase tracking-wide" style={{ color: theme.colors.subtext }}>
+                            Order details
+                        </Text>
+                        <Text className="text-xl font-bold mt-2" style={{ color: theme.colors.text }}>
+                            {selectedOrder ? businessNamesForOrder(selectedOrder) : ''}
+                        </Text>
+                        <Text className="text-sm mt-1" style={{ color: theme.colors.subtext }}>
+                            Status: {selectedOrder?.status}
+                        </Text>
+                        {selectedOrder?.dropOffLocation?.address && (
+                            <Text className="text-sm mt-2" style={{ color: theme.colors.subtext }}>
+                                Dropoff: {selectedOrder.dropOffLocation.address}
+                            </Text>
+                        )}
+
+                        <View className="mt-4 rounded-2xl p-4" style={{ backgroundColor: theme.colors.border }}>
+                            <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
+                                ETA
+                            </Text>
+                            <Text className="text-2xl font-bold" style={{ color: theme.colors.text }}>
+                                {selectedOrder && orderDistances[selectedOrder.id]
+                                    ? `~${Math.round(orderDistances[selectedOrder.id].durationMin)} min`
+                                    : 'Calculating...'}
+                            </Text>
+                            <Text className="text-xs mt-1" style={{ color: theme.colors.subtext }}>
+                                {selectedOrder && orderDistances[selectedOrder.id]
+                                    ? `${orderDistances[selectedOrder.id].distanceKm.toFixed(1)} km total`
+                                    : 'Please wait...'}
+                            </Text>
+                        </View>
+
+                        <View className="mt-4">
+                            <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
+                                Items
+                            </Text>
+                            <View className="mt-2 space-y-1">
+                                {selectedOrder && itemsForOrder(selectedOrder).length > 0 ? (
+                                    itemsForOrder(selectedOrder).map((item: any, index: number) => (
+                                        <Text key={`${item.name}-${index}`} className="text-sm" style={{ color: theme.colors.subtext }}>
+                                            {item.quantity}x {item.name}
+                                        </Text>
+                                    ))
+                                ) : (
+                                    <Text className="text-sm" style={{ color: theme.colors.subtext }}>
+                                        No items listed.
+                                    </Text>
+                                )}
+                            </View>
+                        </View>
+
+                        <View className="flex-row gap-3 mt-6">
+                            <Pressable
+                                className="flex-1 py-3 rounded-2xl items-center"
+                                style={{ backgroundColor: theme.colors.border }}
+                                onPress={() => setSelectedOrder(null)}
+                            >
+                                <Text style={{ color: theme.colors.text }} className="font-semibold">
+                                    Close
+                                </Text>
+                            </Pressable>
+                            <Pressable
+                                className="flex-1 py-3 rounded-2xl items-center"
+                                style={{ backgroundColor: theme.colors.primary }}
+                                onPress={() => {
+                                    if (!selectedOrder) return;
+                                    router.push({ pathname: '/order-map', params: { orderId: selectedOrder.id } });
+                                }}
+                            >
+                                <Text className="text-white font-semibold">Show location</Text>
+                            </Pressable>
+                        </View>
+
+                        {selectedOrder?.status === 'OUT_FOR_DELIVERY' && (
+                            <Pressable
+                                className="mt-3 py-3 rounded-2xl items-center"
+                                style={{ backgroundColor: theme.colors.income }}
+                                onPress={() => selectedOrder && openNavigation(selectedOrder)}
+                            >
+                                <Text className="text-white font-semibold">Start navigation</Text>
+                            </Pressable>
+                        )}
+                    </View>
+                </View>
+            </Modal>
             <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 20 }}>
                 <View className="px-4 pt-4 pb-2 flex-row items-center justify-between">
                     <Text className="text-2xl font-bold" style={{ color: theme.colors.text }}>
                         Deliveries
                     </Text>
                     <View className="flex-row items-center gap-2">
+                        <Pressable
+                            className="px-3 py-1.5 rounded-full"
+                            style={{ backgroundColor: theme.colors.border }}
+                            onPress={handleLogout}
+                        >
+                            <Text className="text-xs" style={{ color: theme.colors.text }}>
+                                Logout
+                            </Text>
+                        </Pressable>
                         <Text className="text-sm" style={{ color: theme.colors.subtext }}>
                             {isOnline ? 'Online' : 'Offline'}
                         </Text>
                         <Switch
                             value={isOnline}
-                            onValueChange={setOnline}
+                            onValueChange={handleOnlineStatusChange}
+                            disabled={updatingStatus}
                             trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
                             thumbColor={isOnline ? '#ffffff' : '#f4f3f4'}
                         />
@@ -307,6 +449,12 @@ export default function Home() {
                                     )}
 
                                     <View className="flex-row gap-2 mt-3">
+                                        <Button
+                                            title="Details"
+                                            size="sm"
+                                            variant="outline"
+                                            onPress={() => setSelectedOrder(order)}
+                                        />
                                         {order.status === 'READY' && (
                                             <Button
                                                 title="Start Delivery"

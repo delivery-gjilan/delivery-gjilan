@@ -7,7 +7,6 @@ import { useTranslations } from '@/hooks/useTranslations';
 import { useBusinesses } from '@/modules/business/hooks/useBusinesses';
 import { RestaurantCard } from '@/modules/business/components/RestaurantCard';
 import { PromoSlider, PromoBanner } from '@/components/PromoSlider';
-import { Categories } from '@/components/Categories';
 import { RestaurantCardSkeleton } from '@/components/Skeleton';
 import { WoltHeader } from '@/components/WoltHeader';
 
@@ -87,11 +86,6 @@ export default function Home() {
 
                 {loading ? (
                     <ScrollView showsVerticalScrollIndicator={false}>
-                        {/* Categories Skeleton */}
-                        <View className="mb-6">
-                            <Categories />
-                        </View>
-
                         {/* Promotional Slider Skeleton */}
                         <View className="mb-6">
                             <PromoSlider banners={promoBanners} />
@@ -116,11 +110,6 @@ export default function Home() {
                     </View>
                 ) : (
                     <ScrollView showsVerticalScrollIndicator={false}>
-                        {/* Categories */}
-                        <View className="mb-6">
-                            <Categories />
-                        </View>
-
                         {/* Promotional Slider */}
                         <View className="mb-6">
                             <PromoSlider banners={promoBanners} />

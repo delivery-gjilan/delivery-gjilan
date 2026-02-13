@@ -9,6 +9,15 @@ interface AuthState {
     user: User | null;
     isLoading: boolean;
     isAuthenticated: boolean;
+    hasHydrated: boolean;
+    /**
+     * Driver's online preference toggle ("I want to work")
+     * Note: This is separate from the backend's connectionStatus
+     * which is calculated based on whether the driver is actively sending location updates
+     * 
+     * - isOnline = user's preference (manual toggle)
+     * - drivers.connectionStatus = system's calculation (automatic, based on heartbeat)
+     */
     isOnline: boolean;
 
     setToken: (token: string) => void;
@@ -28,27 +37,33 @@ export const useAuthStore = create<AuthState>()(
             user: null,
             isLoading: false,
             isAuthenticated: false,
+            hasHydrated: false,
             isOnline: true,
 
             setToken: (token) => set({ token }),
 
-            setUser: (user) =>
+            setUser: (user) => {
+                const onlinePref = (user as any)?.driverConnection?.onlinePreference;
                 set({
                     user,
                     isAuthenticated: isDriver(user),
-                }),
+                    isOnline: typeof onlinePref === 'boolean' ? onlinePref : true,
+                });
+            },
 
             setLoading: (isLoading) => set({ isLoading }),
 
             setOnline: (isOnline) => set({ isOnline }),
 
-            login: (token, user) =>
+            login: (token, user) => {
+                const onlinePref = (user as any)?.driverConnection?.onlinePreference;
                 set({
                     token,
                     user,
                     isAuthenticated: isDriver(user),
-                    isOnline: true,
-                }),
+                    isOnline: typeof onlinePref === 'boolean' ? onlinePref : true,
+                });
+            },
 
             logout: async () => {
                 await deleteToken();
@@ -68,6 +83,16 @@ export const useAuthStore = create<AuthState>()(
                 user: state.user,
                 isOnline: state.isOnline,
             }),
+            onRehydrateStorage: () => (state) => {
+                if (!state) {
+                    return;
+                }
+
+                const onlinePref = (state.user as any)?.driverConnection?.onlinePreference;
+                state.isAuthenticated = isDriver(state.user);
+                state.isOnline = typeof onlinePref === 'boolean' ? onlinePref : state.isOnline;
+                state.hasHydrated = true;
+            },
         }
     )
 );
