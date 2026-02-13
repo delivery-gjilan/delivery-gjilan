@@ -38,9 +38,9 @@
       "isBackground": true
     },
     {
-      "label": "ngrok:api",
+      "label": "ngrok:tunnels",
       "type": "shell",
-      "command": "ngrok http 4000",
+      "command": "ngrok start --all",
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -53,7 +53,7 @@
         "admin:dev",
         "mobile-customer:start",
         "mobile-driver:start",
-        "ngrok:api"
+        "ngrok:tunnels"
       ],
       "dependsOrder": "parallel",
       "problemMatcher": []

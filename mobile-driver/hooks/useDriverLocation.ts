@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Alert } from 'react-native';
+import { Alert, AppState, AppStateStatus } from 'react-native';
 import * as Location from 'expo-location';
 import { useMutation } from '@apollo/client/react';
 import { UPDATE_DRIVER_LOCATION } from '@/graphql/operations/driverLocation';
@@ -16,6 +16,39 @@ export function useDriverLocation() {
     const subscriptionRef = useRef<Location.LocationSubscription | null>(null);
     const simIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const simAngleRef = useRef(0);
+    const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+    const watchRefreshNeededRef = useRef(false);
+
+    // Handle app state changes (restart location watch when app comes to foreground)
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', (
+                isAuthenticated, 
+                isOnline, 
+                watchRefreshNeeded: watchRefreshNeededRef.current 
+            });
+            
+            if (!isAuthenticated) {
+                console.log('[DriverLocation] not authenticated, skipping');
+                return;
+            }
+            
+            if (!isOnline) {
+                console.log('[DriverLocation] not online, skipping location tracking');
+                return;
+            }
+
+            // If watch refresh was needed (app came to foreground), clean up old subscription first
+            if (watchRefreshNeededRef.current) {
+                console.log('[DriverLocation] cleaning up old subscription for refresh');
+                subscriptionRef.current?.remove();
+                subscriptionRef.current = null;
+                watchRefreshNeededRef.current = falsef.current = nextAppState;
+        });
+
+        return () => {
+            subscription.remove();
+        };
+    }, [isAuthenticated, isOnline]);
 
     useEffect(() => {
         let isActive = true;

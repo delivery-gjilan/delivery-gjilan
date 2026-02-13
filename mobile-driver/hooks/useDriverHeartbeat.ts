@@ -172,9 +172,16 @@ export function useDriverHeartbeat() {
       const isNowActive = nextAppState === 'active';
 
       if (wasBackground && isNowActive && isAuthenticated) {
-        // App came to foreground - immediately send heartbeat
-        console.log('[Heartbeat] App foregrounded, sending immediate heartbeat');
-        doHeartbeat();
+        // App came to foreground - ensure heartbeat is still running
+        console.log('[Heartbeat] App foregrounded, verifying heartbeat is active');
+        if (!heartbeatIntervalRef.current) {
+          console.log('[Heartbeat] Heartbeat stopped, restarting...');
+          startHeartbeat();
+        } else {
+          // Send immediate heartbeat to refresh
+          console.log('[Heartbeat] Heartbeat active, sending immediate update');
+          doHeartbeat();
+        }
       }
 
       appStateRef.current = nextAppState;
@@ -183,7 +190,7 @@ export function useDriverHeartbeat() {
     return () => {
       subscription.remove();
     };
-  }, [isAuthenticated, doHeartbeat]);
+  }, [isAuthenticated, startHeartbeat, doHeartbeat]);
 
   // Main effect - start/stop based on auth only
   // Keep heartbeat active even if the driver toggles offline preference

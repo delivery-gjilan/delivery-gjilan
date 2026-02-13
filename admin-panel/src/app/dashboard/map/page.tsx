@@ -150,6 +150,8 @@ export default function MapPage() {
   const [showDriverToBusinessRoute, setShowDriverToBusinessRoute] = useState<Record<string, boolean>>({});
   const [driverProgressOnRoute, setDriverProgressOnRoute] = useState<Record<string, number>>({});
   const [driverTracks, setDriverTracks] = useState<Record<string, any>>({});
+  const [animatedDriverPositions, setAnimatedDriverPositions] = useState<Record<string, { latitude: number; longitude: number }>>({});
+  const animationStateRef = useRef<Record<string, { from: any; to: any; startTime: number; duration: number }>>({});
   const [hoveredOrderId, setHoveredOrderId] = useState<string | null>(null);
   const [showDriversPanel, setShowDriversPanel] = useState(false);
   const [statusChangeTime, setStatusChangeTime] = useState<Record<string, number>>({});
@@ -306,10 +308,22 @@ export default function MapPage() {
       drivers.forEach((driver: any) => {
         const location = driver.driverLocation;
         if (!location?.latitude || !location?.longitude) return;
+        const newPos = { latitude: location.latitude, longitude: location.longitude };
+        
+        // Set up animation state for new position
+        const trackId = driver.id;
+        const currentAnimated = animatedDriverPositions[trackId] || newPos;
+        animationStateRef.current[trackId] = {
+          from: currentAnimated,
+          to: newPos,
+          startTime: Date.now(),
+          duration: 2800, // 2.8s animation for 3s update cycle
+        };
+        
         next[driver.id] = {
           id: driver.id,
           name: `${driver.firstName} ${driver.lastName}`.trim(),
-          to: { latitude: location.latitude, longitude: location.longitude },
+          to: newPos,
           updatedAt: driver.driverLocationUpdatedAt,
         };
       });
@@ -341,6 +355,45 @@ export default function MapPage() {
       }
     });
   }, [drivers, activeOrders, orderDistances]);
+
+  // ==== SMOOTH MARKER ANIMATION ====
+  useEffect(() => {
+    let rafId: number;
+    
+    const animate = () => {
+      const now = Date.now();
+      const newAnimatedPositions: Record<string, { latitude: number; longitude: number }> = {};
+      let hasActiveAnimations = false;
+
+      Object.entries(animationStateRef.current).forEach(([driverId, animation]) => {
+        const elapsed = now - animation.startTime;
+        const progress = Math.min(elapsed / animation.duration, 1);
+
+        // Interpolate position (linear easing)
+        const lat = animation.from.latitude + (animation.to.latitude - animation.from.latitude) * progress;
+        const lng = animation.from.longitude + (animation.to.longitude - animation.from.longitude) * progress;
+
+        newAnimatedPositions[driverId] = { latitude: lat, longitude: lng };
+
+        // Continue loop if animation not finished
+        if (progress < 1) {
+          hasActiveAnimations = true;
+        }
+      });
+
+      if (Object.keys(newAnimatedPositions).length > 0) {
+        setAnimatedDriverPositions(newAnimatedPositions);
+      }
+
+      // Continue loop if there are active animations
+      if (hasActiveAnimations) {
+        rafId = requestAnimationFrame(animate);
+      }
+    };
+
+    rafId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(rafId);
+  }, []);
 
   // ==== ROUTE CALCULATION ====
   useEffect(() => {
@@ -984,16 +1037,16 @@ export default function MapPage() {
                   
                   {/* Busy ring indicator */}
                   {isBusy && connectionStatus === 'CONNECTED' && (
-                    <div className="absolute inset-0 w-10 h-10 -top-1 -left-1 rounded-full border-2 border-emerald-400 animate-pulse" />
+                    <div className="absolute inset-0 w-8 h-8 -top-1 -left-1 rounded-full border-2 border-emerald-400 animate-pulse" />
                   )}
                   
                   {/* Avatar */}
                   {driver ? (
-                    <div className={`w-10 h-10 rounded-full ${getAvatarColor(driver.id)} flex items-center justify-center font-bold text-white text-sm border-3 ${statusStyle.border} shadow-lg transition-all hover:scale-110 ${isBusy ? `ring-2 ${statusStyle.ring}` : ''}`}>
+                    <div className={`w-8 h-8 rounded-full ${getAvatarColor(driver.id)} flex items-center justify-center font-bold text-white text-xs border-2 ${statusStyle.border} shadow-lg transition-all hover:scale-125 ${isBusy ? `ring-1.5 ${statusStyle.ring}` : ''}`}>
                       {getInitials(driver.firstName, driver.lastName)}
                     </div>
                   ) : (
-                    <div className={`w-6 h-6 rounded-full ${statusStyle.bg} border-2 border-white shadow-lg`} />
+                    <div className={`w-5 h-5 rounded-full ${statusStyle.bg} border-2 border-white shadow-lg`} />
                   )}
                   
                   {/* Hover tooltip - Enhanced */}
