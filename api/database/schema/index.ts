@@ -8,3 +8,4 @@ export * from './users';
 export * from './deliveryZones';
 export * from './drivers';
 export * from './settlements';
+export * from './auditLogs';

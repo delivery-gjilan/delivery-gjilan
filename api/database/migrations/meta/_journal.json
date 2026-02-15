@@ -120,6 +120,13 @@
       "when": 1771173829401,
       "tag": "0016_clean_catseye",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1771187471240,
+      "tag": "0017_curved_genesis",
+      "breakpoints": true
     }
   ]
 }

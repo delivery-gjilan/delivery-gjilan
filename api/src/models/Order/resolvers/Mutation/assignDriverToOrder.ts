@@ -1,10 +1,12 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
+import { createAuditLogger } from '@/services/AuditLogger';
 
 export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToOrder']> = async (
     _parent,
     { id, driverId },
-    { orderService, authService, userData },
+    context,
 ) => {
+    const { orderService, authService, userData, db } = context;
     console.log('Assigning driver to order:', id, driverId);
 
     const role = userData?.role;
@@ -13,6 +15,7 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
     }
 
     // If driverId is provided, validate that it's a driver
+    let driverName = 'Unassigned';
     if (driverId) {
         const driver = await authService.authRepository.findById(driverId);
         if (!driver) {
@@ -21,6 +24,7 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
         if (driver.role !== 'DRIVER') {
             throw new Error('Specified user is not a driver');
         }
+        driverName = `${driver.firstName} ${driver.lastName}`;
     }
 
     const order = await orderService.assignDriverToOrder(id, driverId);
@@ -34,6 +38,19 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
         // Publish to all admins for real-time updates
         await orderService.publishAllOrders();
     }
+    
+    // Log the action
+    const logger = createAuditLogger(db, context);
+    await logger.log({
+        action: 'ORDER_ASSIGNED',
+        entityType: 'ORDER',
+        entityId: id,
+        metadata: {
+            orderId: id,
+            driverId: driverId || null,
+            driverName,
+        },
+    });
 
     return order;
 };

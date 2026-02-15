@@ -19,6 +19,79 @@ export type Scalars = {
   Float: { input: number; output: number; }
   Date: { input: Date | string; output: Date | string; }
   DateTime: { input: Date | string; output: Date | string; }
+  JSON: { input: any; output: any; }
+};
+
+export type ActionType =
+  | 'BUSINESS_APPROVED'
+  | 'BUSINESS_CREATED'
+  | 'BUSINESS_DELETED'
+  | 'BUSINESS_REJECTED'
+  | 'BUSINESS_UPDATED'
+  | 'CATEGORY_CREATED'
+  | 'CATEGORY_DELETED'
+  | 'CATEGORY_UPDATED'
+  | 'DRIVER_APPROVED'
+  | 'DRIVER_CREATED'
+  | 'DRIVER_REJECTED'
+  | 'DRIVER_STATUS_CHANGED'
+  | 'DRIVER_UPDATED'
+  | 'ORDER_ASSIGNED'
+  | 'ORDER_CANCELLED'
+  | 'ORDER_CREATED'
+  | 'ORDER_DELIVERED'
+  | 'ORDER_STATUS_CHANGED'
+  | 'ORDER_UPDATED'
+  | 'PASSWORD_CHANGED'
+  | 'PASSWORD_RESET'
+  | 'PRODUCT_AVAILABILITY_CHANGED'
+  | 'PRODUCT_CREATED'
+  | 'PRODUCT_DELETED'
+  | 'PRODUCT_PRICE_CHANGED'
+  | 'PRODUCT_PUBLISHED'
+  | 'PRODUCT_UNPUBLISHED'
+  | 'PRODUCT_UPDATED'
+  | 'SETTLEMENT_CREATED'
+  | 'SETTLEMENT_PAID'
+  | 'SETTLEMENT_PARTIAL_PAID'
+  | 'SETTLEMENT_UNSETTLED'
+  | 'SUBCATEGORY_CREATED'
+  | 'SUBCATEGORY_DELETED'
+  | 'SUBCATEGORY_UPDATED'
+  | 'USER_CREATED'
+  | 'USER_DELETED'
+  | 'USER_LOGIN'
+  | 'USER_LOGOUT'
+  | 'USER_ROLE_CHANGED'
+  | 'USER_UPDATED';
+
+export type ActorType =
+  | 'ADMIN'
+  | 'BUSINESS'
+  | 'CUSTOMER'
+  | 'DRIVER'
+  | 'SYSTEM';
+
+export type AuditLog = {
+  __typename?: 'AuditLog';
+  action: ActionType;
+  actor?: Maybe<User>;
+  actorId?: Maybe<Scalars['ID']['output']>;
+  actorType: ActorType;
+  createdAt: Scalars['DateTime']['output'];
+  entityId?: Maybe<Scalars['ID']['output']>;
+  entityType: EntityType;
+  id: Scalars['ID']['output'];
+  ipAddress?: Maybe<Scalars['String']['output']>;
+  metadata?: Maybe<Scalars['JSON']['output']>;
+  userAgent?: Maybe<Scalars['String']['output']>;
+};
+
+export type AuditLogConnection = {
+  __typename?: 'AuditLogConnection';
+  hasMore: Scalars['Boolean']['output'];
+  logs: Array<AuditLog>;
+  total: Scalars['Int']['output'];
 };
 
 export type AuthResponse = {
@@ -170,6 +243,17 @@ export type DriverHeartbeatResult = {
   /** Whether heartbeat was processed successfully */
   success: Scalars['Boolean']['output'];
 };
+
+export type EntityType =
+  | 'BUSINESS'
+  | 'CATEGORY'
+  | 'DELIVERY_ZONE'
+  | 'DRIVER'
+  | 'ORDER'
+  | 'PRODUCT'
+  | 'SETTLEMENT'
+  | 'SUBCATEGORY'
+  | 'USER';
 
 export type InitiateSignupInput = {
   email: Scalars['String']['input'];
@@ -544,6 +628,8 @@ export type ProductSubcategory = {
 
 export type Query = {
   __typename?: 'Query';
+  auditLog?: Maybe<AuditLog>;
+  auditLogs: AuditLogConnection;
   business?: Maybe<Business>;
   businessBalance: SettlementSummary;
   businesses: Array<Business>;
@@ -566,6 +652,24 @@ export type Query = {
   settlements: Array<Settlement>;
   uncompletedOrders: Array<Order>;
   users: Array<User>;
+};
+
+
+export type QueryauditLogArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryauditLogsArgs = {
+  action?: InputMaybe<ActionType>;
+  actorId?: InputMaybe<Scalars['ID']['input']>;
+  actorType?: InputMaybe<ActorType>;
+  endDate?: InputMaybe<Scalars['DateTime']['input']>;
+  entityId?: InputMaybe<Scalars['ID']['input']>;
+  entityType?: InputMaybe<EntityType>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  startDate?: InputMaybe<Scalars['DateTime']['input']>;
 };
 
 
@@ -708,12 +812,20 @@ export type SubmitPhoneNumberInput = {
 export type Subscription = {
   __typename?: 'Subscription';
   allOrdersUpdated: Array<Order>;
+  auditLogCreated: AuditLog;
   driverConnectionStatusChanged: DriverConnection;
   driversUpdated: Array<User>;
   orderStatusUpdated: Order;
   settlementCreated: Settlement;
   settlementStatusChanged: Settlement;
   userOrdersUpdated: Array<Order>;
+};
+
+
+export type SubscriptionauditLogCreatedArgs = {
+  action?: InputMaybe<ActionType>;
+  actorType?: InputMaybe<ActorType>;
+  entityType?: InputMaybe<EntityType>;
 };
 
 
@@ -926,13 +1038,17 @@ export type DirectiveResolverFn<TResult = {}, TParent = {}, TContext = {}, TArgs
 
 /** Mapping between all available schema types and the resolvers types */
 export type ResolversTypes = {
-  AuthResponse: ResolverTypeWrapper<Omit<AuthResponse, 'user'> & { user: ResolversTypes['User'] }>;
-  String: ResolverTypeWrapper<Scalars['String']['output']>;
-  Business: ResolverTypeWrapper<Omit<Business, 'businessType'> & { businessType: ResolversTypes['BusinessType'] }>;
-  Int: ResolverTypeWrapper<Scalars['Int']['output']>;
-  Float: ResolverTypeWrapper<Scalars['Float']['output']>;
+  ActionType: ResolverTypeWrapper<'USER_CREATED' | 'USER_UPDATED' | 'USER_DELETED' | 'USER_ROLE_CHANGED' | 'BUSINESS_CREATED' | 'BUSINESS_UPDATED' | 'BUSINESS_DELETED' | 'BUSINESS_APPROVED' | 'BUSINESS_REJECTED' | 'PRODUCT_CREATED' | 'PRODUCT_UPDATED' | 'PRODUCT_DELETED' | 'PRODUCT_PUBLISHED' | 'PRODUCT_UNPUBLISHED' | 'PRODUCT_AVAILABILITY_CHANGED' | 'PRODUCT_PRICE_CHANGED' | 'ORDER_CREATED' | 'ORDER_UPDATED' | 'ORDER_STATUS_CHANGED' | 'ORDER_CANCELLED' | 'ORDER_ASSIGNED' | 'ORDER_DELIVERED' | 'SETTLEMENT_CREATED' | 'SETTLEMENT_PAID' | 'SETTLEMENT_PARTIAL_PAID' | 'SETTLEMENT_UNSETTLED' | 'DRIVER_CREATED' | 'DRIVER_UPDATED' | 'DRIVER_APPROVED' | 'DRIVER_REJECTED' | 'DRIVER_STATUS_CHANGED' | 'USER_LOGIN' | 'USER_LOGOUT' | 'PASSWORD_CHANGED' | 'PASSWORD_RESET' | 'CATEGORY_CREATED' | 'CATEGORY_UPDATED' | 'CATEGORY_DELETED' | 'SUBCATEGORY_CREATED' | 'SUBCATEGORY_UPDATED' | 'SUBCATEGORY_DELETED'>;
+  ActorType: ResolverTypeWrapper<'ADMIN' | 'BUSINESS' | 'DRIVER' | 'CUSTOMER' | 'SYSTEM'>;
+  AuditLog: ResolverTypeWrapper<Omit<AuditLog, 'action' | 'actor' | 'actorType' | 'entityType'> & { action: ResolversTypes['ActionType'], actor?: Maybe<ResolversTypes['User']>, actorType: ResolversTypes['ActorType'], entityType: ResolversTypes['EntityType'] }>;
   ID: ResolverTypeWrapper<Scalars['ID']['output']>;
+  String: ResolverTypeWrapper<Scalars['String']['output']>;
+  AuditLogConnection: ResolverTypeWrapper<Omit<AuditLogConnection, 'logs'> & { logs: Array<ResolversTypes['AuditLog']> }>;
   Boolean: ResolverTypeWrapper<Scalars['Boolean']['output']>;
+  Int: ResolverTypeWrapper<Scalars['Int']['output']>;
+  AuthResponse: ResolverTypeWrapper<Omit<AuthResponse, 'user'> & { user: ResolversTypes['User'] }>;
+  Business: ResolverTypeWrapper<Omit<Business, 'businessType'> & { businessType: ResolversTypes['BusinessType'] }>;
+  Float: ResolverTypeWrapper<Scalars['Float']['output']>;
   BusinessType: ResolverTypeWrapper<'MARKET' | 'PHARMACY' | 'RESTAURANT'>;
   CreateBusinessInput: CreateBusinessInput;
   CreateDeliveryZoneInput: CreateDeliveryZoneInput;
@@ -948,7 +1064,9 @@ export type ResolversTypes = {
   DriverConnection: ResolverTypeWrapper<Omit<DriverConnection, 'connectionStatus'> & { connectionStatus: ResolversTypes['DriverConnectionStatus'] }>;
   DriverConnectionStatus: ResolverTypeWrapper<'CONNECTED' | 'STALE' | 'LOST' | 'DISCONNECTED'>;
   DriverHeartbeatResult: ResolverTypeWrapper<Omit<DriverHeartbeatResult, 'connectionStatus'> & { connectionStatus: ResolversTypes['DriverConnectionStatus'] }>;
+  EntityType: ResolverTypeWrapper<'USER' | 'BUSINESS' | 'PRODUCT' | 'ORDER' | 'SETTLEMENT' | 'DRIVER' | 'CATEGORY' | 'SUBCATEGORY' | 'DELIVERY_ZONE'>;
   InitiateSignupInput: InitiateSignupInput;
+  JSON: ResolverTypeWrapper<Scalars['JSON']['output']>;
   Location: ResolverTypeWrapper<Location>;
   LocationInput: LocationInput;
   LoginInput: LoginInput;
@@ -988,13 +1106,15 @@ export type ResolversTypes = {
 
 /** Mapping between all available schema types and the resolvers parents */
 export type ResolversParentTypes = {
-  AuthResponse: Omit<AuthResponse, 'user'> & { user: ResolversParentTypes['User'] };
-  String: Scalars['String']['output'];
-  Business: Business;
-  Int: Scalars['Int']['output'];
-  Float: Scalars['Float']['output'];
+  AuditLog: Omit<AuditLog, 'actor'> & { actor?: Maybe<ResolversParentTypes['User']> };
   ID: Scalars['ID']['output'];
+  String: Scalars['String']['output'];
+  AuditLogConnection: Omit<AuditLogConnection, 'logs'> & { logs: Array<ResolversParentTypes['AuditLog']> };
   Boolean: Scalars['Boolean']['output'];
+  Int: Scalars['Int']['output'];
+  AuthResponse: Omit<AuthResponse, 'user'> & { user: ResolversParentTypes['User'] };
+  Business: Business;
+  Float: Scalars['Float']['output'];
   CreateBusinessInput: CreateBusinessInput;
   CreateDeliveryZoneInput: CreateDeliveryZoneInput;
   CreateOrderInput: CreateOrderInput;
@@ -1009,6 +1129,7 @@ export type ResolversParentTypes = {
   DriverConnection: DriverConnection;
   DriverHeartbeatResult: DriverHeartbeatResult;
   InitiateSignupInput: InitiateSignupInput;
+  JSON: Scalars['JSON']['output'];
   Location: Location;
   LocationInput: LocationInput;
   LoginInput: LoginInput;
@@ -1044,6 +1165,32 @@ export type ResolversParentTypes = {
 export type skipAuthDirectiveArgs = { };
 
 export type skipAuthDirectiveResolver<Result, Parent, ContextType = GraphQLContext, Args = skipAuthDirectiveArgs> = DirectiveResolverFn<Result, Parent, ContextType, Args>;
+
+export type ActionTypeResolvers = EnumResolverSignature<{ BUSINESS_APPROVED?: any, BUSINESS_CREATED?: any, BUSINESS_DELETED?: any, BUSINESS_REJECTED?: any, BUSINESS_UPDATED?: any, CATEGORY_CREATED?: any, CATEGORY_DELETED?: any, CATEGORY_UPDATED?: any, DRIVER_APPROVED?: any, DRIVER_CREATED?: any, DRIVER_REJECTED?: any, DRIVER_STATUS_CHANGED?: any, DRIVER_UPDATED?: any, ORDER_ASSIGNED?: any, ORDER_CANCELLED?: any, ORDER_CREATED?: any, ORDER_DELIVERED?: any, ORDER_STATUS_CHANGED?: any, ORDER_UPDATED?: any, PASSWORD_CHANGED?: any, PASSWORD_RESET?: any, PRODUCT_AVAILABILITY_CHANGED?: any, PRODUCT_CREATED?: any, PRODUCT_DELETED?: any, PRODUCT_PRICE_CHANGED?: any, PRODUCT_PUBLISHED?: any, PRODUCT_UNPUBLISHED?: any, PRODUCT_UPDATED?: any, SETTLEMENT_CREATED?: any, SETTLEMENT_PAID?: any, SETTLEMENT_PARTIAL_PAID?: any, SETTLEMENT_UNSETTLED?: any, SUBCATEGORY_CREATED?: any, SUBCATEGORY_DELETED?: any, SUBCATEGORY_UPDATED?: any, USER_CREATED?: any, USER_DELETED?: any, USER_LOGIN?: any, USER_LOGOUT?: any, USER_ROLE_CHANGED?: any, USER_UPDATED?: any }, ResolversTypes['ActionType']>;
+
+export type ActorTypeResolvers = EnumResolverSignature<{ ADMIN?: any, BUSINESS?: any, CUSTOMER?: any, DRIVER?: any, SYSTEM?: any }, ResolversTypes['ActorType']>;
+
+export type AuditLogResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['AuditLog'] = ResolversParentTypes['AuditLog']> = {
+  action?: Resolver<ResolversTypes['ActionType'], ParentType, ContextType>;
+  actor?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
+  actorId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
+  actorType?: Resolver<ResolversTypes['ActorType'], ParentType, ContextType>;
+  createdAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+  entityId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
+  entityType?: Resolver<ResolversTypes['EntityType'], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  ipAddress?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  metadata?: Resolver<Maybe<ResolversTypes['JSON']>, ParentType, ContextType>;
+  userAgent?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type AuditLogConnectionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['AuditLogConnection'] = ResolversParentTypes['AuditLogConnection']> = {
+  hasMore?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  logs?: Resolver<Array<ResolversTypes['AuditLog']>, ParentType, ContextType>;
+  total?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
 
 export type AuthResponseResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['AuthResponse'] = ResolversParentTypes['AuthResponse']> = {
   message?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
@@ -1112,6 +1259,12 @@ export type DriverHeartbeatResultResolvers<ContextType = GraphQLContext, ParentT
   success?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
+
+export type EntityTypeResolvers = EnumResolverSignature<{ BUSINESS?: any, CATEGORY?: any, DELIVERY_ZONE?: any, DRIVER?: any, ORDER?: any, PRODUCT?: any, SETTLEMENT?: any, SUBCATEGORY?: any, USER?: any }, ResolversTypes['EntityType']>;
+
+export interface JSONScalarConfig extends GraphQLScalarTypeConfig<ResolversTypes['JSON'], any> {
+  name: 'JSON';
+}
 
 export type LocationResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Location'] = ResolversParentTypes['Location']> = {
   address?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
@@ -1236,6 +1389,8 @@ export type ProductSubcategoryResolvers<ContextType = GraphQLContext, ParentType
 };
 
 export type QueryResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Query'] = ResolversParentTypes['Query']> = {
+  auditLog?: Resolver<Maybe<ResolversTypes['AuditLog']>, ParentType, ContextType, RequireFields<QueryauditLogArgs, 'id'>>;
+  auditLogs?: Resolver<ResolversTypes['AuditLogConnection'], ParentType, ContextType, Partial<QueryauditLogsArgs>>;
   business?: Resolver<Maybe<ResolversTypes['Business']>, ParentType, ContextType, RequireFields<QuerybusinessArgs, 'id'>>;
   businessBalance?: Resolver<ResolversTypes['SettlementSummary'], ParentType, ContextType, RequireFields<QuerybusinessBalanceArgs, 'businessId'>>;
   businesses?: Resolver<Array<ResolversTypes['Business']>, ParentType, ContextType>;
@@ -1298,6 +1453,7 @@ export type SignupStepResponseResolvers<ContextType = GraphQLContext, ParentType
 
 export type SubscriptionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Subscription'] = ResolversParentTypes['Subscription']> = {
   allOrdersUpdated?: SubscriptionResolver<Array<ResolversTypes['Order']>, "allOrdersUpdated", ParentType, ContextType>;
+  auditLogCreated?: SubscriptionResolver<ResolversTypes['AuditLog'], "auditLogCreated", ParentType, ContextType, Partial<SubscriptionauditLogCreatedArgs>>;
   driverConnectionStatusChanged?: SubscriptionResolver<ResolversTypes['DriverConnection'], "driverConnectionStatusChanged", ParentType, ContextType, RequireFields<SubscriptiondriverConnectionStatusChangedArgs, 'driverId'>>;
   driversUpdated?: SubscriptionResolver<Array<ResolversTypes['User']>, "driversUpdated", ParentType, ContextType>;
   orderStatusUpdated?: SubscriptionResolver<ResolversTypes['Order'], "orderStatusUpdated", ParentType, ContextType, RequireFields<SubscriptionorderStatusUpdatedArgs, 'orderId'>>;
@@ -1346,6 +1502,10 @@ export type ZoneFeeResultResolvers<ContextType = GraphQLContext, ParentType exte
 };
 
 export type Resolvers<ContextType = GraphQLContext> = {
+  ActionType?: ActionTypeResolvers;
+  ActorType?: ActorTypeResolvers;
+  AuditLog?: AuditLogResolvers<ContextType>;
+  AuditLogConnection?: AuditLogConnectionResolvers<ContextType>;
   AuthResponse?: AuthResponseResolvers<ContextType>;
   Business?: BusinessResolvers<ContextType>;
   BusinessType?: BusinessTypeResolvers;
@@ -1355,6 +1515,8 @@ export type Resolvers<ContextType = GraphQLContext> = {
   DriverConnection?: DriverConnectionResolvers<ContextType>;
   DriverConnectionStatus?: DriverConnectionStatusResolvers;
   DriverHeartbeatResult?: DriverHeartbeatResultResolvers<ContextType>;
+  EntityType?: EntityTypeResolvers;
+  JSON?: GraphQLScalarType;
   Location?: LocationResolvers<ContextType>;
   Mutation?: MutationResolvers<ContextType>;
   Order?: OrderResolvers<ContextType>;

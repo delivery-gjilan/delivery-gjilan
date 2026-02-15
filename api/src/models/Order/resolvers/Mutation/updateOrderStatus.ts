@@ -3,12 +3,14 @@ import { getDB } from '@/database';
 import { orderItems as orderItemsTable } from '@/database/schema';
 import { eq } from 'drizzle-orm';
 import { FinancialService } from '@/services/FinancialService';
+import { createAuditLogger } from '@/services/AuditLogger';
 
 export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus']> = async (
     _parent,
     { id, status },
-    { orderService, userData },
+    context,
 ) => {
+    const { orderService, userData, db } = context;
     console.log('Updating order status:', id, status);
 
     const role = userData?.role;
@@ -100,6 +102,20 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
     
     // Publish to all admins for real-time updates
     await orderService.publishAllOrders();
+    
+    // Log the status change
+    const logger = createAuditLogger(db, context);
+    await logger.log({
+        action: 'ORDER_STATUS_CHANGED',
+        entityType: 'ORDER',
+        entityId: id,
+        metadata: {
+            orderId: id,
+            oldValue: { status: currentStatus },
+            newValue: { status },
+            changedFields: ['status'],
+        },
+    });
     
     return order;
 };

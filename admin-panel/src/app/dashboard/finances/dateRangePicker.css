@@ -1,0 +1,112 @@
+/* Dark theme overrides for react-date-range */
+.rdrCalendarWrapper {
+    font-family: inherit;
+}
+
+.rdrCalendarWrapper.dark-theme {
+    background: #0f0f0f;
+    color: white;
+}
+
+.rdrCalendarWrapper.dark-theme .rdrMonthAndYearWrapper {
+    background: #1a1a1a;
+}
+
+.rdrCalendarWrapper.dark-theme .rdrMonthName {
+    color: white;
+}
+
+.rdrCalendarWrapper.dark-theme .rdrYear,
+.rdrCalendarWrapper.dark-theme .rdrMonth {
+    color: white;
+}
+
+.rdrCalendarWrapper.dark-theme .rdrNextPrevButton {
+    background: #0a0a0a;
+    border: 1px solid #262626;
+}
+
+.rdrCalendarWrapper.dark-theme .rdrNextPrevButton:hover {
+    background: #1a1a1a;
+}
+
+.rdrCalendarWrapper.dark-theme .rdrDayNumber {
+    color: white;
+}
+
+.rdrCalendarWrapper.dark-theme .rdrDayNumber:after {
+    background: transparent;
+}
+
+.rdrCalendarWrapper.dark-theme .rdrDay {
+    background: transparent;
+    border: 1px solid transparent;
+}
+
+.rdrCalendarWrapper.dark-theme .rdrDay:hover {
+    background: #1a1a1a;
+    border: 1px solid #262626;
+}
+
+.rdrCalendarWrapper.dark-theme .rdrDay.rdrDayInPreview {
+    background: #0a4f61;
+}
+
+.rdrCalendarWrapper.dark-theme .rdrDay.rdrDayStartOfMonth {
+    border-left: 1px solid #262626;
+}
+
+.rdrCalendarWrapper.dark-theme .rdrDay.rdrDayEndOfMonth {
+    border-right: 1px solid #262626;
+}
+
+.rdrCalendarWrapper.dark-theme .rdrDay.rdrDayStartPreview,
+.rdrCalendarWrapper.dark-theme .rdrDay.rdrDayInPreview,
+.rdrCalendarWrapper.dark-theme .rdrDay.rdrDayEndPreview {
+    background: #06b6d4;
+}
+
+.rdrCalendarWrapper.dark-theme .rdrDay.rdrDayInPreview span {
+    color: white;
+}
+
+.rdrCalendarWrapper.dark-theme .rdrDayWeekends {
+    background: transparent;
+}
+
+.rdrCalendarWrapper.dark-theme .rdrDayToday .rdrDayNumber span {
+    background: #06b6d4;
+    color: white;
+}
+
+.rdrCalendarWrapper.dark-theme .rdrWeekday {
+    color: #737373;
+}
+
+.rdrCalendarWrapper.dark-theme .rdrMonth {
+    width: 100%;
+}
+
+.rdrDateDisplayWrapper {
+    background: #0a0a0a;
+    border: 1px solid #262626;
+}
+
+.rdrDateDisplayItem {
+    color: white;
+}
+
+.rdrDateDisplayItem input {
+    background: #1a1a1a;
+    border: 1px solid #262626;
+    color: white;
+}
+
+.rdrDateDisplayItem input:focus {
+    border: 1px solid #06b6d4;
+    outline: none;
+}
+
+.rdrInputRanges {
+    display: none;
+}

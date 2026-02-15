@@ -16,6 +16,81 @@ export type Scalars = {
   Float: { input: number; output: number; }
   Date: { input: any; output: any; }
   DateTime: { input: any; output: any; }
+  JSON: { input: any; output: any; }
+};
+
+export enum ActionType {
+  BusinessApproved = 'BUSINESS_APPROVED',
+  BusinessCreated = 'BUSINESS_CREATED',
+  BusinessDeleted = 'BUSINESS_DELETED',
+  BusinessRejected = 'BUSINESS_REJECTED',
+  BusinessUpdated = 'BUSINESS_UPDATED',
+  CategoryCreated = 'CATEGORY_CREATED',
+  CategoryDeleted = 'CATEGORY_DELETED',
+  CategoryUpdated = 'CATEGORY_UPDATED',
+  DriverApproved = 'DRIVER_APPROVED',
+  DriverCreated = 'DRIVER_CREATED',
+  DriverRejected = 'DRIVER_REJECTED',
+  DriverStatusChanged = 'DRIVER_STATUS_CHANGED',
+  DriverUpdated = 'DRIVER_UPDATED',
+  OrderAssigned = 'ORDER_ASSIGNED',
+  OrderCancelled = 'ORDER_CANCELLED',
+  OrderCreated = 'ORDER_CREATED',
+  OrderDelivered = 'ORDER_DELIVERED',
+  OrderStatusChanged = 'ORDER_STATUS_CHANGED',
+  OrderUpdated = 'ORDER_UPDATED',
+  PasswordChanged = 'PASSWORD_CHANGED',
+  PasswordReset = 'PASSWORD_RESET',
+  ProductAvailabilityChanged = 'PRODUCT_AVAILABILITY_CHANGED',
+  ProductCreated = 'PRODUCT_CREATED',
+  ProductDeleted = 'PRODUCT_DELETED',
+  ProductPriceChanged = 'PRODUCT_PRICE_CHANGED',
+  ProductPublished = 'PRODUCT_PUBLISHED',
+  ProductUnpublished = 'PRODUCT_UNPUBLISHED',
+  ProductUpdated = 'PRODUCT_UPDATED',
+  SettlementCreated = 'SETTLEMENT_CREATED',
+  SettlementPaid = 'SETTLEMENT_PAID',
+  SettlementPartialPaid = 'SETTLEMENT_PARTIAL_PAID',
+  SettlementUnsettled = 'SETTLEMENT_UNSETTLED',
+  SubcategoryCreated = 'SUBCATEGORY_CREATED',
+  SubcategoryDeleted = 'SUBCATEGORY_DELETED',
+  SubcategoryUpdated = 'SUBCATEGORY_UPDATED',
+  UserCreated = 'USER_CREATED',
+  UserDeleted = 'USER_DELETED',
+  UserLogin = 'USER_LOGIN',
+  UserLogout = 'USER_LOGOUT',
+  UserRoleChanged = 'USER_ROLE_CHANGED',
+  UserUpdated = 'USER_UPDATED'
+}
+
+export enum ActorType {
+  Admin = 'ADMIN',
+  Business = 'BUSINESS',
+  Customer = 'CUSTOMER',
+  Driver = 'DRIVER',
+  System = 'SYSTEM'
+}
+
+export type AuditLog = {
+  __typename?: 'AuditLog';
+  action: ActionType;
+  actor?: Maybe<User>;
+  actorId?: Maybe<Scalars['ID']['output']>;
+  actorType: ActorType;
+  createdAt: Scalars['DateTime']['output'];
+  entityId?: Maybe<Scalars['ID']['output']>;
+  entityType: EntityType;
+  id: Scalars['ID']['output'];
+  ipAddress?: Maybe<Scalars['String']['output']>;
+  metadata?: Maybe<Scalars['JSON']['output']>;
+  userAgent?: Maybe<Scalars['String']['output']>;
+};
+
+export type AuditLogConnection = {
+  __typename?: 'AuditLogConnection';
+  hasMore: Scalars['Boolean']['output'];
+  logs: Array<AuditLog>;
+  total: Scalars['Int']['output'];
 };
 
 export type AuthResponse = {
@@ -169,6 +244,18 @@ export type DriverHeartbeatResult = {
   /** Whether heartbeat was processed successfully */
   success: Scalars['Boolean']['output'];
 };
+
+export enum EntityType {
+  Business = 'BUSINESS',
+  Category = 'CATEGORY',
+  DeliveryZone = 'DELIVERY_ZONE',
+  Driver = 'DRIVER',
+  Order = 'ORDER',
+  Product = 'PRODUCT',
+  Settlement = 'SETTLEMENT',
+  Subcategory = 'SUBCATEGORY',
+  User = 'USER'
+}
 
 export type InitiateSignupInput = {
   email: Scalars['String']['input'];
@@ -544,6 +631,8 @@ export type ProductSubcategory = {
 
 export type Query = {
   __typename?: 'Query';
+  auditLog?: Maybe<AuditLog>;
+  auditLogs: AuditLogConnection;
   business?: Maybe<Business>;
   businessBalance: SettlementSummary;
   businesses: Array<Business>;
@@ -566,6 +655,24 @@ export type Query = {
   settlements: Array<Settlement>;
   uncompletedOrders: Array<Order>;
   users: Array<User>;
+};
+
+
+export type QueryAuditLogArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryAuditLogsArgs = {
+  action?: InputMaybe<ActionType>;
+  actorId?: InputMaybe<Scalars['ID']['input']>;
+  actorType?: InputMaybe<ActorType>;
+  endDate?: InputMaybe<Scalars['DateTime']['input']>;
+  entityId?: InputMaybe<Scalars['ID']['input']>;
+  entityType?: InputMaybe<EntityType>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  startDate?: InputMaybe<Scalars['DateTime']['input']>;
 };
 
 
@@ -711,12 +818,20 @@ export type SubmitPhoneNumberInput = {
 export type Subscription = {
   __typename?: 'Subscription';
   allOrdersUpdated: Array<Order>;
+  auditLogCreated: AuditLog;
   driverConnectionStatusChanged: DriverConnection;
   driversUpdated: Array<User>;
   orderStatusUpdated: Order;
   settlementCreated: Settlement;
   settlementStatusChanged: Settlement;
   userOrdersUpdated: Array<Order>;
+};
+
+
+export type SubscriptionAuditLogCreatedArgs = {
+  action?: InputMaybe<ActionType>;
+  actorType?: InputMaybe<ActorType>;
+  entityType?: InputMaybe<EntityType>;
 };
 
 
@@ -858,6 +973,28 @@ export type ZoneFeeResult = {
   totalFee: Scalars['Float']['output'];
   zone?: Maybe<DeliveryZone>;
 };
+
+export type GetAuditLogsQueryVariables = Exact<{
+  actorId?: InputMaybe<Scalars['ID']['input']>;
+  actorType?: InputMaybe<ActorType>;
+  action?: InputMaybe<ActionType>;
+  entityType?: InputMaybe<EntityType>;
+  entityId?: InputMaybe<Scalars['ID']['input']>;
+  startDate?: InputMaybe<Scalars['DateTime']['input']>;
+  endDate?: InputMaybe<Scalars['DateTime']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type GetAuditLogsQuery = { __typename?: 'Query', auditLogs: { __typename?: 'AuditLogConnection', total: number, hasMore: boolean, logs: Array<{ __typename?: 'AuditLog', id: string, actorId?: string | null, actorType: ActorType, action: ActionType, entityType: EntityType, entityId?: string | null, metadata?: any | null, ipAddress?: string | null, userAgent?: string | null, createdAt: any, actor?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, role: UserRole } | null }> } };
+
+export type GetAuditLogQueryVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type GetAuditLogQuery = { __typename?: 'Query', auditLog?: { __typename?: 'AuditLog', id: string, actorId?: string | null, actorType: ActorType, action: ActionType, entityType: EntityType, entityId?: string | null, metadata?: any | null, ipAddress?: string | null, userAgent?: string | null, createdAt: any, actor?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, role: UserRole } | null } | null };
 
 export type LoginMutationVariables = Exact<{
   email: Scalars['String']['input'];
@@ -1256,6 +1393,8 @@ export type DriversUpdatedSubscriptionVariables = Exact<{ [key: string]: never; 
 export type DriversUpdatedSubscription = { __typename?: 'Subscription', driversUpdated: Array<{ __typename?: 'User', id: string, email: string, firstName: string, lastName: string, role: UserRole, imageUrl?: string | null, phoneNumber?: string | null, driverLocationUpdatedAt?: any | null, driverLocation?: { __typename?: 'Location', latitude: number, longitude: number, address: string } | null, driverConnection?: { __typename?: 'DriverConnection', onlinePreference: boolean, connectionStatus: DriverConnectionStatus, lastHeartbeatAt?: any | null, lastLocationUpdate?: any | null, disconnectedAt?: any | null } | null }> };
 
 
+export const GetAuditLogsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetAuditLogs"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"actorId"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"actorType"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"ActorType"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"action"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"ActionType"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"entityType"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"EntityType"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"entityId"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"startDate"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"DateTime"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"endDate"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"DateTime"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"auditLogs"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"actorId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"actorId"}}},{"kind":"Argument","name":{"kind":"Name","value":"actorType"},"value":{"kind":"Variable","name":{"kind":"Name","value":"actorType"}}},{"kind":"Argument","name":{"kind":"Name","value":"action"},"value":{"kind":"Variable","name":{"kind":"Name","value":"action"}}},{"kind":"Argument","name":{"kind":"Name","value":"entityType"},"value":{"kind":"Variable","name":{"kind":"Name","value":"entityType"}}},{"kind":"Argument","name":{"kind":"Name","value":"entityId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"entityId"}}},{"kind":"Argument","name":{"kind":"Name","value":"startDate"},"value":{"kind":"Variable","name":{"kind":"Name","value":"startDate"}}},{"kind":"Argument","name":{"kind":"Name","value":"endDate"},"value":{"kind":"Variable","name":{"kind":"Name","value":"endDate"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"logs"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"actorId"}},{"kind":"Field","name":{"kind":"Name","value":"actor"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"role"}}]}},{"kind":"Field","name":{"kind":"Name","value":"actorType"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"entityType"}},{"kind":"Field","name":{"kind":"Name","value":"entityId"}},{"kind":"Field","name":{"kind":"Name","value":"metadata"}},{"kind":"Field","name":{"kind":"Name","value":"ipAddress"}},{"kind":"Field","name":{"kind":"Name","value":"userAgent"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"total"}},{"kind":"Field","name":{"kind":"Name","value":"hasMore"}}]}}]}}]} as unknown as DocumentNode<GetAuditLogsQuery, GetAuditLogsQueryVariables>;
+export const GetAuditLogDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetAuditLog"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"auditLog"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"actorId"}},{"kind":"Field","name":{"kind":"Name","value":"actor"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"role"}}]}},{"kind":"Field","name":{"kind":"Name","value":"actorType"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"entityType"}},{"kind":"Field","name":{"kind":"Name","value":"entityId"}},{"kind":"Field","name":{"kind":"Name","value":"metadata"}},{"kind":"Field","name":{"kind":"Name","value":"ipAddress"}},{"kind":"Field","name":{"kind":"Name","value":"userAgent"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}}]} as unknown as DocumentNode<GetAuditLogQuery, GetAuditLogQueryVariables>;
 export const LoginDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"Login"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"email"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"password"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"login"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"email"},"value":{"kind":"Variable","name":{"kind":"Name","value":"email"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"password"},"value":{"kind":"Variable","name":{"kind":"Name","value":"password"}}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"token"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"role"}},{"kind":"Field","name":{"kind":"Name","value":"businessId"}}]}},{"kind":"Field","name":{"kind":"Name","value":"message"}}]}}]}}]} as unknown as DocumentNode<LoginMutation, LoginMutationVariables>;
 export const CreateBusinessDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateBusiness"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateBusinessInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createBusiness"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}},{"kind":"Field","name":{"kind":"Name","value":"businessType"}},{"kind":"Field","name":{"kind":"Name","value":"imageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"avgPrepTimeMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"prepTimeOverrideMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"location"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}},{"kind":"Field","name":{"kind":"Name","value":"workingHours"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"opensAt"}},{"kind":"Field","name":{"kind":"Name","value":"closesAt"}}]}}]}}]}}]} as unknown as DocumentNode<CreateBusinessMutation, CreateBusinessMutationVariables>;
 export const UpdateBusinessDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateBusiness"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateBusinessInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateBusiness"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}},{"kind":"Field","name":{"kind":"Name","value":"businessType"}},{"kind":"Field","name":{"kind":"Name","value":"imageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"avgPrepTimeMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"prepTimeOverrideMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"location"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}},{"kind":"Field","name":{"kind":"Name","value":"workingHours"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"opensAt"}},{"kind":"Field","name":{"kind":"Name","value":"closesAt"}}]}}]}}]}}]} as unknown as DocumentNode<UpdateBusinessMutation, UpdateBusinessMutationVariables>;

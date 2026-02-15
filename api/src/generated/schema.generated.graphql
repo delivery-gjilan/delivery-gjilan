@@ -1,5 +1,77 @@
 directive @skipAuth on FIELD_DEFINITION
 
+enum ActionType {
+  BUSINESS_APPROVED
+  BUSINESS_CREATED
+  BUSINESS_DELETED
+  BUSINESS_REJECTED
+  BUSINESS_UPDATED
+  CATEGORY_CREATED
+  CATEGORY_DELETED
+  CATEGORY_UPDATED
+  DRIVER_APPROVED
+  DRIVER_CREATED
+  DRIVER_REJECTED
+  DRIVER_STATUS_CHANGED
+  DRIVER_UPDATED
+  ORDER_ASSIGNED
+  ORDER_CANCELLED
+  ORDER_CREATED
+  ORDER_DELIVERED
+  ORDER_STATUS_CHANGED
+  ORDER_UPDATED
+  PASSWORD_CHANGED
+  PASSWORD_RESET
+  PRODUCT_AVAILABILITY_CHANGED
+  PRODUCT_CREATED
+  PRODUCT_DELETED
+  PRODUCT_PRICE_CHANGED
+  PRODUCT_PUBLISHED
+  PRODUCT_UNPUBLISHED
+  PRODUCT_UPDATED
+  SETTLEMENT_CREATED
+  SETTLEMENT_PAID
+  SETTLEMENT_PARTIAL_PAID
+  SETTLEMENT_UNSETTLED
+  SUBCATEGORY_CREATED
+  SUBCATEGORY_DELETED
+  SUBCATEGORY_UPDATED
+  USER_CREATED
+  USER_DELETED
+  USER_LOGIN
+  USER_LOGOUT
+  USER_ROLE_CHANGED
+  USER_UPDATED
+}
+
+enum ActorType {
+  ADMIN
+  BUSINESS
+  CUSTOMER
+  DRIVER
+  SYSTEM
+}
+
+type AuditLog {
+  action: ActionType!
+  actor: User
+  actorId: ID
+  actorType: ActorType!
+  createdAt: DateTime!
+  entityId: ID
+  entityType: EntityType!
+  id: ID!
+  ipAddress: String
+  metadata: JSON
+  userAgent: String
+}
+
+type AuditLogConnection {
+  hasMore: Boolean!
+  logs: [AuditLog!]!
+  total: Int!
+}
+
 type AuthResponse {
   message: String!
   token: String!
@@ -160,12 +232,26 @@ type DriverHeartbeatResult {
   success: Boolean!
 }
 
+enum EntityType {
+  BUSINESS
+  CATEGORY
+  DELIVERY_ZONE
+  DRIVER
+  ORDER
+  PRODUCT
+  SETTLEMENT
+  SUBCATEGORY
+  USER
+}
+
 input InitiateSignupInput {
   email: String!
   firstName: String!
   lastName: String!
   password: String!
 }
+
+scalar JSON
 
 type Location {
   address: String!
@@ -315,6 +401,8 @@ type ProductSubcategory {
 }
 
 type Query {
+  auditLog(id: ID!): AuditLog
+  auditLogs(action: ActionType, actorId: ID, actorType: ActorType, endDate: DateTime, entityId: ID, entityType: EntityType, limit: Int, offset: Int, startDate: DateTime): AuditLogConnection!
   business(id: ID!): Business
   businessBalance(businessId: ID!): SettlementSummary!
   businesses: [Business!]!
@@ -390,6 +478,7 @@ input SubmitPhoneNumberInput {
 
 type Subscription {
   allOrdersUpdated: [Order!]!
+  auditLogCreated(action: ActionType, actorType: ActorType, entityType: EntityType): AuditLog!
   driverConnectionStatusChanged(driverId: ID!): DriverConnection!
   driversUpdated: [User!]!
   orderStatusUpdated(orderId: ID!): Order!

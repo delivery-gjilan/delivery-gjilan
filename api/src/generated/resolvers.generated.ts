@@ -1,6 +1,8 @@
 /* This file was automatically generated. DO NOT UPDATE MANUALLY. */
     import type   { Resolvers } from './types.generated';
-    import    { business as Query_business } from './../models/Business/resolvers/Query/business';
+    import    { auditLog as Query_auditLog } from './../models/AuditLog/resolvers/Query/auditLog';
+import    { auditLogs as Query_auditLogs } from './../models/AuditLog/resolvers/Query/auditLogs';
+import    { business as Query_business } from './../models/Business/resolvers/Query/business';
 import    { businessBalance as Query_businessBalance } from './../models/Settlement/resolvers/Query/businessBalance';
 import    { businesses as Query_businesses } from './../models/Business/resolvers/Query/businesses';
 import    { calculateDeliveryFee as Query_calculateDeliveryFee } from './../models/DeliveryZone/resolvers/Query/calculateDeliveryFee';
@@ -64,12 +66,15 @@ import    { updateUserNote as Mutation_updateUserNote } from './../models/User/r
 import    { verifyEmail as Mutation_verifyEmail } from './../models/User/resolvers/Mutation/verifyEmail';
 import    { verifyPhone as Mutation_verifyPhone } from './../models/User/resolvers/Mutation/verifyPhone';
 import    { allOrdersUpdated as Subscription_allOrdersUpdated } from './../models/Order/resolvers/Subscription/allOrdersUpdated';
+import    { auditLogCreated as Subscription_auditLogCreated } from './../models/AuditLog/resolvers/Subscription/auditLogCreated';
 import    { driverConnectionStatusChanged as Subscription_driverConnectionStatusChanged } from './../models/Driver/resolvers/Subscription/driverConnectionStatusChanged';
 import    { driversUpdated as Subscription_driversUpdated } from './../models/User/resolvers/Subscription/driversUpdated';
 import    { orderStatusUpdated as Subscription_orderStatusUpdated } from './../models/Order/resolvers/Subscription/orderStatusUpdated';
 import    { settlementCreated as Subscription_settlementCreated } from './../models/Settlement/resolvers/Subscription/settlementCreated';
 import    { settlementStatusChanged as Subscription_settlementStatusChanged } from './../models/Settlement/resolvers/Subscription/settlementStatusChanged';
 import    { userOrdersUpdated as Subscription_userOrdersUpdated } from './../models/Order/resolvers/Subscription/userOrdersUpdated';
+import    { AuditLog } from './../models/AuditLog/resolvers/AuditLog';
+import    { AuditLogConnection } from './../models/AuditLog/resolvers/AuditLogConnection';
 import    { AuthResponse } from './../models/User/resolvers/AuthResponse';
 import    { Business } from './../models/Business/resolvers/Business';
 import    { DeliveryZone } from './../models/DeliveryZone/resolvers/DeliveryZone';
@@ -89,12 +94,14 @@ import    { User as User_User } from './../models/User/resolvers/User';
 import    { User as Driver_User } from './../models/Driver/resolvers/User';
 import    { WorkingHours } from './../models/General/resolvers/WorkingHours';
 import    { ZoneFeeResult } from './../models/DeliveryZone/resolvers/ZoneFeeResult';
-import    { DateResolver,DateTimeResolver } from 'graphql-scalars';
+import    { DateResolver,DateTimeResolver,JSONResolver } from 'graphql-scalars';
     export const resolvers: Resolvers = {
-      Query: { business: Query_business,businessBalance: Query_businessBalance,businesses: Query_businesses,calculateDeliveryFee: Query_calculateDeliveryFee,deliveryZone: Query_deliveryZone,deliveryZones: Query_deliveryZones,driverBalance: Query_driverBalance,drivers: Query_drivers,me: Query_me,order: Query_order,orders: Query_orders,ordersByStatus: Query_ordersByStatus,product: Query_product,productCategories: Query_productCategories,productCategory: Query_productCategory,productSubcategories: Query_productSubcategories,productSubcategoriesByBusiness: Query_productSubcategoriesByBusiness,products: Query_products,settlementSummary: Query_settlementSummary,settlements: Query_settlements,uncompletedOrders: Query_uncompletedOrders,users: Query_users },
+      Query: { auditLog: Query_auditLog,auditLogs: Query_auditLogs,business: Query_business,businessBalance: Query_businessBalance,businesses: Query_businesses,calculateDeliveryFee: Query_calculateDeliveryFee,deliveryZone: Query_deliveryZone,deliveryZones: Query_deliveryZones,driverBalance: Query_driverBalance,drivers: Query_drivers,me: Query_me,order: Query_order,orders: Query_orders,ordersByStatus: Query_ordersByStatus,product: Query_product,productCategories: Query_productCategories,productCategory: Query_productCategory,productSubcategories: Query_productSubcategories,productSubcategoriesByBusiness: Query_productSubcategoriesByBusiness,products: Query_products,settlementSummary: Query_settlementSummary,settlements: Query_settlements,uncompletedOrders: Query_uncompletedOrders,users: Query_users },
       Mutation: { adminSetDriverConnectionStatus: Mutation_adminSetDriverConnectionStatus,adminUpdateDriverLocation: Mutation_adminUpdateDriverLocation,assignDriverToOrder: Mutation_assignDriverToOrder,backfillSettlementsForDeliveredOrders: Mutation_backfillSettlementsForDeliveredOrders,cancelOrder: Mutation_cancelOrder,createBusiness: Mutation_createBusiness,createDeliveryZone: Mutation_createDeliveryZone,createOrder: Mutation_createOrder,createProduct: Mutation_createProduct,createProductCategory: Mutation_createProductCategory,createProductSubcategory: Mutation_createProductSubcategory,createUser: Mutation_createUser,deleteBusiness: Mutation_deleteBusiness,deleteDeliveryZone: Mutation_deleteDeliveryZone,deleteProduct: Mutation_deleteProduct,deleteProductCategory: Mutation_deleteProductCategory,deleteProductSubcategory: Mutation_deleteProductSubcategory,deleteUser: Mutation_deleteUser,driverHeartbeat: Mutation_driverHeartbeat,initiateSignup: Mutation_initiateSignup,login: Mutation_login,markSettlementAsPaid: Mutation_markSettlementAsPaid,markSettlementAsPartiallyPaid: Mutation_markSettlementAsPartiallyPaid,markSettlementsAsPaid: Mutation_markSettlementsAsPaid,resendEmailVerification: Mutation_resendEmailVerification,submitPhoneNumber: Mutation_submitPhoneNumber,unsettleSettlement: Mutation_unsettleSettlement,updateBusiness: Mutation_updateBusiness,updateCommissionPercentage: Mutation_updateCommissionPercentage,updateDeliveryZone: Mutation_updateDeliveryZone,updateDriverLocation: Mutation_updateDriverLocation,updateDriverOnlineStatus: Mutation_updateDriverOnlineStatus,updateOrderStatus: Mutation_updateOrderStatus,updateProduct: Mutation_updateProduct,updateProductCategory: Mutation_updateProductCategory,updateProductSubcategory: Mutation_updateProductSubcategory,updateProductsOrder: Mutation_updateProductsOrder,updateUser: Mutation_updateUser,updateUserNote: Mutation_updateUserNote,verifyEmail: Mutation_verifyEmail,verifyPhone: Mutation_verifyPhone },
-      Subscription: { allOrdersUpdated: Subscription_allOrdersUpdated,driverConnectionStatusChanged: Subscription_driverConnectionStatusChanged,driversUpdated: Subscription_driversUpdated,orderStatusUpdated: Subscription_orderStatusUpdated,settlementCreated: Subscription_settlementCreated,settlementStatusChanged: Subscription_settlementStatusChanged,userOrdersUpdated: Subscription_userOrdersUpdated },
-      AuthResponse: AuthResponse,
+      Subscription: { allOrdersUpdated: Subscription_allOrdersUpdated,auditLogCreated: Subscription_auditLogCreated,driverConnectionStatusChanged: Subscription_driverConnectionStatusChanged,driversUpdated: Subscription_driversUpdated,orderStatusUpdated: Subscription_orderStatusUpdated,settlementCreated: Subscription_settlementCreated,settlementStatusChanged: Subscription_settlementStatusChanged,userOrdersUpdated: Subscription_userOrdersUpdated },
+      AuditLog: AuditLog,
+AuditLogConnection: AuditLogConnection,
+AuthResponse: AuthResponse,
 Business: Business,
 DeliveryZone: DeliveryZone,
 DriverConnection: DriverConnection,
@@ -113,5 +120,6 @@ User: { ...User_User,...Driver_User },
 WorkingHours: WorkingHours,
 ZoneFeeResult: ZoneFeeResult,
 Date: DateResolver,
-DateTime: DateTimeResolver
+DateTime: DateTimeResolver,
+JSON: JSONResolver
     }

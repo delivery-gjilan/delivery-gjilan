@@ -2,8 +2,12 @@
 
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation } from '@apollo/client/react';
-import { ArrowLeft, ChevronDown } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Calendar } from 'lucide-react';
 import Link from 'next/link';
+import { DateRange, Range } from 'react-date-range';
+import 'react-date-range/dist/styles.css';
+import 'react-date-range/dist/theme/default.css';
+import './dateRangePicker.css';
 import {
     GET_SETTLEMENTS,
     MARK_SETTLEMENTS_PAID,
@@ -26,27 +30,46 @@ interface Settlement {
 
 export default function FinancesDashboard() {
     const [activeView, setActiveView] = useState<'drivers' | 'businesses'>('drivers');
-    const [dateMode, setDateMode] = useState<'all' | 'today' | 'month' | 'custom'>('all');
-    const [customStartDate, setCustomStartDate] = useState('');
-    const [customEndDate, setCustomEndDate] = useState('');
-    const [selectedBusinessId, setSelectedBusinessId] = useState<string>('');
-    const [selectedDriverId, setSelectedDriverId] = useState<string>('');
+    const [dateMode, setDateMode] = useState<'all' | 'today' | 'month' | 'custom'>('month');
+    const [dateRange, setDateRange] = useState<Range>({
+        startDate: startOfMonth(new Date()),
+        endDate: new Date(),
+        key: 'selection',
+    });
+    const [showDatePicker, setShowDatePicker] = useState(false);
     const [partialAmounts, setPartialAmounts] = useState<Record<string, string>>({});
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
-    // Calculate date range
+    // Calculate date range for query
     const getDateRange = () => {
         const now = new Date();
         const today = startOfDay(now);
         const monthStart = startOfMonth(now);
 
         switch (dateMode) {
-            case 'today':
-                return { start: format(today, 'yyyy-MM-dd'), end: format(now, 'yyyy-MM-dd') };
-            case 'month':
-                return { start: format(monthStart, 'yyyy-MM-dd'), end: format(now, 'yyyy-MM-dd') };
-            case 'custom':
-                return { start: customStartDate, end: customEndDate };
+            case 'today': {
+                const startISO = today.toISOString();
+                const endOfDay = new Date(today);
+                endOfDay.setHours(23, 59, 59, 999);
+                const endISO = endOfDay.toISOString();
+                return { start: startISO, end: endISO };
+            }
+            case 'month': {
+                const startISO = monthStart.toISOString();
+                const endOfMonth = new Date(now);
+                endOfMonth.setHours(23, 59, 59, 999);
+                const endISO = endOfMonth.toISOString();
+                return { start: startISO, end: endISO };
+            }
+            case 'custom': {
+                if (!dateRange.startDate || !dateRange.endDate) {
+                    return { start: '', end: '' };
+                }
+                const start = new Date(dateRange.startDate);
+                const end = new Date(dateRange.endDate);
+                end.setHours(23, 59, 59, 999);
+                return { start: start.toISOString(), end: end.toISOString() };
+            }
             default:
                 return { start: '', end: '' };
         }
@@ -61,8 +84,6 @@ export default function FinancesDashboard() {
         refetch: refetchSettlements,
     } = useQuery(GET_SETTLEMENTS, {
         variables: {
-            driverId: selectedDriverId || undefined,
-            businessId: selectedBusinessId || undefined,
             startDate: dateStart || undefined,
             endDate: dateEnd || undefined,
         },
@@ -274,48 +295,87 @@ export default function FinancesDashboard() {
             {/* Filters & Summary */}
             <div className="bg-[#1a1a1a] border-b border-[#262626] p-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    {/* Filters */}
+                    {/* Date Filters */}
                     <div className="space-y-4">
                         <div className="grid grid-cols-2 gap-2">
                             {(['all', 'today', 'month', 'custom'] as const).map((mode) => (
                                 <button
                                     key={mode}
-                                    onClick={() => setDateMode(mode)}
+                                    onClick={() => {
+                                        setDateMode(mode);
+                                        if (mode !== 'custom') {
+                                            setShowDatePicker(false);
+                                        }
+                                    }}
                                     className={`px-3 py-2 text-xs font-medium rounded transition-colors ${
                                         dateMode === mode
                                             ? 'bg-cyan-600 text-white'
                                             : 'bg-[#0a0a0a] border border-[#262626] text-neutral-400 hover:text-white'
                                     }`}
                                 >
-                                    {mode === 'all' ? 'All' : mode === 'today' ? 'Today' : mode === 'month' ? 'Month' : 'Custom'}
+                                    {mode === 'all' ? 'All' : mode === 'today' ? 'Today' : mode === 'month' ? 'This Month' : 'Custom'}
                                 </button>
                             ))}
                         </div>
 
                         {dateMode === 'custom' && (
-                            <div className="grid grid-cols-2 gap-2">
-                                <input
-                                    type="date"
-                                    value={customStartDate}
-                                    onChange={(e) => setCustomStartDate(e.target.value)}
-                                    className="bg-[#0a0a0a] border border-[#262626] rounded px-3 py-2 text-sm text-white"
-                                />
-                                <input
-                                    type="date"
-                                    value={customEndDate}
-                                    onChange={(e) => setCustomEndDate(e.target.value)}
-                                    className="bg-[#0a0a0a] border border-[#262626] rounded px-3 py-2 text-sm text-white"
-                                />
+                            <div className="relative">
+                                <button
+                                    onClick={() => setShowDatePicker(!showDatePicker)}
+                                    className="w-full flex items-center gap-2 bg-[#0a0a0a] border border-[#262626] rounded px-4 py-3 text-sm text-white hover:border-[#404040] transition-colors"
+                                >
+                                    <Calendar size={16} />
+                                    <span>
+                                        {dateRange.startDate && dateRange.endDate
+                                            ? `${format(new Date(dateRange.startDate), 'MMM dd')} - ${format(new Date(dateRange.endDate), 'MMM dd, yyyy')}`
+                                            : 'Select date range'}
+                                    </span>
+                                </button>
+
+                                {showDatePicker && (
+                                    <div className="absolute top-full left-0 mt-2 z-50 bg-[#1a1a1a] border border-[#262626] rounded shadow-lg">
+                                        <DateRange
+                                            ranges={[dateRange]}
+                                            onChange={(item) => setDateRange(item.selection)}
+                                            maxDate={new Date()}
+                                            rangeColors={['#06b6d4']}
+                                            className="rdrCalendarWrapper dark-theme"
+                                            inputRanges={[]}
+                                        />
+                                        <div className="p-3 border-t border-[#262626] flex gap-2">
+                                            <button
+                                                onClick={() => setShowDatePicker(false)}
+                                                className="flex-1 bg-cyan-600 hover:bg-cyan-700 rounded px-3 py-2 text-sm font-semibold text-white transition-colors"
+                                            >
+                                                Done
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setDateRange({
+                                                        startDate: new Date(),
+                                                        endDate: new Date(),
+                                                        key: 'selection',
+                                                    });
+                                                    setShowDatePicker(false);
+                                                }}
+                                                className="flex-1 bg-neutral-700 hover:bg-neutral-600 rounded px-3 py-2 text-sm font-semibold text-white transition-colors"
+                                            >
+                                                Reset
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 
                         <button
                             onClick={() => {
-                                setDateMode('all');
+                                setDateMode('month');
+                                setShowDatePicker(false);
                             }}
                             className="w-full bg-neutral-700 hover:bg-neutral-600 rounded px-3 py-2 text-sm text-white transition-colors"
                         >
-                            Reset
+                            Reset Filters
                         </button>
                     </div>
 
