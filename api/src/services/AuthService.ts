@@ -279,10 +279,4 @@ export class AuthService {
         return this.authRepository.updateUser(userId, data);
     }
 
-    /**
-     * Update driver online status (for backward compatibility)
-     */
-    async updateDriverOnlineStatus(userId: string, isOnline: boolean): Promise<void> {
-        await this.authRepository.updateDriverOnlineStatus(userId, isOnline);
-    }
 }

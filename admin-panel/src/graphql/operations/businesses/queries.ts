@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const GET_BUSINESS = gql`
+export const GET_BUSINESS = graphql(`
     query Business($id: ID!) {
         business(id: $id) {
             id
@@ -23,9 +23,9 @@ export const GET_BUSINESS = gql`
             createdAt
         }
     }
-`;
+`);
 
-export const GET_BUSINESSES = gql`
+export const GET_BUSINESSES = graphql(`
     query Businesses {
         businesses {
             id
@@ -49,4 +49,4 @@ export const GET_BUSINESSES = gql`
             updatedAt
         }
     }
-`;
+`);

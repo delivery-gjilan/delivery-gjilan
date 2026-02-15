@@ -47,6 +47,7 @@ type DriverHeartbeatResult {
 # Extended User type with new driver connection data
 extend type User {
     driverConnection: DriverConnection
+    commissionPercentage: Float
 }
 
 extend type Mutation {

@@ -1,6 +1,6 @@
-import { gql } from "@apollo/client";
+import { graphql } from '@/gql';
 
-export const USERS_QUERY = gql`
+export const USERS_QUERY = graphql(`
   query Users {
     users {
       id
@@ -18,9 +18,9 @@ export const USERS_QUERY = gql`
       }
     }
   }
-`;
+`);
 
-export const DRIVERS_QUERY = gql`
+export const DRIVERS_QUERY = graphql(`
   query Drivers {
     drivers {
       id
@@ -45,4 +45,4 @@ export const DRIVERS_QUERY = gql`
       }
     }
   }
-`;
+`);

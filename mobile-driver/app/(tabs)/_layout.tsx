@@ -11,6 +11,7 @@ export default function TabLayout() {
     const insets = useSafeAreaInsets();
     const { t } = useTranslations();
 
+
     return (
         <Tabs
             screenOptions={{

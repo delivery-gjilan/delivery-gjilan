@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const GET_DELIVERY_ZONES = gql`
+export const GET_DELIVERY_ZONES = graphql(`
     query GetDeliveryZones {
         deliveryZones {
             id
@@ -15,9 +15,9 @@ export const GET_DELIVERY_ZONES = gql`
             updatedAt
         }
     }
-`;
+`);
 
-export const GET_DELIVERY_ZONE = gql`
+export const GET_DELIVERY_ZONE = graphql(`
     query GetDeliveryZone($id: ID!) {
         deliveryZone(id: $id) {
             id
@@ -32,9 +32,9 @@ export const GET_DELIVERY_ZONE = gql`
             updatedAt
         }
     }
-`;
+`);
 
-export const CALCULATE_DELIVERY_FEE = gql`
+export const CALCULATE_DELIVERY_FEE = graphql(`
     query CalculateDeliveryFee($latitude: Float!, $longitude: Float!, $baseDeliveryFee: Float!) {
         calculateDeliveryFee(latitude: $latitude, longitude: $longitude, baseDeliveryFee: $baseDeliveryFee) {
             zone {
@@ -47,4 +47,4 @@ export const CALCULATE_DELIVERY_FEE = gql`
             baseDeliveryFee
         }
     }
-`;
+`);

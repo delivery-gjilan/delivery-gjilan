@@ -6,13 +6,11 @@ export const userOrdersUpdated: NonNullable<SubscriptionResolvers['userOrdersUpd
         const token = input.token;
         const userData = await authService.verifyJWT(token);
         if (!userData) {
-            throw new GraphQLError('Fix error, Authentication');
+            throw new GraphQLError('Authentication failed');
         }
-        console.log('hej more zor', userData);
         return orderService.subscribeToOrderUpdates(userData.id);
     },
     resolve: (payload: UserOrdersPayload) => {
-        console.log('payload', payload);
         return payload.orders;
     },
 };

@@ -9,6 +9,7 @@ type AuthResponse {
 type Business {
   avgPrepTimeMinutes: Int!
   businessType: BusinessType!
+  commissionPercentage: Float!
   createdAt: Date!
   id: ID!
   imageUrl: String
@@ -76,7 +77,13 @@ input CreateProductInput {
   name: String!
   price: Float!
   salePrice: Float
+  stock: Int
   subcategoryId: ID
+}
+
+input CreateProductSubcategoryInput {
+  categoryId: ID!
+  name: String!
 }
 
 input CreateUserInput {
@@ -184,17 +191,20 @@ type Mutation {
   adminSetDriverConnectionStatus(driverId: ID!, status: DriverConnectionStatus!): User!
   adminUpdateDriverLocation(driverId: ID!, latitude: Float!, longitude: Float!): User!
   assignDriverToOrder(driverId: ID, id: ID!): Order!
+  backfillSettlementsForDeliveredOrders: Int!
   cancelOrder(id: ID!): Order!
   createBusiness(input: CreateBusinessInput!): Business!
   createDeliveryZone(input: CreateDeliveryZoneInput!): DeliveryZone!
   createOrder(input: CreateOrderInput!): Order!
   createProduct(input: CreateProductInput!): Product!
   createProductCategory(input: CreateProductCategoryInput!): ProductCategory!
+  createProductSubcategory(input: CreateProductSubcategoryInput!): ProductSubcategory!
   createUser(input: CreateUserInput!): AuthResponse!
   deleteBusiness(id: ID!): Boolean!
   deleteDeliveryZone(id: ID!): Boolean!
   deleteProduct(id: ID!): Boolean!
   deleteProductCategory(id: ID!): Boolean!
+  deleteProductSubcategory(id: ID!): Boolean!
   deleteUser(id: ID!): Boolean!
 
   """
@@ -205,15 +215,22 @@ type Mutation {
   driverHeartbeat(latitude: Float!, longitude: Float!): DriverHeartbeatResult!
   initiateSignup(input: InitiateSignupInput!): AuthResponse!
   login(input: LoginInput!): AuthResponse!
+  markSettlementAsPaid(settlementId: ID!): Settlement!
+  markSettlementAsPartiallyPaid(amount: Float!, settlementId: ID!): Settlement!
+  markSettlementsAsPaid(ids: [ID!]!): [Settlement!]!
   resendEmailVerification: SignupStepResponse!
   submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
+  unsettleSettlement(settlementId: ID!): Settlement!
   updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
+  updateCommissionPercentage(businessId: ID, driverId: ID, percentage: Float!): Boolean!
   updateDeliveryZone(id: ID!, input: UpdateDeliveryZoneInput!): DeliveryZone!
   updateDriverLocation(latitude: Float!, longitude: Float!): User!
   updateDriverOnlineStatus(isOnline: Boolean!): User!
   updateOrderStatus(id: ID!, status: OrderStatus!): Order!
   updateProduct(id: ID!, input: UpdateProductInput!): Product!
   updateProductCategory(id: ID!, input: UpdateProductCategoryInput!): ProductCategory!
+  updateProductSubcategory(id: ID!, input: UpdateProductSubcategoryInput!): ProductSubcategory!
+  updateProductsOrder(businessId: ID!, products: [ProductOrderInput!]!): Boolean!
   updateUser(input: UpdateUserInput!): User!
   updateUserNote(flagColor: String, note: String, userId: ID!): User!
   verifyEmail(input: VerifyEmailInput!): SignupStepResponse!
@@ -244,6 +261,8 @@ type OrderItem {
   price: Float!
   productId: ID!
   quantity: Int!
+  quantityInStock: Int!
+  quantityNeeded: Int!
 }
 
 enum OrderStatus {
@@ -267,6 +286,9 @@ type Product {
   name: String!
   price: Float!
   salePrice: Float
+  sortOrder: Int!
+  stock: Int!
+  subcategoryId: ID
   updatedAt: String!
 }
 
@@ -279,6 +301,11 @@ type ProductCategory {
   updatedAt: String!
 }
 
+input ProductOrderInput {
+  id: ID!
+  sortOrder: Int!
+}
+
 type ProductSubcategory {
   categoryId: ID!
   createdAt: String!
@@ -289,10 +316,12 @@ type ProductSubcategory {
 
 type Query {
   business(id: ID!): Business
+  businessBalance(businessId: ID!): SettlementSummary!
   businesses: [Business!]!
   calculateDeliveryFee(baseDeliveryFee: Float!, latitude: Float!, longitude: Float!): ZoneFeeResult!
   deliveryZone(id: ID!): DeliveryZone
   deliveryZones: [DeliveryZone!]!
+  driverBalance(driverId: ID!): SettlementSummary!
   drivers: [User!]!
   me: User
   order(id: ID!): Order
@@ -301,9 +330,44 @@ type Query {
   product(id: ID!): Product
   productCategories(businessId: ID!): [ProductCategory!]!
   productCategory(id: ID!): ProductCategory
+  productSubcategories(categoryId: ID!): [ProductSubcategory!]!
+  productSubcategoriesByBusiness(businessId: ID!): [ProductSubcategory!]!
   products(businessId: ID!): [Product!]!
+  settlementSummary(businessId: ID, driverId: ID, endDate: Date, startDate: Date, type: SettlementType): SettlementSummary!
+  settlements(businessId: ID, driverId: ID, endDate: Date, limit: Int, offset: Int, startDate: Date, status: SettlementStatus, type: SettlementType): [Settlement!]!
   uncompletedOrders: [Order!]!
   users: [User!]!
+}
+
+type Settlement {
+  amount: Float!
+  business: Business
+  createdAt: Date!
+  driver: User
+  id: ID!
+  order: Order!
+  paidAt: Date
+  status: SettlementStatus!
+  type: SettlementType!
+  updatedAt: Date!
+}
+
+enum SettlementStatus {
+  PAID
+  PENDING
+}
+
+type SettlementSummary {
+  count: Int!
+  pendingCount: Int!
+  totalAmount: Float!
+  totalPaid: Float!
+  totalPending: Float!
+}
+
+enum SettlementType {
+  BUSINESS_PAYMENT
+  DRIVER_PAYMENT
 }
 
 enum SignupStep {
@@ -329,6 +393,8 @@ type Subscription {
   driverConnectionStatusChanged(driverId: ID!): DriverConnection!
   driversUpdated: [User!]!
   orderStatusUpdated(orderId: ID!): Order!
+  settlementCreated(type: SettlementType): Settlement!
+  settlementStatusChanged(id: ID!): Settlement!
   userOrdersUpdated(input: SubscriptionInput!): [Order!]!
 }
 
@@ -339,6 +405,7 @@ input SubscriptionInput {
 input UpdateBusinessInput {
   avgPrepTimeMinutes: Int
   businessType: BusinessType
+  commissionPercentage: Float
   imageUrl: String
   isActive: Boolean
   location: LocationInput
@@ -372,7 +439,13 @@ input UpdateProductInput {
   name: String
   price: Float
   salePrice: Float
+  sortOrder: Int
+  stock: Int
   subcategoryId: ID
+}
+
+input UpdateProductSubcategoryInput {
+  name: String
 }
 
 input UpdateUserInput {
@@ -388,6 +461,7 @@ type User {
   adminNote: String
   business: Business
   businessId: ID
+  commissionPercentage: Float
   driverConnection: DriverConnection
   driverLocation: Location
   driverLocationUpdatedAt: Date

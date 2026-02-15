@@ -35,10 +35,6 @@ export const updateDriverOnlineStatus: NonNullable<
     throw new GraphQLError('Driver not found', { extensions: { code: 'NOT_FOUND' } });
   }
 
-  // BACKWARD COMPATIBILITY: Also update users table
-  // Remove this after migration period
-  await authService.updateDriverOnlineStatus(userData.userId, isOnline);
-
   // Fetch all drivers and publish update for real-time sync
   try {
     const drivers = await authService.getDrivers();
@@ -52,5 +48,8 @@ export const updateDriverOnlineStatus: NonNullable<
   if (!user) {
     throw new GraphQLError('User not found', { extensions: { code: 'NOT_FOUND' } });
   }
-  return user;
+  return {
+    ...user,
+    isOnline: driver.onlinePreference ?? false,
+  };
 };

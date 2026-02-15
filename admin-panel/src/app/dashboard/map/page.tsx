@@ -317,7 +317,7 @@ export default function MapPage() {
           from: currentAnimated,
           to: newPos,
           startTime: Date.now(),
-          duration: 2800, // 2.8s animation for 3s update cycle
+          duration: 4800, // 4.8s animation to match 5s heartbeat (covers update cycle smoothly)
         };
         
         next[driver.id] = {
@@ -1015,7 +1015,7 @@ export default function MapPage() {
 
           {/* Driver markers */}
           {Object.values(driverTracks).map((track: any) => {
-            const pos = track.to;
+            const pos = animatedDriverPositions[track.id] || track.to;
             if (!isValidLatLng(pos?.latitude, pos?.longitude)) return null;
             const isBusy = activeOrders.some((order: any) => order.driver?.id === track.id);
             const driver = driverMap[track.id];

@@ -1,4 +1,4 @@
-import { pgTable, varchar, boolean, numeric, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { pgTable, varchar, boolean, numeric, timestamp, uuid, integer } from 'drizzle-orm/pg-core';
 import { businesses } from './businesses';
 import { productCategories } from './productCategories';
 import { productSubcategories } from './productSubcategories';
@@ -26,6 +26,8 @@ export const products = pgTable('products', {
     salePrice: numeric('sale_price', { mode: 'number', precision: 10, scale: 2 }),
 
     isAvailable: boolean('is_available').default(true),
+    sortOrder: integer('sort_order').default(0).notNull(),
+    stock: integer('stock').default(0).notNull(),
 
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
         .default(sql`CURRENT_TIMESTAMP`)

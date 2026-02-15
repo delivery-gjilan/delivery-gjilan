@@ -1,5 +1,5 @@
 import { relations, sql } from 'drizzle-orm';
-import { pgTable, varchar, boolean, timestamp, pgEnum, doublePrecision, integer, uuid } from 'drizzle-orm/pg-core';
+import { pgTable, varchar, boolean, timestamp, pgEnum, doublePrecision, integer, uuid, numeric } from 'drizzle-orm/pg-core';
 import { products } from './products';
 import { productCategories } from './productCategories';
 import { BusinessType } from '@/generated/types.generated';
@@ -23,6 +23,7 @@ export const businesses = pgTable('businesses', {
     closesAt: integer('closes_at').notNull(),
     avgPrepTimeMinutes: integer('avg_prep_time_minutes').notNull().default(20),
     prepTimeOverrideMinutes: integer('prep_time_override_minutes'),
+    commissionPercentage: numeric('commission_percentage', { precision: 5, scale: 2 }).default('0').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull(),

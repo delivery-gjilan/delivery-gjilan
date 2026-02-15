@@ -1,6 +1,6 @@
-import { gql } from "@apollo/client";
+import { graphql } from '@/gql';
 
-export const CREATE_USER_MUTATION = gql`
+export const CREATE_USER_MUTATION = graphql(`
   mutation CreateUser(
     $email: String!
     $password: String!
@@ -31,9 +31,9 @@ export const CREATE_USER_MUTATION = gql`
       message
     }
   }
-`;
+`);
 
-export const UPDATE_USER_MUTATION = gql`
+export const UPDATE_USER_MUTATION = graphql(`
   mutation UpdateUser(
     $id: ID!
     $firstName: String!
@@ -61,15 +61,15 @@ export const UPDATE_USER_MUTATION = gql`
       }
     }
   }
-`;
+`);
 
-export const DELETE_USER_MUTATION = gql`
+export const DELETE_USER_MUTATION = graphql(`
   mutation DeleteUser($id: ID!) {
     deleteUser(id: $id)
   }
-`;
+`);
 
-export const UPDATE_USER_NOTE_MUTATION = gql`
+export const UPDATE_USER_NOTE_MUTATION = graphql(`
   mutation UpdateUserNote($userId: ID!, $note: String, $flagColor: String) {
     updateUserNote(userId: $userId, note: $note, flagColor: $flagColor) {
       id
@@ -77,9 +77,9 @@ export const UPDATE_USER_NOTE_MUTATION = gql`
       flagColor
     }
   }
-`;
+`);
 
-export const ADMIN_UPDATE_DRIVER_LOCATION = gql`
+export const ADMIN_UPDATE_DRIVER_LOCATION = graphql(`
   mutation AdminUpdateDriverLocation($driverId: ID!, $latitude: Float!, $longitude: Float!) {
     adminUpdateDriverLocation(driverId: $driverId, latitude: $latitude, longitude: $longitude) {
       id
@@ -91,8 +91,8 @@ export const ADMIN_UPDATE_DRIVER_LOCATION = gql`
       driverLocationUpdatedAt
     }
   }
-`;
-export const UPDATE_DRIVER_ONLINE_STATUS = gql`
+`);
+export const UPDATE_DRIVER_ONLINE_STATUS = graphql(`
   mutation UpdateDriverOnlineStatus($isOnline: Boolean!) {
     updateDriverOnlineStatus(isOnline: $isOnline) {
       id
@@ -101,4 +101,4 @@ export const UPDATE_DRIVER_ONLINE_STATUS = gql`
       lastName
     }
   }
-`;
+`);

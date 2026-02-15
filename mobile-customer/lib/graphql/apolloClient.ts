@@ -36,27 +36,34 @@ const httpLink = new HttpLink({
 });
 
 // Calculate WS URL from HTTP URL (e.g. https://... -> wss://...)
-const httpUrl = process.env.EXPO_PUBLIC_API_URL!;
-const wsUrl = httpUrl.replace(/^http/, 'ws');
+const httpUrl = process.env.EXPO_PUBLIC_API_URL;
+const wsUrl = httpUrl ? httpUrl.replace(/^http/, 'ws') : '';
 
-const wsLink = new GraphQLWsLink(
-    createClient({
-        url: wsUrl,
-        on: {
-            connected: () => console.log('[WS] Connected'),
-            error: (err) => console.error('[WS] Error', err),
-        },
-    }),
-);
+const wsLink = wsUrl
+    ? new GraphQLWsLink(
+          createClient({
+              url: wsUrl,
+              lazy: true,
+              retryAttempts: 3,
+              shouldRetry: () => true,
+              on: {
+                  connected: () => console.log('[WS] Connected'),
+                  error: (err) => console.error('[WS] Error', err),
+              },
+          }),
+      )
+    : null;
 
-const splitLink = ApolloLink.split(
-    ({ query }) => {
-        const definition = getMainDefinition(query);
-        return definition.kind === 'OperationDefinition' && definition.operation === 'subscription';
-    },
-    wsLink,
-    authLink.concat(httpLink),
-);
+const splitLink = wsLink
+    ? ApolloLink.split(
+          ({ query }) => {
+              const definition = getMainDefinition(query);
+              return definition.kind === 'OperationDefinition' && definition.operation === 'subscription';
+          },
+          wsLink,
+          authLink.concat(httpLink),
+      )
+    : authLink.concat(httpLink);
 
 const client = new ApolloClient({
     link: ApolloLink.from([logLink, splitLink]),

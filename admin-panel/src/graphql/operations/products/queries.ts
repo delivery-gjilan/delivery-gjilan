@@ -9,6 +9,7 @@ export const GET_BUSINESS_PRODUCTS_AND_CATEGORIES = graphql(`
         products(businessId: $businessId) {
             id
             categoryId
+            subcategoryId
             name
             description
             price
@@ -16,6 +17,8 @@ export const GET_BUSINESS_PRODUCTS_AND_CATEGORIES = graphql(`
             isOnSale
             salePrice
             isAvailable
+            sortOrder
+            stock
         }
     }
 `);

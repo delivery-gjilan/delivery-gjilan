@@ -6,6 +6,7 @@ import {
     CREATE_PRODUCT,
     UPDATE_PRODUCT,
     DELETE_PRODUCT,
+    UPDATE_PRODUCTS_ORDER,
 } from '@/graphql/operations/products';
 import type { CreateProductInput, UpdateProductInput } from '@/gql/graphql';
 
@@ -39,6 +40,15 @@ export interface UseUpdateProductResult {
 
 export interface UseDeleteProductResult {
     delete: (id: string) => Promise<{
+        success: boolean;
+        error?: string;
+    }>;
+    loading: boolean;
+    error?: string;
+}
+
+export interface UseUpdateProductsOrderResult {
+    updateOrder: (businessId: string, products: { id: string; sortOrder: number }[]) => Promise<{
         success: boolean;
         error?: string;
     }>;
@@ -102,6 +112,23 @@ export function useDeleteProduct(): UseDeleteProductResult {
         delete: async (id) => {
             try {
                 await mutate({ variables: { id } });
+                return { success: true };
+            } catch (err) {
+                return { success: false, error: (err as Error).message };
+            }
+        },
+        loading,
+        error: error?.message,
+    };
+}
+
+export function useUpdateProductsOrder(): UseUpdateProductsOrderResult {
+    const [mutate, { loading, error }] = useMutation(UPDATE_PRODUCTS_ORDER);
+
+    return {
+        updateOrder: async (businessId, products) => {
+            try {
+                await mutate({ variables: { businessId, products } });
                 return { success: true };
             } catch (err) {
                 return { success: false, error: (err as Error).message };

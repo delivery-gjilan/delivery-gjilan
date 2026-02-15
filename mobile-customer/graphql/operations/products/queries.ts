@@ -6,6 +6,7 @@ export const GET_PRODUCTS = graphql(`
             id
             businessId
             categoryId
+            subcategoryId
             name
             description
             imageUrl
@@ -13,6 +14,7 @@ export const GET_PRODUCTS = graphql(`
             isOnSale
             salePrice
             isAvailable
+            sortOrder
             createdAt
             updatedAt
         }
@@ -25,6 +27,7 @@ export const GET_PRODUCT = graphql(`
             id
             businessId
             categoryId
+            subcategoryId
             name
             description
             imageUrl
@@ -32,8 +35,28 @@ export const GET_PRODUCT = graphql(`
             isOnSale
             salePrice
             isAvailable
+            sortOrder
             createdAt
             updatedAt
+        }
+    }
+`);
+
+export const GET_PRODUCT_CATEGORIES = graphql(`
+    query ProductCategories($businessId: ID!) {
+        productCategories(businessId: $businessId) {
+            id
+            name
+        }
+    }
+`);
+
+export const GET_PRODUCT_SUBCATEGORIES_BY_BUSINESS = graphql(`
+    query ProductSubcategoriesByBusiness($businessId: ID!) {
+        productSubcategoriesByBusiness(businessId: $businessId) {
+            id
+            categoryId
+            name
         }
     }
 `);

@@ -18,6 +18,8 @@ type OrderItem {
     imageUrl: String
     quantity: Int!
     price: Float!
+    quantityInStock: Int!
+    quantityNeeded: Int!
 }
 
 type Order {

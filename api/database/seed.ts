@@ -133,6 +133,102 @@ const RESTAURANTS_DATA = [
     },
 ];
 
+const MARKET_DATA = [
+    {
+        name: 'Arti Market',
+        type: 'MARKET' as const,
+        image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&q=80',
+        opensAt: 480, // 08:00
+        closesAt: 1320, // 22:00
+        categories: [
+            {
+                name: 'Produce',
+                subcategories: [
+                    {
+                        name: 'Fruits',
+                        products: [
+                            { name: 'Bananas (1kg)', price: 1.29, image: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=800&q=80', desc: 'Fresh ripe bananas' },
+                            { name: 'Apples (1kg)', price: 2.49, image: 'https://images.unsplash.com/photo-1567306226416-28f0efdc88ce?w=800&q=80', desc: 'Crisp red apples' },
+                        ],
+                    },
+                    {
+                        name: 'Vegetables',
+                        products: [
+                            { name: 'Tomatoes (1kg)', price: 2.19, image: 'https://images.unsplash.com/photo-1561136594-7f68413baa99?w=800&q=80', desc: 'Juicy vine tomatoes' },
+                            { name: 'Cucumbers (1kg)', price: 1.59, image: 'https://images.unsplash.com/photo-1502741338009-cac2772e18bc?w=800&q=80', desc: 'Fresh cucumbers' },
+                            { name: 'Lettuce', price: 1.09, image: 'https://images.unsplash.com/photo-1506806732259-39c2d0268443?w=800&q=80', desc: 'Crisp green lettuce' },
+                            { name: 'Potatoes (2kg)', price: 2.99, image: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=800&q=80', desc: 'Golden potatoes' },
+                        ],
+                    },
+                ],
+            },
+            {
+                name: 'Dairy',
+                subcategories: [
+                    {
+                        name: 'Milk & Yogurt',
+                        products: [
+                            { name: 'Milk 1L', price: 1.19, image: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&q=80', desc: 'Fresh whole milk' },
+                            { name: 'Greek Yogurt', price: 1.49, image: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=800&q=80', desc: 'Plain Greek yogurt 500g' },
+                        ],
+                    },
+                    {
+                        name: 'Cheese & Eggs',
+                        products: [
+                            { name: 'Cheddar Cheese', price: 2.79, image: 'https://images.unsplash.com/photo-1552767059-ce182ead6c1b?w=800&q=80', desc: 'Cheddar block 200g' },
+                            { name: 'Mozzarella', price: 2.19, image: 'https://images.unsplash.com/photo-1452195100486-9cc805987862?w=800&q=80', desc: 'Fresh mozzarella' },
+                            { name: 'Butter', price: 2.29, image: 'https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?w=800&q=80', desc: 'Creamy butter 250g' },
+                            { name: 'Eggs (10 pack)', price: 2.49, image: 'https://images.unsplash.com/photo-1518569656558-1f25e69d93d7?w=800&q=80', desc: 'Free-range eggs' },
+                        ],
+                    },
+                ],
+            },
+            {
+                name: 'Bakery',
+                subcategories: [
+                    {
+                        name: 'Bread',
+                        products: [
+                            { name: 'White Bread', price: 1.29, image: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=800&q=80', desc: 'Soft sliced bread' },
+                            { name: 'Whole Wheat Bread', price: 1.49, image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&q=80', desc: 'Whole wheat loaf' },
+                            { name: 'Pita Bread', price: 1.19, image: 'https://images.unsplash.com/photo-1604908553728-95b6b0b2b4f6?w=800&q=80', desc: 'Soft pita bread' },
+                        ],
+                    },
+                    {
+                        name: 'Pastries',
+                        products: [
+                            { name: 'Croissant', price: 0.99, image: 'https://images.unsplash.com/photo-1542834369-f10ebf06d3cb?w=800&q=80', desc: 'Buttery croissant' },
+                            { name: 'Bagels (4 pack)', price: 2.39, image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&q=80', desc: 'Fresh baked bagels' },
+                            { name: 'Muffins (4 pack)', price: 2.89, image: 'https://images.unsplash.com/photo-1519682577862-22b62b24e493?w=800&q=80', desc: 'Blueberry muffins' },
+                        ],
+                    },
+                ],
+            },
+            {
+                name: 'Beverages',
+                subcategories: [
+                    {
+                        name: 'Soft Drinks',
+                        products: [
+                            { name: 'Mineral Water 1.5L', price: 0.89, image: 'https://images.unsplash.com/photo-1523362628745-0c100150b504?w=800&q=80', desc: 'Sparkling mineral water' },
+                            { name: 'Cola 2L', price: 1.79, image: 'https://images.unsplash.com/photo-1629203851122-3726ecdf080e?w=800&q=80', desc: 'Classic cola' },
+                            { name: 'Iced Tea 1.5L', price: 1.59, image: 'https://images.unsplash.com/photo-1527169402691-feff5539e52c?w=800&q=80', desc: 'Peach iced tea' },
+                            { name: 'Energy Drink', price: 1.49, image: 'https://images.unsplash.com/photo-1607622750671-6cd9a99f3a57?w=800&q=80', desc: 'Energy boost 250ml' },
+                        ],
+                    },
+                    {
+                        name: 'Juices & Coffee',
+                        products: [
+                            { name: 'Orange Juice', price: 2.19, image: 'https://images.unsplash.com/photo-1506806732259-39c2d0268443?w=800&q=80', desc: '100% orange juice' },
+                            { name: 'Coffee Beans 250g', price: 4.99, image: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&q=80', desc: 'Medium roast coffee beans' },
+                        ],
+                    },
+                ],
+            },
+        ],
+    },
+];
+
 async function seed() {
     console.log('🌱 Seeding database...');
     const { faker } = await import('@faker-js/faker');
@@ -268,11 +364,89 @@ async function seed() {
         });
     }
 
+    // Create market with products
+    for (const marketData of MARKET_DATA) {
+        const business: NewDbBusiness = {
+            name: marketData.name,
+            imageUrl: marketData.image,
+            businessType: marketData.type,
+            locationLat: 42.4635,
+            locationLng: 21.4694,
+            locationAddress: 'Gjilan, Kosovo',
+            opensAt: marketData.opensAt,
+            closesAt: marketData.closesAt,
+            isActive: true,
+        };
+
+        const [createdBusiness] = await db.insert(businesses).values(business).returning();
+        console.log(`🏪 Created market: ${createdBusiness.name}`);
+
+        const businessProducts: Array<{ id: string; name: string; price: number }> = [];
+
+        for (const categoryData of marketData.categories) {
+            const category: NewDbProductCategory = {
+                businessId: createdBusiness.id,
+                name: categoryData.name,
+            };
+
+            const [createdCategory] = await db.insert(productCategories).values(category).returning();
+
+            const createdSubcategories = new Map<string, string>();
+
+            for (const subcategoryData of categoryData.subcategories) {
+                const subcategory: NewDbProductSubcategory = {
+                    categoryId: createdCategory.id,
+                    name: subcategoryData.name,
+                };
+
+                const [createdSubcategory] = await db.insert(productSubcategories).values(subcategory).returning();
+                createdSubcategories.set(subcategoryData.name, createdSubcategory.id);
+
+                for (const productData of subcategoryData.products) {
+                    const isOnSale = Math.random() > 0.7;
+                    const subcategoryId = createdSubcategories.get(subcategoryData.name) ?? null;
+                    const product: NewDbProduct = {
+                        businessId: createdBusiness.id,
+                        categoryId: createdCategory.id,
+                        subcategoryId,
+                        name: productData.name,
+                        description: productData.desc,
+                        imageUrl: productData.image,
+                        price: productData.price,
+                        isAvailable: Math.random() > 0.05,
+                        isOnSale: isOnSale,
+                        salePrice: isOnSale ? productData.price * 0.85 : null,
+                    };
+                    const [createdProduct] = await db.insert(products).values(product).returning();
+                    businessProducts.push({
+                        id: createdProduct.id,
+                        name: createdProduct.name,
+                        price: createdProduct.price,
+                    });
+                }
+
+                console.log(`  🛒 Added ${subcategoryData.products.length} products to ${subcategoryData.name}`);
+            }
+        }
+
+        createdBusinesses.push({
+            id: createdBusiness.id,
+            name: createdBusiness.name,
+            products: businessProducts,
+        });
+    }
+
     console.log('\n✅ Database seeded successfully!');
     console.log('\n📊 Summary:');
-    console.log(`  - ${RESTAURANTS_DATA.length} businesses created`);
-    console.log(`  - Each with 10 curated products`);
-    console.log(`  - Total products: ${RESTAURANTS_DATA.length * 10}`);
+    const totalBusinesses = RESTAURANTS_DATA.length + MARKET_DATA.length;
+    const totalProducts =
+        RESTAURANTS_DATA.reduce((sum, b) => sum + b.categories.reduce((cSum, c) => cSum + c.products.length, 0), 0) +
+        MARKET_DATA.reduce(
+            (sum, b) => sum + b.categories.reduce((cSum, c) => cSum + c.subcategories.reduce((sSum, s) => sSum + s.products.length, 0), 0),
+            0,
+        );
+    console.log(`  - ${totalBusinesses} businesses created`);
+    console.log(`  - Total products: ${totalProducts}`);
     console.log(`  - 3 test customer users created`);
     console.log('\n🔐 Credentials:');
     console.log('  Admin: admin@admin.com / 12345678');

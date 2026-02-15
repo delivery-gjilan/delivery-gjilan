@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const GET_ORDERS = gql`
+export const GET_ORDERS = graphql(`
     query GetOrders {
         orders {
             id
@@ -46,13 +46,15 @@ export const GET_ORDERS = gql`
                     imageUrl
                     quantity
                     price
+                    quantityInStock
+                    quantityNeeded
                 }
             }
         }
     }
-`;
+`);
 
-export const GET_ORDER = gql`
+export const GET_ORDER = graphql(`
     query GetOrder($id: ID!) {
         order(id: $id) {
             id
@@ -92,13 +94,15 @@ export const GET_ORDER = gql`
                     imageUrl
                     quantity
                     price
+                    quantityInStock
+                    quantityNeeded
                 }
             }
         }
     }
-`;
+`);
 
-export const GET_ORDERS_BY_STATUS = gql`
+export const GET_ORDERS_BY_STATUS = graphql(`
     query GetOrdersByStatus($status: OrderStatus!) {
         ordersByStatus(status: $status) {
             id
@@ -134,4 +138,4 @@ export const GET_ORDERS_BY_STATUS = gql`
             }
         }
     }
-`;
+`);

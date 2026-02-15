@@ -15,6 +15,7 @@ type Business {
     workingHours: WorkingHours!
     avgPrepTimeMinutes: Int!
     prepTimeOverrideMinutes: Int
+    commissionPercentage: Float!
     isOpen: Boolean!
     createdAt: Date!
     updatedAt: Date!
@@ -45,6 +46,7 @@ input UpdateBusinessInput {
     isActive: Boolean
     avgPrepTimeMinutes: Int
     prepTimeOverrideMinutes: Int
+    commissionPercentage: Float
 }
 
 type Mutation {

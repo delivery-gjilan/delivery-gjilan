@@ -20,13 +20,16 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  DollarSign,
 } from "lucide-react";
 
 const menu = [
   { name: "Orders", href: "/dashboard/orders", icon: ClipboardList, businessAdminVisible: true },
   { name: "Products", href: "/dashboard/products", icon: Package, businessAdminVisible: true },
+  { name: "Market", href: "/dashboard/market", icon: Store, businessAdminVisible: true },
   { name: "Deals", href: "/dashboard/deals", icon: Percent, businessAdminVisible: true },
   { name: "Statistics", href: "/dashboard/statistics", icon: BarChart3, businessAdminVisible: true },
+  { name: "Finances", href: "/dashboard/finances", icon: DollarSign, businessAdminVisible: true },
   { name: "Settings", href: "/dashboard/settings", icon: Settings, businessAdminVisible: true },
   { name: "Businesses", href: "/dashboard/businesses", icon: Store, superAdminOnly: true },
   { name: "Drivers", href: "/dashboard/drivers", icon: Truck, superAdminOnly: true },
@@ -35,6 +38,7 @@ const menu = [
   { name: "Promotions", href: "/dashboard/promotions", icon: Tag, superAdminOnly: true },
   { name: "Admins", href: "/dashboard/admins", icon: UserCog, superAdminOnly: true },
   { name: "Users", href: "/dashboard/users", icon: Users, superAdminOnly: true },
+  { name: "Commission Settings", href: "/dashboard/settings/commissions", icon: DollarSign, superAdminOnly: true },
 ];
 
 export default function Sidebar() {

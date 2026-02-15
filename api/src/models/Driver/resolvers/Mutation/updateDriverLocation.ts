@@ -35,14 +35,6 @@ export const updateDriverLocation: NonNullable<
     throw new GraphQLError('Driver not found', { extensions: { code: 'NOT_FOUND' } });
   }
 
-  // BACKWARD COMPATIBILITY: Also update users table
-  // Remove this after migration period
-  await authService.updateUser(userData.userId, {
-    driverLat: latitude,
-    driverLng: longitude,
-    driverLocationUpdatedAt: new Date().toISOString(),
-  });
-
   // Publish update to subscriptions
   try {
     const drivers = await authService.getDrivers();
@@ -56,5 +48,8 @@ export const updateDriverLocation: NonNullable<
   if (!user) {
     throw new GraphQLError('User not found', { extensions: { code: 'NOT_FOUND' } });
   }
-  return user;
+  return {
+    ...user,
+    isOnline: driver.onlinePreference ?? false,
+  };
 };

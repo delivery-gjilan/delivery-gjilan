@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const CALCULATE_DELIVERY_FEE = gql`
+export const CALCULATE_DELIVERY_FEE = graphql(`
     query CalculateDeliveryFee($latitude: Float!, $longitude: Float!, $baseDeliveryFee: Float!) {
         calculateDeliveryFee(latitude: $latitude, longitude: $longitude, baseDeliveryFee: $baseDeliveryFee) {
             zone {
@@ -13,4 +13,4 @@ export const CALCULATE_DELIVERY_FEE = gql`
             baseDeliveryFee
         }
     }
-`;
+`);

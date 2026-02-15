@@ -95,11 +95,7 @@ export class DriverHeartbeatHandler {
     );
 
     if (shouldUpdateLocation) {
-      try {
-        await this.authRepository.updateDriverLocation(userId, latitude, longitude);
-      } catch (error) {
-        console.warn('[HeartbeatHandler] Failed to sync user driver location:', error);
-      }
+      // Location is stored in drivers table only.
     }
 
     if (!updatedDriver) {

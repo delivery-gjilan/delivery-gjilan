@@ -70,4 +70,14 @@ export class ProductService {
     async deleteProduct(id: string): Promise<boolean> {
         return this.productRepository.delete(id);
     }
+
+    async updateProductsOrder(businessId: string, products: { id: string; sortOrder: number }[]): Promise<boolean> {
+        try {
+            await this.productRepository.updateProductsOrder(businessId, products);
+            return true;
+        } catch (error) {
+            console.error('Error updating products order:', error);
+            return false;
+        }
+    }
 }

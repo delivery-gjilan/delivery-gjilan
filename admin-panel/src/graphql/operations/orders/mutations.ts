@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const UPDATE_ORDER_STATUS = gql`
+export const UPDATE_ORDER_STATUS = graphql(`
     mutation UpdateOrderStatus($id: ID!, $status: OrderStatus!) {
         updateOrderStatus(id: $id, status: $status) {
             id
@@ -36,18 +36,18 @@ export const UPDATE_ORDER_STATUS = gql`
             }
         }
     }
-`;
+`);
 
-export const CANCEL_ORDER = gql`
+export const CANCEL_ORDER = graphql(`
     mutation CancelOrder($id: ID!) {
         cancelOrder(id: $id) {
             id
             status
         }
     }
-`;
+`);
 
-export const ASSIGN_DRIVER_TO_ORDER = gql`
+export const ASSIGN_DRIVER_TO_ORDER = graphql(`
     mutation AssignDriverToOrder($id: ID!, $driverId: ID) {
         assignDriverToOrder(id: $id, driverId: $driverId) {
             id
@@ -60,4 +60,4 @@ export const ASSIGN_DRIVER_TO_ORDER = gql`
             status
         }
     }
-`;
+`);

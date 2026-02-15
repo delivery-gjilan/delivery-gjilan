@@ -6,3 +6,5 @@ export * from './productCategories';
 export * from './productSubcategories';
 export * from './users';
 export * from './deliveryZones';
+export * from './drivers';
+export * from './settlements';

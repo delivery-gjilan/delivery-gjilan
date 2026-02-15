@@ -25,6 +25,8 @@ interface OrderItem {
     imageUrl?: string;
     quantity: number;
     price: number;
+    quantityInStock: number;
+    quantityNeeded: number;
 }
 
 interface OrderBusiness {
@@ -641,31 +643,128 @@ export default function OrdersPage() {
                             )}
                         </div>
 
-                        {/* Businesses & Products */}
-                        <div className="space-y-4">
-                            {selectedOrder.businesses.map((biz, idx) => (
-                                <div key={idx} className="bg-[#0a0a0a] border border-[#262626] rounded-lg p-4">
-                                    <div className="flex items-center gap-2 mb-3 pb-3 border-b border-[#262626]">
-                                        <Store size={18} className="text-cyan-500" />
-                                        <span className="font-semibold text-white">{biz.business.name}</span>
-                                        <span className="text-xs text-neutral-400">({biz.business.businessType})</span>
+                        {/* Businesses & Products - Table View */}
+                        <div className="space-y-6">
+                            {selectedOrder.businesses.filter(biz => biz.business.businessType === 'MARKET').map((biz, idx) => (
+                                <div key={idx} className="space-y-3">
+                                    <div className="bg-[#0a0a0a] border border-[#262626] rounded-lg p-3">
+                                        <div className="flex items-center gap-2">
+                                            <Store size={16} className="text-cyan-500" />
+                                            <span className="font-semibold text-white text-sm">{biz.business.name}</span>
+                                            <span className="text-xs text-neutral-400">({biz.business.businessType})</span>
+                                        </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        {biz.items.map((item, itemIdx) => (
-                                            <div key={itemIdx} className="flex items-center justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <Package size={16} className="text-neutral-400" />
-                                                    <div>
-                                                        <div className="text-white text-sm">{item.name}</div>
-                                                        <div className="text-xs text-neutral-400">Qty: {item.quantity}</div>
-                                                    </div>
-                                                </div>
-                                                <div className="text-white font-medium">${(item.price * item.quantity).toFixed(2)}</div>
-                                            </div>
-                                        ))}
+
+                                    {/* Products Table */}
+                                    <div className="overflow-x-auto border border-[#262626] rounded-lg">
+                                        <table className="w-full">
+                                            <thead>
+                                                <tr className="bg-[#0a0a0a] border-b border-[#262626]">
+                                                    <th className="px-3 py-2 text-left text-xs font-bold text-neutral-400 uppercase">Product</th>
+                                                    <th className="px-3 py-2 text-center text-xs font-bold text-neutral-400 uppercase">In Stock</th>
+                                                    <th className="px-3 py-2 text-center text-xs font-bold text-neutral-400 uppercase">Need to Buy</th>
+                                                    <th className="px-3 py-2 text-right text-xs font-bold text-neutral-400 uppercase">Unit Price</th>
+                                                    <th className="px-3 py-2 text-right text-xs font-bold text-neutral-400 uppercase">Total</th>
+                                                    <th className="px-3 py-2 text-center text-xs font-bold text-neutral-400 uppercase">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {biz.items.map((item, itemIdx) => {
+                                                    const isFullyInStock = item.quantityNeeded === 0;
+                                                    const isPartial = item.quantityInStock > 0 && item.quantityNeeded > 0;
+                                                    const isNeedToBuy = item.quantityInStock === 0 && item.quantityNeeded > 0;
+
+                                                    let rowBg = "";
+                                                    if (isFullyInStock) rowBg = "bg-green-500/10 border-l-4 border-green-500";
+                                                    else if (isPartial) rowBg = "bg-yellow-500/5 border-l-4 border-yellow-500";
+                                                    else if (isNeedToBuy) rowBg = "bg-amber-500/10 border-l-4 border-amber-500";
+
+                                                    let statusBadge = "";
+                                                    let statusColor = "";
+                                                    if (isFullyInStock) {
+                                                        statusBadge = "✓ In Stock";
+                                                        statusColor = "bg-green-500/20 text-green-300";
+                                                    } else if (isPartial) {
+                                                        statusBadge = "⚠ Partial";
+                                                        statusColor = "bg-yellow-500/20 text-yellow-300";
+                                                    } else if (isNeedToBuy) {
+                                                        statusBadge = "⚠ Need All";
+                                                        statusColor = "bg-amber-500/20 text-amber-300";
+                                                    }
+
+                                                    return (
+                                                        <tr
+                                                            key={itemIdx}
+                                                            className={`border-b border-[#262626] hover:bg-[#15151] transition-colors ${rowBg}`}
+                                                        >
+                                                            <td className="px-3 py-3">
+                                                                <div className="flex items-center gap-2">
+                                                                    {item.imageUrl && (
+                                                                        <img
+                                                                            src={item.imageUrl}
+                                                                            alt={item.name}
+                                                                            className="w-8 h-8 rounded object-cover"
+                                                                        />
+                                                                    )}
+                                                                    <div className="min-w-0">
+                                                                        <div className="text-white text-sm font-semibold truncate">{item.name}</div>
+                                                                        {item.category && (
+                                                                            <div className="text-xs text-neutral-400">{item.category}</div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-3 py-3 text-center">
+                                                                <div
+                                                                    className={`inline-block px-2 py-1 rounded text-sm font-bold ${
+                                                                        item.quantityInStock > 0 ? "bg-green-500/20 text-green-300" : "text-neutral-500"
+                                                                    }`}
+                                                                >
+                                                                    {item.quantityInStock}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-3 py-3 text-center">
+                                                                <div
+                                                                    className={`inline-block px-2 py-1 rounded text-sm font-bold ${
+                                                                        item.quantityNeeded > 0 ? "bg-amber-500/20 text-amber-300" : "text-neutral-500"
+                                                                    }`}
+                                                                >
+                                                                    {item.quantityNeeded}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-3 py-3 text-right">
+                                                                <span className="text-white text-sm font-semibold">${item.price.toFixed(2)}</span>
+                                                            </td>
+                                                            <td className="px-3 py-3 text-right">
+                                                                <div className="text-right">
+                                                                    <div className="text-white font-bold">
+                                                                        ${((item.quantityInStock + item.quantityNeeded) * item.price).toFixed(2)}
+                                                                    </div>
+                                                                    {isPartial && (
+                                                                        <div className="text-xs text-neutral-400">
+                                                                            ${(item.quantityInStock * item.price).toFixed(2)} have
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-3 py-3 text-center">
+                                                                <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold ${statusColor}`}>
+                                                                    {statusBadge}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
                             ))}
+                            {selectedOrder.businesses.filter(biz => biz.business.businessType === 'MARKET').length === 0 && (
+                                <div className="text-center text-neutral-400 py-8">
+                                    No market items in this order
+                                </div>
+                            )}
                         </div>
 
                         {/* Totals */}

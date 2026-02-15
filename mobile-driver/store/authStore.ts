@@ -8,8 +8,8 @@ interface AuthState {
     token: string | null;
     user: User | null;
     isLoading: boolean;
-    isAuthenticated: boolean;
     hasHydrated: boolean;
+    isAuthenticated: boolean;
     /**
      * Driver's online preference toggle ("I want to work")
      * Note: This is separate from the backend's connectionStatus
@@ -20,6 +20,7 @@ interface AuthState {
      */
     isOnline: boolean;
 
+    // Actions
     setToken: (token: string) => void;
     setUser: (user: User | null) => void;
     setLoading: (loading: boolean) => void;
@@ -30,25 +31,37 @@ interface AuthState {
 
 const isDriver = (user: User | null) => user?.role === UserRole.Driver;
 
+/**
+ * Calculate authentication status from token and user
+ */
+const calculateIsAuthenticated = (token: string | null, user: User | null): boolean => {
+    return !!(token && user && isDriver(user));
+};
+
 export const useAuthStore = create<AuthState>()(
     persist(
         (set) => ({
             token: null,
             user: null,
             isLoading: false,
-            isAuthenticated: false,
             hasHydrated: false,
-            isOnline: true,
+            isAuthenticated: false,
+            isOnline: false,
 
-            setToken: (token) => set({ token }),
+            setToken: (token) => {
+                set((state) => ({
+                    token,
+                    isAuthenticated: calculateIsAuthenticated(token, state.user),
+                }));
+            },
 
             setUser: (user) => {
                 const onlinePref = (user as any)?.driverConnection?.onlinePreference;
-                set({
+                set((state) => ({
                     user,
-                    isAuthenticated: isDriver(user),
-                    isOnline: typeof onlinePref === 'boolean' ? onlinePref : true,
-                });
+                    isAuthenticated: calculateIsAuthenticated(state.token, user),
+                    isOnline: typeof onlinePref === 'boolean' ? onlinePref : state.isOnline,
+                }));
             },
 
             setLoading: (isLoading) => set({ isLoading }),
@@ -60,8 +73,14 @@ export const useAuthStore = create<AuthState>()(
                 set({
                     token,
                     user,
-                    isAuthenticated: isDriver(user),
-                    isOnline: typeof onlinePref === 'boolean' ? onlinePref : true,
+                    isAuthenticated: calculateIsAuthenticated(token, user),
+                    isOnline: typeof onlinePref === 'boolean' ? onlinePref : false,
+                });
+                console.log('[AuthStore] Login successful', { 
+                    hasToken: !!token, 
+                    hasUser: !!user, 
+                    isDriver: isDriver(user),
+                    isAuthenticated: calculateIsAuthenticated(token, user)
                 });
             },
 
@@ -73,6 +92,7 @@ export const useAuthStore = create<AuthState>()(
                     isAuthenticated: false,
                     isOnline: false,
                 });
+                console.log('[AuthStore] Logout successful');
             },
         }),
         {
@@ -88,10 +108,16 @@ export const useAuthStore = create<AuthState>()(
                     return;
                 }
 
+                // Recalculate isAuthenticated after rehydration
                 const onlinePref = (state.user as any)?.driverConnection?.onlinePreference;
-                state.isAuthenticated = isDriver(state.user);
+                state.isAuthenticated = calculateIsAuthenticated(state.token, state.user);
                 state.isOnline = typeof onlinePref === 'boolean' ? onlinePref : state.isOnline;
                 state.hasHydrated = true;
+                console.log('[AuthStore] Rehydrated', { 
+                    isAuthenticated: state.isAuthenticated, 
+                    hasToken: !!state.token,
+                    hasUser: !!state.user 
+                });
             },
         }
     )

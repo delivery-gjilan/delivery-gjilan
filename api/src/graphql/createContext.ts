@@ -5,11 +5,15 @@ import { BusinessRepository } from '@/repositories/BusinessRepository';
 import { BusinessService } from '@/services/BusinessService';
 import { ProductCategoryRepository } from '@/repositories/ProductCategoryRepository';
 import { ProductCategoryService } from '@/services/ProductCategoryService';
+import { ProductSubcategoryRepository } from '@/repositories/ProductSubcategoryRepository';
+import { ProductSubcategoryService } from '@/services/ProductSubcategoryService';
 import { ProductRepository } from '@/repositories/ProductRepository';
 import { ProductService } from '@/services/ProductService';
 import { AuthRepository } from '@/repositories/AuthRepository';
 import { AuthService } from '@/services/AuthService';
 import { GraphQLContext } from './context';
+import { DriverAuthService } from '@/services/DriverAuthService';
+import { DriverRepository } from '@/repositories/DriverRepository';
 
 import { OrderRepository } from '@/repositories/OrderRepository';
 import { OrderService } from '@/services/OrderService';
@@ -68,8 +72,6 @@ async function extractUserData(context: YogaInitialContext & { connectionParams?
 export async function createContext(initialContext: YogaInitialContext): Promise<GraphQLContext> {
     // Extract user data from request
     const userData = await extractUserData(initialContext);
-    console.log('Request', initialContext.request?.clone().body);
-    console.log('UserData', userData);
 
     // Initialize database connection
     const db = await getDB();
@@ -77,6 +79,7 @@ export async function createContext(initialContext: YogaInitialContext): Promise
     // Initialize repositories
     const businessRepository = new BusinessRepository(db);
     const productCategoryRepository = new ProductCategoryRepository(db);
+    const productSubcategoryRepository = new ProductSubcategoryRepository(db);
     const productRepository = new ProductRepository(db);
     const authRepository = new AuthRepository(db);
     const orderRepository = new OrderRepository();
@@ -85,8 +88,10 @@ export async function createContext(initialContext: YogaInitialContext): Promise
     // Initialize services
     const businessService = new BusinessService(businessRepository);
     const productCategoryService = new ProductCategoryService(productCategoryRepository);
+    const productSubcategoryService = new ProductSubcategoryService(productSubcategoryRepository, productCategoryRepository);
     const productService = new ProductService(productRepository);
     const authService = new AuthService(authRepository);
+    const driverAuthService = new DriverAuthService(authRepository, new DriverRepository(db));
     const orderService = new OrderService(orderRepository, authRepository, productRepository, pubsub);
     const deliveryZoneService = new DeliveryZoneService(deliveryZoneRepository);
 
@@ -112,8 +117,10 @@ export async function createContext(initialContext: YogaInitialContext): Promise
         userData,
         businessService,
         productCategoryService,
+        productSubcategoryService,
         productService,
         authService,
+        driverAuthService,
         orderService,
         deliveryZoneService,
         driverService,

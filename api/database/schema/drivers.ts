@@ -1,4 +1,4 @@
-import { pgTable, uuid, doublePrecision, timestamp, pgEnum, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, doublePrecision, timestamp, pgEnum, boolean, numeric } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import { users } from './users';
 
@@ -71,6 +71,9 @@ export const drivers = pgTable('drivers', {
    * CONNECTED -> STALE (15s) -> LOST (30s) -> DISCONNECTED (subscription closed)
    */
   connectionStatus: driverConnectionStatus('connection_status').default('DISCONNECTED').notNull(),
+
+  // Commission and payment tracking
+  commissionPercentage: numeric('commission_percentage', { precision: 5, scale: 2 }).default('0').notNull(),
 
   // Metadata
   createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })

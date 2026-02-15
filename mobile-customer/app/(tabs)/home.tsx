@@ -15,6 +15,7 @@ export default function Home() {
     const { t } = useTranslations();
     const router = useRouter();
     const { businesses, loading, error } = useBusinesses();
+    const restaurants = (businesses || []).filter((business) => business.businessType === 'RESTAURANT');
     // Demo promotional banners
     const promoBanners: PromoBanner[] = [
         {
@@ -122,7 +123,7 @@ export default function Home() {
                             </Text>
 
                             {/* Restaurant Cards */}
-                            {businesses?.map((item, index) => {
+                            {restaurants.map((item, index) => {
                                 const metadata = getRestaurantMetadata(index);
                                 return (
                                     <RestaurantCard

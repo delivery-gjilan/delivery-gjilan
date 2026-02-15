@@ -1,0 +1,68 @@
+enum SettlementType {
+    DRIVER_PAYMENT
+    BUSINESS_PAYMENT
+}
+
+enum SettlementStatus {
+    PENDING
+    PAID
+}
+
+type Settlement {
+    id: ID!
+    type: SettlementType!
+    driver: User
+    business: Business
+    order: Order!
+    amount: Float!
+    status: SettlementStatus!
+    paidAt: Date
+    createdAt: Date!
+    updatedAt: Date!
+}
+
+type SettlementSummary {
+    totalAmount: Float!
+    totalPending: Float!
+    totalPaid: Float!
+    count: Int!
+    pendingCount: Int!
+}
+
+type Query {
+    settlements(
+        type: SettlementType
+        status: SettlementStatus
+        driverId: ID
+        businessId: ID
+        startDate: Date
+        endDate: Date
+        limit: Int
+        offset: Int
+    ): [Settlement!]!
+    
+    settlementSummary(
+        type: SettlementType
+        driverId: ID
+        businessId: ID
+        startDate: Date
+        endDate: Date
+    ): SettlementSummary!
+    
+    driverBalance(driverId: ID!): SettlementSummary!
+    businessBalance(businessId: ID!): SettlementSummary!
+}
+
+type Mutation {
+    markSettlementAsPaid(settlementId: ID!): Settlement!
+    markSettlementsAsPaid(ids: [ID!]!): [Settlement!]!
+    markSettlementAsPartiallyPaid(settlementId: ID!, amount: Float!): Settlement!
+    unsettleSettlement(settlementId: ID!): Settlement!
+    updateCommissionPercentage(driverId: ID, businessId: ID, percentage: Float!): Boolean!
+    backfillSettlementsForDeliveredOrders: Int!
+}
+
+extend type Subscription {
+    settlementCreated(type: SettlementType): Settlement!
+    settlementStatusChanged(id: ID!): Settlement!
+}

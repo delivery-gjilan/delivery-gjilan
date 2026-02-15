@@ -1,6 +1,6 @@
-import { gql } from "@apollo/client";
+import { graphql } from '@/gql';
 
-export const DRIVERS_UPDATED_SUBSCRIPTION = gql`
+export const DRIVERS_UPDATED_SUBSCRIPTION = graphql(`
   subscription DriversUpdated {
     driversUpdated {
       id
@@ -25,4 +25,4 @@ export const DRIVERS_UPDATED_SUBSCRIPTION = gql`
       }
     }
   }
-`;
+`);

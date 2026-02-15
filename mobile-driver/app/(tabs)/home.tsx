@@ -18,7 +18,7 @@ export default function Home() {
     const { t } = useTranslations();
     const router = useRouter();
     const { logout } = useAuth();
-
+    
     const isOnline = useAuthStore((state) => state.isOnline);
     const setOnline = useAuthStore((state) => state.setOnline);
     const setUser = useAuthStore((state) => state.setUser);

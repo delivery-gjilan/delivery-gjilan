@@ -2,6 +2,7 @@ type Product {
     id: ID!
     businessId: ID!
     categoryId: ID!
+    subcategoryId: ID
     name: String!
     description: String
     imageUrl: String
@@ -9,6 +10,8 @@ type Product {
     isOnSale: Boolean!
     salePrice: Float
     isAvailable: Boolean!
+    sortOrder: Int!
+    stock: Int!
     createdAt: String!
     updatedAt: String!
 }
@@ -28,6 +31,7 @@ input CreateProductInput {
     isOnSale: Boolean
     salePrice: Float
     isAvailable: Boolean
+    stock: Int
 }
 
 input UpdateProductInput {
@@ -40,10 +44,18 @@ input UpdateProductInput {
     isOnSale: Boolean
     salePrice: Float
     isAvailable: Boolean
+    sortOrder: Int
+    stock: Int
+}
+
+input ProductOrderInput {
+    id: ID!
+    sortOrder: Int!
 }
 
 type Mutation {
     createProduct(input: CreateProductInput!): Product!
     updateProduct(id: ID!, input: UpdateProductInput!): Product!
+    updateProductsOrder(businessId: ID!, products: [ProductOrderInput!]!): Boolean!
     deleteProduct(id: ID!): Boolean!
 }

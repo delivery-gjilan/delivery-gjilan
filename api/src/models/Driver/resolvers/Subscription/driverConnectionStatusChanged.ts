@@ -1,4 +1,5 @@
 import type { SubscriptionResolvers, DriverConnection } from './../../../../generated/types.generated';
+import { GraphQLError } from 'graphql';
 import { pubsub, subscribe } from '@/lib/pubsub';
 
 // Create a topic key for per-driver connection status changes
@@ -22,7 +23,18 @@ const createDriverConnectionStatusTopic = (driverId: string): PerDriverConnectio
 export const driverConnectionStatusChanged: NonNullable<
   SubscriptionResolvers['driverConnectionStatusChanged']
 > = {
-  subscribe: (_parent, { driverId }) => {
+  subscribe: (_parent, { driverId }, { userData }) => {
+    if (!userData.userId) {
+      throw new GraphQLError('Authentication required', { extensions: { code: 'UNAUTHENTICATED' } });
+    }
+
+    const isAdmin = userData.role === 'SUPER_ADMIN' || userData.role === 'BUSINESS_ADMIN';
+    const isSelf = userData.userId === driverId;
+
+    if (!isAdmin && !isSelf) {
+      throw new GraphQLError('Forbidden', { extensions: { code: 'FORBIDDEN' } });
+    }
+
     const topic = createDriverConnectionStatusTopic(driverId);
     return subscribe(pubsub, topic as any);
   },

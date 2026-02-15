@@ -12,6 +12,7 @@ export const UPDATE_PRODUCT = graphql(`
     mutation UpdateProduct($id: ID!, $input: UpdateProductInput!) {
         updateProduct(id: $id, input: $input) {
             id
+            stock
         }
     }
 `);
@@ -19,5 +20,11 @@ export const UPDATE_PRODUCT = graphql(`
 export const DELETE_PRODUCT = graphql(`
     mutation DeleteProduct($id: ID!) {
         deleteProduct(id: $id)
+    }
+`);
+
+export const UPDATE_PRODUCTS_ORDER = graphql(`
+    mutation UpdateProductsOrder($businessId: ID!, $products: [ProductOrderInput!]!) {
+        updateProductsOrder(businessId: $businessId, products: $products)
     }
 `);

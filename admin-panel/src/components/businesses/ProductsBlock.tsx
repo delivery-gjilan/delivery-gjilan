@@ -13,6 +13,7 @@ import {
     useUpdateProduct,
     useDeleteProduct,
 } from "@/lib/hooks/useProducts";
+import { useProductSubcategories } from "@/lib/hooks/useProductSubcategories";
 import type { CreateProductInput, UpdateProductInput } from "@/gql/graphql";
 
 /* ===============================================
@@ -27,6 +28,7 @@ interface Category {
 interface Product {
     id: string;
     categoryId: string;
+    subcategoryId?: string | null;
     name: string;
     description?: string | null;
     price: number;
@@ -42,6 +44,7 @@ interface Product {
 
 export default function ProductsBlock({ businessId }: { businessId: string }) {
     const { products, categories, loading, error, refetch } = useProducts(businessId);
+    const { subcategories } = useProductSubcategories(businessId);
     const { create: createProduct, loading: createLoading, error: createError } = useCreateProduct();
     const { update: updateProduct, loading: updateLoading, error: updateError } = useUpdateProduct();
     const { delete: deleteProduct, loading: deleteLoading, error: deleteError } = useDeleteProduct();
@@ -72,6 +75,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
     const [createForm, setCreateForm] = useState<CreateProductInput & { id?: string }>({
         businessId,
         categoryId: "",
+        subcategoryId: undefined,
         name: "",
         description: "",
         imageUrl: "",
@@ -83,6 +87,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
     const [editForm, setEditForm] = useState<UpdateProductInput & { id: string }>({
         id: "",
         categoryId: "",
+        subcategoryId: undefined,
         name: "",
         description: "",
         imageUrl: "",
@@ -109,7 +114,8 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             return (
                 p.name.toLowerCase().includes(query) ||
                 p.description?.toLowerCase().includes(query) ||
-                categories.find(c => c.id === p.categoryId)?.name.toLowerCase().includes(query)
+                categories.find(c => c.id === p.categoryId)?.name.toLowerCase().includes(query) ||
+                subcategories.find((s: any) => s.id === p.subcategoryId)?.name.toLowerCase().includes(query)
             );
         });
 
@@ -119,7 +125,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         });
 
         return groups;
-    }, [products, categories, searchQuery]);
+    }, [products, categories, searchQuery, subcategories]);
 
     /* ===============================================
      HANDLERS
@@ -195,6 +201,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         const input: CreateProductInput = {
             businessId,
             categoryId: createForm.categoryId,
+            subcategoryId: createForm.subcategoryId || undefined,
             name: createForm.name,
             description: createForm.description || undefined,
             imageUrl: imageUrl || undefined,
@@ -211,6 +218,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             setCreateForm({
                 businessId,
                 categoryId: "",
+                subcategoryId: undefined,
                 name: "",
                 description: "",
                 imageUrl: "",
@@ -229,6 +237,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         setEditForm({
             id: p.id,
             categoryId: p.categoryId,
+            subcategoryId: p.subcategoryId ?? undefined,
             name: p.name,
             description: p.description || "",
             imageUrl: p.imageUrl || "",
@@ -264,6 +273,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         const { id, ...input } = editForm;
         const updateInput: UpdateProductInput = {
             categoryId: input.categoryId,
+            subcategoryId: input.subcategoryId || undefined,
             name: input.name,
             description: input.description || undefined,
             imageUrl: imageUrl || undefined,
@@ -354,6 +364,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                     <tr>
                                         <Th>Image</Th>
                                         <Th>Name</Th>
+                                        <Th>Subcategory</Th>
                                         <Th>Price</Th>
                                         <Th>Sale</Th>
                                         <Th>Status</Th>
@@ -380,6 +391,10 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
 
                                             <Td>{p.name}</Td>
 
+                                            <Td>
+                                                {subcategories.find((s: any) => s.id === p.subcategoryId)?.name || "-"}
+                                            </Td>
+
                                             <Td>${p.price.toFixed(2)}</Td>
 
                                             <Td>
@@ -401,7 +416,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                     </span>
                                                 ) : (
                                                     <span className="text-red-400">
-                                                        $
+                                                        Unavailable
                                                     </span>
                                                 )}
                                             </Td>
@@ -460,6 +475,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                 setCreateForm({
                                     ...createForm,
                                     categoryId: e.target.value,
+                                    subcategoryId: undefined,
                                 })
                             }
                         >
@@ -469,6 +485,31 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                     {c.name}
                                 </option>
                             ))}
+                        </Select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                            Subcategory
+                        </label>
+                        <Select
+                            value={createForm.subcategoryId ?? ""}
+                            onChange={(e) =>
+                                setCreateForm({
+                                    ...createForm,
+                                    subcategoryId: e.target.value || undefined,
+                                })
+                            }
+                            disabled={!createForm.categoryId}
+                        >
+                            <option value="">No subcategory</option>
+                            {subcategories
+                                .filter((s: any) => s.categoryId === createForm.categoryId)
+                                .map((s: any) => (
+                                    <option key={s.id} value={s.id}>
+                                        {s.name}
+                                    </option>
+                                ))}
                         </Select>
                     </div>
 
@@ -612,6 +653,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                 setEditForm({
                                     ...editForm,
                                     categoryId: e.target.value,
+                                    subcategoryId: undefined,
                                 })
                             }
                         >
@@ -620,6 +662,31 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                     {c.name}
                                 </option>
                             ))}
+                        </Select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                            Subcategory
+                        </label>
+                        <Select
+                            value={editForm.subcategoryId ?? ""}
+                            onChange={(e) =>
+                                setEditForm({
+                                    ...editForm,
+                                    subcategoryId: e.target.value || undefined,
+                                })
+                            }
+                            disabled={!editForm.categoryId}
+                        >
+                            <option value="">No subcategory</option>
+                            {subcategories
+                                .filter((s: any) => s.categoryId === editForm.categoryId)
+                                .map((s: any) => (
+                                    <option key={s.id} value={s.id}>
+                                        {s.name}
+                                    </option>
+                                ))}
                         </Select>
                     </div>
 

@@ -7,7 +7,7 @@ import {
     products as productsTable,
     businesses as businessesTable,
 } from '@/database/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import type { Order, OrderBusiness, OrderItem, OrderStatus, CreateOrderInput } from '@/generated/types.generated';
 import type { DbOrder } from '@/database/schema/orders';
 import { PubSub, publish, subscribe, topics } from '@/lib/pubsub';
@@ -87,6 +87,15 @@ export class OrderService {
             throw new GraphQLError('Fix the error messages');
         }
 
+        // Decrement stock for ordered products (ensure it doesn't go below 0)
+        const db = await getDB();
+        for (const item of itemsToCreate) {
+            await db
+                .update(productsTable)
+                .set({ stock: sql`GREATEST(0, ${productsTable.stock} - ${item.quantity})` })
+                .where(eq(productsTable.id, item.productId));
+        }
+
         return this.mapToOrder(createdOrder);
     }
 
@@ -112,12 +121,15 @@ export class OrderService {
                 businessMap.set(product.businessId, []);
             }
 
+            const originalStock = Math.max(0, product.stock + item.quantity);
             businessMap.get(product.businessId)!.push({
                 productId: item.productId,
                 name: product.name,
                 imageUrl: product.imageUrl || undefined,
                 quantity: item.quantity,
                 price: item.price,
+                quantityInStock: Math.min(item.quantity, originalStock),
+                quantityNeeded: Math.max(0, item.quantity - originalStock),
             });
         }
 
@@ -246,6 +258,24 @@ export class OrderService {
     }
 
     async cancelOrder(id: string): Promise<Order> {
+        // Get the order to retrieve its items
+        const dbOrder = await this.orderRepository.findById(id);
+        if (!dbOrder) {
+            throw new Error('Order not found');
+        }
+
+        // Get order items
+        const db = await getDB();
+        const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, id));
+
+        // Restore stock for cancelled order items
+        for (const item of items) {
+            await db
+                .update(productsTable)
+                .set({ stock: sql`${productsTable.stock} + ${item.quantity}` })
+                .where(eq(productsTable.id, item.productId));
+        }
+
         return this.updateOrderStatus(id, 'CANCELLED');
     }
 

@@ -25,9 +25,6 @@ export const updateDriverOnlineStatus: NonNullable<MutationResolvers['updateDriv
     throw new GraphQLError('Driver not found', { extensions: { code: 'NOT_FOUND' } });
   }
 
-  // BACKWARD COMPATIBILITY: Also update users table
-  await authService.authRepository.updateDriverOnlineStatus(userData.userId, isOnline);
-
   // Fetch all drivers and publish update for real-time sync
   try {
     const drivers = await authService.authRepository.findDrivers();
@@ -37,5 +34,11 @@ export const updateDriverOnlineStatus: NonNullable<MutationResolvers['updateDriv
   }
 
   const user = await authService.authRepository.findById(userData.userId);
-  return user;
+  if (!user) {
+    throw new GraphQLError('User not found', { extensions: { code: 'NOT_FOUND' } });
+  }
+  return {
+    ...user,
+    isOnline: driver.onlinePreference ?? false,
+  };
 };

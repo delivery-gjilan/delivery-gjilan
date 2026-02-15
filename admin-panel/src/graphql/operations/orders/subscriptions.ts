@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const ORDERS_SUBSCRIPTION = gql`
+export const ORDERS_SUBSCRIPTION = graphql(`
     subscription OrdersUpdated($token: String!) {
         userOrdersUpdated(input: { token: $token }) {
             id
@@ -9,6 +9,20 @@ export const ORDERS_SUBSCRIPTION = gql`
             totalPrice
             orderDate
             status
+            user {
+                id
+                firstName
+                lastName
+                email
+                address
+                phoneNumber
+            }
+            driver {
+                id
+                firstName
+                lastName
+                email
+            }
             dropOffLocation {
                 latitude
                 longitude
@@ -18,6 +32,7 @@ export const ORDERS_SUBSCRIPTION = gql`
                 business {
                     id
                     name
+                    phoneNumber
                     businessType
                     location {
                         latitude
@@ -31,13 +46,15 @@ export const ORDERS_SUBSCRIPTION = gql`
                     imageUrl
                     quantity
                     price
+                    quantityInStock
+                    quantityNeeded
                 }
             }
         }
     }
-`;
+`);
 
-export const ALL_ORDERS_SUBSCRIPTION = gql`
+export const ALL_ORDERS_SUBSCRIPTION = graphql(`
     subscription AllOrdersUpdated {
         allOrdersUpdated {
             id
@@ -52,6 +69,7 @@ export const ALL_ORDERS_SUBSCRIPTION = gql`
                 lastName
                 email
                 address
+                phoneNumber
             }
             driver {
                 id
@@ -69,6 +87,12 @@ export const ALL_ORDERS_SUBSCRIPTION = gql`
                     id
                     name
                     businessType
+                    phoneNumber
+                    location {
+                        latitude
+                        longitude
+                        address
+                    }
                 }
                 items {
                     productId
@@ -76,8 +100,10 @@ export const ALL_ORDERS_SUBSCRIPTION = gql`
                     imageUrl
                     quantity
                     price
+                    quantityInStock
+                    quantityNeeded
                 }
             }
         }
     }
-`;
+`);

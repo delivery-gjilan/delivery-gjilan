@@ -5,3 +5,23 @@ type ProductSubcategory {
     createdAt: String!
     updatedAt: String!
 }
+
+type Query {
+    productSubcategories(categoryId: ID!): [ProductSubcategory!]! @skipAuth
+    productSubcategoriesByBusiness(businessId: ID!): [ProductSubcategory!]! @skipAuth
+}
+
+input CreateProductSubcategoryInput {
+    categoryId: ID!
+    name: String!
+}
+
+input UpdateProductSubcategoryInput {
+    name: String
+}
+
+type Mutation {
+    createProductSubcategory(input: CreateProductSubcategoryInput!): ProductSubcategory!
+    updateProductSubcategory(id: ID!, input: UpdateProductSubcategoryInput!): ProductSubcategory!
+    deleteProductSubcategory(id: ID!): Boolean!
+}

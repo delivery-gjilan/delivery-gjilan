@@ -1,4 +1,5 @@
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
 
 import * as schemas from './schema';
 
@@ -8,6 +9,7 @@ const dbSchema = {
 };
 
 let db: NodePgDatabase<typeof dbSchema>;
+let pool: Pool;
 
 export async function getDB() {
     if (db) {
@@ -16,7 +18,11 @@ export async function getDB() {
 
     const connectionString = process.env.DB_URL as string;
 
-    db = drizzle(connectionString, { schema: dbSchema });
+    pool = new Pool({
+        connectionString,
+    });
+
+    db = drizzle(pool, { schema: dbSchema });
 
     return db;
 }

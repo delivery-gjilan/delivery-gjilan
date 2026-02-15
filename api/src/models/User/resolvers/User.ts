@@ -4,23 +4,28 @@ export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'busines
         if (!parent.businessId) {
             return null;
         }
-        return businessService.getBusiness(parent.businessId);
+        return businessService.getBusiness(String(parent.businessId));
     },
-    driverLocation: async (parent, _args, { driverService }) => {
-        if (parent.driverLat && parent.driverLng) {
-            return {
-                latitude: parent.driverLat,
-                longitude: parent.driverLng,
-                address: 'Driver location',
-            };
+    isOnline: async (parent, _args, { driverService }) => {
+        if (parent.role !== 'DRIVER' || !driverService) {
+            return false;
         }
 
+        try {
+            const driver = await driverService.getDriverWithConnection(String(parent.id));
+            return driver?.onlinePreference ?? false;
+        } catch (error) {
+            console.error('[User.isOnline] Error resolving driver online preference:', error);
+            return false;
+        }
+    },
+    driverLocation: async (parent, _args, { driverService }) => {
         if (parent.role !== 'DRIVER' || !driverService) {
             return null;
         }
 
         try {
-            const driver = await driverService.getDriverWithConnection(parent.id);
+            const driver = await driverService.getDriverWithConnection(String(parent.id));
             if (!driver?.driverLat || !driver?.driverLng) {
                 return null;
             }
@@ -35,10 +40,10 @@ export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'busines
         }
     },
     driverLocationUpdatedAt: async (parent, _args, { driverService }) => {
-        let value = parent.driverLocationUpdatedAt;
-        if (!value && parent.role === 'DRIVER' && driverService) {
+        let value: string | Date | null | undefined;
+        if (parent.role === 'DRIVER' && driverService) {
             try {
-                const driver = await driverService.getDriverWithConnection(parent.id);
+                const driver = await driverService.getDriverWithConnection(String(parent.id));
                 value = driver?.lastLocationUpdate ?? null;
             } catch (error) {
                 console.error('[User.driverLocationUpdatedAt] Error resolving driver location timestamp:', error);
@@ -56,30 +61,38 @@ export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'busines
         }
         return null;
     },
-    driverConnection: async (parent, _args, { driverService }) => {
-        // Only drivers have connection info
-        if (parent.role !== 'DRIVER') {
-            return null;
-        }
-
-        if (!driverService) {
+    commissionPercentage: async (parent, _args, { driverService }) => {
+        if (parent.role !== 'DRIVER' || !driverService) {
             return null;
         }
 
         try {
-            const driver = await driverService.getDriverWithConnection(parent.id);
+            const driver = await driverService.getDriverWithConnection(String(parent.id));
+            if (!driver?.commissionPercentage) {
+                return null;
+            }
+            return parseFloat(driver.commissionPercentage);
+        } catch (error) {
+            console.error('[User.commissionPercentage] Error resolving driver commission:', error);
+            return null;
+        }
+    },
+    driverConnection: async (parent, _args, { driverService }) => {
+        if (parent.role !== 'DRIVER' || !driverService) {
+            return null;
+        }
+
+        try {
+            const driver = await driverService.getDriverWithConnection(String(parent.id));
             if (!driver) {
                 return null;
             }
-
             return {
-                onlinePreference: driver.onlinePreference,
-                connectionStatus: driver.connectionStatus,
-                lastLocationUpdate: driver.lastLocationUpdate
-                    ? driver.lastLocationUpdate instanceof Date
-                        ? driver.lastLocationUpdate
-                        : new Date(driver.lastLocationUpdate)
-                    : null,
+                onlinePreference: driver.onlinePreference ?? false,
+                connectionStatus: driver.connectionStatus ?? 'DISCONNECTED',
+                lastHeartbeatAt: driver.lastHeartbeatAt,
+                lastLocationUpdate: driver.lastLocationUpdate,
+                disconnectedAt: driver.disconnectedAt,
             };
         } catch (error) {
             console.error('[User.driverConnection] Error resolving driver connection:', error);

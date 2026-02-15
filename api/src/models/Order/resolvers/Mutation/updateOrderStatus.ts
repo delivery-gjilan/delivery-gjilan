@@ -1,4 +1,8 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
+import { getDB } from '@/database';
+import { orderItems as orderItemsTable } from '@/database/schema';
+import { eq } from 'drizzle-orm';
+import { FinancialService } from '@/services/FinancialService';
 
 export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus']> = async (
     _parent,
@@ -76,6 +80,16 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
         throw new Error('Not authorized to update order status');
     } else {
         order = await orderService.updateOrderStatus(id, status);
+    }
+
+    if (status === 'DELIVERED' && currentStatus !== 'DELIVERED') {
+        const db = await getDB();
+        const refreshed = await orderService.orderRepository.findById(id);
+        if (refreshed) {
+            const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, id));
+            const financialService = new FinancialService(db);
+            await financialService.createOrderSettlements(refreshed, items, refreshed.driverId);
+        }
     }
 
     console.log(`[Server] Publishing to channel: orderStatusUpdated:${id}`);

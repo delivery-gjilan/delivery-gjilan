@@ -4,7 +4,7 @@ import type { UserResolvers } from './../../../generated/types.generated';
  * Driver-related User resolver
  * Resolves the driverConnection field for driver users
  */
-export const User: Pick<UserResolvers, 'driverConnection'|'__isTypeOf'> = {
+export const User: Pick<UserResolvers, 'commissionPercentage'|'driverConnection'|'__isTypeOf'> = {
   driverConnection: async (parent, _args, { driverService }) => {
     // Only drivers have connection info
     if (parent.role !== 'DRIVER') {
