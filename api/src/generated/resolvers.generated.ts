@@ -11,6 +11,7 @@ import    { deliveryZones as Query_deliveryZones } from './../models/DeliveryZon
 import    { driverBalance as Query_driverBalance } from './../models/Settlement/resolvers/Query/driverBalance';
 import    { drivers as Query_drivers } from './../models/User/resolvers/Query/drivers';
 import    { me as Query_me } from './../models/User/resolvers/Query/me';
+import    { myBehavior as Query_myBehavior } from './../models/User/resolvers/Query/myBehavior';
 import    { order as Query_order } from './../models/Order/resolvers/Query/order';
 import    { orders as Query_orders } from './../models/Order/resolvers/Query/orders';
 import    { ordersByStatus as Query_ordersByStatus } from './../models/Order/resolvers/Query/ordersByStatus';
@@ -23,6 +24,7 @@ import    { products as Query_products } from './../models/Product/resolvers/Que
 import    { settlementSummary as Query_settlementSummary } from './../models/Settlement/resolvers/Query/settlementSummary';
 import    { settlements as Query_settlements } from './../models/Settlement/resolvers/Query/settlements';
 import    { uncompletedOrders as Query_uncompletedOrders } from './../models/Order/resolvers/Query/uncompletedOrders';
+import    { userBehavior as Query_userBehavior } from './../models/User/resolvers/Query/userBehavior';
 import    { users as Query_users } from './../models/User/resolvers/Query/users';
 import    { adminSetDriverConnectionStatus as Mutation_adminSetDriverConnectionStatus } from './../models/Driver/resolvers/Mutation/adminSetDriverConnectionStatus';
 import    { adminUpdateDriverLocation as Mutation_adminUpdateDriverLocation } from './../models/User/resolvers/Mutation/adminUpdateDriverLocation';
@@ -92,11 +94,12 @@ import    { SettlementSummary } from './../models/Settlement/resolvers/Settlemen
 import    { SignupStepResponse } from './../models/User/resolvers/SignupStepResponse';
 import    { User as User_User } from './../models/User/resolvers/User';
 import    { User as Driver_User } from './../models/Driver/resolvers/User';
+import    { UserBehavior } from './../models/User/resolvers/UserBehavior';
 import    { WorkingHours } from './../models/General/resolvers/WorkingHours';
 import    { ZoneFeeResult } from './../models/DeliveryZone/resolvers/ZoneFeeResult';
 import    { DateResolver,DateTimeResolver,JSONResolver } from 'graphql-scalars';
     export const resolvers: Resolvers = {
-      Query: { auditLog: Query_auditLog,auditLogs: Query_auditLogs,business: Query_business,businessBalance: Query_businessBalance,businesses: Query_businesses,calculateDeliveryFee: Query_calculateDeliveryFee,deliveryZone: Query_deliveryZone,deliveryZones: Query_deliveryZones,driverBalance: Query_driverBalance,drivers: Query_drivers,me: Query_me,order: Query_order,orders: Query_orders,ordersByStatus: Query_ordersByStatus,product: Query_product,productCategories: Query_productCategories,productCategory: Query_productCategory,productSubcategories: Query_productSubcategories,productSubcategoriesByBusiness: Query_productSubcategoriesByBusiness,products: Query_products,settlementSummary: Query_settlementSummary,settlements: Query_settlements,uncompletedOrders: Query_uncompletedOrders,users: Query_users },
+      Query: { auditLog: Query_auditLog,auditLogs: Query_auditLogs,business: Query_business,businessBalance: Query_businessBalance,businesses: Query_businesses,calculateDeliveryFee: Query_calculateDeliveryFee,deliveryZone: Query_deliveryZone,deliveryZones: Query_deliveryZones,driverBalance: Query_driverBalance,drivers: Query_drivers,me: Query_me,myBehavior: Query_myBehavior,order: Query_order,orders: Query_orders,ordersByStatus: Query_ordersByStatus,product: Query_product,productCategories: Query_productCategories,productCategory: Query_productCategory,productSubcategories: Query_productSubcategories,productSubcategoriesByBusiness: Query_productSubcategoriesByBusiness,products: Query_products,settlementSummary: Query_settlementSummary,settlements: Query_settlements,uncompletedOrders: Query_uncompletedOrders,userBehavior: Query_userBehavior,users: Query_users },
       Mutation: { adminSetDriverConnectionStatus: Mutation_adminSetDriverConnectionStatus,adminUpdateDriverLocation: Mutation_adminUpdateDriverLocation,assignDriverToOrder: Mutation_assignDriverToOrder,backfillSettlementsForDeliveredOrders: Mutation_backfillSettlementsForDeliveredOrders,cancelOrder: Mutation_cancelOrder,createBusiness: Mutation_createBusiness,createDeliveryZone: Mutation_createDeliveryZone,createOrder: Mutation_createOrder,createProduct: Mutation_createProduct,createProductCategory: Mutation_createProductCategory,createProductSubcategory: Mutation_createProductSubcategory,createUser: Mutation_createUser,deleteBusiness: Mutation_deleteBusiness,deleteDeliveryZone: Mutation_deleteDeliveryZone,deleteProduct: Mutation_deleteProduct,deleteProductCategory: Mutation_deleteProductCategory,deleteProductSubcategory: Mutation_deleteProductSubcategory,deleteUser: Mutation_deleteUser,driverHeartbeat: Mutation_driverHeartbeat,initiateSignup: Mutation_initiateSignup,login: Mutation_login,markSettlementAsPaid: Mutation_markSettlementAsPaid,markSettlementAsPartiallyPaid: Mutation_markSettlementAsPartiallyPaid,markSettlementsAsPaid: Mutation_markSettlementsAsPaid,resendEmailVerification: Mutation_resendEmailVerification,submitPhoneNumber: Mutation_submitPhoneNumber,unsettleSettlement: Mutation_unsettleSettlement,updateBusiness: Mutation_updateBusiness,updateCommissionPercentage: Mutation_updateCommissionPercentage,updateDeliveryZone: Mutation_updateDeliveryZone,updateDriverLocation: Mutation_updateDriverLocation,updateDriverOnlineStatus: Mutation_updateDriverOnlineStatus,updateOrderStatus: Mutation_updateOrderStatus,updateProduct: Mutation_updateProduct,updateProductCategory: Mutation_updateProductCategory,updateProductSubcategory: Mutation_updateProductSubcategory,updateProductsOrder: Mutation_updateProductsOrder,updateUser: Mutation_updateUser,updateUserNote: Mutation_updateUserNote,verifyEmail: Mutation_verifyEmail,verifyPhone: Mutation_verifyPhone },
       Subscription: { allOrdersUpdated: Subscription_allOrdersUpdated,auditLogCreated: Subscription_auditLogCreated,driverConnectionStatusChanged: Subscription_driverConnectionStatusChanged,driversUpdated: Subscription_driversUpdated,orderStatusUpdated: Subscription_orderStatusUpdated,settlementCreated: Subscription_settlementCreated,settlementStatusChanged: Subscription_settlementStatusChanged,userOrdersUpdated: Subscription_userOrdersUpdated },
       AuditLog: AuditLog,
@@ -117,6 +120,7 @@ Settlement: Settlement,
 SettlementSummary: SettlementSummary,
 SignupStepResponse: SignupStepResponse,
 User: { ...User_User,...Driver_User },
+UserBehavior: UserBehavior,
 WorkingHours: WorkingHours,
 ZoneFeeResult: ZoneFeeResult,
 Date: DateResolver,

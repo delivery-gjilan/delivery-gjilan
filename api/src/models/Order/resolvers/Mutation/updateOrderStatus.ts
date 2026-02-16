@@ -94,6 +94,14 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
         }
     }
 
+    await orderService.updateUserBehaviorOnStatusChange(
+        dbOrder.userId,
+        currentStatus,
+        status,
+        dbOrder.price + dbOrder.deliveryPrice,
+        dbOrder.orderDate || null,
+    );
+
     console.log(`[Server] Publishing to channel: orderStatusUpdated:${id}`);
     console.log('publishing to haha:', userData);
     

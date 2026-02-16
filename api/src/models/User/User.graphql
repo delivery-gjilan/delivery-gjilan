@@ -34,6 +34,20 @@ type User {
     driverLocationUpdatedAt: Date
 }
 
+type UserBehavior {
+    userId: ID!
+    totalOrders: Int!
+    deliveredOrders: Int!
+    cancelledOrders: Int!
+    totalSpend: Float!
+    avgOrderValue: Float!
+    firstOrderAt: DateTime
+    lastOrderAt: DateTime
+    lastDeliveredAt: DateTime
+    createdAt: DateTime!
+    updatedAt: DateTime!
+}
+
 type SignupStepResponse {
     userId: ID!
     currentStep: SignupStep!
@@ -89,6 +103,8 @@ input UpdateUserInput {
 
 type Query {
     me: User
+    myBehavior: UserBehavior
+    userBehavior(userId: ID!): UserBehavior
     users: [User!]!
     drivers: [User!]!
 }

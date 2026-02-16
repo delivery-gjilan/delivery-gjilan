@@ -639,6 +639,7 @@ export type Query = {
   driverBalance: SettlementSummary;
   drivers: Array<User>;
   me?: Maybe<User>;
+  myBehavior?: Maybe<UserBehavior>;
   order?: Maybe<Order>;
   orders: Array<Order>;
   ordersByStatus: Array<Order>;
@@ -651,6 +652,7 @@ export type Query = {
   settlementSummary: SettlementSummary;
   settlements: Array<Settlement>;
   uncompletedOrders: Array<Order>;
+  userBehavior?: Maybe<UserBehavior>;
   users: Array<User>;
 };
 
@@ -758,6 +760,11 @@ export type QuerysettlementsArgs = {
   startDate?: InputMaybe<Scalars['Date']['input']>;
   status?: InputMaybe<SettlementStatus>;
   type?: InputMaybe<SettlementType>;
+};
+
+
+export type QueryuserBehaviorArgs = {
+  userId: Scalars['ID']['input'];
 };
 
 export type Settlement = {
@@ -935,6 +942,21 @@ export type User = {
   signupStep: SignupStep;
 };
 
+export type UserBehavior = {
+  __typename?: 'UserBehavior';
+  avgOrderValue: Scalars['Float']['output'];
+  cancelledOrders: Scalars['Int']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  deliveredOrders: Scalars['Int']['output'];
+  firstOrderAt?: Maybe<Scalars['DateTime']['output']>;
+  lastDeliveredAt?: Maybe<Scalars['DateTime']['output']>;
+  lastOrderAt?: Maybe<Scalars['DateTime']['output']>;
+  totalOrders: Scalars['Int']['output'];
+  totalSpend: Scalars['Float']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+  userId: Scalars['ID']['output'];
+};
+
 export type UserRole =
   | 'BUSINESS_ADMIN'
   | 'CUSTOMER'
@@ -1096,6 +1118,7 @@ export type ResolversTypes = {
   UpdateProductSubcategoryInput: UpdateProductSubcategoryInput;
   UpdateUserInput: UpdateUserInput;
   User: ResolverTypeWrapper<Omit<User, 'business' | 'driverConnection' | 'role' | 'signupStep'> & { business?: Maybe<ResolversTypes['Business']>, driverConnection?: Maybe<ResolversTypes['DriverConnection']>, role: ResolversTypes['UserRole'], signupStep: ResolversTypes['SignupStep'] }>;
+  UserBehavior: ResolverTypeWrapper<UserBehavior>;
   UserRole: ResolverTypeWrapper<'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN' | 'BUSINESS_ADMIN'>;
   VerifyEmailInput: VerifyEmailInput;
   VerifyPhoneInput: VerifyPhoneInput;
@@ -1155,6 +1178,7 @@ export type ResolversParentTypes = {
   UpdateProductSubcategoryInput: UpdateProductSubcategoryInput;
   UpdateUserInput: UpdateUserInput;
   User: Omit<User, 'business' | 'driverConnection'> & { business?: Maybe<ResolversParentTypes['Business']>, driverConnection?: Maybe<ResolversParentTypes['DriverConnection']> };
+  UserBehavior: UserBehavior;
   VerifyEmailInput: VerifyEmailInput;
   VerifyPhoneInput: VerifyPhoneInput;
   WorkingHours: WorkingHours;
@@ -1400,6 +1424,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   driverBalance?: Resolver<ResolversTypes['SettlementSummary'], ParentType, ContextType, RequireFields<QuerydriverBalanceArgs, 'driverId'>>;
   drivers?: Resolver<Array<ResolversTypes['User']>, ParentType, ContextType>;
   me?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
+  myBehavior?: Resolver<Maybe<ResolversTypes['UserBehavior']>, ParentType, ContextType>;
   order?: Resolver<Maybe<ResolversTypes['Order']>, ParentType, ContextType, RequireFields<QueryorderArgs, 'id'>>;
   orders?: Resolver<Array<ResolversTypes['Order']>, ParentType, ContextType>;
   ordersByStatus?: Resolver<Array<ResolversTypes['Order']>, ParentType, ContextType, RequireFields<QueryordersByStatusArgs, 'status'>>;
@@ -1412,6 +1437,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   settlementSummary?: Resolver<ResolversTypes['SettlementSummary'], ParentType, ContextType, Partial<QuerysettlementSummaryArgs>>;
   settlements?: Resolver<Array<ResolversTypes['Settlement']>, ParentType, ContextType, Partial<QuerysettlementsArgs>>;
   uncompletedOrders?: Resolver<Array<ResolversTypes['Order']>, ParentType, ContextType>;
+  userBehavior?: Resolver<Maybe<ResolversTypes['UserBehavior']>, ParentType, ContextType, RequireFields<QueryuserBehaviorArgs, 'userId'>>;
   users?: Resolver<Array<ResolversTypes['User']>, ParentType, ContextType>;
 };
 
@@ -1486,6 +1512,21 @@ export type UserResolvers<ContextType = GraphQLContext, ParentType extends Resol
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
+export type UserBehaviorResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['UserBehavior'] = ResolversParentTypes['UserBehavior']> = {
+  avgOrderValue?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  cancelledOrders?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  createdAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+  deliveredOrders?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  firstOrderAt?: Resolver<Maybe<ResolversTypes['DateTime']>, ParentType, ContextType>;
+  lastDeliveredAt?: Resolver<Maybe<ResolversTypes['DateTime']>, ParentType, ContextType>;
+  lastOrderAt?: Resolver<Maybe<ResolversTypes['DateTime']>, ParentType, ContextType>;
+  totalOrders?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  totalSpend?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  updatedAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+  userId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
 export type UserRoleResolvers = EnumResolverSignature<{ BUSINESS_ADMIN?: any, CUSTOMER?: any, DRIVER?: any, SUPER_ADMIN?: any }, ResolversTypes['UserRole']>;
 
 export type WorkingHoursResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['WorkingHours'] = ResolversParentTypes['WorkingHours']> = {
@@ -1535,6 +1576,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   SignupStepResponse?: SignupStepResponseResolvers<ContextType>;
   Subscription?: SubscriptionResolvers<ContextType>;
   User?: UserResolvers<ContextType>;
+  UserBehavior?: UserBehaviorResolvers<ContextType>;
   UserRole?: UserRoleResolvers;
   WorkingHours?: WorkingHoursResolvers<ContextType>;
   ZoneFeeResult?: ZoneFeeResultResolvers<ContextType>;

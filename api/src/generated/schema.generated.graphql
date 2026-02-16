@@ -412,6 +412,7 @@ type Query {
   driverBalance(driverId: ID!): SettlementSummary!
   drivers: [User!]!
   me: User
+  myBehavior: UserBehavior
   order(id: ID!): Order
   orders: [Order!]!
   ordersByStatus(status: OrderStatus!): [Order!]!
@@ -424,6 +425,7 @@ type Query {
   settlementSummary(businessId: ID, driverId: ID, endDate: Date, startDate: Date, type: SettlementType): SettlementSummary!
   settlements(businessId: ID, driverId: ID, endDate: Date, limit: Int, offset: Int, startDate: Date, status: SettlementStatus, type: SettlementType): [Settlement!]!
   uncompletedOrders: [Order!]!
+  userBehavior(userId: ID!): UserBehavior
   users: [User!]!
 }
 
@@ -566,6 +568,20 @@ type User {
   phoneVerified: Boolean!
   role: UserRole!
   signupStep: SignupStep!
+}
+
+type UserBehavior {
+  avgOrderValue: Float!
+  cancelledOrders: Int!
+  createdAt: DateTime!
+  deliveredOrders: Int!
+  firstOrderAt: DateTime
+  lastDeliveredAt: DateTime
+  lastOrderAt: DateTime
+  totalOrders: Int!
+  totalSpend: Float!
+  updatedAt: DateTime!
+  userId: ID!
 }
 
 enum UserRole {

@@ -127,6 +127,20 @@
       "when": 1771187471240,
       "tag": "0017_curved_genesis",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1771188000000,
+      "tag": "0018_user_behaviors",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1771239983568,
+      "tag": "0019_equal_zodiak",
+      "breakpoints": true
     }
   ]
 }
