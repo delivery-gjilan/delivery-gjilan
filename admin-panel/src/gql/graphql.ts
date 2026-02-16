@@ -71,6 +71,32 @@ export enum ActorType {
   System = 'SYSTEM'
 }
 
+export type AddWalletCreditInput = {
+  amount: Scalars['Float']['input'];
+  description?: InputMaybe<Scalars['String']['input']>;
+  type: Scalars['String']['input'];
+  userId: Scalars['ID']['input'];
+};
+
+export type ApplicablePromotion = {
+  __typename?: 'ApplicablePromotion';
+  appliedAmount: Scalars['Float']['output'];
+  code?: Maybe<Scalars['String']['output']>;
+  description?: Maybe<Scalars['String']['output']>;
+  freeDelivery: Scalars['Boolean']['output'];
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+  priority: Scalars['Int']['output'];
+  target: PromotionTarget;
+  type: PromotionTypeV2;
+};
+
+export type AssignPromotionToUserInput = {
+  expiresAt?: InputMaybe<Scalars['String']['input']>;
+  promotionId: Scalars['ID']['input'];
+  userIds: Array<Scalars['ID']['input']>;
+};
+
 export type AuditLog = {
   __typename?: 'AuditLog';
   action: ActionType;
@@ -123,6 +149,20 @@ export enum BusinessType {
   Pharmacy = 'PHARMACY',
   Restaurant = 'RESTAURANT'
 }
+
+export type CartContextInput = {
+  businessIds: Array<Scalars['ID']['input']>;
+  deliveryPrice: Scalars['Float']['input'];
+  items: Array<CartItemInput>;
+  subtotal: Scalars['Float']['input'];
+};
+
+export type CartItemInput = {
+  businessId: Scalars['ID']['input'];
+  price: Scalars['Float']['input'];
+  productId: Scalars['ID']['input'];
+  quantity: Scalars['Int']['input'];
+};
 
 export type CreateBusinessInput = {
   avgPrepTimeMinutes?: InputMaybe<Scalars['Int']['input']>;
@@ -182,22 +222,26 @@ export type CreateProductSubcategoryInput = {
   name: Scalars['String']['input'];
 };
 
-export type CreatePromotionInput = {
-  autoApply?: InputMaybe<Scalars['Boolean']['input']>;
-  code: Scalars['String']['input'];
+export type CreatePromotionV2Input = {
+  code?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
-  endsAt?: InputMaybe<Scalars['DateTime']['input']>;
-  firstOrderOnly?: InputMaybe<Scalars['Boolean']['input']>;
-  freeDeliveryCount?: InputMaybe<Scalars['Int']['input']>;
-  isActive?: InputMaybe<Scalars['Boolean']['input']>;
-  maxRedemptions?: InputMaybe<Scalars['Int']['input']>;
-  maxRedemptionsPerUser?: InputMaybe<Scalars['Int']['input']>;
+  discountValue?: InputMaybe<Scalars['Float']['input']>;
+  eligibleBusinessIds?: InputMaybe<Array<Scalars['ID']['input']>>;
+  endsAt?: InputMaybe<Scalars['String']['input']>;
+  isActive: Scalars['Boolean']['input'];
+  isStackable: Scalars['Boolean']['input'];
+  maxDiscountCap?: InputMaybe<Scalars['Float']['input']>;
+  maxGlobalUsage?: InputMaybe<Scalars['Int']['input']>;
+  maxUsagePerUser?: InputMaybe<Scalars['Int']['input']>;
+  minOrderAmount?: InputMaybe<Scalars['Float']['input']>;
   name: Scalars['String']['input'];
-  referrerUserId?: InputMaybe<Scalars['ID']['input']>;
-  startsAt?: InputMaybe<Scalars['DateTime']['input']>;
+  priority: Scalars['Int']['input'];
+  spendThreshold?: InputMaybe<Scalars['Float']['input']>;
+  startsAt?: InputMaybe<Scalars['String']['input']>;
+  target: PromotionTarget;
   targetUserIds?: InputMaybe<Array<Scalars['ID']['input']>>;
-  type: PromotionType;
-  value?: InputMaybe<Scalars['Float']['input']>;
+  thresholdReward?: InputMaybe<Scalars['String']['input']>;
+  type: PromotionTypeV2;
 };
 
 export type CreateUserInput = {
@@ -303,10 +347,12 @@ export type LoginInput = {
 
 export type Mutation = {
   __typename?: 'Mutation';
+  addWalletCredit: WalletTransaction;
   /** Admin mutation to manually set connection status (for testing/recovery) */
   adminSetDriverConnectionStatus: User;
   adminUpdateDriverLocation: User;
   assignDriverToOrder: Order;
+  assignPromotionToUsers: Array<UserPromotion>;
   backfillSettlementsForDeliveredOrders: Scalars['Int']['output'];
   cancelOrder: Order;
   createBusiness: Business;
@@ -315,14 +361,15 @@ export type Mutation = {
   createProduct: Product;
   createProductCategory: ProductCategory;
   createProductSubcategory: ProductSubcategory;
-  createPromotion: Promotion;
+  createPromotionV2: PromotionV2;
   createUser: AuthResponse;
+  deductWalletCredit: WalletTransaction;
   deleteBusiness: Scalars['Boolean']['output'];
   deleteDeliveryZone: Scalars['Boolean']['output'];
   deleteProduct: Scalars['Boolean']['output'];
   deleteProductCategory: Scalars['Boolean']['output'];
   deleteProductSubcategory: Scalars['Boolean']['output'];
-  deletePromotion: Scalars['Boolean']['output'];
+  deletePromotionV2: Scalars['Boolean']['output'];
   deleteUser: Scalars['Boolean']['output'];
   /**
    * Driver heartbeat - call every 5 seconds while online.
@@ -332,9 +379,11 @@ export type Mutation = {
   driverHeartbeat: DriverHeartbeatResult;
   initiateSignup: AuthResponse;
   login: AuthResponse;
+  markFirstOrderUsed: UserPromoMetadata;
   markSettlementAsPaid: Settlement;
   markSettlementAsPartiallyPaid: Settlement;
   markSettlementsAsPaid: Array<Settlement>;
+  removeUserFromPromotion: Scalars['Boolean']['output'];
   resendEmailVerification: SignupStepResponse;
   submitPhoneNumber: SignupStepResponse;
   unsettleSettlement: Settlement;
@@ -348,11 +397,16 @@ export type Mutation = {
   updateProductCategory: ProductCategory;
   updateProductSubcategory: ProductSubcategory;
   updateProductsOrder: Scalars['Boolean']['output'];
-  updatePromotion: Promotion;
+  updatePromotionV2: PromotionV2;
   updateUser: User;
   updateUserNote: User;
   verifyEmail: SignupStepResponse;
   verifyPhone: SignupStepResponse;
+};
+
+
+export type MutationAddWalletCreditArgs = {
+  input: AddWalletCreditInput;
 };
 
 
@@ -372,6 +426,11 @@ export type MutationAdminUpdateDriverLocationArgs = {
 export type MutationAssignDriverToOrderArgs = {
   driverId?: InputMaybe<Scalars['ID']['input']>;
   id: Scalars['ID']['input'];
+};
+
+
+export type MutationAssignPromotionToUsersArgs = {
+  input: AssignPromotionToUserInput;
 };
 
 
@@ -410,13 +469,20 @@ export type MutationCreateProductSubcategoryArgs = {
 };
 
 
-export type MutationCreatePromotionArgs = {
-  input: CreatePromotionInput;
+export type MutationCreatePromotionV2Args = {
+  input: CreatePromotionV2Input;
 };
 
 
 export type MutationCreateUserArgs = {
   input: CreateUserInput;
+};
+
+
+export type MutationDeductWalletCreditArgs = {
+  amount: Scalars['Float']['input'];
+  orderId: Scalars['ID']['input'];
+  userId: Scalars['ID']['input'];
 };
 
 
@@ -445,7 +511,7 @@ export type MutationDeleteProductSubcategoryArgs = {
 };
 
 
-export type MutationDeletePromotionArgs = {
+export type MutationDeletePromotionV2Args = {
   id: Scalars['ID']['input'];
 };
 
@@ -471,6 +537,11 @@ export type MutationLoginArgs = {
 };
 
 
+export type MutationMarkFirstOrderUsedArgs = {
+  userId: Scalars['ID']['input'];
+};
+
+
 export type MutationMarkSettlementAsPaidArgs = {
   settlementId: Scalars['ID']['input'];
 };
@@ -484,6 +555,12 @@ export type MutationMarkSettlementAsPartiallyPaidArgs = {
 
 export type MutationMarkSettlementsAsPaidArgs = {
   ids: Array<Scalars['ID']['input']>;
+};
+
+
+export type MutationRemoveUserFromPromotionArgs = {
+  promotionId: Scalars['ID']['input'];
+  userId: Scalars['ID']['input'];
 };
 
 
@@ -557,9 +634,8 @@ export type MutationUpdateProductsOrderArgs = {
 };
 
 
-export type MutationUpdatePromotionArgs = {
-  id: Scalars['ID']['input'];
-  input: UpdatePromotionInput;
+export type MutationUpdatePromotionV2Args = {
+  input: UpdatePromotionV2Input;
 };
 
 
@@ -668,56 +744,83 @@ export type ProductSubcategory = {
   updatedAt: Scalars['String']['output'];
 };
 
-export type Promotion = {
-  __typename?: 'Promotion';
-  autoApply: Scalars['Boolean']['output'];
-  code: Scalars['String']['output'];
-  createdAt: Scalars['DateTime']['output'];
-  description?: Maybe<Scalars['String']['output']>;
-  endsAt?: Maybe<Scalars['DateTime']['output']>;
-  firstOrderOnly: Scalars['Boolean']['output'];
-  freeDeliveryCount?: Maybe<Scalars['Int']['output']>;
-  id: Scalars['ID']['output'];
-  isActive: Scalars['Boolean']['output'];
-  maxRedemptions?: Maybe<Scalars['Int']['output']>;
-  maxRedemptionsPerUser?: Maybe<Scalars['Int']['output']>;
-  name: Scalars['String']['output'];
-  referrerUserId?: Maybe<Scalars['ID']['output']>;
-  startsAt?: Maybe<Scalars['DateTime']['output']>;
-  targetUserIds: Array<Scalars['ID']['output']>;
-  type: PromotionType;
-  updatedAt: Scalars['DateTime']['output'];
-  value: Scalars['Float']['output'];
+export type PromotionAnalyticsResult = {
+  __typename?: 'PromotionAnalyticsResult';
+  averageOrderValue: Scalars['Float']['output'];
+  conversionRate?: Maybe<Scalars['Float']['output']>;
+  promotion: PromotionV2;
+  totalDiscountGiven: Scalars['Float']['output'];
+  totalRevenue: Scalars['Float']['output'];
+  totalUsageCount: Scalars['Int']['output'];
+  uniqueUsers: Scalars['Int']['output'];
 };
 
-export type PromotionRedemption = {
-  __typename?: 'PromotionRedemption';
-  createdAt: Scalars['DateTime']['output'];
+export type PromotionResult = {
+  __typename?: 'PromotionResult';
+  finalDeliveryPrice: Scalars['Float']['output'];
+  finalSubtotal: Scalars['Float']['output'];
+  finalTotal: Scalars['Float']['output'];
+  freeDeliveryApplied: Scalars['Boolean']['output'];
+  promotions: Array<ApplicablePromotion>;
+  totalDiscount: Scalars['Float']['output'];
+};
+
+export enum PromotionTarget {
+  AllUsers = 'ALL_USERS',
+  Conditional = 'CONDITIONAL',
+  FirstOrder = 'FIRST_ORDER',
+  SpecificUsers = 'SPECIFIC_USERS'
+}
+
+export enum PromotionTypeV2 {
+  FixedAmount = 'FIXED_AMOUNT',
+  FreeDelivery = 'FREE_DELIVERY',
+  Percentage = 'PERCENTAGE',
+  WalletCredit = 'WALLET_CREDIT'
+}
+
+export type PromotionUsage = {
+  __typename?: 'PromotionUsage';
+  businessId?: Maybe<Scalars['ID']['output']>;
   discountAmount: Scalars['Float']['output'];
   freeDeliveryApplied: Scalars['Boolean']['output'];
   id: Scalars['ID']['output'];
+  order?: Maybe<Order>;
   orderId: Scalars['ID']['output'];
+  orderSubtotal: Scalars['Float']['output'];
+  promotion?: Maybe<PromotionV2>;
   promotionId: Scalars['ID']['output'];
-  referrerUserId?: Maybe<Scalars['ID']['output']>;
+  usedAt: Scalars['String']['output'];
+  user?: Maybe<User>;
   userId: Scalars['ID']['output'];
 };
 
-export enum PromotionType {
-  FixedDiscount = 'FIXED_DISCOUNT',
-  FreeDelivery = 'FREE_DELIVERY',
-  PercentDiscount = 'PERCENT_DISCOUNT',
-  Referral = 'REFERRAL'
-}
-
-export type PromotionValidationResult = {
-  __typename?: 'PromotionValidationResult';
-  discountAmount: Scalars['Float']['output'];
-  effectiveDeliveryPrice: Scalars['Float']['output'];
-  freeDeliveryApplied: Scalars['Boolean']['output'];
-  isValid: Scalars['Boolean']['output'];
-  promotion?: Maybe<Promotion>;
-  reason?: Maybe<Scalars['String']['output']>;
-  totalPrice: Scalars['Float']['output'];
+export type PromotionV2 = {
+  __typename?: 'PromotionV2';
+  assignedUsers?: Maybe<Array<UserPromotion>>;
+  code?: Maybe<Scalars['String']['output']>;
+  createdAt: Scalars['String']['output'];
+  currentGlobalUsage: Scalars['Int']['output'];
+  description?: Maybe<Scalars['String']['output']>;
+  discountValue?: Maybe<Scalars['Float']['output']>;
+  eligibleBusinesses?: Maybe<Array<Business>>;
+  endsAt?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  isActive: Scalars['Boolean']['output'];
+  isStackable: Scalars['Boolean']['output'];
+  maxDiscountCap?: Maybe<Scalars['Float']['output']>;
+  maxGlobalUsage?: Maybe<Scalars['Int']['output']>;
+  maxUsagePerUser?: Maybe<Scalars['Int']['output']>;
+  minOrderAmount?: Maybe<Scalars['Float']['output']>;
+  name: Scalars['String']['output'];
+  priority: Scalars['Int']['output'];
+  spendThreshold?: Maybe<Scalars['Float']['output']>;
+  startsAt?: Maybe<Scalars['String']['output']>;
+  target: PromotionTarget;
+  thresholdReward?: Maybe<Scalars['String']['output']>;
+  totalRevenue: Scalars['Float']['output'];
+  totalUsageCount: Scalars['Int']['output'];
+  type: PromotionTypeV2;
 };
 
 export type Query = {
@@ -732,6 +835,15 @@ export type Query = {
   deliveryZones: Array<DeliveryZone>;
   driverBalance: SettlementSummary;
   drivers: Array<User>;
+  getAllPromotionsV2: Array<PromotionV2>;
+  getApplicablePromotionsV2: Array<ApplicablePromotion>;
+  getPromotionAnalytics: PromotionAnalyticsResult;
+  getPromotionUsage: Array<PromotionUsage>;
+  getPromotionV2?: Maybe<PromotionV2>;
+  getUserPromoMetadata?: Maybe<UserPromoMetadata>;
+  getUserPromotions: Array<UserPromotion>;
+  getUserWallet?: Maybe<UserWallet>;
+  getWalletTransactions: Array<WalletTransaction>;
   me?: Maybe<User>;
   myBehavior?: Maybe<UserBehavior>;
   order?: Maybe<Order>;
@@ -743,14 +855,12 @@ export type Query = {
   productSubcategories: Array<ProductSubcategory>;
   productSubcategoriesByBusiness: Array<ProductSubcategory>;
   products: Array<Product>;
-  promotion?: Maybe<Promotion>;
-  promotions: Array<Promotion>;
   settlementSummary: SettlementSummary;
   settlements: Array<Settlement>;
   uncompletedOrders: Array<Order>;
   userBehavior?: Maybe<UserBehavior>;
   users: Array<User>;
-  validatePromotion: PromotionValidationResult;
+  validatePromotionsV2: PromotionResult;
 };
 
 
@@ -799,6 +909,52 @@ export type QueryDriverBalanceArgs = {
 };
 
 
+export type QueryGetAllPromotionsV2Args = {
+  isActive?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
+
+export type QueryGetApplicablePromotionsV2Args = {
+  cart: CartContextInput;
+  manualCode?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryGetPromotionAnalyticsArgs = {
+  promotionId: Scalars['ID']['input'];
+};
+
+
+export type QueryGetPromotionUsageArgs = {
+  promotionId: Scalars['ID']['input'];
+};
+
+
+export type QueryGetPromotionV2Args = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryGetUserPromoMetadataArgs = {
+  userId: Scalars['ID']['input'];
+};
+
+
+export type QueryGetUserPromotionsArgs = {
+  userId: Scalars['ID']['input'];
+};
+
+
+export type QueryGetUserWalletArgs = {
+  userId: Scalars['ID']['input'];
+};
+
+
+export type QueryGetWalletTransactionsArgs = {
+  userId: Scalars['ID']['input'];
+};
+
+
 export type QueryOrderArgs = {
   id: Scalars['ID']['input'];
 };
@@ -839,11 +995,6 @@ export type QueryProductsArgs = {
 };
 
 
-export type QueryPromotionArgs = {
-  code: Scalars['String']['input'];
-};
-
-
 export type QuerySettlementSummaryArgs = {
   businessId?: InputMaybe<Scalars['ID']['input']>;
   driverId?: InputMaybe<Scalars['ID']['input']>;
@@ -870,8 +1021,9 @@ export type QueryUserBehaviorArgs = {
 };
 
 
-export type QueryValidatePromotionArgs = {
-  input: ValidatePromotionInput;
+export type QueryValidatePromotionsV2Args = {
+  cart: CartContextInput;
+  manualCode?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type Settlement = {
@@ -1020,20 +1172,24 @@ export type UpdateProductSubcategoryInput = {
   name?: InputMaybe<Scalars['String']['input']>;
 };
 
-export type UpdatePromotionInput = {
-  autoApply?: InputMaybe<Scalars['Boolean']['input']>;
+export type UpdatePromotionV2Input = {
   code?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
-  endsAt?: InputMaybe<Scalars['DateTime']['input']>;
-  freeDeliveryCount?: InputMaybe<Scalars['Int']['input']>;
-  maxRedemptions?: InputMaybe<Scalars['Int']['input']>;
-  maxRedemptionsPerUser?: InputMaybe<Scalars['Int']['input']>;
+  discountValue?: InputMaybe<Scalars['Float']['input']>;
+  endsAt?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['ID']['input'];
+  isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  isStackable?: InputMaybe<Scalars['Boolean']['input']>;
+  maxDiscountCap?: InputMaybe<Scalars['Float']['input']>;
+  maxGlobalUsage?: InputMaybe<Scalars['Int']['input']>;
+  maxUsagePerUser?: InputMaybe<Scalars['Int']['input']>;
+  minOrderAmount?: InputMaybe<Scalars['Float']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
-  referrerUserId?: InputMaybe<Scalars['ID']['input']>;
-  startsAt?: InputMaybe<Scalars['DateTime']['input']>;
-  targetUserIds?: InputMaybe<Array<Scalars['ID']['input']>>;
-  type?: InputMaybe<PromotionType>;
-  value?: InputMaybe<Scalars['Float']['input']>;
+  priority?: InputMaybe<Scalars['Int']['input']>;
+  spendThreshold?: InputMaybe<Scalars['Float']['input']>;
+  startsAt?: InputMaybe<Scalars['String']['input']>;
+  thresholdReward?: InputMaybe<Scalars['String']['input']>;
+  type?: InputMaybe<PromotionTypeV2>;
 };
 
 export type UpdateUserInput = {
@@ -1083,6 +1239,28 @@ export type UserBehavior = {
   userId: Scalars['ID']['output'];
 };
 
+export type UserPromoMetadata = {
+  __typename?: 'UserPromoMetadata';
+  hasUsedFirstOrderPromo: Scalars['Boolean']['output'];
+  lastPromoUsedAt?: Maybe<Scalars['String']['output']>;
+  totalPromosUsed: Scalars['Int']['output'];
+  totalSavings: Scalars['Float']['output'];
+  user?: Maybe<User>;
+  userId: Scalars['ID']['output'];
+};
+
+export type UserPromotion = {
+  __typename?: 'UserPromotion';
+  assignedAt: Scalars['String']['output'];
+  expiresAt?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  promotion?: Maybe<PromotionV2>;
+  promotionId: Scalars['ID']['output'];
+  usageCount: Scalars['Int']['output'];
+  user?: Maybe<User>;
+  userId: Scalars['ID']['output'];
+};
+
 export enum UserRole {
   BusinessAdmin = 'BUSINESS_ADMIN',
   Customer = 'CUSTOMER',
@@ -1090,10 +1268,14 @@ export enum UserRole {
   SuperAdmin = 'SUPER_ADMIN'
 }
 
-export type ValidatePromotionInput = {
-  code: Scalars['String']['input'];
-  deliveryPrice: Scalars['Float']['input'];
-  itemsTotal: Scalars['Float']['input'];
+export type UserWallet = {
+  __typename?: 'UserWallet';
+  balance: Scalars['Float']['output'];
+  createdAt: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  transactions?: Maybe<Array<WalletTransaction>>;
+  updatedAt: Scalars['String']['output'];
+  userId: Scalars['ID']['output'];
 };
 
 export type VerifyEmailInput = {
@@ -1102,6 +1284,20 @@ export type VerifyEmailInput = {
 
 export type VerifyPhoneInput = {
   code: Scalars['String']['input'];
+};
+
+export type WalletTransaction = {
+  __typename?: 'WalletTransaction';
+  amount: Scalars['Float']['output'];
+  balanceAfter: Scalars['Float']['output'];
+  balanceBefore: Scalars['Float']['output'];
+  createdAt: Scalars['String']['output'];
+  description?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  orderId?: Maybe<Scalars['ID']['output']>;
+  type: Scalars['String']['output'];
+  wallet?: Maybe<UserWallet>;
+  walletId: Scalars['ID']['output'];
 };
 
 export type WorkingHours = {
@@ -1378,32 +1574,33 @@ export type ProductsAndCategoriesQueryVariables = Exact<{
 
 export type ProductsAndCategoriesQuery = { __typename?: 'Query', productCategories: Array<{ __typename?: 'ProductCategory', id: string, name: string }>, products: Array<{ __typename?: 'Product', id: string, categoryId: string, subcategoryId?: string | null, name: string, description?: string | null, price: number, imageUrl?: string | null, isOnSale: boolean, salePrice?: number | null, isAvailable: boolean, sortOrder: number, stock: number }> };
 
-export type CreatePromotionMutationVariables = Exact<{
-  input: CreatePromotionInput;
+export type CreatePromotionV2MutationVariables = Exact<{
+  input: CreatePromotionV2Input;
 }>;
 
 
-export type CreatePromotionMutation = { __typename?: 'Mutation', createPromotion: { __typename?: 'Promotion', id: string, code: string, name: string, description?: string | null, type: PromotionType, value: number, maxRedemptions?: number | null, maxRedemptionsPerUser?: number | null, freeDeliveryCount?: number | null, firstOrderOnly: boolean, isActive: boolean, autoApply: boolean, startsAt?: any | null, endsAt?: any | null, referrerUserId?: string | null, targetUserIds: Array<string>, createdAt: any, updatedAt: any } };
+export type CreatePromotionV2Mutation = { __typename?: 'Mutation', createPromotionV2: { __typename?: 'PromotionV2', id: string, name: string, description?: string | null, code?: string | null, type: PromotionTypeV2, target: PromotionTarget, discountValue?: number | null, maxDiscountCap?: number | null, minOrderAmount?: number | null, spendThreshold?: number | null, thresholdReward?: string | null, maxGlobalUsage?: number | null, currentGlobalUsage: number, maxUsagePerUser?: number | null, isStackable: boolean, priority: number, isActive: boolean, startsAt?: string | null, endsAt?: string | null, createdAt: string } };
 
-export type UpdatePromotionMutationVariables = Exact<{
+export type UpdatePromotionV2MutationVariables = Exact<{
+  input: UpdatePromotionV2Input;
+}>;
+
+
+export type UpdatePromotionV2Mutation = { __typename?: 'Mutation', updatePromotionV2: { __typename?: 'PromotionV2', id: string, name: string, description?: string | null, code?: string | null, type: PromotionTypeV2, target: PromotionTarget, discountValue?: number | null, maxDiscountCap?: number | null, minOrderAmount?: number | null, spendThreshold?: number | null, thresholdReward?: string | null, maxGlobalUsage?: number | null, currentGlobalUsage: number, maxUsagePerUser?: number | null, isStackable: boolean, priority: number, isActive: boolean, startsAt?: string | null, endsAt?: string | null, createdAt: string } };
+
+export type DeletePromotionV2MutationVariables = Exact<{
   id: Scalars['ID']['input'];
-  input: UpdatePromotionInput;
 }>;
 
 
-export type UpdatePromotionMutation = { __typename?: 'Mutation', updatePromotion: { __typename?: 'Promotion', id: string, code: string, name: string, description?: string | null, type: PromotionType, value: number, maxRedemptions?: number | null, maxRedemptionsPerUser?: number | null, freeDeliveryCount?: number | null, firstOrderOnly: boolean, isActive: boolean, autoApply: boolean, startsAt?: any | null, endsAt?: any | null, referrerUserId?: string | null, targetUserIds: Array<string>, createdAt: any, updatedAt: any } };
+export type DeletePromotionV2Mutation = { __typename?: 'Mutation', deletePromotionV2: boolean };
 
-export type DeletePromotionMutationVariables = Exact<{
-  id: Scalars['ID']['input'];
+export type GetPromotionsV2QueryVariables = Exact<{
+  isActive?: InputMaybe<Scalars['Boolean']['input']>;
 }>;
 
 
-export type DeletePromotionMutation = { __typename?: 'Mutation', deletePromotion: boolean };
-
-export type GetPromotionsQueryVariables = Exact<{ [key: string]: never; }>;
-
-
-export type GetPromotionsQuery = { __typename?: 'Query', promotions: Array<{ __typename?: 'Promotion', id: string, code: string, name: string, description?: string | null, type: PromotionType, value: number, maxRedemptions?: number | null, maxRedemptionsPerUser?: number | null, freeDeliveryCount?: number | null, firstOrderOnly: boolean, isActive: boolean, autoApply: boolean, startsAt?: any | null, endsAt?: any | null, referrerUserId?: string | null, targetUserIds: Array<string>, createdAt: any, updatedAt: any }> };
+export type GetPromotionsV2Query = { __typename?: 'Query', getAllPromotionsV2: Array<{ __typename?: 'PromotionV2', id: string, name: string, description?: string | null, code?: string | null, type: PromotionTypeV2, target: PromotionTarget, discountValue?: number | null, maxDiscountCap?: number | null, minOrderAmount?: number | null, spendThreshold?: number | null, thresholdReward?: string | null, maxGlobalUsage?: number | null, currentGlobalUsage: number, maxUsagePerUser?: number | null, isStackable: boolean, priority: number, isActive: boolean, startsAt?: string | null, endsAt?: string | null, createdAt: string, totalUsageCount: number, totalRevenue: number }> };
 
 export type GetSettlementsQueryVariables = Exact<{
   type?: InputMaybe<SettlementType>;
@@ -1610,10 +1807,10 @@ export const UpdateProductDocument = {"kind":"Document","definitions":[{"kind":"
 export const DeleteProductDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteProduct"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteProduct"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}]}}]} as unknown as DocumentNode<DeleteProductMutation, DeleteProductMutationVariables>;
 export const UpdateProductsOrderDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateProductsOrder"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"products"}},"type":{"kind":"NonNullType","type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ProductOrderInput"}}}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateProductsOrder"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"businessId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}}},{"kind":"Argument","name":{"kind":"Name","value":"products"},"value":{"kind":"Variable","name":{"kind":"Name","value":"products"}}}]}]}}]} as unknown as DocumentNode<UpdateProductsOrderMutation, UpdateProductsOrderMutationVariables>;
 export const ProductsAndCategoriesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ProductsAndCategories"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"productCategories"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"businessId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"products"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"businessId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"categoryId"}},{"kind":"Field","name":{"kind":"Name","value":"subcategoryId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"price"}},{"kind":"Field","name":{"kind":"Name","value":"imageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"isOnSale"}},{"kind":"Field","name":{"kind":"Name","value":"salePrice"}},{"kind":"Field","name":{"kind":"Name","value":"isAvailable"}},{"kind":"Field","name":{"kind":"Name","value":"sortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"stock"}}]}}]}}]} as unknown as DocumentNode<ProductsAndCategoriesQuery, ProductsAndCategoriesQueryVariables>;
-export const CreatePromotionDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreatePromotion"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreatePromotionInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createPromotion"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"value"}},{"kind":"Field","name":{"kind":"Name","value":"maxRedemptions"}},{"kind":"Field","name":{"kind":"Name","value":"maxRedemptionsPerUser"}},{"kind":"Field","name":{"kind":"Name","value":"freeDeliveryCount"}},{"kind":"Field","name":{"kind":"Name","value":"firstOrderOnly"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"autoApply"}},{"kind":"Field","name":{"kind":"Name","value":"startsAt"}},{"kind":"Field","name":{"kind":"Name","value":"endsAt"}},{"kind":"Field","name":{"kind":"Name","value":"referrerUserId"}},{"kind":"Field","name":{"kind":"Name","value":"targetUserIds"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode<CreatePromotionMutation, CreatePromotionMutationVariables>;
-export const UpdatePromotionDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdatePromotion"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdatePromotionInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updatePromotion"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"value"}},{"kind":"Field","name":{"kind":"Name","value":"maxRedemptions"}},{"kind":"Field","name":{"kind":"Name","value":"maxRedemptionsPerUser"}},{"kind":"Field","name":{"kind":"Name","value":"freeDeliveryCount"}},{"kind":"Field","name":{"kind":"Name","value":"firstOrderOnly"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"autoApply"}},{"kind":"Field","name":{"kind":"Name","value":"startsAt"}},{"kind":"Field","name":{"kind":"Name","value":"endsAt"}},{"kind":"Field","name":{"kind":"Name","value":"referrerUserId"}},{"kind":"Field","name":{"kind":"Name","value":"targetUserIds"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode<UpdatePromotionMutation, UpdatePromotionMutationVariables>;
-export const DeletePromotionDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeletePromotion"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deletePromotion"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}]}}]} as unknown as DocumentNode<DeletePromotionMutation, DeletePromotionMutationVariables>;
-export const GetPromotionsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetPromotions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"promotions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"value"}},{"kind":"Field","name":{"kind":"Name","value":"maxRedemptions"}},{"kind":"Field","name":{"kind":"Name","value":"maxRedemptionsPerUser"}},{"kind":"Field","name":{"kind":"Name","value":"freeDeliveryCount"}},{"kind":"Field","name":{"kind":"Name","value":"firstOrderOnly"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"autoApply"}},{"kind":"Field","name":{"kind":"Name","value":"startsAt"}},{"kind":"Field","name":{"kind":"Name","value":"endsAt"}},{"kind":"Field","name":{"kind":"Name","value":"referrerUserId"}},{"kind":"Field","name":{"kind":"Name","value":"targetUserIds"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode<GetPromotionsQuery, GetPromotionsQueryVariables>;
+export const CreatePromotionV2Document = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreatePromotionV2"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreatePromotionV2Input"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createPromotionV2"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"target"}},{"kind":"Field","name":{"kind":"Name","value":"discountValue"}},{"kind":"Field","name":{"kind":"Name","value":"maxDiscountCap"}},{"kind":"Field","name":{"kind":"Name","value":"minOrderAmount"}},{"kind":"Field","name":{"kind":"Name","value":"spendThreshold"}},{"kind":"Field","name":{"kind":"Name","value":"thresholdReward"}},{"kind":"Field","name":{"kind":"Name","value":"maxGlobalUsage"}},{"kind":"Field","name":{"kind":"Name","value":"currentGlobalUsage"}},{"kind":"Field","name":{"kind":"Name","value":"maxUsagePerUser"}},{"kind":"Field","name":{"kind":"Name","value":"isStackable"}},{"kind":"Field","name":{"kind":"Name","value":"priority"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"startsAt"}},{"kind":"Field","name":{"kind":"Name","value":"endsAt"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}}]} as unknown as DocumentNode<CreatePromotionV2Mutation, CreatePromotionV2MutationVariables>;
+export const UpdatePromotionV2Document = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdatePromotionV2"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdatePromotionV2Input"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updatePromotionV2"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"target"}},{"kind":"Field","name":{"kind":"Name","value":"discountValue"}},{"kind":"Field","name":{"kind":"Name","value":"maxDiscountCap"}},{"kind":"Field","name":{"kind":"Name","value":"minOrderAmount"}},{"kind":"Field","name":{"kind":"Name","value":"spendThreshold"}},{"kind":"Field","name":{"kind":"Name","value":"thresholdReward"}},{"kind":"Field","name":{"kind":"Name","value":"maxGlobalUsage"}},{"kind":"Field","name":{"kind":"Name","value":"currentGlobalUsage"}},{"kind":"Field","name":{"kind":"Name","value":"maxUsagePerUser"}},{"kind":"Field","name":{"kind":"Name","value":"isStackable"}},{"kind":"Field","name":{"kind":"Name","value":"priority"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"startsAt"}},{"kind":"Field","name":{"kind":"Name","value":"endsAt"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}}]} as unknown as DocumentNode<UpdatePromotionV2Mutation, UpdatePromotionV2MutationVariables>;
+export const DeletePromotionV2Document = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeletePromotionV2"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deletePromotionV2"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}]}}]} as unknown as DocumentNode<DeletePromotionV2Mutation, DeletePromotionV2MutationVariables>;
+export const GetPromotionsV2Document = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetPromotionsV2"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"isActive"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Boolean"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getAllPromotionsV2"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"isActive"},"value":{"kind":"Variable","name":{"kind":"Name","value":"isActive"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"target"}},{"kind":"Field","name":{"kind":"Name","value":"discountValue"}},{"kind":"Field","name":{"kind":"Name","value":"maxDiscountCap"}},{"kind":"Field","name":{"kind":"Name","value":"minOrderAmount"}},{"kind":"Field","name":{"kind":"Name","value":"spendThreshold"}},{"kind":"Field","name":{"kind":"Name","value":"thresholdReward"}},{"kind":"Field","name":{"kind":"Name","value":"maxGlobalUsage"}},{"kind":"Field","name":{"kind":"Name","value":"currentGlobalUsage"}},{"kind":"Field","name":{"kind":"Name","value":"maxUsagePerUser"}},{"kind":"Field","name":{"kind":"Name","value":"isStackable"}},{"kind":"Field","name":{"kind":"Name","value":"priority"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"startsAt"}},{"kind":"Field","name":{"kind":"Name","value":"endsAt"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"totalUsageCount"}},{"kind":"Field","name":{"kind":"Name","value":"totalRevenue"}}]}}]}}]} as unknown as DocumentNode<GetPromotionsV2Query, GetPromotionsV2QueryVariables>;
 export const GetSettlementsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetSettlements"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"type"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"SettlementType"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"status"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"SettlementStatus"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"driverId"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"startDate"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Date"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"endDate"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Date"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"settlements"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"type"},"value":{"kind":"Variable","name":{"kind":"Name","value":"type"}}},{"kind":"Argument","name":{"kind":"Name","value":"status"},"value":{"kind":"Variable","name":{"kind":"Name","value":"status"}}},{"kind":"Argument","name":{"kind":"Name","value":"driverId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"driverId"}}},{"kind":"Argument","name":{"kind":"Name","value":"businessId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}}},{"kind":"Argument","name":{"kind":"Name","value":"startDate"},"value":{"kind":"Variable","name":{"kind":"Name","value":"startDate"}}},{"kind":"Argument","name":{"kind":"Name","value":"endDate"},"value":{"kind":"Variable","name":{"kind":"Name","value":"endDate"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"driver"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"business"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"order"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"orderPrice"}},{"kind":"Field","name":{"kind":"Name","value":"deliveryPrice"}},{"kind":"Field","name":{"kind":"Name","value":"totalPrice"}}]}},{"kind":"Field","name":{"kind":"Name","value":"amount"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"paidAt"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}}]} as unknown as DocumentNode<GetSettlementsQuery, GetSettlementsQueryVariables>;
 export const GetSettlementSummaryDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetSettlementSummary"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"type"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"SettlementType"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"driverId"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"startDate"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Date"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"endDate"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Date"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"settlementSummary"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"type"},"value":{"kind":"Variable","name":{"kind":"Name","value":"type"}}},{"kind":"Argument","name":{"kind":"Name","value":"driverId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"driverId"}}},{"kind":"Argument","name":{"kind":"Name","value":"businessId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}}},{"kind":"Argument","name":{"kind":"Name","value":"startDate"},"value":{"kind":"Variable","name":{"kind":"Name","value":"startDate"}}},{"kind":"Argument","name":{"kind":"Name","value":"endDate"},"value":{"kind":"Variable","name":{"kind":"Name","value":"endDate"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"totalAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalPending"}},{"kind":"Field","name":{"kind":"Name","value":"totalPaid"}},{"kind":"Field","name":{"kind":"Name","value":"count"}},{"kind":"Field","name":{"kind":"Name","value":"pendingCount"}}]}}]}}]} as unknown as DocumentNode<GetSettlementSummaryQuery, GetSettlementSummaryQueryVariables>;
 export const GetDriverBalanceDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetDriverBalance"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"driverId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"driverBalance"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"driverId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"driverId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"totalAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalPending"}},{"kind":"Field","name":{"kind":"Name","value":"totalPaid"}},{"kind":"Field","name":{"kind":"Name","value":"count"}},{"kind":"Field","name":{"kind":"Name","value":"pendingCount"}}]}}]}}]} as unknown as DocumentNode<GetDriverBalanceQuery, GetDriverBalanceQueryVariables>;

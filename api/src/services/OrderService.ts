@@ -8,12 +8,13 @@ import {
     businesses as businessesTable,
     userBehaviors as userBehaviorsTable,
 } from '@/database/schema';
+import { userPromoMetadata } from '@/database/schema';
 import { eq, inArray, sql } from 'drizzle-orm';
 import type { Order, OrderBusiness, OrderItem, OrderStatus, CreateOrderInput } from '@/generated/types.generated';
 import type { DbOrder } from '@/database/schema/orders';
 import { PubSub, publish, subscribe, topics } from '@/lib/pubsub';
 import { GraphQLError } from 'graphql';
-import { PromotionService } from '@/services/PromotionService';
+import { PromotionEngineV2 } from '@/services/PromotionEngineV2';
 
 export class OrderService {
     public orderRepository: OrderRepository; // Made public for resolver access
@@ -23,7 +24,6 @@ export class OrderService {
         private authRepository: AuthRepository,
         private productRepository: ProductRepository,
         private pubsub: PubSub,
-        private promotionService: PromotionService,
     ) {
         this.orderRepository = orderRepository;
     }
@@ -42,6 +42,8 @@ export class OrderService {
         // 2. Validate Products and Calculate Totals
         let calculatedItemsTotal = 0;
         const itemsToCreate = [];
+        const cartItems = [] as Array<{ productId: string; businessId: string; quantity: number; price: number }>;
+        const businessIds = new Set<string>();
 
         for (const itemInput of input.items) {
             const product = await this.productRepository.findById(itemInput.productId);
@@ -63,53 +65,40 @@ export class OrderService {
                 quantity: itemInput.quantity,
                 price: price, // Store the price at time of purchase
             });
+
+            cartItems.push({
+                productId: itemInput.productId,
+                businessId: product.businessId,
+                quantity: itemInput.quantity,
+                price: price,
+            });
+
+            businessIds.add(product.businessId);
         }
 
         console.log('prices,', calculatedItemsTotal, input.deliveryPrice);
-        // 3. Apply Promotion (if any) and Create Order
-        const promoCode = input.promoCode?.trim();
-        let discountAmount = 0;
-        let effectiveDeliveryPrice = input.deliveryPrice;
-        let promotionToRedeem = null as null | Awaited<ReturnType<PromotionService['getPromotionByCode']>>;
-        let freeDeliveryApplied = false;
+        // 3. Apply PromotionEngineV2 (server-side validation)
+        const promotionEngine = new PromotionEngineV2(await getDB());
+        const cartContext = {
+            items: cartItems,
+            subtotal: calculatedItemsTotal,
+            deliveryPrice: input.deliveryPrice,
+            businessIds: Array.from(businessIds),
+        };
 
-        if (promoCode) {
-            // User entered a promo code
-            const promoResult = await this.promotionService.validatePromotionForUser(
-                userId,
-                promoCode,
-                calculatedItemsTotal,
-                input.deliveryPrice,
-            );
+        const promoResult = await promotionEngine.applyPromotions(
+            userId,
+            cartContext,
+            input.promoCode || undefined,
+        );
 
-            if (!promoResult.isValid) {
-                throw new Error(promoResult.reason || 'Invalid promotion');
-            }
-
-            discountAmount = promoResult.discountAmount;
-            effectiveDeliveryPrice = promoResult.effectiveDeliveryPrice;
-            freeDeliveryApplied = promoResult.freeDeliveryApplied;
-            promotionToRedeem = promoResult.promotion || null;
-        } else {
-            // No promo code provided - check for auto-apply promotions
-            const autoPromos = await this.promotionService.getAutoApplyPromotions(
-                userId,
-                calculatedItemsTotal,
-                input.deliveryPrice,
-            );
-
-            if (autoPromos.length > 0) {
-                // Use the best auto-apply promotion (already sorted by best discount first)
-                const bestPromo = autoPromos[0];
-                discountAmount = bestPromo.discountAmount;
-                effectiveDeliveryPrice = bestPromo.effectiveDeliveryPrice;
-                freeDeliveryApplied = bestPromo.freeDeliveryApplied;
-                promotionToRedeem = bestPromo.promotion || null;
-            }
+        if (input.promoCode && promoResult.promotions.length === 0) {
+            throw new Error('Invalid promo code');
         }
 
-        const effectiveOrderPrice = Math.max(0, calculatedItemsTotal - discountAmount);
-        const totalOrderPrice = effectiveOrderPrice + effectiveDeliveryPrice;
+        const effectiveOrderPrice = promoResult.finalSubtotal;
+        const effectiveDeliveryPrice = promoResult.finalDeliveryPrice;
+        const totalOrderPrice = promoResult.finalTotal;
 
         // Verify total price matches client input (allow small float error)
         if (Math.abs(totalOrderPrice - input.totalPrice) > 0.01) {
@@ -134,14 +123,27 @@ export class OrderService {
 
         await this.updateUserBehaviorOnOrderCreated(userId, createdOrder.orderDate || null);
 
-        if (promotionToRedeem) {
-            await this.promotionService.createRedemption({
-                promotion: promotionToRedeem,
+        // Ensure metadata row exists before promo updates
+        await this.ensureUserPromoMetadata(userId);
+
+        if (promoResult.promotions.length > 0) {
+            const appliedPromotionIds = promoResult.promotions.map((promo) => promo.id);
+            const orderBusinessId = businessIds.size === 1 ? Array.from(businessIds)[0] : null;
+
+            await promotionEngine.recordUsage(
+                appliedPromotionIds,
                 userId,
-                orderId: createdOrder.id,
-                discountAmount,
-                freeDeliveryApplied,
-            });
+                createdOrder.id,
+                promoResult.totalDiscount,
+                promoResult.freeDeliveryApplied,
+                promoResult.finalSubtotal,
+                orderBusinessId,
+            );
+
+            const hasFirstOrderPromo = promoResult.promotions.some((promo) => promo.target === 'FIRST_ORDER');
+            if (hasFirstOrderPromo) {
+                await promotionEngine.markFirstOrderUsed(userId);
+            }
         }
 
         // Decrement stock for ordered products (ensure it doesn't go below 0)
@@ -154,6 +156,14 @@ export class OrderService {
         }
 
         return this.mapToOrder(createdOrder);
+    }
+
+    private async ensureUserPromoMetadata(userId: string): Promise<void> {
+        const db = await getDB();
+        await db
+            .insert(userPromoMetadata)
+            .values({ userId })
+            .onConflictDoNothing();
     }
 
     private async mapToOrder(dbOrder: DbOrder): Promise<Order> {

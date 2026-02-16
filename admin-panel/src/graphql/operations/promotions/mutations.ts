@@ -1,57 +1,66 @@
 import { graphql } from '@/gql';
 
-export const CREATE_PROMOTION = graphql(`
-    mutation CreatePromotion($input: CreatePromotionInput!) {
-        createPromotion(input: $input) {
+export const CREATE_PROMOTION_V2 = graphql(`
+    mutation CreatePromotionV2($input: CreatePromotionV2Input!) {
+        createPromotionV2(input: $input) {
             id
-            code
             name
             description
+            code
             type
-            value
-            maxRedemptions
-            maxRedemptionsPerUser
-            freeDeliveryCount
-            firstOrderOnly
+            target
+            discountValue
+            maxDiscountCap
+            minOrderAmount
+            spendThreshold
+            thresholdReward
+            maxGlobalUsage
+            currentGlobalUsage
+            maxUsagePerUser
+            isStackable
+            priority
             isActive
-            autoApply
             startsAt
             endsAt
-            referrerUserId
-            targetUserIds
             createdAt
-            updatedAt
         }
     }
 `);
 
-export const UPDATE_PROMOTION = graphql(`
-    mutation UpdatePromotion($id: ID!, $input: UpdatePromotionInput!) {
-        updatePromotion(id: $id, input: $input) {
+export const UPDATE_PROMOTION_V2 = graphql(`
+    mutation UpdatePromotionV2($input: UpdatePromotionV2Input!) {
+        updatePromotionV2(input: $input) {
             id
-            code
             name
             description
+            code
             type
-            value
-            maxRedemptions
-            maxRedemptionsPerUser
-            freeDeliveryCount
-            firstOrderOnly
+            target
+            discountValue
+            maxDiscountCap
+            minOrderAmount
+            spendThreshold
+            thresholdReward
+            maxGlobalUsage
+            currentGlobalUsage
+            maxUsagePerUser
+            isStackable
+            priority
             isActive
-            autoApply
             startsAt
             endsAt
-            referrerUserId
-            targetUserIds
             createdAt
-            updatedAt
         }
     }
 `);
 
-export const DELETE_PROMOTION = graphql(`
-    mutation DeletePromotion($id: ID!) {
-        deletePromotion(id: $id)
+export const DELETE_PROMOTION_V2 = graphql(`
+    mutation DeletePromotionV2($id: ID!) {
+        deletePromotionV2(id: $id)
     }
 `);
+
+// Legacy aliases for backward compatibility
+export const CREATE_PROMOTION = CREATE_PROMOTION_V2;
+export const UPDATE_PROMOTION = UPDATE_PROMOTION_V2;
+export const DELETE_PROMOTION = DELETE_PROMOTION_V2;

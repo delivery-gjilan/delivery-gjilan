@@ -139,7 +139,14 @@
       "idx": 19,
       "version": "7",
       "when": 1771191000000,
-      "tag": "0019_promotions",
+      "tag": "0019_promotion_system_v2",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1771253319609,
+      "tag": "0020_first_proudstar",
       "breakpoints": true
     }
   ]

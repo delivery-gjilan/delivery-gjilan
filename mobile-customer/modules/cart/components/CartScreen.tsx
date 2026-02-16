@@ -10,15 +10,54 @@ import { useTheme } from '@/hooks/useTheme';
 import { useCart } from '../hooks/useCart';
 import { useCartActions } from '../hooks/useCartActions';
 import { useCreateOrder } from '../hooks/useCreateOrder';
+import { gql } from '@apollo/client';
 import { useLazyQuery } from '@apollo/client/react';
 import { CALCULATE_DELIVERY_FEE } from '@/graphql/operations/deliveryZones';
-import { VALIDATE_PROMOTION } from '@/graphql/operations/promotions/queries';
+
+const VALIDATE_PROMOTIONS_V2 = gql`
+    query ValidatePromotionsV2($cart: CartContextInput!, $manualCode: String) {
+        validatePromotionsV2(cart: $cart, manualCode: $manualCode) {
+            totalDiscount
+            freeDeliveryApplied
+            finalSubtotal
+            finalDeliveryPrice
+            finalTotal
+            promotions {
+                id
+                name
+                code
+                type
+                target
+                appliedAmount
+                freeDelivery
+                priority
+            }
+        }
+    }
+`;
 
 type CheckoutLocation = {
     latitude: number;
     longitude: number;
     address: string;
     label?: string;
+};
+
+type AutoPromoResult = {
+    totalDiscount: number;
+    freeDeliveryApplied: boolean;
+    finalDeliveryPrice: number;
+    finalTotal: number;
+    promotions: Array<{
+        id: string;
+        name: string;
+        code?: string | null;
+        type: string;
+        target: string;
+        appliedAmount: number;
+        freeDelivery: boolean;
+        priority: number;
+    }>;
 };
 
 const formatAddress = (item: Location.LocationGeocodedAddress | null) => {
@@ -137,6 +176,7 @@ export const CartScreen = () => {
         effectiveDeliveryPrice: number;
         totalPrice: number;
     } | null>(null);
+    const [autoPromoResult, setAutoPromoResult] = useState<AutoPromoResult | null>(null);
     const [mapRegion, setMapRegion] = useState<Region>({
         latitude: 42.4629,
         longitude: 21.4694,
@@ -152,7 +192,27 @@ export const CartScreen = () => {
     const addressSlideX = useRef(new Animated.Value(screenWidth)).current;
 
     const [calculateFee, { data: feeData, loading: feeLoading }] = useLazyQuery(CALCULATE_DELIVERY_FEE);
-    const [validatePromotion, { loading: promoLoading }] = useLazyQuery(VALIDATE_PROMOTION);
+    const [validatePromotionsV2, { loading: autoPromoLoading }] = useLazyQuery(VALIDATE_PROMOTIONS_V2, {
+        fetchPolicy: 'no-cache',
+    });
+    const [validatePromotionsV2Manual, { loading: manualPromoLoading }] = useLazyQuery(VALIDATE_PROMOTIONS_V2, {
+        fetchPolicy: 'no-cache',
+    });
+
+    const cartContext = useMemo(() => {
+        const businessIds = Array.from(new Set(items.map((item) => item.businessId)));
+        return {
+            items: items.map((item) => ({
+                productId: item.productId,
+                businessId: item.businessId,
+                quantity: item.quantity,
+                price: item.price,
+            })),
+            subtotal: total,
+            deliveryPrice,
+            businessIds,
+        };
+    }, [items, total, deliveryPrice]);
 
     const defaultAddresses = useMemo(
         () => [
@@ -413,14 +473,55 @@ export const CartScreen = () => {
     }, [total, deliveryPrice]);
 
     useEffect(() => {
+        if (items.length === 0) {
+            setAutoPromoResult(null);
+            return;
+        }
+
+        validatePromotionsV2({ variables: { cart: cartContext } })
+            .then(({ data }) => {
+                if (data?.validatePromotionsV2) {
+                    setAutoPromoResult(data.validatePromotionsV2 as AutoPromoResult);
+                } else {
+                    setAutoPromoResult(null);
+                }
+            })
+            .catch(() => {
+                setAutoPromoResult(null);
+            });
+    }, [cartContext, items.length, validatePromotionsV2]);
+
+    useEffect(() => {
         if (promoResult && promoResult.code !== couponCode.trim()) {
             setPromoResult(null);
         }
     }, [couponCode, promoResult]);
 
-    const appliedDiscount = promoResult?.discountAmount ?? 0;
-    const appliedDeliveryPrice = promoResult?.effectiveDeliveryPrice ?? deliveryPrice;
-    const finalTotal = promoResult?.totalPrice ?? Math.max(0, total + deliveryPrice - appliedDiscount);
+    const manualPromoApplied = !!promoResult;
+    const autoPromoApplied = !manualPromoApplied && !!autoPromoResult && autoPromoResult.promotions.length > 0;
+    const freeDeliveryApplied = manualPromoApplied
+        ? promoResult?.freeDeliveryApplied ?? false
+        : autoPromoApplied
+            ? autoPromoResult.freeDeliveryApplied
+            : false;
+
+    const appliedDiscount = manualPromoApplied
+        ? promoResult?.discountAmount ?? 0
+        : autoPromoApplied
+            ? autoPromoResult.totalDiscount
+            : 0;
+
+    const appliedDeliveryPrice = manualPromoApplied
+        ? promoResult?.effectiveDeliveryPrice ?? deliveryPrice
+        : autoPromoApplied
+            ? autoPromoResult.finalDeliveryPrice
+            : deliveryPrice;
+
+    const finalTotal = manualPromoApplied
+        ? promoResult?.totalPrice ?? Math.max(0, total + deliveryPrice - appliedDiscount)
+        : autoPromoApplied
+            ? autoPromoResult.finalTotal
+            : Math.max(0, total + deliveryPrice - appliedDiscount);
 
     const handleApplyCoupon = () => {
         const code = couponCode.trim();
@@ -434,31 +535,28 @@ export const CartScreen = () => {
             return;
         }
 
-        validatePromotion({
+        validatePromotionsV2Manual({
             variables: {
-                input: {
-                    code,
-                    itemsTotal: total,
-                    deliveryPrice,
-                },
+                cart: cartContext,
+                manualCode: code,
             },
         })
             .then(({ data }) => {
-                const result = data?.validatePromotion;
-                if (!result || !result.isValid) {
+                const result = data?.validatePromotionsV2 as AutoPromoResult | undefined;
+                if (!result || result.promotions.length === 0) {
                     setPromoResult(null);
-                    Alert.alert('Invalid Code', result?.reason || 'Promotion not valid.');
+                    Alert.alert('Invalid Code', 'Promotion not valid.');
                     return;
                 }
 
                 setPromoResult({
                     code,
-                    discountAmount: Number(result.discountAmount ?? 0),
+                    discountAmount: Number(result.totalDiscount ?? 0),
                     freeDeliveryApplied: result.freeDeliveryApplied ?? false,
-                    effectiveDeliveryPrice: Number(result.effectiveDeliveryPrice ?? deliveryPrice),
-                    totalPrice: Number(result.totalPrice ?? total + deliveryPrice),
+                    effectiveDeliveryPrice: Number(result.finalDeliveryPrice ?? deliveryPrice),
+                    totalPrice: Number(result.finalTotal ?? total + deliveryPrice),
                 });
-                Alert.alert('Promo Applied', `Discount €${Number(result.discountAmount ?? 0).toFixed(2)} added.`);
+                Alert.alert('Promo Applied', `Discount €${Number(result.totalDiscount ?? 0).toFixed(2)} added.`);
             })
             .catch(() => {
                 Alert.alert('Promo Error', 'Unable to validate promo code.');
@@ -930,16 +1028,16 @@ export const CartScreen = () => {
                                         {feeLoading && <ActivityIndicator size="small" color={theme.colors.subtext} />}
                                     </View>
                                     <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
-                                        {promoResult?.freeDeliveryApplied ? 'Free' : `€${appliedDeliveryPrice.toFixed(2)}`}
+                                        {freeDeliveryApplied ? 'Free' : `€${appliedDeliveryPrice.toFixed(2)}`}
                                     </Text>
                                 </View>
-                                {(appliedDiscount > 0 || promoResult?.freeDeliveryApplied) && (
+                                {(appliedDiscount > 0 || freeDeliveryApplied) && (
                                     <View className="flex-row justify-between items-center">
                                         <Text className="text-base" style={{ color: theme.colors.subtext }}>
                                             Promo
                                         </Text>
                                         <Text className="text-base font-semibold" style={{ color: theme.colors.income }}>
-                                            {promoResult?.freeDeliveryApplied && appliedDiscount === 0
+                                            {freeDeliveryApplied && appliedDiscount === 0
                                                 ? 'Free delivery'
                                                 : `-€${appliedDiscount.toFixed(2)}`}
                                         </Text>
@@ -968,13 +1066,13 @@ export const CartScreen = () => {
                                     <TouchableOpacity
                                         className="px-4 py-2 rounded-xl"
                                         style={{
-                                            backgroundColor: promoLoading ? theme.colors.border : theme.colors.primary,
-                                            opacity: promoLoading ? 0.7 : 1,
+                                            backgroundColor: manualPromoLoading ? theme.colors.border : theme.colors.primary,
+                                            opacity: manualPromoLoading ? 0.7 : 1,
                                         }}
                                         onPress={handleApplyCoupon}
-                                        disabled={promoLoading}
+                                        disabled={manualPromoLoading}
                                     >
-                                        {promoLoading ? (
+                                        {manualPromoLoading ? (
                                             <ActivityIndicator size="small" color={theme.colors.text} />
                                         ) : (
                                             <Text className="text-white font-semibold">Apply</Text>
@@ -987,6 +1085,38 @@ export const CartScreen = () => {
                                     </Text>
                                 )}
                             </View>
+
+                            {(autoPromoLoading || (autoPromoResult && autoPromoResult.promotions.length > 0)) && (
+                                <View className="p-4 rounded-2xl border mb-4" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
+                                    <View className="flex-row items-center justify-between mb-2">
+                                        <Text className="text-xs uppercase" style={{ color: theme.colors.subtext }}>
+                                            Auto-applied promotions
+                                        </Text>
+                                        {autoPromoLoading && <ActivityIndicator size="small" color={theme.colors.subtext} />}
+                                    </View>
+
+                                    {autoPromoResult?.promotions.map((promo) => (
+                                        <View key={promo.id} className="flex-row items-center justify-between mb-2">
+                                            <View className="flex-1 pr-2">
+                                                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
+                                                    {promo.name}
+                                                </Text>
+                                                {promo.code && (
+                                                    <Text className="text-xs" style={{ color: theme.colors.subtext }}>
+                                                        Code: {promo.code}
+                                                    </Text>
+                                                )}
+                                            </View>
+                                            <Text className="text-sm font-semibold" style={{ color: theme.colors.income }}>
+                                                {promo.freeDelivery && promo.appliedAmount === 0
+                                                    ? 'Free delivery'
+                                                    : `-€${Number(promo.appliedAmount).toFixed(2)}`}
+                                            </Text>
+                                        </View>
+                                    ))}
+
+                                </View>
+                            )}
 
                             <View className="h-px mb-3" style={{ backgroundColor: theme.colors.border }} />
 

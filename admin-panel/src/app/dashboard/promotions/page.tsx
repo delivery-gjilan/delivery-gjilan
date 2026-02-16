@@ -8,51 +8,60 @@ import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import { Table, Th, Td } from "@/components/ui/Table";
-import { GET_PROMOTIONS } from "@/graphql/operations/promotions/queries";
-import { CREATE_PROMOTION, UPDATE_PROMOTION, DELETE_PROMOTION } from "@/graphql/operations/promotions/mutations";
-import type { PromotionType, PromotionsQuery } from "@/gql/graphql";
+import { GET_PROMOTIONS_V2 } from "@/graphql/operations/promotions/queries";
+import { CREATE_PROMOTION_V2, UPDATE_PROMOTION_V2, DELETE_PROMOTION_V2 } from "@/graphql/operations/promotions/mutations";
+import type { PromotionTypeV2, PromotionTarget, GetPromotionsV2Query } from "@/gql/graphql";
 
-const promotionTypeLabels: Record<PromotionType, string> = {
-    FIXED_DISCOUNT: "Fixed discount",
-    PERCENT_DISCOUNT: "Percent discount",
+const promotionTypeLabels: Record<PromotionTypeV2, string> = {
+    FIXED_AMOUNT: "Fixed amount",
+    PERCENTAGE: "Percentage",
     FREE_DELIVERY: "Free delivery",
-    REFERRAL: "Referral",
+    WALLET_CREDIT: "Wallet credit",
+};
+
+const promotionTargetLabels: Record<PromotionTarget, string> = {
+    ALL_USERS: "All users",
+    SPECIFIC_USERS: "Specific users",
+    FIRST_ORDER: "First order",
+    CONDITIONAL: "Conditional",
 };
 
 type PromotionFormState = {
-    code: string;
     name: string;
     description: string;
-    type: PromotionType;
-    value: string;
-    maxRedemptions: string;
-    maxRedemptionsPerUser: string;
-    freeDeliveryCount: string;
-    firstOrderOnly: string;
+    code: string;
+    type: PromotionTypeV2;
+    target: PromotionTarget;
+    discountValue: string;
+    maxDiscountCap: string;
+    minOrderAmount: string;
+    spendThreshold: string;
+    thresholdRewardType: "FIXED_AMOUNT" | "PERCENTAGE" | "FREE_DELIVERY";
+    thresholdRewardValue: string;
+    isStackable: string;
+    priority: string;
     isActive: string;
-    autoApply: string;
     startsAt: string;
     endsAt: string;
-    referrerUserId: string;
-    targetUserEmails: string;
 };
 
 const emptyForm: PromotionFormState = {
-    code: "",
     name: "",
     description: "",
-    type: "FIXED_DISCOUNT",
-    value: "",
-    maxRedemptions: "",
-    maxRedemptionsPerUser: "",
-    freeDeliveryCount: "",
-    firstOrderOnly: "false",
+    code: "",
+    type: "FIXED_AMOUNT",
+    target: "ALL_USERS",
+    discountValue: "",
+    maxDiscountCap: "",
+    minOrderAmount: "",
+    spendThreshold: "",
+    thresholdRewardType: "FIXED_AMOUNT",
+    thresholdRewardValue: "",
+    isStackable: "false",
+    priority: "50",
     isActive: "true",
-    autoApply: "false",
     startsAt: "",
     endsAt: "",
-    referrerUserId: "",
-    targetUserEmails: "",
 };
 
 const toDateTimeLocal = (value?: string | null) => {
@@ -77,24 +86,24 @@ const toOptionalNumber = (value: string) => {
 };
 
 export default function PromotionsPage() {
-    const { data, loading, error, refetch } = useQuery<PromotionsQuery>(GET_PROMOTIONS);
-    const [createPromotion, { loading: creating }] = useMutation(CREATE_PROMOTION, {
+    const { data, loading, error, refetch } = useQuery<GetPromotionsV2Query>(GET_PROMOTIONS_V2);
+    const [createPromotion, { loading: creating }] = useMutation(CREATE_PROMOTION_V2, {
         onCompleted: () => refetch(),
     });
-    const [updatePromotion, { loading: updating }] = useMutation(UPDATE_PROMOTION, {
+    const [updatePromotion, { loading: updating }] = useMutation(UPDATE_PROMOTION_V2, {
         onCompleted: () => refetch(),
     });
-    const [deletePromotion, { loading: deleting }] = useMutation(DELETE_PROMOTION, {
+    const [deletePromotion, { loading: deleting }] = useMutation(DELETE_PROMOTION_V2, {
         onCompleted: () => refetch(),
     });
 
     const [showModal, setShowModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [editingPromotion, setEditingPromotion] = useState<PromotionsQuery["promotions"][number] | null>(null);
-    const [promotionToDelete, setPromotionToDelete] = useState<PromotionsQuery["promotions"][number] | null>(null);
+    const [editingPromotion, setEditingPromotion] = useState<GetPromotionsV2Query["getAllPromotionsV2"][number] | null>(null);
+    const [promotionToDelete, setPromotionToDelete] = useState<GetPromotionsV2Query["getAllPromotionsV2"][number] | null>(null);
     const [formData, setFormData] = useState<PromotionFormState>(emptyForm);
 
-    const promotions = useMemo(() => data?.promotions ?? [], [data?.promotions]);
+    const promotions = useMemo(() => data?.getAllPromotionsV2 ?? [], [data?.getAllPromotionsV2]);
 
     const handleOpenCreate = () => {
         setEditingPromotion(null);
@@ -102,24 +111,39 @@ export default function PromotionsPage() {
         setShowModal(true);
     };
 
-    const handleOpenEdit = (promotion: PromotionsQuery["promotions"][number]) => {
+    const handleOpenEdit = (promotion: GetPromotionsV2Query["getAllPromotionsV2"][number]) => {
         setEditingPromotion(promotion);
+        
+        // Parse threshold reward if it exists
+        let thresholdRewardType: "FIXED_AMOUNT" | "PERCENTAGE" | "FREE_DELIVERY" = "FIXED_AMOUNT";
+        let thresholdRewardValue = "";
+        if (promotion.thresholdReward) {
+            try {
+                const parsed = JSON.parse(promotion.thresholdReward);
+                thresholdRewardType = parsed.type || "FIXED_AMOUNT";
+                thresholdRewardValue = parsed.value ? String(parsed.value) : "";
+            } catch (e) {
+                console.error("Failed to parse thresholdReward:", e);
+            }
+        }
+        
         setFormData({
-            code: promotion.code,
             name: promotion.name,
             description: promotion.description ?? "",
+            code: promotion.code ?? "",
             type: promotion.type,
-            value: promotion.value ? String(promotion.value) : "",
-            maxRedemptions: promotion.maxRedemptions ? String(promotion.maxRedemptions) : "",
-            maxRedemptionsPerUser: promotion.maxRedemptionsPerUser ? String(promotion.maxRedemptionsPerUser) : "",
-            freeDeliveryCount: promotion.freeDeliveryCount ? String(promotion.freeDeliveryCount) : "",
-            firstOrderOnly: promotion.firstOrderOnly ? "true" : "false",
+            target: promotion.target,
+            discountValue: promotion.discountValue ? String(promotion.discountValue) : "",
+            maxDiscountCap: promotion.maxDiscountCap ? String(promotion.maxDiscountCap) : "",
+            minOrderAmount: promotion.minOrderAmount ? String(promotion.minOrderAmount) : "",
+            spendThreshold: promotion.spendThreshold ? String(promotion.spendThreshold) : "",
+            thresholdRewardType,
+            thresholdRewardValue,
+            isStackable: promotion.isStackable ? "true" : "false",
+            priority: String(promotion.priority),
             isActive: promotion.isActive ? "true" : "false",
-            autoApply: promotion.autoApply ? "true" : "false",
             startsAt: toDateTimeLocal(promotion.startsAt),
             endsAt: toDateTimeLocal(promotion.endsAt),
-            referrerUserId: promotion.referrerUserId ?? "",
-            targetUserEmails: (promotion.targetUserIds ?? []).join(", "),
         });
         setShowModal(true);
     };
@@ -130,7 +154,7 @@ export default function PromotionsPage() {
         setFormData(emptyForm);
     };
 
-    const handleDeleteRequest = (promotion: PromotionsQuery["promotions"][number]) => {
+    const handleDeleteRequest = (promotion: GetPromotionsV2Query["getAllPromotionsV2"][number]) => {
         setPromotionToDelete(promotion);
         setShowDeleteModal(true);
     };
@@ -143,31 +167,39 @@ export default function PromotionsPage() {
     };
 
     const handleSave = async () => {
-        const targetUserIds = formData.targetUserEmails
-            .split(',')
-            .map(id => id.trim())
-            .filter(id => id.length > 0);
-
+        // Construct thresholdReward JSON if target is CONDITIONAL
+        let thresholdReward: string | undefined = undefined;
+        if (formData.target === "CONDITIONAL" && formData.spendThreshold.trim()) {
+            const rewardObj: { type: string; value?: number } = {
+                type: formData.thresholdRewardType,
+            };
+            // Add value only if it's not FREE_DELIVERY and has a value
+            if (formData.thresholdRewardType !== "FREE_DELIVERY" && formData.thresholdRewardValue.trim()) {
+                rewardObj.value = Number(formData.thresholdRewardValue);
+            }
+            thresholdReward = JSON.stringify(rewardObj);
+        }
+        
         const payload = {
-            code: formData.code.trim().toUpperCase(),
             name: formData.name.trim(),
-            description: formData.description.trim() || null,
+            description: formData.description.trim() || undefined,
+            code: formData.code.trim().toUpperCase() || undefined,
             type: formData.type,
-            value: toOptionalNumber(formData.value),
-            maxRedemptions: toOptionalNumber(formData.maxRedemptions),
-            maxRedemptionsPerUser: toOptionalNumber(formData.maxRedemptionsPerUser),
-            freeDeliveryCount: toOptionalNumber(formData.freeDeliveryCount),
-            firstOrderOnly: formData.firstOrderOnly === "true",
+            target: formData.target,
+            discountValue: toOptionalNumber(formData.discountValue),
+            maxDiscountCap: toOptionalNumber(formData.maxDiscountCap),
+            minOrderAmount: toOptionalNumber(formData.minOrderAmount),
+            spendThreshold: toOptionalNumber(formData.spendThreshold),
+            thresholdReward: thresholdReward,
+            isStackable: formData.isStackable === "true",
+            priority: Number(formData.priority),
             isActive: formData.isActive === "true",
-            autoApply: formData.autoApply === "true",
-            startsAt: formData.startsAt ? new Date(formData.startsAt).toISOString() : null,
-            endsAt: formData.endsAt ? new Date(formData.endsAt).toISOString() : null,
-            referrerUserId: formData.referrerUserId.trim() || null,
-            targetUserIds: targetUserIds.length > 0 ? targetUserIds : null,
+            startsAt: formData.startsAt || undefined,
+            endsAt: formData.endsAt || undefined,
         };
 
         if (editingPromotion) {
-            await updatePromotion({ variables: { id: editingPromotion.id, input: payload } });
+            await updatePromotion({ variables: { input: { id: editingPromotion.id, ...payload } } });
         } else {
             await createPromotion({ variables: { input: payload } });
         }
@@ -186,10 +218,10 @@ export default function PromotionsPage() {
                 <div>
                     <h1 className="text-2xl font-bold text-white flex items-center gap-3">
                         <Tag size={26} />
-                        Promotions
+                        Promotions V2
                     </h1>
                     <p className="text-neutral-400 mt-1">
-                        Create promo codes, free delivery offers, and referral campaigns.
+                        Manage promotions, wallet credits, and targeted campaigns.
                     </p>
                 </div>
                 <Button onClick={handleOpenCreate}>
@@ -211,12 +243,12 @@ export default function PromotionsPage() {
                     <Table>
                         <thead>
                             <tr>
-                                <Th>Code</Th>
+                                <Th>Name / Code</Th>
                                 <Th>Type</Th>
+                                <Th>Target</Th>
                                 <Th>Value</Th>
-                                <Th>Rules</Th>
+                                <Th>Priority</Th>
                                 <Th>Status</Th>
-                                <Th>Dates</Th>
                                 <Th>Actions</Th>
                             </tr>
                         </thead>
@@ -233,8 +265,10 @@ export default function PromotionsPage() {
                                 promotions.map((promotion) => (
                                     <tr key={promotion.id}>
                                         <Td>
-                                            <div className="text-white font-semibold">{promotion.code}</div>
-                                            <div className="text-xs text-neutral-400">{promotion.name}</div>
+                                            <div className="text-white font-semibold">{promotion.name}</div>
+                                            {promotion.code && (
+                                                <div className="text-xs text-cyan-400 font-mono">{promotion.code}</div>
+                                            )}
                                         </Td>
                                         <Td>
                                             <div className="text-sm text-neutral-300">
@@ -242,31 +276,29 @@ export default function PromotionsPage() {
                                             </div>
                                         </Td>
                                         <Td>
-                                            <div className="text-sm text-white">
-                                                {promotion.type === "PERCENT_DISCOUNT"
-                                                    ? `${promotion.value}%`
-                                                    : promotion.type === "FREE_DELIVERY"
-                                                        ? "Free delivery"
-                                                        : `€${promotion.value.toFixed(2)}`}
+                                            <div className="text-sm text-neutral-300">
+                                                {promotionTargetLabels[promotion.target]}
                                             </div>
                                         </Td>
                                         <Td>
-                                            <div className="text-xs text-neutral-400 space-y-1">
-                                                {promotion.autoApply && (
-                                                    <div className="text-purple-400 font-semibold">✨ Auto-apply</div>
-                                                )}
-                                                {promotion.targetUserIds && promotion.targetUserIds.length > 0 && (
-                                                    <div className="text-cyan-400">👥 {promotion.targetUserIds.length} targeted users</div>
-                                                )}
-                                                {promotion.firstOrderOnly && <div>First order only</div>}
-                                                {promotion.freeDeliveryCount && (
-                                                    <div>{promotion.freeDeliveryCount} free deliveries</div>
-                                                )}
-                                                {promotion.maxRedemptions && <div>Max {promotion.maxRedemptions} uses</div>}
-                                                {promotion.maxRedemptionsPerUser && (
-                                                    <div>{promotion.maxRedemptionsPerUser} per user</div>
-                                                )}
+                                            <div className="text-sm text-white">
+                                                {promotion.type === "PERCENTAGE"
+                                                    ? `${promotion.discountValue}%`
+                                                    : promotion.type === "FREE_DELIVERY"
+                                                        ? "Free delivery"
+                                                        : `€${promotion.discountValue?.toFixed(2) || "0.00"}`}
                                             </div>
+                                            {promotion.maxDiscountCap && (
+                                                <div className="text-xs text-neutral-400">
+                                                    Cap: €{promotion.maxDiscountCap.toFixed(2)}
+                                                </div>
+                                            )}
+                                        </Td>
+                                        <Td>
+                                            <div className="text-sm text-neutral-300">{promotion.priority}</div>
+                                            {promotion.isStackable && (
+                                                <div className="text-xs text-purple-400">Stackable</div>
+                                            )}
                                         </Td>
                                         <Td>
                                             <span
@@ -276,12 +308,6 @@ export default function PromotionsPage() {
                                             >
                                                 {promotion.isActive ? "Active" : "Inactive"}
                                             </span>
-                                        </Td>
-                                        <Td>
-                                            <div className="text-xs text-neutral-400">
-                                                <div>Start: {formatDate(promotion.startsAt)}</div>
-                                                <div>End: {formatDate(promotion.endsAt)}</div>
-                                            </div>
                                         </Td>
                                         <Td>
                                             <div className="flex gap-2">
@@ -301,210 +327,310 @@ export default function PromotionsPage() {
                 )}
             </div>
 
-            {showModal && (
-                <Modal
-                    open={showModal}
-                    onClose={handleCloseModal}
-                    title={editingPromotion ? "Edit Promotion" : "Create Promotion"}
-                >
+            {/* Create/Edit Modal */}
+            <Modal isOpen={showModal} onClose={handleCloseModal} title={editingPromotion ? "Edit Promotion" : "Create Promotion"}>
+                <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+                    {/* Basic Information */}
                     <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                                <label className="block text-sm text-neutral-300 mb-2">Code</label>
-                                <Input
-                                    value={formData.code}
-                                    onChange={(event) => setFormData((prev) => ({ ...prev, code: event.target.value.toUpperCase() }))}
-                                    placeholder="WELCOME2"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm text-neutral-300 mb-2">Name</label>
-                                <Input
-                                    value={formData.name}
-                                    onChange={(event) => setFormData((prev) => ({ ...prev, name: event.target.value }))}
-                                    placeholder="Welcome bonus"
-                                />
-                            </div>
+                        <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-neutral-800 pb-2">
+                            📝 Basic Information
+                        </h3>
+                        <Input
+                            label="Name"
+                            value={formData.name}
+                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            placeholder="Summer Sale 2026"
+                        />
+                        <div className="text-xs text-neutral-500 -mt-2">
+                            Internal name for this promotion (visible to admins only)
+                        </div>
+                        
+                        <Input
+                            label="Description"
+                            value={formData.description}
+                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                            placeholder="Get 20% off your first order!"
+                        />
+                        <div className="text-xs text-neutral-500 -mt-2">
+                            Customer-facing description shown in the app
                         </div>
 
-                        <div>
-                            <label className="block text-sm text-neutral-300 mb-2">Description</label>
-                            <Input
-                                value={formData.description}
-                                onChange={(event) => setFormData((prev) => ({ ...prev, description: event.target.value }))}
-                                placeholder="2 EUR off first order"
-                            />
+                        <Input
+                            label="Promo Code (Optional)"
+                            value={formData.code}
+                            onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                            placeholder="SUMMER20"
+                        />
+                        <div className="text-xs text-neutral-500 -mt-2">
+                            Leave empty for auto-applied promotions (e.g., first order). Enter a code for manual entry.
                         </div>
+                    </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* Promotion Type & Target */}
+                    <div className="space-y-4">
+                        <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-neutral-800 pb-2">
+                            🎯 Type & Target Audience
+                        </h3>
+                        <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm text-neutral-300 mb-2">Type</label>
                                 <Select
+                                    label="Promotion Type"
                                     value={formData.type}
-                                    onChange={(event) => setFormData((prev) => ({ ...prev, type: event.target.value as PromotionType }))}
+                                    onChange={(e) => setFormData({ ...formData, type: e.target.value as PromotionTypeV2 })}
                                 >
-                                    {Object.entries(promotionTypeLabels).map(([value, label]) => (
-                                        <option key={value} value={value}>
-                                            {label}
-                                        </option>
-                                    ))}
+                                    <option value="FIXED_AMOUNT">💵 Fixed Amount (e.g., $5 off)</option>
+                                    <option value="PERCENTAGE">📊 Percentage (e.g., 20% off)</option>
+                                    <option value="FREE_DELIVERY">🚚 Free Delivery</option>
+                                    <option value="WALLET_CREDIT">💳 Wallet Credit</option>
                                 </Select>
+                                <div className="text-xs text-neutral-500 mt-1">
+                                    {formData.type === "FIXED_AMOUNT" && "Subtract a fixed dollar amount"}
+                                    {formData.type === "PERCENTAGE" && "Discount by percentage of order total"}
+                                    {formData.type === "FREE_DELIVERY" && "Waive delivery fees"}
+                                    {formData.type === "WALLET_CREDIT" && "Add credit to user's wallet"}
+                                </div>
                             </div>
                             <div>
-                                <label className="block text-sm text-neutral-300 mb-2">Value</label>
-                                <Input
-                                    type="number"
-                                    value={formData.value}
-                                    onChange={(event) => setFormData((prev) => ({ ...prev, value: event.target.value }))}
-                                    placeholder={formData.type === "PERCENT_DISCOUNT" ? "10" : "2.00"}
-                                />
-                                <p className="text-xs text-neutral-500 mt-1">
-                                    {formData.type === "PERCENT_DISCOUNT"
-                                        ? "Percent discount off items"
-                                        : formData.type === "FREE_DELIVERY"
-                                            ? "No value needed for free delivery"
-                                            : "Fixed discount in EUR"}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div>
-                                <label className="block text-sm text-neutral-300 mb-2">Max redemptions</label>
-                                <Input
-                                    type="number"
-                                    value={formData.maxRedemptions}
-                                    onChange={(event) => setFormData((prev) => ({ ...prev, maxRedemptions: event.target.value }))}
-                                    placeholder="Leave empty"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm text-neutral-300 mb-2">Per user limit</label>
-                                <Input
-                                    type="number"
-                                    value={formData.maxRedemptionsPerUser}
-                                    onChange={(event) => setFormData((prev) => ({ ...prev, maxRedemptionsPerUser: event.target.value }))}
-                                    placeholder="Leave empty"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm text-neutral-300 mb-2">Free deliveries</label>
-                                <Input
-                                    type="number"
-                                    value={formData.freeDeliveryCount}
-                                    onChange={(event) => setFormData((prev) => ({ ...prev, freeDeliveryCount: event.target.value }))}
-                                    placeholder="e.g. 2"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div>
-                                <label className="block text-sm text-neutral-300 mb-2">First order only</label>
                                 <Select
-                                    value={formData.firstOrderOnly}
-                                    onChange={(event) => setFormData((prev) => ({ ...prev, firstOrderOnly: event.target.value }))}
+                                    label="Target Audience"
+                                    value={formData.target}
+                                    onChange={(e) => setFormData({ ...formData, target: e.target.value as PromotionTarget })}
                                 >
-                                    <option value="false">No</option>
-                                    <option value="true">Yes</option>
+                                    <option value="ALL_USERS">👥 All Users</option>
+                                    <option value="SPECIFIC_USERS">🎁 Specific Users</option>
+                                    <option value="FIRST_ORDER">🆕 First Order Only</option>
+                                    <option value="CONDITIONAL">💰 Conditional (Spend X Get Y)</option>
                                 </Select>
-                            </div>
-                            <div>
-                                <label className="block text-sm text-neutral-300 mb-2">Active</label>
-                                <Select
-                                    value={formData.isActive}
-                                    onChange={(event) => setFormData((prev) => ({ ...prev, isActive: event.target.value }))}
-                                >
-                                    <option value="true">Active</option>
-                                    <option value="false">Inactive</option>
-                                </Select>
-                            </div>
-                            <div>
-                                <label className="block text-sm text-neutral-300 mb-2">Auto-apply</label>
-                                <Select
-                                    value={formData.autoApply}
-                                    onChange={(event) => setFormData((prev) => ({ ...prev, autoApply: event.target.value }))}
-                                >
-                                    <option value="false">No</option>
-                                    <option value="true">Yes - Apply automatically</option>
-                                </Select>
-                                <p className="text-xs text-gray-500 mt-1">Auto-applied to cart without code</p>
+                                <div className="text-xs text-neutral-500 mt-1">
+                                    {formData.target === "ALL_USERS" && "Anyone can use this promo"}
+                                    {formData.target === "SPECIFIC_USERS" && "Manually assign to specific users"}
+                                    {formData.target === "FIRST_ORDER" && "Auto-applies to user's first order"}
+                                    {formData.target === "CONDITIONAL" && "Requires minimum spend threshold"}
+                                </div>
                             </div>
                         </div>
+                    </div>
 
-                        <div>
-                            <label className="block text-sm text-neutral-300 mb-2">Target specific users (optional)</label>
-                            <Input
-                                value={formData.targetUserEmails}
-                                onChange={(event) => setFormData((prev) => ({ ...prev, targetUserEmails: event.target.value }))}
-                                placeholder="Leave empty for all users, or paste user IDs separated by commas"
-                            />
-                            <p className="text-xs text-gray-500 mt-1">Leave blank to make this promo available to everyone. Add user IDs (comma-separated) to restrict to specific users only.</p>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* Conditional Promotion: Spend X Get Y */}
+                    {formData.target === "CONDITIONAL" && (
+                        <div className="space-y-4 bg-purple-900/10 border border-purple-700/30 rounded-lg p-4">
+                            <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-purple-700/30 pb-2">
+                                🎯 Spend X Get Y Configuration
+                            </h3>
+                            <div className="bg-purple-900/20 border border-purple-700/20 rounded p-3 text-xs text-purple-200">
+                                <strong>How it works:</strong> When user spends the threshold amount, they automatically receive the reward you configure below. 
+                                Example: Spend $20, get $5 off.
+                            </div>
+                            
+                            {/* Spend Threshold */}
                             <div>
-                                <label className="block text-sm text-neutral-300 mb-2">Referrer user ID</label>
                                 <Input
-                                    value={formData.referrerUserId}
-                                    onChange={(event) => setFormData((prev) => ({ ...prev, referrerUserId: event.target.value }))}
-                                    placeholder="Optional"
+                                    label="Spend Threshold (Required)"
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.spendThreshold}
+                                    onChange={(e) => setFormData({ ...formData, spendThreshold: e.target.value })}
+                                    placeholder="20.00"
                                 />
+                                <div className="text-xs text-neutral-500 mt-1">
+                                    The minimum amount customer must spend to unlock the reward (e.g., $20)
+                                </div>
+                            </div>
+
+                            {/* Threshold Reward */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <Select
+                                        label="Reward Type"
+                                        value={formData.thresholdRewardType}
+                                        onChange={(e) => setFormData({ ...formData, thresholdRewardType: e.target.value as "FIXED_AMOUNT" | "PERCENTAGE" | "FREE_DELIVERY" })}
+                                    >
+                                        <option value="FIXED_AMOUNT">💵 Fixed Amount Off</option>
+                                        <option value="PERCENTAGE">📊 Percentage Off</option>
+                                        <option value="FREE_DELIVERY">🚚 Free Delivery</option>
+                                    </Select>
+                                    <div className="text-xs text-neutral-500 mt-1">
+                                        What reward they get when threshold is met
+                                    </div>
+                                </div>
+                                {formData.thresholdRewardType !== "FREE_DELIVERY" && (
+                                    <div>
+                                        <Input
+                                            label="Reward Value"
+                                            type="number"
+                                            step="0.01"
+                                            value={formData.thresholdRewardValue}
+                                            onChange={(e) => setFormData({ ...formData, thresholdRewardValue: e.target.value })}
+                                            placeholder={formData.thresholdRewardType === "PERCENTAGE" ? "10" : "5.00"}
+                                        />
+                                        <div className="text-xs text-neutral-500 mt-1">
+                                            {formData.thresholdRewardType === "PERCENTAGE" 
+                                                ? "Percentage off (e.g., 10 for 10%)" 
+                                                : "Dollar amount off (e.g., 5 for $5)"}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="bg-blue-900/20 border border-blue-700/20 rounded p-3 text-xs text-blue-200">
+                                <strong>💡 Example:</strong> Spend Threshold: $20 → Reward Type: Fixed Amount → Reward Value: $5 = "Spend $20, get $5 off"
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Discount Settings */}
+                    <div className="space-y-4">
+                        <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-neutral-800 pb-2">
+                            💸 Discount Configuration
+                        </h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <Input
+                                    label={formData.type === "PERCENTAGE" ? "Discount Percentage" : "Discount Amount"}
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.discountValue}
+                                    onChange={(e) => setFormData({ ...formData, discountValue: e.target.value })}
+                                    placeholder={formData.type === "PERCENTAGE" ? "20" : "5.00"}
+                                />
+                                <div className="text-xs text-neutral-500 mt-1">
+                                    {formData.type === "PERCENTAGE" ? "Enter value as number (e.g., 20 for 20%)" : "Enter dollar amount (e.g., 5 for $5 off)"}
+                                </div>
+                            </div>
+                            <div>
+                                <Input
+                                    label="Max Discount Cap"
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.maxDiscountCap}
+                                    onChange={(e) => setFormData({ ...formData, maxDiscountCap: e.target.value })}
+                                    placeholder="50.00"
+                                />
+                                <div className="text-xs text-neutral-500 mt-1">
+                                    Maximum discount amount (useful for percentage promos)
+                                </div>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <Input
+                            label="Minimum Order Amount"
+                            type="number"
+                            step="0.01"
+                            value={formData.minOrderAmount}
+                            onChange={(e) => setFormData({ ...formData, minOrderAmount: e.target.value })}
+                            placeholder="20.00"
+                        />
+                        <div className="text-xs text-neutral-500 -mt-2">
+                            Order must be at least this amount to qualify (leave empty for no minimum)
+                        </div>
+                    </div>
+
+                    {/* Advanced Settings */}
+                    <div className="space-y-4">
+                        <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-neutral-800 pb-2">
+                            ⚙️ Advanced Settings
+                        </h3>
+                        <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm text-neutral-300 mb-2">Starts at</label>
                                 <Input
+                                    label="Priority"
+                                    type="number"
+                                    value={formData.priority}
+                                    onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                                    placeholder="50"
+                                />
+                                <div className="text-xs text-neutral-500 mt-1">
+                                    Higher priority = applied first (0-100, default: 50)
+                                </div>
+                            </div>
+                            <div>
+                                <Select
+                                    label="Can Stack with Others?"
+                                    value={formData.isStackable}
+                                    onChange={(e) => setFormData({ ...formData, isStackable: e.target.value })}
+                                >
+                                    <option value="false">❌ No - Exclusive</option>
+                                    <option value="true">✅ Yes - Stackable</option>
+                                </Select>
+                                <div className="text-xs text-neutral-500 mt-1">
+                                    Allow combining with other promotions
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Schedule */}
+                    <div className="space-y-4">
+                        <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-neutral-800 pb-2">
+                            📅 Schedule & Status
+                        </h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <Input
+                                    label="Start Date & Time"
                                     type="datetime-local"
                                     value={formData.startsAt}
-                                    onChange={(event) => setFormData((prev) => ({ ...prev, startsAt: event.target.value }))}
+                                    onChange={(e) => setFormData({ ...formData, startsAt: e.target.value })}
                                 />
+                                <div className="text-xs text-neutral-500 mt-1">
+                                    When this promotion becomes active
+                                </div>
                             </div>
                             <div>
-                                <label className="block text-sm text-neutral-300 mb-2">Ends at</label>
                                 <Input
+                                    label="End Date & Time"
                                     type="datetime-local"
                                     value={formData.endsAt}
-                                    onChange={(event) => setFormData((prev) => ({ ...prev, endsAt: event.target.value }))}
+                                    onChange={(e) => setFormData({ ...formData, endsAt: e.target.value })}
                                 />
+                                <div className="text-xs text-neutral-500 mt-1">
+                                    When this promotion expires
+                                </div>
                             </div>
                         </div>
 
-                        <div className="flex justify-end gap-3 pt-2">
-                            <Button variant="outline" onClick={handleCloseModal}>
-                                Cancel
-                            </Button>
-                            <Button onClick={handleSave} disabled={creating || updating}>
-                                {creating || updating ? "Saving..." : editingPromotion ? "Update Promotion" : "Create Promotion"}
-                            </Button>
+                        <Select
+                            label="Status"
+                            value={formData.isActive}
+                            onChange={(e) => setFormData({ ...formData, isActive: e.target.value })}
+                        >
+                            <option value="true">✅ Active</option>
+                            <option value="false">⏸️ Inactive</option>
+                        </Select>
+                        <div className="text-xs text-neutral-500 -mt-2">
+                            Inactive promotions won't be applied even if dates are valid
                         </div>
                     </div>
-                </Modal>
-            )}
 
-            {showDeleteModal && promotionToDelete && (
-                <Modal
-                    open={showDeleteModal}
-                    onClose={() => setShowDeleteModal(false)}
-                    title="Delete Promotion"
-                >
-                    <div className="space-y-4">
-                        <p className="text-sm text-neutral-300">
-                            Are you sure you want to delete <strong>{promotionToDelete.code}</strong>? This cannot be undone.
-                        </p>
-                        <div className="flex justify-end gap-3">
-                            <Button variant="outline" onClick={() => setShowDeleteModal(false)}>
-                                Cancel
-                            </Button>
-                            <Button variant="danger" onClick={handleConfirmDelete} disabled={deleting}>
-                                {deleting ? "Deleting..." : "Delete"}
-                            </Button>
-                        </div>
+                    {/* Actions */}
+                    <div className="flex justify-end gap-3 pt-4 border-t border-neutral-800">
+                        <Button variant="outline" onClick={handleCloseModal}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSave} disabled={creating || updating || !formData.name.trim()}>
+                            {creating || updating ? "Saving..." : editingPromotion ? "Update Promotion" : "Create Promotion"}
+                        </Button>
                     </div>
-                </Modal>
-            )}
+                </div>
+            </Modal>
+
+            {/* Delete Confirmation Modal */}
+            <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="Delete Promotion">
+                <div className="space-y-4">
+                    <p className="text-neutral-300">
+                        Are you sure you want to delete &quot;{promotionToDelete?.name}&quot;?
+                        This action cannot be undone.
+                    </p>
+                    <div className="flex justify-end gap-3">
+                        <Button variant="outline" onClick={() => setShowDeleteModal(false)}>
+                            Cancel
+                        </Button>
+                        <Button variant="danger" onClick={handleConfirmDelete} disabled={deleting}>
+                            Delete
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }

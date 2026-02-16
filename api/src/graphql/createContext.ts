@@ -17,8 +17,6 @@ import { DriverRepository } from '@/repositories/DriverRepository';
 
 import { OrderRepository } from '@/repositories/OrderRepository';
 import { OrderService } from '@/services/OrderService';
-import { PromotionRepository } from '@/repositories/PromotionRepository';
-import { PromotionService } from '@/services/PromotionService';
 import { DeliveryZoneRepository } from '@/repositories/DeliveryZoneRepository';
 import { DeliveryZoneService } from '@/services/DeliveryZoneService';
 import { pubsub } from '@/lib/pubsub';
@@ -86,7 +84,6 @@ export async function createContext(initialContext: YogaInitialContext): Promise
     const authRepository = new AuthRepository(db);
     const orderRepository = new OrderRepository();
     const deliveryZoneRepository = new DeliveryZoneRepository(db);
-    const promotionRepository = new PromotionRepository(db);
 
     // Initialize services
     const businessService = new BusinessService(businessRepository);
@@ -95,8 +92,7 @@ export async function createContext(initialContext: YogaInitialContext): Promise
     const productService = new ProductService(productRepository);
     const authService = new AuthService(authRepository);
     const driverAuthService = new DriverAuthService(authRepository, new DriverRepository(db));
-    const promotionService = new PromotionService(db, promotionRepository);
-    const orderService = new OrderService(orderRepository, authRepository, productRepository, pubsub, promotionService);
+    const orderService = new OrderService(orderRepository, authRepository, productRepository, pubsub);
     const deliveryZoneService = new DeliveryZoneService(deliveryZoneRepository);
 
     // Get driver services (initialized on server startup)
@@ -126,7 +122,6 @@ export async function createContext(initialContext: YogaInitialContext): Promise
         authService,
         driverAuthService,
         orderService,
-        promotionService,
         deliveryZoneService,
         driverService,
         pubsub,

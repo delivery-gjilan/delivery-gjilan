@@ -52,6 +52,31 @@ enum ActorType {
   SYSTEM
 }
 
+input AddWalletCreditInput {
+  amount: Float!
+  description: String
+  type: String!
+  userId: ID!
+}
+
+type ApplicablePromotion {
+  appliedAmount: Float!
+  code: String
+  description: String
+  freeDelivery: Boolean!
+  id: ID!
+  name: String!
+  priority: Int!
+  target: PromotionTarget!
+  type: PromotionTypeV2!
+}
+
+input AssignPromotionToUserInput {
+  expiresAt: String
+  promotionId: ID!
+  userIds: [ID!]!
+}
+
 type AuditLog {
   action: ActionType!
   actor: User
@@ -99,6 +124,20 @@ enum BusinessType {
   MARKET
   PHARMACY
   RESTAURANT
+}
+
+input CartContextInput {
+  businessIds: [ID!]!
+  deliveryPrice: Float!
+  items: [CartItemInput!]!
+  subtotal: Float!
+}
+
+input CartItemInput {
+  businessId: ID!
+  price: Float!
+  productId: ID!
+  quantity: Int!
 }
 
 input CreateBusinessInput {
@@ -159,22 +198,26 @@ input CreateProductSubcategoryInput {
   name: String!
 }
 
-input CreatePromotionInput {
-  autoApply: Boolean
-  code: String!
+input CreatePromotionV2Input {
+  code: String
   description: String
-  endsAt: DateTime
-  firstOrderOnly: Boolean
-  freeDeliveryCount: Int
-  isActive: Boolean
-  maxRedemptions: Int
-  maxRedemptionsPerUser: Int
+  discountValue: Float
+  eligibleBusinessIds: [ID!]
+  endsAt: String
+  isActive: Boolean!
+  isStackable: Boolean!
+  maxDiscountCap: Float
+  maxGlobalUsage: Int
+  maxUsagePerUser: Int
+  minOrderAmount: Float
   name: String!
-  referrerUserId: ID
-  startsAt: DateTime
+  priority: Int!
+  spendThreshold: Float
+  startsAt: String
+  target: PromotionTarget!
   targetUserIds: [ID!]
-  type: PromotionType!
-  value: Float
+  thresholdReward: String
+  type: PromotionTypeV2!
 }
 
 input CreateUserInput {
@@ -263,11 +306,6 @@ enum EntityType {
   USER
 }
 
-input GetAutoApplyPromotionsInput {
-  deliveryPrice: Float!
-  itemsTotal: Float!
-}
-
 input InitiateSignupInput {
   email: String!
   firstName: String!
@@ -295,12 +333,15 @@ input LoginInput {
 }
 
 type Mutation {
+  addWalletCredit(input: AddWalletCreditInput!): WalletTransaction!
+
   """
   Admin mutation to manually set connection status (for testing/recovery)
   """
   adminSetDriverConnectionStatus(driverId: ID!, status: DriverConnectionStatus!): User!
   adminUpdateDriverLocation(driverId: ID!, latitude: Float!, longitude: Float!): User!
   assignDriverToOrder(driverId: ID, id: ID!): Order!
+  assignPromotionToUsers(input: AssignPromotionToUserInput!): [UserPromotion!]!
   backfillSettlementsForDeliveredOrders: Int!
   cancelOrder(id: ID!): Order!
   createBusiness(input: CreateBusinessInput!): Business!
@@ -309,14 +350,15 @@ type Mutation {
   createProduct(input: CreateProductInput!): Product!
   createProductCategory(input: CreateProductCategoryInput!): ProductCategory!
   createProductSubcategory(input: CreateProductSubcategoryInput!): ProductSubcategory!
-  createPromotion(input: CreatePromotionInput!): Promotion!
+  createPromotionV2(input: CreatePromotionV2Input!): PromotionV2!
   createUser(input: CreateUserInput!): AuthResponse!
+  deductWalletCredit(amount: Float!, orderId: ID!, userId: ID!): WalletTransaction!
   deleteBusiness(id: ID!): Boolean!
   deleteDeliveryZone(id: ID!): Boolean!
   deleteProduct(id: ID!): Boolean!
   deleteProductCategory(id: ID!): Boolean!
   deleteProductSubcategory(id: ID!): Boolean!
-  deletePromotion(id: ID!): Boolean!
+  deletePromotionV2(id: ID!): Boolean!
   deleteUser(id: ID!): Boolean!
 
   """
@@ -327,9 +369,11 @@ type Mutation {
   driverHeartbeat(latitude: Float!, longitude: Float!): DriverHeartbeatResult!
   initiateSignup(input: InitiateSignupInput!): AuthResponse!
   login(input: LoginInput!): AuthResponse!
+  markFirstOrderUsed(userId: ID!): UserPromoMetadata!
   markSettlementAsPaid(settlementId: ID!): Settlement!
   markSettlementAsPartiallyPaid(amount: Float!, settlementId: ID!): Settlement!
   markSettlementsAsPaid(ids: [ID!]!): [Settlement!]!
+  removeUserFromPromotion(promotionId: ID!, userId: ID!): Boolean!
   resendEmailVerification: SignupStepResponse!
   submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
   unsettleSettlement(settlementId: ID!): Settlement!
@@ -343,7 +387,7 @@ type Mutation {
   updateProductCategory(id: ID!, input: UpdateProductCategoryInput!): ProductCategory!
   updateProductSubcategory(id: ID!, input: UpdateProductSubcategoryInput!): ProductSubcategory!
   updateProductsOrder(businessId: ID!, products: [ProductOrderInput!]!): Boolean!
-  updatePromotion(id: ID!, input: UpdatePromotionInput!): Promotion!
+  updatePromotionV2(input: UpdatePromotionV2Input!): PromotionV2!
   updateUser(input: UpdateUserInput!): User!
   updateUserNote(flagColor: String, note: String, userId: ID!): User!
   verifyEmail(input: VerifyEmailInput!): SignupStepResponse!
@@ -428,53 +472,79 @@ type ProductSubcategory {
   updatedAt: String!
 }
 
-type Promotion {
-  autoApply: Boolean!
-  code: String!
-  createdAt: DateTime!
-  description: String
-  endsAt: DateTime
-  firstOrderOnly: Boolean!
-  freeDeliveryCount: Int
-  id: ID!
-  isActive: Boolean!
-  maxRedemptions: Int
-  maxRedemptionsPerUser: Int
-  name: String!
-  referrerUserId: ID
-  startsAt: DateTime
-  targetUserIds: [ID!]!
-  type: PromotionType!
-  updatedAt: DateTime!
-  value: Float!
+type PromotionAnalyticsResult {
+  averageOrderValue: Float!
+  conversionRate: Float
+  promotion: PromotionV2!
+  totalDiscountGiven: Float!
+  totalRevenue: Float!
+  totalUsageCount: Int!
+  uniqueUsers: Int!
 }
 
-type PromotionRedemption {
-  createdAt: DateTime!
+type PromotionResult {
+  finalDeliveryPrice: Float!
+  finalSubtotal: Float!
+  finalTotal: Float!
+  freeDeliveryApplied: Boolean!
+  promotions: [ApplicablePromotion!]!
+  totalDiscount: Float!
+}
+
+enum PromotionTarget {
+  ALL_USERS
+  CONDITIONAL
+  FIRST_ORDER
+  SPECIFIC_USERS
+}
+
+enum PromotionTypeV2 {
+  FIXED_AMOUNT
+  FREE_DELIVERY
+  PERCENTAGE
+  WALLET_CREDIT
+}
+
+type PromotionUsage {
+  businessId: ID
   discountAmount: Float!
   freeDeliveryApplied: Boolean!
   id: ID!
+  order: Order
   orderId: ID!
+  orderSubtotal: Float!
+  promotion: PromotionV2
   promotionId: ID!
-  referrerUserId: ID
+  usedAt: String!
+  user: User
   userId: ID!
 }
 
-enum PromotionType {
-  FIXED_DISCOUNT
-  FREE_DELIVERY
-  PERCENT_DISCOUNT
-  REFERRAL
-}
-
-type PromotionValidationResult {
-  discountAmount: Float!
-  effectiveDeliveryPrice: Float!
-  freeDeliveryApplied: Boolean!
-  isValid: Boolean!
-  promotion: Promotion
-  reason: String
-  totalPrice: Float!
+type PromotionV2 {
+  assignedUsers: [UserPromotion!]
+  code: String
+  createdAt: String!
+  currentGlobalUsage: Int!
+  description: String
+  discountValue: Float
+  eligibleBusinesses: [Business!]
+  endsAt: String
+  id: ID!
+  isActive: Boolean!
+  isStackable: Boolean!
+  maxDiscountCap: Float
+  maxGlobalUsage: Int
+  maxUsagePerUser: Int
+  minOrderAmount: Float
+  name: String!
+  priority: Int!
+  spendThreshold: Float
+  startsAt: String
+  target: PromotionTarget!
+  thresholdReward: String
+  totalRevenue: Float!
+  totalUsageCount: Int!
+  type: PromotionTypeV2!
 }
 
 type Query {
@@ -488,7 +558,15 @@ type Query {
   deliveryZones: [DeliveryZone!]!
   driverBalance(driverId: ID!): SettlementSummary!
   drivers: [User!]!
-  getAutoApplyPromotions(input: GetAutoApplyPromotionsInput!): [PromotionValidationResult!]!
+  getAllPromotionsV2(isActive: Boolean): [PromotionV2!]!
+  getApplicablePromotionsV2(cart: CartContextInput!, manualCode: String): [ApplicablePromotion!]!
+  getPromotionAnalytics(promotionId: ID!): PromotionAnalyticsResult!
+  getPromotionUsage(promotionId: ID!): [PromotionUsage!]!
+  getPromotionV2(id: ID!): PromotionV2
+  getUserPromoMetadata(userId: ID!): UserPromoMetadata
+  getUserPromotions(userId: ID!): [UserPromotion!]!
+  getUserWallet(userId: ID!): UserWallet
+  getWalletTransactions(userId: ID!): [WalletTransaction!]!
   me: User
   myBehavior: UserBehavior
   order(id: ID!): Order
@@ -500,14 +578,12 @@ type Query {
   productSubcategories(categoryId: ID!): [ProductSubcategory!]!
   productSubcategoriesByBusiness(businessId: ID!): [ProductSubcategory!]!
   products(businessId: ID!): [Product!]!
-  promotion(code: String!): Promotion
-  promotions: [Promotion!]!
   settlementSummary(businessId: ID, driverId: ID, endDate: Date, startDate: Date, type: SettlementType): SettlementSummary!
   settlements(businessId: ID, driverId: ID, endDate: Date, limit: Int, offset: Int, startDate: Date, status: SettlementStatus, type: SettlementType): [Settlement!]!
   uncompletedOrders: [Order!]!
   userBehavior(userId: ID!): UserBehavior
   users: [User!]!
-  validatePromotion(input: ValidatePromotionInput!): PromotionValidationResult!
+  validatePromotionsV2(cart: CartContextInput!, manualCode: String): PromotionResult!
 }
 
 type Settlement {
@@ -620,20 +696,24 @@ input UpdateProductSubcategoryInput {
   name: String
 }
 
-input UpdatePromotionInput {
-  autoApply: Boolean
+input UpdatePromotionV2Input {
   code: String
   description: String
-  endsAt: DateTime
-  freeDeliveryCount: Int
-  maxRedemptions: Int
-  maxRedemptionsPerUser: Int
+  discountValue: Float
+  endsAt: String
+  id: ID!
+  isActive: Boolean
+  isStackable: Boolean
+  maxDiscountCap: Float
+  maxGlobalUsage: Int
+  maxUsagePerUser: Int
+  minOrderAmount: Float
   name: String
-  referrerUserId: ID
-  startsAt: DateTime
-  targetUserIds: [ID!]
-  type: PromotionType
-  value: Float
+  priority: Int
+  spendThreshold: Float
+  startsAt: String
+  thresholdReward: String
+  type: PromotionTypeV2
 }
 
 input UpdateUserInput {
@@ -681,6 +761,26 @@ type UserBehavior {
   userId: ID!
 }
 
+type UserPromoMetadata {
+  hasUsedFirstOrderPromo: Boolean!
+  lastPromoUsedAt: String
+  totalPromosUsed: Int!
+  totalSavings: Float!
+  user: User
+  userId: ID!
+}
+
+type UserPromotion {
+  assignedAt: String!
+  expiresAt: String
+  id: ID!
+  promotion: PromotionV2
+  promotionId: ID!
+  usageCount: Int!
+  user: User
+  userId: ID!
+}
+
 enum UserRole {
   BUSINESS_ADMIN
   CUSTOMER
@@ -688,10 +788,13 @@ enum UserRole {
   SUPER_ADMIN
 }
 
-input ValidatePromotionInput {
-  code: String!
-  deliveryPrice: Float!
-  itemsTotal: Float!
+type UserWallet {
+  balance: Float!
+  createdAt: String!
+  id: ID!
+  transactions: [WalletTransaction!]
+  updatedAt: String!
+  userId: ID!
 }
 
 input VerifyEmailInput {
@@ -700,6 +803,19 @@ input VerifyEmailInput {
 
 input VerifyPhoneInput {
   code: String!
+}
+
+type WalletTransaction {
+  amount: Float!
+  balanceAfter: Float!
+  balanceBefore: Float!
+  createdAt: String!
+  description: String
+  id: ID!
+  orderId: ID
+  type: String!
+  wallet: UserWallet
+  walletId: ID!
 }
 
 type WorkingHours {

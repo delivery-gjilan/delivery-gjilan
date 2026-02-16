@@ -1,26 +1,33 @@
 import { graphql } from '@/gql';
 
-export const GET_PROMOTIONS = graphql(`
-    query GetPromotions {
-        promotions {
+export const GET_PROMOTIONS_V2 = graphql(`
+    query GetPromotionsV2($isActive: Boolean) {
+        getAllPromotionsV2(isActive: $isActive) {
             id
-            code
             name
             description
+            code
             type
-            value
-            maxRedemptions
-            maxRedemptionsPerUser
-            freeDeliveryCount
-            firstOrderOnly
+            target
+            discountValue
+            maxDiscountCap
+            minOrderAmount
+            spendThreshold
+            thresholdReward
+            maxGlobalUsage
+            currentGlobalUsage
+            maxUsagePerUser
+            isStackable
+            priority
             isActive
-            autoApply
             startsAt
             endsAt
-            referrerUserId
-            targetUserIds
             createdAt
-            updatedAt
+            totalUsageCount
+            totalRevenue
         }
     }
 `);
+
+// Legacy alias for backward compatibility
+export const GET_PROMOTIONS = GET_PROMOTIONS_V2;

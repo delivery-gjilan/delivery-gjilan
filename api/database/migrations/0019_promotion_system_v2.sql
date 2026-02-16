@@ -1,8 +1,6 @@
--- Migration: Complete Promotion System V2 Refactor
--- Description: Wolt-style flexible promotion system with wallet, conditional promos, and analytics
-
--- ==================== DROP OLD SYSTEM ====================
--- We'll keep the old tables for now and create V2 versions
+-- Migration: Promotion System V2 (Consolidated)
+-- Description: Complete Wolt-style promotion system with wallet, conditional promos, and analytics
+-- Replaces: 0019_promotions.sql, 0020_auto_apply_and_user_targeting.sql, 0021_promotion_system_v2.sql, 0022_drop_old_promotions.sql
 
 -- ==================== ENUMS ====================
 
@@ -271,6 +269,8 @@ CREATE TRIGGER trigger_create_user_wallet
     FOR EACH ROW
     EXECUTE FUNCTION create_user_wallet();
 
+-- ==================== BOOTSTRAP EXISTING USERS ====================
+
 -- Create wallets for existing users
 INSERT INTO user_wallet (user_id, balance)
 SELECT id, 0 FROM users
@@ -281,6 +281,8 @@ INSERT INTO user_promo_metadata (user_id)
 SELECT id FROM users
 WHERE id NOT IN (SELECT user_id FROM user_promo_metadata)
 ON CONFLICT (user_id) DO NOTHING;
+
+-- ==================== COMMENTS ====================
 
 COMMENT ON TABLE promotions_v2 IS 'Flexible promotion system supporting multiple types and conditional logic';
 COMMENT ON TABLE user_wallet IS 'User credit balance for platform credits, refunds, and referral rewards';

@@ -10,5 +10,4 @@ export * from './drivers';
 export * from './settlements';
 export * from './auditLogs';
 export * from './userBehaviors';
-export * from './promotions';
-export * from './promotionRedemptions';
+export * from './promotionsV2';
