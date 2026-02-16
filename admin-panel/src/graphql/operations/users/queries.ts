@@ -46,3 +46,19 @@ export const DRIVERS_QUERY = graphql(`
     }
   }
 `);
+
+export const USER_BEHAVIOR_QUERY = graphql(`
+  query UserBehavior($userId: ID!) {
+    userBehavior(userId: $userId) {
+      userId
+      totalOrders
+      deliveredOrders
+      cancelledOrders
+      totalSpend
+      avgOrderValue
+      firstOrderAt
+      lastOrderAt
+      lastDeliveredAt
+    }
+  }
+`);

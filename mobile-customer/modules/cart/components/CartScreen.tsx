@@ -12,6 +12,7 @@ import { useCartActions } from '../hooks/useCartActions';
 import { useCreateOrder } from '../hooks/useCreateOrder';
 import { useLazyQuery } from '@apollo/client/react';
 import { CALCULATE_DELIVERY_FEE } from '@/graphql/operations/deliveryZones';
+import { VALIDATE_PROMOTION } from '@/graphql/operations/promotions/queries';
 
 type CheckoutLocation = {
     latitude: number;
@@ -129,7 +130,13 @@ export const CartScreen = () => {
     const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
     const [selectedLocation, setSelectedLocation] = useState<CheckoutLocation | null>(null);
     const [couponCode, setCouponCode] = useState('');
-    const [discountAmount, setDiscountAmount] = useState(0);
+    const [promoResult, setPromoResult] = useState<{
+        code: string;
+        discountAmount: number;
+        freeDeliveryApplied: boolean;
+        effectiveDeliveryPrice: number;
+        totalPrice: number;
+    } | null>(null);
     const [mapRegion, setMapRegion] = useState<Region>({
         latitude: 42.4629,
         longitude: 21.4694,
@@ -145,6 +152,7 @@ export const CartScreen = () => {
     const addressSlideX = useRef(new Animated.Value(screenWidth)).current;
 
     const [calculateFee, { data: feeData, loading: feeLoading }] = useLazyQuery(CALCULATE_DELIVERY_FEE);
+    const [validatePromotion, { loading: promoLoading }] = useLazyQuery(VALIDATE_PROMOTION);
 
     const defaultAddresses = useMemo(
         () => [
@@ -398,24 +406,63 @@ export const CartScreen = () => {
         }
     }, [feeData]);
 
-    const appliedDiscount = Math.min(discountAmount, total + deliveryPrice);
-    const finalTotal = Math.max(0, total + deliveryPrice - appliedDiscount);
+    useEffect(() => {
+        if (promoResult) {
+            setPromoResult(null);
+        }
+    }, [total, deliveryPrice]);
+
+    useEffect(() => {
+        if (promoResult && promoResult.code !== couponCode.trim()) {
+            setPromoResult(null);
+        }
+    }, [couponCode, promoResult]);
+
+    const appliedDiscount = promoResult?.discountAmount ?? 0;
+    const appliedDeliveryPrice = promoResult?.effectiveDeliveryPrice ?? deliveryPrice;
+    const finalTotal = promoResult?.totalPrice ?? Math.max(0, total + deliveryPrice - appliedDiscount);
 
     const handleApplyCoupon = () => {
         const code = couponCode.trim();
         if (!code) {
-            setDiscountAmount(0);
+            setPromoResult(null);
             return;
         }
 
-        if (code.length < 3) {
+        if (code.length < 2) {
             Alert.alert('Invalid Code', 'Please enter a valid promo code.');
             return;
         }
 
-        const nextDiscount = Math.min(2.5, total * 0.1);
-        setDiscountAmount(Number(nextDiscount.toFixed(2)));
-        Alert.alert('Promo Applied', `Discount €${nextDiscount.toFixed(2)} added.`);
+        validatePromotion({
+            variables: {
+                input: {
+                    code,
+                    itemsTotal: total,
+                    deliveryPrice,
+                },
+            },
+        })
+            .then(({ data }) => {
+                const result = data?.validatePromotion;
+                if (!result || !result.isValid) {
+                    setPromoResult(null);
+                    Alert.alert('Invalid Code', result?.reason || 'Promotion not valid.');
+                    return;
+                }
+
+                setPromoResult({
+                    code,
+                    discountAmount: Number(result.discountAmount ?? 0),
+                    freeDeliveryApplied: result.freeDeliveryApplied ?? false,
+                    effectiveDeliveryPrice: Number(result.effectiveDeliveryPrice ?? deliveryPrice),
+                    totalPrice: Number(result.totalPrice ?? total + deliveryPrice),
+                });
+                Alert.alert('Promo Applied', `Discount €${Number(result.discountAmount ?? 0).toFixed(2)} added.`);
+            })
+            .catch(() => {
+                Alert.alert('Promo Error', 'Unable to validate promo code.');
+            });
     };
 
     const handleCheckout = async () => {
@@ -427,7 +474,7 @@ export const CartScreen = () => {
 
         setIsProcessing(true);
         try {
-            await createOrder(selectedLocation, deliveryPrice, appliedDiscount);
+            await createOrder(selectedLocation, appliedDeliveryPrice, finalTotal, promoResult?.code);
             // Navigation happens in the hook
         } catch (err) {
             Alert.alert('Order Failed', 'Unable to create order. Please try again.', [{ text: 'OK' }]);
@@ -883,16 +930,18 @@ export const CartScreen = () => {
                                         {feeLoading && <ActivityIndicator size="small" color={theme.colors.subtext} />}
                                     </View>
                                     <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
-                                        €{deliveryPrice.toFixed(2)}
+                                        {promoResult?.freeDeliveryApplied ? 'Free' : `€${appliedDeliveryPrice.toFixed(2)}`}
                                     </Text>
                                 </View>
-                                {appliedDiscount > 0 && (
+                                {(appliedDiscount > 0 || promoResult?.freeDeliveryApplied) && (
                                     <View className="flex-row justify-between items-center">
                                         <Text className="text-base" style={{ color: theme.colors.subtext }}>
                                             Promo
                                         </Text>
                                         <Text className="text-base font-semibold" style={{ color: theme.colors.income }}>
-                                            -€{appliedDiscount.toFixed(2)}
+                                            {promoResult?.freeDeliveryApplied && appliedDiscount === 0
+                                                ? 'Free delivery'
+                                                : `-€${appliedDiscount.toFixed(2)}`}
                                         </Text>
                                     </View>
                                 )}
@@ -918,15 +967,23 @@ export const CartScreen = () => {
                                     />
                                     <TouchableOpacity
                                         className="px-4 py-2 rounded-xl"
-                                        style={{ backgroundColor: theme.colors.primary }}
+                                        style={{
+                                            backgroundColor: promoLoading ? theme.colors.border : theme.colors.primary,
+                                            opacity: promoLoading ? 0.7 : 1,
+                                        }}
                                         onPress={handleApplyCoupon}
+                                        disabled={promoLoading}
                                     >
-                                        <Text className="text-white font-semibold">Apply</Text>
+                                        {promoLoading ? (
+                                            <ActivityIndicator size="small" color={theme.colors.text} />
+                                        ) : (
+                                            <Text className="text-white font-semibold">Apply</Text>
+                                        )}
                                     </TouchableOpacity>
                                 </View>
-                                {appliedDiscount > 0 && (
+                                {promoResult && (
                                     <Text className="text-xs mt-2" style={{ color: theme.colors.subtext }}>
-                                        Promo applied to this order.
+                                        Promo {promoResult.code} applied to this order.
                                     </Text>
                                 )}
                             </View>

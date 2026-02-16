@@ -7,7 +7,7 @@ import { useCartActions } from './useCartActions';
 import { useActiveOrdersStore } from '@/modules/orders/store/activeOrdersStore';
 
 export function useCreateOrder() {
-    const { items, total } = useCart();
+    const { items } = useCart();
     const { clearCart } = useCartActions();
     const { hasActiveOrders } = useActiveOrdersStore();
 
@@ -15,8 +15,9 @@ export function useCreateOrder() {
 
     const createOrder = async (
         location: { latitude: number; longitude: number; address: string } | null,
-        deliveryPrice = 2.0,
-        discountAmount = 0,
+        deliveryPrice: number,
+        totalPrice: number,
+        promoCode?: string | null,
     ) => {
         // Check if user already has an active order
         if (hasActiveOrders) {
@@ -42,8 +43,6 @@ export function useCreateOrder() {
             price: item.price,
         }));
 
-        const normalizedDiscount = Math.min(discountAmount, total + deliveryPrice);
-
         try {
             const result = await createOrderMutation({
                 variables: {
@@ -55,7 +54,8 @@ export function useCreateOrder() {
                             address: location.address,
                         },
                         deliveryPrice,
-                        totalPrice: total + deliveryPrice - normalizedDiscount,
+                        totalPrice,
+                        promoCode: promoCode || null,
                     },
                 },
             });

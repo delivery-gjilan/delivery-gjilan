@@ -1,17 +1,18 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, useMemo } from "react";
 import { useQuery, useMutation } from "@apollo/client/react";
-import { USERS_QUERY } from "@/graphql/operations/users/queries";
+import { USERS_QUERY, USER_BEHAVIOR_QUERY } from "@/graphql/operations/users/queries";
 import { CREATE_USER_MUTATION, UPDATE_USER_MUTATION, DELETE_USER_MUTATION, UPDATE_USER_NOTE_MUTATION } from "@/graphql/operations/users/mutations";
 import { GET_BUSINESSES } from "@/graphql/operations/businesses/queries";
+import { GET_ORDERS } from "@/graphql/operations/orders/queries";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import { Table, Th, Td } from "@/components/ui/Table";
 import Modal from "@/components/ui/Modal";
 import { useAuth } from "@/lib/auth-context";
-import { Pencil, Trash2, Building2, Flag, MessageSquare, AlertCircle } from "lucide-react";
+import { Pencil, Trash2, Flag, AlertCircle } from "lucide-react";
 
 interface UserItem {
     id: string;
@@ -50,13 +51,73 @@ interface CreateUserResponse {
     };
 }
 
+interface OrderBusinessItem {
+    business: {
+        id: string;
+        name: string;
+        businessType?: string;
+        phoneNumber?: string | null;
+    };
+    items: Array<{
+        productId: string;
+        name: string;
+        imageUrl?: string | null;
+        quantity: number;
+        price: number;
+        quantityInStock: number;
+        quantityNeeded: number;
+    }>;
+}
+
+interface OrderItem {
+    id: string;
+    orderPrice: number;
+    deliveryPrice: number;
+    orderDate: string;
+    updatedAt: string;
+    status: string;
+    totalPrice: number;
+    dropOffLocation: {
+        address: string;
+    };
+    businesses: OrderBusinessItem[];
+    user?: {
+        id: string;
+    };
+    driver?: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+    } | null;
+}
+
+interface OrdersResponse {
+    orders: OrderItem[];
+}
+
+interface UserBehaviorItem {
+    userId: string;
+    totalOrders: number;
+    deliveredOrders: number;
+    cancelledOrders: number;
+    totalSpend: number;
+    avgOrderValue: number;
+    firstOrderAt?: string | null;
+    lastOrderAt?: string | null;
+    lastDeliveredAt?: string | null;
+}
+
+interface UserBehaviorResponse {
+    userBehavior: UserBehaviorItem | null;
+}
+
 export default function UsersPage() {
     const { admin } = useAuth();
     const isSuperAdmin = admin?.role === "SUPER_ADMIN";
 
     const { data, loading, error, refetch } = useQuery<UsersResponse>(USERS_QUERY);
     const { data: businessesData } = useQuery<BusinessesResponse>(GET_BUSINESSES);
-    
     const [createUser, { loading: creating }] = useMutation<CreateUserResponse>(CREATE_USER_MUTATION, {
         onCompleted: () => {
             refetch();
@@ -84,11 +145,16 @@ export default function UsersPage() {
     const [showModal, setShowModal] = useState(false);
     const [showNoteModal, setShowNoteModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [showHistoryModal, setShowHistoryModal] = useState(false);
+    const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
     const [selectedUserForNote, setSelectedUserForNote] = useState<UserItem | null>(null);
     const [selectedUserForDelete, setSelectedUserForDelete] = useState<UserItem | null>(null);
+    const [selectedUserForHistory, setSelectedUserForHistory] = useState<UserItem | null>(null);
+    const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<OrderItem | null>(null);
     const [noteInput, setNoteInput] = useState("");
     const [flagColor, setFlagColor] = useState("yellow");
     const [editingUser, setEditingUser] = useState<UserItem | null>(null);
+    const [searchTerm, setSearchTerm] = useState("");
     const [formData, setFormData] = useState({
         email: "",
         password: "",
@@ -99,6 +165,10 @@ export default function UsersPage() {
     });
     const [formError, setFormError] = useState("");
     const [formSuccess, setFormSuccess] = useState("");
+
+    const { data: ordersData, loading: ordersLoading, error: ordersError } = useQuery<OrdersResponse>(GET_ORDERS, {
+        skip: !showHistoryModal,
+    });
 
     const handleEdit = (user: UserItem) => {
         setEditingUser(user);
@@ -152,6 +222,28 @@ export default function UsersPage() {
         setShowNoteModal(false);
         setSelectedUserForNote(null);
         setNoteInput("");
+    };
+
+    const handleOpenHistoryModal = (user: UserItem) => {
+        setSelectedUserForHistory(user);
+        setShowHistoryModal(true);
+    };
+
+    const handleCloseHistoryModal = () => {
+        setShowHistoryModal(false);
+        setSelectedUserForHistory(null);
+        setShowOrderDetailsModal(false);
+        setSelectedOrderForDetails(null);
+    };
+
+    const handleOpenOrderDetails = (order: OrderItem) => {
+        setSelectedOrderForDetails(order);
+        setShowOrderDetailsModal(true);
+    };
+
+    const handleCloseOrderDetails = () => {
+        setShowOrderDetailsModal(false);
+        setSelectedOrderForDetails(null);
     };
 
     const handleSaveNote = async () => {
@@ -237,8 +329,90 @@ export default function UsersPage() {
         });
     };
 
+    const formatDate = (value?: string | null) => {
+        if (!value) return "-";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "-";
+        return date.toLocaleString();
+    };
+
+    const formatCurrency = (value?: number | null) => {
+        if (value === null || value === undefined) return "-";
+        return new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: "EUR",
+            minimumFractionDigits: 2,
+        }).format(value);
+    };
+
+    const formatDuration = (ms: number) => {
+        if (!Number.isFinite(ms) || ms <= 0) return "0m";
+        const totalMinutes = Math.floor(ms / 60000);
+        const days = Math.floor(totalMinutes / 1440);
+        const hours = Math.floor((totalMinutes % 1440) / 60);
+        const minutes = totalMinutes % 60;
+        const parts = [] as string[];
+        if (days > 0) parts.push(`${days}d`);
+        if (hours > 0) parts.push(`${hours}h`);
+        if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
+        return parts.join(" ");
+    };
+
+    const getOrderDuration = (order: OrderItem) => {
+        const start = new Date(order.orderDate).getTime();
+        if (Number.isNaN(start)) return "-";
+        const end = order.status === "DELIVERED" ? new Date(order.updatedAt).getTime() : Date.now();
+        if (Number.isNaN(end)) return "-";
+        const ms = Math.max(0, end - start);
+        return formatDuration(ms);
+    };
+
+    const getStatusBadgeColor = (status: string) => {
+        switch (status) {
+            case "DELIVERED":
+                return "bg-green-500/10 text-green-400 border-green-500/30";
+            case "CANCELLED":
+                return "bg-red-500/10 text-red-400 border-red-500/30";
+            case "OUT_FOR_DELIVERY":
+                return "bg-blue-500/10 text-blue-400 border-blue-500/30";
+            case "READY":
+                return "bg-amber-500/10 text-amber-400 border-amber-500/30";
+            default:
+                return "bg-gray-500/10 text-gray-400 border-gray-500/30";
+        }
+    };
+
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
     // Filter to show only customers (drivers are managed in Drivers section)
-    const filteredUsers = data?.users?.filter(user => user.role === 'CUSTOMER') || [];
+    const filteredUsers = useMemo(() => {
+        const customers = data?.users?.filter(user => user.role === 'CUSTOMER') || [];
+        if (!normalizedSearch) return customers;
+        return customers.filter((user) => {
+            const fullName = `${user.firstName} ${user.lastName}`.toLowerCase();
+            return (
+                fullName.includes(normalizedSearch) ||
+                user.email.toLowerCase().includes(normalizedSearch) ||
+                (user.phoneNumber || "").toLowerCase().includes(normalizedSearch)
+            );
+        });
+    }, [data?.users, normalizedSearch]);
+
+    const { data: behaviorData, loading: behaviorLoading, error: behaviorError } = useQuery<UserBehaviorResponse>(
+        USER_BEHAVIOR_QUERY,
+        {
+            variables: { userId: selectedUserForHistory?.id || "" },
+            skip: !showHistoryModal || !selectedUserForHistory || !isSuperAdmin,
+        },
+    );
+
+    const userOrders = useMemo(() => {
+        if (!selectedUserForHistory) return [];
+        const orders = ordersData?.orders || [];
+        return orders
+            .filter((order) => order.user?.id === selectedUserForHistory.id)
+            .sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
+    }, [ordersData?.orders, selectedUserForHistory]);
 
     return (
         <div className="text-white">
@@ -247,11 +421,21 @@ export default function UsersPage() {
                     <h1 className="text-2xl font-semibold">Users</h1>
                     <p className="text-gray-400 mt-1">Manage customer accounts. To manage drivers, go to the Drivers section.</p>
                 </div>
-                {isSuperAdmin && (
-                    <Button onClick={() => setShowModal(true)} className="bg-blue-600 hover:bg-blue-700">
-                        Create Customer
-                    </Button>
-                )}
+                <div className="flex items-center gap-3">
+                    <div className="w-64">
+                        <Input
+                            name="search"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Search users by name, email, phone"
+                        />
+                    </div>
+                    {isSuperAdmin && (
+                        <Button onClick={() => setShowModal(true)} className="bg-blue-600 hover:bg-blue-700">
+                            Create Customer
+                        </Button>
+                    )}
+                </div>
             </div>
 
             {error && (
@@ -317,30 +501,40 @@ export default function UsersPage() {
                                         </Button>
                                     </Td>
                                     <Td>
-                                        {isSuperAdmin && (
-                                            <div className="flex items-center gap-2">
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => handleEdit(user)}
-                                                    disabled={updating}
-                                                    className="text-cyan-400 hover:text-cyan-300"
-                                                >
-                                                    <Pencil size={14} className="mr-1" />
-                                                    Edit
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => handleDelete(user)}
-                                                    disabled={deleting}
-                                                    className="text-red-400 hover:text-red-300"
-                                                >
-                                                    <Trash2 size={14} className="mr-1" />
-                                                    Delete
-                                                </Button>
-                                            </div>
-                                        )}
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => handleOpenHistoryModal(user)}
+                                                className="text-blue-400 hover:text-blue-300"
+                                            >
+                                                View History
+                                            </Button>
+                                            {isSuperAdmin && (
+                                                <>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => handleEdit(user)}
+                                                        disabled={updating}
+                                                        className="text-cyan-400 hover:text-cyan-300"
+                                                    >
+                                                        <Pencil size={14} className="mr-1" />
+                                                        Edit
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => handleDelete(user)}
+                                                        disabled={deleting}
+                                                        className="text-red-400 hover:text-red-300"
+                                                    >
+                                                        <Trash2 size={14} className="mr-1" />
+                                                        Delete
+                                                    </Button>
+                                                </>
+                                            )}
+                                        </div>
                                     </Td>
                                 </tr>
                             ))}
@@ -583,6 +777,243 @@ export default function UsersPage() {
                                 className="bg-red-600 hover:bg-red-700"
                             >
                                 {deleting ? "Deleting..." : "Delete User"}
+                            </Button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
+
+            {/* User History Modal */}
+            {showHistoryModal && selectedUserForHistory && (
+                <Modal
+                    open={showHistoryModal}
+                    onClose={handleCloseHistoryModal}
+                    title={`Order history for ${selectedUserForHistory.firstName} ${selectedUserForHistory.lastName}`}
+                >
+                    <div className="space-y-6">
+                        {isSuperAdmin ? (
+                            <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
+                                <h3 className="text-sm font-semibold text-gray-200 mb-3">Behavior Summary</h3>
+                                {behaviorError && (
+                                    <div className="text-sm text-red-300">{behaviorError.message}</div>
+                                )}
+                                {behaviorLoading ? (
+                                    <div className="text-sm text-gray-400">Loading behavior...</div>
+                                ) : behaviorData?.userBehavior ? (
+                                    <div className="grid grid-cols-2 gap-3 text-sm">
+                                        <div className="bg-gray-800/60 rounded-lg p-3">
+                                            <div className="text-gray-400">Total Orders</div>
+                                            <div className="text-white font-semibold">
+                                                {behaviorData.userBehavior.totalOrders}
+                                            </div>
+                                        </div>
+                                        <div className="bg-gray-800/60 rounded-lg p-3">
+                                            <div className="text-gray-400">Delivered Orders</div>
+                                            <div className="text-white font-semibold">
+                                                {behaviorData.userBehavior.deliveredOrders}
+                                            </div>
+                                        </div>
+                                        <div className="bg-gray-800/60 rounded-lg p-3">
+                                            <div className="text-gray-400">Cancelled Orders</div>
+                                            <div className="text-white font-semibold">
+                                                {behaviorData.userBehavior.cancelledOrders}
+                                            </div>
+                                        </div>
+                                        <div className="bg-gray-800/60 rounded-lg p-3">
+                                            <div className="text-gray-400">Total Spend</div>
+                                            <div className="text-white font-semibold">
+                                                {formatCurrency(behaviorData.userBehavior.totalSpend)}
+                                            </div>
+                                        </div>
+                                        <div className="bg-gray-800/60 rounded-lg p-3">
+                                            <div className="text-gray-400">Avg Order Value</div>
+                                            <div className="text-white font-semibold">
+                                                {formatCurrency(behaviorData.userBehavior.avgOrderValue)}
+                                            </div>
+                                        </div>
+                                        <div className="bg-gray-800/60 rounded-lg p-3">
+                                            <div className="text-gray-400">Last Delivered</div>
+                                            <div className="text-white font-semibold">
+                                                {formatDate(behaviorData.userBehavior.lastDeliveredAt)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="text-sm text-gray-400">No behavior data yet.</div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 text-sm text-gray-400">
+                                Behavior summary is only available for super admins.
+                            </div>
+                        )}
+
+                        <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+                            <div className="px-4 py-3 border-b border-gray-800 text-sm font-semibold text-gray-200">
+                                Orders ({userOrders.length})
+                            </div>
+                            {ordersError && (
+                                <div className="p-4 text-sm text-red-300">{ordersError.message}</div>
+                            )}
+                            {ordersLoading ? (
+                                <div className="p-4 text-sm text-gray-400">Loading orders...</div>
+                            ) : userOrders.length ? (
+                                <div className="max-h-[360px] overflow-y-auto">
+                                    <Table>
+                                        <thead>
+                                            <tr>
+                                                <Th>Date</Th>
+                                                <Th>Status</Th>
+                                                <Th>Total</Th>
+                                                <Th>Businesses</Th>
+                                                <Th>Dropoff</Th>
+                                                <Th>Actions</Th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {userOrders.map((order) => (
+                                                <tr key={order.id}>
+                                                    <Td>{formatDate(order.orderDate)}</Td>
+                                                    <Td>
+                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs border ${getStatusBadgeColor(order.status)}`}>
+                                                            {order.status}
+                                                        </span>
+                                                    </Td>
+                                                    <Td>{formatCurrency(order.totalPrice)}</Td>
+                                                    <Td>
+                                                        <div className="text-gray-300">
+                                                            {order.businesses.map((b) => b.business.name).join(", ") || "-"}
+                                                        </div>
+                                                    </Td>
+                                                    <Td>
+                                                        <div className="text-gray-400 max-w-xs truncate">
+                                                            {order.dropOffLocation?.address || "-"}
+                                                        </div>
+                                                    </Td>
+                                                    <Td>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => handleOpenOrderDetails(order)}
+                                                            className="text-blue-400 hover:text-blue-300"
+                                                        >
+                                                            View Details
+                                                        </Button>
+                                                    </Td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </Table>
+                                </div>
+                            ) : (
+                                <div className="p-4 text-sm text-gray-400">No orders found for this user.</div>
+                            )}
+                        </div>
+
+                        <div className="flex justify-end">
+                            <Button type="button" variant="outline" onClick={handleCloseHistoryModal}>
+                                Close
+                            </Button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
+
+            {/* Order Details Modal */}
+            {showOrderDetailsModal && selectedOrderForDetails && (
+                <Modal
+                    open={showOrderDetailsModal}
+                    onClose={handleCloseOrderDetails}
+                    title="Order Details"
+                >
+                    <div className="space-y-5">
+                        <div className="flex items-center justify-between pb-4 border-b border-gray-800">
+                            <div>
+                                <div className="text-xs text-gray-400">Order ID</div>
+                                <div className="font-mono text-sm text-white">{selectedOrderForDetails.id}</div>
+                                <div className="text-xs text-gray-500 mt-1">{formatDate(selectedOrderForDetails.orderDate)}</div>
+                            </div>
+                            <div className={`px-3 py-1 rounded-full text-xs border ${getStatusBadgeColor(selectedOrderForDetails.status)}`}>
+                                {selectedOrderForDetails.status}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
+                                <div className="text-xs text-gray-400 mb-2">Assigned Driver</div>
+                                {selectedOrderForDetails.driver ? (
+                                    <>
+                                        <div className="text-white font-medium">
+                                            {selectedOrderForDetails.driver.firstName} {selectedOrderForDetails.driver.lastName}
+                                        </div>
+                                        <div className="text-sm text-gray-400 mt-1">
+                                            {selectedOrderForDetails.driver.email}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="text-neutral-500">No driver assigned</div>
+                                )}
+                            </div>
+
+                            <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
+                                <div className="text-xs text-gray-400 mb-2">Delivery</div>
+                                <div className="text-sm text-white">
+                                    {selectedOrderForDetails.dropOffLocation?.address || "-"}
+                                </div>
+                                <div className="text-xs text-gray-500 mt-2">
+                                    {selectedOrderForDetails.status === "DELIVERED" ? "Delivery time" : "Elapsed"}: {getOrderDuration(selectedOrderForDetails)}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            {selectedOrderForDetails.businesses.map((biz, idx) => (
+                                <div key={`${biz.business.id}-${idx}`} className="bg-gray-900 border border-gray-800 rounded-lg p-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <div className="text-sm font-semibold text-white">{biz.business.name}</div>
+                                            {biz.business.businessType && (
+                                                <div className="text-xs text-gray-500">{biz.business.businessType}</div>
+                                            )}
+                                        </div>
+                                        {biz.business.phoneNumber && (
+                                            <div className="text-xs text-gray-400">{biz.business.phoneNumber}</div>
+                                        )}
+                                    </div>
+                                    <div className="mt-3 space-y-2">
+                                        {biz.items.map((item) => (
+                                            <div key={item.productId} className="flex items-center justify-between text-sm">
+                                                <div className="text-gray-200">
+                                                    {item.quantity}x {item.name}
+                                                </div>
+                                                <div className="text-gray-400">
+                                                    {formatCurrency(item.price * item.quantity)}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-2">
+                            <div className="flex justify-between text-sm">
+                                <span className="text-gray-400">Subtotal</span>
+                                <span className="text-white">{formatCurrency(selectedOrderForDetails.orderPrice)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                                <span className="text-gray-400">Delivery Fee</span>
+                                <span className="text-white">{formatCurrency(selectedOrderForDetails.deliveryPrice)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm font-semibold pt-2 border-t border-gray-800">
+                                <span className="text-white">Total</span>
+                                <span className="text-blue-300">{formatCurrency(selectedOrderForDetails.totalPrice)}</span>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end">
+                            <Button type="button" variant="outline" onClick={handleCloseOrderDetails}>
+                                Close
                             </Button>
                         </div>
                     </div>

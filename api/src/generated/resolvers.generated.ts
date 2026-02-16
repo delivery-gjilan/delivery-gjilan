@@ -10,6 +10,7 @@ import    { deliveryZone as Query_deliveryZone } from './../models/DeliveryZone/
 import    { deliveryZones as Query_deliveryZones } from './../models/DeliveryZone/resolvers/Query/deliveryZones';
 import    { driverBalance as Query_driverBalance } from './../models/Settlement/resolvers/Query/driverBalance';
 import    { drivers as Query_drivers } from './../models/User/resolvers/Query/drivers';
+import    { getAutoApplyPromotions as Query_getAutoApplyPromotions } from './../models/Promotion/resolvers/Query/getAutoApplyPromotions';
 import    { me as Query_me } from './../models/User/resolvers/Query/me';
 import    { myBehavior as Query_myBehavior } from './../models/User/resolvers/Query/myBehavior';
 import    { order as Query_order } from './../models/Order/resolvers/Query/order';
@@ -21,11 +22,14 @@ import    { productCategory as Query_productCategory } from './../models/Product
 import    { productSubcategories as Query_productSubcategories } from './../models/ProductSubcategory/resolvers/Query/productSubcategories';
 import    { productSubcategoriesByBusiness as Query_productSubcategoriesByBusiness } from './../models/ProductSubcategory/resolvers/Query/productSubcategoriesByBusiness';
 import    { products as Query_products } from './../models/Product/resolvers/Query/products';
+import    { promotion as Query_promotion } from './../models/Promotion/resolvers/Query/promotion';
+import    { promotions as Query_promotions } from './../models/Promotion/resolvers/Query/promotions';
 import    { settlementSummary as Query_settlementSummary } from './../models/Settlement/resolvers/Query/settlementSummary';
 import    { settlements as Query_settlements } from './../models/Settlement/resolvers/Query/settlements';
 import    { uncompletedOrders as Query_uncompletedOrders } from './../models/Order/resolvers/Query/uncompletedOrders';
 import    { userBehavior as Query_userBehavior } from './../models/User/resolvers/Query/userBehavior';
 import    { users as Query_users } from './../models/User/resolvers/Query/users';
+import    { validatePromotion as Query_validatePromotion } from './../models/Promotion/resolvers/Query/validatePromotion';
 import    { adminSetDriverConnectionStatus as Mutation_adminSetDriverConnectionStatus } from './../models/Driver/resolvers/Mutation/adminSetDriverConnectionStatus';
 import    { adminUpdateDriverLocation as Mutation_adminUpdateDriverLocation } from './../models/User/resolvers/Mutation/adminUpdateDriverLocation';
 import    { assignDriverToOrder as Mutation_assignDriverToOrder } from './../models/Order/resolvers/Mutation/assignDriverToOrder';
@@ -37,12 +41,14 @@ import    { createOrder as Mutation_createOrder } from './../models/Order/resolv
 import    { createProduct as Mutation_createProduct } from './../models/Product/resolvers/Mutation/createProduct';
 import    { createProductCategory as Mutation_createProductCategory } from './../models/ProductCategory/resolvers/Mutation/createProductCategory';
 import    { createProductSubcategory as Mutation_createProductSubcategory } from './../models/ProductSubcategory/resolvers/Mutation/createProductSubcategory';
+import    { createPromotion as Mutation_createPromotion } from './../models/Promotion/resolvers/Mutation/createPromotion';
 import    { createUser as Mutation_createUser } from './../models/User/resolvers/Mutation/createUser';
 import    { deleteBusiness as Mutation_deleteBusiness } from './../models/Business/resolvers/Mutation/deleteBusiness';
 import    { deleteDeliveryZone as Mutation_deleteDeliveryZone } from './../models/DeliveryZone/resolvers/Mutation/deleteDeliveryZone';
 import    { deleteProduct as Mutation_deleteProduct } from './../models/Product/resolvers/Mutation/deleteProduct';
 import    { deleteProductCategory as Mutation_deleteProductCategory } from './../models/ProductCategory/resolvers/Mutation/deleteProductCategory';
 import    { deleteProductSubcategory as Mutation_deleteProductSubcategory } from './../models/ProductSubcategory/resolvers/Mutation/deleteProductSubcategory';
+import    { deletePromotion as Mutation_deletePromotion } from './../models/Promotion/resolvers/Mutation/deletePromotion';
 import    { deleteUser as Mutation_deleteUser } from './../models/User/resolvers/Mutation/deleteUser';
 import    { driverHeartbeat as Mutation_driverHeartbeat } from './../models/Driver/resolvers/Mutation/driverHeartbeat';
 import    { initiateSignup as Mutation_initiateSignup } from './../models/User/resolvers/Mutation/initiateSignup';
@@ -63,6 +69,7 @@ import    { updateProduct as Mutation_updateProduct } from './../models/Product/
 import    { updateProductCategory as Mutation_updateProductCategory } from './../models/ProductCategory/resolvers/Mutation/updateProductCategory';
 import    { updateProductSubcategory as Mutation_updateProductSubcategory } from './../models/ProductSubcategory/resolvers/Mutation/updateProductSubcategory';
 import    { updateProductsOrder as Mutation_updateProductsOrder } from './../models/Product/resolvers/Mutation/updateProductsOrder';
+import    { updatePromotion as Mutation_updatePromotion } from './../models/Promotion/resolvers/Mutation/updatePromotion';
 import    { updateUser as Mutation_updateUser } from './../models/User/resolvers/Mutation/updateUser';
 import    { updateUserNote as Mutation_updateUserNote } from './../models/User/resolvers/Mutation/updateUserNote';
 import    { verifyEmail as Mutation_verifyEmail } from './../models/User/resolvers/Mutation/verifyEmail';
@@ -89,6 +96,9 @@ import    { OrderItem } from './../models/Order/resolvers/OrderItem';
 import    { Product } from './../models/Product/resolvers/Product';
 import    { ProductCategory } from './../models/ProductCategory/resolvers/ProductCategory';
 import    { ProductSubcategory } from './../models/ProductSubcategory/resolvers/ProductSubcategory';
+import    { Promotion } from './../models/Promotion/resolvers/Promotion';
+import    { PromotionRedemption } from './../models/Promotion/resolvers/PromotionRedemption';
+import    { PromotionValidationResult } from './../models/Promotion/resolvers/PromotionValidationResult';
 import    { Settlement } from './../models/Settlement/resolvers/Settlement';
 import    { SettlementSummary } from './../models/Settlement/resolvers/SettlementSummary';
 import    { SignupStepResponse } from './../models/User/resolvers/SignupStepResponse';
@@ -99,8 +109,8 @@ import    { WorkingHours } from './../models/General/resolvers/WorkingHours';
 import    { ZoneFeeResult } from './../models/DeliveryZone/resolvers/ZoneFeeResult';
 import    { DateResolver,DateTimeResolver,JSONResolver } from 'graphql-scalars';
     export const resolvers: Resolvers = {
-      Query: { auditLog: Query_auditLog,auditLogs: Query_auditLogs,business: Query_business,businessBalance: Query_businessBalance,businesses: Query_businesses,calculateDeliveryFee: Query_calculateDeliveryFee,deliveryZone: Query_deliveryZone,deliveryZones: Query_deliveryZones,driverBalance: Query_driverBalance,drivers: Query_drivers,me: Query_me,myBehavior: Query_myBehavior,order: Query_order,orders: Query_orders,ordersByStatus: Query_ordersByStatus,product: Query_product,productCategories: Query_productCategories,productCategory: Query_productCategory,productSubcategories: Query_productSubcategories,productSubcategoriesByBusiness: Query_productSubcategoriesByBusiness,products: Query_products,settlementSummary: Query_settlementSummary,settlements: Query_settlements,uncompletedOrders: Query_uncompletedOrders,userBehavior: Query_userBehavior,users: Query_users },
-      Mutation: { adminSetDriverConnectionStatus: Mutation_adminSetDriverConnectionStatus,adminUpdateDriverLocation: Mutation_adminUpdateDriverLocation,assignDriverToOrder: Mutation_assignDriverToOrder,backfillSettlementsForDeliveredOrders: Mutation_backfillSettlementsForDeliveredOrders,cancelOrder: Mutation_cancelOrder,createBusiness: Mutation_createBusiness,createDeliveryZone: Mutation_createDeliveryZone,createOrder: Mutation_createOrder,createProduct: Mutation_createProduct,createProductCategory: Mutation_createProductCategory,createProductSubcategory: Mutation_createProductSubcategory,createUser: Mutation_createUser,deleteBusiness: Mutation_deleteBusiness,deleteDeliveryZone: Mutation_deleteDeliveryZone,deleteProduct: Mutation_deleteProduct,deleteProductCategory: Mutation_deleteProductCategory,deleteProductSubcategory: Mutation_deleteProductSubcategory,deleteUser: Mutation_deleteUser,driverHeartbeat: Mutation_driverHeartbeat,initiateSignup: Mutation_initiateSignup,login: Mutation_login,markSettlementAsPaid: Mutation_markSettlementAsPaid,markSettlementAsPartiallyPaid: Mutation_markSettlementAsPartiallyPaid,markSettlementsAsPaid: Mutation_markSettlementsAsPaid,resendEmailVerification: Mutation_resendEmailVerification,submitPhoneNumber: Mutation_submitPhoneNumber,unsettleSettlement: Mutation_unsettleSettlement,updateBusiness: Mutation_updateBusiness,updateCommissionPercentage: Mutation_updateCommissionPercentage,updateDeliveryZone: Mutation_updateDeliveryZone,updateDriverLocation: Mutation_updateDriverLocation,updateDriverOnlineStatus: Mutation_updateDriverOnlineStatus,updateOrderStatus: Mutation_updateOrderStatus,updateProduct: Mutation_updateProduct,updateProductCategory: Mutation_updateProductCategory,updateProductSubcategory: Mutation_updateProductSubcategory,updateProductsOrder: Mutation_updateProductsOrder,updateUser: Mutation_updateUser,updateUserNote: Mutation_updateUserNote,verifyEmail: Mutation_verifyEmail,verifyPhone: Mutation_verifyPhone },
+      Query: { auditLog: Query_auditLog,auditLogs: Query_auditLogs,business: Query_business,businessBalance: Query_businessBalance,businesses: Query_businesses,calculateDeliveryFee: Query_calculateDeliveryFee,deliveryZone: Query_deliveryZone,deliveryZones: Query_deliveryZones,driverBalance: Query_driverBalance,drivers: Query_drivers,getAutoApplyPromotions: Query_getAutoApplyPromotions,me: Query_me,myBehavior: Query_myBehavior,order: Query_order,orders: Query_orders,ordersByStatus: Query_ordersByStatus,product: Query_product,productCategories: Query_productCategories,productCategory: Query_productCategory,productSubcategories: Query_productSubcategories,productSubcategoriesByBusiness: Query_productSubcategoriesByBusiness,products: Query_products,promotion: Query_promotion,promotions: Query_promotions,settlementSummary: Query_settlementSummary,settlements: Query_settlements,uncompletedOrders: Query_uncompletedOrders,userBehavior: Query_userBehavior,users: Query_users,validatePromotion: Query_validatePromotion },
+      Mutation: { adminSetDriverConnectionStatus: Mutation_adminSetDriverConnectionStatus,adminUpdateDriverLocation: Mutation_adminUpdateDriverLocation,assignDriverToOrder: Mutation_assignDriverToOrder,backfillSettlementsForDeliveredOrders: Mutation_backfillSettlementsForDeliveredOrders,cancelOrder: Mutation_cancelOrder,createBusiness: Mutation_createBusiness,createDeliveryZone: Mutation_createDeliveryZone,createOrder: Mutation_createOrder,createProduct: Mutation_createProduct,createProductCategory: Mutation_createProductCategory,createProductSubcategory: Mutation_createProductSubcategory,createPromotion: Mutation_createPromotion,createUser: Mutation_createUser,deleteBusiness: Mutation_deleteBusiness,deleteDeliveryZone: Mutation_deleteDeliveryZone,deleteProduct: Mutation_deleteProduct,deleteProductCategory: Mutation_deleteProductCategory,deleteProductSubcategory: Mutation_deleteProductSubcategory,deletePromotion: Mutation_deletePromotion,deleteUser: Mutation_deleteUser,driverHeartbeat: Mutation_driverHeartbeat,initiateSignup: Mutation_initiateSignup,login: Mutation_login,markSettlementAsPaid: Mutation_markSettlementAsPaid,markSettlementAsPartiallyPaid: Mutation_markSettlementAsPartiallyPaid,markSettlementsAsPaid: Mutation_markSettlementsAsPaid,resendEmailVerification: Mutation_resendEmailVerification,submitPhoneNumber: Mutation_submitPhoneNumber,unsettleSettlement: Mutation_unsettleSettlement,updateBusiness: Mutation_updateBusiness,updateCommissionPercentage: Mutation_updateCommissionPercentage,updateDeliveryZone: Mutation_updateDeliveryZone,updateDriverLocation: Mutation_updateDriverLocation,updateDriverOnlineStatus: Mutation_updateDriverOnlineStatus,updateOrderStatus: Mutation_updateOrderStatus,updateProduct: Mutation_updateProduct,updateProductCategory: Mutation_updateProductCategory,updateProductSubcategory: Mutation_updateProductSubcategory,updateProductsOrder: Mutation_updateProductsOrder,updatePromotion: Mutation_updatePromotion,updateUser: Mutation_updateUser,updateUserNote: Mutation_updateUserNote,verifyEmail: Mutation_verifyEmail,verifyPhone: Mutation_verifyPhone },
       Subscription: { allOrdersUpdated: Subscription_allOrdersUpdated,auditLogCreated: Subscription_auditLogCreated,driverConnectionStatusChanged: Subscription_driverConnectionStatusChanged,driversUpdated: Subscription_driversUpdated,orderStatusUpdated: Subscription_orderStatusUpdated,settlementCreated: Subscription_settlementCreated,settlementStatusChanged: Subscription_settlementStatusChanged,userOrdersUpdated: Subscription_userOrdersUpdated },
       AuditLog: AuditLog,
 AuditLogConnection: AuditLogConnection,
@@ -116,6 +126,9 @@ OrderItem: OrderItem,
 Product: Product,
 ProductCategory: ProductCategory,
 ProductSubcategory: ProductSubcategory,
+Promotion: Promotion,
+PromotionRedemption: PromotionRedemption,
+PromotionValidationResult: PromotionValidationResult,
 Settlement: Settlement,
 SettlementSummary: SettlementSummary,
 SignupStepResponse: SignupStepResponse,

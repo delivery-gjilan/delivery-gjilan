@@ -132,8 +132,30 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         return statusColors[status] || { bg: '#F3F4F6', dot: '#9CA3AF' };
     };
 
+    const formatDuration = (ms: number) => {
+        if (!Number.isFinite(ms) || ms <= 0) return '0m';
+        const totalMinutes = Math.floor(ms / 60000);
+        const days = Math.floor(totalMinutes / 1440);
+        const hours = Math.floor((totalMinutes % 1440) / 60);
+        const minutes = totalMinutes % 60;
+        const parts: string[] = [];
+        if (days > 0) parts.push(`${days}d`);
+        if (hours > 0) parts.push(`${hours}h`);
+        if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
+        return parts.join(' ');
+    };
+
+    const getOrderDuration = () => {
+        const start = new Date(order.orderDate).getTime();
+        if (Number.isNaN(start)) return null;
+        const end = order.status === 'DELIVERED' && order.updatedAt ? new Date(order.updatedAt).getTime() : Date.now();
+        if (Number.isNaN(end)) return null;
+        return formatDuration(Math.max(0, end - start));
+    };
+
     const statusLabel = formatStatus(order.status);
     const statusColor = getStatusColor(order.status);
+    const orderDuration = getOrderDuration();
     const displayAddress = addressOverride ?? order.dropOffLocation.address;
     const driver = (driverData as any)?.order?.driver ?? (order as any)?.driver ?? (order as any)?.assignedDriver ?? (order as any)?.courier ?? null;
     const driverName = driver?.firstName ? `${driver.firstName} ${driver?.lastName || ''}`.trim() : null;
@@ -179,6 +201,11 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                         <View className="flex-1">
                             <Text className="text-xs text-subtext font-semibold mb-1">Current Status</Text>
                             <Text className="text-xl font-bold text-foreground">{statusLabel}</Text>
+                            {orderDuration && (
+                                <Text className="text-xs text-subtext mt-2">
+                                    {order.status === 'DELIVERED' ? 'Delivery time' : 'Elapsed'}: {orderDuration}
+                                </Text>
+                            )}
                         </View>
                         <View className="items-center">
                             <View className="w-3 h-3 rounded-full mb-2" style={{ backgroundColor: statusColor.dot }} />

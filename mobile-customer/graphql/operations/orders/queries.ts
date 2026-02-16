@@ -8,6 +8,7 @@ export const GET_ORDERS = graphql(`
             deliveryPrice
             totalPrice
             orderDate
+            updatedAt
             status
             dropOffLocation {
                 latitude
@@ -51,6 +52,7 @@ export const GET_ORDER = graphql(`
             deliveryPrice
             totalPrice
             orderDate
+            updatedAt
             status
             dropOffLocation {
                 latitude
@@ -97,6 +99,7 @@ export const GET_ORDERS_BY_STATUS = graphql(`
             deliveryPrice
             totalPrice
             orderDate
+            updatedAt
             status
             dropOffLocation {
                 latitude
@@ -140,6 +143,7 @@ export const UNCOMPLETED_ORDERS = graphql(`
             deliveryPrice
             totalPrice
             orderDate
+            updatedAt
             status
             dropOffLocation {
                 latitude

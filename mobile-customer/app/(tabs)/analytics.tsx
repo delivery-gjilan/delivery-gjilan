@@ -1,15 +1,19 @@
 import { View, Text, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
+import { useOrders } from '@/modules/orders';
 import { ProfileRow } from '@/components/ProfileRow';
 import { useAuthStore } from '@/store/authStore';
 
 export default function Profile() {
     const theme = useTheme();
+    const router = useRouter();
     const { logout } = useAuth();
     const user = useAuthStore((state) => state.user);
+    const { orders, loading: ordersLoading } = useOrders();
 
     // Get user initials
     const getInitials = () => {
@@ -28,6 +32,16 @@ export default function Profile() {
     const handleLogout = () => {
         logout();
     };
+
+    const handleOrderHistoryPress = () => {
+        router.push('/orders/history');
+    };
+
+    const ordersSubtitle = ordersLoading
+        ? 'Loading...'
+        : orders.length > 0
+            ? `${orders.length} order${orders.length !== 1 ? 's' : ''}`
+            : 'No orders';
 
     return (
         <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }} edges={['top']}>
@@ -67,7 +81,7 @@ export default function Profile() {
                         }}
                     >
                         <View className="px-4">
-                            <ProfileRow title="Order history" subtitle="No orders" onPress={() => {}} />
+                            <ProfileRow title="Order history" subtitle={ordersSubtitle} onPress={handleOrderHistoryPress} />
                             <ProfileRow title="Credits" onPress={() => {}} />
                             <ProfileRow title="Buy gift card" onPress={() => {}} showDivider={false} />
                         </View>
@@ -144,7 +158,7 @@ export default function Profile() {
                     <View>
                         <ProfileRow title="Redeem code" onPress={() => {}} />
                         <ProfileRow title="Contact Support" onPress={() => {}} />
-                        <ProfileRow title="Order history" onPress={() => {}} showDivider={false} />
+                        <ProfileRow title="Order history" onPress={handleOrderHistoryPress} showDivider={false} />
                     </View>
                 </View>
 

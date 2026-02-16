@@ -2,6 +2,7 @@
 export { OrdersFloatingBar } from './components/OrdersFloatingBar';
 export { ActiveOrdersList } from './components/ActiveOrdersList';
 export { OrderDetails } from './components/OrderDetails';
+export { OrderHistoryList } from './components/OrderHistoryList';
 
 // Hooks
 export { useOrders, useOrder, useOrdersByStatus } from './hooks/useOrders';

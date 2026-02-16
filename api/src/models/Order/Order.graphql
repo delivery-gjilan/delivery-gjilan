@@ -28,6 +28,7 @@ type Order {
     deliveryPrice: Float!
     totalPrice: Float!
     orderDate: Date!
+    updatedAt: Date!
     status: OrderStatus!
     user: User
     driver: User
@@ -60,6 +61,7 @@ input CreateOrderInput {
     dropOffLocation: LocationInput!
     deliveryPrice: Float!
     totalPrice: Float! # For validation/check
+    promoCode: String
 }
 
 input CreateOrderItemInput {

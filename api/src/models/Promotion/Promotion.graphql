@@ -1,0 +1,106 @@
+enum PromotionType {
+    FIXED_DISCOUNT
+    PERCENT_DISCOUNT
+    FREE_DELIVERY
+    REFERRAL
+}
+
+type Promotion {
+    id: ID!
+    code: String!
+    name: String!
+    description: String
+    type: PromotionType!
+    value: Float!
+    maxRedemptions: Int
+    maxRedemptionsPerUser: Int
+    freeDeliveryCount: Int
+    firstOrderOnly: Boolean!
+    isActive: Boolean!
+    autoApply: Boolean!
+    startsAt: DateTime
+    endsAt: DateTime
+    referrerUserId: ID
+    targetUserIds: [ID!]!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+}
+
+type PromotionRedemption {
+    id: ID!
+    promotionId: ID!
+    userId: ID!
+    orderId: ID!
+    discountAmount: Float!
+    freeDeliveryApplied: Boolean!
+    referrerUserId: ID
+    createdAt: DateTime!
+}
+
+type PromotionValidationResult {
+    isValid: Boolean!
+    reason: String
+    discountAmount: Float!
+    freeDeliveryApplied: Boolean!
+    effectiveDeliveryPrice: Float!
+    totalPrice: Float!
+    promotion: Promotion
+}
+
+input CreatePromotionInput {
+    code: String!
+    name: String!
+    description: String
+    type: PromotionType!
+    value: Float
+    maxRedemptions: Int
+    maxRedemptionsPerUser: Int
+    freeDeliveryCount: Int
+    firstOrderOnly: Boolean
+    isActive: Boolean
+    autoApply: Boolean
+    startsAt: DateTime
+    endsAt: DateTime
+    referrerUserId: ID
+    targetUserIds: [ID!]
+}
+
+input UpdatePromotionInput {
+    code: String
+    name: String
+    description: String
+    type: PromotionType
+    value: Float
+    maxRedemptions: Int
+    maxRedemptionsPerUser: Int
+    freeDeliveryCount: Int
+    autoApply: Boolean
+    startsAt: DateTime
+    endsAt: DateTime
+    referrerUserId: ID
+    targetUserIds: [ID!]
+}
+
+input ValidatePromotionInput {
+    code: String!
+    itemsTotal: Float!
+    deliveryPrice: Float!
+}
+
+input GetAutoApplyPromotionsInput {
+    itemsTotal: Float!
+    deliveryPrice: Float!
+}
+
+type Query {
+    promotions: [Promotion!]!
+    promotion(code: String!): Promotion
+    validatePromotion(input: ValidatePromotionInput!): PromotionValidationResult!
+    getAutoApplyPromotions(input: GetAutoApplyPromotionsInput!): [PromotionValidationResult!]!
+}
+
+type Mutation {
+    createPromotion(input: CreatePromotionInput!): Promotion!
+    updatePromotion(id: ID!, input: UpdatePromotionInput!): Promotion!
+    deletePromotion(id: ID!): Boolean!
+}

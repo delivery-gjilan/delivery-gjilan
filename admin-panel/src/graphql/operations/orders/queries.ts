@@ -8,6 +8,7 @@ export const GET_ORDERS = graphql(`
             deliveryPrice
             totalPrice
             orderDate
+            updatedAt
             status
             user {
                 id
@@ -62,6 +63,7 @@ export const GET_ORDER = graphql(`
             deliveryPrice
             totalPrice
             orderDate
+            updatedAt
             status
             user {
                 id

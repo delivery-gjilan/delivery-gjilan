@@ -13,6 +13,7 @@ import type { Order, OrderBusiness, OrderItem, OrderStatus, CreateOrderInput } f
 import type { DbOrder } from '@/database/schema/orders';
 import { PubSub, publish, subscribe, topics } from '@/lib/pubsub';
 import { GraphQLError } from 'graphql';
+import { PromotionService } from '@/services/PromotionService';
 
 export class OrderService {
     public orderRepository: OrderRepository; // Made public for resolver access
@@ -22,6 +23,7 @@ export class OrderService {
         private authRepository: AuthRepository,
         private productRepository: ProductRepository,
         private pubsub: PubSub,
+        private promotionService: PromotionService,
     ) {
         this.orderRepository = orderRepository;
     }
@@ -64,8 +66,50 @@ export class OrderService {
         }
 
         console.log('prices,', calculatedItemsTotal, input.deliveryPrice);
-        // 3. Create Order
-        const totalOrderPrice = calculatedItemsTotal + input.deliveryPrice;
+        // 3. Apply Promotion (if any) and Create Order
+        const promoCode = input.promoCode?.trim();
+        let discountAmount = 0;
+        let effectiveDeliveryPrice = input.deliveryPrice;
+        let promotionToRedeem = null as null | Awaited<ReturnType<PromotionService['getPromotionByCode']>>;
+        let freeDeliveryApplied = false;
+
+        if (promoCode) {
+            // User entered a promo code
+            const promoResult = await this.promotionService.validatePromotionForUser(
+                userId,
+                promoCode,
+                calculatedItemsTotal,
+                input.deliveryPrice,
+            );
+
+            if (!promoResult.isValid) {
+                throw new Error(promoResult.reason || 'Invalid promotion');
+            }
+
+            discountAmount = promoResult.discountAmount;
+            effectiveDeliveryPrice = promoResult.effectiveDeliveryPrice;
+            freeDeliveryApplied = promoResult.freeDeliveryApplied;
+            promotionToRedeem = promoResult.promotion || null;
+        } else {
+            // No promo code provided - check for auto-apply promotions
+            const autoPromos = await this.promotionService.getAutoApplyPromotions(
+                userId,
+                calculatedItemsTotal,
+                input.deliveryPrice,
+            );
+
+            if (autoPromos.length > 0) {
+                // Use the best auto-apply promotion (already sorted by best discount first)
+                const bestPromo = autoPromos[0];
+                discountAmount = bestPromo.discountAmount;
+                effectiveDeliveryPrice = bestPromo.effectiveDeliveryPrice;
+                freeDeliveryApplied = bestPromo.freeDeliveryApplied;
+                promotionToRedeem = bestPromo.promotion || null;
+            }
+        }
+
+        const effectiveOrderPrice = Math.max(0, calculatedItemsTotal - discountAmount);
+        const totalOrderPrice = effectiveOrderPrice + effectiveDeliveryPrice;
 
         // Verify total price matches client input (allow small float error)
         if (Math.abs(totalOrderPrice - input.totalPrice) > 0.01) {
@@ -73,9 +117,9 @@ export class OrderService {
         }
 
         const orderData = {
-            price: calculatedItemsTotal,
+            price: effectiveOrderPrice,
             userId,
-            deliveryPrice: input.deliveryPrice,
+            deliveryPrice: effectiveDeliveryPrice,
             status: 'PENDING' as const,
             dropoffLat: input.dropOffLocation.latitude,
             dropoffLng: input.dropOffLocation.longitude,
@@ -89,6 +133,16 @@ export class OrderService {
         }
 
         await this.updateUserBehaviorOnOrderCreated(userId, createdOrder.orderDate || null);
+
+        if (promotionToRedeem) {
+            await this.promotionService.createRedemption({
+                promotion: promotionToRedeem,
+                userId,
+                orderId: createdOrder.id,
+                discountAmount,
+                freeDeliveryApplied,
+            });
+        }
 
         // Decrement stock for ordered products (ensure it doesn't go below 0)
         const db = await getDB();
@@ -181,6 +235,7 @@ export class OrderService {
             deliveryPrice: dbOrder.deliveryPrice,
             totalPrice: dbOrder.price + dbOrder.deliveryPrice,
             orderDate: new Date(dbOrder.orderDate || new Date()),
+            updatedAt: new Date(dbOrder.updatedAt),
             status: dbOrder.status as OrderStatus,
             driver: driverUser
                 ? {

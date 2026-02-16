@@ -125,6 +125,7 @@ input CreateOrderInput {
   deliveryPrice: Float!
   dropOffLocation: LocationInput!
   items: [CreateOrderItemInput!]!
+  promoCode: String
   totalPrice: Float!
 }
 
@@ -156,6 +157,24 @@ input CreateProductInput {
 input CreateProductSubcategoryInput {
   categoryId: ID!
   name: String!
+}
+
+input CreatePromotionInput {
+  autoApply: Boolean
+  code: String!
+  description: String
+  endsAt: DateTime
+  firstOrderOnly: Boolean
+  freeDeliveryCount: Int
+  isActive: Boolean
+  maxRedemptions: Int
+  maxRedemptionsPerUser: Int
+  name: String!
+  referrerUserId: ID
+  startsAt: DateTime
+  targetUserIds: [ID!]
+  type: PromotionType!
+  value: Float
 }
 
 input CreateUserInput {
@@ -244,6 +263,11 @@ enum EntityType {
   USER
 }
 
+input GetAutoApplyPromotionsInput {
+  deliveryPrice: Float!
+  itemsTotal: Float!
+}
+
 input InitiateSignupInput {
   email: String!
   firstName: String!
@@ -285,12 +309,14 @@ type Mutation {
   createProduct(input: CreateProductInput!): Product!
   createProductCategory(input: CreateProductCategoryInput!): ProductCategory!
   createProductSubcategory(input: CreateProductSubcategoryInput!): ProductSubcategory!
+  createPromotion(input: CreatePromotionInput!): Promotion!
   createUser(input: CreateUserInput!): AuthResponse!
   deleteBusiness(id: ID!): Boolean!
   deleteDeliveryZone(id: ID!): Boolean!
   deleteProduct(id: ID!): Boolean!
   deleteProductCategory(id: ID!): Boolean!
   deleteProductSubcategory(id: ID!): Boolean!
+  deletePromotion(id: ID!): Boolean!
   deleteUser(id: ID!): Boolean!
 
   """
@@ -317,6 +343,7 @@ type Mutation {
   updateProductCategory(id: ID!, input: UpdateProductCategoryInput!): ProductCategory!
   updateProductSubcategory(id: ID!, input: UpdateProductSubcategoryInput!): ProductSubcategory!
   updateProductsOrder(businessId: ID!, products: [ProductOrderInput!]!): Boolean!
+  updatePromotion(id: ID!, input: UpdatePromotionInput!): Promotion!
   updateUser(input: UpdateUserInput!): User!
   updateUserNote(flagColor: String, note: String, userId: ID!): User!
   verifyEmail(input: VerifyEmailInput!): SignupStepResponse!
@@ -333,6 +360,7 @@ type Order {
   orderPrice: Float!
   status: OrderStatus!
   totalPrice: Float!
+  updatedAt: Date!
   user: User
 }
 
@@ -400,6 +428,55 @@ type ProductSubcategory {
   updatedAt: String!
 }
 
+type Promotion {
+  autoApply: Boolean!
+  code: String!
+  createdAt: DateTime!
+  description: String
+  endsAt: DateTime
+  firstOrderOnly: Boolean!
+  freeDeliveryCount: Int
+  id: ID!
+  isActive: Boolean!
+  maxRedemptions: Int
+  maxRedemptionsPerUser: Int
+  name: String!
+  referrerUserId: ID
+  startsAt: DateTime
+  targetUserIds: [ID!]!
+  type: PromotionType!
+  updatedAt: DateTime!
+  value: Float!
+}
+
+type PromotionRedemption {
+  createdAt: DateTime!
+  discountAmount: Float!
+  freeDeliveryApplied: Boolean!
+  id: ID!
+  orderId: ID!
+  promotionId: ID!
+  referrerUserId: ID
+  userId: ID!
+}
+
+enum PromotionType {
+  FIXED_DISCOUNT
+  FREE_DELIVERY
+  PERCENT_DISCOUNT
+  REFERRAL
+}
+
+type PromotionValidationResult {
+  discountAmount: Float!
+  effectiveDeliveryPrice: Float!
+  freeDeliveryApplied: Boolean!
+  isValid: Boolean!
+  promotion: Promotion
+  reason: String
+  totalPrice: Float!
+}
+
 type Query {
   auditLog(id: ID!): AuditLog
   auditLogs(action: ActionType, actorId: ID, actorType: ActorType, endDate: DateTime, entityId: ID, entityType: EntityType, limit: Int, offset: Int, startDate: DateTime): AuditLogConnection!
@@ -411,6 +488,7 @@ type Query {
   deliveryZones: [DeliveryZone!]!
   driverBalance(driverId: ID!): SettlementSummary!
   drivers: [User!]!
+  getAutoApplyPromotions(input: GetAutoApplyPromotionsInput!): [PromotionValidationResult!]!
   me: User
   myBehavior: UserBehavior
   order(id: ID!): Order
@@ -422,11 +500,14 @@ type Query {
   productSubcategories(categoryId: ID!): [ProductSubcategory!]!
   productSubcategoriesByBusiness(businessId: ID!): [ProductSubcategory!]!
   products(businessId: ID!): [Product!]!
+  promotion(code: String!): Promotion
+  promotions: [Promotion!]!
   settlementSummary(businessId: ID, driverId: ID, endDate: Date, startDate: Date, type: SettlementType): SettlementSummary!
   settlements(businessId: ID, driverId: ID, endDate: Date, limit: Int, offset: Int, startDate: Date, status: SettlementStatus, type: SettlementType): [Settlement!]!
   uncompletedOrders: [Order!]!
   userBehavior(userId: ID!): UserBehavior
   users: [User!]!
+  validatePromotion(input: ValidatePromotionInput!): PromotionValidationResult!
 }
 
 type Settlement {
@@ -539,6 +620,22 @@ input UpdateProductSubcategoryInput {
   name: String
 }
 
+input UpdatePromotionInput {
+  autoApply: Boolean
+  code: String
+  description: String
+  endsAt: DateTime
+  freeDeliveryCount: Int
+  maxRedemptions: Int
+  maxRedemptionsPerUser: Int
+  name: String
+  referrerUserId: ID
+  startsAt: DateTime
+  targetUserIds: [ID!]
+  type: PromotionType
+  value: Float
+}
+
 input UpdateUserInput {
   businessId: ID
   firstName: String!
@@ -589,6 +686,12 @@ enum UserRole {
   CUSTOMER
   DRIVER
   SUPER_ADMIN
+}
+
+input ValidatePromotionInput {
+  code: String!
+  deliveryPrice: Float!
+  itemsTotal: Float!
 }
 
 input VerifyEmailInput {
