@@ -157,6 +157,9 @@ export default function MapPage() {
   const [statusChangeTime, setStatusChangeTime] = useState<Record<string, number>>({});
   const orderRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const prevOrderStatusRef = useRef<Record<string, string>>({});
+  
+  // Camera tracking state
+  const [followingDriverId, setFollowingDriverId] = useState<string | null>(null);
 
   // ==== DATA ====
   const orders = useMemo(() => subscriptionData?.allOrdersUpdated ?? ordersData?.orders ?? [], [subscriptionData, ordersData]);
@@ -274,6 +277,25 @@ export default function MapPage() {
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // ==== CAMERA TRACKING: Follow driver in real-time ====
+  useEffect(() => {
+    if (!followingDriverId || !mapRef.current) return;
+    
+    const followedTrack = driverTracks[followingDriverId];
+    if (!followedTrack) return;
+    
+    const pos = animatedDriverPositions[followingDriverId] || followedTrack.to;
+    if (!isValidLatLng(pos?.latitude, pos?.longitude)) return;
+    
+    // Smoothly fly to driver position (zoom 16 for driver tracking)
+    mapRef.current.flyTo({
+      center: [pos.longitude, pos.latitude],
+      zoom: 16,
+      duration: 800,
+      pitch: 0,
+    });
+  }, [followingDriverId, driverTracks, animatedDriverPositions]);
 
   // ==== TRACK STATUS CHANGES ====
   useEffect(() => {
@@ -1026,10 +1048,19 @@ export default function MapPage() {
             const StatusIcon = statusStyle.icon;
             const isAssignable = isDriverAssignable(driver);
             const lastHeartbeat = driver?.driverConnection?.lastHeartbeatAt;
+            const isFollowing = followingDriverId === track.id;
 
             return (
               <Marker key={`driver-${track.id}`} latitude={pos.latitude} longitude={pos.longitude} anchor="bottom">
-                <div className={`relative flex flex-col items-center group cursor-pointer ${connectionStatus === 'DISCONNECTED' || connectionStatus === 'LOST' ? 'opacity-50' : ''}`}>
+                <div 
+                  className={`relative flex flex-col items-center group cursor-pointer ${connectionStatus === 'DISCONNECTED' || connectionStatus === 'LOST' ? 'opacity-50' : ''} ${isFollowing ? 'ring-2 ring-offset-2 ring-blue-500 rounded-full' : ''}`}
+                  onClick={() => setFollowingDriverId(isFollowing ? null : track.id)}
+                >
+                  {/* Following indicator ring */}
+                  {isFollowing && (
+                    <div className="absolute inset-0 w-12 h-12 -top-2 -left-2 rounded-full border-2 border-blue-400 animate-pulse" />
+                  )}
+                  
                   {/* Connection status indicator badge */}
                   <div className={`absolute -top-2 -right-2 z-10 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full ${statusStyle.bg} ${connectionStatus === 'STALE' ? 'animate-pulse' : ''}`}>
                     <StatusIcon size={10} className="text-white" />
@@ -1050,7 +1081,7 @@ export default function MapPage() {
                   )}
                   
                   {/* Hover tooltip - Enhanced */}
-                  <div className="absolute bottom-full mb-3 hidden group-hover:block bg-black/95 text-white text-xs rounded-lg shadow-2xl z-[100] border border-white/20 min-w-[180px] backdrop-blur-sm">
+                  <div className="absolute bottom-full mb-3 hidden group-hover:block bg-black/95 text-white text-xs rounded-lg shadow-2xl z-[100] border border-white/20 min-w-[220px] backdrop-blur-sm">
                     <div className="p-3">
                       <div className="font-semibold text-sm">
                         {driver ? `${driver.firstName} ${driver.lastName}` : track.name}
@@ -1075,6 +1106,11 @@ export default function MapPage() {
                         </span>
                       </div>
                       
+                      {/* Location coordinates */}
+                      <div className="text-[10px] text-neutral-300 mt-2 font-mono">
+                        {pos.latitude.toFixed(4)}, {pos.longitude.toFixed(4)}
+                      </div>
+                      
                       {/* Status badges */}
                       <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/10">
                         <span className={`text-[9px] px-1.5 py-0.5 rounded ${isBusy ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
@@ -1083,6 +1119,15 @@ export default function MapPage() {
                         <span className={`text-[9px] px-1.5 py-0.5 rounded ${isAssignable ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-500/20 text-slate-400'}`}>
                           {isAssignable ? 'ASSIGNABLE' : 'UNAVAILABLE'}
                         </span>
+                        {isFollowing && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">
+                            👁️ TRACKING
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="text-[9px] text-neutral-400 mt-2 pt-2 border-t border-white/10">
+                        Click to {isFollowing ? 'stop' : 'start'} tracking
                       </div>
                     </div>
                     <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-transparent border-t-black/95" />

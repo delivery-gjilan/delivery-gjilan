@@ -1,9 +1,12 @@
 import { Stack } from 'expo-router';
 import '../global.css';
 import { useAppSetup } from '@/hooks/useAppSetup';
+import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import Providers from '@/lib/graphql/providers';
 import { useDriverTracking } from '@/hooks/useDriverTracking';
+import Mapbox from '@rnmapbox/maps';
+import { MAPBOX_TOKEN } from '@/utils/mapbox';
 
 function AppContent() {
     // Start heartbeat as soon as auth is established
@@ -19,6 +22,13 @@ function AppContent() {
 
 export default function RootLayout() {
     const { ready } = useAppSetup();
+
+    useEffect(() => {
+        if (MAPBOX_TOKEN) {
+            Mapbox.setAccessToken(MAPBOX_TOKEN);
+        }
+    }, []);
+
     if (!ready) {
         return (
             <View className="flex-1 justify-center items-center bg-white">

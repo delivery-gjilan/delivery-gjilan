@@ -50,6 +50,7 @@
           "root": "app"
         }
       ],
+      "@rnmapbox/maps",
       [
         "expo-splash-screen",
         {

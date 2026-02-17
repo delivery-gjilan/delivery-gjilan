@@ -278,7 +278,7 @@ export default function DriversPage() {
 
             {showModal && isSuperAdmin && (
                 <Modal
-                    open={showModal}
+                    isOpen={showModal}
                     onClose={handleCloseModal}
                     title="Create New Driver"
                 >
@@ -352,7 +352,7 @@ export default function DriversPage() {
 
             {showDeleteModal && selectedDriverForDelete && (
                 <Modal
-                    open={showDeleteModal}
+                    isOpen={showDeleteModal}
                     onClose={() => {
                         setShowDeleteModal(false);
                         setSelectedDriverForDelete(null);

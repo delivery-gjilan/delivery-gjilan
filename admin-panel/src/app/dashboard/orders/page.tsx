@@ -596,7 +596,7 @@ export default function OrdersPage() {
 
             {/* ORDER DETAILS MODAL */}
             <Modal
-                open={detailsOpen}
+                isOpen={detailsOpen}
                 onClose={() => setDetailsOpen(false)}
                 title="Order Details"
             >

@@ -13,11 +13,14 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { Alert, AppState, AppStateStatus } from 'react-native';
 import * as Location from 'expo-location';
+import * as TaskManager from 'expo-task-manager';
 import { useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import { useAuthStore } from '@/store/authStore';
+import { getToken } from '@/utils/secureTokenStore';
 
 const HEARTBEAT_INTERVAL_MS = 5000; // Every 5 seconds
+const BACKGROUND_HEARTBEAT_TASK = 'driver-heartbeat-background-task';
 
 const DRIVER_HEARTBEAT_MUTATION = gql`
   mutation DriverHeartbeat($latitude: Float!, $longitude: Float!) {
@@ -32,6 +35,65 @@ const DRIVER_HEARTBEAT_MUTATION = gql`
 
 type ConnectionStatus = 'CONNECTED' | 'STALE' | 'LOST' | 'DISCONNECTED';
 
+const DRIVER_HEARTBEAT_MUTATION_TEXT = `
+  mutation DriverHeartbeat($latitude: Float!, $longitude: Float!) {
+    driverHeartbeat(latitude: $latitude, longitude: $longitude) {
+      success
+      connectionStatus
+      locationUpdated
+      lastHeartbeatAt
+    }
+  }
+`;
+
+async function sendBackgroundHeartbeat(latitude: number, longitude: number): Promise<void> {
+  try {
+    const token = await getToken();
+    const endpoint = process.env.EXPO_PUBLIC_API_URL;
+
+    if (!token || !endpoint) {
+      return;
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        query: DRIVER_HEARTBEAT_MUTATION_TEXT,
+        variables: { latitude, longitude },
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn('[Heartbeat][Background] Request failed with status', response.status);
+    }
+  } catch (error) {
+    console.warn('[Heartbeat][Background] Failed:', error);
+  }
+}
+
+if (!TaskManager.isTaskDefined(BACKGROUND_HEARTBEAT_TASK)) {
+  TaskManager.defineTask(BACKGROUND_HEARTBEAT_TASK, async ({ data, error }) => {
+    if (error) {
+      console.warn('[Heartbeat][Background] Task error:', error);
+      return;
+    }
+
+    const locations = (data as { locations?: Array<{ coords?: { latitude: number; longitude: number } }> } | undefined)?.locations;
+    const latest = locations?.[locations.length - 1];
+    const coords = latest?.coords;
+
+    if (!coords) {
+      return;
+    }
+
+    await sendBackgroundHeartbeat(coords.latitude, coords.longitude);
+  });
+}
+
 export function useDriverHeartbeat() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [sendHeartbeat] = useMutation(DRIVER_HEARTBEAT_MUTATION);
@@ -42,6 +104,51 @@ export function useDriverHeartbeat() {
   const simulatedLocationRef = useRef<{ latitude: number; longitude: number }>({ latitude: 42.4635, longitude: 21.4694 });
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('DISCONNECTED');
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+
+  const startBackgroundHeartbeat = useCallback(async () => {
+    try {
+      const hasStarted = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_HEARTBEAT_TASK);
+      if (hasStarted) {
+        return;
+      }
+
+      const backgroundPermission = await Location.requestBackgroundPermissionsAsync();
+      if (backgroundPermission.status !== 'granted') {
+        console.warn('[Heartbeat] Background permission not granted');
+        return;
+      }
+
+      await Location.startLocationUpdatesAsync(BACKGROUND_HEARTBEAT_TASK, {
+        accuracy: Location.Accuracy.Balanced,
+        timeInterval: HEARTBEAT_INTERVAL_MS,
+        distanceInterval: 5,
+        pausesUpdatesAutomatically: false,
+        showsBackgroundLocationIndicator: true,
+        foregroundService: {
+          notificationTitle: 'Driver tracking active',
+          notificationBody: 'Updating your delivery location in background',
+        },
+      });
+
+      console.log('[Heartbeat] Background heartbeat started');
+    } catch (error) {
+      console.warn('[Heartbeat] Failed to start background heartbeat:', error);
+    }
+  }, []);
+
+  const stopBackgroundHeartbeat = useCallback(async () => {
+    try {
+      const hasStarted = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_HEARTBEAT_TASK);
+      if (!hasStarted) {
+        return;
+      }
+
+      await Location.stopLocationUpdatesAsync(BACKGROUND_HEARTBEAT_TASK);
+      console.log('[Heartbeat] Background heartbeat stopped');
+    } catch (error) {
+      console.warn('[Heartbeat] Failed to stop background heartbeat:', error);
+    }
+  }, []);
 
   // Request location permissions
   const requestPermissions = useCallback(async (): Promise<boolean> => {
@@ -165,7 +272,7 @@ export function useDriverHeartbeat() {
       }
     } catch (watchErr) {
       console.error('[Heartbeat] Watch setup failed:', watchErr);
-      locationWatchRef.current = undefined;
+      locationWatchRef.current = null;
     }
   }, []);
 
@@ -196,7 +303,7 @@ export function useDriverHeartbeat() {
         },
       });
 
-      const data = result.data?.driverHeartbeat;
+      const data = (result.data as any)?.driverHeartbeat;
       if (data?.success) {
         setConnectionStatus(data.connectionStatus as ConnectionStatus);
         console.log('[Heartbeat] Sent', {
@@ -204,7 +311,7 @@ export function useDriverHeartbeat() {
           locationUpdated: data.locationUpdated,
         });
       } else {
-        console.warn('[Heartbeat] Failed:', result.errors);
+        console.warn('[Heartbeat] Failed:', result.error);
       }
     } catch (err: any) {
       console.error('[Heartbeat] Error:', err.message);
@@ -227,6 +334,7 @@ export function useDriverHeartbeat() {
 
     // Send immediate heartbeat
     await startLocationWatch();
+    await startBackgroundHeartbeat();
     console.log('[Heartbeat] Starting (interval: 5s)');
     await doHeartbeat();
 
@@ -242,8 +350,9 @@ export function useDriverHeartbeat() {
       console.log('[Heartbeat] Stopped');
     }
     stopLocationWatch();
+    stopBackgroundHeartbeat();
     setConnectionStatus('DISCONNECTED');
-  }, [stopLocationWatch]);
+  }, [stopLocationWatch, stopBackgroundHeartbeat]);
 
   // Handle app state changes (background/foreground)
   useEffect(() => {

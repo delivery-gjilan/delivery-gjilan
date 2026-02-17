@@ -107,9 +107,12 @@ export class DriverHeartbeatHandler {
       };
     }
 
-    // Publish update if status changed (e.g., reconnection)
-    if (wasDisconnected) {
-      console.log(`[HeartbeatHandler] Driver ${userId} reconnected (was ${driver.connectionStatus})`);
+    // Publish updates when reconnecting or when location write is refreshed.
+    // This keeps admin driver lists/maps in sync without waiting for watchdog transitions.
+    if (wasDisconnected || shouldUpdateLocation) {
+      if (wasDisconnected) {
+        console.log(`[HeartbeatHandler] Driver ${userId} reconnected (was ${driver.connectionStatus})`);
+      }
       await this.publishDriverUpdate();
     }
 

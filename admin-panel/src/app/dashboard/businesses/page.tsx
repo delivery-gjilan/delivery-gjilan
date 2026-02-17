@@ -451,7 +451,7 @@ export default function BusinessesPage() {
          CREATE MODAL
       ---------------------------------------------------------- */}
             <Modal
-                open={createOpen}
+                isOpen={createOpen}
                 onClose={() => setCreateOpen(false)}
                 title="Create Business"
             >
@@ -686,7 +686,7 @@ export default function BusinessesPage() {
          EDIT MODAL
       ---------------------------------------------------------- */}
             <Modal
-                open={editOpen}
+                isOpen={editOpen}
                 onClose={() => setEditOpen(false)}
                 title="Edit Business"
             >
@@ -886,7 +886,7 @@ export default function BusinessesPage() {
          DELETE CONFIRMATION
       ---------------------------------------------------------- */}
             <Modal
-                open={deleteId !== null}
+                isOpen={deleteId !== null}
                 onClose={() => setDeleteId(null)}
                 title="Delete Business"
             >

@@ -1,6 +1,6 @@
-import { graphql } from '@/gql';
+import { gql } from '@apollo/client';
 
-export const ORDERS_SUBSCRIPTION = graphql(`
+export const ORDERS_SUBSCRIPTION = gql(`
     subscription OrdersUpdated($token: String!) {
         userOrdersUpdated(input: { token: $token }) {
             id
@@ -8,6 +8,7 @@ export const ORDERS_SUBSCRIPTION = graphql(`
             deliveryPrice
             totalPrice
             orderDate
+            updatedAt
             status
             user {
                 id
@@ -54,7 +55,7 @@ export const ORDERS_SUBSCRIPTION = graphql(`
     }
 `);
 
-export const ALL_ORDERS_SUBSCRIPTION = graphql(`
+export const ALL_ORDERS_SUBSCRIPTION = gql(`
     subscription AllOrdersUpdated {
         allOrdersUpdated {
             id
@@ -62,6 +63,7 @@ export const ALL_ORDERS_SUBSCRIPTION = graphql(`
             deliveryPrice
             totalPrice
             orderDate
+            updatedAt
             status
             user {
                 id

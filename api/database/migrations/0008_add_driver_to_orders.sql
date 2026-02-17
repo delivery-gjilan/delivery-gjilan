@@ -1,2 +1,0 @@
-ALTER TABLE orders
-ADD COLUMN IF NOT EXISTS driver_id UUID REFERENCES users(id);

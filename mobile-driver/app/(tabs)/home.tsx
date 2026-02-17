@@ -193,10 +193,6 @@ export default function Home() {
             await updateStatus({ variables: { id, status } });
             await refetch();
             if (status === 'OUT_FOR_DELIVERY') {
-                const order = activeOrders.find((o: any) => o.id === id);
-                if (order) {
-                    await openNavigation(order);
-                }
                 router.push({ pathname: '/order-map', params: { orderId: id } });
             }
         } catch (err) {

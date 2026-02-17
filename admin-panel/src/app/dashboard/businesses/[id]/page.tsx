@@ -156,7 +156,7 @@ export default function BusinessDetailsPage() {
             {/* ------------------------------------
           EDIT MODAL
       ------------------------------------ */}
-            <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Edit Business">
+            <Modal isOpen={editOpen} onClose={() => setEditOpen(false)} title="Edit Business">
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-400 mb-1">Business Name</label>

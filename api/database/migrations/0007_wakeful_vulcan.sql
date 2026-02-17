@@ -1,1 +1,0 @@
-ALTER TABLE "businesses" ADD COLUMN "phone_number" varchar(32);

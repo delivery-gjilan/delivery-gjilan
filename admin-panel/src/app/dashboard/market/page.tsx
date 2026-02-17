@@ -1095,7 +1095,7 @@ function CategoryModal({ modal, onClose, onCreate, onUpdate }: CategoryModalProp
 
     return (
         <Modal
-            open={modal.open}
+            isOpen={modal.open}
             onClose={onClose}
             title={modal.mode === 'create' ? 'Create Category' : 'Edit Category'}
         >
@@ -1195,7 +1195,7 @@ function SubcategoryModal({ modal, categories, onClose, onCreate, onUpdate }: Su
 
     return (
         <Modal
-            open={modal.open}
+            isOpen={modal.open}
             onClose={onClose}
             title={modal.mode === 'create' ? 'Create Subcategory' : 'Edit Subcategory'}
         >
@@ -1419,7 +1419,7 @@ function ProductModal({
 
     return (
         <Modal
-            open={modal.open}
+            isOpen={modal.open}
             onClose={onClose}
             title={modal.mode === 'create' ? 'Create Product' : 'Edit Product'}
         >
@@ -1624,7 +1624,7 @@ function DeleteModal({ modal, onClose, onConfirm }: DeleteModalProps) {
     if (!modal) return null;
 
     return (
-        <Modal open={!!modal} onClose={onClose} title={`Delete ${modal.type}`}>
+        <Modal isOpen={!!modal} onClose={onClose} title={`Delete ${modal.type}`}>
             <div className="space-y-4">
                 <p className="text-gray-300">
                     Are you sure you want to delete <strong>{modal.name}</strong>?

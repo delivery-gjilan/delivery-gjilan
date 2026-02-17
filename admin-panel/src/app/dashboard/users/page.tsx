@@ -116,6 +116,7 @@ export default function UsersPage() {
     const { admin } = useAuth();
     const isSuperAdmin = admin?.role === "SUPER_ADMIN";
 
+
     const { data, loading, error, refetch } = useQuery<UsersResponse>(USERS_QUERY);
     const { data: businessesData } = useQuery<BusinessesResponse>(GET_BUSINESSES);
     const [createUser, { loading: creating }] = useMutation<CreateUserResponse>(CREATE_USER_MUTATION, {
@@ -431,7 +432,7 @@ export default function UsersPage() {
                         />
                     </div>
                     {isSuperAdmin && (
-                        <Button onClick={() => setShowModal(true)} className="bg-blue-600 hover:bg-blue-700">
+                        <Button onClick={() => {setShowModal(true); console.log("qap")}} className="bg-blue-600 hover:bg-blue-700">
                             Create Customer
                         </Button>
                     )}
@@ -554,7 +555,7 @@ export default function UsersPage() {
 
             {showModal && isSuperAdmin && (
                 <Modal
-                    open={showModal}
+                    isOpen={showModal}
                     onClose={handleCloseModal}
                     title={editingUser ? "Edit User" : "Create Customer"}
                 >
@@ -652,7 +653,7 @@ export default function UsersPage() {
             {/* Note Modal */}
             {showNoteModal && selectedUserForNote && (
                 <Modal 
-                    open={showNoteModal} 
+                    isOpen={showNoteModal} 
                     onClose={handleCloseNoteModal} 
                     title={`Flag/Note for ${selectedUserForNote.firstName} ${selectedUserForNote.lastName}`}
                 >
@@ -742,7 +743,7 @@ export default function UsersPage() {
             {/* Delete Confirmation Modal */}
             {showDeleteModal && selectedUserForDelete && (
                 <Modal 
-                    open={showDeleteModal} 
+                    isOpen={showDeleteModal} 
                     onClose={() => setShowDeleteModal(false)} 
                     title="Confirm Delete"
                 >
@@ -786,7 +787,7 @@ export default function UsersPage() {
             {/* User History Modal */}
             {showHistoryModal && selectedUserForHistory && (
                 <Modal
-                    open={showHistoryModal}
+                    isOpen={showHistoryModal}
                     onClose={handleCloseHistoryModal}
                     title={`Order history for ${selectedUserForHistory.firstName} ${selectedUserForHistory.lastName}`}
                 >
@@ -922,7 +923,7 @@ export default function UsersPage() {
             {/* Order Details Modal */}
             {showOrderDetailsModal && selectedOrderForDetails && (
                 <Modal
-                    open={showOrderDetailsModal}
+                    isOpen={showOrderDetailsModal}
                     onClose={handleCloseOrderDetails}
                     title="Order Details"
                 >

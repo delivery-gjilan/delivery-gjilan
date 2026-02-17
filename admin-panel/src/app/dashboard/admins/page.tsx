@@ -330,7 +330,7 @@ export default function AdminsPage() {
 
             {/* Modal for Create/Edit Admin */}
             {showModal && (
-                <Modal open={showModal} onClose={handleCloseModal} title={editingUser ? "Edit Admin" : "Add Admin"}>
+                <Modal isOpen={showModal} onClose={handleCloseModal} title={editingUser ? "Edit Admin" : "Add Admin"}>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-300 mb-2">Admin Type *</label>
@@ -445,8 +445,8 @@ export default function AdminsPage() {
 
             {/* Delete Confirmation Modal */}
             {showDeleteModal && selectedUserForDelete && (
-                <Modal 
-                    open={showDeleteModal} 
+                <Modal
+                    isOpen={showDeleteModal} 
                     onClose={() => setShowDeleteModal(false)} 
                     title="Confirm Delete"
                 >
