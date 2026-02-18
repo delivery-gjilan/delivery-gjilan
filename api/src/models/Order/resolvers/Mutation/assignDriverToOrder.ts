@@ -10,14 +10,49 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
     console.log('Assigning driver to order:', id, driverId);
 
     const role = userData?.role;
-    if (!role || role !== 'SUPER_ADMIN') {
-        throw new Error('Only super admins can assign drivers to orders');
+    if (!role) {
+        throw new Error('Unauthorized');
+    }
+
+    const isSuperAdmin = role === 'SUPER_ADMIN';
+    const isDriver = role === 'DRIVER';
+
+    if (!isSuperAdmin && !isDriver) {
+        throw new Error('Not authorized to assign driver');
+    }
+
+    let effectiveDriverId = driverId;
+
+    if (isDriver) {
+        if (!userData?.userId) {
+            throw new Error('Driver not authenticated');
+        }
+
+        // Drivers can only self-assign
+        if (driverId && driverId !== userData.userId) {
+            throw new Error('Drivers can only assign themselves');
+        }
+
+        const dbOrder = await orderService.orderRepository.findById(id);
+        if (!dbOrder) {
+            throw new Error('Order not found');
+        }
+
+        if (dbOrder.driverId && dbOrder.driverId !== userData.userId) {
+            throw new Error('Order already assigned to another driver');
+        }
+
+        if (dbOrder.status !== 'READY' && dbOrder.status !== 'ACCEPTED') {
+            throw new Error('Order is not available for driver assignment');
+        }
+
+        effectiveDriverId = userData.userId;
     }
 
     // If driverId is provided, validate that it's a driver
     let driverName = 'Unassigned';
-    if (driverId) {
-        const driver = await authService.authRepository.findById(driverId);
+    if (effectiveDriverId) {
+        const driver = await authService.authRepository.findById(effectiveDriverId);
         if (!driver) {
             throw new Error('Driver not found');
         }
@@ -27,7 +62,7 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
         driverName = `${driver.firstName} ${driver.lastName}`;
     }
 
-    const order = await orderService.assignDriverToOrder(id, driverId);
+    const order = await orderService.assignDriverToOrder(id, effectiveDriverId ?? null);
 
     // Get the order to find the user ID for publishing
     const dbOrder = await orderService.orderRepository.findById(id);
@@ -47,7 +82,7 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
         entityId: id,
         metadata: {
             orderId: id,
-            driverId: driverId || null,
+            driverId: effectiveDriverId || null,
             driverName,
         },
     });

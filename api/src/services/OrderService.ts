@@ -310,7 +310,10 @@ export class OrderService {
     }
 
     async updateOrderStatusWithDriver(id: string, status: OrderStatus, driverId: string): Promise<Order> {
-        const updated = await this.orderRepository.updateStatusAndDriver(id, status, driverId, 'READY');
+        let updated = await this.orderRepository.updateStatusAndDriver(id, status, driverId, 'READY');
+        if (!updated) {
+            updated = await this.orderRepository.updateStatusAndDriver(id, status, driverId, 'ACCEPTED');
+        }
         if (!updated) {
             throw new Error('Order already assigned or not ready');
         }

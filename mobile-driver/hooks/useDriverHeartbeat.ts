@@ -18,6 +18,7 @@ import { useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import { useAuthStore } from '@/store/authStore';
 import { getToken } from '@/utils/secureTokenStore';
+import { useDriverLocationOverrideStore } from '@/store/driverLocationOverrideStore';
 
 const HEARTBEAT_INTERVAL_MS = 5000; // Every 5 seconds
 const BACKGROUND_HEARTBEAT_TASK = 'driver-heartbeat-background-task';
@@ -187,6 +188,11 @@ export function useDriverHeartbeat() {
 
   // Get current location with fast timeout fallback to simulation
   const getCurrentLocation = useCallback(async (): Promise<{ latitude: number; longitude: number } | null> => {
+    const overrideState = useDriverLocationOverrideStore.getState();
+    if (overrideState.isSimulationOverrideEnabled && overrideState.locationOverride) {
+      return overrideState.locationOverride;
+    }
+
     // Try real GPS with aggressive timeout (2 seconds max)
     try {
       const location = await Promise.race([

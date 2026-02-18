@@ -35,6 +35,11 @@ export const GET_ORDERS = gql`
                 lastName
                 phoneNumber
             }
+            driver {
+                id
+                firstName
+                lastName
+            }
         }
     }
 `;
@@ -73,6 +78,25 @@ export const GET_ORDER = gql`
                 firstName
                 lastName
                 phoneNumber
+            }
+            driver {
+                id
+                firstName
+                lastName
+            }
+        }
+    }
+`;
+
+export const ASSIGN_DRIVER_TO_ORDER = gql`
+    mutation AssignDriverToOrder($id: ID!, $driverId: ID) {
+        assignDriverToOrder(id: $id, driverId: $driverId) {
+            id
+            status
+            driver {
+                id
+                firstName
+                lastName
             }
         }
     }
@@ -121,6 +145,11 @@ export const ALL_ORDERS_UPDATED = gql`
                 firstName
                 lastName
                 phoneNumber
+            }
+            driver {
+                id
+                firstName
+                lastName
             }
         }
     }

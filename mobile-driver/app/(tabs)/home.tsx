@@ -1,11 +1,11 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { View, Text, ScrollView, Modal, Pressable, Switch, Linking, Platform } from 'react-native';
+import { View, Text, ScrollView, Modal, Pressable, Switch, Linking, Platform, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useAuth } from '@/hooks/useAuth';
 import { useMutation, useQuery, useSubscription } from '@apollo/client/react';
-import { ALL_ORDERS_UPDATED, GET_ORDERS, UPDATE_ORDER_STATUS } from '@/graphql/operations/orders';
+import { ALL_ORDERS_UPDATED, ASSIGN_DRIVER_TO_ORDER, GET_ORDERS, UPDATE_ORDER_STATUS } from '@/graphql/operations/orders';
 import { UPDATE_DRIVER_ONLINE_STATUS } from '@/graphql/operations/driverLocation';
 import { Button } from '@/components/Button';
 import { calculateRouteDistance } from '@/utils/mapbox';
@@ -22,6 +22,7 @@ export default function Home() {
     const isOnline = useAuthStore((state) => state.isOnline);
     const setOnline = useAuthStore((state) => state.setOnline);
     const setUser = useAuthStore((state) => state.setUser);
+    const currentDriverId = useAuthStore((state) => state.user?.id);
     const [newOrder, setNewOrder] = useState<any | null>(null);
     const seenOrderIds = useRef<Set<string>>(new Set());
     const [orderDistances, setOrderDistances] = useState<Record<string, { distanceKm: number; durationMin: number }>>({});
@@ -35,7 +36,11 @@ export default function Home() {
         onData: ({ client, data: subData }) => {
             if (subData?.data?.allOrdersUpdated) {
                 const incomingOrders = subData.data.allOrdersUpdated as any[];
-                const readyOrders = incomingOrders.filter((order: any) => order.status === 'READY');
+                const readyOrders = incomingOrders.filter((order: any) => {
+                    if (order.status !== 'READY') return false;
+                    // Show order only if unassigned or assigned to this driver
+                    return !order.driver?.id || order.driver.id === currentDriverId;
+                });
 
                 const unseenOrder = readyOrders.find((order: any) => !seenOrderIds.current.has(order.id));
                 if (unseenOrder) {
@@ -52,6 +57,7 @@ export default function Home() {
     });
 
     const [updateStatus, { loading: updating }] = useMutation(UPDATE_ORDER_STATUS);
+    const [assignDriverToOrder, { loading: assigningOrder }] = useMutation(ASSIGN_DRIVER_TO_ORDER);
     const [updatingId, setUpdatingId] = useState<string | null>(null);
     const [updateOnlineStatus, { loading: updatingStatus }] = useMutation(UPDATE_DRIVER_ONLINE_STATUS);
     
@@ -79,10 +85,55 @@ export default function Home() {
 
     const activeOrders = useMemo(() => {
         const orders = (data as any)?.orders || [];
-        return orders.filter((order: any) =>
-            order.status !== 'DELIVERED' && order.status !== 'CANCELLED'
-        );
-    }, [data]);
+        return orders.filter((order: any) => {
+            if (order.status === 'DELIVERED' || order.status === 'CANCELLED') return false;
+
+            // If assigned, only assigned driver can see it
+            if (order.driver?.id) {
+                return order.driver.id === currentDriverId;
+            }
+
+            // Unassigned orders remain visible for claiming
+            return true;
+        });
+    }, [data, currentDriverId]);
+
+    const handleAcceptAndOpenMap = async (orderId: string) => {
+        if (!currentDriverId) {
+            Alert.alert('Error', 'Driver profile not loaded. Please re-login.');
+            return;
+        }
+
+        const order = activeOrders.find((o: any) => o.id === orderId);
+        if (!order) {
+            Alert.alert('Unavailable', 'Order is no longer available.');
+            return;
+        }
+
+        // If already assigned to another driver, block immediately
+        if (order.driver?.id && order.driver.id !== currentDriverId) {
+            Alert.alert('Already assigned', 'This order has been assigned to another driver.');
+            return;
+        }
+
+        try {
+            if (!order.driver?.id) {
+                await assignDriverToOrder({
+                    variables: {
+                        id: orderId,
+                        driverId: currentDriverId,
+                    },
+                });
+            }
+
+            await refetch();
+            openOrderMap(orderId);
+        } catch (error: any) {
+            console.error('[Home] Failed to assign order', error);
+            Alert.alert('Could not lock order', error?.message || 'Please try again.');
+            await refetch();
+        }
+    };
 
     const getPickupLocation = (order: any) => {
         const business = order?.businesses?.[0]?.business;
@@ -217,6 +268,20 @@ export default function Home() {
         }
     };
 
+    const readyOrders = useMemo(
+        () => activeOrders.filter((order: any) => order.status === 'READY'),
+        [activeOrders],
+    );
+
+    const inDeliveryOrders = useMemo(
+        () => activeOrders.filter((order: any) => order.status === 'OUT_FOR_DELIVERY' || order.status === 'ACCEPTED'),
+        [activeOrders],
+    );
+
+    const openOrderMap = (id: string) => {
+        router.push({ pathname: '/order-map', params: { orderId: id } });
+    };
+
     return (
         <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }}>
             <Modal
@@ -225,50 +290,87 @@ export default function Home() {
                 animationType="fade"
                 onRequestClose={() => setNewOrder(null)}
             >
-                <View className="flex-1 items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
-                    <View className="w-[90%] rounded-3xl p-6" style={{ backgroundColor: theme.colors.card }}>
-                        <Text className="text-xs uppercase tracking-wide mb-2" style={{ color: theme.colors.subtext }}>
-                            New order
-                        </Text>
-                        <Text className="text-2xl font-bold" style={{ color: theme.colors.text }}>
-                            {newOrder ? businessNamesForOrder(newOrder) : ''}
-                        </Text>
-                        <Text className="text-sm mt-2" style={{ color: theme.colors.subtext }}>
-                            Customer at {newOrder?.dropOffLocation?.address}
-                        </Text>
-
-                        <View className="mt-4 rounded-2xl p-4" style={{ backgroundColor: theme.colors.border }}>
-                            <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
-                                Distance
+                <View className="flex-1 items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}>
+                    <View className="w-[92%] rounded-3xl overflow-hidden" style={{ backgroundColor: theme.colors.card }}>
+                        {/* Header */}
+                        <View className="p-6 pb-4" style={{ backgroundColor: theme.colors.income + '15' }}>
+                            <View className="flex-row items-center mb-2">
+                                <View className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: theme.colors.income }} />
+                                <Text className="text-xs font-bold uppercase tracking-wide" style={{ color: theme.colors.income }}>
+                                    NEW ORDER AVAILABLE
+                                </Text>
+                            </View>
+                            <Text className="text-2xl font-bold mt-1" style={{ color: theme.colors.text }}>
+                                {newOrder ? businessNamesForOrder(newOrder) : ''}
                             </Text>
-                            <Text className="text-2xl font-bold" style={{ color: theme.colors.text }}>
-                                {newOrder && orderDistances[newOrder.id]
-                                    ? `${orderDistances[newOrder.id].distanceKm.toFixed(1)} km`
-                                    : 'Calculating...'}
-                            </Text>
-                            <Text className="text-xs mt-1" style={{ color: theme.colors.subtext }}>
-                                {newOrder && orderDistances[newOrder.id]
-                                    ? `Estimated ${Math.round(orderDistances[newOrder.id].durationMin)} min`
-                                    : 'Please wait...'}
+                            <Text className="text-sm mt-2" style={{ color: theme.colors.subtext }}>
+                                📍 {newOrder?.dropOffLocation?.address}
                             </Text>
                         </View>
 
-                        <View className="flex-row gap-3 mt-6">
+                        {/* Distance/ETA Info */}
+                        <View className="px-6 py-5">
+                            {newOrder && orderDistances[newOrder.id] ? (
+                                <View className="flex-row items-stretch gap-3">
+                                    <View className="flex-1 rounded-2xl p-4 items-center" 
+                                        style={{ backgroundColor: theme.colors.border }}>
+                                        <Text className="text-xs font-semibold mb-1" style={{ color: theme.colors.subtext }}>
+                                            DISTANCE
+                                        </Text>
+                                        <Text className="text-3xl font-bold" style={{ color: theme.colors.text }}>
+                                            {orderDistances[newOrder.id].distanceKm.toFixed(1)}
+                                        </Text>
+                                        <Text className="text-xs mt-1" style={{ color: theme.colors.subtext }}>
+                                            kilometers
+                                        </Text>
+                                    </View>
+                                    <View className="flex-1 rounded-2xl p-4 items-center" 
+                                        style={{ backgroundColor: theme.colors.income + '15' }}>
+                                        <Text className="text-xs font-semibold mb-1" style={{ color: theme.colors.income }}>
+                                            ETA
+                                        </Text>
+                                        <Text className="text-3xl font-bold" style={{ color: theme.colors.text }}>
+                                            {Math.round(orderDistances[newOrder.id].durationMin)}
+                                        </Text>
+                                        <Text className="text-xs mt-1" style={{ color: theme.colors.income }}>
+                                            minutes
+                                        </Text>
+                                    </View>
+                                </View>
+                            ) : (
+                                <View className="rounded-2xl p-6 items-center" style={{ backgroundColor: theme.colors.border }}>
+                                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                                    <Text className="text-sm mt-3" style={{ color: theme.colors.subtext }}>
+                                        Calculating route...
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+
+                        {/* Action Buttons */}
+                        <View className="px-6 pb-6 gap-3">
                             <Pressable
-                                className="flex-1 py-3 rounded-2xl items-center"
+                                className="py-4 rounded-2xl items-center"
+                                style={{ backgroundColor: theme.colors.income }}
+                                onPress={() => {
+                                    if (!newOrder) return;
+                                    setNewOrder(null);
+                                    handleAcceptAndOpenMap(newOrder.id);
+                                }}
+                                disabled={assigningOrder}
+                            >
+                                <Text className="text-white font-bold text-base">
+                                    {assigningOrder ? '⏳ Accepting...' : '✅ Accept Order'}
+                                </Text>
+                            </Pressable>
+                            <Pressable
+                                className="py-4 rounded-2xl items-center"
                                 style={{ backgroundColor: theme.colors.border }}
                                 onPress={() => setNewOrder(null)}
                             >
                                 <Text style={{ color: theme.colors.text }} className="font-semibold">
                                     Dismiss
                                 </Text>
-                            </Pressable>
-                            <Pressable
-                                className="flex-1 py-3 rounded-2xl items-center"
-                                style={{ backgroundColor: theme.colors.income }}
-                                onPress={() => setNewOrder(null)}
-                            >
-                                <Text className="text-white font-semibold">View</Text>
                             </Pressable>
                         </View>
                     </View>
@@ -367,34 +469,68 @@ export default function Home() {
                 </View>
             </Modal>
             <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 20 }}>
-                <View className="px-4 pt-4 pb-2 flex-row items-center justify-between">
-                    <Text className="text-2xl font-bold" style={{ color: theme.colors.text }}>
-                        Deliveries
-                    </Text>
-                    <View className="flex-row items-center gap-2">
-                        <Pressable
-                            className="px-3 py-1.5 rounded-full"
-                            style={{ backgroundColor: theme.colors.border }}
-                            onPress={handleLogout}
-                        >
-                            <Text className="text-xs" style={{ color: theme.colors.text }}>
-                                Logout
-                            </Text>
-                        </Pressable>
-                        <Text className="text-sm" style={{ color: theme.colors.subtext }}>
-                            {isOnline ? 'Online' : 'Offline'}
-                        </Text>
-                        <Switch
-                            value={isOnline}
-                            onValueChange={handleOnlineStatusChange}
-                            disabled={updatingStatus}
-                            trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-                            thumbColor={isOnline ? '#ffffff' : '#f4f3f4'}
-                        />
+                <View className="px-4 pt-4 pb-2">
+                    <View
+                        className="rounded-3xl p-4"
+                        style={{
+                            backgroundColor: theme.colors.card,
+                            borderColor: theme.colors.border,
+                            borderWidth: 1,
+                        }}
+                    >
+                        <View className="flex-row items-center justify-between">
+                            <View>
+                                <Text className="text-2xl font-bold" style={{ color: theme.colors.text }}>
+                                    Driver Console
+                                </Text>
+                                <Text className="text-xs mt-1" style={{ color: theme.colors.subtext }}>
+                                    Live dispatch and navigation
+                                </Text>
+                            </View>
+                            <Pressable
+                                className="px-3 py-2 rounded-full"
+                                style={{ backgroundColor: theme.colors.border }}
+                                onPress={handleLogout}
+                            >
+                                <Text className="text-xs font-semibold" style={{ color: theme.colors.text }}>
+                                    Logout
+                                </Text>
+                            </Pressable>
+                        </View>
+
+                        <View className="mt-4 flex-row items-center justify-between">
+                            <View className="flex-row items-center gap-2">
+                                <View
+                                    className="w-2.5 h-2.5 rounded-full"
+                                    style={{ backgroundColor: isOnline ? '#22c55e' : '#ef4444' }}
+                                />
+                                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
+                                    {isOnline ? 'Online (Receiving Orders)' : 'Offline'}
+                                </Text>
+                            </View>
+                            <Switch
+                                value={isOnline}
+                                onValueChange={handleOnlineStatusChange}
+                                disabled={updatingStatus}
+                                trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                                thumbColor={isOnline ? '#ffffff' : '#f4f3f4'}
+                            />
+                        </View>
+
+                        <View className="mt-4 flex-row gap-2">
+                            <View className="flex-1 rounded-2xl p-4" style={{ backgroundColor: theme.colors.income + '15', borderWidth: 1, borderColor: theme.colors.income + '30' }}>
+                                <Text className="text-xs font-semibold" style={{ color: theme.colors.income }}>READY NOW</Text>
+                                <Text className="text-3xl font-bold mt-1" style={{ color: theme.colors.text }}>{readyOrders.length}</Text>
+                            </View>
+                            <View className="flex-1 rounded-2xl p-4" style={{ backgroundColor: theme.colors.primary + '15', borderWidth: 1, borderColor: theme.colors.primary + '30' }}>
+                                <Text className="text-xs font-semibold" style={{ color: theme.colors.primary }}>ACTIVE</Text>
+                                <Text className="text-3xl font-bold mt-1" style={{ color: theme.colors.text }}>{inDeliveryOrders.length}</Text>
+                            </View>
+                        </View>
                     </View>
                 </View>
 
-                <View className="px-4 mt-4">
+                <View className="px-4 mt-2">
                     {loading && (
                         <Text className="text-sm mt-2" style={{ color: theme.colors.subtext }}>
                             Loading orders...
@@ -413,72 +549,154 @@ export default function Home() {
                         </Text>
                     )}
 
-                    <View className="mt-4 space-y-3">
-                        {activeOrders.map((order: any) => {
-                            const businessNames = order.businesses
-                                .map((b: any) => b.business.name)
-                                .join(', ');
-                            const totalItems = order.businesses.reduce(
-                                (sum: number, b: any) => sum + b.items.reduce((s: number, i: any) => s + i.quantity, 0),
-                                0
-                            );
+                    {readyOrders.length > 0 && (
+                        <View className="mt-6">
+                            <Text className="text-sm font-bold mb-3" style={{ color: theme.colors.text }}>
+                                🔥 Ready for Pickup
+                            </Text>
+                            <View className="space-y-3">
+                                {readyOrders.map((order: any) => {
+                                    const businessNames = order.businesses
+                                        .map((b: any) => b.business.name)
+                                        .join(', ');
+                                    const distance = orderDistances[order.id];
 
-                            return (
-                                <View
-                                    key={order.id}
-                                    className="bg-card rounded-2xl p-4 mb-3"
-                                    style={{ borderColor: theme.colors.border, borderWidth: 1 }}
-                                >
-                                    <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
-                                        {businessNames}
-                                    </Text>
-                                    <Text className="text-sm" style={{ color: theme.colors.subtext }}>
-                                        {order.dropOffLocation.address}
-                                    </Text>
-                                    <Text className="text-xs mt-1" style={{ color: theme.colors.subtext }}>
-                                        {totalItems} item{totalItems !== 1 ? 's' : ''} · Status: {order.status}
-                                    </Text>
-                                    {orderDistances[order.id] && (
-                                        <Text className="text-xs mt-1 font-semibold" style={{ color: theme.colors.income }}>
-                                            📍 {orderDistances[order.id].distanceKm.toFixed(1)} km · ~{Math.round(orderDistances[order.id].durationMin)} min
-                                        </Text>
-                                    )}
-
-                                    <View className="flex-row gap-2 mt-3">
-                                        <Button
-                                            title="Details"
-                                            size="sm"
-                                            variant="outline"
+                                    return (
+                                        <Pressable
+                                            key={order.id}
+                                            className="rounded-3xl overflow-hidden"
+                                            style={{
+                                                backgroundColor: theme.colors.card,
+                                                borderWidth: 2,
+                                                borderColor: theme.colors.income + '40',
+                                            }}
                                             onPress={() => setSelectedOrder(order)}
-                                        />
-                                        {order.status === 'READY' && (
-                                            <Button
-                                                title="Start Delivery"
-                                                size="sm"
-                                                onPress={() => handleUpdate(order.id, 'OUT_FOR_DELIVERY')}
-                                                loading={updating && updatingId === order.id}
-                                            />
-                                        )}
-                                        {order.status === 'OUT_FOR_DELIVERY' && (
-                                            <Button
-                                                title="Mark Delivered"
-                                                size="sm"
-                                                variant="success"
-                                                onPress={() => handleUpdate(order.id, 'DELIVERED')}
-                                                loading={updating && updatingId === order.id}
-                                            />
-                                        )}
-                                        <Button
-                                            title="View Map"
-                                            size="sm"
-                                            variant="outline"
-                                            onPress={() => router.push({ pathname: '/order-map', params: { orderId: order.id } })}
-                                        />
-                                    </View>
-                                </View>
-                            );
-                        })}
-                    </View>
+                                        >
+                                            {/* Top Section - Business & Customer */}
+                                            <View className="p-5">
+                                                <Text className="text-lg font-bold mb-1" style={{ color: theme.colors.text }}>
+                                                    {businessNames}
+                                                </Text>
+                                                <Text className="text-sm" style={{ color: theme.colors.subtext }} numberOfLines={1}>
+                                                    📍 {order.dropOffLocation.address}
+                                                </Text>
+
+                                                {/* ETA Banner */}
+                                                {distance && (
+                                                    <View className="mt-4 flex-row items-center justify-between rounded-2xl p-4" 
+                                                        style={{ backgroundColor: theme.colors.income + '15' }}>
+                                                        <View>
+                                                            <Text className="text-xs font-semibold" style={{ color: theme.colors.income }}>
+                                                                ESTIMATED TIME
+                                                            </Text>
+                                                            <Text className="text-3xl font-bold mt-1" style={{ color: theme.colors.text }}>
+                                                                {Math.round(distance.durationMin)} min
+                                                            </Text>
+                                                        </View>
+                                                        <View className="items-end">
+                                                            <Text className="text-xs font-semibold" style={{ color: theme.colors.income }}>
+                                                                DISTANCE
+                                                            </Text>
+                                                            <Text className="text-3xl font-bold mt-1" style={{ color: theme.colors.text }}>
+                                                                {distance.distanceKm.toFixed(1)} <Text className="text-lg">km</Text>
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+                                                )}
+
+                                                {/* Loading State */}
+                                                {!distance && (
+                                                    <View className="mt-4 rounded-2xl p-4 items-center" 
+                                                        style={{ backgroundColor: theme.colors.border }}>
+                                                        <ActivityIndicator size="small" color={theme.colors.primary} />
+                                                        <Text className="text-xs mt-2" style={{ color: theme.colors.subtext }}>
+                                                            Calculating route...
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                            </View>
+
+                                            {/* Action Button */}
+                                            <Pressable
+                                                className="py-5 items-center"
+                                                style={{ backgroundColor: theme.colors.income }}
+                                                onPress={() => handleAcceptAndOpenMap(order.id)}
+                                                disabled={assigningOrder}
+                                            >
+                                                <Text className="text-white font-bold text-base">
+                                                    {assigningOrder ? '⏳ Accepting...' : '✅ Accept & Start Navigation'}
+                                                </Text>
+                                            </Pressable>
+                                        </Pressable>
+                                    );
+                                })}
+                            </View>
+                        </View>
+                    )}
+
+                    {inDeliveryOrders.length > 0 && (
+                        <View className="mt-6">
+                            <Text className="text-sm font-bold mb-3" style={{ color: theme.colors.text }}>
+                                🚗 Active Deliveries
+                            </Text>
+                            <View className="space-y-3">
+                                {inDeliveryOrders.map((order: any) => {
+                                    const businessNames = order.businesses
+                                        .map((b: any) => b.business.name)
+                                        .join(', ');
+
+                                    return (
+                                        <View
+                                            key={order.id}
+                                            className="rounded-3xl p-5"
+                                            style={{
+                                                backgroundColor: theme.colors.card,
+                                                borderWidth: 2,
+                                                borderColor: theme.colors.primary + '40',
+                                            }}
+                                        >
+                                            <View className="flex-row items-center mb-3">
+                                                <View className="w-2.5 h-2.5 rounded-full mr-2" 
+                                                    style={{ backgroundColor: theme.colors.primary }} />
+                                                <Text className="text-xs font-bold" style={{ color: theme.colors.primary }}>
+                                                    {order.status === 'ACCEPTED' ? 'HEADING TO PICKUP' : 'OUT FOR DELIVERY'}
+                                                </Text>
+                                            </View>
+
+                                            <Text className="text-lg font-bold mb-1" style={{ color: theme.colors.text }}>
+                                                {businessNames}
+                                            </Text>
+                                            <Text className="text-sm" style={{ color: theme.colors.subtext }} numberOfLines={1}>
+                                                📍 {order.dropOffLocation.address}
+                                            </Text>
+
+                                            <View className="flex-row gap-2 mt-4">
+                                                <Pressable
+                                                    className="flex-1 py-3 rounded-2xl items-center"
+                                                    style={{ backgroundColor: theme.colors.primary }}
+                                                    onPress={() => openOrderMap(order.id)}
+                                                >
+                                                    <Text className="text-white font-bold">Continue Navigation</Text>
+                                                </Pressable>
+                                            </View>
+                                        </View>
+                                    );
+                                })}
+                            </View>
+                        </View>
+                    )}
+
+                    {!loading && readyOrders.length === 0 && inDeliveryOrders.length === 0 && (
+                        <View className="mt-20 items-center">
+                            <Text className="text-6xl mb-4">📦</Text>
+                            <Text className="text-lg font-semibold mb-2" style={{ color: theme.colors.text }}>
+                                All Clear!
+                            </Text>
+                            <Text className="text-sm text-center px-8" style={{ color: theme.colors.subtext }}>
+                                No deliveries right now. New orders will appear here automatically.
+                            </Text>
+                        </View>
+                    )}
                 </View>
             </ScrollView>
         </SafeAreaView>

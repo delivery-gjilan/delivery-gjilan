@@ -1,14 +1,29 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, ActivityIndicator, Pressable, StyleSheet } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, ActivityIndicator, Pressable, StyleSheet, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Mapbox from '@rnmapbox/maps';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import * as Location from 'expo-location';
-import { useQuery } from '@apollo/client/react';
-import { GET_ORDER } from '@/graphql/operations/orders';
-import { fetchNavigationRoute, fetchRouteGeometry, NavigationStep } from '@/utils/mapbox';
+import { useMutation, useQuery } from '@apollo/client/react';
+import { ASSIGN_DRIVER_TO_ORDER, GET_ORDER, UPDATE_ORDER_STATUS } from '@/graphql/operations/orders';
 import { useTheme } from '@/hooks/useTheme';
+import { useDriverLocationOverrideStore } from '@/store/driverLocationOverrideStore';
+import { useAuthStore } from '@/store/authStore';
 import type { Feature, LineString } from 'geojson';
+
+// ─────────────────────── Custom Hooks ───────────────────────
+import { useDriverLocation } from '@/hooks/useDriverLocation';
+import { useNavigationState } from '@/hooks/useNavigationState';
+import { useNavigationCamera } from '@/hooks/useNavigationCamera';
+import { useNavigationRoute } from '@/hooks/useNavigationRoute';
+import { useOffRouteDetection } from '@/hooks/useOffRouteDetection';
+import { useNavigationSteps } from '@/hooks/useNavigationSteps';
+import { useNavigationSimulation } from '@/hooks/useNavigationSimulation';
+import { usePredictedTracking } from '@/hooks/usePredictedTracking';
+
+// ─────────────────────── Components ───────────────────────
+import { InstructionBanner } from '@/components/navigation/InstructionBanner';
+import { NavigationBottomPanel } from '@/components/navigation/NavigationBottomPanel';
+import { RecenterButton } from '@/components/navigation/RecenterButton';
 
 /* ─────────────────────── constants ─────────────────────── */
 
@@ -16,79 +31,7 @@ const GJILAN_CENTER: [number, number] = [21.4694, 42.4635];
 const GJILAN_NE: [number, number] = [21.51, 42.50];
 const GJILAN_SW: [number, number] = [21.42, 42.43];
 const MAP_STYLE = 'mapbox://styles/mapbox/dark-v11';
-const NAV_ZOOM = 18.5; // Close, immersive view (Google Maps navigation style)
-const NAV_PITCH = 55; // 3D tilted view (Google Maps uses ~50-60°)
-const NAV_HEADING_FOLLOW_BEARING = true; // Rotate map based on driver heading
-const NAV_CAMERA_ANIMATION_MS = 250; // Smooth, responsive updates (not sluggish)
-const OVERVIEW_ZOOM = 13;
-const REROUTE_INTERVAL_MS = 30_000;
-const OFF_ROUTE_THRESHOLD_M = 80;
-const DESTINATION_REACHED_THRESHOLD_M = 25; // Auto-stop when within 25m
-
-/* ─────────────────────── helpers ─────────────────────── */
-
-function haversineMeters(
-    a: { latitude: number; longitude: number },
-    b: { latitude: number; longitude: number },
-): number {
-    const R = 6_371_000;
-    const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
-    const dLng = ((b.longitude - a.longitude) * Math.PI) / 180;
-    const lat1 = (a.latitude * Math.PI) / 180;
-    const lat2 = (b.latitude * Math.PI) / 180;
-    const s =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
-}
-
-/** Minimum distance (m) from a point to the nearest vertex on the polyline. */
-function minDistToPolyline(
-    point: { latitude: number; longitude: number },
-    coords: Array<[number, number]>,
-): number {
-    let best = Number.POSITIVE_INFINITY;
-    for (const c of coords) {
-        const d = haversineMeters(point, { latitude: c[1], longitude: c[0] });
-        if (d < best) best = d;
-    }
-    return best;
-}
-
-function formatDist(meters: number): string {
-    if (meters >= 1000) return `${(meters / 1000).toFixed(1)} km`;
-    return `${Math.round(meters)} m`;
-}
-
-function maneuverArrow(type?: string, modifier?: string): string {
-    if (type === 'arrive') return '🏁';
-    if (type === 'depart') return '🚗';
-    if (type === 'roundabout' || type === 'rotary') return '🔄';
-    if (modifier?.includes('uturn')) return '↩️';
-    if (modifier?.includes('sharp') && modifier.includes('left')) return '↰';
-    if (modifier?.includes('sharp') && modifier.includes('right')) return '↱';
-    if (modifier?.includes('left')) return '⬅';
-    if (modifier?.includes('right')) return '➡';
-    if (modifier?.includes('straight')) return '⬆';
-    return '⬆';
-}
-
-/** Calculate bearing (degrees, 0-360) from point A to B (0° = North, 90° = East) */
-function calculateBearing(
-    from: { latitude: number; longitude: number },
-    to: { latitude: number; longitude: number },
-): number {
-    const dLat = ((to.latitude - from.latitude) * Math.PI) / 180;
-    const dLng = ((to.longitude - from.longitude) * Math.PI) / 180;
-    const lat1 = (from.latitude * Math.PI) / 180;
-    const lat2 = (to.latitude * Math.PI) / 180;
-
-    const y = Math.sin(dLng) * Math.cos(lat2);
-    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
-
-    const bearing = (Math.atan2(y, x) * 180) / Math.PI;
-    return (bearing + 360) % 360;
-}
+const DESTINATION_REACHED_THRESHOLD_M = 25;
 
 /* ═══════════════════════════════════════════════════════════ */
 
@@ -97,16 +40,25 @@ export default function OrderMapScreen() {
     const theme = useTheme();
     const insets = useSafeAreaInsets();
     const { orderId } = useLocalSearchParams<{ orderId?: string }>();
+    const { setLocationOverride, clearLocationOverride } = useDriverLocationOverrideStore();
+    const currentDriverId = useAuthStore((state) => state.user?.id);
 
-    const { data, loading } = useQuery(GET_ORDER, {
+    // ═══════════════ Query Order Data ═══════════════
+    const { data, loading, refetch } = useQuery(GET_ORDER, {
         variables: { id: orderId },
         skip: !orderId,
     });
+    const [updateOrderStatus, { loading: updatingOrderStatus }] = useMutation(UPDATE_ORDER_STATUS);
+    const [assignDriverToOrder] = useMutation(ASSIGN_DRIVER_TO_ORDER);
 
     const order = (data as any)?.order;
+    const [previewRoutePulse, setPreviewRoutePulse] = useState(0.6);
+    const [showRelockChip, setShowRelockChip] = useState(false);
+    const relockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastViewportSaveRef = useRef(0);
+    const wasFollowingBeforeOverviewRef = useRef(false);
 
-    /* ── derived points ── */
-
+    // ═══════════════ Derive Points ═══════════════
     const pickup = useMemo(() => {
         const biz = order?.businesses?.[0]?.business;
         if (!biz?.location) return null;
@@ -135,236 +87,470 @@ export default function OrderMapScreen() {
         'OUT_FOR_DELIVERY',
     ].includes(order?.status);
 
-    const hasPickedUp = order?.status === 'OUT_FOR_DELIVERY';
+    // ═══════════════ Custom Hooks ═══════════════
+    const { location, locationRef, permissionGranted, error: locationError } = useDriverLocation({
+        smoothing: true,
+        timeInterval: 2000,
+        distanceFilter: 5,
+    });
 
-    /* ── refs ── */
+    const {
+        isSimulating,
+        simulatedLocation,
+        startSimulation,
+        stopSimulation,
+        toggleSimulation,
+    } = useNavigationSimulation({
+        speedKmh: 40, // Realistic city driving speed
+        updateIntervalMs: 200, // Update every 200ms for ultra-smooth movement
+    });
 
-    const cameraRef = useRef<Mapbox.Camera>(null);
-    const mapRef = useRef<Mapbox.MapView>(null);
-    const driverLocRef = useRef<Location.LocationObjectCoords | null>(null);
-    const hasFitted = useRef(false);
-    const lastRerouteRef = useRef(0);
-    const prevPickedUpRef = useRef(hasPickedUp);
+    // Use simulated location when simulation is active, otherwise use real GPS
+    const effectiveLocation = isSimulating ? simulatedLocation : location;
 
-    /* ── state ── */
+    const {
+        state,
+        context,
+        isNavigating,
+        isNavigatingToPickup,
+        isNavigatingToDropoff,
+        isInOverview,
+        startNavigation: startNav,
+        markPickupComplete,
+        markDeliveryComplete,
+        setNavigatingToPickup,
+        setNavigatingToDropoff,
+        stopNavigation: stopNav,
+        showOverview,
+    } = useNavigationState();
 
-    const [driverLocation, setDriverLocation] = useState<Location.LocationObjectCoords | null>(null);
-    const [routeCoords, setRouteCoords] = useState<Array<[number, number]>>([]);
-    const [eta, setEta] = useState<number | null>(null);
-    const [distKm, setDistKm] = useState<number | null>(null);
-    const [isNavigating, setIsNavigating] = useState(false);
-    const [navSteps, setNavSteps] = useState<NavigationStep[]>([]);
-    const [stepIdx, setStepIdx] = useState(0);
-    const [isFollowing, setIsFollowing] = useState(true); // Track if camera is auto-following
+    const {
+        cameraRef,
+        cameraState,
+        isFollowing,
+        followMode,
+        enableFollowMode,
+        disableFollowMode,
+        setFollowMode,
+        cycleFollowMode,
+        recenter,
+        fitBounds,
+        handleMapPress,
+        saveViewportPreference,
+    } = useNavigationCamera();
 
-    // Use real GPS location
-    const effectiveLocation = driverLocation;
+    const driverMarkerRef = useRef<any>(null);
+    const driverArrowRef = useRef<any>(null);
 
-    /* ── watch driver GPS ── */
+    // Imperative 60 FPS marker + camera prediction loop
+    // Only follow camera when explicitly locked by user
+    usePredictedTracking({
+        sourceLocation: effectiveLocation,
+        isActive: Boolean(effectiveLocation),
+        followCamera: isFollowing, // Follow only when locked, regardless of navigation state
+        cameraRef,
+        markerRef: driverMarkerRef,
+        arrowRef: driverArrowRef,
+        zoomLevel: cameraState.zoom || 18.5,
+        pitch: cameraState.pitch || 58,
+        followMode,
+        deadZoneOffsetMeters: 95,
+        headingSnapThresholdDeg: 10,
+        adaptiveZoom: true,
+    });
+
+    const {
+        route,
+        isLoading: isRouteLoading,
+        error: routeError,
+        fetchRoute,
+        clearRoute,
+        shouldReroute,
+        lastRerouteTime,
+    } = useNavigationRoute();
+
+    const { checkOffRoute, calculateDistanceToDestination } = useOffRouteDetection();
+
+    const { currentStep, nextStep, reset: resetSteps } = useNavigationSteps(
+        route?.steps || [],
+        effectiveLocation,
+    );
+
+    // ═══════════════ Navigation Logic ═══════════════
+
+    // Keep navigation leg aligned with backend order status
+    useEffect(() => {
+        if (!orderId || !pickup || !dropoff) return;
+
+        if (order?.status === 'ACCEPTED') {
+            if (isNavigating && !isNavigatingToPickup) {
+                setNavigatingToPickup();
+            }
+            return;
+        }
+
+        if (order?.status === 'READY') {
+            // READY should preview route to pickup, but not force navigation start
+            if (isNavigating && !isNavigatingToPickup) {
+                setNavigatingToPickup();
+            }
+            return;
+        }
+
+        if (order?.status === 'OUT_FOR_DELIVERY') {
+            if (!isNavigating) {
+                startNav(orderId, pickup, dropoff);
+            }
+            if (!isNavigatingToDropoff) {
+                setNavigatingToDropoff();
+            }
+        }
+    }, [
+        order?.status,
+        orderId,
+        pickup,
+        dropoff,
+        isNavigating,
+        isNavigatingToPickup,
+        isNavigatingToDropoff,
+        startNav,
+        setNavigatingToPickup,
+        setNavigatingToDropoff,
+    ]);
+
+    // ═══════════════ Status-Driven Single-Leg Routing ═══════════════
+    // Preview route before navigation starts OR fetch route during navigation
+    // Route leg is determined purely by order status:
+    // - ACCEPTED/READY → driver to pickup
+    // - OUT_FOR_DELIVERY → driver to dropoff
+    useEffect(() => {
+        if (!effectiveLocation || !pickup || !dropoff) return;
+
+        // Determine destination based on order status
+        const destination =
+            order?.status === 'ACCEPTED' || order?.status === 'READY'
+                ? pickup
+                : order?.status === 'OUT_FOR_DELIVERY'
+                ? dropoff
+                : null;
+
+        if (!destination) {
+            clearRoute();
+            return;
+        }
+
+        fetchRoute(effectiveLocation, destination);
+    }, [
+        effectiveLocation,
+        order?.status,
+        pickup,
+        dropoff,
+        fetchRoute,
+        clearRoute,
+    ]);
+
+    // Simulation remains manual-only (no auto-start)
+
+    // Sync simulated location into heartbeat pipeline for admin tracking
+    useEffect(() => {
+        if (isSimulating && simulatedLocation) {
+            setLocationOverride({
+                latitude: simulatedLocation.latitude,
+                longitude: simulatedLocation.longitude,
+            });
+            return;
+        }
+
+        clearLocationOverride();
+    }, [isSimulating, simulatedLocation, setLocationOverride, clearLocationOverride]);
 
     useEffect(() => {
-        let sub: Location.LocationSubscription | null = null;
-        let alive = true;
-
-        (async () => {
-            const { status } = await Location.requestForegroundPermissionsAsync();
-            if (status !== 'granted' || !alive) return;
-            sub = await Location.watchPositionAsync(
-                {
-                    accuracy: Location.Accuracy.BestForNavigation,
-                    timeInterval: 2000,
-                    distanceInterval: 5,
-                },
-                (loc) => {
-                    if (!alive) return;
-                    driverLocRef.current = loc.coords;
-                    setDriverLocation(loc.coords);
-                },
-            );
-        })();
-
         return () => {
-            alive = false;
-            sub?.remove();
+            clearLocationOverride();
+        };
+    }, [clearLocationOverride]);
+
+    // Reroute logic: off-route detection + periodic updates
+    useEffect(() => {
+        if (!isNavigating || !effectiveLocation || !route) return;
+
+        const destination = isNavigatingToPickup ? pickup : dropoff;
+        if (!destination) return;
+
+        const offRoute = checkOffRoute(effectiveLocation, route.coordinates);
+        const needsReroute = shouldReroute(effectiveLocation, offRoute);
+
+        if (needsReroute) {
+            fetchRoute(effectiveLocation, destination);
+        }
+    }, [
+        isNavigating,
+        effectiveLocation,
+        route,
+        pickup,
+        dropoff,
+        isNavigatingToPickup,
+        checkOffRoute,
+        shouldReroute,
+        fetchRoute,
+    ]);
+
+    // Auto-complete pickup/dropoff when destination reached
+    useEffect(() => {
+        if (!isNavigating || !effectiveLocation) return;
+
+        const destination = isNavigatingToPickup ? pickup : isNavigatingToDropoff ? dropoff : null;
+        if (!destination) return;
+
+        const distanceToDestination = calculateDistanceToDestination(effectiveLocation, destination);
+
+        if (distanceToDestination !== null && distanceToDestination < DESTINATION_REACHED_THRESHOLD_M) {
+            if (isNavigatingToPickup) {
+                markPickupComplete();
+            } else if (isNavigatingToDropoff) {
+                markDeliveryComplete();
+            }
+        }
+    }, [
+        isNavigating,
+        effectiveLocation,
+        pickup,
+        dropoff,
+        isNavigatingToPickup,
+        isNavigatingToDropoff,
+        calculateDistanceToDestination,
+        markPickupComplete,
+        markDeliveryComplete,
+    ]);
+
+    // No auto-fit camera behavior - user controls camera manually with lock/unlock/recenter buttons
+
+    // ═══════════════ Handlers ═══════════════
+    const handleStartNavigation = () => {
+        if (!pickup || !dropoff || !orderId) return;
+        startNav(orderId, pickup, dropoff);
+
+        if (order?.status === 'OUT_FOR_DELIVERY') {
+            setNavigatingToDropoff();
+        } else {
+            setNavigatingToPickup();
+        }
+
+        // Don't force follow mode - let driver control camera manually
+        // enableFollowMode(); // Removed: allow manual camera control like Google Maps
+    };
+
+    const handleOutForDelivery = async () => {
+        if (!pickup || !dropoff || !orderId) return;
+        if (!currentDriverId) {
+            Alert.alert('Error', 'Driver profile not loaded. Please re-login.');
+            return;
+        }
+
+        if (order?.status !== 'READY') {
+            Alert.alert('Not ready', 'Order must be READY before going out for delivery.');
+            return;
+        }
+
+        if (order?.driver?.id && order.driver.id !== currentDriverId) {
+            Alert.alert('Already assigned', 'This order is assigned to another driver.');
+            return;
+        }
+
+        try {
+            if (!order?.driver?.id) {
+                await assignDriverToOrder({
+                    variables: {
+                        id: orderId,
+                        driverId: currentDriverId,
+                    },
+                });
+            }
+        } catch (error) {
+            console.error('[OrderMap] Failed to assign before OUT_FOR_DELIVERY', error);
+            Alert.alert('Could not lock order', 'Please try again.');
+            await refetch();
+            return;
+        }
+
+        // Start dropoff leg immediately for a responsive UX
+        if (!isNavigating) {
+            startNav(orderId, pickup, dropoff);
+        }
+        setNavigatingToDropoff();
+        enableFollowMode();
+
+        try {
+            await updateOrderStatus({
+                variables: {
+                    id: orderId,
+                    status: 'OUT_FOR_DELIVERY',
+                },
+            });
+            await refetch();
+        } catch (error) {
+            console.error('[OrderMap] Failed to update status to OUT_FOR_DELIVERY', error);
+            Alert.alert('Update failed', 'Order could not be moved to OUT_FOR_DELIVERY.');
+            await refetch();
+        }
+    };
+
+    const handleStopNavigation = () => {
+        stopNav();
+        clearRoute();
+        resetSteps();
+        disableFollowMode();
+        stopSimulation(); // Stop simulation when navigation ends
+    };
+
+    const handleRecenter = () => {
+        if (!effectiveLocation || !cameraRef.current) return;
+        
+        // Recenter to driver position with navigation settings
+        cameraRef.current.setCamera({
+            centerCoordinate: [effectiveLocation.longitude, effectiveLocation.latitude],
+            zoomLevel: 18.5,
+            pitch: 60,
+            heading: effectiveLocation.heading || 0,
+            animationDuration: 600,
+        });
+    };
+
+    const handleToggleSimulation = () => {
+        if (!route || route.coordinates.length < 2) {
+            Alert.alert('No route', 'Cannot start simulation without a route');
+            return;
+        }
+
+        if (isSimulating) {
+            stopSimulation();
+        } else {
+            // Start simulation following the actual route polyline
+            startSimulation(route.coordinates);
+        }
+    };
+
+    const handleToggleCameraLock = () => {
+        if (followMode === 'free') {
+            setFollowMode('heading-up');
+            setShowRelockChip(false);
+            return;
+        }
+
+        setFollowMode('free');
+    };
+
+    const handleCycleFollowMode = () => {
+        cycleFollowMode();
+        setShowRelockChip(false);
+    };
+
+    const clearRelockTimer = () => {
+        if (relockTimerRef.current) {
+            clearTimeout(relockTimerRef.current);
+            relockTimerRef.current = null;
+        }
+    };
+
+    const triggerAutoUnlock = () => {
+        if (!isFollowing) return;
+
+        setFollowMode('free');
+        setShowRelockChip(true);
+        clearRelockTimer();
+
+        relockTimerRef.current = setTimeout(() => {
+            const speed = effectiveLocation?.speed ?? 0;
+            if (speed >= 5) {
+                setFollowMode('heading-up');
+                setShowRelockChip(false);
+                return;
+            }
+
+            setShowRelockChip(true);
+        }, 8000);
+    };
+
+    const handleMapTouchStart = () => {
+        triggerAutoUnlock();
+    };
+
+    const handleCameraChanged = (event: any) => {
+        const now = Date.now();
+        if (now - lastViewportSaveRef.current < 1200) return;
+
+        const properties = event?.properties;
+        const zoom = properties?.zoom;
+        const pitch = properties?.pitch;
+
+        if (typeof zoom === 'number' && typeof pitch === 'number') {
+            saveViewportPreference(zoom, pitch);
+            lastViewportSaveRef.current = now;
+        }
+    };
+
+    const handleOverviewPressIn = () => {
+        if (!route || route.coordinates.length < 2) return;
+        wasFollowingBeforeOverviewRef.current = isFollowing;
+        setFollowMode('free');
+        fitBounds(route.coordinates, [130, 60, 300, 60]);
+    };
+
+    const handleOverviewPressOut = () => {
+        if (!wasFollowingBeforeOverviewRef.current || !effectiveLocation) return;
+        setFollowMode('heading-up');
+        recenter(effectiveLocation);
+        wasFollowingBeforeOverviewRef.current = false;
+    };
+
+    useEffect(() => {
+        return () => {
+            clearRelockTimer();
         };
     }, []);
 
-
-
-    useEffect(() => {
-        if (isNavigating || !pickup || !dropoff) return;
-        fetchRouteGeometry(pickup, dropoff).then((r) => {
-            if (!r) return;
-            setRouteCoords(r.coordinates);
-            setEta(Math.round(r.durationMin));
-            setDistKm(r.distanceKm);
-        });
-    }, [pickup, dropoff, isNavigating]);
-
-    /* ── navigation route fetch (uses ref for driver location) ── */
-
-    const fetchNavRoute = useCallback(async () => {
-        const loc = driverLocRef.current;
-        if (!dropoff) return;
-
-        // Use real GPS or fall back to Gjilan center
-        const from = loc
-            ? { latitude: loc.latitude, longitude: loc.longitude }
-            : { latitude: GJILAN_CENTER[1], longitude: GJILAN_CENTER[0] };
-        const dest = { latitude: dropoff.latitude, longitude: dropoff.longitude };
-
-        // Include pickup as waypoint if driver hasn't picked up yet
-        const waypoints =
-            !hasPickedUp && pickup
-                ? [{ latitude: pickup.latitude, longitude: pickup.longitude }]
-                : [];
-
-        const nav = await fetchNavigationRoute(from, dest, waypoints);
-        if (!nav) {
-            console.log('[NAV] fetchNavRoute: failed to fetch navigation');
-            return;
-        }
-
-        console.log('[NAV] *** fetchNavRoute SUCCESS ***, got', nav.coordinates.length, 'coordinates,', nav.steps.length, 'steps');
-
-        setRouteCoords(nav.coordinates);
-        setEta(Math.round(nav.durationMin));
-        setDistKm(nav.distanceKm);
-        setNavSteps(nav.steps);
-        setStepIdx(0);
-        lastRerouteRef.current = Date.now();
-    }, [pickup, dropoff, hasPickedUp]);
-
-    /* ── start / stop navigation ── */
-
-    const startNavigation = useCallback(() => {
-        console.log('[NAV] *** START NAVIGATION ***');
-        setIsNavigating(true);
-        // fetchNavRoute will be called by the effect when isNavigating changes
-    }, []);
-
-    const stopNavigation = useCallback(() => {
-        console.log('[NAV] *** STOP NAVIGATION ***');
-        setIsNavigating(false);
-        setNavSteps([]);
-        setStepIdx(0);
-        hasFitted.current = false;
-    }, []);
-
-    /* ── reroute: periodic + off-route detection ── */
-
-    useEffect(() => {
-        if (!isNavigating) {
-            console.log('[NAV] Navigation ended');
-            return;
-        }
-        console.log('[NAV] Navigation started, calling fetchNavRoute');
-        fetchNavRoute();
-    }, [isNavigating, fetchNavRoute]);
-
-    useEffect(() => {
-        if (!isNavigating || !effectiveLocation || routeCoords.length < 2) return;
-
-        const now = Date.now();
-        const driverPt = { latitude: effectiveLocation.latitude, longitude: effectiveLocation.longitude };
-        const offRoute = minDistToPolyline(driverPt, routeCoords) > OFF_ROUTE_THRESHOLD_M;
-        const stale = now - lastRerouteRef.current > REROUTE_INTERVAL_MS;
-
-        if (offRoute || stale) {
-            fetchNavRoute();
-        }
-    }, [isNavigating, effectiveLocation, routeCoords, fetchNavRoute]);
-
-    /* ── reroute on order status change (picked up → new destination) ── */
-
-    useEffect(() => {
-        if (isNavigating && prevPickedUpRef.current !== hasPickedUp) {
-            prevPickedUpRef.current = hasPickedUp;
-            lastRerouteRef.current = 0;
-            fetchNavRoute();
-        }
-    }, [isNavigating, hasPickedUp, fetchNavRoute]);
-
-    /* ── auto-stop when destination reached ── */
-
-    useEffect(() => {
-        if (!isNavigating || !effectiveLocation || !dropoff) return;
-
-        const distToDestM = haversineMeters(effectiveLocation, dropoff);
-        if (distToDestM < DESTINATION_REACHED_THRESHOLD_M) {
-            stopNavigation();
-        }
-    }, [isNavigating, effectiveLocation, dropoff, stopNavigation]);
-
-    /* ── track current navigation step ── */
-
-    useEffect(() => {
-        if (!isNavigating || !effectiveLocation || navSteps.length === 0) return;
-
-        const driverPt = { latitude: effectiveLocation.latitude, longitude: effectiveLocation.longitude };
-        let bestIdx = stepIdx;
-        let bestDist = Infinity;
-
-        for (let i = stepIdx; i < navSteps.length; i++) {
-            const step = navSteps[i];
-            if (!step) continue;
-            const d = haversineMeters(driverPt, {
-                latitude: step.maneuverLocation[1],
-                longitude: step.maneuverLocation[0],
-            });
-            if (d < bestDist) {
-                bestDist = d;
-                bestIdx = i;
-            }
-        }
-
-        if (bestDist < 30 && bestIdx < navSteps.length - 1) {
-            bestIdx += 1;
-        }
-
-        if (bestIdx !== stepIdx) setStepIdx(bestIdx);
-    }, [isNavigating, effectiveLocation, navSteps, stepIdx]);
-
-    /* ── initial camera fit (overview) ── */
-
-    useEffect(() => {
-        if (isNavigating || hasFitted.current || !cameraRef.current) return;
-
-        const pts: Array<[number, number]> = [];
-        if (pickup) pts.push([pickup.longitude, pickup.latitude]);
-        if (dropoff) pts.push([dropoff.longitude, dropoff.latitude]);
-        if (effectiveLocation) pts.push([effectiveLocation.longitude, effectiveLocation.latitude]);
-        if (pts.length < 2) return;
-
-        const lngs = pts.map((p) => p[0]);
-        const lats = pts.map((p) => p[1]);
-
-        cameraRef.current.fitBounds(
-            [Math.max(...lngs), Math.max(...lats)],
-            [Math.min(...lngs), Math.min(...lats)],
-            [120, 60, 280, 60],
-            800,
-        );
-        hasFitted.current = true;
-    }, [pickup, dropoff, effectiveLocation, isNavigating]);
-
-
-
-    /* ── derived values ── */
-
-    const currentStep = navSteps[stepIdx] ?? null;
-    const nextStep = navSteps[stepIdx + 1] ?? null;
-
-    const routeShape = useMemo<Feature<LineString>>(
-        () => ({
+    // ═══════════════ Derived Values ═══════════════
+    const routeShape = useMemo<Feature<LineString> | null>(() => {
+        if (!route || route.coordinates.length < 2) return null;
+        return {
             type: 'Feature',
             properties: {},
-            geometry: { type: 'LineString', coordinates: routeCoords },
-        }),
-        [routeCoords],
-    );
+            geometry: { type: 'LineString', coordinates: route.coordinates },
+        };
+    }, [route]);
 
-    const headingTo = hasPickedUp ? 'Drop-off' : 'Pickup';
+    const headingTo = isNavigatingToPickup ? 'Pickup' : 'Drop-off';
+    // Fix: route.duration is in SECONDS from Mapbox API, convert to minutes
+    const eta = route ? Math.round(route.duration / 60) : null;
+    const distKm = route ? route.distance / 1000 : null;
+    const isPreviewMode = !isNavigating && order?.status === 'READY';
+    const etaArrivalText = eta != null
+        ? new Date(Date.now() + eta * 60 * 1000).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+          })
+        : undefined;
+
+    useEffect(() => {
+        if (!isPreviewMode) {
+            setPreviewRoutePulse(0.6);
+            return;
+        }
+
+        let frameId = 0;
+        const started = Date.now();
+
+        const animate = () => {
+            const elapsed = (Date.now() - started) / 1000;
+            const pulse = 0.45 + ((Math.sin(elapsed * 2.6) + 1) / 2) * 0.45;
+            setPreviewRoutePulse(pulse);
+            frameId = requestAnimationFrame(animate);
+        };
+
+        frameId = requestAnimationFrame(animate);
+        return () => cancelAnimationFrame(frameId);
+    }, [isPreviewMode]);
+
 
     /* ═══════════════════ LOADING ═══════════════════ */
 
@@ -380,42 +566,23 @@ export default function OrderMapScreen() {
 
     return (
         <View style={styles.container}>
-            {/* ── TURN-BY-TURN INSTRUCTION BAR (navigation mode) ── */}
+            {/* ── INSTRUCTION BANNER (Navigation mode) ── */}
             {isNavigating && currentStep && (
-                <View style={[styles.instructionBar, { paddingTop: insets.top + 8 }]}>
-                    <View style={styles.instructionRow}>
-                        <Text style={styles.maneuverIcon}>
-                            {maneuverArrow(currentStep.maneuverType, currentStep.maneuverModifier)}
-                        </Text>
-                        <View style={styles.instructionTextWrap}>
-                            <Text style={styles.instructionDist}>
-                                {formatDist(currentStep.distanceM)}
-                            </Text>
-                            <Text style={styles.instructionLabel} numberOfLines={2}>
-                                {currentStep.instruction}
-                            </Text>
-                        </View>
-                    </View>
-                    {nextStep && (
-                        <View style={styles.thenRow}>
-                            <Text style={styles.thenText}>
-                                Then{' '}
-                                {maneuverArrow(nextStep.maneuverType, nextStep.maneuverModifier)}{' '}
-                                {nextStep.instruction}
-                            </Text>
-                        </View>
-                    )}
-                </View>
+                <InstructionBanner
+                    currentStep={currentStep}
+                    nextStep={nextStep}
+                    topInset={insets.top}
+                />
             )}
 
-            {/* ── BACK BAR (overview mode) ── */}
+            {/* ── TOP BAR (Overview mode) ── */}
             {!isNavigating && (
-                <View style={[styles.topBarOverview, { paddingTop: insets.top }]}>
+                <View style={[styles.topBar, { paddingTop: insets.top }]}>
                     <Pressable style={styles.backButton} onPress={() => router.back()}>
                         <Text style={styles.backArrow}>{'←'}</Text>
                     </Pressable>
                     <Text style={styles.topBarTitle}>
-                        {hasPickedUp ? 'Delivering Order' : 'Picking Up Order'}
+                        {isNavigatingToDropoff ? 'Delivering Order' : 'Picking Up Order'}
                     </Text>
                     <View style={{ width: 44 }} />
                 </View>
@@ -424,7 +591,6 @@ export default function OrderMapScreen() {
             {/* ── MAP ── */}
             <View style={styles.mapContainer}>
                 <Mapbox.MapView
-                    ref={mapRef}
                     style={styles.map}
                     styleURL={MAP_STYLE}
                     logoEnabled={false}
@@ -436,75 +602,103 @@ export default function OrderMapScreen() {
                     scrollEnabled
                     rotateEnabled
                     pitchEnabled
-                    onPress={() => {
-                        console.log('[MAP] User touched map, disabling auto-follow');
-                        setIsFollowing(false);
-                    }}
-                    onLongPress={() => {
-                        console.log('[MAP] User long-pressed map, disabling auto-follow');
-                        setIsFollowing(false);
-                    }}
+                    onPress={handleMapPress}
+                    onTouchStart={handleMapTouchStart}
+                    onCameraChanged={handleCameraChanged}
                 >
-                    {/* 
-                        Navigation Camera: Uses native Mapbox followUserLocation for smooth Uber-like experience
-                        - followUserLocation: Auto-follows driver puck
-                        - followUserMode="course": Rotates map based on bearing
-                        - followZoomLevel: Close, immersive view
-                        - followPitch: Steep 3D perspective
-                    */}
-                    {isNavigating && isFollowing && effectiveLocation ? (
-                        <Mapbox.Camera
-                            ref={cameraRef}
-                            followUserLocation={true}
-                            followZoomLevel={NAV_ZOOM}
-                            followPitch={NAV_PITCH}
-                            animationDuration={NAV_CAMERA_ANIMATION_MS}
-                        />
-                    ) : !isNavigating && effectiveLocation ? (
-                        <Mapbox.Camera
-                            ref={cameraRef}
-                            defaultSettings={{
-                                centerCoordinate: GJILAN_CENTER,
-                                zoomLevel: OVERVIEW_ZOOM,
-                            }}
-                            maxBounds={{
-                                ne: GJILAN_NE,
-                                sw: GJILAN_SW,
-                            }}
-                        />
-                    ) : null}
-                    {/* 
-                        Puck: Use native UserLocation for real GPS, custom marker for simulation
-                        - Real GPS: Native UserLocation (smooth Mapbox handling)
-                        - Simulation: Custom marker (shows simulated position)
-                    */}
-                    {driverLocation && (
-                        // Real GPS: Native puck
-                        <Mapbox.UserLocation
-                            visible={true}
-                            showsUserHeadingIndicator={true}
-                        />
+                    <Mapbox.Camera
+                        ref={cameraRef}
+                        defaultSettings={{
+                            centerCoordinate: GJILAN_CENTER,
+                            zoomLevel: 13,
+                        }}
+                        maxBounds={{
+                            ne: GJILAN_NE,
+                            sw: GJILAN_SW,
+                        }}
+                    />
+
+                    {/* Driver position marker - clean design */}
+                    {effectiveLocation && (
+                        <Mapbox.PointAnnotation
+                            id="driver-position"
+                            ref={driverMarkerRef}
+                            coordinate={[effectiveLocation.longitude, effectiveLocation.latitude]}
+                        >
+                            <View style={styles.driverMarker}>
+                                <View
+                                    ref={driverArrowRef}
+                                    style={[
+                                        styles.driverArrow,
+                                        {
+                                            transform: [
+                                                {
+                                                    rotate: `${effectiveLocation.heading || 0}deg`,
+                                                },
+                                            ],
+                                        },
+                                    ]}
+                                />
+                            </View>
+                        </Mapbox.PointAnnotation>
                     )}
 
-                    {/* Route line: casing + fill (night mode colors) */}
-                    {routeCoords.length > 1 && (
+                    {/* Route line - Modern gradient style with glow */}
+                    {routeShape && (
                         <Mapbox.ShapeSource id="route-source" shape={routeShape}>
+                            {/* Outer glow */}
+                            <Mapbox.LineLayer
+                                id="route-outer-glow"
+                                style={{
+                                    lineColor: isPreviewMode ? '#3b82f6' : '#06b6d4',
+                                    lineWidth: 16,
+                                    lineOpacity: isPreviewMode ? 0.15 : 0.2,
+                                    lineCap: 'round' as const,
+                                    lineJoin: 'round' as const,
+                                    lineBlur: 4,
+                                }}
+                            />
+                            {/* Middle glow */}
+                            <Mapbox.LineLayer
+                                id="route-middle-glow"
+                                style={{
+                                    lineColor: isPreviewMode ? '#60a5fa' : '#22d3ee',
+                                    lineWidth: 12,
+                                    lineOpacity: isPreviewMode ? 0.25 : 0.35,
+                                    lineCap: 'round' as const,
+                                    lineJoin: 'round' as const,
+                                    lineBlur: 2,
+                                }}
+                            />
+                            {/* Dark casing */}
                             <Mapbox.LineLayer
                                 id="route-casing"
                                 style={{
-                                    lineColor: '#1a5490', // Darker blue for night
-                                    lineWidth: 10,
-                                    lineOpacity: 0.4,
+                                    lineColor: '#0f172a',
+                                    lineWidth: 9,
+                                    lineOpacity: 0.8,
                                     lineCap: 'round' as const,
                                     lineJoin: 'round' as const,
                                 }}
                             />
+                            {/* Main route line - gradient effect */}
                             <Mapbox.LineLayer
                                 id="route-fill"
                                 style={{
-                                    lineColor: '#4db8ff', // Bright blue for night visibility
+                                    lineColor: isPreviewMode ? '#3b82f6' : '#06b6d4',
                                     lineWidth: 6,
-                                    lineOpacity: 1,
+                                    lineOpacity: isPreviewMode ? previewRoutePulse : 1,
+                                    lineCap: 'round' as const,
+                                    lineJoin: 'round' as const,
+                                }}
+                            />
+                            {/* Inner highlight */}
+                            <Mapbox.LineLayer
+                                id="route-highlight"
+                                style={{
+                                    lineColor: '#ffffff',
+                                    lineWidth: 2,
+                                    lineOpacity: isPreviewMode ? previewRoutePulse * 0.4 : 0.5,
                                     lineCap: 'round' as const,
                                     lineJoin: 'round' as const,
                                 }}
@@ -512,116 +706,110 @@ export default function OrderMapScreen() {
                         </Mapbox.ShapeSource>
                     )}
 
-                    {/* PICKUP marker (A) – green */}
+                    {/* Pickup marker - business style (orange circle) */}
                     {pickup && (
                         <Mapbox.PointAnnotation
                             id="marker-pickup"
                             coordinate={[pickup.longitude, pickup.latitude]}
                         >
-                            <View style={styles.markerA}>
-                                <Text style={styles.markerLetter}>A</Text>
+                            <View style={styles.businessMarker}>
+                                <View style={styles.businessMarkerInner} />
                             </View>
                             <Mapbox.Callout title={pickupLabel} />
                         </Mapbox.PointAnnotation>
                     )}
 
-                    {/* DROPOFF marker (B) – red */}
+                    {/* Dropoff marker - package icon in status-colored circle */}
                     {dropoff && (
                         <Mapbox.PointAnnotation
                             id="marker-dropoff"
                             coordinate={[dropoff.longitude, dropoff.latitude]}
                         >
-                            <View style={styles.markerB}>
-                                <Text style={styles.markerLetter}>B</Text>
+                            <View style={styles.dropoffMarker}>
+                                <Text style={styles.dropoffIcon}>📦</Text>
                             </View>
                             <Mapbox.Callout title={dropoffLabel} />
                         </Mapbox.PointAnnotation>
                     )}
                 </Mapbox.MapView>
 
-                {/* Floating re-center button (during navigation) */}
-                {isNavigating && (
+                {/* Simulation control button */}
+                {route && route.coordinates.length >= 2 && (
                     <Pressable
-                        style={[styles.fab, { bottom: 200, right: 16 }]}
-                        onPress={() => {
-                            const loc = driverLocRef.current;
-                            if (!loc || !cameraRef.current) return;
-                            
-                            console.log('[RECENTER] Re-enabling camera auto-follow');
-                            setIsFollowing(true); // Re-enable auto-follow
-                            
-                            cameraRef.current.setCamera({
-                                centerCoordinate: [loc.longitude, loc.latitude],
-                                zoomLevel: NAV_ZOOM,
-                                pitch: NAV_PITCH,
-                                heading: loc.heading ?? 0,
-                                animationDuration: 600,
-                            });
-                        }}
+                        style={[
+                            styles.simulationButton,
+                            { bottom: 340 },
+                            isSimulating && styles.simulationButtonActive,
+                        ]}
+                        onPress={handleToggleSimulation}
                     >
-                        <Text style={styles.fabIcon}>◎</Text>
+                        <Text style={styles.simulationButtonIcon}>
+                            {isSimulating ? '⏹' : '▶️'}
+                        </Text>
                     </Pressable>
                 )}
 
-                {/* Floating fit-all button (overview) */}
-                {!isNavigating && (
+                {/* Camera lock toggle button (always available) */}
+                <Pressable
+                    style={[
+                        styles.cameraLockButton,
+                        { bottom: 270 },
+                        followMode !== 'free' && styles.cameraLockButtonActive,
+                    ]}
+                    onPress={handleToggleCameraLock}
+                >
+                    <Text style={styles.cameraLockIcon}>
+                        {followMode === 'free' ? '🔓' : '🔒'}
+                    </Text>
+                </Pressable>
+
+                <Pressable
+                    style={[
+                        styles.followModeButton,
+                        { bottom: 270 },
+                    ]}
+                    onPress={handleCycleFollowMode}
+                >
+                    <Text style={styles.followModeButtonText}>
+                        {followMode === 'heading-up' ? 'Heading' : followMode === 'north-up' ? 'North' : 'Free'}
+                    </Text>
+                </Pressable>
+
+                {showRelockChip && (
                     <Pressable
-                        style={[styles.fab, { bottom: 260, right: 16 }]}
+                        style={styles.relockChip}
                         onPress={() => {
-                            if (!cameraRef.current) return;
-                            const pts: Array<[number, number]> = [];
-                            if (pickup) pts.push([pickup.longitude, pickup.latitude]);
-                            if (dropoff) pts.push([dropoff.longitude, dropoff.latitude]);
-                            if (driverLocation)
-                                pts.push([driverLocation.longitude, driverLocation.latitude]);
-                            if (pts.length < 2) return;
-                            const lngs = pts.map((p) => p[0]);
-                            const lats = pts.map((p) => p[1]);
-                            cameraRef.current.fitBounds(
-                                [Math.max(...lngs), Math.max(...lats)],
-                                [Math.min(...lngs), Math.min(...lats)],
-                                [120, 60, 280, 60],
-                                800,
-                            );
+                            setFollowMode('heading-up');
+                            setShowRelockChip(false);
                         }}
                     >
-                        <Text style={styles.fabIcon}>⊡</Text>
+                        <Text style={styles.relockChipText}>Relock camera</Text>
                     </Pressable>
                 )}
+
+                {/* Recenter to driver button */}
+                <RecenterButton
+                    onPress={handleRecenter}
+                    onPressIn={handleOverviewPressIn}
+                    onPressOut={handleOverviewPressOut}
+                    bottom={200}
+                    right={16}
+                />
             </View>
 
             {/* ════════════ BOTTOM PANEL ════════════ */}
             {isNavigating ? (
-                /* ── Navigation bottom strip ── */
-                <View style={[styles.navBottom, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-                    <View style={styles.navHeadingRow}>
-                        <View
-                            style={[
-                                styles.navHeadingDot,
-                                { backgroundColor: hasPickedUp ? '#EA4335' : '#34A853' },
-                            ]}
-                        />
-                        <Text style={styles.navHeadingText}>Heading to {headingTo}</Text>
-                    </View>
-                    <View style={styles.navStatsRow}>
-                        <View style={styles.navStat}>
-                            <Text style={styles.navStatValue}>{eta ?? '–'}</Text>
-                            <Text style={styles.navStatUnit}>min</Text>
-                        </View>
-                        <View style={styles.navDivider} />
-                        <View style={styles.navStat}>
-                            <Text style={styles.navStatValue}>
-                                {distKm != null ? distKm.toFixed(1) : '–'}
-                            </Text>
-                            <Text style={styles.navStatUnit}>km</Text>
-                        </View>
-                        <Pressable style={styles.endBtn} onPress={stopNavigation}>
-                            <Text style={styles.endBtnText}>End</Text>
-                        </Pressable>
-                    </View>
-
-
-                </View>
+                <NavigationBottomPanel
+                    eta={eta}
+                    distance={distKm}
+                    destination={headingTo}
+                    etaArrivalText={etaArrivalText}
+                    onPrimaryAction={order?.status === 'READY' ? handleOutForDelivery : undefined}
+                    primaryActionLabel={order?.status === 'READY' ? 'Out for delivery' : undefined}
+                    primaryActionLoading={updatingOrderStatus}
+                    onEnd={handleStopNavigation}
+                    bottomInset={insets.bottom}
+                />
             ) : (
                 /* ── Overview bottom card ── */
                 <View
@@ -670,9 +858,16 @@ export default function OrderMapScreen() {
                     {canNavigate ? (
                         <Pressable
                             style={styles.startBtn}
-                            onPress={startNavigation}
+                            onPress={order?.status === 'READY' ? handleOutForDelivery : handleStartNavigation}
+                            disabled={updatingOrderStatus}
                         >
-                            <Text style={styles.startBtnText}>Start Navigation</Text>
+                            <Text style={styles.startBtnText}>
+                                {updatingOrderStatus
+                                    ? 'Updating…'
+                                    : order?.status === 'READY'
+                                    ? 'Out for Delivery'
+                                    : 'Start Navigation'}
+                            </Text>
                         </Pressable>
                     ) : (
                         <View style={styles.statusChip}>
@@ -689,230 +884,277 @@ export default function OrderMapScreen() {
 
 /* ═══════════════════ STYLES ═══════════════════ */
 
-const BLUE = '#4285F4';
-const BLUE_DARK = '#1a73e8';
-
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#0a0a0a' },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-    /* ── instruction bar (night mode) ── */
-    instructionBar: {
-        backgroundColor: '#0d1b2a', // Deep dark
-        paddingHorizontal: 20,
-        paddingBottom: 14,
-        zIndex: 10,
-    },
-    instructionRow: {
+    /* ── top bar ── */
+    topBar: {
         flexDirection: 'row',
         alignItems: 'center',
-    },
-    maneuverIcon: {
-        fontSize: 38,
-        color: '#fff',
-        width: 56,
-        textAlign: 'center',
-    },
-    instructionTextWrap: { flex: 1, marginLeft: 10 },
-    instructionDist: {
-        fontSize: 26,
-        fontWeight: '700',
-        color: '#4db8ff', // Bright blue for visibility
-    },
-    instructionLabel: {
-        fontSize: 15,
-        color: 'rgba(255,255,255,0.9)',
-        marginTop: 2,
-    },
-    thenRow: {
-        marginTop: 10,
-        paddingTop: 10,
-        borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: 'rgba(255,255,255,0.2)',
-    },
-    thenText: { fontSize: 13, color: 'rgba(255,255,255,0.7)' },
-
-    /* ── top bar (overview, night mode) ── */
-    topBarOverview: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingBottom: 8,
-        backgroundColor: '#1a1a1a',
-        elevation: 2,
+        paddingHorizontal: 16,
+        paddingBottom: 12,
+        backgroundColor: 'rgba(10, 10, 10, 0.95)',
+        backdropFilter: 'blur(10px)',
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255, 255, 255, 0.05)',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.3,
-        shadowRadius: 2,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.4,
+        shadowRadius: 8,
         zIndex: 10,
     },
     backButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(59, 130, 246, 0.15)',
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(59, 130, 246, 0.3)',
     },
-    backArrow: { fontSize: 24, color: '#4db8ff' },
+    backArrow: { fontSize: 20, color: '#3b82f6' },
     topBarTitle: {
         flex: 1,
         textAlign: 'center',
-        fontSize: 16,
-        fontWeight: '600',
+        fontSize: 15,
+        fontWeight: '700',
         color: '#ffffff',
+        letterSpacing: 0.5,
     },
 
     /* ── map ── */
     mapContainer: { flex: 1 },
     map: { flex: 1 },
 
-    /* ── floating action buttons (night mode) ── */
+    /* ── floating action button ── */
     fab: {
         position: 'absolute',
-        width: 46,
-        height: 46,
-        borderRadius: 23,
-        backgroundColor: '#2a2a2a',
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: '#0d1b2a',
         alignItems: 'center',
         justifyContent: 'center',
-        elevation: 4,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.5,
-        shadowRadius: 4,
+        shadowRadius: 6,
+        elevation: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(77, 184, 255, 0.3)',
     },
-    fabIcon: { fontSize: 22, color: '#4db8ff' },
+    fabActive: {
+        backgroundColor: '#1a5490',
+        borderColor: '#4db8ff',
+        borderWidth: 2,
+    },
+    fabIcon: { fontSize: 24, color: '#4db8ff' },
+
+    /* ── simulation button ── */
+    simulationButton: {
+        position: 'absolute',
+        right: 20,
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: 'rgba(22, 163, 74, 0.95)',
+        backdropFilter: 'blur(10px)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#16a34a',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.5,
+        shadowRadius: 12,
+        elevation: 8,
+        borderWidth: 1.5,
+        borderColor: 'rgba(34, 197, 94, 0.3)',
+    },
+    simulationButtonActive: {
+        backgroundColor: 'rgba(220, 38, 38, 0.95)',
+        shadowColor: '#dc2626',
+        borderColor: 'rgba(239, 68, 68, 0.4)',
+    },
+    simulationButtonIcon: {
+        fontSize: 22,
+        color: '#ffffff',
+    },
+
+    /* ── camera lock button ── */
+    cameraLockButton: {
+        position: 'absolute',
+        right: 20,
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: 'rgba(59, 130, 246, 0.95)',
+        backdropFilter: 'blur(10px)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#3b82f6',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.5,
+        shadowRadius: 12,
+        elevation: 8,
+        borderWidth: 1.5,
+        borderColor: 'rgba(96, 165, 250, 0.3)',
+    },
+    cameraLockButtonActive: {
+        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+        shadowColor: '#0f172a',
+        borderColor: 'rgba(148, 163, 184, 0.3)',
+    },
+    cameraLockIcon: {
+        fontSize: 24,
+        color: '#ffffff',
+    },
+
+    followModeButton: {
+        position: 'absolute',
+        right: 84,
+        minWidth: 86,
+        height: 42,
+        borderRadius: 12,
+        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(148, 163, 184, 0.25)',
+        paddingHorizontal: 12,
+    },
+    followModeButtonText: {
+        color: '#e2e8f0',
+        fontSize: 12,
+        fontWeight: '700',
+        letterSpacing: 0.3,
+    },
+
+    relockChip: {
+        position: 'absolute',
+        top: 22,
+        alignSelf: 'center',
+        backgroundColor: 'rgba(15, 23, 42, 0.92)',
+        borderRadius: 999,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(59, 130, 246, 0.5)',
+    },
+    relockChipText: {
+        color: '#bfdbfe',
+        fontSize: 12,
+        fontWeight: '700',
+    },
+
+    /* ── recenter button ── */
+    recenterButton: {
+        position: 'absolute',
+        right: 20,
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+        backdropFilter: 'blur(10px)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.5,
+        shadowRadius: 12,
+        elevation: 8,
+        borderWidth: 1.5,
+        borderColor: 'rgba(148, 163, 184, 0.2)',
+    },
+    recenterButtonIcon: {
+        fontSize: 18,
+        color: '#ffffff',
+    },
 
     /* ── markers ── */
     markerA: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         backgroundColor: '#34A853',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 3,
         borderColor: '#fff',
-        elevation: 4,
+        elevation: 6,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.3,
-        shadowRadius: 2,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.4,
+        shadowRadius: 3,
     },
     markerB: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         backgroundColor: '#EA4335',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 3,
         borderColor: '#fff',
-        elevation: 4,
+        elevation: 6,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.3,
-        shadowRadius: 2,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.4,
+        shadowRadius: 3,
     },
     markerLetter: {
         color: '#ffffff',
         fontWeight: '800',
-        fontSize: 15,
-    },
-
-    /* ── navigation bottom strip (night mode) ── */
-    navBottom: {
-        backgroundColor: '#1a1a1a',
-        paddingTop: 14,
-        paddingHorizontal: 20,
-        borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: '#333',
-    },
-    navHeadingRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    navHeadingDot: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        marginRight: 8,
-    },
-    navHeadingText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#e0e0e0',
-    },
-    navStatsRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    navStat: { alignItems: 'center', flex: 1 },
-    navStatValue: {
-        fontSize: 30,
-        fontWeight: '700',
-        color: '#4db8ff',
-    },
-    navStatUnit: {
-        fontSize: 13,
-        color: '#a0a0a0',
-        marginTop: 2,
-    },
-    navDivider: {
-        width: 1,
-        height: 40,
-        backgroundColor: '#333',
-        marginHorizontal: 4,
-    },
-    endBtn: {
-        backgroundColor: '#d32f2f', // Red for night
-        borderRadius: 26,
-        paddingHorizontal: 30,
-        paddingVertical: 14,
-        marginLeft: 8,
-    },
-    endBtnText: {
-        color: '#fff',
-        fontWeight: '700',
         fontSize: 16,
     },
 
-    /* ── overview bottom card (night mode) ── */
+    /* ── overview bottom card ── */
     overviewCard: {
-        backgroundColor: '#1a1a1a',
+        backgroundColor: 'rgba(15, 23, 42, 0.98)',
+        backdropFilter: 'blur(20px)',
         paddingTop: 20,
         paddingHorizontal: 20,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        elevation: 10,
+        borderTopLeftRadius: 28,
+        borderTopRightRadius: 28,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.1)',
+        elevation: 16,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.5,
-        shadowRadius: 10,
+        shadowOffset: { width: 0, height: -8 },
+        shadowOpacity: 0.4,
+        shadowRadius: 20,
     },
-    addressBlock: { marginBottom: 14 },
+    addressBlock: {
+        marginBottom: 16,
+        backgroundColor: 'rgba(30, 41, 59, 0.6)',
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+        padding: 16,
+    },
     addressRow: {
         flexDirection: 'row',
         alignItems: 'center',
     },
     addressDot: {
-        width: 12,
-        height: 12,
-        borderRadius: 6,
+        width: 14,
+        height: 14,
+        borderRadius: 7,
+        borderWidth: 2,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
     },
     addressTexts: { marginLeft: 12, flex: 1 },
     addressLabel: {
         fontSize: 11,
-        fontWeight: '700',
-        letterSpacing: 0.6,
-        color: '#888',
+        fontWeight: '800',
+        letterSpacing: 0.8,
+        color: '#94a3b8',
     },
     addressName: {
         fontSize: 15,
-        fontWeight: '500',
-        color: '#e0e0e0',
-        marginTop: 1,
+        fontWeight: '600',
+        color: '#f1f5f9',
+        marginTop: 2,
     },
     addressConnector: {
         marginLeft: 5,
@@ -922,31 +1164,40 @@ const styles = StyleSheet.create({
     connectorLine: {
         width: 2,
         height: 18,
-        backgroundColor: '#333',
+        backgroundColor: '#2f3844',
     },
     etaBadge: {
-        backgroundColor: '#2a2a3e',
-        borderRadius: 12,
-        paddingVertical: 10,
+        backgroundColor: 'rgba(6, 182, 212, 0.1)',
+        borderRadius: 16,
+        paddingVertical: 12,
         alignItems: 'center',
-        marginBottom: 14,
+        marginBottom: 16,
+        borderWidth: 1.5,
+        borderColor: 'rgba(6, 182, 212, 0.3)',
     },
     etaBadgeText: {
         fontSize: 15,
-        fontWeight: '600',
-        color: '#4db8ff',
+        fontWeight: '700',
+        color: '#22d3ee',
+        letterSpacing: 0.5,
     },
     startBtn: {
-        backgroundColor: '#1a73e8',
+        backgroundColor: '#3b82f6',
         borderRadius: 16,
         paddingVertical: 16,
         alignItems: 'center',
-        marginBottom: 4,
+        marginBottom: 8,
+        shadowColor: '#3b82f6',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.4,
+        shadowRadius: 8,
+        elevation: 6,
     },
     startBtnText: {
         color: '#fff',
-        fontWeight: '700',
-        fontSize: 17,
+        fontWeight: '800',
+        fontSize: 16,
+        letterSpacing: 0.5,
     },
     statusChip: {
         backgroundColor: '#2a2a2a',
@@ -961,63 +1212,77 @@ const styles = StyleSheet.create({
         color: '#a0a0a0',
     },
 
-    /* ── driver puck (night mode) ── */
-    driverPuck: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: 'rgba(77,184,255,0.2)', // Bright blue with transparency for night
+    /* ── Marker Styles - Modern Design ── */
+    businessMarker: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(249, 115, 22, 0.2)',
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    driverPuckInner: {
-        width: 14,
-        height: 14,
-        borderRadius: 7,
-        backgroundColor: '#4db8ff', // Bright blue for night
         borderWidth: 2.5,
-        borderColor: '#ffffff',
+        borderColor: 'rgba(249, 115, 22, 0.5)',
+        shadowColor: '#f97316',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.4,
+        shadowRadius: 8,
     },
-    driverPuckArrow: {
-        position: 'absolute',
+    businessMarkerInner: {
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: '#f97316',
+        borderWidth: 2,
+        borderColor: 'rgba(253, 186, 116, 0.8)',
+        shadowColor: '#f97316',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.6,
+        shadowRadius: 4,
+    },
+    dropoffMarker: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        backgroundColor: 'rgba(6, 182, 212, 0.2)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2.5,
+        borderColor: 'rgba(6, 182, 212, 0.6)',
+        shadowColor: '#06b6d4',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.5,
+        shadowRadius: 8,
+    },
+    dropoffIcon: {
+        fontSize: 20,
+    },
+
+    /* ── Driver Marker (Clean Circle Design) ── */
+    driverMarker: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#3b82f6',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 4,
+        borderColor: '#ffffff',
+        shadowColor: '#3b82f6',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.7,
+        shadowRadius: 12,
+        elevation: 10,
+    },
+    driverArrow: {
         width: 0,
         height: 0,
         backgroundColor: 'transparent',
-        borderLeftWidth: 6,
-        borderRightWidth: 6,
-        borderBottomWidth: 10,
+        borderStyle: 'solid',
+        borderLeftWidth: 9,
+        borderRightWidth: 9,
+        borderBottomWidth: 16,
         borderLeftColor: 'transparent',
         borderRightColor: 'transparent',
-        borderBottomColor: '#4db8ff',
-        top: -8,
-    },
-
-    /* ── debug button (dev mode) ── */
-    debugBtn: {
-        marginTop: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 20,
-        alignSelf: 'flex-start',
-    },
-    debugBtnText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#ffffff',
-    },
-    debugPanel: {
-        marginTop: 12,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        backgroundColor: 'rgba(10,10,10,0.8)',
-        borderRadius: 8,
-        borderTopWidth: 1,
-        borderTopColor: '#3a3a3a',
-    },
-    debugText: {
-        fontSize: 10,
-        color: '#8a8a8a',
-        marginTop: 4,
-        fontFamily: 'monospace',
+        borderBottomColor: '#ffffff',
     },
 });

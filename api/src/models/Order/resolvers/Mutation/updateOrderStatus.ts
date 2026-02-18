@@ -57,6 +57,7 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
         order = await orderService.updateOrderStatus(id, status);
     } else if (isDriver) {
         const allowed: Record<string, string[]> = {
+            ACCEPTED: ['OUT_FOR_DELIVERY'],
             READY: ['OUT_FOR_DELIVERY'],
             OUT_FOR_DELIVERY: ['DELIVERED'],
         };

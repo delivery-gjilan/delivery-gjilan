@@ -121,10 +121,24 @@ const distanceMeters = (a: { latitude: number; longitude: number }, b: { latitud
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 };
 
+type AnimatedDriverPoint = {
+  latitude: number;
+  longitude: number;
+};
+
+type DriverMotionTarget = {
+  latitude: number;
+  longitude: number;
+  timestamp: number;
+  velocityLatPerSec: number;
+  velocityLngPerSec: number;
+  updatedAtMs: number;
+};
+
 export default function MapPage() {
   const { data: businessesData } = useQuery<any>(GET_BUSINESSES);
   const { data: zonesData } = useQuery<any>(GET_DELIVERY_ZONES);
-  const { data: driversData } = useQuery<any>(DRIVERS_QUERY, { pollInterval: 3000 });
+  const { data: driversData } = useQuery<any>(DRIVERS_QUERY, { fetchPolicy: 'cache-and-network' });
   const { data: driversSubscriptionData } = useSubscription<any>(DRIVERS_UPDATED_SUBSCRIPTION);
   const { data: subscriptionData } = useSubscription<any>(ALL_ORDERS_SUBSCRIPTION);
   const { data: ordersData } = useQuery<any>(GET_ORDERS, { fetchPolicy: 'cache-and-network' });
@@ -150,8 +164,11 @@ export default function MapPage() {
   const [showDriverToBusinessRoute, setShowDriverToBusinessRoute] = useState<Record<string, boolean>>({});
   const [driverProgressOnRoute, setDriverProgressOnRoute] = useState<Record<string, number>>({});
   const [driverTracks, setDriverTracks] = useState<Record<string, any>>({});
-  const [animatedDriverPositions, setAnimatedDriverPositions] = useState<Record<string, { latitude: number; longitude: number }>>({});
-  const animationStateRef = useRef<Record<string, { from: any; to: any; startTime: number; duration: number }>>({});
+  const [animatedDriverPositions, setAnimatedDriverPositions] = useState<Record<string, AnimatedDriverPoint>>({});
+  const animatedDriverPositionsRef = useRef<Record<string, AnimatedDriverPoint>>({});
+  const driverMotionTargetsRef = useRef<Record<string, DriverMotionTarget>>({});
+  const lastAnimationFrameTsRef = useRef<number>(0);
+  const lastDriverLocationUpdateMsRef = useRef<Record<string, number>>({});
   const [hoveredOrderId, setHoveredOrderId] = useState<string | null>(null);
   const [showDriversPanel, setShowDriversPanel] = useState(false);
   const [statusChangeTime, setStatusChangeTime] = useState<Record<string, number>>({});
@@ -288,11 +305,12 @@ export default function MapPage() {
     const pos = animatedDriverPositions[followingDriverId] || followedTrack.to;
     if (!isValidLatLng(pos?.latitude, pos?.longitude)) return;
     
-    // Smoothly fly to driver position (zoom 16 for driver tracking)
+    // Smoothly fly to driver position during continuous tracking (zoom 16 for driver tracking)
+    // Use short duration for smoother real-time following
     mapRef.current.flyTo({
       center: [pos.longitude, pos.latitude],
       zoom: 16,
-      duration: 800,
+      duration: 400,
       pitch: 0,
     });
   }, [followingDriverId, driverTracks, animatedDriverPositions]);
@@ -325,22 +343,71 @@ export default function MapPage() {
   // ==== DRIVER TRACKING ====
   useEffect(() => {
     if (!drivers.length) return;
+
+    const nowTs = Date.now();
+
     setDriverTracks((prev) => {
       const next = { ...prev } as Record<string, any>;
       drivers.forEach((driver: any) => {
         const location = driver.driverLocation;
         if (!location?.latitude || !location?.longitude) return;
         const newPos = { latitude: location.latitude, longitude: location.longitude };
-        
-        // Set up animation state for new position
+
+        // Update motion target for predictive interpolation
         const trackId = driver.id;
-        const currentAnimated = animatedDriverPositions[trackId] || newPos;
-        animationStateRef.current[trackId] = {
-          from: currentAnimated,
-          to: newPos,
-          startTime: Date.now(),
-          duration: 4800, // 4.8s animation to match 5s heartbeat (covers update cycle smoothly)
+        const previousTarget = driverMotionTargetsRef.current[trackId];
+        const updatedAtMs = driver.driverLocationUpdatedAt
+          ? new Date(driver.driverLocationUpdatedAt).getTime()
+          : nowTs;
+
+        const lastSeenUpdateMs = lastDriverLocationUpdateMsRef.current[trackId] ?? 0;
+        if (updatedAtMs <= lastSeenUpdateMs && previousTarget) {
+          next[driver.id] = {
+            id: driver.id,
+            name: `${driver.firstName} ${driver.lastName}`.trim(),
+            to: { latitude: previousTarget.latitude, longitude: previousTarget.longitude },
+            updatedAt: driver.driverLocationUpdatedAt,
+          };
+          return;
+        }
+
+        lastDriverLocationUpdateMsRef.current[trackId] = updatedAtMs;
+
+        let velocityLatPerSec = 0;
+        let velocityLngPerSec = 0;
+
+        if (previousTarget) {
+          const deltaSec = Math.max((updatedAtMs - previousTarget.updatedAtMs) / 1000, 0.001);
+          const rawVelocityLat = (newPos.latitude - previousTarget.latitude) / deltaSec;
+          const rawVelocityLng = (newPos.longitude - previousTarget.longitude) / deltaSec;
+
+          const rawSpeedDegPerSec = Math.hypot(rawVelocityLat, rawVelocityLng);
+          const minMovingSpeedDegPerSec = 0.0000025; // ~0.28 m/s around Gjilan
+
+          if (rawSpeedDegPerSec < minMovingSpeedDegPerSec) {
+            velocityLatPerSec = previousTarget.velocityLatPerSec * 0.92;
+            velocityLngPerSec = previousTarget.velocityLngPerSec * 0.92;
+          } else {
+            const velocityBlend = 0.35;
+            velocityLatPerSec =
+              previousTarget.velocityLatPerSec * (1 - velocityBlend) + rawVelocityLat * velocityBlend;
+            velocityLngPerSec =
+              previousTarget.velocityLngPerSec * (1 - velocityBlend) + rawVelocityLng * velocityBlend;
+          }
+        }
+
+        driverMotionTargetsRef.current[trackId] = {
+          latitude: newPos.latitude,
+          longitude: newPos.longitude,
+          timestamp: nowTs,
+          velocityLatPerSec,
+          velocityLngPerSec,
+          updatedAtMs,
         };
+
+        if (!animatedDriverPositionsRef.current[trackId]) {
+          animatedDriverPositionsRef.current[trackId] = newPos;
+        }
         
         next[driver.id] = {
           id: driver.id,
@@ -382,39 +449,61 @@ export default function MapPage() {
   useEffect(() => {
     let rafId: number;
     
-    const animate = () => {
+    const animate = (frameTs: number) => {
+      if (!lastAnimationFrameTsRef.current) {
+        lastAnimationFrameTsRef.current = frameTs;
+      }
+
+      const dtMs = Math.max(frameTs - lastAnimationFrameTsRef.current, 1);
+      lastAnimationFrameTsRef.current = frameTs;
+
       const now = Date.now();
-      const newAnimatedPositions: Record<string, { latitude: number; longitude: number }> = {};
-      let hasActiveAnimations = false;
+      const nextAnimated = { ...animatedDriverPositionsRef.current };
+      let hasAnyDriver = false;
 
-      Object.entries(animationStateRef.current).forEach(([driverId, animation]) => {
-        const elapsed = now - animation.startTime;
-        const progress = Math.min(elapsed / animation.duration, 1);
+      Object.entries(driverMotionTargetsRef.current).forEach(([driverId, target]) => {
+        hasAnyDriver = true;
 
-        // Interpolate position (linear easing)
-        const lat = animation.from.latitude + (animation.to.latitude - animation.from.latitude) * progress;
-        const lng = animation.from.longitude + (animation.to.longitude - animation.from.longitude) * progress;
+        const ageSec = Math.max((now - target.timestamp) / 1000, 0);
+        const lookAheadSec = 1.2;
+        const staleAfterSec = 10;
+        const decaySec = Math.max(ageSec - staleAfterSec, 0);
+        const staleDecay = Math.exp(-decaySec / 4);
+        const predictionWindowSec = Math.min(ageSec + lookAheadSec, 14);
 
-        newAnimatedPositions[driverId] = { latitude: lat, longitude: lng };
+        const predictedLat =
+          target.latitude + target.velocityLatPerSec * staleDecay * predictionWindowSec;
+        const predictedLng =
+          target.longitude + target.velocityLngPerSec * staleDecay * predictionWindowSec;
 
-        // Continue loop if animation not finished
-        if (progress < 1) {
-          hasActiveAnimations = true;
-        }
+        const current =
+          nextAnimated[driverId] || {
+            latitude: target.latitude,
+            longitude: target.longitude,
+          };
+
+        const tauMs = 300;
+        const alpha = 1 - Math.exp(-dtMs / tauMs);
+
+        nextAnimated[driverId] = {
+          latitude: current.latitude + (predictedLat - current.latitude) * alpha,
+          longitude: current.longitude + (predictedLng - current.longitude) * alpha,
+        };
       });
 
-      if (Object.keys(newAnimatedPositions).length > 0) {
-        setAnimatedDriverPositions(newAnimatedPositions);
+      if (hasAnyDriver) {
+        animatedDriverPositionsRef.current = nextAnimated;
+        setAnimatedDriverPositions(nextAnimated);
       }
 
-      // Continue loop if there are active animations
-      if (hasActiveAnimations) {
-        rafId = requestAnimationFrame(animate);
-      }
+      rafId = requestAnimationFrame(animate);
     };
 
     rafId = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(rafId);
+    return () => {
+      cancelAnimationFrame(rafId);
+      lastAnimationFrameTsRef.current = 0;
+    };
   }, []);
 
   // ==== ROUTE CALCULATION ====
@@ -802,7 +891,29 @@ export default function MapPage() {
                   </div>
                 ) : (
                   filteredDrivers.map((driver: any) => (
-                    <DriverCard key={driver.id} driver={driver} activeOrders={activeOrders} now={now} />
+                    <DriverCard 
+                      key={driver.id} 
+                      driver={driver} 
+                      activeOrders={activeOrders} 
+                      now={now}
+                      onTrack={() => {
+                        // Toggle tracking: if already tracking this driver, untrack; otherwise track
+                        const newTrackingId = followingDriverId === driver.id ? null : driver.id;
+                        setFollowingDriverId(newTrackingId);
+                        
+                        // Immediately jump to driver position when starting to track
+                        if (newTrackingId && mapRef.current) {
+                          const track = driverTracks[driver.id];
+                          if (track?.to?.latitude && track?.to?.longitude) {
+                            mapRef.current.jumpTo({
+                              center: [track.to.longitude, track.to.latitude],
+                              zoom: 16,
+                            });
+                          }
+                        }
+                      }}
+                      isTracking={followingDriverId === driver.id}
+                    />
                   ))
                 )}
               </div>
@@ -1054,7 +1165,19 @@ export default function MapPage() {
               <Marker key={`driver-${track.id}`} latitude={pos.latitude} longitude={pos.longitude} anchor="bottom">
                 <div 
                   className={`relative flex flex-col items-center group cursor-pointer ${connectionStatus === 'DISCONNECTED' || connectionStatus === 'LOST' ? 'opacity-50' : ''} ${isFollowing ? 'ring-2 ring-offset-2 ring-blue-500 rounded-full' : ''}`}
-                  onClick={() => setFollowingDriverId(isFollowing ? null : track.id)}
+                  onClick={() => {
+                    // Toggle tracking: if already tracking this driver, untrack; otherwise track
+                    const newTrackingId = isFollowing ? null : track.id;
+                    setFollowingDriverId(newTrackingId);
+                    
+                    // Immediately jump to driver position when starting to track
+                    if (newTrackingId && mapRef.current) {
+                      mapRef.current.jumpTo({
+                        center: [pos.longitude, pos.latitude],
+                        zoom: 16,
+                      });
+                    }
+                  }}
                 >
                   {/* Following indicator ring */}
                   {isFollowing && (
@@ -1137,6 +1260,84 @@ export default function MapPage() {
             );
           })}
         </Map>
+        
+        {/* Floating Tracking Panel */}
+        {followingDriverId && driverMap[followingDriverId] && (() => {
+          const driver = driverMap[followingDriverId];
+          const track = driverTracks[followingDriverId];
+          const pos = animatedDriverPositions[followingDriverId] || track?.to;
+          const connectionStatus = (driver?.driverConnection?.connectionStatus ?? 'DISCONNECTED') as keyof typeof DRIVER_CONNECTION_COLORS;
+          const statusStyle = DRIVER_CONNECTION_COLORS[connectionStatus];
+          const StatusIcon = statusStyle.icon;
+          
+          return (
+            <div className="absolute top-4 right-4 bg-black/90 border border-blue-500/50 rounded-lg p-4 max-w-xs backdrop-blur-sm shadow-2xl z-50">
+              {/* Header with close button */}
+              <div className="flex items-center justify-between mb-3 pb-3 border-b border-white/10">
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${statusStyle.bg}`} />
+                  <span className="text-sm font-semibold text-white">Tracking</span>
+                </div>
+                <button
+                  onClick={() => setFollowingDriverId(null)}
+                  className="p-1 hover:bg-white/10 rounded-md transition-colors"
+                  title="Stop tracking"
+                >
+                  <X size={16} className="text-neutral-400" />
+                </button>
+              </div>
+              
+              {/* Driver Info */}
+              <div className="space-y-3">
+                {/* Name */}
+                <div>
+                  <div className="text-xs text-neutral-400 uppercase">Driver</div>
+                  <div className="text-sm font-semibold text-white">
+                    {driver.firstName} {driver.lastName}
+                  </div>
+                </div>
+                
+                {/* Location */}
+                {pos && (
+                  <div>
+                    <div className="text-xs text-neutral-400 uppercase">Location</div>
+                    <div className="text-xs font-mono text-blue-300">
+                      {pos.latitude.toFixed(5)}
+                    </div>
+                    <div className="text-xs font-mono text-blue-300">
+                      {pos.longitude.toFixed(5)}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Connection Status */}
+                <div>
+                  <div className="text-xs text-neutral-400 uppercase">Status</div>
+                  <div className={`flex items-center gap-2 text-xs font-medium ${statusStyle.text}`}>
+                    <StatusIcon size={12} />
+                    {statusStyle.label}
+                  </div>
+                </div>
+                
+                {/* Last Heartbeat */}
+                <div>
+                  <div className="text-xs text-neutral-400 uppercase">Last Heartbeat</div>
+                  <div className="text-xs text-neutral-300">
+                    {formatHeartbeatElapsed(driver?.driverConnection?.lastHeartbeatAt, now)}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Stop Tracking Button */}
+              <button
+                onClick={() => setFollowingDriverId(null)}
+                className="w-full mt-4 px-3 py-2 rounded-md bg-rose-500/20 text-rose-400 text-xs font-medium hover:bg-rose-500/30 transition-colors border border-rose-500/50"
+              >
+                Stop Tracking
+              </button>
+            </div>
+          );
+        })()}
       </div>
 
       {/* ==== ORDER DETAIL DRAWER ==== */}
@@ -1565,7 +1766,7 @@ function OrderDetailDrawer({ order, drivers, activeOrders, orderDistances, onClo
   );
 }
 
-function DriverCard({ driver, activeOrders, now }: any) {
+function DriverCard({ driver, activeOrders, now, onTrack, isTracking }: any) {
   const assignedOrder = activeOrders.find((o: any) => o.driver?.id === driver.id);
   const isBusy = !!assignedOrder;
   const hasLocation = driver.driverLocation?.latitude && driver.driverLocation?.longitude;
@@ -1578,11 +1779,13 @@ function DriverCard({ driver, activeOrders, now }: any) {
   const canAssign = isDriverAssignable(driver) && !isBusy;
 
   return (
-    <div className={`bg-[#0a0a0a] border rounded-lg p-3 transition-all ${statusStyle.border} ${connectionStatus === 'DISCONNECTED' || connectionStatus === 'LOST' ? 'opacity-60' : ''}`}>
+    <div className={`bg-[#0a0a0a] border rounded-lg p-3 transition-all ${statusStyle.border} ${isTracking ? 'ring-2 ring-blue-500/50 bg-blue-500/5' : ''} ${connectionStatus === 'DISCONNECTED' || connectionStatus === 'LOST' ? 'opacity-60' : ''} cursor-pointer hover:border-blue-500/50`}
+      onClick={hasLocation ? onTrack : undefined}
+    >
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2">
           {/* Avatar */}
-          <div className={`w-8 h-8 rounded-full ${getAvatarColor(driver.id)} flex items-center justify-center font-bold text-white text-xs border-2 ${statusStyle.border}`}>
+          <div className={`w-8 h-8 rounded-full ${getAvatarColor(driver.id)} flex items-center justify-center font-bold text-white text-xs border-2 ${statusStyle.border} ${isTracking ? 'ring-2 ring-blue-400' : ''}`}>
             {getInitials(driver.firstName, driver.lastName)}
           </div>
           <div>
@@ -1605,7 +1808,7 @@ function DriverCard({ driver, activeOrders, now }: any) {
       </div>
       
       {/* Status row */}
-      <div className="flex items-center gap-2 mt-2">
+      <div className="flex items-center gap-2 mt-2 flex-wrap">
         <span className={`text-[9px] px-1.5 py-0.5 rounded ${!isBusy ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
           {isBusy ? 'BUSY' : 'FREE'}
         </span>
@@ -1615,6 +1818,11 @@ function DriverCard({ driver, activeOrders, now }: any) {
         <span className={`text-[9px] px-1.5 py-0.5 rounded ${canAssign ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-500/20 text-slate-400'}`}>
           {canAssign ? 'ASSIGNABLE' : 'UNAVAILABLE'}
         </span>
+        {isTracking && (
+          <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 ml-auto flex items-center gap-1">
+            👁️ Tracking
+          </span>
+        )}
       </div>
       
       {/* Last heartbeat */}
@@ -1635,6 +1843,13 @@ function DriverCard({ driver, activeOrders, now }: any) {
       {assignedOrder && (
         <div className="mt-2 pt-2 border-t border-[#1f1f1f] text-[10px] text-neutral-400">
           <span className="text-amber-400">Delivering:</span> {assignedOrder.businesses?.[0]?.business?.name || 'Order'}
+        </div>
+      )}
+      
+      {/* Track info */}
+      {hasLocation && (
+        <div className="text-[9px] text-neutral-400 mt-2 pt-2 border-t border-[#1f1f1f]">
+          Click to {isTracking ? 'stop' : 'track'} on map
         </div>
       )}
     </div>
