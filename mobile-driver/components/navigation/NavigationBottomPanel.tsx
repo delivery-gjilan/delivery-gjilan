@@ -11,6 +11,7 @@ interface NavigationBottomPanelProps {
   onPrimaryAction?: () => void;
   primaryActionLabel?: string;
   primaryActionLoading?: boolean;
+  primaryActionDisabled?: boolean;
 }
 
 export const NavigationBottomPanel: React.FC<NavigationBottomPanelProps> = ({
@@ -23,46 +24,49 @@ export const NavigationBottomPanel: React.FC<NavigationBottomPanelProps> = ({
   onPrimaryAction,
   primaryActionLabel,
   primaryActionLoading = false,
+  primaryActionDisabled = false,
 }) => {
   return (
-    <View style={[styles.container, { paddingBottom: Math.max(bottomInset, 12) }]}>
-      <View style={styles.header}>
-        <View style={styles.dot} />
-        <Text style={styles.headerText}>Heading to {destination}</Text>
-        {etaArrivalText ? <Text style={styles.arrivalText}>Arrive {etaArrivalText}</Text> : null}
-      </View>
-
-      <View style={styles.statsRow}>
-        <View style={styles.stat}>
-          <Text style={styles.statValue}>{eta ?? '–'}</Text>
-          <Text style={styles.statUnit}>min</Text>
-        </View>
-
-        <View style={styles.divider} />
-
-        <View style={styles.stat}>
-          <Text style={styles.statValue}>
-            {distance != null ? distance.toFixed(1) : '–'}
+    <View style={[styles.container, { paddingBottom: Math.max(bottomInset, 14) }]}>
+      {/* ETA row */}
+      <View style={styles.etaRow}>
+        <View style={styles.etaLeft}>
+          <Text style={styles.etaValue}>{eta ?? '–'}</Text>
+          <Text style={styles.etaUnit}> min</Text>
+          <View style={styles.etaDot} />
+          <Text style={styles.etaDetail}>
+            {distance != null ? `${distance.toFixed(1)} km` : '–'}
           </Text>
-          <Text style={styles.statUnit}>km</Text>
         </View>
+        {etaArrivalText ? (
+          <Text style={styles.arrivalTime}>{etaArrivalText}</Text>
+        ) : null}
       </View>
 
+      {/* Destination label */}
+      <Text style={styles.destLabel} numberOfLines={1}>
+        {destination}
+      </Text>
+
+      {/* Action buttons */}
       <View style={styles.actionsRow}>
         {onPrimaryAction && primaryActionLabel ? (
           <Pressable
-            style={[styles.primaryActionButton, primaryActionLoading && styles.primaryActionButtonDisabled]}
+            style={[
+              styles.primaryBtn,
+              (primaryActionLoading || primaryActionDisabled) && styles.primaryBtnDisabled,
+            ]}
             onPress={onPrimaryAction}
-            disabled={primaryActionLoading}
+            disabled={primaryActionLoading || primaryActionDisabled}
           >
-            <Text style={styles.primaryActionButtonText}>
+            <Text style={styles.primaryBtnText}>
               {primaryActionLoading ? 'Updating…' : primaryActionLabel}
             </Text>
           </Pressable>
         ) : null}
 
-        <Pressable style={styles.endButton} onPress={onEnd}>
-          <Text style={styles.endButtonText}>End Trip</Text>
+        <Pressable style={styles.endBtn} onPress={onEnd}>
+          <Text style={styles.endBtnIcon}>✕</Text>
         </Pressable>
       </View>
     </View>
@@ -71,103 +75,99 @@ export const NavigationBottomPanel: React.FC<NavigationBottomPanelProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#111317',
-    paddingTop: 14,
-    paddingHorizontal: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: '#ffffff',
+    paddingTop: 16,
+    paddingHorizontal: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.22,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 12,
   },
-  header: {
+
+  /* ETA row */
+  etaRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
   },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#22c55e',
-    marginRight: 8,
+  etaLeft: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
   },
-  headerText: {
+  etaValue: {
+    fontSize: 38,
+    fontWeight: '700',
+    color: '#1B873B',
+    letterSpacing: -1,
+  },
+  etaUnit: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1B873B',
+  },
+  etaDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#9CA3AF',
+    marginHorizontal: 10,
+    marginBottom: 4,
+  },
+  etaDetail: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  arrivalTime: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#e5e7eb',
-    flex: 1,
+    color: '#374151',
   },
-  arrivalText: {
-    fontSize: 12,
-    color: '#9ca3af',
+
+  /* Destination label */
+  destLabel: {
+    fontSize: 14,
+    color: '#6B7280',
     fontWeight: '500',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#181c22',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-    paddingVertical: 10,
-  },
-  stat: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statValue: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#f3f4f6',
-    letterSpacing: -0.6,
-  },
-  statUnit: {
-    fontSize: 12,
-    color: '#94a3b8',
     marginTop: 2,
-    fontWeight: '500',
+    marginBottom: 14,
   },
-  divider: {
-    width: 1,
-    height: 44,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    marginHorizontal: 8,
-  },
+
+  /* Actions */
   actionsRow: {
-    marginTop: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
-  primaryActionButton: {
+  primaryBtn: {
     flex: 1,
-    backgroundColor: '#1d4ed8',
-    borderRadius: 12,
-    paddingVertical: 13,
+    backgroundColor: '#1B873B',
+    borderRadius: 24,
+    paddingVertical: 14,
     alignItems: 'center',
   },
-  primaryActionButtonDisabled: {
-    opacity: 0.6,
+  primaryBtnDisabled: {
+    opacity: 0.5,
   },
-  primaryActionButtonText: {
+  primaryBtnText: {
     color: '#ffffff',
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 15,
   },
-  endButton: {
-    backgroundColor: '#2b313a',
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 13,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+  endBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  endButtonText: {
-    color: '#f3f4f6',
-    fontWeight: '600',
-    fontSize: 14,
+  endBtnIcon: {
+    fontSize: 18,
+    color: '#374151',
+    fontWeight: '700',
   },
 });

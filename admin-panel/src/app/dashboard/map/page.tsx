@@ -109,6 +109,14 @@ const isDriverAssignable = (driver: any) => {
   return onlinePreference && (connectionStatus === 'CONNECTED' || connectionStatus === 'STALE');
 };
 
+// Maximum number of active orders a single driver can have
+const MAX_DRIVER_ACTIVE_ORDERS = 2;
+
+const getActiveCountForDriver = (driverId: string, activeOrders: any[]) => {
+  if (!driverId) return 0;
+  return activeOrders.filter((o: any) => o.driver?.id === driverId).length;
+};
+
 const distanceMeters = (a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) => {
   const R = 6371000;
   const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
@@ -208,7 +216,7 @@ export default function MapPage() {
   // ==== STATS ====
   const stats = useMemo(() => {
     const activeCount = activeOrders.length;
-    const availableDrivers = drivers.filter((d: any) => !activeOrders.some((o: any) => o.driver?.id === d.id)).length;
+    const availableDrivers = drivers.filter((d: any) => getActiveCountForDriver(d.id, activeOrders) < MAX_DRIVER_ACTIVE_ORDERS).length;
     const busyDrivers = drivers.length - availableDrivers;
     const todayOrders = orders.filter((o: any) => {
       const orderDate = o.orderDate ? new Date(o.orderDate) : null;
@@ -240,7 +248,7 @@ export default function MapPage() {
       stale: drivers.filter((d: any) => d.driverConnection?.connectionStatus === 'STALE').length,
       lost: drivers.filter((d: any) => d.driverConnection?.connectionStatus === 'LOST').length,
       disconnected: drivers.filter((d: any) => d.driverConnection?.connectionStatus === 'DISCONNECTED' || !d.driverConnection?.connectionStatus).length,
-      assignable: drivers.filter((d: any) => isDriverAssignable(d) && !activeOrders.some((o: any) => o.driver?.id === d.id)).length,
+      assignable: drivers.filter((d: any) => isDriverAssignable(d) && getActiveCountForDriver(d.id, activeOrders) < MAX_DRIVER_ACTIVE_ORDERS).length,
     };
 
     return { activeCount, availableDrivers, busyDrivers, todayOrders, avgDeliveryTime, todayRevenue, oldestPendingTime, driverStats };
@@ -262,9 +270,9 @@ export default function MapPage() {
     if (driverFilter !== 'ALL') {
       result = result.filter((d: any) => {
         const status = d.driverConnection?.connectionStatus ?? 'DISCONNECTED';
-        if (driverFilter === 'ASSIGNABLE') return isDriverAssignable(d) && !activeOrders.some((o: any) => o.driver?.id === d.id);
-        if (driverFilter === 'BUSY') return activeOrders.some((o: any) => o.driver?.id === d.id);
-        if (driverFilter === 'FREE') return !activeOrders.some((o: any) => o.driver?.id === d.id);
+        if (driverFilter === 'ASSIGNABLE') return isDriverAssignable(d) && getActiveCountForDriver(d.id, activeOrders) < MAX_DRIVER_ACTIVE_ORDERS;
+        if (driverFilter === 'BUSY') return getActiveCountForDriver(d.id, activeOrders) > 0;
+        if (driverFilter === 'FREE') return getActiveCountForDriver(d.id, activeOrders) === 0;
         return status === driverFilter;
       });
     }
@@ -506,6 +514,55 @@ export default function MapPage() {
     };
   }, []);
 
+  const ROUTE_RECALC_MIN_MS = 60000;
+  const ROUTE_RECALC_MIN_METERS = 80;
+  const lastRouteCalcRef = useRef<
+    Record<string, { timestamp: number; latitude: number; longitude: number }>
+  >({});
+
+  const haversineMeters = (a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) => {
+    const R = 6371000;
+    const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
+    const dLon = ((b.longitude - a.longitude) * Math.PI) / 180;
+    const lat1 = (a.latitude * Math.PI) / 180;
+    const lat2 = (b.latitude * Math.PI) / 180;
+    const h =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+  };
+
+  const shouldRecalculateRoute = (
+    orderId: string,
+    driverPos: { latitude: number; longitude: number }
+  ) => {
+    const prev = lastRouteCalcRef.current[orderId];
+    const now = Date.now();
+
+    if (!prev) {
+      lastRouteCalcRef.current[orderId] = {
+        timestamp: now,
+        latitude: driverPos.latitude,
+        longitude: driverPos.longitude,
+      };
+      return true;
+    }
+
+    const elapsed = now - prev.timestamp;
+    const moved = haversineMeters(prev, driverPos);
+
+    if (elapsed < ROUTE_RECALC_MIN_MS && moved < ROUTE_RECALC_MIN_METERS) {
+      return false;
+    }
+
+    lastRouteCalcRef.current[orderId] = {
+      timestamp: now,
+      latitude: driverPos.latitude,
+      longitude: driverPos.longitude,
+    };
+    return true;
+  };
+
   // ==== ROUTE CALCULATION ====
   useEffect(() => {
     const calculateDistances = async () => {
@@ -545,6 +602,10 @@ export default function MapPage() {
               latitude: driverLocation.latitude,
             };
 
+            if (!shouldRecalculateRoute(order.id, driverPos)) {
+              continue;
+            }
+
             const [toPickupRoute, toDropoffRoute] = await Promise.all([
               calculateRouteDistance(driverPos, pickup),
               calculateRouteDistance(pickup, dropoff),
@@ -571,6 +632,10 @@ export default function MapPage() {
               longitude: driverLocation.longitude,
               latitude: driverLocation.latitude,
             };
+
+            if (!shouldRecalculateRoute(order.id, driverPos)) {
+              continue;
+            }
 
             const toDropoffRoute = await calculateRouteDistance(driverPos, dropoff);
 
@@ -684,7 +749,7 @@ export default function MapPage() {
       // Find nearest available driver (must be assignable - CONNECTED or STALE, with online preference ON)
       const availableDrivers = drivers.filter((d: any) => {
         const hasLocation = d.driverLocation?.latitude && d.driverLocation?.longitude;
-        const isBusy = activeOrders.some((o: any) => o.driver?.id === d.id);
+        const isBusy = getActiveCountForDriver(d.id, activeOrders) > 0;
         const canAssign = isDriverAssignable(d);
         return hasLocation && !isBusy && canAssign;
       });
@@ -1150,7 +1215,7 @@ export default function MapPage() {
           {Object.values(driverTracks).map((track: any) => {
             const pos = animatedDriverPositions[track.id] || track.to;
             if (!isValidLatLng(pos?.latitude, pos?.longitude)) return null;
-            const isBusy = activeOrders.some((order: any) => order.driver?.id === track.id);
+            const isBusy = getActiveCountForDriver(track.id, activeOrders) > 0;
             const driver = driverMap[track.id];
             // New architecture: onlinePreference (user toggle) vs connectionStatus (system-detected)
             const onlinePreference = driver?.driverConnection?.onlinePreference ?? false;
@@ -1633,7 +1698,7 @@ function OrderDetailDrawer({ order, drivers, activeOrders, orderDistances, onClo
                 const statusStyle = DRIVER_CONNECTION_COLORS[connectionStatus] || DRIVER_CONNECTION_COLORS.DISCONNECTED;
                 const StatusIcon = statusStyle.icon;
                 const canAssign = isDriverAssignable(driver);
-                const isBusy = activeOrders.some((o: any) => o.driver?.id === driver.id);
+                const isBusy = getActiveCountForDriver(driver.id, activeOrders) > 0;
                 const isSelected = selectedDriverId === driver.id;
                 
                 return (
@@ -1686,7 +1751,7 @@ function OrderDetailDrawer({ order, drivers, activeOrders, orderDistances, onClo
             </div>
             
             {/* No assignable drivers warning */}
-            {!drivers.some((d: any) => isDriverAssignable(d) && !activeOrders.some((o: any) => o.driver?.id === d.id)) && (
+            {!drivers.some((d: any) => isDriverAssignable(d) && getActiveCountForDriver(d.id, activeOrders) < MAX_DRIVER_ACTIVE_ORDERS) && (
               <div className="flex items-center gap-2 p-2 rounded bg-amber-500/10 border border-amber-500/30 mb-2">
                 <AlertCircle size={14} className="text-amber-400" />
                 <span className="text-xs text-amber-400">No drivers available for assignment</span>
@@ -1767,8 +1832,9 @@ function OrderDetailDrawer({ order, drivers, activeOrders, orderDistances, onClo
 }
 
 function DriverCard({ driver, activeOrders, now, onTrack, isTracking }: any) {
-  const assignedOrder = activeOrders.find((o: any) => o.driver?.id === driver.id);
-  const isBusy = !!assignedOrder;
+  const assignedOrders = activeOrders.filter((o: any) => o.driver?.id === driver.id);
+  const assignedOrder = assignedOrders[0] ?? null;
+  const isBusy = assignedOrders.length >= MAX_DRIVER_ACTIVE_ORDERS;
   const hasLocation = driver.driverLocation?.latitude && driver.driverLocation?.longitude;
   // New architecture: onlinePreference (user toggle) vs connectionStatus (system-detected)
   const onlinePreference = driver.driverConnection?.onlinePreference ?? false;
@@ -1776,7 +1842,7 @@ function DriverCard({ driver, activeOrders, now, onTrack, isTracking }: any) {
   const statusStyle = DRIVER_CONNECTION_COLORS[connectionStatus] || DRIVER_CONNECTION_COLORS.DISCONNECTED;
   const StatusIcon = statusStyle.icon;
   const lastHeartbeat = driver.driverConnection?.lastHeartbeatAt;
-  const canAssign = isDriverAssignable(driver) && !isBusy;
+  const canAssign = isDriverAssignable(driver) && getActiveCountForDriver(driver.id, activeOrders) < MAX_DRIVER_ACTIVE_ORDERS;
 
   return (
     <div className={`bg-[#0a0a0a] border rounded-lg p-3 transition-all ${statusStyle.border} ${isTracking ? 'ring-2 ring-blue-500/50 bg-blue-500/5' : ''} ${connectionStatus === 'DISCONNECTED' || connectionStatus === 'LOST' ? 'opacity-60' : ''} cursor-pointer hover:border-blue-500/50`}

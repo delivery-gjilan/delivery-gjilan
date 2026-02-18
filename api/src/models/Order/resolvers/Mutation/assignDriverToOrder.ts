@@ -62,6 +62,18 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
         driverName = `${driver.firstName} ${driver.lastName}`;
     }
 
+    // Server-side guard: prevent assigning a driver more than MAX_ACTIVE_ORDERS
+    const MAX_ACTIVE_ORDERS = 2;
+    if (effectiveDriverId) {
+        const existingOrders = await orderService.orderRepository.findUncompletedOrdersByUserId(effectiveDriverId);
+        // If the order already has this driver assigned, allow it
+        const dbOrderBefore = await orderService.orderRepository.findById(id);
+        const alreadyAssignedToSameDriver = dbOrderBefore?.driverId === effectiveDriverId;
+        if (!alreadyAssignedToSameDriver && existingOrders.length >= MAX_ACTIVE_ORDERS) {
+            throw new Error('Driver already has maximum number of active orders');
+        }
+    }
+
     const order = await orderService.assignDriverToOrder(id, effectiveDriverId ?? null);
 
     // Get the order to find the user ID for publishing

@@ -6,12 +6,23 @@ interface SimulationOptions {
   updateIntervalMs?: number; // How often to update position
 }
 
+export interface SimulationSnapshot {
+  isSimulating: boolean;
+  simulatedLocation: Location.LocationObjectCoords | null;
+  routeCoordinates: Array<[number, number]>;
+  currentIndex: number;
+  progress: number;
+  lastBearing: number;
+}
+
 interface UseNavigationSimulationReturn {
   isSimulating: boolean;
   simulatedLocation: Location.LocationObjectCoords | null;
   startSimulation: (routeCoordinates: Array<[number, number]>) => void;
   stopSimulation: () => void;
   toggleSimulation: () => void;
+  getSimulationSnapshot: () => SimulationSnapshot;
+  restoreSimulationSnapshot: (snapshot: SimulationSnapshot | null) => void;
 }
 
 /**
@@ -257,11 +268,40 @@ export function useNavigationSimulation(
     };
   }, [isSimulating, speedKmh, updateIntervalMs, calculateDistance, interpolate, calculateBearing, stopSimulation]);
 
+  const getSimulationSnapshot = useCallback((): SimulationSnapshot => {
+    return {
+      isSimulating,
+      simulatedLocation,
+      routeCoordinates: routeCoordsRef.current,
+      currentIndex: currentIndexRef.current,
+      progress: progressRef.current,
+      lastBearing: lastBearingRef.current,
+    };
+  }, [isSimulating, simulatedLocation]);
+
+  const restoreSimulationSnapshot = useCallback((snapshot: SimulationSnapshot | null) => {
+    if (!snapshot) return;
+
+    routeCoordsRef.current = snapshot.routeCoordinates ?? [];
+    currentIndexRef.current = snapshot.currentIndex ?? 0;
+    progressRef.current = snapshot.progress ?? 0;
+    lastBearingRef.current = snapshot.lastBearing ?? 0;
+    setSimulatedLocation(snapshot.simulatedLocation ?? null);
+
+    if (snapshot.isSimulating && routeCoordsRef.current.length >= 2) {
+      setIsSimulating(true);
+    } else {
+      setIsSimulating(false);
+    }
+  }, []);
+
   return {
     isSimulating,
     simulatedLocation,
     startSimulation,
     stopSimulation,
     toggleSimulation,
+    getSimulationSnapshot,
+    restoreSimulationSnapshot,
   };
 }

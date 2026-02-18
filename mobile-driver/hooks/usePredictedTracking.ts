@@ -23,6 +23,8 @@ interface UsePredictedTrackingProps {
 }
 
 const EARTH_RADIUS_M = 6371000;
+const MAX_PREDICTION_SECONDS = 6;
+const SPEED_DECAY_SECONDS = 5;
 
 function toRad(deg: number): number {
   return (deg * Math.PI) / 180;
@@ -117,12 +119,13 @@ export function usePredictedTracking({
   zoomLevel = 18.5,
   pitch = 60,
   followMode = 'heading-up',
-  deadZoneOffsetMeters = 90,
+  deadZoneOffsetMeters = 30,
   headingSnapThresholdDeg = 10,
-  adaptiveZoom = true,
+  adaptiveZoom = false,
 }: UsePredictedTrackingProps) {
   const animationFrameRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number>(0);
+  const lastCameraUpdateTimeRef = useRef<number>(0);
 
   const anchorPosRef = useRef<[number, number] | null>(null);
   const anchorHeadingRef = useRef<number>(0);
@@ -131,6 +134,8 @@ export function usePredictedTracking({
 
   const currentPosRef = useRef<[number, number] | null>(null);
   const currentHeadingRef = useRef<number>(0);
+  const currentCameraPosRef = useRef<[number, number] | null>(null);
+  const currentCameraHeadingRef = useRef<number>(0);
 
   const prevBackendRef = useRef<LocationLike | null>(null);
   const prevBackendTsRef = useRef<number>(0);
@@ -170,7 +175,9 @@ export function usePredictedTracking({
     }
 
     const safeHeading = normalizeHeading(inferredHeading ?? 0);
-    const safeSpeed = Math.max(0, Math.min(inferredSpeed ?? 0, 60));
+    const rawSpeed = Math.max(0, Math.min(inferredSpeed ?? 0, 25));
+    const previousSpeed = anchorSpeedRef.current;
+    const safeSpeed = previousSpeed * 0.75 + rawSpeed * 0.25;
 
     anchorPosRef.current = [sourceLocation.longitude, sourceLocation.latitude];
     anchorHeadingRef.current = safeHeading;
@@ -180,6 +187,8 @@ export function usePredictedTracking({
     if (currentPosRef.current === null) {
       currentPosRef.current = [sourceLocation.longitude, sourceLocation.latitude];
       currentHeadingRef.current = safeHeading;
+      currentCameraPosRef.current = [sourceLocation.longitude, sourceLocation.latitude];
+      currentCameraHeadingRef.current = safeHeading;
     }
 
     prevBackendRef.current = sourceLocation;
@@ -208,8 +217,10 @@ export function usePredictedTracking({
       }
 
       const ageSeconds = Math.max((Date.now() - anchorTimeRef.current) / 1000, 0);
-      const predictionSeconds = Math.min(ageSeconds, 12);
-      const predictedDistance = anchorSpeedRef.current * predictionSeconds;
+      const predictionSeconds = Math.min(ageSeconds, MAX_PREDICTION_SECONDS);
+      const decayFactor = Math.exp(-ageSeconds / SPEED_DECAY_SECONDS);
+      const decayedSpeed = anchorSpeedRef.current * decayFactor;
+      const predictedDistance = decayedSpeed * predictionSeconds;
 
       const [predLon, predLat] = destinationPoint(
         anchorPos[1],
@@ -218,8 +229,8 @@ export function usePredictedTracking({
         predictedDistance,
       );
 
-      const positionTauMs = 350;
-      const headingTauMs = 250;
+      const positionTauMs = 460;
+      const headingTauMs = 420;
       const posAlpha = 1 - Math.exp(-deltaMs / positionTauMs);
       const headingAlpha = 1 - Math.exp(-deltaMs / headingTauMs);
 
@@ -231,7 +242,9 @@ export function usePredictedTracking({
         currentHeadingRef.current,
         anchorHeadingRef.current,
       );
-      const shouldRotate = Math.abs(headingDelta) >= headingSnapThresholdDeg;
+      const speedForHeading = decayedSpeed;
+      const shouldRotate =
+        speedForHeading > 0.8 && Math.abs(headingDelta) >= headingSnapThresholdDeg;
       const nextHeading = shouldRotate
         ? normalizeHeading(currentHeadingRef.current + headingDelta * headingAlpha)
         : currentHeadingRef.current;
@@ -248,7 +261,7 @@ export function usePredictedTracking({
       });
 
       if (followCamera && cameraRef.current) {
-        const speedMps = anchorSpeedRef.current;
+        const speedMps = decayedSpeed;
         const speedKmh = speedMps * 3.6;
 
         let targetZoom = zoomLevel;
@@ -266,13 +279,45 @@ export function usePredictedTracking({
           deadZoneOffsetMeters,
         );
 
-        cameraRef.current.setCamera({
-          centerCoordinate: [camLon, camLat],
-          heading: cameraHeading,
-          zoomLevel: targetZoom,
-          pitch,
-          animationDuration: 0,
-        });
+        const currentCamPos =
+          currentCameraPosRef.current ?? ([camLon, camLat] as [number, number]);
+        const cameraPositionTauMs = 620;
+        const cameraPosAlpha = 1 - Math.exp(-deltaMs / cameraPositionTauMs);
+        const smoothCamLon =
+          currentCamPos[0] + (camLon - currentCamPos[0]) * cameraPosAlpha;
+        const smoothCamLat =
+          currentCamPos[1] + (camLat - currentCamPos[1]) * cameraPosAlpha;
+        currentCameraPosRef.current = [smoothCamLon, smoothCamLat];
+
+        const currentCamHeading = currentCameraHeadingRef.current;
+        const camHeadingDelta = shortestAngleDelta(currentCamHeading, cameraHeading);
+        const cameraHeadingTauMs = 560;
+        const cameraHeadingAlpha = 1 - Math.exp(-deltaMs / cameraHeadingTauMs);
+        const smoothCameraHeading =
+          followMode === 'north-up'
+            ? 0
+            : normalizeHeading(currentCamHeading + camHeadingDelta * cameraHeadingAlpha);
+        currentCameraHeadingRef.current = smoothCameraHeading;
+
+        if (time - lastCameraUpdateTimeRef.current < 32) {
+          animationFrameRef.current = requestAnimationFrame(frame);
+          return;
+        }
+        lastCameraUpdateTimeRef.current = time;
+
+        const cameraUpdate: Record<string, any> = {
+          centerCoordinate: [smoothCamLon, smoothCamLat],
+          heading: smoothCameraHeading,
+          animationDuration: 100,
+        };
+
+        // Keep manual zoom/pitch while locked unless adaptive zoom is intentionally enabled.
+        if (adaptiveZoom) {
+          cameraUpdate.zoomLevel = targetZoom;
+          cameraUpdate.pitch = pitch;
+        }
+
+        cameraRef.current.setCamera(cameraUpdate);
       }
 
       animationFrameRef.current = requestAnimationFrame(frame);
@@ -286,6 +331,7 @@ export function usePredictedTracking({
         animationFrameRef.current = null;
       }
       lastFrameTimeRef.current = 0;
+      lastCameraUpdateTimeRef.current = 0;
     };
   }, [
     isActive,

@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, ActivityIndicator, Pressable, StyleSheet, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Mapbox from '@rnmapbox/maps';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@apollo/client/react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ASSIGN_DRIVER_TO_ORDER, GET_ORDER, UPDATE_ORDER_STATUS } from '@/graphql/operations/orders';
 import { useTheme } from '@/hooks/useTheme';
 import { useDriverLocationOverrideStore } from '@/store/driverLocationOverrideStore';
@@ -14,24 +15,88 @@ import type { Feature, LineString } from 'geojson';
 import { useDriverLocation } from '@/hooks/useDriverLocation';
 import { useNavigationState } from '@/hooks/useNavigationState';
 import { useNavigationCamera } from '@/hooks/useNavigationCamera';
-import { useNavigationRoute } from '@/hooks/useNavigationRoute';
+import { useNavigationRoute, type RouteData } from '@/hooks/useNavigationRoute';
 import { useOffRouteDetection } from '@/hooks/useOffRouteDetection';
 import { useNavigationSteps } from '@/hooks/useNavigationSteps';
-import { useNavigationSimulation } from '@/hooks/useNavigationSimulation';
 import { usePredictedTracking } from '@/hooks/usePredictedTracking';
 
 // ─────────────────────── Components ───────────────────────
-import { InstructionBanner } from '@/components/navigation/InstructionBanner';
 import { NavigationBottomPanel } from '@/components/navigation/NavigationBottomPanel';
 import { RecenterButton } from '@/components/navigation/RecenterButton';
+import { FloatingMapButtons } from '@/components/navigation/FloatingMapButtons';
 
 /* ─────────────────────── constants ─────────────────────── */
 
 const GJILAN_CENTER: [number, number] = [21.4694, 42.4635];
 const GJILAN_NE: [number, number] = [21.51, 42.50];
 const GJILAN_SW: [number, number] = [21.42, 42.43];
-const MAP_STYLE = 'mapbox://styles/mapbox/dark-v11';
+const MAP_STYLE = 'mapbox://styles/artshabani2002/cmls0528e002701p93dejgdri';
 const DESTINATION_REACHED_THRESHOLD_M = 25;
+const OUT_FOR_DELIVERY_UNLOCK_M = 120;
+const ORDER_MAP_ZOOM_KEY = 'order_map_zoom_state_v2';
+const ORDER_MAP_LOCK_KEY = 'order_map_lock_state_v2';
+
+/* ── Simple Camera State Management ── */
+const saveZoomState = async (zoom: number) => {
+    try {
+        const zoomStr = JSON.stringify(zoom);
+        console.log('[ORDER_MAP] Saving zoom to AsyncStorage:', zoom);
+        await AsyncStorage.setItem(ORDER_MAP_ZOOM_KEY, zoomStr);
+        // Verify it was saved
+        const verify = await AsyncStorage.getItem(ORDER_MAP_ZOOM_KEY);
+        console.log('[ORDER_MAP] Verified saved zoom:', verify);
+    } catch (error) {
+        console.warn('[ORDER_MAP] Failed to save zoom:', error);
+    }
+};
+
+const loadZoomState = async (): Promise<number | null> => {
+    try {
+        const data = await AsyncStorage.getItem(ORDER_MAP_ZOOM_KEY);
+        console.log('[ORDER_MAP] Raw zoom data from storage:', data);
+        if (!data) {
+            console.log('[ORDER_MAP] No saved zoom found');
+            return null;
+        }
+        const zoom = JSON.parse(data) as number;
+        console.log('[ORDER_MAP] Parsed zoom:', zoom, 'type:', typeof zoom);
+        return zoom;
+    } catch (error) {
+        console.warn('[ORDER_MAP] Failed to load zoom:', error);
+        return null;
+    }
+};
+
+const saveLockState = async (isLocked: boolean) => {
+    try {
+        const lockStr = JSON.stringify(isLocked);
+        console.log('[ORDER_MAP] Saving lock state:', isLocked);
+        await AsyncStorage.setItem(ORDER_MAP_LOCK_KEY, lockStr);
+        const verify = await AsyncStorage.getItem(ORDER_MAP_LOCK_KEY);
+        console.log('[ORDER_MAP] Verified saved lock:', verify);
+    } catch (error) {
+        console.warn('[ORDER_MAP] Failed to save lock state:', error);
+    }
+};
+
+const loadLockState = async (): Promise<boolean | null> => {
+    try {
+        const data = await AsyncStorage.getItem(ORDER_MAP_LOCK_KEY);
+        console.log('[ORDER_MAP] Raw lock data from storage:', data);
+        if (!data) {
+            console.log('[ORDER_MAP] No saved lock state found');
+            return null;
+        }
+        const isLocked = JSON.parse(data) as boolean;
+        console.log('[ORDER_MAP] Parsed lock state:', isLocked, 'type:', typeof isLocked);
+        return isLocked;
+    } catch (error) {
+        console.warn('[ORDER_MAP] Failed to load lock state:', error);
+        return null;
+    }
+};
+
+const routeCache = new Map<string, RouteData>();
 
 /* ═══════════════════════════════════════════════════════════ */
 
@@ -40,7 +105,7 @@ export default function OrderMapScreen() {
     const theme = useTheme();
     const insets = useSafeAreaInsets();
     const { orderId } = useLocalSearchParams<{ orderId?: string }>();
-    const { setLocationOverride, clearLocationOverride } = useDriverLocationOverrideStore();
+    const { clearLocationOverride } = useDriverLocationOverrideStore();
     const currentDriverId = useAuthStore((state) => state.user?.id);
 
     // ═══════════════ Query Order Data ═══════════════
@@ -53,10 +118,14 @@ export default function OrderMapScreen() {
 
     const order = (data as any)?.order;
     const [previewRoutePulse, setPreviewRoutePulse] = useState(0.6);
-    const [showRelockChip, setShowRelockChip] = useState(false);
-    const relockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const lastViewportSaveRef = useRef(0);
+    const [destinationBlink, setDestinationBlink] = useState(1);
+    const [routeRefreshKey, setRouteRefreshKey] = useState(0);
+    const [isRestoringView, setIsRestoringView] = useState(false);
     const wasFollowingBeforeOverviewRef = useRef(false);
+    const hasRecenteredOnFocusRef = useRef(false);
+    const isFocusedRef = useRef(false);
+    const autoStartRef = useRef(false);
+    const isRestoringCameraRef = useRef(false);
 
     // ═══════════════ Derive Points ═══════════════
     const pickup = useMemo(() => {
@@ -86,6 +155,13 @@ export default function OrderMapScreen() {
         'READY',
         'OUT_FOR_DELIVERY',
     ].includes(order?.status);
+    const isAssignedToOrder = Boolean(order?.driver?.id && order?.driver?.id === currentDriverId);
+    const shouldAutoStartNavigation =
+        isAssignedToOrder && (order?.status === 'ACCEPTED' || order?.status === 'READY');
+
+    useEffect(() => {
+        autoStartRef.current = false;
+    }, [orderId, order?.driver?.id]);
 
     // ═══════════════ Custom Hooks ═══════════════
     const { location, locationRef, permissionGranted, error: locationError } = useDriverLocation({
@@ -94,19 +170,7 @@ export default function OrderMapScreen() {
         distanceFilter: 5,
     });
 
-    const {
-        isSimulating,
-        simulatedLocation,
-        startSimulation,
-        stopSimulation,
-        toggleSimulation,
-    } = useNavigationSimulation({
-        speedKmh: 40, // Realistic city driving speed
-        updateIntervalMs: 200, // Update every 200ms for ultra-smooth movement
-    });
-
-    // Use simulated location when simulation is active, otherwise use real GPS
-    const effectiveLocation = isSimulating ? simulatedLocation : location;
+    const effectiveLocation = location;
 
     const {
         state,
@@ -132,7 +196,6 @@ export default function OrderMapScreen() {
         enableFollowMode,
         disableFollowMode,
         setFollowMode,
-        cycleFollowMode,
         recenter,
         fitBounds,
         handleMapPress,
@@ -141,6 +204,8 @@ export default function OrderMapScreen() {
 
     const driverMarkerRef = useRef<any>(null);
     const driverArrowRef = useRef<any>(null);
+    const lastRouteRef = useRef<RouteData | null>(null);
+    const latestLocationRef = useRef<typeof effectiveLocation>(null);
 
     // Imperative 60 FPS marker + camera prediction loop
     // Only follow camera when explicitly locked by user
@@ -154,10 +219,14 @@ export default function OrderMapScreen() {
         zoomLevel: cameraState.zoom || 18.5,
         pitch: cameraState.pitch || 58,
         followMode,
-        deadZoneOffsetMeters: 95,
+        deadZoneOffsetMeters: 28,
         headingSnapThresholdDeg: 10,
-        adaptiveZoom: true,
+        adaptiveZoom: false,
     });
+
+    useEffect(() => {
+        latestLocationRef.current = effectiveLocation ?? null;
+    }, [effectiveLocation]);
 
     const {
         route,
@@ -167,6 +236,12 @@ export default function OrderMapScreen() {
         clearRoute,
         shouldReroute,
         lastRerouteTime,
+    } = useNavigationRoute();
+
+    const {
+        route: pickupToDropoffRoute,
+        fetchRoute: fetchPickupToDropoffRoute,
+        clearRoute: clearPickupToDropoffRoute,
     } = useNavigationRoute();
 
     const { checkOffRoute, calculateDistanceToDestination } = useOffRouteDetection();
@@ -218,51 +293,113 @@ export default function OrderMapScreen() {
         setNavigatingToDropoff,
     ]);
 
+    useEffect(() => {
+        if (!shouldAutoStartNavigation || !orderId || !pickup || !dropoff) return;
+        if (isNavigating) return;
+        if (autoStartRef.current) return;
+
+        startNav(orderId, pickup, dropoff);
+        setNavigatingToPickup();
+
+        if (effectiveLocation) {
+            recenter(effectiveLocation);
+        } else {
+            enableFollowMode();
+        }
+
+        setRouteRefreshKey((prev) => prev + 1);
+        autoStartRef.current = true;
+    }, [
+        shouldAutoStartNavigation,
+        orderId,
+        pickup,
+        dropoff,
+        isNavigating,
+        startNav,
+        setNavigatingToPickup,
+        effectiveLocation,
+        recenter,
+        enableFollowMode,
+    ]);
+
     // ═══════════════ Status-Driven Single-Leg Routing ═══════════════
     // Preview route before navigation starts OR fetch route during navigation
     // Route leg is determined purely by order status:
     // - ACCEPTED/READY → driver to pickup
     // - OUT_FOR_DELIVERY → driver to dropoff
+    const currentDestination = useMemo(() => {
+        if (!pickup || !dropoff) return null;
+        if (order?.status === 'ACCEPTED' || order?.status === 'READY') return pickup;
+        if (order?.status === 'OUT_FOR_DELIVERY') return dropoff;
+        return null;
+    }, [order?.status, pickup, dropoff]);
+
+    const routeCacheKey = useMemo(() => {
+        if (!orderId || !currentDestination) return null;
+        return `${orderId}:${order?.status ?? 'UNKNOWN'}`;
+    }, [orderId, currentDestination, order?.status]);
+
+    const hasLocation = Boolean(effectiveLocation);
+
     useEffect(() => {
-        if (!effectiveLocation || !pickup || !dropoff) return;
-
-        // Determine destination based on order status
-        const destination =
-            order?.status === 'ACCEPTED' || order?.status === 'READY'
-                ? pickup
-                : order?.status === 'OUT_FOR_DELIVERY'
-                ? dropoff
-                : null;
-
-        if (!destination) {
+        if (!currentDestination) {
             clearRoute();
+            lastRouteRef.current = null;
             return;
         }
 
-        fetchRoute(effectiveLocation, destination);
+        if (routeCacheKey && !lastRouteRef.current) {
+            const cached = routeCache.get(routeCacheKey);
+            if (cached) {
+                lastRouteRef.current = cached;
+            }
+        }
+
+        const locationForRoute = latestLocationRef.current;
+        if (!locationForRoute) return;
+
+        fetchRoute(locationForRoute, currentDestination);
     }, [
-        effectiveLocation,
-        order?.status,
-        pickup,
-        dropoff,
+        currentDestination,
+        routeCacheKey,
+        hasLocation,
         fetchRoute,
         clearRoute,
+        routeRefreshKey,
     ]);
 
-    // Simulation remains manual-only (no auto-start)
-
-    // Sync simulated location into heartbeat pipeline for admin tracking
     useEffect(() => {
-        if (isSimulating && simulatedLocation) {
-            setLocationOverride({
-                latitude: simulatedLocation.latitude,
-                longitude: simulatedLocation.longitude,
-            });
+        if (route && route.coordinates.length >= 2) {
+            lastRouteRef.current = route;
+            if (routeCacheKey) {
+                routeCache.set(routeCacheKey, route);
+            }
+        }
+    }, [route, routeCacheKey]);
+
+    useEffect(() => {
+        lastRouteRef.current = null;
+    }, [orderId]);
+
+    useEffect(() => {
+        if (!pickup || !dropoff) return;
+
+        const shouldPreviewRoute =
+            order?.status === 'ACCEPTED' || order?.status === 'READY';
+
+        if (!shouldPreviewRoute) {
+            clearPickupToDropoffRoute();
             return;
         }
 
-        clearLocationOverride();
-    }, [isSimulating, simulatedLocation, setLocationOverride, clearLocationOverride]);
+        fetchPickupToDropoffRoute(pickup, dropoff);
+    }, [
+        pickup,
+        dropoff,
+        order?.status,
+        fetchPickupToDropoffRoute,
+        clearPickupToDropoffRoute,
+    ]);
 
     useEffect(() => {
         return () => {
@@ -336,14 +473,24 @@ export default function OrderMapScreen() {
             setNavigatingToPickup();
         }
 
-        // Don't force follow mode - let driver control camera manually
-        // enableFollowMode(); // Removed: allow manual camera control like Google Maps
+        if (effectiveLocation) {
+            recenter(effectiveLocation);
+        } else {
+            enableFollowMode();
+        }
+
+        setRouteRefreshKey((prev) => prev + 1);
     };
 
     const handleOutForDelivery = async () => {
         if (!pickup || !dropoff || !orderId) return;
         if (!currentDriverId) {
             Alert.alert('Error', 'Driver profile not loaded. Please re-login.');
+            return;
+        }
+
+        if (!canUnlockOutForDelivery) {
+            Alert.alert('Too far', 'Get closer to the pickup location to start delivery.');
             return;
         }
 
@@ -400,94 +547,172 @@ export default function OrderMapScreen() {
         clearRoute();
         resetSteps();
         disableFollowMode();
-        stopSimulation(); // Stop simulation when navigation ends
+
+        setRouteRefreshKey((prev) => prev + 1);
     };
 
     const handleRecenter = () => {
         if (!effectiveLocation || !cameraRef.current) return;
         
-        // Recenter to driver position with navigation settings
+        // Center on driver with full zoom + lock camera
+        const zoomLevel = 20;
         cameraRef.current.setCamera({
             centerCoordinate: [effectiveLocation.longitude, effectiveLocation.latitude],
-            zoomLevel: 18.5,
-            pitch: 60,
+            zoomLevel: zoomLevel,
+            pitch: 55,
             heading: effectiveLocation.heading || 0,
             animationDuration: 600,
         });
+        
+        // Lock camera in heading-up mode
+        setFollowMode('heading-up');
+        saveLockState(true);
+        saveZoomState(zoomLevel);
     };
 
-    const handleToggleSimulation = () => {
-        if (!route || route.coordinates.length < 2) {
-            Alert.alert('No route', 'Cannot start simulation without a route');
-            return;
-        }
+    const handleUnlockCamera = () => {
+        setFollowMode('free');
+        saveLockState(false);
+    };
 
-        if (isSimulating) {
-            stopSimulation();
-        } else {
-            // Start simulation following the actual route polyline
-            startSimulation(route.coordinates);
+    const fitAllMarkers = () => {
+        if (!cameraRef.current || !effectiveLocation) return;
+        
+        // Collect all visible markers: driver, pickup, dropoff
+        const coordinates: [number, number][] = [
+            [effectiveLocation.longitude, effectiveLocation.latitude], // Driver
+        ];
+        
+        if (pickup) {
+            coordinates.push([pickup.longitude, pickup.latitude]);
+        }
+        
+        if (dropoff) {
+            coordinates.push([dropoff.longitude, dropoff.latitude]);
+        }
+        
+        // Fit bounds with padding to show all markers
+        if (coordinates.length > 0) {
+            fitBounds(coordinates, [100, 80, 100, 200]); // [top, right, bottom, left]
+            setFollowMode('free');
         }
     };
 
     const handleToggleCameraLock = () => {
         if (followMode === 'free') {
-            setFollowMode('heading-up');
-            setShowRelockChip(false);
+            handleRecenter();
+        } else {
+            handleUnlockCamera();
+        }
+    };
+
+    // Auto-fit all markers when in preview mode (accepting an order)
+    useEffect(() => {
+        const isPreviewMode = !isNavigating && (order?.status === 'READY' || order?.status === 'ACCEPTED');
+        
+        if (isPreviewMode && effectiveLocation && pickup && dropoff && cameraRef.current && !hasRecenteredOnFocusRef.current) {
+            setTimeout(() => {
+                fitAllMarkers();
+                hasRecenteredOnFocusRef.current = true;
+            }, 500); // Slight delay to let map settle
+        }
+    }, [order?.status, isNavigating, effectiveLocation, pickup, dropoff, fitBounds]);
+
+    const handleCameraChanged = (event: any) => {
+        // Skip saving if we're currently restoring camera state
+        if (isRestoringCameraRef.current) {
+            console.log('[ORDER_MAP] Skipping camera save - restoration in progress');
             return;
         }
 
-        setFollowMode('free');
-    };
-
-    const handleCycleFollowMode = () => {
-        cycleFollowMode();
-        setShowRelockChip(false);
-    };
-
-    const clearRelockTimer = () => {
-        if (relockTimerRef.current) {
-            clearTimeout(relockTimerRef.current);
-            relockTimerRef.current = null;
-        }
-    };
-
-    const triggerAutoUnlock = () => {
-        if (!isFollowing) return;
-
-        setFollowMode('free');
-        setShowRelockChip(true);
-        clearRelockTimer();
-
-        relockTimerRef.current = setTimeout(() => {
-            const speed = effectiveLocation?.speed ?? 0;
-            if (speed >= 5) {
-                setFollowMode('heading-up');
-                setShowRelockChip(false);
-                return;
-            }
-
-            setShowRelockChip(true);
-        }, 8000);
-    };
-
-    const handleMapTouchStart = () => {
-        triggerAutoUnlock();
-    };
-
-    const handleCameraChanged = (event: any) => {
-        const now = Date.now();
-        if (now - lastViewportSaveRef.current < 1200) return;
-
         const properties = event?.properties;
         const zoom = properties?.zoom;
-        const pitch = properties?.pitch;
 
-        if (typeof zoom === 'number' && typeof pitch === 'number') {
-            saveViewportPreference(zoom, pitch);
-            lastViewportSaveRef.current = now;
+        if (typeof zoom === 'number' && zoom > 0) {
+            console.log('[ORDER_MAP] Camera zoom changed:', zoom);
+            saveZoomState(zoom);
         }
     };
+
+    useFocusEffect(
+        useCallback(() => {
+            console.log('[ORDER_MAP] Screen focused - restoring zoom and lock state');
+            isFocusedRef.current = true;
+            hasRecenteredOnFocusRef.current = false;
+            setIsRestoringView(false); // Hide map while restoring
+
+            const restoreState = async () => {
+                try {
+                    const savedZoom = await loadZoomState();
+                    const savedLocked = await loadLockState();
+                    
+                    const zoomToUse = savedZoom || 18.5;
+                    const isLocked = savedLocked ?? false;
+                    
+                    console.log('[ORDER_MAP] Loaded saved state - zoom:', zoomToUse, 'locked:', isLocked);
+                    
+                    // Mark restoration in progress to block camera saves
+                    isRestoringCameraRef.current = true;
+                    
+                    // Restore lock state immediately
+                    if (isLocked) {
+                        console.log('[ORDER_MAP] Restoring locked state');
+                        setFollowMode('heading-up');
+                    } else {
+                        console.log('[ORDER_MAP] Restoring free state');
+                        setFollowMode('free');
+                    }
+                    
+                    // Wait for camera and location to be ready
+                    let retries = 0;
+                    const waitForCamera = setInterval(() => {
+                        if (cameraRef.current && effectiveLocation) {
+                            clearInterval(waitForCamera);
+                            console.log('[ORDER_MAP] Camera ready, applying saved zoom');
+                            
+                            // Apply saved zoom
+                            cameraRef.current.setCamera({
+                                centerCoordinate: [effectiveLocation.longitude, effectiveLocation.latitude],
+                                zoomLevel: zoomToUse,
+                                pitch: 55,
+                                heading: effectiveLocation.heading || 0,
+                                animationDuration: 0,
+                            });
+                            
+                            // Wait for map to fully settle and then show it
+                            setTimeout(() => {
+                                console.log('[ORDER_MAP] Restoration complete, showing map and re-enabling saves');
+                                isRestoringCameraRef.current = false;
+                                setIsRestoringView(true); // Show map once restored
+                            }, 1200);
+                            
+                            hasRecenteredOnFocusRef.current = true;
+                        } else {
+                            retries++;
+                            if (retries > 50) {
+                                // Timeout after 5 seconds
+                                console.warn('[ORDER_MAP] Camera or location not ready, showing map anyway');
+                                clearInterval(waitForCamera);
+                                isRestoringCameraRef.current = false;
+                                setIsRestoringView(true);
+                            }
+                        }
+                    }, 100);
+                    
+                } catch (error) {
+                    console.warn('[ORDER_MAP] Failed to restore state:', error);
+                    setIsRestoringView(true); // Show map even if restore failed
+                }
+            };
+
+            restoreState();
+
+            return () => {
+                console.log('[ORDER_MAP] Screen unfocused');
+                isFocusedRef.current = false;
+            };
+        }, [effectiveLocation]),
+    );
 
     const handleOverviewPressIn = () => {
         if (!route || route.coordinates.length < 2) return;
@@ -503,33 +728,55 @@ export default function OrderMapScreen() {
         wasFollowingBeforeOverviewRef.current = false;
     };
 
-    useEffect(() => {
-        return () => {
-            clearRelockTimer();
-        };
-    }, []);
-
     // ═══════════════ Derived Values ═══════════════
+    const activeRoute = route ?? lastRouteRef.current;
     const routeShape = useMemo<Feature<LineString> | null>(() => {
-        if (!route || route.coordinates.length < 2) return null;
+        if (!activeRoute || activeRoute.coordinates.length < 2) return null;
         return {
             type: 'Feature',
             properties: {},
-            geometry: { type: 'LineString', coordinates: route.coordinates },
+            geometry: { type: 'LineString', coordinates: activeRoute.coordinates },
         };
-    }, [route]);
+    }, [activeRoute]);
+
+    const pickupToDropoffShape = useMemo<Feature<LineString> | null>(() => {
+        if (!pickupToDropoffRoute || pickupToDropoffRoute.coordinates.length < 2) return null;
+        return {
+            type: 'Feature',
+            properties: {},
+            geometry: { type: 'LineString', coordinates: pickupToDropoffRoute.coordinates },
+        };
+    }, [pickupToDropoffRoute]);
 
     const headingTo = isNavigatingToPickup ? 'Pickup' : 'Drop-off';
     // Fix: route.duration is in SECONDS from Mapbox API, convert to minutes
     const eta = route ? Math.round(route.duration / 60) : null;
     const distKm = route ? route.distance / 1000 : null;
     const isPreviewMode = !isNavigating && order?.status === 'READY';
+    const distanceToPickup = useMemo(() => {
+        if (!effectiveLocation || !pickup) return null;
+        return calculateDistanceToDestination(effectiveLocation, pickup);
+    }, [effectiveLocation, pickup, calculateDistanceToDestination]);
+    const canUnlockOutForDelivery = Boolean(
+        order?.status === 'READY' &&
+            distanceToPickup != null &&
+            distanceToPickup <= OUT_FOR_DELIVERY_UNLOCK_M,
+    );
     const etaArrivalText = eta != null
         ? new Date(Date.now() + eta * 60 * 1000).toLocaleTimeString([], {
               hour: '2-digit',
               minute: '2-digit',
           })
         : undefined;
+
+    const markerScale = useMemo(() => {
+        const zoom = cameraState.zoom ?? 15;
+        if (zoom >= 16) return 1;
+        if (zoom >= 14) return 0.88;
+        if (zoom >= 12) return 0.75;
+        if (zoom >= 10) return 0.65;
+        return 0.55;
+    }, [cameraState.zoom]);
 
     useEffect(() => {
         if (!isPreviewMode) {
@@ -551,6 +798,21 @@ export default function OrderMapScreen() {
         return () => cancelAnimationFrame(frameId);
     }, [isPreviewMode]);
 
+    useEffect(() => {
+        let frameId = 0;
+        const started = Date.now();
+
+        const animate = () => {
+            const elapsed = (Date.now() - started) / 1000;
+            const pulse = 0.35 + ((Math.sin(elapsed * 4.2) + 1) / 2) * 0.65;
+            setDestinationBlink(pulse);
+            frameId = requestAnimationFrame(animate);
+        };
+
+        frameId = requestAnimationFrame(animate);
+        return () => cancelAnimationFrame(frameId);
+    }, []);
+
 
     /* ═══════════════════ LOADING ═══════════════════ */
 
@@ -566,15 +828,6 @@ export default function OrderMapScreen() {
 
     return (
         <View style={styles.container}>
-            {/* ── INSTRUCTION BANNER (Navigation mode) ── */}
-            {isNavigating && currentStep && (
-                <InstructionBanner
-                    currentStep={currentStep}
-                    nextStep={nextStep}
-                    topInset={insets.top}
-                />
-            )}
-
             {/* ── TOP BAR (Overview mode) ── */}
             {!isNavigating && (
                 <View style={[styles.topBar, { paddingTop: insets.top }]}>
@@ -589,7 +842,7 @@ export default function OrderMapScreen() {
             )}
 
             {/* ── MAP ── */}
-            <View style={styles.mapContainer}>
+            <View style={[styles.mapContainer, !isRestoringView && { opacity: 0 }]}>
                 <Mapbox.MapView
                     style={styles.map}
                     styleURL={MAP_STYLE}
@@ -603,7 +856,6 @@ export default function OrderMapScreen() {
                     rotateEnabled
                     pitchEnabled
                     onPress={handleMapPress}
-                    onTouchStart={handleMapTouchStart}
                     onCameraChanged={handleCameraChanged}
                 >
                     <Mapbox.Camera
@@ -618,14 +870,84 @@ export default function OrderMapScreen() {
                         }}
                     />
 
-                    {/* Driver position marker - clean design */}
+                    {/* Preview pickup → dropoff route (before delivery) */}
+                    {pickupToDropoffShape && !isNavigatingToDropoff && (
+                        <Mapbox.ShapeSource id="preview-route-source" shape={pickupToDropoffShape}>
+                            <Mapbox.LineLayer
+                                id="preview-route"
+                                style={{
+                                    lineColor: '#F59E0B',
+                                    lineWidth: [
+                                        'interpolate',
+                                        ['linear'],
+                                        ['zoom'],
+                                        11, 3,
+                                        13, 4,
+                                        15, 6,
+                                        17, 7,
+                                    ],
+                                    lineOpacity: 0.75,
+                                    lineCap: 'round' as const,
+                                    lineJoin: 'round' as const,
+                                }}
+                            />
+                        </Mapbox.ShapeSource>
+                    )}
+
+                    {/* Route line - Google Maps style */}
+                    {routeShape && (
+                        <Mapbox.ShapeSource id="route-source" shape={routeShape}>
+                            {/* White road casing */}
+                            <Mapbox.LineLayer
+                                id="route-casing"
+                                style={{
+                                    lineColor: '#ffffff',
+                                    lineWidth: [
+                                        'interpolate',
+                                        ['linear'],
+                                        ['zoom'],
+                                        11, 5,
+                                        13, 7,
+                                        15, 9,
+                                        17, 12,
+                                    ],
+                                    lineOpacity: 0.9,
+                                    lineCap: 'round' as const,
+                                    lineJoin: 'round' as const,
+                                }}
+                            />
+
+                            {/* Google blue navigation line */}
+                            <Mapbox.LineLayer
+                                id="route-fill"
+                                style={{
+                                    lineColor: '#4285F4',
+                                    lineWidth: [
+                                        'interpolate',
+                                        ['linear'],
+                                        ['zoom'],
+                                        11, 3,
+                                        13, 4,
+                                        15, 6,
+                                        17, 8,
+                                    ],
+                                    lineOpacity: isPreviewMode ? Math.max(0.7, previewRoutePulse) : 1,
+                                    lineCap: 'round' as const,
+                                    lineJoin: 'round' as const,
+                                }}
+                            />
+                        </Mapbox.ShapeSource>
+                    )}
+
+                    {/* Driver position marker - keep above route */}
                     {effectiveLocation && (
                         <Mapbox.PointAnnotation
                             id="driver-position"
                             ref={driverMarkerRef}
                             coordinate={[effectiveLocation.longitude, effectiveLocation.latitude]}
                         >
-                            <View style={styles.driverMarker}>
+                            <View style={[styles.driverMarker, { transform: [{ scale: markerScale }] }]}>
+                                <View style={styles.driverMarkerCore} />
                                 <View
                                     ref={driverArrowRef}
                                     style={[
@@ -643,156 +965,66 @@ export default function OrderMapScreen() {
                         </Mapbox.PointAnnotation>
                     )}
 
-                    {/* Route line - Modern gradient style with glow */}
-                    {routeShape && (
-                        <Mapbox.ShapeSource id="route-source" shape={routeShape}>
-                            {/* Outer glow */}
-                            <Mapbox.LineLayer
-                                id="route-outer-glow"
-                                style={{
-                                    lineColor: isPreviewMode ? '#3b82f6' : '#06b6d4',
-                                    lineWidth: 16,
-                                    lineOpacity: isPreviewMode ? 0.15 : 0.2,
-                                    lineCap: 'round' as const,
-                                    lineJoin: 'round' as const,
-                                    lineBlur: 4,
-                                }}
-                            />
-                            {/* Middle glow */}
-                            <Mapbox.LineLayer
-                                id="route-middle-glow"
-                                style={{
-                                    lineColor: isPreviewMode ? '#60a5fa' : '#22d3ee',
-                                    lineWidth: 12,
-                                    lineOpacity: isPreviewMode ? 0.25 : 0.35,
-                                    lineCap: 'round' as const,
-                                    lineJoin: 'round' as const,
-                                    lineBlur: 2,
-                                }}
-                            />
-                            {/* Dark casing */}
-                            <Mapbox.LineLayer
-                                id="route-casing"
-                                style={{
-                                    lineColor: '#0f172a',
-                                    lineWidth: 9,
-                                    lineOpacity: 0.8,
-                                    lineCap: 'round' as const,
-                                    lineJoin: 'round' as const,
-                                }}
-                            />
-                            {/* Main route line - gradient effect */}
-                            <Mapbox.LineLayer
-                                id="route-fill"
-                                style={{
-                                    lineColor: isPreviewMode ? '#3b82f6' : '#06b6d4',
-                                    lineWidth: 6,
-                                    lineOpacity: isPreviewMode ? previewRoutePulse : 1,
-                                    lineCap: 'round' as const,
-                                    lineJoin: 'round' as const,
-                                }}
-                            />
-                            {/* Inner highlight */}
-                            <Mapbox.LineLayer
-                                id="route-highlight"
-                                style={{
-                                    lineColor: '#ffffff',
-                                    lineWidth: 2,
-                                    lineOpacity: isPreviewMode ? previewRoutePulse * 0.4 : 0.5,
-                                    lineCap: 'round' as const,
-                                    lineJoin: 'round' as const,
-                                }}
-                            />
-                        </Mapbox.ShapeSource>
-                    )}
-
-                    {/* Pickup marker - business style (orange circle) */}
+                    {/* Pickup marker - pinpoint shape */}
                     {pickup && (
                         <Mapbox.PointAnnotation
                             id="marker-pickup"
                             coordinate={[pickup.longitude, pickup.latitude]}
+                            anchor={{ x: 0.5, y: 1 }}
                         >
-                            <View style={styles.businessMarker}>
-                                <View style={styles.businessMarkerInner} />
+                            <View style={[styles.pinMarkerContainer, { transform: [{ scale: markerScale }] }]}>
+                                <View style={styles.pickupPin}>
+                                    <View style={styles.pickupPinCircle}>
+                                        <View style={styles.pickupPinInner} />
+                                    </View>
+                                    <View style={styles.pickupPinTip} />
+                                </View>
                             </View>
                             <Mapbox.Callout title={pickupLabel} />
                         </Mapbox.PointAnnotation>
                     )}
 
-                    {/* Dropoff marker - package icon in status-colored circle */}
+                    {/* Dropoff marker - pinpoint shape */}
                     {dropoff && (
                         <Mapbox.PointAnnotation
                             id="marker-dropoff"
                             coordinate={[dropoff.longitude, dropoff.latitude]}
+                            anchor={{ x: 0.5, y: 1 }}
                         >
-                            <View style={styles.dropoffMarker}>
-                                <Text style={styles.dropoffIcon}>📦</Text>
+                            <View style={[styles.pinMarkerContainer, { transform: [{ scale: markerScale }] }]}>
+                                <View style={styles.dropoffPin}>
+                                    <View style={styles.dropoffPinCircle} />
+                                    <View style={styles.dropoffPinTip} />
+                                </View>
                             </View>
                             <Mapbox.Callout title={dropoffLabel} />
                         </Mapbox.PointAnnotation>
                     )}
                 </Mapbox.MapView>
 
-                {/* Simulation control button */}
-                {route && route.coordinates.length >= 2 && (
-                    <Pressable
-                        style={[
-                            styles.simulationButton,
-                            { bottom: 340 },
-                            isSimulating && styles.simulationButtonActive,
-                        ]}
-                        onPress={handleToggleSimulation}
-                    >
-                        <Text style={styles.simulationButtonIcon}>
-                            {isSimulating ? '⏹' : '▶️'}
-                        </Text>
-                    </Pressable>
-                )}
-
-                {/* Camera lock toggle button (always available) */}
                 <Pressable
-                    style={[
-                        styles.cameraLockButton,
-                        { bottom: 270 },
-                        followMode !== 'free' && styles.cameraLockButtonActive,
-                    ]}
-                    onPress={handleToggleCameraLock}
+                    style={[styles.backButtonFloating, { top: insets.top + 10 }]}
+                    onPress={() => router.back()}
                 >
-                    <Text style={styles.cameraLockIcon}>
-                        {followMode === 'free' ? '🔓' : '🔒'}
-                    </Text>
+                    <Text style={styles.backArrow}>{'←'}</Text>
                 </Pressable>
 
-                <Pressable
-                    style={[
-                        styles.followModeButton,
-                        { bottom: 270 },
-                    ]}
-                    onPress={handleCycleFollowMode}
-                >
-                    <Text style={styles.followModeButtonText}>
-                        {followMode === 'heading-up' ? 'Heading' : followMode === 'north-up' ? 'North' : 'Free'}
-                    </Text>
-                </Pressable>
+                {/* ── Floating control buttons (right side) ── */}
+                <FloatingMapButtons
+                    topOffset={insets.top + 16}
+                    isLocked={followMode !== 'free'}
+                    onLockAndZoom={handleRecenter}
+                    onUnlock={handleUnlockCamera}
+                    followMode={followMode}
+                />
 
-                {showRelockChip && (
-                    <Pressable
-                        style={styles.relockChip}
-                        onPress={() => {
-                            setFollowMode('heading-up');
-                            setShowRelockChip(false);
-                        }}
-                    >
-                        <Text style={styles.relockChipText}>Relock camera</Text>
-                    </Pressable>
-                )}
-
-                {/* Recenter to driver button */}
+                {/* ── Recenter button (right side) ── */}
                 <RecenterButton
                     onPress={handleRecenter}
                     onPressIn={handleOverviewPressIn}
                     onPressOut={handleOverviewPressOut}
-                    bottom={200}
+                    isFollowing={isFollowing}
+                    bottom={isNavigating ? 180 : 220}
                     right={16}
                 />
             </View>
@@ -806,6 +1038,7 @@ export default function OrderMapScreen() {
                     etaArrivalText={etaArrivalText}
                     onPrimaryAction={order?.status === 'READY' ? handleOutForDelivery : undefined}
                     primaryActionLabel={order?.status === 'READY' ? 'Out for delivery' : undefined}
+                    primaryActionDisabled={order?.status === 'READY' ? !canUnlockOutForDelivery : false}
                     primaryActionLoading={updatingOrderStatus}
                     onEnd={handleStopNavigation}
                     bottomInset={insets.bottom}
@@ -858,24 +1091,31 @@ export default function OrderMapScreen() {
                     {canNavigate ? (
                         <Pressable
                             style={styles.startBtn}
-                            onPress={order?.status === 'READY' ? handleOutForDelivery : handleStartNavigation}
+                            onPress={handleStartNavigation}
                             disabled={updatingOrderStatus}
                         >
                             <Text style={styles.startBtnText}>
                                 {updatingOrderStatus
                                     ? 'Updating…'
-                                    : order?.status === 'READY'
-                                    ? 'Out for Delivery'
                                     : 'Start Navigation'}
                             </Text>
                         </Pressable>
                     ) : (
                         <View style={styles.statusChip}>
                             <Text style={styles.statusChipText}>
-                                {order?.status?.replace(/_/g, ' ') ?? 'Loading…'}
+                                {shouldAutoStartNavigation
+                                    ? 'Navigation active'
+                                    : order?.status?.replace(/_/g, ' ') ?? 'Loading…'}
                             </Text>
                         </View>
                     )}
+                </View>
+            )}
+
+            {/* Loading overlay while restoring camera */}
+            {!isRestoringView && (
+                <View style={[StyleSheet.absoluteFill, styles.loadingOverlay]}>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
                 </View>
             )}
         </View>
@@ -884,324 +1124,149 @@ export default function OrderMapScreen() {
 
 /* ═══════════════════ STYLES ═══════════════════ */
 
+const GOOGLE_BLUE = '#4285F4';
+const GOOGLE_GREEN = '#34A853';
+const GOOGLE_RED = '#EA4335';
+
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#0a0a0a' },
+    container: { flex: 1, backgroundColor: '#f5f5f5' },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-    /* ── top bar ── */
+    /* ── top bar (overview mode) ── */
     topBar: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 16,
         paddingBottom: 12,
-        backgroundColor: 'rgba(10, 10, 10, 0.95)',
-        backdropFilter: 'blur(10px)',
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+        backgroundColor: '#ffffff',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.4,
+        shadowOpacity: 0.1,
         shadowRadius: 8,
+        elevation: 4,
         zIndex: 10,
     },
     backButton: {
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: 'rgba(59, 130, 246, 0.15)',
+        backgroundColor: '#F3F4F6',
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(59, 130, 246, 0.3)',
     },
-    backArrow: { fontSize: 20, color: '#3b82f6' },
+    backButtonFloating: {
+        position: 'absolute',
+        left: 16,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#ffffff',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+        elevation: 4,
+        zIndex: 20,
+    },
+    backArrow: { fontSize: 20, color: '#374151' },
     topBarTitle: {
         flex: 1,
         textAlign: 'center',
-        fontSize: 15,
-        fontWeight: '700',
-        color: '#ffffff',
-        letterSpacing: 0.5,
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1F2937',
     },
 
     /* ── map ── */
     mapContainer: { flex: 1 },
     map: { flex: 1 },
 
-    /* ── floating action button ── */
-    fab: {
-        position: 'absolute',
-        width: 52,
-        height: 52,
-        borderRadius: 26,
-        backgroundColor: '#0d1b2a',
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.5,
-        shadowRadius: 6,
-        elevation: 8,
-        borderWidth: 1,
-        borderColor: 'rgba(77, 184, 255, 0.3)',
-    },
-    fabActive: {
-        backgroundColor: '#1a5490',
-        borderColor: '#4db8ff',
-        borderWidth: 2,
-    },
-    fabIcon: { fontSize: 24, color: '#4db8ff' },
-
-    /* ── simulation button ── */
-    simulationButton: {
-        position: 'absolute',
-        right: 20,
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        backgroundColor: 'rgba(22, 163, 74, 0.95)',
-        backdropFilter: 'blur(10px)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#16a34a',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.5,
-        shadowRadius: 12,
-        elevation: 8,
-        borderWidth: 1.5,
-        borderColor: 'rgba(34, 197, 94, 0.3)',
-    },
-    simulationButtonActive: {
-        backgroundColor: 'rgba(220, 38, 38, 0.95)',
-        shadowColor: '#dc2626',
-        borderColor: 'rgba(239, 68, 68, 0.4)',
-    },
-    simulationButtonIcon: {
-        fontSize: 22,
-        color: '#ffffff',
-    },
-
-    /* ── camera lock button ── */
-    cameraLockButton: {
-        position: 'absolute',
-        right: 20,
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        backgroundColor: 'rgba(59, 130, 246, 0.95)',
-        backdropFilter: 'blur(10px)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#3b82f6',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.5,
-        shadowRadius: 12,
-        elevation: 8,
-        borderWidth: 1.5,
-        borderColor: 'rgba(96, 165, 250, 0.3)',
-    },
-    cameraLockButtonActive: {
-        backgroundColor: 'rgba(15, 23, 42, 0.95)',
-        shadowColor: '#0f172a',
-        borderColor: 'rgba(148, 163, 184, 0.3)',
-    },
-    cameraLockIcon: {
-        fontSize: 24,
-        color: '#ffffff',
-    },
-
-    followModeButton: {
-        position: 'absolute',
-        right: 84,
-        minWidth: 86,
-        height: 42,
-        borderRadius: 12,
-        backgroundColor: 'rgba(15, 23, 42, 0.95)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(148, 163, 184, 0.25)',
-        paddingHorizontal: 12,
-    },
-    followModeButtonText: {
-        color: '#e2e8f0',
-        fontSize: 12,
-        fontWeight: '700',
-        letterSpacing: 0.3,
-    },
-
-    relockChip: {
-        position: 'absolute',
-        top: 22,
-        alignSelf: 'center',
-        backgroundColor: 'rgba(15, 23, 42, 0.92)',
-        borderRadius: 999,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderWidth: 1,
-        borderColor: 'rgba(59, 130, 246, 0.5)',
-    },
-    relockChipText: {
-        color: '#bfdbfe',
-        fontSize: 12,
-        fontWeight: '700',
-    },
-
-    /* ── recenter button ── */
-    recenterButton: {
-        position: 'absolute',
-        right: 20,
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        backgroundColor: 'rgba(15, 23, 42, 0.95)',
-        backdropFilter: 'blur(10px)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.5,
-        shadowRadius: 12,
-        elevation: 8,
-        borderWidth: 1.5,
-        borderColor: 'rgba(148, 163, 184, 0.2)',
-    },
-    recenterButtonIcon: {
-        fontSize: 18,
-        color: '#ffffff',
-    },
-
-    /* ── markers ── */
-    markerA: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: '#34A853',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 3,
-        borderColor: '#fff',
-        elevation: 6,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.4,
-        shadowRadius: 3,
-    },
-    markerB: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: '#EA4335',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 3,
-        borderColor: '#fff',
-        elevation: 6,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.4,
-        shadowRadius: 3,
-    },
-    markerLetter: {
-        color: '#ffffff',
-        fontWeight: '800',
-        fontSize: 16,
-    },
-
-    /* ── overview bottom card ── */
+    /* ── overview bottom card (Google Maps style) ── */
     overviewCard: {
-        backgroundColor: 'rgba(15, 23, 42, 0.98)',
-        backdropFilter: 'blur(20px)',
+        backgroundColor: '#ffffff',
         paddingTop: 20,
         paddingHorizontal: 20,
-        borderTopLeftRadius: 28,
-        borderTopRightRadius: 28,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(255,255,255,0.1)',
-        elevation: 16,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: -8 },
-        shadowOpacity: 0.4,
-        shadowRadius: 20,
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 16,
+        elevation: 12,
     },
     addressBlock: {
         marginBottom: 16,
-        backgroundColor: 'rgba(30, 41, 59, 0.6)',
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
-        padding: 16,
     },
     addressRow: {
         flexDirection: 'row',
         alignItems: 'center',
     },
     addressDot: {
-        width: 14,
-        height: 14,
-        borderRadius: 7,
-        borderWidth: 2,
-        borderColor: 'rgba(255, 255, 255, 0.2)',
+        width: 12,
+        height: 12,
+        borderRadius: 6,
     },
-    addressTexts: { marginLeft: 12, flex: 1 },
+    addressTexts: { marginLeft: 14, flex: 1 },
     addressLabel: {
         fontSize: 11,
-        fontWeight: '800',
-        letterSpacing: 0.8,
-        color: '#94a3b8',
+        fontWeight: '700',
+        letterSpacing: 0.6,
+        color: '#9CA3AF',
+        textTransform: 'uppercase',
     },
     addressName: {
         fontSize: 15,
         fontWeight: '600',
-        color: '#f1f5f9',
+        color: '#1F2937',
         marginTop: 2,
     },
     addressConnector: {
         marginLeft: 5,
-        height: 18,
+        height: 20,
         justifyContent: 'center',
     },
     connectorLine: {
         width: 2,
-        height: 18,
-        backgroundColor: '#2f3844',
+        height: 20,
+        backgroundColor: '#E5E7EB',
     },
     etaBadge: {
-        backgroundColor: 'rgba(6, 182, 212, 0.1)',
+        backgroundColor: '#F0FDF4',
         borderRadius: 16,
         paddingVertical: 12,
         alignItems: 'center',
         marginBottom: 16,
-        borderWidth: 1.5,
-        borderColor: 'rgba(6, 182, 212, 0.3)',
+        borderWidth: 1,
+        borderColor: '#BBF7D0',
     },
     etaBadgeText: {
         fontSize: 15,
         fontWeight: '700',
-        color: '#22d3ee',
-        letterSpacing: 0.5,
+        color: GOOGLE_GREEN,
+        letterSpacing: 0.3,
     },
     startBtn: {
-        backgroundColor: '#3b82f6',
-        borderRadius: 16,
+        backgroundColor: GOOGLE_BLUE,
+        borderRadius: 24,
         paddingVertical: 16,
         alignItems: 'center',
         marginBottom: 8,
-        shadowColor: '#3b82f6',
+        shadowColor: GOOGLE_BLUE,
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.4,
+        shadowOpacity: 0.3,
         shadowRadius: 8,
         elevation: 6,
     },
     startBtnText: {
-        color: '#fff',
-        fontWeight: '800',
+        color: '#ffffff',
+        fontWeight: '700',
         fontSize: 16,
-        letterSpacing: 0.5,
     },
     statusChip: {
-        backgroundColor: '#2a2a2a',
-        borderRadius: 12,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 16,
         padding: 14,
         alignItems: 'center',
         marginBottom: 4,
@@ -1209,80 +1274,126 @@ const styles = StyleSheet.create({
     statusChipText: {
         fontSize: 14,
         fontWeight: '500',
-        color: '#a0a0a0',
+        color: '#6B7280',
     },
 
-    /* ── Marker Styles - Modern Design ── */
-    businessMarker: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(249, 115, 22, 0.2)',
+    /* ── Pin Marker Container ── */
+    pinMarkerContainer: {
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+    },
+
+    /* ── Pickup Pin (Green teardrop, minimal) ── */
+    pickupPin: {
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+    },
+    pickupPinCircle: {
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        backgroundColor: GOOGLE_GREEN,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 2.5,
-        borderColor: 'rgba(249, 115, 22, 0.5)',
-        shadowColor: '#f97316',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.4,
-        shadowRadius: 8,
-    },
-    businessMarkerInner: {
-        width: 16,
-        height: 16,
-        borderRadius: 8,
-        backgroundColor: '#f97316',
         borderWidth: 2,
-        borderColor: 'rgba(253, 186, 116, 0.8)',
-        shadowColor: '#f97316',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.6,
-        shadowRadius: 4,
-    },
-    dropoffMarker: {
-        width: 42,
-        height: 42,
-        borderRadius: 21,
-        backgroundColor: 'rgba(6, 182, 212, 0.2)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 2.5,
-        borderColor: 'rgba(6, 182, 212, 0.6)',
-        shadowColor: '#06b6d4',
+        borderColor: '#fff',
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.5,
-        shadowRadius: 8,
+        shadowOpacity: 0.15,
+        shadowRadius: 2,
+        elevation: 2,
+        zIndex: 2,
     },
-    dropoffIcon: {
-        fontSize: 20,
+    pickupPinInner: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#fff',
     },
-
-    /* ── Driver Marker (Clean Circle Design) ── */
-    driverMarker: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: '#3b82f6',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 4,
-        borderColor: '#ffffff',
-        shadowColor: '#3b82f6',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.7,
-        shadowRadius: 12,
-        elevation: 10,
-    },
-    driverArrow: {
+    pickupPinTip: {
         width: 0,
         height: 0,
         backgroundColor: 'transparent',
         borderStyle: 'solid',
-        borderLeftWidth: 9,
-        borderRightWidth: 9,
-        borderBottomWidth: 16,
+        borderLeftWidth: 4,
+        borderRightWidth: 4,
+        borderTopWidth: 7,
         borderLeftColor: 'transparent',
         borderRightColor: 'transparent',
-        borderBottomColor: '#ffffff',
+        borderTopColor: GOOGLE_GREEN,
+        marginTop: -2,
+        zIndex: 1,
+    },
+
+    /* ── Dropoff Pin (Red teardrop, minimal) ── */
+    dropoffPin: {
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+    },
+    dropoffPinCircle: {
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        backgroundColor: GOOGLE_RED,
+        borderWidth: 2,
+        borderColor: '#fff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 2,
+        elevation: 2,
+        zIndex: 2,
+    },
+    dropoffPinTip: {
+        width: 0,
+        height: 0,
+        backgroundColor: 'transparent',
+        borderStyle: 'solid',
+        borderLeftWidth: 4,
+        borderRightWidth: 4,
+        borderTopWidth: 7,
+        borderLeftColor: 'transparent',
+        borderRightColor: 'transparent',
+        borderTopColor: GOOGLE_RED,
+        marginTop: -2,
+        zIndex: 1,
+    },
+
+    /* ── Driver Marker (Google blue navigation dot) ── */
+    driverMarker: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: GOOGLE_BLUE,
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 30,
+        borderWidth: 3,
+        borderColor: '#ffffff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.35,
+        shadowRadius: 6,
+        elevation: 10,
+    },
+    driverMarkerCore: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: '#ffffff',
+    },
+    driverArrow: {
+        position: 'absolute',
+        top: -8,
+        width: 0,
+        height: 0,
+        backgroundColor: 'transparent',
+        borderStyle: 'solid',
+        borderLeftWidth: 5,
+        borderRightWidth: 5,
+        borderBottomWidth: 9,
+        borderLeftColor: 'transparent',
+        borderRightColor: 'transparent',
+        borderBottomColor: GOOGLE_BLUE,
     },
 });

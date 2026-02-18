@@ -3,6 +3,11 @@ export const MAPBOX_TOKEN =
     process.env.NEXT_PUBLIC_MAPBOX_TOKEN ??
     '';
 
+// In-memory counter for Mapbox Directions API calls (per app runtime)
+let directionsApiCallCount = 0;
+export function getDirectionsApiCallCount() {
+    return directionsApiCallCount;
+}
 interface DirectionsResponse {
     routes: Array<{
         distance: number; // in meters
@@ -46,7 +51,10 @@ export async function calculateRouteDistance(
 ): Promise<{ distanceKm: number; durationMin: number } | null> {
     try {
         const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${from.longitude},${from.latitude};${to.longitude},${to.latitude}?access_token=${MAPBOX_TOKEN}&geometries=geojson`;
-        
+        // Count Directions API call
+        directionsApiCallCount++;
+        console.log('[MAPBOX] Directions API calls:', directionsApiCallCount, 'function=calculateRouteDistance');
+
         const response = await fetch(url);
         if (!response.ok) {
             console.error('Mapbox Directions API error:', response.statusText);
@@ -86,6 +94,10 @@ export async function fetchRouteGeometry(
 } | null> {
     try {
         const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${from.longitude},${from.latitude};${to.longitude},${to.latitude}?access_token=${MAPBOX_TOKEN}&geometries=geojson`;
+        // Count Directions API call
+        directionsApiCallCount++;
+        console.log('[MAPBOX] Directions API calls:', directionsApiCallCount, 'function=fetchRouteGeometry');
+
         const response = await fetch(url);
         if (!response.ok) {
             console.error('Mapbox Directions API error:', response.statusText);
@@ -133,6 +145,10 @@ export async function fetchNavigationRoute(
             .join(';');
 
         const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${points}?access_token=${MAPBOX_TOKEN}&geometries=geojson&overview=full&steps=true&language=en`;
+        // Count Directions API call
+        directionsApiCallCount++;
+        console.log('[MAPBOX] Directions API calls:', directionsApiCallCount, 'function=fetchNavigationRoute');
+
         const response = await fetch(url);
         if (!response.ok) {
             console.error('Mapbox Directions API error:', response.statusText);

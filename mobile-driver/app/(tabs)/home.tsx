@@ -34,8 +34,9 @@ export default function Home() {
 
     useSubscription(ALL_ORDERS_UPDATED, {
         onData: ({ client, data: subData }) => {
-            if (subData?.data?.allOrdersUpdated) {
-                const incomingOrders = subData.data.allOrdersUpdated as any[];
+            const payload = (subData as any)?.data?.allOrdersUpdated as any[] | undefined;
+            if (payload) {
+                const incomingOrders = payload;
                 const readyOrders = incomingOrders.filter((order: any) => {
                     if (order.status !== 'READY') return false;
                     // Show order only if unassigned or assigned to this driver
@@ -318,7 +319,7 @@ export default function Home() {
                                             DISTANCE
                                         </Text>
                                         <Text className="text-3xl font-bold" style={{ color: theme.colors.text }}>
-                                            {orderDistances[newOrder.id].distanceKm.toFixed(1)}
+                                            {orderDistances[newOrder.id]?.distanceKm.toFixed(1)}
                                         </Text>
                                         <Text className="text-xs mt-1" style={{ color: theme.colors.subtext }}>
                                             kilometers
@@ -330,7 +331,7 @@ export default function Home() {
                                             ETA
                                         </Text>
                                         <Text className="text-3xl font-bold" style={{ color: theme.colors.text }}>
-                                            {Math.round(orderDistances[newOrder.id].durationMin)}
+                                            {Math.round(orderDistances[newOrder.id]?.durationMin ?? 0)}
                                         </Text>
                                         <Text className="text-xs mt-1" style={{ color: theme.colors.income }}>
                                             minutes
@@ -351,16 +352,29 @@ export default function Home() {
                         <View className="px-6 pb-6 gap-3">
                             <Pressable
                                 className="py-4 rounded-2xl items-center"
-                                style={{ backgroundColor: theme.colors.income }}
+                                style={{
+                                    backgroundColor:
+                                        newOrder?.driver?.id && newOrder.driver.id === currentDriverId
+                                            ? theme.colors.primary
+                                            : theme.colors.income,
+                                }}
                                 onPress={() => {
                                     if (!newOrder) return;
                                     setNewOrder(null);
+                                    if (newOrder?.driver?.id && newOrder.driver.id === currentDriverId) {
+                                        openOrderMap(newOrder.id);
+                                        return;
+                                    }
                                     handleAcceptAndOpenMap(newOrder.id);
                                 }}
                                 disabled={assigningOrder}
                             >
                                 <Text className="text-white font-bold text-base">
-                                    {assigningOrder ? '⏳ Accepting...' : '✅ Accept Order'}
+                                    {assigningOrder
+                                        ? '⏳ Loading...'
+                                        : newOrder?.driver?.id && newOrder.driver.id === currentDriverId
+                                        ? 'Continue Navigation'
+                                        : '✅ Accept Order'}
                                 </Text>
                             </Pressable>
                             <Pressable
@@ -405,12 +419,12 @@ export default function Home() {
                             </Text>
                             <Text className="text-2xl font-bold" style={{ color: theme.colors.text }}>
                                 {selectedOrder && orderDistances[selectedOrder.id]
-                                    ? `~${Math.round(orderDistances[selectedOrder.id].durationMin)} min`
+                                    ? `~${Math.round(orderDistances[selectedOrder.id]?.durationMin ?? 0)} min`
                                     : 'Calculating...'}
                             </Text>
                             <Text className="text-xs mt-1" style={{ color: theme.colors.subtext }}>
                                 {selectedOrder && orderDistances[selectedOrder.id]
-                                    ? `${orderDistances[selectedOrder.id].distanceKm.toFixed(1)} km total`
+                                    ? `${orderDistances[selectedOrder.id]?.distanceKm.toFixed(1)} km total`
                                     : 'Please wait...'}
                             </Text>
                         </View>
@@ -560,6 +574,7 @@ export default function Home() {
                                         .map((b: any) => b.business.name)
                                         .join(', ');
                                     const distance = orderDistances[order.id];
+                                    const isAssignedToMe = Boolean(order.driver?.id && order.driver.id === currentDriverId);
 
                                     return (
                                         <Pressable
@@ -619,12 +634,20 @@ export default function Home() {
                                             {/* Action Button */}
                                             <Pressable
                                                 className="py-5 items-center"
-                                                style={{ backgroundColor: theme.colors.income }}
-                                                onPress={() => handleAcceptAndOpenMap(order.id)}
+                                                style={{ backgroundColor: isAssignedToMe ? theme.colors.primary : theme.colors.income }}
+                                                onPress={() =>
+                                                    isAssignedToMe
+                                                        ? openOrderMap(order.id)
+                                                        : handleAcceptAndOpenMap(order.id)
+                                                }
                                                 disabled={assigningOrder}
                                             >
                                                 <Text className="text-white font-bold text-base">
-                                                    {assigningOrder ? '⏳ Accepting...' : '✅ Accept & Start Navigation'}
+                                                    {assigningOrder
+                                                        ? '⏳ Loading...'
+                                                        : isAssignedToMe
+                                                        ? 'Continue Navigation'
+                                                        : '✅ Accept & Start Navigation'}
                                                 </Text>
                                             </Pressable>
                                         </Pressable>
