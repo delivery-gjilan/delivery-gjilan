@@ -4,14 +4,15 @@ import { useCart } from '@/modules/cart/hooks/useCart';
 import { useCartActions } from '@/modules/cart/hooks/useCartActions';
 import { Product } from '@/gql/graphql';
 
-export function useProductActions(product: Product) {
+export function useProductActions(product: Partial<Product>) {
     const { items } = useCart();
     const { addItem, updateQuantity, removeItem } = useCartActions();
 
     // Find cart item
+    const id = product.id ?? '';
     const cartItem = useMemo(() => {
-        return items.find((item) => item.productId === product.id);
-    }, [items, product.id]);
+        return items.find((item) => item.productId === id);
+    }, [items, id]);
 
     // Local quantity state
     const [localQuantity, setLocalQuantity] = useState(cartItem?.quantity || 1);
@@ -28,29 +29,32 @@ export function useProductActions(product: Product) {
     };
 
     const addToCart = () => {
+        if (!id) return;
         addItem({
-            productId: product.id,
-            name: product.name,
-            price: product.isOnSale && product.salePrice ? product.salePrice : product.price,
+            productId: id,
+            name: product.name ?? 'Unknown',
+            price: product.isOnSale && product.salePrice ? product.salePrice : (product.price ?? 0),
             quantity: localQuantity,
             imageUrl: product.imageUrl || undefined,
-            businessId: product.businessId,
+            businessId: product.businessId ?? '',
             originalPrice: product.isOnSale && product.salePrice ? product.price : undefined,
         });
 
         // Navigate back to business page with animation
-        router.push(`/business/${product.businessId}`);
+        router.push(`/business/${product.businessId ?? ''}`);
     };
 
     const updateCart = () => {
-        updateQuantity(product.id, localQuantity);
+        if (!id) return;
+        updateQuantity(id, localQuantity);
 
         // Navigate back to business page with animation
-        router.push(`/business/${product.businessId}`);
+        router.push(`/business/${product.businessId ?? ''}`);
     };
 
     const removeFromCart = () => {
-        removeItem(product.id);
+        if (!id) return;
+        removeItem(id);
         setLocalQuantity(1);
     };
 

@@ -6,7 +6,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useProductInCart } from '../hooks/useProductInCart';
 
 interface MarketProductCardProps {
-    product: Product;
+    product: Partial<Product>;
     onPress?: (productId: string) => void;
     descriptionOverride?: string | null;
 }

@@ -2,7 +2,7 @@ import { View, Text } from 'react-native';
 import { Product } from '@/gql/graphql';
 
 interface ProductDetailsProps {
-    product: Product;
+    product: Partial<Product>;
 }
 
 export function ProductDetails({ product }: ProductDetailsProps) {

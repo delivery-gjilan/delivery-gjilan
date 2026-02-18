@@ -52,7 +52,7 @@ export function useUserLocation() {
                 latitude: current.coords.latitude,
                 longitude: current.coords.longitude,
             });
-            address = formatAddress(reverse);
+            address = formatAddress(reverse ?? null);
         } catch {
             address = '';
         }

@@ -12,11 +12,10 @@ import { useCartActions } from '../hooks/useCartActions';
 import { useCreateOrder } from '../hooks/useCreateOrder';
 import { gql } from '@apollo/client';
 import { useLazyQuery } from '@apollo/client/react';
-import { CALCULATE_DELIVERY_FEE } from '@/graphql/operations/deliveryZones';
 
-const VALIDATE_PROMOTIONS_V2 = gql`
-    query ValidatePromotionsV2($cart: CartContextInput!, $manualCode: String) {
-        validatePromotionsV2(cart: $cart, manualCode: $manualCode) {
+const VALIDATE_PROMOTIONS = gql`
+    query ValidatePromotions($cart: CartContextInput!, $manualCode: String) {
+        validatePromotions(cart: $cart, manualCode: $manualCode) {
             totalDiscount
             freeDeliveryApplied
             finalSubtotal
@@ -41,23 +40,6 @@ type CheckoutLocation = {
     longitude: number;
     address: string;
     label?: string;
-};
-
-type AutoPromoResult = {
-    totalDiscount: number;
-    freeDeliveryApplied: boolean;
-    finalDeliveryPrice: number;
-    finalTotal: number;
-    promotions: Array<{
-        id: string;
-        name: string;
-        code?: string | null;
-        type: string;
-        target: string;
-        appliedAmount: number;
-        freeDelivery: boolean;
-        priority: number;
-    }>;
 };
 
 const formatAddress = (item: Location.LocationGeocodedAddress | null) => {
@@ -162,9 +144,7 @@ export const CartScreen = () => {
     const { createOrder, loading: orderLoading } = useCreateOrder();
 
     const [isProcessing, setIsProcessing] = useState(false);
-    const [deliveryPrice, setDeliveryPrice] = useState(2.0); // Base delivery fee
-    const [deliveryZone, setDeliveryZone] = useState<string | null>(null);
-    const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+    const [deliveryPrice] = useState(2.0); // Base delivery fee
     const [isMapModalOpen, setIsMapModalOpen] = useState(false);
     const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
     const [selectedLocation, setSelectedLocation] = useState<CheckoutLocation | null>(null);
@@ -176,7 +156,6 @@ export const CartScreen = () => {
         effectiveDeliveryPrice: number;
         totalPrice: number;
     } | null>(null);
-    const [autoPromoResult, setAutoPromoResult] = useState<AutoPromoResult | null>(null);
     const [mapRegion, setMapRegion] = useState<Region>({
         latitude: 42.4629,
         longitude: 21.4694,
@@ -191,11 +170,7 @@ export const CartScreen = () => {
     const mapSlideX = useRef(new Animated.Value(screenWidth)).current;
     const addressSlideX = useRef(new Animated.Value(screenWidth)).current;
 
-    const [calculateFee, { data: feeData, loading: feeLoading }] = useLazyQuery(CALCULATE_DELIVERY_FEE);
-    const [validatePromotionsV2, { loading: autoPromoLoading }] = useLazyQuery(VALIDATE_PROMOTIONS_V2, {
-        fetchPolicy: 'no-cache',
-    });
-    const [validatePromotionsV2Manual, { loading: manualPromoLoading }] = useLazyQuery(VALIDATE_PROMOTIONS_V2, {
+    const [validatePromotionsManual, { loading: manualPromoLoading }] = useLazyQuery(VALIDATE_PROMOTIONS, {
         fetchPolicy: 'no-cache',
     });
 
@@ -235,13 +210,7 @@ export const CartScreen = () => {
     );
 
     const requestFeeForLocation = (next: CheckoutLocation) => {
-        calculateFee({
-            variables: {
-                latitude: next.latitude,
-                longitude: next.longitude,
-                baseDeliveryFee: 2.0,
-            },
-        });
+        // Delivery price is fixed for now
     };
 
     useEffect(() => {
@@ -288,35 +257,6 @@ export const CartScreen = () => {
     }, [selectedLocation, proceedButtonAnim]);
 
     useEffect(() => {
-        if (!isAddressModalOpen) return;
-        addressSlideX.setValue(screenWidth);
-        Animated.timing(addressSlideX, {
-            toValue: 0,
-            duration: 280,
-            useNativeDriver: true,
-        }).start();
-    }, [isAddressModalOpen, screenWidth, addressSlideX]);
-
-    useEffect(() => {
-        // Get user's current location when modal opens
-        if (isAddressModalOpen) {
-            (async () => {
-                const { status } = await Location.requestForegroundPermissionsAsync();
-                if (status === 'granted') {
-                    const location = await Location.getCurrentPositionAsync({});
-                    const newRegion = {
-                        latitude: location.coords.latitude,
-                        longitude: location.coords.longitude,
-                        latitudeDelta: 0.01,
-                        longitudeDelta: 0.01,
-                    };
-                    setMapRegion(newRegion);
-                }
-            })();
-        }
-    }, [isAddressModalOpen]);
-
-    useEffect(() => {
         if (!isSummaryModalOpen) return;
         summarySlideX.setValue(screenWidth);
         Animated.timing(summarySlideX, {
@@ -352,19 +292,9 @@ export const CartScreen = () => {
         }).start(() => setIsMapModalOpen(false));
     };
 
-    const closeAddressModal = () => {
-        Animated.timing(addressSlideX, {
-            toValue: screenWidth,
-            duration: 250,
-            useNativeDriver: true,
-        }).start(() => setIsAddressModalOpen(false));
-    };
-
     const handleMapPress = async (event: any) => {
         const { latitude, longitude } = event.nativeEvent.coordinate;
-        setMapMarker({ latitude, longitude });
-        
-        // Reverse geocode to get address
+        // Reverse geocode to get address and reuse the central select handler
         try {
             const [result] = await Location.reverseGeocodeAsync({ latitude, longitude });
             const address = formatAddress(result ?? null);
@@ -374,8 +304,7 @@ export const CartScreen = () => {
                 address: address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
                 label: 'Map location',
             };
-            setSelectedLocation(location);
-            requestFeeForLocation(location);
+            handleSelectLocation(location);
         } catch (error) {
             const location = {
                 latitude,
@@ -383,17 +312,13 @@ export const CartScreen = () => {
                 address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
                 label: 'Map location',
             };
-            setSelectedLocation(location);
-            requestFeeForLocation(location);
+            handleSelectLocation(location);
         }
     };
 
     const handleSelectLocation = (next: CheckoutLocation) => {
         setSelectedLocation(next);
-        setDeliveryPrice(2.0);
-        setDeliveryZone(null);
         requestFeeForLocation(next);
-        
         // Update map marker and center map on selected location
         setMapMarker({ latitude: next.latitude, longitude: next.longitude });
         setMapRegion({
@@ -402,6 +327,9 @@ export const CartScreen = () => {
             latitudeDelta: 0.005,
             longitudeDelta: 0.005,
         });
+        // Close map modal and open summary so user can confirm the address
+        closeMapModal();
+        setTimeout(() => setIsSummaryModalOpen(true), 260);
     };
 
     const handleUseCurrentLocation = async () => {
@@ -458,13 +386,7 @@ export const CartScreen = () => {
         setIsMapModalOpen(true);
     };
 
-    // Update delivery price based on zone calculation
-    useEffect(() => {
-        if (feeData?.calculateDeliveryFee) {
-            setDeliveryPrice(feeData.calculateDeliveryFee.totalFee);
-            setDeliveryZone(feeData.calculateDeliveryFee.zone?.name || null);
-        }
-    }, [feeData]);
+
 
     useEffect(() => {
         if (promoResult) {
@@ -472,24 +394,46 @@ export const CartScreen = () => {
         }
     }, [total, deliveryPrice]);
 
-    useEffect(() => {
-        if (items.length === 0) {
-            setAutoPromoResult(null);
+    // Manual promo application handler (previous auto-validation removed)
+    const handleApplyCoupon = async () => {
+        if (!couponCode.trim()) {
+            Alert.alert('Enter Code', 'Please enter a promo code.');
             return;
         }
 
-        validatePromotionsV2({ variables: { cart: cartContext } })
-            .then(({ data }) => {
-                if (data?.validatePromotionsV2) {
-                    setAutoPromoResult(data.validatePromotionsV2 as AutoPromoResult);
-                } else {
-                    setAutoPromoResult(null);
-                }
-            })
-            .catch(() => {
-                setAutoPromoResult(null);
+        try {
+            const response = await validatePromotionsManual({
+                variables: {
+                    cart: cartContext,
+                    manualCode: couponCode,
+                },
             });
-    }, [cartContext, items.length, validatePromotionsV2]);
+
+            const result = (response?.data as any)?.validatePromotions;
+            if (!result || (Array.isArray(result.promotions) && result.promotions.length === 0)) {
+                setPromoResult(null);
+                Alert.alert('Invalid Code', 'Promotion not valid.');
+                return;
+            }
+
+            setPromoResult({
+                code: couponCode.trim(),
+                discountAmount: Number(result.totalDiscount ?? 0),
+                freeDeliveryApplied: result.freeDeliveryApplied ?? false,
+                effectiveDeliveryPrice: Number(result.finalDeliveryPrice ?? deliveryPrice),
+                totalPrice: Number(result.finalTotal ?? total + deliveryPrice),
+            });
+            Alert.alert('Promo Applied', `Discount €${Number(result.totalDiscount ?? 0).toFixed(2)} added.`);
+        } catch (err) {
+            Alert.alert('Promo Error', 'Unable to validate promo code.');
+        }
+    };
+
+    useEffect(() => {
+        if (items.length === 0) {
+            setPromoResult(null);
+        }
+    }, [items.length]);
 
     useEffect(() => {
         if (promoResult && promoResult.code !== couponCode.trim()) {
@@ -498,75 +442,25 @@ export const CartScreen = () => {
     }, [couponCode, promoResult]);
 
     const manualPromoApplied = !!promoResult;
-    const autoPromoApplied = !manualPromoApplied && !!autoPromoResult && autoPromoResult.promotions.length > 0;
     const freeDeliveryApplied = manualPromoApplied
         ? promoResult?.freeDeliveryApplied ?? false
-        : autoPromoApplied
-            ? autoPromoResult.freeDeliveryApplied
-            : false;
+        : false;
 
     const appliedDiscount = manualPromoApplied
         ? promoResult?.discountAmount ?? 0
-        : autoPromoApplied
-            ? autoPromoResult.totalDiscount
-            : 0;
+        : 0;
 
     const appliedDeliveryPrice = manualPromoApplied
         ? promoResult?.effectiveDeliveryPrice ?? deliveryPrice
-        : autoPromoApplied
-            ? autoPromoResult.finalDeliveryPrice
-            : deliveryPrice;
+        : deliveryPrice;
 
     const finalTotal = manualPromoApplied
         ? promoResult?.totalPrice ?? Math.max(0, total + deliveryPrice - appliedDiscount)
-        : autoPromoApplied
-            ? autoPromoResult.finalTotal
-            : Math.max(0, total + deliveryPrice - appliedDiscount);
-
-    const handleApplyCoupon = () => {
-        const code = couponCode.trim();
-        if (!code) {
-            setPromoResult(null);
-            return;
-        }
-
-        if (code.length < 2) {
-            Alert.alert('Invalid Code', 'Please enter a valid promo code.');
-            return;
-        }
-
-        validatePromotionsV2Manual({
-            variables: {
-                cart: cartContext,
-                manualCode: code,
-            },
-        })
-            .then(({ data }) => {
-                const result = data?.validatePromotionsV2 as AutoPromoResult | undefined;
-                if (!result || result.promotions.length === 0) {
-                    setPromoResult(null);
-                    Alert.alert('Invalid Code', 'Promotion not valid.');
-                    return;
-                }
-
-                setPromoResult({
-                    code,
-                    discountAmount: Number(result.totalDiscount ?? 0),
-                    freeDeliveryApplied: result.freeDeliveryApplied ?? false,
-                    effectiveDeliveryPrice: Number(result.finalDeliveryPrice ?? deliveryPrice),
-                    totalPrice: Number(result.finalTotal ?? total + deliveryPrice),
-                });
-                Alert.alert('Promo Applied', `Discount €${Number(result.totalDiscount ?? 0).toFixed(2)} added.`);
-            })
-            .catch(() => {
-                Alert.alert('Promo Error', 'Unable to validate promo code.');
-            });
-    };
+        : Math.max(0, total + deliveryPrice - appliedDiscount);
 
     const handleCheckout = async () => {
         if (!selectedLocation) {
             Alert.alert('Select Address', 'Please choose a delivery address to continue.');
-            setIsAddressModalOpen(true);
             return;
         }
 
@@ -750,7 +644,7 @@ export const CartScreen = () => {
                         opacity: isProcessing ? 0.6 : pulseAnim,
                     }}
                     activeOpacity={0.8}
-                    onPress={() => setIsAddressModalOpen(true)}
+                    onPress={() => setIsMapModalOpen(true)}
                     disabled={isProcessing}
                 >
                     {isProcessing ? (
@@ -763,170 +657,6 @@ export const CartScreen = () => {
                     )}
                 </AnimatedTouchable>
             </View>
-
-            {/* Address Chooser Modal */}
-            <Modal visible={isAddressModalOpen} animationType="none" onRequestClose={closeAddressModal}>
-                <ImageBackground
-                    source={require('../../../assets/images/splash.png')}
-                    blurRadius={18}
-                    style={{ flex: 1 }}
-                    imageStyle={{ opacity: 0.18 }}
-                >
-                    <SafeAreaView className="flex-1" style={{ backgroundColor: 'transparent' }}>
-                        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: theme.colors.background, opacity: 0.92 }]} />
-                        <Animated.View style={{ flex: 1, transform: [{ translateX: addressSlideX }] }}>
-                        <View className="flex-row items-center justify-between px-4 py-3 border-b" style={{ borderBottomColor: theme.colors.border }}>
-                            <TouchableOpacity onPress={closeAddressModal} className="p-2 -ml-2">
-                                <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
-                            </TouchableOpacity>
-                            <Text className="text-lg font-bold" style={{ color: theme.colors.text }}>
-                                Choose address
-                            </Text>
-                            <TouchableOpacity onPress={closeAddressModal} className="p-2 -mr-2">
-                                <Ionicons name="close" size={24} color={theme.colors.text} />
-                            </TouchableOpacity>
-                        </View>
-
-                        <ScrollView className="flex-1" contentContainerStyle={{ padding: 16 }}>
-                        <Text className="text-xs uppercase mb-2" style={{ color: theme.colors.subtext }}>
-                            Saved addresses
-                        </Text>
-                        {defaultAddresses.length === 0 ? (
-                            <Text className="text-sm" style={{ color: theme.colors.subtext }}>
-                                No saved addresses yet.
-                            </Text>
-                        ) : (
-                            <View className="gap-2 mb-4">
-                                <TouchableOpacity
-                                    className="flex-row items-center p-4 rounded-2xl border"
-                                    style={{
-                                        borderColor: selectedLocation?.label === 'Current location' ? theme.colors.primary : theme.colors.border,
-                                        backgroundColor: selectedLocation?.label === 'Current location'
-                                            ? theme.colors.primary + '12'
-                                            : theme.colors.background,
-                                    }}
-                                    onPress={handleUseCurrentLocation}
-                                >
-                                    <View
-                                        className="w-10 h-10 rounded-full items-center justify-center mr-3"
-                                        style={{
-                                            backgroundColor:
-                                                selectedLocation?.label === 'Current location'
-                                                    ? theme.colors.primary + '20'
-                                                    : theme.colors.primary + '15',
-                                        }}
-                                    >
-                                        <Ionicons name="locate" size={18} color={theme.colors.primary} />
-                                    </View>
-                                    <View className="flex-1">
-                                        <Text
-                                            className="text-base font-semibold"
-                                            style={{
-                                                color:
-                                                    selectedLocation?.label === 'Current location'
-                                                        ? theme.colors.primary
-                                                        : theme.colors.text,
-                                            }}
-                                        >
-                                            Use my current location
-                                        </Text>
-                                    </View>
-                                </TouchableOpacity>
-                                {defaultAddresses.map((address) => {
-                                    const isSelected = selectedLocation?.address === address.address;
-                                    return (
-                                    <TouchableOpacity
-                                        key={address.id}
-                                        className="p-4 rounded-2xl border"
-                                        style={{
-                                            borderColor: isSelected ? theme.colors.primary : theme.colors.border,
-                                            backgroundColor: isSelected ? theme.colors.primary + '12' : theme.colors.background,
-                                        }}
-                                        onPress={() =>
-                                            handleSelectLocation({
-                                                latitude: address.latitude,
-                                                longitude: address.longitude,
-                                                address: address.address,
-                                                label: address.label,
-                                            })
-                                        }
-                                    >
-                                        <Text
-                                            className="text-base font-semibold"
-                                            style={{ color: isSelected ? theme.colors.primary : theme.colors.text }}
-                                        >
-                                            {address.label}
-                                        </Text>
-                                        <Text
-                                            className="text-sm"
-                                            style={{ color: isSelected ? theme.colors.primary : theme.colors.subtext }}
-                                        >
-                                            {address.address}
-                                        </Text>
-                                    </TouchableOpacity>
-                                    );
-                                })}
-                            </View>
-                        )}
-
-                        <View className="h-px my-4" style={{ backgroundColor: theme.colors.border }} />
-
-                        <Text className="text-xs uppercase mb-2" style={{ color: theme.colors.subtext }}>
-                            Select on map
-                        </Text>
-                        <View className="mb-4">
-                            <View className="rounded-2xl overflow-hidden" style={{ height: 400, backgroundColor: theme.colors.border }}>
-                                <MapView
-                                    style={{ flex: 1 }}
-                                    region={mapRegion}
-                                    onPress={handleMapPress}
-                                    showsUserLocation={true}
-                                    showsMyLocationButton={false}
-                                    showsCompass={false}
-                                    showsScale={false}
-                                    showsBuildings={false}
-                                    showsTraffic={false}
-                                    showsIndoors={false}
-                                    toolbarEnabled={false}
-                                    mapType="standard"
-                                    customMapStyle={minimalistMapStyle}
-                                >
-                                    {mapMarker && (
-                                        <Marker
-                                            coordinate={mapMarker}
-                                            pinColor={theme.colors.primary}
-                                        />
-                                    )}
-                                </MapView>
-                            </View>
-                        </View>
-                        </ScrollView>
-
-                        <View className="p-4 border-t" style={{ borderTopColor: theme.colors.border, backgroundColor: theme.colors.card }}>
-                        <AnimatedTouchable
-                            className="py-4 rounded-xl items-center"
-                            style={{ 
-                                backgroundColor: selectedLocation ? theme.colors.primary : theme.colors.subtext,
-                                opacity: selectedLocation ? 1 : 0.5,
-                                transform: [{ scale: proceedButtonAnim }]
-                            }}
-                            disabled={!selectedLocation}
-                            onPress={() => {
-                                if (!selectedLocation) {
-                                    Alert.alert('Select Address', 'Please choose a delivery address to continue.');
-                                    return;
-                                }
-                                setIsAddressModalOpen(false);
-                                setIsSummaryModalOpen(true);
-                            }}
-                        >
-                            <Text className="text-white font-bold text-lg">Proceed to checkout</Text>
-                        </AnimatedTouchable>
-                    </View>
-                    </Animated.View>
-                    </SafeAreaView>
-                </ImageBackground>
-            </Modal>
 
             {/* Map Picker Modal */}
             <Modal visible={isMapModalOpen} animationType="none" onRequestClose={closeMapModal}>
@@ -942,27 +672,37 @@ export const CartScreen = () => {
                             <View style={{ width: 26 }} />
                         </View>
 
-                        <View className="flex-1 items-center justify-center px-6">
-                            <Ionicons name="map-outline" size={72} color={theme.colors.subtext} />
-                            <Text className="text-lg font-semibold mt-4" style={{ color: theme.colors.text }}>
-                                Map picker is unavailable in Expo Go
-                            </Text>
-                            <Text className="text-center mt-2" style={{ color: theme.colors.subtext }}>
-                                Use your current location for now. We can enable pin selection in a dev build.
-                            </Text>
+                        <View style={{ flex: 1 }}>
+                            <MapView
+                                style={{ flex: 1 }}
+                                initialRegion={mapRegion}
+                                region={mapRegion}
+                                onPress={handleMapPress}
+                                customMapStyle={minimalistMapStyle as any}
+                            >
+                                {mapMarker && (
+                                    <Marker coordinate={{ latitude: mapMarker.latitude, longitude: mapMarker.longitude }} />
+                                )}
+                            </MapView>
                         </View>
 
                         <View className="p-4 border-t" style={{ borderTopColor: theme.colors.border, backgroundColor: theme.colors.card }}>
                             <TouchableOpacity
                                 className="py-3 rounded-xl items-center mb-2"
-                                style={{ backgroundColor: theme.colors.primary }}
+                                style={{
+                                    backgroundColor: theme.colors.primary,
+                                    opacity: 1,
+                                }}
                                 onPress={handleUseCurrentLocation}
                             >
                                 <Text className="text-white font-semibold">Use my current address</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 className="py-3 rounded-xl items-center"
-                                style={{ backgroundColor: theme.colors.border }}
+                                style={{
+                                    backgroundColor: theme.colors.border,
+                                    opacity: 1,
+                                }}
                                 onPress={closeMapModal}
                             >
                                 <Text className="font-semibold" style={{ color: theme.colors.text }}>
@@ -1017,15 +757,7 @@ export const CartScreen = () => {
                                         <Text className="text-base" style={{ color: theme.colors.subtext }}>
                                             Delivery
                                         </Text>
-                                        {deliveryZone && (
-                                            <Text
-                                                className="text-xs px-2 py-0.5 rounded-full"
-                                                style={{ backgroundColor: theme.colors.primary + '20', color: theme.colors.primary }}
-                                            >
-                                                {deliveryZone}
-                                            </Text>
-                                        )}
-                                        {feeLoading && <ActivityIndicator size="small" color={theme.colors.subtext} />}
+                                        {/* Delivery zone and feeLoading removed */}
                                     </View>
                                     <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
                                         {freeDeliveryApplied ? 'Free' : `€${appliedDeliveryPrice.toFixed(2)}`}
@@ -1086,38 +818,6 @@ export const CartScreen = () => {
                                 )}
                             </View>
 
-                            {(autoPromoLoading || (autoPromoResult && autoPromoResult.promotions.length > 0)) && (
-                                <View className="p-4 rounded-2xl border mb-4" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
-                                    <View className="flex-row items-center justify-between mb-2">
-                                        <Text className="text-xs uppercase" style={{ color: theme.colors.subtext }}>
-                                            Auto-applied promotions
-                                        </Text>
-                                        {autoPromoLoading && <ActivityIndicator size="small" color={theme.colors.subtext} />}
-                                    </View>
-
-                                    {autoPromoResult?.promotions.map((promo) => (
-                                        <View key={promo.id} className="flex-row items-center justify-between mb-2">
-                                            <View className="flex-1 pr-2">
-                                                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
-                                                    {promo.name}
-                                                </Text>
-                                                {promo.code && (
-                                                    <Text className="text-xs" style={{ color: theme.colors.subtext }}>
-                                                        Code: {promo.code}
-                                                    </Text>
-                                                )}
-                                            </View>
-                                            <Text className="text-sm font-semibold" style={{ color: theme.colors.income }}>
-                                                {promo.freeDelivery && promo.appliedAmount === 0
-                                                    ? 'Free delivery'
-                                                    : `-€${Number(promo.appliedAmount).toFixed(2)}`}
-                                            </Text>
-                                        </View>
-                                    ))}
-
-                                </View>
-                            )}
-
                             <View className="h-px mb-3" style={{ backgroundColor: theme.colors.border }} />
 
                             <View className="flex-row justify-between items-center mb-4">
@@ -1136,11 +836,11 @@ export const CartScreen = () => {
                             <TouchableOpacity
                                 className="py-3 rounded-xl items-center mb-2"
                                 style={{
-                                    backgroundColor: isProcessing || feeLoading ? theme.colors.border : theme.colors.primary,
-                                    opacity: isProcessing || feeLoading ? 0.6 : 1,
+                                    backgroundColor: isProcessing ? theme.colors.border : theme.colors.primary,
+                                    opacity: isProcessing ? 0.6 : 1,
                                 }}
                                 onPress={handleCheckout}
-                                disabled={isProcessing || feeLoading}
+                                disabled={isProcessing}
                             >
                                 {isProcessing || orderLoading ? (
                                     <View className="flex-row items-center gap-2">
@@ -1156,7 +856,7 @@ export const CartScreen = () => {
                                 style={{ backgroundColor: theme.colors.border }}
                                 onPress={() => {
                                     closeSummaryModal();
-                                    setTimeout(() => setIsAddressModalOpen(true), 120);
+                                    setTimeout(() => setIsMapModalOpen(true), 260);
                                 }}
                             >
                                 <Text className="font-semibold" style={{ color: theme.colors.text }}>

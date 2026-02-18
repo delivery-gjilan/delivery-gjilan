@@ -1,8 +1,8 @@
 import { graphql } from '@/gql';
 
-export const CREATE_PROMOTION_V2 = graphql(`
-    mutation CreatePromotionV2($input: CreatePromotionV2Input!) {
-        createPromotionV2(input: $input) {
+export const CREATE_PROMOTION = graphql(`
+    mutation CreatePromotion($input: CreatePromotionInput!) {
+        createPromotion(input: $input) {
             id
             name
             description
@@ -27,9 +27,9 @@ export const CREATE_PROMOTION_V2 = graphql(`
     }
 `);
 
-export const UPDATE_PROMOTION_V2 = graphql(`
-    mutation UpdatePromotionV2($input: UpdatePromotionV2Input!) {
-        updatePromotionV2(input: $input) {
+export const UPDATE_PROMOTION = graphql(`
+    mutation UpdatePromotion($input: UpdatePromotionInput!) {
+        updatePromotion(input: $input) {
             id
             name
             description
@@ -54,13 +54,8 @@ export const UPDATE_PROMOTION_V2 = graphql(`
     }
 `);
 
-export const DELETE_PROMOTION_V2 = graphql(`
-    mutation DeletePromotionV2($id: ID!) {
-        deletePromotionV2(id: $id)
+export const DELETE_PROMOTION = graphql(`
+    mutation DeletePromotion($id: ID!) {
+        deletePromotion(id: $id)
     }
 `);
-
-// Legacy aliases for backward compatibility
-export const CREATE_PROMOTION = CREATE_PROMOTION_V2;
-export const UPDATE_PROMOTION = UPDATE_PROMOTION_V2;
-export const DELETE_PROMOTION = DELETE_PROMOTION_V2;

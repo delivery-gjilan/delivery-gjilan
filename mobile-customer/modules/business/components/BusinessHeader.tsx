@@ -12,7 +12,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { Business } from '@/gql/graphql';
 import { useRouter } from 'expo-router';
 
-export function BusinessHeader({ business, scrollY }: { business: Business; scrollY?: SharedValue<number> }) {
+export function BusinessHeader({ business, scrollY }: { business: Partial<Business>; scrollY?: SharedValue<number> }) {
     const theme = useTheme();
     const router = useRouter();
     const insets = useSafeAreaInsets();
@@ -34,7 +34,7 @@ export function BusinessHeader({ business, scrollY }: { business: Business; scro
                 Extrapolate.CLAMP
             ),
         };
-    });
+    }) as any;
 
     // Dark overlay opacity
     const overlayAnimatedStyle = useAnimatedStyle(() => {
@@ -48,11 +48,11 @@ export function BusinessHeader({ business, scrollY }: { business: Business; scro
                 Extrapolate.CLAMP
             ),
         };
-    });
+    }) as any;
 
     // Large title in hero - moves up and fades
     const heroTitleAnimatedStyle = useAnimatedStyle(() => {
-        if (!scrollY) return { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }] };
+        if (!scrollY) return { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }] } as any;
         
         return {
             opacity: interpolate(
@@ -79,12 +79,12 @@ export function BusinessHeader({ business, scrollY }: { business: Business; scro
                     ),
                 },
             ],
-        };
-    });
+        } as any;
+    }) as any;
 
     // Search bar - morphs from center to top and stays visible
     const searchBarAnimatedStyle = useAnimatedStyle(() => {
-        if (!scrollY) return { opacity: 0, transform: [{ translateY: 0 }, { scale: 1 }] };
+        if (!scrollY) return { opacity: 0, transform: [{ translateY: 0 }, { scale: 1 }] } as any;
         
         return {
             opacity: interpolate(
@@ -111,8 +111,8 @@ export function BusinessHeader({ business, scrollY }: { business: Business; scro
                     ),
                 },
             ],
-        };
-    });
+        } as any;
+    }) as any;
 
     // Sticky top bar - fades in when collapsed
     const stickyBarAnimatedStyle = useAnimatedStyle(() => {

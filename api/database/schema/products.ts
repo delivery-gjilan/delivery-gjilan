@@ -3,6 +3,7 @@ import { businesses } from './businesses';
 import { productCategories } from './productCategories';
 import { productSubcategories } from './productSubcategories';
 import { relations, sql } from 'drizzle-orm';
+import { productStocks } from './productStock';
 
 export const products = pgTable('products', {
     id: uuid('id').primaryKey().defaultRandom().notNull(),
@@ -27,8 +28,6 @@ export const products = pgTable('products', {
 
     isAvailable: boolean('is_available').default(true),
     sortOrder: integer('sort_order').default(0).notNull(),
-    stock: integer('stock').default(0).notNull(),
-
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull(),
@@ -51,6 +50,7 @@ export const productsRelations = relations(products, ({ one }) => ({
         fields: [products.subcategoryId],
         references: [productSubcategories.id],
     }),
+    productStock: one(productStocks),
 }));
 
 export type DbProduct = typeof products.$inferSelect;

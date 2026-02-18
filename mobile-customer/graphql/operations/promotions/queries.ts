@@ -1,20 +1,22 @@
 import { graphql } from '@/gql';
 
-export const VALIDATE_PROMOTION = graphql(`
-    query ValidatePromotion($input: ValidatePromotionInput!) {
-        validatePromotion(input: $input) {
-            isValid
-            reason
-            discountAmount
+export const VALIDATE_PROMOTIONS = graphql(`
+    query ValidatePromotions($cart: CartContextInput!, $manualCode: String) {
+        validatePromotions(cart: $cart, manualCode: $manualCode) {
+            totalDiscount
             freeDeliveryApplied
-            effectiveDeliveryPrice
-            totalPrice
-            promotion {
+            finalSubtotal
+            finalDeliveryPrice
+            finalTotal
+            promotions {
                 id
-                code
                 name
+                code
                 type
-                value
+                target
+                appliedAmount
+                freeDelivery
+                priority
             }
         }
     }

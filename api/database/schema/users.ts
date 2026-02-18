@@ -4,6 +4,7 @@ import { relations, sql } from 'drizzle-orm';
 import { SignupStep, UserRole } from '@/generated/types.generated';
 import { orders } from './orders';
 import { businesses } from './businesses';
+import { userAddress } from './userAddress';
 
 const signupStepValues = ['INITIAL', 'EMAIL_SENT', 'EMAIL_VERIFIED', 'PHONE_SENT', 'COMPLETED'] as const;
 [...signupStepValues] satisfies SignupStep[];
@@ -47,6 +48,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
         fields: [users.businessId],
         references: [businesses.id],
     }),
+    addresses: many(userAddress),
 }));
 
 export type DbUser = typeof users.$inferSelect;

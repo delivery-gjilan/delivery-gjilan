@@ -3,6 +3,7 @@ import { pgTable, varchar, numeric, timestamp, uuid, pgEnum, doublePrecision } f
 import { orderItems } from './orderItems';
 import { OrderStatus } from '@/generated/types.generated';
 import { users } from './users';
+import { orderPromotions } from './orderPromotions';
 
 const orderStatusValues = ['PENDING', 'ACCEPTED', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'] as const;
 [...orderStatusValues] satisfies OrderStatus[];
@@ -16,6 +17,8 @@ export const orders = pgTable('orders', {
     driverId: uuid('driver_id').references(() => users.id, { onDelete: 'set null' }),
     price: numeric('price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
     deliveryPrice: numeric('delivery_price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
+    originalPrice: numeric('original_price', { mode: 'number', precision: 10, scale: 2 }),
+    originalDeliveryPrice: numeric('original_delivery_price', { mode: 'number', precision: 10, scale: 2 }),
     status: orderStatus('status').notNull(),
     dropoffLat: doublePrecision('dropoff_lat').notNull(),
     dropoffLng: doublePrecision('dropoff_lng').notNull(),
@@ -40,6 +43,7 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
         fields: [orders.driverId],
         references: [users.id],
     }),
+    orderPromotions: many(orderPromotions),
 }));
 
 export type DbOrder = typeof orders.$inferSelect;

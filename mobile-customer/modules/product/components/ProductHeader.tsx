@@ -5,7 +5,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { Product } from '@/gql/graphql';
 
 interface ProductHeaderProps {
-    product: Product;
+    product: Partial<Product>;
 }
 
 export function ProductHeader({ product }: ProductHeaderProps) {

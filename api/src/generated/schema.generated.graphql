@@ -68,7 +68,7 @@ type ApplicablePromotion {
   name: String!
   priority: Int!
   target: PromotionTarget!
-  type: PromotionTypeV2!
+  type: PromotionType!
 }
 
 input AssignPromotionToUserInput {
@@ -150,16 +150,6 @@ input CreateBusinessInput {
   workingHours: WorkingHoursInput!
 }
 
-input CreateDeliveryZoneInput {
-  color: String
-  description: String
-  feeDelta: Float!
-  geometry: String!
-  isActive: Boolean
-  name: String!
-  priority: Int
-}
-
 input CreateOrderInput {
   deliveryPrice: Float!
   dropOffLocation: LocationInput!
@@ -198,7 +188,7 @@ input CreateProductSubcategoryInput {
   name: String!
 }
 
-input CreatePromotionV2Input {
+input CreatePromotionInput {
   code: String
   description: String
   discountValue: Float
@@ -217,7 +207,7 @@ input CreatePromotionV2Input {
   target: PromotionTarget!
   targetUserIds: [ID!]
   thresholdReward: String
-  type: PromotionTypeV2!
+  type: PromotionType!
 }
 
 input CreateUserInput {
@@ -232,19 +222,6 @@ input CreateUserInput {
 scalar Date
 
 scalar DateTime
-
-type DeliveryZone {
-  color: String!
-  createdAt: DateTime!
-  description: String
-  feeDelta: Float!
-  geometry: String!
-  id: ID!
-  isActive: Boolean!
-  name: String!
-  priority: Int!
-  updatedAt: DateTime!
-}
 
 type DriverConnection {
   """System-calculated: current connection state"""
@@ -345,20 +322,18 @@ type Mutation {
   backfillSettlementsForDeliveredOrders: Int!
   cancelOrder(id: ID!): Order!
   createBusiness(input: CreateBusinessInput!): Business!
-  createDeliveryZone(input: CreateDeliveryZoneInput!): DeliveryZone!
   createOrder(input: CreateOrderInput!): Order!
   createProduct(input: CreateProductInput!): Product!
   createProductCategory(input: CreateProductCategoryInput!): ProductCategory!
   createProductSubcategory(input: CreateProductSubcategoryInput!): ProductSubcategory!
-  createPromotionV2(input: CreatePromotionV2Input!): PromotionV2!
+  createPromotion(input: CreatePromotionInput!): Promotion!
   createUser(input: CreateUserInput!): AuthResponse!
   deductWalletCredit(amount: Float!, orderId: ID!, userId: ID!): WalletTransaction!
   deleteBusiness(id: ID!): Boolean!
-  deleteDeliveryZone(id: ID!): Boolean!
   deleteProduct(id: ID!): Boolean!
   deleteProductCategory(id: ID!): Boolean!
   deleteProductSubcategory(id: ID!): Boolean!
-  deletePromotionV2(id: ID!): Boolean!
+  deletePromotion(id: ID!): Boolean!
   deleteUser(id: ID!): Boolean!
 
   """
@@ -379,7 +354,6 @@ type Mutation {
   unsettleSettlement(settlementId: ID!): Settlement!
   updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
   updateCommissionPercentage(businessId: ID, driverId: ID, percentage: Float!): Boolean!
-  updateDeliveryZone(id: ID!, input: UpdateDeliveryZoneInput!): DeliveryZone!
   updateDriverLocation(latitude: Float!, longitude: Float!): User!
   updateDriverOnlineStatus(isOnline: Boolean!): User!
   updateOrderStatus(id: ID!, status: OrderStatus!): Order!
@@ -387,7 +361,7 @@ type Mutation {
   updateProductCategory(id: ID!, input: UpdateProductCategoryInput!): ProductCategory!
   updateProductSubcategory(id: ID!, input: UpdateProductSubcategoryInput!): ProductSubcategory!
   updateProductsOrder(businessId: ID!, products: [ProductOrderInput!]!): Boolean!
-  updatePromotionV2(input: UpdatePromotionV2Input!): PromotionV2!
+  updatePromotion(input: UpdatePromotionInput!): Promotion!
   updateUser(input: UpdateUserInput!): User!
   updateUserNote(flagColor: String, note: String, userId: ID!): User!
   verifyEmail(input: VerifyEmailInput!): SignupStepResponse!
@@ -402,6 +376,9 @@ type Order {
   id: ID!
   orderDate: Date!
   orderPrice: Float!
+  orderPromotions: [OrderPromotion!]
+  originalDeliveryPrice: Float
+  originalPrice: Float
   status: OrderStatus!
   totalPrice: Float!
   updatedAt: Date!
@@ -421,6 +398,13 @@ type OrderItem {
   quantity: Int!
   quantityInStock: Int!
   quantityNeeded: Int!
+}
+
+type OrderPromotion {
+  appliesTo: PromotionAppliesTo!
+  discountAmount: Float!
+  id: ID!
+  promotionId: ID!
 }
 
 enum OrderStatus {
@@ -472,55 +456,7 @@ type ProductSubcategory {
   updatedAt: String!
 }
 
-type PromotionAnalyticsResult {
-  averageOrderValue: Float!
-  conversionRate: Float
-  promotion: PromotionV2!
-  totalDiscountGiven: Float!
-  totalRevenue: Float!
-  totalUsageCount: Int!
-  uniqueUsers: Int!
-}
-
-type PromotionResult {
-  finalDeliveryPrice: Float!
-  finalSubtotal: Float!
-  finalTotal: Float!
-  freeDeliveryApplied: Boolean!
-  promotions: [ApplicablePromotion!]!
-  totalDiscount: Float!
-}
-
-enum PromotionTarget {
-  ALL_USERS
-  CONDITIONAL
-  FIRST_ORDER
-  SPECIFIC_USERS
-}
-
-enum PromotionTypeV2 {
-  FIXED_AMOUNT
-  FREE_DELIVERY
-  PERCENTAGE
-  WALLET_CREDIT
-}
-
-type PromotionUsage {
-  businessId: ID
-  discountAmount: Float!
-  freeDeliveryApplied: Boolean!
-  id: ID!
-  order: Order
-  orderId: ID!
-  orderSubtotal: Float!
-  promotion: PromotionV2
-  promotionId: ID!
-  usedAt: String!
-  user: User
-  userId: ID!
-}
-
-type PromotionV2 {
+type Promotion {
   assignedUsers: [UserPromotion!]
   code: String
   createdAt: String!
@@ -544,7 +480,60 @@ type PromotionV2 {
   thresholdReward: String
   totalRevenue: Float!
   totalUsageCount: Int!
-  type: PromotionTypeV2!
+  type: PromotionType!
+}
+
+type PromotionAnalyticsResult {
+  averageOrderValue: Float!
+  conversionRate: Float
+  promotion: Promotion!
+  totalDiscountGiven: Float!
+  totalRevenue: Float!
+  totalUsageCount: Int!
+  uniqueUsers: Int!
+}
+
+enum PromotionAppliesTo {
+  DELIVERY
+  PRICE
+}
+
+type PromotionResult {
+  finalDeliveryPrice: Float!
+  finalSubtotal: Float!
+  finalTotal: Float!
+  freeDeliveryApplied: Boolean!
+  promotions: [ApplicablePromotion!]!
+  totalDiscount: Float!
+}
+
+enum PromotionTarget {
+  ALL_USERS
+  CONDITIONAL
+  FIRST_ORDER
+  SPECIFIC_USERS
+}
+
+enum PromotionType {
+  FIXED_AMOUNT
+  FREE_DELIVERY
+  PERCENTAGE
+  WALLET_CREDIT
+}
+
+type PromotionUsage {
+  businessId: ID
+  discountAmount: Float!
+  freeDeliveryApplied: Boolean!
+  id: ID!
+  order: Order
+  orderId: ID!
+  orderSubtotal: Float!
+  promotion: Promotion
+  promotionId: ID!
+  usedAt: String!
+  user: User
+  userId: ID!
 }
 
 type Query {
@@ -553,16 +542,13 @@ type Query {
   business(id: ID!): Business
   businessBalance(businessId: ID!): SettlementSummary!
   businesses: [Business!]!
-  calculateDeliveryFee(baseDeliveryFee: Float!, latitude: Float!, longitude: Float!): ZoneFeeResult!
-  deliveryZone(id: ID!): DeliveryZone
-  deliveryZones: [DeliveryZone!]!
   driverBalance(driverId: ID!): SettlementSummary!
   drivers: [User!]!
-  getAllPromotionsV2(isActive: Boolean): [PromotionV2!]!
-  getApplicablePromotionsV2(cart: CartContextInput!, manualCode: String): [ApplicablePromotion!]!
+  getAllPromotions(isActive: Boolean): [Promotion!]!
+  getApplicablePromotions(cart: CartContextInput!, manualCode: String): [ApplicablePromotion!]!
+  getPromotion(id: ID!): Promotion
   getPromotionAnalytics(promotionId: ID!): PromotionAnalyticsResult!
   getPromotionUsage(promotionId: ID!): [PromotionUsage!]!
-  getPromotionV2(id: ID!): PromotionV2
   getUserPromoMetadata(userId: ID!): UserPromoMetadata
   getUserPromotions(userId: ID!): [UserPromotion!]!
   getUserWallet(userId: ID!): UserWallet
@@ -583,7 +569,7 @@ type Query {
   uncompletedOrders: [Order!]!
   userBehavior(userId: ID!): UserBehavior
   users: [User!]!
-  validatePromotionsV2(cart: CartContextInput!, manualCode: String): PromotionResult!
+  validatePromotions(cart: CartContextInput!, manualCode: String): PromotionResult!
 }
 
 type Settlement {
@@ -663,16 +649,6 @@ input UpdateBusinessInput {
   workingHours: WorkingHoursInput
 }
 
-input UpdateDeliveryZoneInput {
-  color: String
-  description: String
-  feeDelta: Float
-  geometry: String
-  isActive: Boolean
-  name: String
-  priority: Int
-}
-
 input UpdateProductCategoryInput {
   isActive: Boolean
   name: String
@@ -696,7 +672,7 @@ input UpdateProductSubcategoryInput {
   name: String
 }
 
-input UpdatePromotionV2Input {
+input UpdatePromotionInput {
   code: String
   description: String
   discountValue: Float
@@ -713,7 +689,7 @@ input UpdatePromotionV2Input {
   spendThreshold: Float
   startsAt: String
   thresholdReward: String
-  type: PromotionTypeV2
+  type: PromotionType
 }
 
 input UpdateUserInput {
@@ -774,7 +750,7 @@ type UserPromotion {
   assignedAt: String!
   expiresAt: String
   id: ID!
-  promotion: PromotionV2
+  promotion: Promotion
   promotionId: ID!
   usageCount: Int!
   user: User
@@ -826,10 +802,4 @@ type WorkingHours {
 input WorkingHoursInput {
   closesAt: String!
   opensAt: String!
-}
-
-type ZoneFeeResult {
-  baseDeliveryFee: Float!
-  totalFee: Float!
-  zone: DeliveryZone
 }

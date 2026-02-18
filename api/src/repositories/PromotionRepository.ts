@@ -1,151 +1,259 @@
 import { DbType } from '@/database';
-import { promotions, promotionRedemptions, promotionTargetUsers } from '@/database/schema';
-import type { DbPromotion, NewDbPromotion } from '@/database/schema/promotions';
-import type { NewDbPromotionRedemption } from '@/database/schema/promotionRedemptions';
-import { and, eq, sql, inArray } from 'drizzle-orm';
+import {
+    promotions,
+    userPromotions,
+    promotionUsage,
+    promotionBusinessEligibility,
+    userPromoMetadata,
+    DbPromotion,
+    NewDbPromotion,
+} from '@/database/schema';
+import { eq, and, or, isNull, lte, gte, ne } from 'drizzle-orm';
+
+export interface PromotionFilters {
+    isActive?: boolean;
+    type?: string;
+    target?: string;
+    code?: string;
+    hasExpired?: boolean;
+    limit?: number;
+    offset?: number;
+}
 
 export class PromotionRepository {
     constructor(private db: DbType) {}
 
-    async findAll(): Promise<DbPromotion[]> {
-        return this.db.select().from(promotions).orderBy(promotions.createdAt);
+    async create(input: NewDbPromotion): Promise<DbPromotion> {
+        const [promo] = await this.db
+            .insert(promotions)
+            .values(input)
+            .returning();
+        
+        if (!promo) {
+            throw new Error('Failed to create promotion');
+        }
+        
+        return promo;
     }
 
-    async findById(id: string): Promise<DbPromotion | undefined> {
-        const [promotion] = await this.db.select().from(promotions).where(eq(promotions.id, id));
-        return promotion;
-    }
-
-    async findByCode(code: string): Promise<DbPromotion | undefined> {
-        const [promotion] = await this.db
+    async getById(id: string): Promise<DbPromotion | null> {
+        const [promo] = await this.db
             .select()
             .from(promotions)
-            .where(eq(promotions.code, code));
-        return promotion;
+            .where(eq(promotions.id, id))
+            .limit(1);
+        
+        return promo || null;
     }
 
-    async create(data: NewDbPromotion): Promise<DbPromotion> {
-        const [promotion] = await this.db.insert(promotions).values(data).returning();
-        return promotion;
+    async getByCode(code: string): Promise<DbPromotion | null> {
+        const [promo] = await this.db
+            .select()
+            .from(promotions)
+            .where(eq(promotions.code, code.toUpperCase()))
+            .limit(1);
+        
+        return promo || null;
     }
 
-    async update(id: string, data: Partial<NewDbPromotion>): Promise<DbPromotion | undefined> {
-        const [promotion] = await this.db.update(promotions).set(data).where(eq(promotions.id, id)).returning();
-        return promotion;
+    async list(filters: PromotionFilters = {}): Promise<DbPromotion[]> {
+        let query = this.db.select().from(promotions);
+
+        const conditions = [];
+
+        if (filters.isActive !== undefined) {
+            conditions.push(eq(promotions.isActive, filters.isActive));
+        }
+
+        if (filters.type) {
+            conditions.push(eq(promotions.type, filters.type as any));
+        }
+
+        if (filters.target) {
+            conditions.push(eq(promotions.target, filters.target as any));
+        }
+
+        if (filters.code) {
+            conditions.push(eq(promotions.code, filters.code.toUpperCase()));
+        }
+
+        if (filters.hasExpired !== undefined) {
+            const now = new Date().toISOString();
+            if (filters.hasExpired) {
+                conditions.push(lte(promotions.endsAt, now));
+            } else {
+                conditions.push(
+                    or(
+                        isNull(promotions.endsAt),
+                        gte(promotions.endsAt, now)
+                    )
+                );
+            }
+        }
+
+        if (conditions.length > 0) {
+            query = query.where(and(...conditions)) as any;
+        }
+
+        if (filters.limit) {
+            query = query.limit(filters.limit);
+        }
+
+        if (filters.offset) {
+            query = query.offset(filters.offset);
+        }
+
+        return await query;
+    }
+
+    async update(id: string, updates: Partial<DbPromotion>): Promise<DbPromotion> {
+        const [promo] = await this.db
+            .update(promotions)
+            .set(updates)
+            .where(eq(promotions.id, id))
+            .returning();
+        
+        if (!promo) {
+            throw new Error('Promotion not found');
+        }
+        
+        return promo;
     }
 
     async delete(id: string): Promise<boolean> {
-        const [deleted] = await this.db.delete(promotions).where(eq(promotions.id, id)).returning();
-        return !!deleted;
-    }
-
-    async countRedemptions(promotionId: string): Promise<number> {
-        const [row] = await this.db
-            .select({ count: sql<number>`count(*)` })
-            .from(promotionRedemptions)
-            .where(eq(promotionRedemptions.promotionId, promotionId));
-        return Number(row?.count || 0);
-    }
-
-    async countRedemptionsByUser(promotionId: string, userId: string): Promise<number> {
-        const [row] = await this.db
-            .select({ count: sql<number>`count(*)` })
-            .from(promotionRedemptions)
-            .where(and(eq(promotionRedemptions.promotionId, promotionId), eq(promotionRedemptions.userId, userId)));
-        return Number(row?.count || 0);
-    }
-
-    async createRedemption(data: NewDbPromotionRedemption) {
-        const [redemption] = await this.db.insert(promotionRedemptions).values(data).returning();
-        return redemption;
-    }
-
-    async findAutoApplyPromotions(userId: string): Promise<DbPromotion[]> {
-        const now = new Date();
+        // Delete related records first
+        await this.db
+            .delete(userPromotions)
+            .where(eq(userPromotions.promotionId, id));
         
-        // Find all auto-apply promotions that are:
-        // 1. Active
-        // 2. Auto-apply is true
-        // 3. Within date range (or no date restrictions)
-        // 4. Either: no target users OR user is in target users
+        await this.db
+            .delete(promotionBusinessEligibility)
+            .where(eq(promotionBusinessEligibility.promotionId, id));
         
-        const allAutoApply = await this.db
+        // Delete the promotion
+        const result = await this.db
+            .delete(promotions)
+            .where(eq(promotions.id, id));
+        
+        return !!result;
+    }
+
+    async checkCodeExists(code: string, excludeId?: string): Promise<boolean> {
+        let query = this.db
             .select()
             .from(promotions)
-            .where(
-                and(
-                    eq(promotions.isActive, true),
-                    eq(promotions.autoApply, true)
-                )
-            );
+            .where(eq(promotions.code, code.toUpperCase()));
         
-        // Filter by date range
-        const validPromos = allAutoApply.filter(promo => {
-            if (promo.startsAt && new Date(promo.startsAt) > now) return false;
-            if (promo.endsAt && new Date(promo.endsAt) < now) return false;
-            return true;
-        });
-        
-        // For each promo, check if it's user-targeted
-        const result: DbPromotion[] = [];
-        for (const promo of validPromos) {
-            const targetUsers = await this.getTargetUserIds(promo.id);
-            // If no target users, it's for everyone
-            // If has target users, check if this user is included
-            if (targetUsers.length === 0 || targetUsers.includes(userId)) {
-                result.push(promo);
-            }
+        if (excludeId) {
+            query = query.where(ne(promotions.id, excludeId)) as any;
         }
         
-        return result;
+        const [result] = await query.limit(1);
+        return !!result;
     }
 
-    async getTargetUserIds(promotionId: string): Promise<string[]> {
-        const targets = await this.db
-            .select({ userId: promotionTargetUsers.userId })
-            .from(promotionTargetUsers)
-            .where(eq(promotionTargetUsers.promotionId, promotionId));
-        return targets.map(t => t.userId);
-    }
-
-    async setTargetUsers(promotionId: string, userIds: string[]): Promise<void> {
-        // Clear existing targets
+    async recordUsage(
+        promotionId: string,
+        userId: string,
+        orderId: string,
+        discountAmount: number,
+        freeDeliveryApplied: boolean,
+        orderSubtotal: number,
+        businessId?: string
+    ): Promise<void> {
         await this.db
-            .delete(promotionTargetUsers)
-            .where(eq(promotionTargetUsers.promotionId, promotionId));
-        
-        // Add new targets if any
-        if (userIds.length > 0) {
-            await this.db.insert(promotionTargetUsers).values(
-                userIds.map(userId => ({
-                    promotionId,
-                    userId,
-                }))
-            );
-        }
-    }
-
-    async addTargetUsers(promotionId: string, userIds: string[]): Promise<void> {
-        if (userIds.length === 0) return;
-        
-        await this.db.insert(promotionTargetUsers).values(
-            userIds.map(userId => ({
+            .insert(promotionUsage)
+            .values({
                 promotionId,
                 userId,
-            }))
-        ).onConflictDoNothing();
+                orderId,
+                discountAmount,
+                freeDeliveryApplied,
+                orderSubtotal,
+                businessId: businessId || null,
+            });
     }
 
-    async removeTargetUsers(promotionId: string, userIds: string[]): Promise<void> {
+    async getUserAssignments(userId: string, onlyActive = true): Promise<any[]> {
+        let query = this.db
+            .select()
+            .from(userPromotions)
+            .where(eq(userPromotions.userId, userId));
+        
+        if (onlyActive) {
+            query = query.where(eq(userPromotions.isActive, true)) as any;
+        }
+        
+        return await query;
+    }
+
+    async assignToUsers(promotionId: string, userIds: string[]): Promise<void> {
         if (userIds.length === 0) return;
         
         await this.db
-            .delete(promotionTargetUsers)
-            .where(
-                and(
-                    eq(promotionTargetUsers.promotionId, promotionId),
-                    inArray(promotionTargetUsers.userId, userIds)
-                )
+            .insert(userPromotions)
+            .values(
+                userIds.map(userId => ({
+                    userId,
+                    promotionId,
+                }))
             );
     }
+
+    async setBusinessEligibility(promotionId: string, businessIds: string[]): Promise<void> {
+        // Delete existing eligibility
+        await this.db
+            .delete(promotionBusinessEligibility)
+            .where(eq(promotionBusinessEligibility.promotionId, promotionId));
+        
+        // Insert new eligibility
+        if (businessIds.length > 0) {
+            await this.db
+                .insert(promotionBusinessEligibility)
+                .values(
+                    businessIds.map(businessId => ({
+                        promotionId,
+                        businessId,
+                    }))
+                );
+        }
+    }
+
+    async getBusinessEligibility(promotionId: string): Promise<string[]> {
+        const results = await this.db
+            .select({ businessId: promotionBusinessEligibility.businessId })
+            .from(promotionBusinessEligibility)
+            .where(eq(promotionBusinessEligibility.promotionId, promotionId));
+        
+        return results.map(r => r.businessId);
+    }
+
+    async getMetadata(userId: string): Promise<any> {
+        const [metadata] = await this.db
+            .select()
+            .from(userPromoMetadata)
+            .where(eq(userPromoMetadata.userId, userId))
+            .limit(1);
+        
+        return metadata || null;
+    }
+
+    async upsertMetadata(userId: string, updates: Partial<any>): Promise<void> {
+        const existing = await this.getMetadata(userId);
+        
+        if (existing) {
+            await this.db
+                .update(userPromoMetadata)
+                .set(updates)
+                .where(eq(userPromoMetadata.userId, userId));
+        } else {
+            await this.db
+                .insert(userPromoMetadata)
+                .values({
+                    userId,
+                    ...updates,
+                });
+        }
+    }
 }
+

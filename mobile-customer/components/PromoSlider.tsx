@@ -24,7 +24,7 @@ export function PromoSlider({ banners }: PromoSliderProps) {
     const flatListRef = useRef<FlatList>(null);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isUserScrolling, setIsUserScrolling] = useState(false);
-    const scrollTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const scrollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     // Auto-scroll logic
     useEffect(() => {

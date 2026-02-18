@@ -8,12 +8,12 @@ import { useProductInCart } from '../hooks/useProductInCart';
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 interface CartControlsProps {
-    product: Product;
+    product: Partial<Product>;
 }
 
 export function CartControls({ product }: CartControlsProps) {
     const theme = useTheme();
-    const { quantity, addToCart, incrementQuantity, decrementQuantity } = useProductInCart(product);
+    const { quantity, addToCart, incrementQuantity, decrementQuantity } = useProductInCart(product as any);
     const scaleAnim = useRef(new Animated.Value(1)).current;
     const [showFloatingNumber, setShowFloatingNumber] = useState(false);
     const floatingOpacity = useRef(new Animated.Value(0)).current;

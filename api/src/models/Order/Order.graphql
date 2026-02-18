@@ -7,6 +7,11 @@ enum OrderStatus {
     CANCELLED
 }
 
+enum PromotionAppliesTo {
+    PRICE
+    DELIVERY
+}
+
 type OrderBusiness {
     business: Business!
     items: [OrderItem!]!
@@ -22,10 +27,19 @@ type OrderItem {
     quantityNeeded: Int!
 }
 
+type OrderPromotion {
+    id: ID!
+    promotionId: ID!
+    appliesTo: PromotionAppliesTo!
+    discountAmount: Float!
+}
+
 type Order {
     id: ID!
     orderPrice: Float!
     deliveryPrice: Float!
+    originalPrice: Float
+    originalDeliveryPrice: Float
     totalPrice: Float!
     orderDate: Date!
     updatedAt: Date!
@@ -34,6 +48,7 @@ type Order {
     driver: User
     dropOffLocation: Location!
     businesses: [OrderBusiness!]!
+    orderPromotions: [OrderPromotion!]
 }
 
 type Query {

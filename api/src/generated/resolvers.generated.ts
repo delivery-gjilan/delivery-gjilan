@@ -5,20 +5,17 @@ import    { auditLogs as Query_auditLogs } from './../models/AuditLog/resolvers/
 import    { business as Query_business } from './../models/Business/resolvers/Query/business';
 import    { businessBalance as Query_businessBalance } from './../models/Settlement/resolvers/Query/businessBalance';
 import    { businesses as Query_businesses } from './../models/Business/resolvers/Query/businesses';
-import    { calculateDeliveryFee as Query_calculateDeliveryFee } from './../models/DeliveryZone/resolvers/Query/calculateDeliveryFee';
-import    { deliveryZone as Query_deliveryZone } from './../models/DeliveryZone/resolvers/Query/deliveryZone';
-import    { deliveryZones as Query_deliveryZones } from './../models/DeliveryZone/resolvers/Query/deliveryZones';
 import    { driverBalance as Query_driverBalance } from './../models/Settlement/resolvers/Query/driverBalance';
 import    { drivers as Query_drivers } from './../models/User/resolvers/Query/drivers';
-import    { getAllPromotionsV2 as Query_getAllPromotionsV2 } from './../models/PromotionV2/resolvers/Query/getAllPromotionsV2';
-import    { getApplicablePromotionsV2 as Query_getApplicablePromotionsV2 } from './../models/PromotionV2/resolvers/Query/getApplicablePromotionsV2';
-import    { getPromotionAnalytics as Query_getPromotionAnalytics } from './../models/PromotionV2/resolvers/Query/getPromotionAnalytics';
-import    { getPromotionUsage as Query_getPromotionUsage } from './../models/PromotionV2/resolvers/Query/getPromotionUsage';
-import    { getPromotionV2 as Query_getPromotionV2 } from './../models/PromotionV2/resolvers/Query/getPromotionV2';
-import    { getUserPromoMetadata as Query_getUserPromoMetadata } from './../models/PromotionV2/resolvers/Query/getUserPromoMetadata';
-import    { getUserPromotions as Query_getUserPromotions } from './../models/PromotionV2/resolvers/Query/getUserPromotions';
-import    { getUserWallet as Query_getUserWallet } from './../models/PromotionV2/resolvers/Query/getUserWallet';
-import    { getWalletTransactions as Query_getWalletTransactions } from './../models/PromotionV2/resolvers/Query/getWalletTransactions';
+import    { getAllPromotions as Query_getAllPromotions } from './../models/Promotion/resolvers/Query/getAllPromotions';
+import    { getApplicablePromotions as Query_getApplicablePromotions } from './../models/Promotion/resolvers/Query/getApplicablePromotions';
+import    { getPromotion as Query_getPromotion } from './../models/Promotion/resolvers/Query/getPromotion';
+import    { getPromotionAnalytics as Query_getPromotionAnalytics } from './../models/Promotion/resolvers/Query/getPromotionAnalytics';
+import    { getPromotionUsage as Query_getPromotionUsage } from './../models/Promotion/resolvers/Query/getPromotionUsage';
+import    { getUserPromoMetadata as Query_getUserPromoMetadata } from './../models/Promotion/resolvers/Query/getUserPromoMetadata';
+import    { getUserPromotions as Query_getUserPromotions } from './../models/Promotion/resolvers/Query/getUserPromotions';
+import    { getUserWallet as Query_getUserWallet } from './../models/Promotion/resolvers/Query/getUserWallet';
+import    { getWalletTransactions as Query_getWalletTransactions } from './../models/Promotion/resolvers/Query/getWalletTransactions';
 import    { me as Query_me } from './../models/User/resolvers/Query/me';
 import    { myBehavior as Query_myBehavior } from './../models/User/resolvers/Query/myBehavior';
 import    { order as Query_order } from './../models/Order/resolvers/Query/order';
@@ -35,44 +32,41 @@ import    { settlements as Query_settlements } from './../models/Settlement/reso
 import    { uncompletedOrders as Query_uncompletedOrders } from './../models/Order/resolvers/Query/uncompletedOrders';
 import    { userBehavior as Query_userBehavior } from './../models/User/resolvers/Query/userBehavior';
 import    { users as Query_users } from './../models/User/resolvers/Query/users';
-import    { validatePromotionsV2 as Query_validatePromotionsV2 } from './../models/PromotionV2/resolvers/Query/validatePromotionsV2';
-import    { addWalletCredit as Mutation_addWalletCredit } from './../models/PromotionV2/resolvers/Mutation/addWalletCredit';
+import    { validatePromotions as Query_validatePromotions } from './../models/Promotion/resolvers/Query/validatePromotions';
+import    { addWalletCredit as Mutation_addWalletCredit } from './../models/Promotion/resolvers/Mutation/addWalletCredit';
 import    { adminSetDriverConnectionStatus as Mutation_adminSetDriverConnectionStatus } from './../models/Driver/resolvers/Mutation/adminSetDriverConnectionStatus';
 import    { adminUpdateDriverLocation as Mutation_adminUpdateDriverLocation } from './../models/User/resolvers/Mutation/adminUpdateDriverLocation';
 import    { assignDriverToOrder as Mutation_assignDriverToOrder } from './../models/Order/resolvers/Mutation/assignDriverToOrder';
-import    { assignPromotionToUsers as Mutation_assignPromotionToUsers } from './../models/PromotionV2/resolvers/Mutation/assignPromotionToUsers';
+import    { assignPromotionToUsers as Mutation_assignPromotionToUsers } from './../models/Promotion/resolvers/Mutation/assignPromotionToUsers';
 import    { backfillSettlementsForDeliveredOrders as Mutation_backfillSettlementsForDeliveredOrders } from './../models/Settlement/resolvers/Mutation/backfillSettlementsForDeliveredOrders';
 import    { cancelOrder as Mutation_cancelOrder } from './../models/Order/resolvers/Mutation/cancelOrder';
 import    { createBusiness as Mutation_createBusiness } from './../models/Business/resolvers/Mutation/createBusiness';
-import    { createDeliveryZone as Mutation_createDeliveryZone } from './../models/DeliveryZone/resolvers/Mutation/createDeliveryZone';
 import    { createOrder as Mutation_createOrder } from './../models/Order/resolvers/Mutation/createOrder';
 import    { createProduct as Mutation_createProduct } from './../models/Product/resolvers/Mutation/createProduct';
 import    { createProductCategory as Mutation_createProductCategory } from './../models/ProductCategory/resolvers/Mutation/createProductCategory';
 import    { createProductSubcategory as Mutation_createProductSubcategory } from './../models/ProductSubcategory/resolvers/Mutation/createProductSubcategory';
-import    { createPromotionV2 as Mutation_createPromotionV2 } from './../models/PromotionV2/resolvers/Mutation/createPromotionV2';
+import    { createPromotion as Mutation_createPromotion } from './../models/Promotion/resolvers/Mutation/createPromotion';
 import    { createUser as Mutation_createUser } from './../models/User/resolvers/Mutation/createUser';
-import    { deductWalletCredit as Mutation_deductWalletCredit } from './../models/PromotionV2/resolvers/Mutation/deductWalletCredit';
+import    { deductWalletCredit as Mutation_deductWalletCredit } from './../models/Promotion/resolvers/Mutation/deductWalletCredit';
 import    { deleteBusiness as Mutation_deleteBusiness } from './../models/Business/resolvers/Mutation/deleteBusiness';
-import    { deleteDeliveryZone as Mutation_deleteDeliveryZone } from './../models/DeliveryZone/resolvers/Mutation/deleteDeliveryZone';
 import    { deleteProduct as Mutation_deleteProduct } from './../models/Product/resolvers/Mutation/deleteProduct';
 import    { deleteProductCategory as Mutation_deleteProductCategory } from './../models/ProductCategory/resolvers/Mutation/deleteProductCategory';
 import    { deleteProductSubcategory as Mutation_deleteProductSubcategory } from './../models/ProductSubcategory/resolvers/Mutation/deleteProductSubcategory';
-import    { deletePromotionV2 as Mutation_deletePromotionV2 } from './../models/PromotionV2/resolvers/Mutation/deletePromotionV2';
+import    { deletePromotion as Mutation_deletePromotion } from './../models/Promotion/resolvers/Mutation/deletePromotion';
 import    { deleteUser as Mutation_deleteUser } from './../models/User/resolvers/Mutation/deleteUser';
 import    { driverHeartbeat as Mutation_driverHeartbeat } from './../models/Driver/resolvers/Mutation/driverHeartbeat';
 import    { initiateSignup as Mutation_initiateSignup } from './../models/User/resolvers/Mutation/initiateSignup';
 import    { login as Mutation_login } from './../models/User/resolvers/Mutation/login';
-import    { markFirstOrderUsed as Mutation_markFirstOrderUsed } from './../models/PromotionV2/resolvers/Mutation/markFirstOrderUsed';
+import    { markFirstOrderUsed as Mutation_markFirstOrderUsed } from './../models/Promotion/resolvers/Mutation/markFirstOrderUsed';
 import    { markSettlementAsPaid as Mutation_markSettlementAsPaid } from './../models/Settlement/resolvers/Mutation/markSettlementAsPaid';
 import    { markSettlementAsPartiallyPaid as Mutation_markSettlementAsPartiallyPaid } from './../models/Settlement/resolvers/Mutation/markSettlementAsPartiallyPaid';
 import    { markSettlementsAsPaid as Mutation_markSettlementsAsPaid } from './../models/Settlement/resolvers/Mutation/markSettlementsAsPaid';
-import    { removeUserFromPromotion as Mutation_removeUserFromPromotion } from './../models/PromotionV2/resolvers/Mutation/removeUserFromPromotion';
+import    { removeUserFromPromotion as Mutation_removeUserFromPromotion } from './../models/Promotion/resolvers/Mutation/removeUserFromPromotion';
 import    { resendEmailVerification as Mutation_resendEmailVerification } from './../models/User/resolvers/Mutation/resendEmailVerification';
 import    { submitPhoneNumber as Mutation_submitPhoneNumber } from './../models/User/resolvers/Mutation/submitPhoneNumber';
 import    { unsettleSettlement as Mutation_unsettleSettlement } from './../models/Settlement/resolvers/Mutation/unsettleSettlement';
 import    { updateBusiness as Mutation_updateBusiness } from './../models/Business/resolvers/Mutation/updateBusiness';
 import    { updateCommissionPercentage as Mutation_updateCommissionPercentage } from './../models/Settlement/resolvers/Mutation/updateCommissionPercentage';
-import    { updateDeliveryZone as Mutation_updateDeliveryZone } from './../models/DeliveryZone/resolvers/Mutation/updateDeliveryZone';
 import    { updateDriverLocation as Mutation_updateDriverLocation } from './../models/User/resolvers/Mutation/updateDriverLocation';
 import    { updateDriverOnlineStatus as Mutation_updateDriverOnlineStatus } from './../models/User/resolvers/Mutation/updateDriverOnlineStatus';
 import    { updateOrderStatus as Mutation_updateOrderStatus } from './../models/Order/resolvers/Mutation/updateOrderStatus';
@@ -80,7 +74,7 @@ import    { updateProduct as Mutation_updateProduct } from './../models/Product/
 import    { updateProductCategory as Mutation_updateProductCategory } from './../models/ProductCategory/resolvers/Mutation/updateProductCategory';
 import    { updateProductSubcategory as Mutation_updateProductSubcategory } from './../models/ProductSubcategory/resolvers/Mutation/updateProductSubcategory';
 import    { updateProductsOrder as Mutation_updateProductsOrder } from './../models/Product/resolvers/Mutation/updateProductsOrder';
-import    { updatePromotionV2 as Mutation_updatePromotionV2 } from './../models/PromotionV2/resolvers/Mutation/updatePromotionV2';
+import    { updatePromotion as Mutation_updatePromotion } from './../models/Promotion/resolvers/Mutation/updatePromotion';
 import    { updateUser as Mutation_updateUser } from './../models/User/resolvers/Mutation/updateUser';
 import    { updateUserNote as Mutation_updateUserNote } from './../models/User/resolvers/Mutation/updateUserNote';
 import    { verifyEmail as Mutation_verifyEmail } from './../models/User/resolvers/Mutation/verifyEmail';
@@ -93,61 +87,60 @@ import    { orderStatusUpdated as Subscription_orderStatusUpdated } from './../m
 import    { settlementCreated as Subscription_settlementCreated } from './../models/Settlement/resolvers/Subscription/settlementCreated';
 import    { settlementStatusChanged as Subscription_settlementStatusChanged } from './../models/Settlement/resolvers/Subscription/settlementStatusChanged';
 import    { userOrdersUpdated as Subscription_userOrdersUpdated } from './../models/Order/resolvers/Subscription/userOrdersUpdated';
-import    { ApplicablePromotion } from './../models/PromotionV2/resolvers/ApplicablePromotion';
+import    { ApplicablePromotion } from './../models/Promotion/resolvers/ApplicablePromotion';
 import    { AuditLog } from './../models/AuditLog/resolvers/AuditLog';
 import    { AuditLogConnection } from './../models/AuditLog/resolvers/AuditLogConnection';
 import    { AuthResponse } from './../models/User/resolvers/AuthResponse';
 import    { Business } from './../models/Business/resolvers/Business';
-import    { DeliveryZone } from './../models/DeliveryZone/resolvers/DeliveryZone';
 import    { DriverConnection } from './../models/Driver/resolvers/DriverConnection';
 import    { DriverHeartbeatResult } from './../models/Driver/resolvers/DriverHeartbeatResult';
 import    { Location } from './../models/General/resolvers/Location';
 import    { Order } from './../models/Order/resolvers/Order';
 import    { OrderBusiness } from './../models/Order/resolvers/OrderBusiness';
 import    { OrderItem } from './../models/Order/resolvers/OrderItem';
+import    { OrderPromotion } from './../models/Order/resolvers/OrderPromotion';
 import    { Product } from './../models/Product/resolvers/Product';
 import    { ProductCategory } from './../models/ProductCategory/resolvers/ProductCategory';
 import    { ProductSubcategory } from './../models/ProductSubcategory/resolvers/ProductSubcategory';
-import    { PromotionAnalyticsResult } from './../models/PromotionV2/resolvers/PromotionAnalyticsResult';
-import    { PromotionResult } from './../models/PromotionV2/resolvers/PromotionResult';
-import    { PromotionUsage } from './../models/PromotionV2/resolvers/PromotionUsage';
-import    { PromotionV2 } from './../models/PromotionV2/resolvers/PromotionV2';
+import    { Promotion } from './../models/Promotion/resolvers/Promotion';
+import    { PromotionAnalyticsResult } from './../models/Promotion/resolvers/PromotionAnalyticsResult';
+import    { PromotionResult } from './../models/Promotion/resolvers/PromotionResult';
+import    { PromotionUsage } from './../models/Promotion/resolvers/PromotionUsage';
 import    { Settlement } from './../models/Settlement/resolvers/Settlement';
 import    { SettlementSummary } from './../models/Settlement/resolvers/SettlementSummary';
 import    { SignupStepResponse } from './../models/User/resolvers/SignupStepResponse';
 import    { User as User_User } from './../models/User/resolvers/User';
 import    { User as Driver_User } from './../models/Driver/resolvers/User';
 import    { UserBehavior } from './../models/User/resolvers/UserBehavior';
-import    { UserPromoMetadata } from './../models/PromotionV2/resolvers/UserPromoMetadata';
-import    { UserPromotion } from './../models/PromotionV2/resolvers/UserPromotion';
-import    { UserWallet } from './../models/PromotionV2/resolvers/UserWallet';
-import    { WalletTransaction } from './../models/PromotionV2/resolvers/WalletTransaction';
+import    { UserPromoMetadata } from './../models/Promotion/resolvers/UserPromoMetadata';
+import    { UserPromotion } from './../models/Promotion/resolvers/UserPromotion';
+import    { UserWallet } from './../models/Promotion/resolvers/UserWallet';
+import    { WalletTransaction } from './../models/Promotion/resolvers/WalletTransaction';
 import    { WorkingHours } from './../models/General/resolvers/WorkingHours';
-import    { ZoneFeeResult } from './../models/DeliveryZone/resolvers/ZoneFeeResult';
 import    { DateResolver,DateTimeResolver,JSONResolver } from 'graphql-scalars';
     export const resolvers: Resolvers = {
-      Query: { auditLog: Query_auditLog,auditLogs: Query_auditLogs,business: Query_business,businessBalance: Query_businessBalance,businesses: Query_businesses,calculateDeliveryFee: Query_calculateDeliveryFee,deliveryZone: Query_deliveryZone,deliveryZones: Query_deliveryZones,driverBalance: Query_driverBalance,drivers: Query_drivers,getAllPromotionsV2: Query_getAllPromotionsV2,getApplicablePromotionsV2: Query_getApplicablePromotionsV2,getPromotionAnalytics: Query_getPromotionAnalytics,getPromotionUsage: Query_getPromotionUsage,getPromotionV2: Query_getPromotionV2,getUserPromoMetadata: Query_getUserPromoMetadata,getUserPromotions: Query_getUserPromotions,getUserWallet: Query_getUserWallet,getWalletTransactions: Query_getWalletTransactions,me: Query_me,myBehavior: Query_myBehavior,order: Query_order,orders: Query_orders,ordersByStatus: Query_ordersByStatus,product: Query_product,productCategories: Query_productCategories,productCategory: Query_productCategory,productSubcategories: Query_productSubcategories,productSubcategoriesByBusiness: Query_productSubcategoriesByBusiness,products: Query_products,settlementSummary: Query_settlementSummary,settlements: Query_settlements,uncompletedOrders: Query_uncompletedOrders,userBehavior: Query_userBehavior,users: Query_users,validatePromotionsV2: Query_validatePromotionsV2 },
-      Mutation: { addWalletCredit: Mutation_addWalletCredit,adminSetDriverConnectionStatus: Mutation_adminSetDriverConnectionStatus,adminUpdateDriverLocation: Mutation_adminUpdateDriverLocation,assignDriverToOrder: Mutation_assignDriverToOrder,assignPromotionToUsers: Mutation_assignPromotionToUsers,backfillSettlementsForDeliveredOrders: Mutation_backfillSettlementsForDeliveredOrders,cancelOrder: Mutation_cancelOrder,createBusiness: Mutation_createBusiness,createDeliveryZone: Mutation_createDeliveryZone,createOrder: Mutation_createOrder,createProduct: Mutation_createProduct,createProductCategory: Mutation_createProductCategory,createProductSubcategory: Mutation_createProductSubcategory,createPromotionV2: Mutation_createPromotionV2,createUser: Mutation_createUser,deductWalletCredit: Mutation_deductWalletCredit,deleteBusiness: Mutation_deleteBusiness,deleteDeliveryZone: Mutation_deleteDeliveryZone,deleteProduct: Mutation_deleteProduct,deleteProductCategory: Mutation_deleteProductCategory,deleteProductSubcategory: Mutation_deleteProductSubcategory,deletePromotionV2: Mutation_deletePromotionV2,deleteUser: Mutation_deleteUser,driverHeartbeat: Mutation_driverHeartbeat,initiateSignup: Mutation_initiateSignup,login: Mutation_login,markFirstOrderUsed: Mutation_markFirstOrderUsed,markSettlementAsPaid: Mutation_markSettlementAsPaid,markSettlementAsPartiallyPaid: Mutation_markSettlementAsPartiallyPaid,markSettlementsAsPaid: Mutation_markSettlementsAsPaid,removeUserFromPromotion: Mutation_removeUserFromPromotion,resendEmailVerification: Mutation_resendEmailVerification,submitPhoneNumber: Mutation_submitPhoneNumber,unsettleSettlement: Mutation_unsettleSettlement,updateBusiness: Mutation_updateBusiness,updateCommissionPercentage: Mutation_updateCommissionPercentage,updateDeliveryZone: Mutation_updateDeliveryZone,updateDriverLocation: Mutation_updateDriverLocation,updateDriverOnlineStatus: Mutation_updateDriverOnlineStatus,updateOrderStatus: Mutation_updateOrderStatus,updateProduct: Mutation_updateProduct,updateProductCategory: Mutation_updateProductCategory,updateProductSubcategory: Mutation_updateProductSubcategory,updateProductsOrder: Mutation_updateProductsOrder,updatePromotionV2: Mutation_updatePromotionV2,updateUser: Mutation_updateUser,updateUserNote: Mutation_updateUserNote,verifyEmail: Mutation_verifyEmail,verifyPhone: Mutation_verifyPhone },
+      Query: { auditLog: Query_auditLog,auditLogs: Query_auditLogs,business: Query_business,businessBalance: Query_businessBalance,businesses: Query_businesses,driverBalance: Query_driverBalance,drivers: Query_drivers,getAllPromotions: Query_getAllPromotions,getApplicablePromotions: Query_getApplicablePromotions,getPromotion: Query_getPromotion,getPromotionAnalytics: Query_getPromotionAnalytics,getPromotionUsage: Query_getPromotionUsage,getUserPromoMetadata: Query_getUserPromoMetadata,getUserPromotions: Query_getUserPromotions,getUserWallet: Query_getUserWallet,getWalletTransactions: Query_getWalletTransactions,me: Query_me,myBehavior: Query_myBehavior,order: Query_order,orders: Query_orders,ordersByStatus: Query_ordersByStatus,product: Query_product,productCategories: Query_productCategories,productCategory: Query_productCategory,productSubcategories: Query_productSubcategories,productSubcategoriesByBusiness: Query_productSubcategoriesByBusiness,products: Query_products,settlementSummary: Query_settlementSummary,settlements: Query_settlements,uncompletedOrders: Query_uncompletedOrders,userBehavior: Query_userBehavior,users: Query_users,validatePromotions: Query_validatePromotions },
+      Mutation: { addWalletCredit: Mutation_addWalletCredit,adminSetDriverConnectionStatus: Mutation_adminSetDriverConnectionStatus,adminUpdateDriverLocation: Mutation_adminUpdateDriverLocation,assignDriverToOrder: Mutation_assignDriverToOrder,assignPromotionToUsers: Mutation_assignPromotionToUsers,backfillSettlementsForDeliveredOrders: Mutation_backfillSettlementsForDeliveredOrders,cancelOrder: Mutation_cancelOrder,createBusiness: Mutation_createBusiness,createOrder: Mutation_createOrder,createProduct: Mutation_createProduct,createProductCategory: Mutation_createProductCategory,createProductSubcategory: Mutation_createProductSubcategory,createPromotion: Mutation_createPromotion,createUser: Mutation_createUser,deductWalletCredit: Mutation_deductWalletCredit,deleteBusiness: Mutation_deleteBusiness,deleteProduct: Mutation_deleteProduct,deleteProductCategory: Mutation_deleteProductCategory,deleteProductSubcategory: Mutation_deleteProductSubcategory,deletePromotion: Mutation_deletePromotion,deleteUser: Mutation_deleteUser,driverHeartbeat: Mutation_driverHeartbeat,initiateSignup: Mutation_initiateSignup,login: Mutation_login,markFirstOrderUsed: Mutation_markFirstOrderUsed,markSettlementAsPaid: Mutation_markSettlementAsPaid,markSettlementAsPartiallyPaid: Mutation_markSettlementAsPartiallyPaid,markSettlementsAsPaid: Mutation_markSettlementsAsPaid,removeUserFromPromotion: Mutation_removeUserFromPromotion,resendEmailVerification: Mutation_resendEmailVerification,submitPhoneNumber: Mutation_submitPhoneNumber,unsettleSettlement: Mutation_unsettleSettlement,updateBusiness: Mutation_updateBusiness,updateCommissionPercentage: Mutation_updateCommissionPercentage,updateDriverLocation: Mutation_updateDriverLocation,updateDriverOnlineStatus: Mutation_updateDriverOnlineStatus,updateOrderStatus: Mutation_updateOrderStatus,updateProduct: Mutation_updateProduct,updateProductCategory: Mutation_updateProductCategory,updateProductSubcategory: Mutation_updateProductSubcategory,updateProductsOrder: Mutation_updateProductsOrder,updatePromotion: Mutation_updatePromotion,updateUser: Mutation_updateUser,updateUserNote: Mutation_updateUserNote,verifyEmail: Mutation_verifyEmail,verifyPhone: Mutation_verifyPhone },
       Subscription: { allOrdersUpdated: Subscription_allOrdersUpdated,auditLogCreated: Subscription_auditLogCreated,driverConnectionStatusChanged: Subscription_driverConnectionStatusChanged,driversUpdated: Subscription_driversUpdated,orderStatusUpdated: Subscription_orderStatusUpdated,settlementCreated: Subscription_settlementCreated,settlementStatusChanged: Subscription_settlementStatusChanged,userOrdersUpdated: Subscription_userOrdersUpdated },
       ApplicablePromotion: ApplicablePromotion,
 AuditLog: AuditLog,
 AuditLogConnection: AuditLogConnection,
 AuthResponse: AuthResponse,
 Business: Business,
-DeliveryZone: DeliveryZone,
 DriverConnection: DriverConnection,
 DriverHeartbeatResult: DriverHeartbeatResult,
 Location: Location,
 Order: Order,
 OrderBusiness: OrderBusiness,
 OrderItem: OrderItem,
+OrderPromotion: OrderPromotion,
 Product: Product,
 ProductCategory: ProductCategory,
 ProductSubcategory: ProductSubcategory,
+Promotion: Promotion,
 PromotionAnalyticsResult: PromotionAnalyticsResult,
 PromotionResult: PromotionResult,
 PromotionUsage: PromotionUsage,
-PromotionV2: PromotionV2,
 Settlement: Settlement,
 SettlementSummary: SettlementSummary,
 SignupStepResponse: SignupStepResponse,
@@ -158,7 +151,6 @@ UserPromotion: UserPromotion,
 UserWallet: UserWallet,
 WalletTransaction: WalletTransaction,
 WorkingHours: WorkingHours,
-ZoneFeeResult: ZoneFeeResult,
 Date: DateResolver,
 DateTime: DateTimeResolver,
 JSON: JSONResolver

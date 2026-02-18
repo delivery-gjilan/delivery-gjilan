@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useCartActions } from '@/modules/cart';
 
 interface OrderDetailsProps {
-    order: Order | null;
+    order: Partial<Order> | null;
     loading?: boolean;
 }
 

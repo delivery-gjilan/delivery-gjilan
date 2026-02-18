@@ -17,8 +17,6 @@ import { DriverRepository } from '@/repositories/DriverRepository';
 
 import { OrderRepository } from '@/repositories/OrderRepository';
 import { OrderService } from '@/services/OrderService';
-import { DeliveryZoneRepository } from '@/repositories/DeliveryZoneRepository';
-import { DeliveryZoneService } from '@/services/DeliveryZoneService';
 import { pubsub } from '@/lib/pubsub';
 import { decodeJwtToken } from '@/lib/utils/authUtils';
 import { getDriverServices, initializeDriverServices } from '@/services/driverServices.init';
@@ -83,17 +81,15 @@ export async function createContext(initialContext: YogaInitialContext): Promise
     const productRepository = new ProductRepository(db);
     const authRepository = new AuthRepository(db);
     const orderRepository = new OrderRepository();
-    const deliveryZoneRepository = new DeliveryZoneRepository(db);
 
     // Initialize services
     const businessService = new BusinessService(businessRepository);
     const productCategoryService = new ProductCategoryService(productCategoryRepository);
     const productSubcategoryService = new ProductSubcategoryService(productSubcategoryRepository, productCategoryRepository);
-    const productService = new ProductService(productRepository);
+    const productService = new ProductService(productRepository, db);
     const authService = new AuthService(authRepository);
     const driverAuthService = new DriverAuthService(authRepository, new DriverRepository(db));
     const orderService = new OrderService(orderRepository, authRepository, productRepository, pubsub);
-    const deliveryZoneService = new DeliveryZoneService(deliveryZoneRepository);
 
     // Get driver services (initialized on server startup)
     let driverService;
@@ -122,7 +118,6 @@ export async function createContext(initialContext: YogaInitialContext): Promise
         authService,
         driverAuthService,
         orderService,
-        deliveryZoneService,
         driverService,
         pubsub,
     };

@@ -33,7 +33,7 @@ export function useOrders() {
                 // Update Apollo cache
                 client.writeQuery({
                     query: GET_ORDERS,
-                    data: { orders },
+                    data: { orders } as any,
                 });
 
                 // Update Zustand store with active orders
@@ -41,7 +41,7 @@ export function useOrders() {
                     (order: any) => order.status !== 'DELIVERED' && order.status !== 'CANCELLED'
                 );
                 console.log('[useOrders] Filtered active orders:', activeOrders.length);
-                setActiveOrders(activeOrders);
+                setActiveOrders(activeOrders as unknown as any);
             }
         },
     });
@@ -53,7 +53,7 @@ export function useOrders() {
                 (order) => order.status !== 'DELIVERED' && order.status !== 'CANCELLED'
             );
             console.log('[useOrders] Query data - Total orders:', data.orders.length, 'Active:', activeOrders.length);
-            setActiveOrders(activeOrders);
+            setActiveOrders(activeOrders as unknown as any);
         }
     }, [data, setActiveOrders]);
 

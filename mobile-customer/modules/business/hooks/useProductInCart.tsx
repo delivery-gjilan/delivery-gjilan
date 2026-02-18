@@ -3,36 +3,41 @@ import { Product } from '@/gql/graphql';
 import { useCart } from '@/modules/cart/hooks/useCart';
 import { useCartActions } from '@/modules/cart/hooks/useCartActions';
 
-export function useProductInCart(product: Product) {
+export function useProductInCart(product: Partial<Product>) {
     const { items } = useCart();
     const { addItem, updateQuantity } = useCartActions();
 
+    const id = product.id ?? '';
+
     // Find the current quantity of this product in the cart
     const quantity = useMemo(() => {
-        const cartItem = items.find((item) => item.productId === product.id);
+        const cartItem = items.find((item) => item.productId === id);
         return cartItem?.quantity || 0;
-    }, [items, product.id]);
+    }, [items, id]);
 
     const addToCart = () => {
-        const price = product.isOnSale && product.salePrice ? product.salePrice : product.price;
+        if (!id) return;
+        const price = product.isOnSale && product.salePrice ? product.salePrice : (product.price ?? 0);
 
         addItem({
-            productId: product.id,
-            name: product.name,
+            productId: id,
+            name: product.name ?? 'Unknown',
             price,
             quantity: 1,
             imageUrl: product.imageUrl || undefined,
-            businessId: product.businessId,
+            businessId: product.businessId ?? '',
             originalPrice: product.isOnSale && product.salePrice ? product.price : undefined,
         });
     };
 
     const incrementQuantity = () => {
-        updateQuantity(product.id, quantity + 1);
+        if (!id) return;
+        updateQuantity(id, quantity + 1);
     };
 
     const decrementQuantity = () => {
-        updateQuantity(product.id, quantity - 1);
+        if (!id) return;
+        updateQuantity(id, quantity - 1);
     };
 
     return {

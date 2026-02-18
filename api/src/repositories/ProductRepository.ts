@@ -1,6 +1,7 @@
 import { DbType } from '@/database';
 import { DbProduct, NewDbProduct, products } from '@/database/schema/products';
 import { eq, and, inArray, asc } from 'drizzle-orm';
+import { productStocks } from '@/database/schema/productStock';
 
 export class ProductRepository {
     constructor(private db: DbType) {}
@@ -10,17 +11,39 @@ export class ProductRepository {
         return createdProduct;
     }
 
-    async findById(id: string): Promise<DbProduct | undefined> {
-        const [product] = await this.db.select().from(products).where(eq(products.id, id));
-        return product;
+    async findById(id: string): Promise<(DbProduct & { stock?: number }) | undefined> {
+        const result = await this.db.query.products.findFirst({
+            where: eq(products.id, id),
+            with: {
+                productStock: true,
+            },
+        });
+        
+        if (!result) return undefined;
+        
+        return {
+            ...result,
+            stock: result.productStock?.stock ?? 0,
+        };
     }
 
-    async findByBusinessId(businessId: string): Promise<DbProduct[]> {
-        return this.db
-            .select()
-            .from(products)
-            .where(eq(products.businessId, businessId))
-            .orderBy(asc(products.categoryId), asc(products.subcategoryId), asc(products.sortOrder));
+    async findByBusinessId(businessId: string): Promise<(DbProduct & { stock?: number })[]> {
+        const results = await this.db.query.products.findMany({
+            where: eq(products.businessId, businessId),
+            orderBy: (products, { asc }) => [
+                asc(products.categoryId),
+                asc(products.subcategoryId),
+                asc(products.sortOrder),
+            ],
+            with: {
+                productStock: true,
+            },
+        });
+
+        return results.map((p) => ({
+            ...p,
+            stock: p.productStock?.stock ?? 0,
+        }));
     }
 
     async update(id: string, data: Partial<NewDbProduct>): Promise<DbProduct | undefined> {

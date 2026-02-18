@@ -5,5 +5,5 @@ export default function OrderDetailsScreen() {
     const { orderId } = useLocalSearchParams<{ orderId: string }>();
     const { order, loading } = useOrder(orderId);
 
-    return <OrderDetails order={order} loading={loading} />;
+    return <OrderDetails order={order as any} loading={loading} />;
 }

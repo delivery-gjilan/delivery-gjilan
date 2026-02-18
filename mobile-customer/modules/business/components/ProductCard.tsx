@@ -7,18 +7,19 @@ import { useTheme } from '@/hooks/useTheme';
 import { CartControls } from './CartControls';
 
 interface ProductCardProps {
-    product: Product;
+    product: Partial<Product>;
 }
 
 export function ProductCard({ product }: ProductCardProps) {
     const theme = useTheme();
 
     const handlePress = () => {
+        if (!product.id) return;
         router.push(`/product/${product.id}`);
     };
 
-    const effectivePrice = product.isOnSale && product.salePrice ? product.salePrice : product.price;
-    const hasDiscount = product.isOnSale && product.salePrice;
+    const effectivePrice = product.isOnSale && product.salePrice ? product.salePrice : (product.price ?? 0);
+    const hasDiscount = !!(product.isOnSale && product.salePrice);
     const discountPercent = hasDiscount
         ? Math.round(((product.price - product.salePrice!) / product.price) * 100)
         : 0;

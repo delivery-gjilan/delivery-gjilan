@@ -1,0 +1,283 @@
+# Promotion System GraphQL Schema
+
+enum PromotionType {
+  FIXED_AMOUNT
+  PERCENTAGE
+  FREE_DELIVERY
+  WALLET_CREDIT
+}
+
+enum PromotionTarget {
+  ALL_USERS
+  SPECIFIC_USERS
+  FIRST_ORDER
+  CONDITIONAL
+}
+
+type Promotion {
+  id: ID!
+  name: String!
+  description: String
+  code: String
+  type: PromotionType!
+  target: PromotionTarget!
+  discountValue: Float
+  maxDiscountCap: Float
+  minOrderAmount: Float
+  spendThreshold: Float
+  thresholdReward: String
+  maxGlobalUsage: Int
+  currentGlobalUsage: Int!
+  maxUsagePerUser: Int
+  isStackable: Boolean!
+  priority: Int!
+  isActive: Boolean!
+  startsAt: String
+  endsAt: String
+  createdAt: String!
+  
+  # Analytics
+  totalUsageCount: Int!
+  totalRevenue: Float!
+  
+  # Relations
+  assignedUsers: [UserPromotion!]
+  eligibleBusinesses: [Business!]
+}
+
+type UserPromotion {
+  id: ID!
+  userId: ID!
+  promotionId: ID!
+  assignedAt: String!
+  expiresAt: String
+  usageCount: Int!
+  
+  # Relations
+  user: User
+  promotion: Promotion
+}
+
+type PromotionUsage {
+  id: ID!
+  promotionId: ID!
+  userId: ID!
+  orderId: ID!
+  orderSubtotal: Float!
+  discountAmount: Float!
+  freeDeliveryApplied: Boolean!
+  businessId: ID
+  usedAt: String!
+  
+  # Relations
+  promotion: Promotion
+  user: User
+  order: Order
+}
+
+type ApplicablePromotion {
+  id: ID!
+  name: String!
+  description: String
+  code: String
+  type: PromotionType!
+  target: PromotionTarget!
+  appliedAmount: Float!
+  freeDelivery: Boolean!
+  priority: Int!
+}
+
+type PromotionResult {
+  promotions: [ApplicablePromotion!]!
+  totalDiscount: Float!
+  freeDeliveryApplied: Boolean!
+  finalSubtotal: Float!
+  finalDeliveryPrice: Float!
+  finalTotal: Float!
+}
+
+type UserWallet {
+  id: ID!
+  userId: ID!
+  balance: Float!
+  createdAt: String!
+  updatedAt: String!
+  
+  # Relations
+  transactions: [WalletTransaction!]
+}
+
+type WalletTransaction {
+  id: ID!
+  walletId: ID!
+  type: String!
+  amount: Float!
+  balanceBefore: Float!
+  balanceAfter: Float!
+  orderId: ID
+  description: String
+  createdAt: String!
+  
+  # Relations
+  wallet: UserWallet
+}
+
+type UserPromoMetadata {
+  userId: ID!
+  hasUsedFirstOrderPromo: Boolean!
+  totalSavings: Float!
+  totalPromosUsed: Int!
+  lastPromoUsedAt: String
+  
+  # Relations
+  user: User
+}
+
+# ============================================
+# INPUTS
+# ============================================
+
+input CreatePromotionInput {
+  name: String!
+  description: String
+  code: String
+  type: PromotionType!
+  target: PromotionTarget!
+  discountValue: Float
+  maxDiscountCap: Float
+  minOrderAmount: Float
+  spendThreshold: Float
+  thresholdReward: String
+  maxGlobalUsage: Int
+  maxUsagePerUser: Int
+  isStackable: Boolean!
+  priority: Int!
+  isActive: Boolean!
+  startsAt: String
+  endsAt: String
+  
+  # Optional: Assign to specific users
+  targetUserIds: [ID!]
+  
+  # Optional: Restrict to specific businesses
+  eligibleBusinessIds: [ID!]
+}
+
+input UpdatePromotionInput {
+  id: ID!
+  name: String
+  description: String
+  code: String
+  type: PromotionType
+  discountValue: Float
+  maxDiscountCap: Float
+  minOrderAmount: Float
+  spendThreshold: Float
+  thresholdReward: String
+  maxGlobalUsage: Int
+  maxUsagePerUser: Int
+  isStackable: Boolean
+  priority: Int
+  isActive: Boolean
+  startsAt: String
+  endsAt: String
+}
+
+input AssignPromotionToUserInput {
+  promotionId: ID!
+  userIds: [ID!]!
+  expiresAt: String
+}
+
+input CartContextInput {
+  items: [CartItemInput!]!
+  subtotal: Float!
+  deliveryPrice: Float!
+  businessIds: [ID!]!
+}
+
+input CartItemInput {
+  productId: ID!
+  businessId: ID!
+  quantity: Int!
+  price: Float!
+}
+
+input AddWalletCreditInput {
+  userId: ID!
+  amount: Float!
+  type: String!
+  description: String
+}
+
+# ============================================
+# QUERIES
+# ============================================
+
+type Query {
+  # Get all promotions (admin)
+  getAllPromotions(isActive: Boolean): [Promotion!]!
+  
+  # Get single promotion
+  getPromotion(id: ID!): Promotion
+  
+  # Get applicable promotions for user's cart
+  getApplicablePromotions(cart: CartContextInput!, manualCode: String): [ApplicablePromotion!]!
+  
+  # Validate and apply promotions (returns final prices)
+  validatePromotions(cart: CartContextInput!, manualCode: String): PromotionResult!
+  
+  # Get user's assigned promotions
+  getUserPromotions(userId: ID!): [UserPromotion!]!
+  
+  # Get promotion usage history
+  getPromotionUsage(promotionId: ID!): [PromotionUsage!]!
+  
+  # Get user's promo metadata (first order status, savings)
+  getUserPromoMetadata(userId: ID!): UserPromoMetadata
+  
+  # Wallet queries
+  getUserWallet(userId: ID!): UserWallet
+  getWalletTransactions(userId: ID!): [WalletTransaction!]!
+  
+  # Analytics
+  getPromotionAnalytics(promotionId: ID!): PromotionAnalyticsResult!
+}
+
+type PromotionAnalyticsResult {
+  promotion: Promotion!
+  totalUsageCount: Int!
+  totalRevenue: Float!
+  totalDiscountGiven: Float!
+  uniqueUsers: Int!
+  averageOrderValue: Float!
+  conversionRate: Float
+}
+
+# ============================================
+# MUTATIONS
+# ============================================
+
+type Mutation {
+  # Create new promotion
+  createPromotion(input: CreatePromotionInput!): Promotion!
+  
+  # Update promotion
+  updatePromotion(input: UpdatePromotionInput!): Promotion!
+  
+  # Delete (deactivate) promotion
+  deletePromotion(id: ID!): Boolean!
+  
+  # Assign promotion to specific users
+  assignPromotionToUsers(input: AssignPromotionToUserInput!): [UserPromotion!]!
+  
+  # Remove user assignment
+  removeUserFromPromotion(promotionId: ID!, userId: ID!): Boolean!
+  
+  # Wallet mutations
+  addWalletCredit(input: AddWalletCreditInput!): WalletTransaction!
+  deductWalletCredit(userId: ID!, amount: Float!, orderId: ID!): WalletTransaction!
+  
+  # Mark first order used (called after order created)
+  markFirstOrderUsed(userId: ID!): UserPromoMetadata!
+}

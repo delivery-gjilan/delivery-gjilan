@@ -9,7 +9,7 @@ import { useProductActions } from '../hooks/useProductActions';
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 interface ProductActionsProps {
-    product: Product;
+    product: Partial<Product>;
 }
 
 export function ProductActions({ product }: ProductActionsProps) {

@@ -5,7 +5,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { ProductCard } from './ProductCard';
 import { Product } from '@/gql/graphql';
 
-export function ProductsList({ products }: { products: Product[] }) {
+export function ProductsList({ products }: { products: Partial<Product>[] }) {
     const theme = useTheme();
 
     if (products.length === 0) {

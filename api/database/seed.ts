@@ -3,6 +3,7 @@ import { businesses, NewDbBusiness } from './schema/businesses';
 import { productCategories, NewDbProductCategory } from './schema/productCategories';
 import { productSubcategories, NewDbProductSubcategory } from './schema/productSubcategories';
 import { products, NewDbProduct } from './schema/products';
+import { productStocks, NewDbProductStock } from './schema/productStock';
 import { orders, NewDbOrder } from './schema/orders';
 import { orderItems, NewDbOrderItem } from './schema/orderItems';
 import { users } from './schema/users';
@@ -347,6 +348,14 @@ async function seed() {
                     salePrice: isOnSale ? productData.price * 0.85 : null,
                 };
                 const [createdProduct] = await db.insert(products).values(product).returning();
+                
+                // Create stock entry for the product
+                const stock = Math.floor(Math.random() * 90) + 10; // Random stock between 10-100
+                await db.insert(productStocks).values({
+                    productId: createdProduct.id,
+                    stock,
+                });
+                
                 businessProducts.push({
                     id: createdProduct.id,
                     name: createdProduct.name,
@@ -418,6 +427,14 @@ async function seed() {
                         salePrice: isOnSale ? productData.price * 0.85 : null,
                     };
                     const [createdProduct] = await db.insert(products).values(product).returning();
+                    
+                    // Create stock entry for the product
+                    const stock = Math.floor(Math.random() * 90) + 10; // Random stock between 10-100
+                    await db.insert(productStocks).values({
+                        productId: createdProduct.id,
+                        stock,
+                    });
+                    
                     businessProducts.push({
                         id: createdProduct.id,
                         name: createdProduct.name,

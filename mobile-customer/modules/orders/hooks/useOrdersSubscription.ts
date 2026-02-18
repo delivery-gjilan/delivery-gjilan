@@ -32,7 +32,7 @@ export function useOrdersSubscription() {
     useEffect(() => {
         if (data?.userOrdersUpdated) {
             // Update each order in the store
-            setActiveOrders(data.userOrdersUpdated);
+            setActiveOrders(data.userOrdersUpdated as unknown as any);
         }
     }, [data, setActiveOrders]);
 

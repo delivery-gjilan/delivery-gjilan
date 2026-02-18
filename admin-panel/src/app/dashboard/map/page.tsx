@@ -5,7 +5,6 @@ import { useQuery, useSubscription, useMutation } from "@apollo/client/react";
 import Map, { Marker, Source, Layer } from "react-map-gl/mapbox";
 import { MapPin, X, Filter, TrendingUp, Users, Clock, DollarSign, Package, Navigation, Phone, User, Store, Calendar, AlertCircle, Wifi, WifiOff, Signal, SignalLow, SignalZero } from "lucide-react";
 import { GET_BUSINESSES } from "@/graphql/operations/businesses/queries";
-import { GET_DELIVERY_ZONES } from "@/graphql/operations/deliveryZones/queries";
 import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
 import { DRIVERS_UPDATED_SUBSCRIPTION } from "@/graphql/operations/users/subscriptions";
 import { GET_ORDERS } from "@/graphql/operations/orders/queries";
@@ -145,7 +144,6 @@ type DriverMotionTarget = {
 
 export default function MapPage() {
   const { data: businessesData } = useQuery<any>(GET_BUSINESSES);
-  const { data: zonesData } = useQuery<any>(GET_DELIVERY_ZONES);
   const { data: driversData } = useQuery<any>(DRIVERS_QUERY, { fetchPolicy: 'cache-and-network' });
   const { data: driversSubscriptionData } = useSubscription<any>(DRIVERS_UPDATED_SUBSCRIPTION);
   const { data: subscriptionData } = useSubscription<any>(ALL_ORDERS_SUBSCRIPTION);
@@ -190,7 +188,6 @@ export default function MapPage() {
   const orders = useMemo(() => subscriptionData?.allOrdersUpdated ?? ordersData?.orders ?? [], [subscriptionData, ordersData]);
   const drivers = useMemo(() => driversSubscriptionData?.driversUpdated ?? driversData?.drivers ?? [], [driversSubscriptionData, driversData]);
   const businesses = useMemo(() => businessesData?.businesses ?? [], [businessesData]);
-  const zones = useMemo(() => zonesData?.deliveryZones ?? [], [zonesData]);
 
   const activeOrders = useMemo(
     () => orders.filter((order: any) => order.status !== "DELIVERED" && order.status !== "CANCELLED"),
@@ -1137,20 +1134,6 @@ export default function MapPage() {
                 <Layer id={`driver-to-business-line-${order.id}`} type="line" paint={{ "line-color": "#60a5fa", "line-width": 4, "line-opacity": 0.8, "line-dasharray": [2, 2] }} layout={{ "line-cap": "round", "line-join": "round" }} />
               </Source>
             );
-          })}
-
-          {/* Delivery zones */}
-          {zones.map((zone: any) => {
-            try {
-              const geom = JSON.parse(zone.geometry);
-              return (
-                <Source key={`zone-${zone.id}`} id={`zone-${zone.id}`} type="geojson" data={{ type: "Feature", properties: {}, geometry: geom }}>
-                  <Layer id={`zone-fill-${zone.id}`} type="fill" paint={{ "fill-color": zone.color || "#3b82f6", "fill-opacity": 0.08 }} />
-                </Source>
-              );
-            } catch {
-              return null;
-            }
           })}
 
           {/* Order markers */}

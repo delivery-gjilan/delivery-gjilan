@@ -7,6 +7,8 @@ import {
     products as productsTable,
     businesses as businessesTable,
     userBehaviors as userBehaviorsTable,
+    productStocks as productStocksTable,
+    orderPromotions as orderPromotionsTable,
 } from '@/database/schema';
 import { userPromoMetadata } from '@/database/schema';
 import { eq, inArray, sql } from 'drizzle-orm';
@@ -14,7 +16,7 @@ import type { Order, OrderBusiness, OrderItem, OrderStatus, CreateOrderInput } f
 import type { DbOrder } from '@/database/schema/orders';
 import { PubSub, publish, subscribe, topics } from '@/lib/pubsub';
 import { GraphQLError } from 'graphql';
-import { PromotionEngineV2 } from '@/services/PromotionEngineV2';
+import { PromotionEngine } from '@/services/PromotionEngine';
 
 export class OrderService {
     public orderRepository: OrderRepository; // Made public for resolver access
@@ -77,8 +79,8 @@ export class OrderService {
         }
 
         console.log('prices,', calculatedItemsTotal, input.deliveryPrice);
-        // 3. Apply PromotionEngineV2 (server-side validation)
-        const promotionEngine = new PromotionEngineV2(await getDB());
+        // 3. Apply PromotionEngine (server-side validation)
+        const promotionEngine = new PromotionEngine(await getDB());
         const cartContext = {
             items: cartItems,
             subtotal: calculatedItemsTotal,
@@ -109,6 +111,8 @@ export class OrderService {
             price: effectiveOrderPrice,
             userId,
             deliveryPrice: effectiveDeliveryPrice,
+            originalPrice: calculatedItemsTotal !== effectiveOrderPrice ? calculatedItemsTotal : undefined,
+            originalDeliveryPrice: input.deliveryPrice !== effectiveDeliveryPrice ? input.deliveryPrice : undefined,
             status: 'PENDING' as const,
             dropoffLat: input.dropOffLocation.latitude,
             dropoffLng: input.dropOffLocation.longitude,
@@ -140,6 +144,24 @@ export class OrderService {
                 orderBusinessId,
             );
 
+            // Store promotions in orderPromotions table
+            const db = await getDB();
+            for (const promo of promoResult.promotions) {
+                const appliesTo = promo.target === 'FIRST_ORDER' || promo.target === 'DISCOUNT' ? 'PRICE' : 'DELIVERY';
+                const discountAmount = promo.target === 'FIRST_ORDER' || promo.target === 'DISCOUNT'
+                    ? promoResult.totalDiscount
+                    : promoResult.freeDeliveryApplied ? effectiveDeliveryPrice : 0;
+
+                if (discountAmount > 0) {
+                    await db.insert(orderPromotionsTable).values({
+                        orderId: createdOrder.id,
+                        promotionId: promo.id,
+                        appliesTo,
+                        discountAmount,
+                    }).onConflictDoNothing();
+                }
+            }
+
             const hasFirstOrderPromo = promoResult.promotions.some((promo) => promo.target === 'FIRST_ORDER');
             if (hasFirstOrderPromo) {
                 await promotionEngine.markFirstOrderUsed(userId);
@@ -149,10 +171,23 @@ export class OrderService {
         // Decrement stock for ordered products (ensure it doesn't go below 0)
         const db = await getDB();
         for (const item of itemsToCreate) {
-            await db
-                .update(productsTable)
-                .set({ stock: sql`GREATEST(0, ${productsTable.stock} - ${item.quantity})` })
-                .where(eq(productsTable.id, item.productId));
+            // Check if productStock entry exists
+            const existingStock = await db.select().from(productStocksTable)
+                .where(eq(productStocksTable.productId, item.productId))
+                .then(rows => rows[0]);
+
+            if (existingStock) {
+                // Update existing stock
+                await db.update(productStocksTable)
+                    .set({ stock: sql`GREATEST(0, ${productStocksTable.stock} - ${item.quantity})` })
+                    .where(eq(productStocksTable.productId, item.productId));
+            } else {
+                // Create stock entry (assume starting at 0 and going negative if oversold)
+                await db.insert(productStocksTable).values({
+                    productId: item.productId,
+                    stock: Math.max(0, 0 - item.quantity),
+                }).onConflictDoNothing();
+            }
         }
 
         return this.mapToOrder(createdOrder);
@@ -188,7 +223,12 @@ export class OrderService {
                 businessMap.set(product.businessId, []);
             }
 
-            const originalStock = Math.max(0, product.stock + item.quantity);
+            // Fetch stock from separate productStocks table
+            const stockRecord = await db.select().from(productStocksTable)
+                .where(eq(productStocksTable.productId, product.id))
+                .then(rows => rows[0]);
+            const currentStock = stockRecord?.stock ?? 0;
+            const originalStock = Math.max(0, currentStock + item.quantity);
             businessMap.get(product.businessId)!.push({
                 productId: item.productId,
                 name: product.name,
@@ -341,10 +381,22 @@ export class OrderService {
 
         // Restore stock for cancelled order items
         for (const item of items) {
-            await db
-                .update(productsTable)
-                .set({ stock: sql`${productsTable.stock} + ${item.quantity}` })
-                .where(eq(productsTable.id, item.productId));
+            const existingStock = await db.select().from(productStocksTable)
+                .where(eq(productStocksTable.productId, item.productId))
+                .then(rows => rows[0]);
+
+            if (existingStock) {
+                // Update existing stock entry
+                await db.update(productStocksTable)
+                    .set({ stock: sql`${productStocksTable.stock} + ${item.quantity}` })
+                    .where(eq(productStocksTable.productId, item.productId));
+            } else {
+                // Create stock entry with restored quantity
+                await db.insert(productStocksTable).values({
+                    productId: item.productId,
+                    stock: item.quantity,
+                }).onConflictDoNothing();
+            }
         }
 
         const order = await this.updateOrderStatus(id, 'CANCELLED');

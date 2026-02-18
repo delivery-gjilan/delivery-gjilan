@@ -74,7 +74,7 @@ export function useAuthInitialization() {
 
         // Successfully fetched user data
         if (data?.me) {
-            setUser(data.me);
+            setUser(data.me as any);
 
             // Redirect based on signup completion status
             if (data.me.signupStep === SignupStep.Completed) {
