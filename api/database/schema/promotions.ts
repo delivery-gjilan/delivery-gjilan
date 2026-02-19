@@ -32,6 +32,8 @@ export const walletTransactionTypeEnum = pgEnum('wallet_transaction_type', [
 
 // ==================== PROMOTIONS ====================
 
+// Use the canonical `promotions` table name in the database.
+// This file defines the `promotions` table shape used throughout the codebase.
 export const promotions = pgTable('promotions', {
     id: uuid('id').primaryKey().defaultRandom().notNull(),
     

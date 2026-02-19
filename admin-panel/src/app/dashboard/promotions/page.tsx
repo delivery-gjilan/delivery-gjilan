@@ -8,9 +8,9 @@ import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import { Table, Th, Td } from "@/components/ui/Table";
-import { GET_PROMOTIONS_V2 } from "@/graphql/operations/promotions/queries";
-import { CREATE_PROMOTION_V2, UPDATE_PROMOTION_V2, DELETE_PROMOTION_V2 } from "@/graphql/operations/promotions/mutations";
-import type { PromotionTypeV2, PromotionTarget, GetPromotionsV2Query } from "@/gql/graphql";
+import { GET_PROMOTIONS } from "@/graphql/operations/promotions/queries";
+import { CREATE_PROMOTION, UPDATE_PROMOTION, DELETE_PROMOTION } from "@/graphql/operations/promotions/mutations";
+import type { PromotionType, PromotionTarget, GetPromotionsQuery } from "@/gql/graphql";
 
 const promotionTypeLabels: Record<PromotionTypeV2, string> = {
     FIXED_AMOUNT: "Fixed amount",
@@ -86,24 +86,24 @@ const toOptionalNumber = (value: string) => {
 };
 
 export default function PromotionsPage() {
-    const { data, loading, error, refetch } = useQuery<GetPromotionsV2Query>(GET_PROMOTIONS_V2);
-    const [createPromotion, { loading: creating }] = useMutation(CREATE_PROMOTION_V2, {
+    const { data, loading, error, refetch } = useQuery<GetPromotionsQuery>(GET_PROMOTIONS);
+    const [createPromotion, { loading: creating }] = useMutation(CREATE_PROMOTION, {
         onCompleted: () => refetch(),
     });
-    const [updatePromotion, { loading: updating }] = useMutation(UPDATE_PROMOTION_V2, {
+    const [updatePromotion, { loading: updating }] = useMutation(UPDATE_PROMOTION, {
         onCompleted: () => refetch(),
     });
-    const [deletePromotion, { loading: deleting }] = useMutation(DELETE_PROMOTION_V2, {
+    const [deletePromotion, { loading: deleting }] = useMutation(DELETE_PROMOTION, {
         onCompleted: () => refetch(),
     });
 
     const [showModal, setShowModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [editingPromotion, setEditingPromotion] = useState<GetPromotionsV2Query["getAllPromotionsV2"][number] | null>(null);
-    const [promotionToDelete, setPromotionToDelete] = useState<GetPromotionsV2Query["getAllPromotionsV2"][number] | null>(null);
+    const [editingPromotion, setEditingPromotion] = useState<GetPromotionsQuery["getAllPromotions"][number] | null>(null);
+    const [promotionToDelete, setPromotionToDelete] = useState<GetPromotionsQuery["getAllPromotions"][number] | null>(null);
     const [formData, setFormData] = useState<PromotionFormState>(emptyForm);
 
-    const promotions = useMemo(() => data?.getAllPromotionsV2 ?? [], [data?.getAllPromotionsV2]);
+    const promotions = useMemo(() => data?.getAllPromotions ?? [], [data?.getAllPromotions]);
 
     const handleOpenCreate = () => {
         setEditingPromotion(null);

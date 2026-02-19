@@ -7,6 +7,7 @@ import { productStocks, NewDbProductStock } from './schema/productStock';
 import { orders, NewDbOrder } from './schema/orders';
 import { orderItems, NewDbOrderItem } from './schema/orderItems';
 import { users } from './schema/users';
+import { promotions, userPromotions, promotionBusinessEligibility, userPromoMetadata } from './schema/promotions';
 import { hashPassword } from '@/lib/utils/authUtils';
 import { OrderStatus } from '@/generated/types.generated';
 
@@ -451,6 +452,125 @@ async function seed() {
             name: createdBusiness.name,
             products: businessProducts,
         });
+    }
+
+    // ------------------------------
+    // Seed promotions (compatible with `promotions` schema)
+    // ------------------------------
+    try {
+        const [exampleBusiness] = await db.select().from(businesses).limit(1).returning();
+        const businessId = exampleBusiness?.id ?? null;
+
+        // First-order auto-applied free delivery promo (no code)
+        const [firstOrderPromo] = await db.insert(promotions).values({
+            code: null,
+            name: 'First Order Free Delivery',
+            description: 'Free delivery for users on their first order (auto-applied)',
+            type: 'FREE_DELIVERY',
+            target: 'FIRST_ORDER',
+            discount_value: null,
+            max_discount_cap: null,
+            min_order_amount: 0,
+            spend_threshold: null,
+            threshold_reward: null,
+            max_global_usage: null,
+            max_usage_per_user: 1,
+            current_global_usage: 0,
+            is_stackable: false,
+            priority: 100,
+            is_active: true,
+        }).returning();
+
+        // Global percentage promo
+        const [percentagePromo] = await db.insert(promotions).values({
+            code: 'WELCOME20',
+            name: 'Welcome 20% Off',
+            description: '20% off your order (up to 50€)',
+            type: 'PERCENTAGE',
+            target: 'ALL_USERS',
+            discount_value: 20.0,
+            max_discount_cap: 50.0,
+            min_order_amount: 0,
+            spend_threshold: null,
+            threshold_reward: null,
+            max_global_usage: 10000,
+            max_usage_per_user: 1,
+            current_global_usage: 0,
+            is_stackable: false,
+            priority: 50,
+            is_active: true,
+        }).returning();
+
+        // Fixed discount promo
+        const [fixedPromo] = await db.insert(promotions).values({
+            code: 'EURO3OFF',
+            name: '3€ Off',
+            description: 'Flat 3€ off on orders over 10€',
+            type: 'FIXED_AMOUNT',
+            target: 'ALL_USERS',
+            discount_value: 3.0,
+            max_discount_cap: null,
+            min_order_amount: 10.0,
+            spend_threshold: null,
+            threshold_reward: null,
+            max_global_usage: 5000,
+            max_usage_per_user: 3,
+            current_global_usage: 0,
+            is_stackable: true,
+            priority: 40,
+            is_active: true,
+        }).returning();
+
+        // Business-specific promo if a business exists
+        if (businessId) {
+            const [bizPromo] = await db.insert(promotions).values({
+                code: 'BIZ10',
+                name: 'Business 10% Off',
+                description: '10% off for a specific business',
+                type: 'PERCENTAGE',
+                target: 'CONDITIONAL',
+                discount_value: 10.0,
+                max_discount_cap: 20.0,
+                min_order_amount: 0,
+                spend_threshold: null,
+                threshold_reward: null,
+                max_global_usage: 2000,
+                max_usage_per_user: 2,
+                current_global_usage: 0,
+                is_stackable: false,
+                priority: 60,
+                is_active: true,
+            }).returning();
+
+            await db.insert(promotionBusinessEligibility).values({
+                promotion_id: bizPromo.id,
+                business_id: businessId,
+            }).onConflictDoNothing();
+        }
+
+        // Assign an example promo to a sample user if present
+        const sampleUser = (await db.select().from(users).limit(1)).at(0);
+        if (sampleUser) {
+            await db.insert(userPromotions).values({
+                user_id: sampleUser.id,
+                promotion_id: fixedPromo.id,
+                assigned_by: sampleUser.id,
+                expires_at: null,
+                usage_count: 0,
+                is_active: true,
+            }).onConflictDoNothing();
+
+            await db.insert(userPromoMetadata).values({
+                user_id: sampleUser.id,
+                has_used_first_order_promo: false,
+                total_promotions_used: 0,
+                total_savings: 0,
+            }).onConflictDoNothing();
+        }
+
+        console.log('[SEED] Promotions seeded.');
+    } catch (err) {
+        console.warn('[SEED] Promotions seed skipped or error:', err);
     }
 
     console.log('\n✅ Database seeded successfully!');

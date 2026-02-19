@@ -1,5 +1,5 @@
 {
-  "id": "0dafb8fc-2701-4722-bff9-09b1dfacd877",
+  "id": "ebca68ba-ff62-4401-8661-284a0a90c6a9",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1243,10 +1243,10 @@
         }
       },
       "foreignKeys": {
-        "promotion_business_eligibility_promotion_id_promotions_v2_id_fk": {
-          "name": "promotion_business_eligibility_promotion_id_promotions_v2_id_fk",
+        "promotion_business_eligibility_promotion_id_promotions_id_fk": {
+          "name": "promotion_business_eligibility_promotion_id_promotions_id_fk",
           "tableFrom": "promotion_business_eligibility",
-          "tableTo": "promotions_v2",
+          "tableTo": "promotions",
           "columnsFrom": [
             "promotion_id"
           ],
@@ -1386,10 +1386,10 @@
         }
       },
       "foreignKeys": {
-        "promotion_usage_promotion_id_promotions_v2_id_fk": {
-          "name": "promotion_usage_promotion_id_promotions_v2_id_fk",
+        "promotion_usage_promotion_id_promotions_id_fk": {
+          "name": "promotion_usage_promotion_id_promotions_id_fk",
           "tableFrom": "promotion_usage",
-          "tableTo": "promotions_v2",
+          "tableTo": "promotions",
           "columnsFrom": [
             "promotion_id"
           ],
@@ -1445,8 +1445,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.promotions_v2": {
-      "name": "promotions_v2",
+    "public.promotions": {
+      "name": "promotions",
       "schema": "",
       "columns": {
         "id": {
@@ -1476,7 +1476,7 @@
         },
         "type": {
           "name": "type",
-          "type": "promotion_type_v2",
+          "type": "promotion_type",
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
@@ -1606,8 +1606,8 @@
         }
       },
       "indexes": {
-        "idx_promotions_v2_code": {
-          "name": "idx_promotions_v2_code",
+        "idx_promotions_code": {
+          "name": "idx_promotions_code",
           "columns": [
             {
               "expression": "code",
@@ -1621,8 +1621,8 @@
           "method": "btree",
           "with": {}
         },
-        "idx_promotions_v2_active": {
-          "name": "idx_promotions_v2_active",
+        "idx_promotions_active": {
+          "name": "idx_promotions_active",
           "columns": [
             {
               "expression": "is_active",
@@ -1642,8 +1642,8 @@
           "method": "btree",
           "with": {}
         },
-        "idx_promotions_v2_target": {
-          "name": "idx_promotions_v2_target",
+        "idx_promotions_target": {
+          "name": "idx_promotions_target",
           "columns": [
             {
               "expression": "target",
@@ -1659,9 +1659,9 @@
         }
       },
       "foreignKeys": {
-        "promotions_v2_created_by_users_id_fk": {
-          "name": "promotions_v2_created_by_users_id_fk",
-          "tableFrom": "promotions_v2",
+        "promotions_created_by_users_id_fk": {
+          "name": "promotions_created_by_users_id_fk",
+          "tableFrom": "promotions",
           "tableTo": "users",
           "columnsFrom": [
             "created_by"
@@ -1675,8 +1675,8 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "promotions_v2_code_unique": {
-          "name": "promotions_v2_code_unique",
+        "promotions_code_unique": {
+          "name": "promotions_code_unique",
           "nullsNotDistinct": false,
           "columns": [
             "code"
@@ -1922,10 +1922,10 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "user_promotions_promotion_id_promotions_v2_id_fk": {
-          "name": "user_promotions_promotion_id_promotions_v2_id_fk",
+        "user_promotions_promotion_id_promotions_id_fk": {
+          "name": "user_promotions_promotion_id_promotions_id_fk",
           "tableFrom": "user_promotions",
-          "tableTo": "promotions_v2",
+          "tableTo": "promotions",
           "columnsFrom": [
             "promotion_id"
           ],
@@ -2207,10 +2207,10 @@
           "onDelete": "set null",
           "onUpdate": "no action"
         },
-        "wallet_transactions_promotion_id_promotions_v2_id_fk": {
-          "name": "wallet_transactions_promotion_id_promotions_v2_id_fk",
+        "wallet_transactions_promotion_id_promotions_id_fk": {
+          "name": "wallet_transactions_promotion_id_promotions_id_fk",
           "tableFrom": "wallet_transactions",
-          "tableTo": "promotions_v2",
+          "tableTo": "promotions",
           "columnsFrom": [
             "promotion_id"
           ],
@@ -2353,10 +2353,10 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "order_promotions_promotion_id_promotions_v2_id_fk": {
-          "name": "order_promotions_promotion_id_promotions_v2_id_fk",
+        "order_promotions_promotion_id_promotions_id_fk": {
+          "name": "order_promotions_promotion_id_promotions_id_fk",
           "tableFrom": "order_promotions",
-          "tableTo": "promotions_v2",
+          "tableTo": "promotions",
           "columnsFrom": [
             "promotion_id"
           ],
@@ -2575,217 +2575,6 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
-    },
-    "public.promotion_target_users": {
-      "name": "promotion_target_users",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "promotion_id": {
-          "name": "promotion_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "CURRENT_TIMESTAMP"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "promotion_target_users_promotion_id_promotions_id_fk": {
-          "name": "promotion_target_users_promotion_id_promotions_id_fk",
-          "tableFrom": "promotion_target_users",
-          "tableTo": "promotions",
-          "columnsFrom": [
-            "promotion_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "promotion_target_users_user_id_users_id_fk": {
-          "name": "promotion_target_users_user_id_users_id_fk",
-          "tableFrom": "promotion_target_users",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.promotions": {
-      "name": "promotions",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "code": {
-          "name": "code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "type": {
-          "name": "type",
-          "type": "promotion_type",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "value": {
-          "name": "value",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "max_redemptions": {
-          "name": "max_redemptions",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "max_redemptions_per_user": {
-          "name": "max_redemptions_per_user",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "free_delivery_count": {
-          "name": "free_delivery_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "first_order_only": {
-          "name": "first_order_only",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "is_active": {
-          "name": "is_active",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "auto_apply": {
-          "name": "auto_apply",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "starts_at": {
-          "name": "starts_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "ends_at": {
-          "name": "ends_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "referrer_user_id": {
-          "name": "referrer_user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "CURRENT_TIMESTAMP"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "CURRENT_TIMESTAMP"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "promotions_referrer_user_id_users_id_fk": {
-          "name": "promotions_referrer_user_id_users_id_fk",
-          "tableFrom": "promotions",
-          "tableTo": "users",
-          "columnsFrom": [
-            "referrer_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "promotions_code_unique": {
-          "name": "promotions_code_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "code"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -2941,8 +2730,8 @@
         "CONDITIONAL"
       ]
     },
-    "public.promotion_type_v2": {
-      "name": "promotion_type_v2",
+    "public.promotion_type": {
+      "name": "promotion_type",
       "schema": "public",
       "values": [
         "FIXED_AMOUNT",
@@ -2970,16 +2759,6 @@
       "values": [
         "PRICE",
         "DELIVERY"
-      ]
-    },
-    "public.promotion_type": {
-      "name": "promotion_type",
-      "schema": "public",
-      "values": [
-        "FIXED_DISCOUNT",
-        "PERCENT_DISCOUNT",
-        "FREE_DELIVERY",
-        "REFERRAL"
       ]
     }
   },
