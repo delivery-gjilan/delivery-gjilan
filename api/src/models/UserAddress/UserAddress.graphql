@@ -1,0 +1,37 @@
+type UserAddress {
+    id: ID!
+    userId: ID!
+    latitude: Float!
+    longitude: Float!
+    addressName: String
+    displayName: String
+    priority: Int!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+}
+
+input AddUserAddressInput {
+    latitude: Float!
+    longitude: Float!
+    addressName: String
+    displayName: String
+    priority: Int
+}
+
+input UpdateUserAddressInput {
+    id: ID!
+    addressName: String
+    displayName: String
+    priority: Int
+}
+
+type Query {
+    myAddresses: [UserAddress!]!
+}
+
+type Mutation {
+    addUserAddress(input: AddUserAddressInput!): UserAddress!
+    updateUserAddress(input: UpdateUserAddressInput!): UserAddress!
+    deleteUserAddress(id: ID!): Boolean!
+    setDefaultAddress(id: ID!): Boolean!
+}

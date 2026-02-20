@@ -87,6 +87,16 @@ type ApplicablePromotion {
   priority: Int!
 }
 
+type PromotionThreshold {
+  id: ID!
+  name: String!
+  code: String
+  spendThreshold: Float!
+  eligibleBusinessIds: [ID!]
+  priority: Int!
+  isActive: Boolean!
+}
+
 type PromotionResult {
   promotions: [ApplicablePromotion!]!
   totalDiscount: Float!
@@ -169,6 +179,7 @@ input UpdatePromotionInput {
   description: String
   code: String
   type: PromotionType
+  target: PromotionTarget
   discountValue: Float
   maxDiscountCap: Float
   minOrderAmount: Float
@@ -181,6 +192,7 @@ input UpdatePromotionInput {
   isActive: Boolean
   startsAt: String
   endsAt: String
+  eligibleBusinessIds: [ID!]
 }
 
 input AssignPromotionToUserInput {
@@ -223,6 +235,9 @@ type Query {
   
   # Get applicable promotions for user's cart
   getApplicablePromotions(cart: CartContextInput!, manualCode: String): [ApplicablePromotion!]!
+
+  # Get active conditional promotions that have spend thresholds (for progress bars)
+  getPromotionThresholds(cart: CartContextInput!): [PromotionThreshold!]!
   
   # Validate and apply promotions (returns final prices)
   validatePromotions(cart: CartContextInput!, manualCode: String): PromotionResult!

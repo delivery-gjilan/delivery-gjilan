@@ -1,5 +1,6 @@
 import { DbType } from '@/database';
 import { DbUser, users } from '@/database/schema/users';
+import { userReferrals } from '@/database/schema/referrals';
 import { SignupStep } from '@/generated/types.generated';
 import { eq } from 'drizzle-orm';
 
@@ -163,5 +164,24 @@ export class AuthRepository {
     async deleteUser(userId: string): Promise<boolean> {
         const result = await this.db.delete(users).where(eq(users.id, userId)).returning();
         return result.length > 0;
+    }
+
+    async findUserByReferralCode(referralCode: string): Promise<string | null> {
+        const [user] = await this.db
+            .select()
+            .from(users)
+            .where(eq(users.referralCode, referralCode))
+            .limit(1);
+        return user ? user.id : null;
+    }
+
+    async createReferral(referrerUserId: string, referredUserId: string, referralCode: string): Promise<void> {
+        await this.db.insert(userReferrals).values({
+            referrerUserId,
+            referredUserId,
+            referralCode,
+            status: 'PENDING',
+            rewardGiven: false,
+        });
     }
 }

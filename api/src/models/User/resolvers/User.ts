@@ -1,5 +1,5 @@
 import type { UserResolvers } from './../../../generated/types.generated';
-export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'businessId'|'driverLocation'|'driverLocationUpdatedAt'|'email'|'emailVerified'|'firstName'|'flagColor'|'id'|'imageUrl'|'isOnline'|'lastName'|'phoneNumber'|'phoneVerified'|'role'|'signupStep'|'__isTypeOf'> = {
+export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'businessId'|'driverLocation'|'driverLocationUpdatedAt'|'email'|'emailVerified'|'firstName'|'flagColor'|'id'|'imageUrl'|'isOnline'|'lastName'|'phoneNumber'|'phoneVerified'|'referralCode'|'role'|'signupStep'|'__isTypeOf'> = {
     business: async (parent, _args, { businessService }) => {
         if (!parent.businessId) {
             return null;

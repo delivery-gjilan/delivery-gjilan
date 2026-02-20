@@ -9,13 +9,25 @@ import client from '@/lib/graphql/apolloClient';
 import LoadingScreen from '@/components/LoadingScreen';
 import { FloatingBars } from '@/components/FloatingBars';
 import { useActiveOrdersTracking } from '@/hooks/useActiveOrdersTracking';
+import { useStoreStatus } from '@/hooks/useStoreStatus';
+import StoreClosedScreen from '@/components/StoreClosedScreen';
 
 // Inner component that uses Apollo Client (must be inside ApolloProvider)
 function AppContent() {
     const theme = useTheme();
+    const { isStoreClosed, closedMessage, loading: storeStatusLoading } = useStoreStatus();
 
     // Track active orders (query + subscription)
     useActiveOrdersTracking();
+
+    // Show store closed screen if store is closed
+    if (storeStatusLoading) {
+        return <LoadingScreen />;
+    }
+
+    if (isStoreClosed) {
+        return <StoreClosedScreen message={closedMessage} />;
+    }
 
     return (
         <ThemeProvider value={theme}>

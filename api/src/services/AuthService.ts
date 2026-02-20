@@ -18,11 +18,20 @@ export class AuthService {
     /**
      * Step 1: Initiate signup - Create user, generate email verification code, and return JWT token
      */
-    async initiateSignup(firstName: string, lastName: string, email: string, password: string): Promise<AuthResponse> {
+    async initiateSignup(firstName: string, lastName: string, email: string, password: string, referralCode?: string): Promise<AuthResponse> {
         // Check if user already exists
         const existingUser = await this.authRepository.findByEmail(email);
         if (existingUser) {
             throw new Error('User with this email already exists');
+        }
+
+        // If referral code provided, validate it
+        let referrerUserId: string | null = null;
+        if (referralCode) {
+            referrerUserId = await this.authRepository.findUserByReferralCode(referralCode);
+            if (!referrerUserId) {
+                throw new Error('Invalid referral code');
+            }
         }
 
         // Hash password
@@ -30,6 +39,11 @@ export class AuthService {
 
         // Create user
         const user = await this.authRepository.createUser(firstName, lastName, email, hashedPassword);
+
+        // Create referral record if referral code was provided
+        if (referrerUserId) {
+            await this.authRepository.createReferral(referrerUserId, user.id, referralCode!);
+        }
 
         // Generate and set email verification code
         const verificationCode = generateVerificationCode();

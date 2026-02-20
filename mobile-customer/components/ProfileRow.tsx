@@ -6,12 +6,13 @@ import { useTheme } from '@/hooks/useTheme';
 interface ProfileRowProps {
     title: string;
     subtitle?: string;
+    icon?: keyof typeof Ionicons.glyphMap;
     onPress?: () => void;
     showChevron?: boolean;
     showDivider?: boolean;
 }
 
-export function ProfileRow({ title, subtitle, onPress, showChevron = true, showDivider = true }: ProfileRowProps) {
+export function ProfileRow({ title, subtitle, icon, onPress, showChevron = true, showDivider = true }: ProfileRowProps) {
     const theme = useTheme();
 
     return (
@@ -27,6 +28,11 @@ export function ProfileRow({ title, subtitle, onPress, showChevron = true, showD
                     justifyContent: 'space-between',
                 }}
             >
+                {icon && (
+                    <View style={{ marginRight: 12 }}>
+                        <Ionicons name={icon} size={22} color={theme.colors.primary} />
+                    </View>
+                )}
                 <View style={{ flex: 1 }}>
                     <Text className="text-base" style={{ color: theme.colors.text }}>
                         {title}

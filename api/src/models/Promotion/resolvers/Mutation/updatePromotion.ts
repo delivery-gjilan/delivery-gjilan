@@ -1,6 +1,6 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { getDB } from '@/database';
-import { promotions } from '@/database/schema';
+import { promotions, promotionBusinessEligibility } from '@/database/schema';
 import { eq } from 'drizzle-orm';
 
 export const updatePromotion: NonNullable<MutationResolvers['updatePromotion']> = async (_parent, { input }, { userData }) => {
@@ -15,6 +15,7 @@ export const updatePromotion: NonNullable<MutationResolvers['updatePromotion']> 
   if (input.description !== undefined) updateData.description = input.description;
   if (input.code !== undefined) updateData.code = input.code?.toUpperCase() || null;
   if (input.type !== undefined) updateData.type = input.type;
+  if (input.target !== undefined) updateData.target = input.target;
   if (input.discountValue !== undefined) updateData.discountValue = input.discountValue;
   if (input.maxDiscountCap !== undefined) updateData.maxDiscountCap = input.maxDiscountCap;
   if (input.minOrderAmount !== undefined) updateData.minOrderAmount = input.minOrderAmount;
@@ -36,6 +37,24 @@ export const updatePromotion: NonNullable<MutationResolvers['updatePromotion']> 
 
   if (!promo) {
     throw new Error('Promotion not found');
+  }
+
+  // Update eligible businesses if provided
+  if (input.eligibleBusinessIds !== undefined) {
+    // Delete existing business eligibility records
+    await db
+      .delete(promotionBusinessEligibility)
+      .where(eq(promotionBusinessEligibility.promotionId, input.id));
+
+    // Insert new business eligibility records
+    if (input.eligibleBusinessIds.length > 0) {
+      await db.insert(promotionBusinessEligibility).values(
+        input.eligibleBusinessIds.map((businessId) => ({
+          promotionId: input.id,
+          businessId,
+        }))
+      );
+    }
   }
 
   // Helper to ensure ISO string format

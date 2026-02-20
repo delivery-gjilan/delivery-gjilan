@@ -30,6 +30,7 @@ export default function SignupScreen() {
     const [lastName, setLastName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [referralCode, setReferralCode] = useState('');
 
     // Step 2: Email verification
     const [emailCode, setEmailCode] = useState('');
@@ -59,12 +60,13 @@ export default function SignupScreen() {
         setError(null);
         setLoading(true);
         try {
-            await initiateSignup(email, password, firstName, lastName);
+            await initiateSignup(email, password, firstName, lastName, referralCode.trim() || undefined);
             // Clear form
             setFirstName('');
             setLastName('');
             setEmail('');
             setPassword('');
+            setReferralCode('');
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Signup failed');
         } finally {
@@ -244,6 +246,21 @@ export default function SignupScreen() {
                                 editable={!loading}
                                 secureTextEntry
                             />
+                        </View>
+
+                        <View className="mb-6">
+                            <Text className="text-gray-700 font-semibold mb-2">Referral Code (Optional)</Text>
+                            <TextInput
+                                className="border border-gray-300 rounded-lg px-4 py-3 text-gray-900"
+                                placeholder="Enter referral code if you have one"
+                                value={referralCode}
+                                onChangeText={(text) => setReferralCode(text.toUpperCase())}
+                                editable={!loading}
+                                autoCapitalize="characters"
+                            />
+                            <Text className="text-xs text-gray-500 mt-1">
+                                Get rewarded when you use a friend's referral code
+                            </Text>
                         </View>
 
                         <TouchableOpacity

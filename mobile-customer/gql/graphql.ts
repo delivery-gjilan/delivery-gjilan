@@ -71,6 +71,14 @@ export enum ActorType {
   System = 'SYSTEM'
 }
 
+export type AddUserAddressInput = {
+  addressName?: InputMaybe<Scalars['String']['input']>;
+  displayName?: InputMaybe<Scalars['String']['input']>;
+  latitude: Scalars['Float']['input'];
+  longitude: Scalars['Float']['input'];
+  priority?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type AddWalletCreditInput = {
   amount: Scalars['Float']['input'];
   description?: InputMaybe<Scalars['String']['input']>;
@@ -301,6 +309,7 @@ export type InitiateSignupInput = {
   firstName: Scalars['String']['input'];
   lastName: Scalars['String']['input'];
   password: Scalars['String']['input'];
+  referralCode?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type Location = {
@@ -323,6 +332,7 @@ export type LoginInput = {
 
 export type Mutation = {
   __typename?: 'Mutation';
+  addUserAddress: UserAddress;
   addWalletCredit: WalletTransaction;
   /** Admin mutation to manually set connection status (for testing/recovery) */
   adminSetDriverConnectionStatus: User;
@@ -345,12 +355,14 @@ export type Mutation = {
   deleteProductSubcategory: Scalars['Boolean']['output'];
   deletePromotion: Scalars['Boolean']['output'];
   deleteUser: Scalars['Boolean']['output'];
+  deleteUserAddress: Scalars['Boolean']['output'];
   /**
    * Driver heartbeat - call every 5 seconds while online.
    * Updates lastHeartbeatAt and connectionStatus to CONNECTED.
    * Location is throttled: only written if >10s since last write OR moved >5m.
    */
   driverHeartbeat: DriverHeartbeatResult;
+  generateReferralCode: Scalars['String']['output'];
   initiateSignup: AuthResponse;
   login: AuthResponse;
   markFirstOrderUsed: UserPromoMetadata;
@@ -359,6 +371,7 @@ export type Mutation = {
   markSettlementsAsPaid: Array<Settlement>;
   removeUserFromPromotion: Scalars['Boolean']['output'];
   resendEmailVerification: SignupStepResponse;
+  setDefaultAddress: Scalars['Boolean']['output'];
   submitPhoneNumber: SignupStepResponse;
   unsettleSettlement: Settlement;
   updateBusiness: Business;
@@ -371,10 +384,17 @@ export type Mutation = {
   updateProductSubcategory: ProductSubcategory;
   updateProductsOrder: Scalars['Boolean']['output'];
   updatePromotion: Promotion;
+  updateStoreStatus: StoreStatus;
   updateUser: User;
+  updateUserAddress: UserAddress;
   updateUserNote: User;
   verifyEmail: SignupStepResponse;
   verifyPhone: SignupStepResponse;
+};
+
+
+export type MutationAddUserAddressArgs = {
+  input: AddUserAddressInput;
 };
 
 
@@ -484,6 +504,11 @@ export type MutationDeleteUserArgs = {
 };
 
 
+export type MutationDeleteUserAddressArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
 export type MutationDriverHeartbeatArgs = {
   latitude: Scalars['Float']['input'];
   longitude: Scalars['Float']['input'];
@@ -524,6 +549,11 @@ export type MutationMarkSettlementsAsPaidArgs = {
 export type MutationRemoveUserFromPromotionArgs = {
   promotionId: Scalars['ID']['input'];
   userId: Scalars['ID']['input'];
+};
+
+
+export type MutationSetDefaultAddressArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -596,8 +626,18 @@ export type MutationUpdatePromotionArgs = {
 };
 
 
+export type MutationUpdateStoreStatusArgs = {
+  input: UpdateStoreStatusInput;
+};
+
+
 export type MutationUpdateUserArgs = {
   input: UpdateUserInput;
+};
+
+
+export type MutationUpdateUserAddressArgs = {
+  input: UpdateUserAddressInput;
 };
 
 
@@ -773,6 +813,17 @@ export enum PromotionTarget {
   SpecificUsers = 'SPECIFIC_USERS'
 }
 
+export type PromotionThreshold = {
+  __typename?: 'PromotionThreshold';
+  code?: Maybe<Scalars['String']['output']>;
+  eligibleBusinessIds?: Maybe<Array<Scalars['ID']['output']>>;
+  id: Scalars['ID']['output'];
+  isActive: Scalars['Boolean']['output'];
+  name: Scalars['String']['output'];
+  priority: Scalars['Int']['output'];
+  spendThreshold: Scalars['Float']['output'];
+};
+
 export enum PromotionType {
   FixedAmount = 'FIXED_AMOUNT',
   FreeDelivery = 'FREE_DELIVERY',
@@ -809,13 +860,17 @@ export type Query = {
   getApplicablePromotions: Array<ApplicablePromotion>;
   getPromotion?: Maybe<Promotion>;
   getPromotionAnalytics: PromotionAnalyticsResult;
+  getPromotionThresholds: Array<PromotionThreshold>;
   getPromotionUsage: Array<PromotionUsage>;
+  getStoreStatus: StoreStatus;
   getUserPromoMetadata?: Maybe<UserPromoMetadata>;
   getUserPromotions: Array<UserPromotion>;
   getUserWallet?: Maybe<UserWallet>;
   getWalletTransactions: Array<WalletTransaction>;
   me?: Maybe<User>;
+  myAddresses: Array<UserAddress>;
   myBehavior?: Maybe<UserBehavior>;
+  myReferralStats: ReferralStats;
   order?: Maybe<Order>;
   orders: Array<Order>;
   ordersByStatus: Array<Order>;
@@ -885,6 +940,11 @@ export type QueryGetPromotionArgs = {
 
 export type QueryGetPromotionAnalyticsArgs = {
   promotionId: Scalars['ID']['input'];
+};
+
+
+export type QueryGetPromotionThresholdsArgs = {
+  cart: CartContextInput;
 };
 
 
@@ -984,6 +1044,36 @@ export type QueryValidatePromotionsArgs = {
   manualCode?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type Referral = {
+  __typename?: 'Referral';
+  completedAt?: Maybe<Scalars['DateTime']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  id: Scalars['ID']['output'];
+  referralCode: Scalars['String']['output'];
+  referredUser?: Maybe<User>;
+  referredUserId?: Maybe<Scalars['ID']['output']>;
+  referrerUserId: Scalars['ID']['output'];
+  rewardAmount?: Maybe<Scalars['Float']['output']>;
+  rewardGiven: Scalars['Boolean']['output'];
+  status: ReferralStatus;
+};
+
+export type ReferralStats = {
+  __typename?: 'ReferralStats';
+  completedReferrals: Scalars['Int']['output'];
+  pendingReferrals: Scalars['Int']['output'];
+  referralCode: Scalars['String']['output'];
+  referrals: Array<Referral>;
+  totalReferrals: Scalars['Int']['output'];
+  totalRewardsEarned: Scalars['Float']['output'];
+};
+
+export enum ReferralStatus {
+  Completed = 'COMPLETED',
+  Expired = 'EXPIRED',
+  Pending = 'PENDING'
+}
+
 export type Settlement = {
   __typename?: 'Settlement';
   amount: Scalars['Float']['output'];
@@ -1030,6 +1120,12 @@ export type SignupStepResponse = {
   currentStep: SignupStep;
   message: Scalars['String']['output'];
   userId: Scalars['ID']['output'];
+};
+
+export type StoreStatus = {
+  __typename?: 'StoreStatus';
+  closedMessage?: Maybe<Scalars['String']['output']>;
+  isStoreClosed: Scalars['Boolean']['output'];
 };
 
 export type SubmitPhoneNumberInput = {
@@ -1124,6 +1220,7 @@ export type UpdatePromotionInput = {
   code?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   discountValue?: InputMaybe<Scalars['Float']['input']>;
+  eligibleBusinessIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   endsAt?: InputMaybe<Scalars['String']['input']>;
   id: Scalars['ID']['input'];
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
@@ -1136,8 +1233,21 @@ export type UpdatePromotionInput = {
   priority?: InputMaybe<Scalars['Int']['input']>;
   spendThreshold?: InputMaybe<Scalars['Float']['input']>;
   startsAt?: InputMaybe<Scalars['String']['input']>;
+  target?: InputMaybe<PromotionTarget>;
   thresholdReward?: InputMaybe<Scalars['String']['input']>;
   type?: InputMaybe<PromotionType>;
+};
+
+export type UpdateStoreStatusInput = {
+  closedMessage?: InputMaybe<Scalars['String']['input']>;
+  isStoreClosed: Scalars['Boolean']['input'];
+};
+
+export type UpdateUserAddressInput = {
+  addressName?: InputMaybe<Scalars['String']['input']>;
+  displayName?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['ID']['input'];
+  priority?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type UpdateUserInput = {
@@ -1168,8 +1278,22 @@ export type User = {
   lastName: Scalars['String']['output'];
   phoneNumber?: Maybe<Scalars['String']['output']>;
   phoneVerified: Scalars['Boolean']['output'];
+  referralCode?: Maybe<Scalars['String']['output']>;
   role: UserRole;
   signupStep: SignupStep;
+};
+
+export type UserAddress = {
+  __typename?: 'UserAddress';
+  addressName?: Maybe<Scalars['String']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  displayName?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  latitude: Scalars['Float']['output'];
+  longitude: Scalars['Float']['output'];
+  priority: Scalars['Int']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+  userId: Scalars['ID']['output'];
 };
 
 export type UserBehavior = {
@@ -1258,6 +1382,39 @@ export type WorkingHoursInput = {
   closesAt: Scalars['String']['input'];
   opensAt: Scalars['String']['input'];
 };
+
+export type GetMyAddressesQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetMyAddressesQuery = { __typename?: 'Query', myAddresses: Array<{ __typename?: 'UserAddress', id: string, latitude: number, longitude: number, addressName?: string | null, displayName?: string | null, priority: number, createdAt: any }> };
+
+export type AddUserAddressMutationVariables = Exact<{
+  input: AddUserAddressInput;
+}>;
+
+
+export type AddUserAddressMutation = { __typename?: 'Mutation', addUserAddress: { __typename?: 'UserAddress', id: string, latitude: number, longitude: number, addressName?: string | null, displayName?: string | null, priority: number } };
+
+export type UpdateUserAddressMutationVariables = Exact<{
+  input: UpdateUserAddressInput;
+}>;
+
+
+export type UpdateUserAddressMutation = { __typename?: 'Mutation', updateUserAddress: { __typename?: 'UserAddress', id: string, addressName?: string | null, displayName?: string | null, priority: number } };
+
+export type DeleteUserAddressMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type DeleteUserAddressMutation = { __typename?: 'Mutation', deleteUserAddress: boolean };
+
+export type SetDefaultAddressMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type SetDefaultAddressMutation = { __typename?: 'Mutation', setDefaultAddress: boolean };
 
 export type InitiateSignupMutationVariables = Exact<{
   input: InitiateSignupInput;
@@ -1412,7 +1569,34 @@ export type ValidatePromotionsQueryVariables = Exact<{
 
 export type ValidatePromotionsQuery = { __typename?: 'Query', validatePromotions: { __typename?: 'PromotionResult', totalDiscount: number, freeDeliveryApplied: boolean, finalSubtotal: number, finalDeliveryPrice: number, finalTotal: number, promotions: Array<{ __typename?: 'ApplicablePromotion', id: string, name: string, code?: string | null, type: PromotionType, target: PromotionTarget, appliedAmount: number, freeDelivery: boolean, priority: number }> } };
 
+export type GetPromotionThresholdsQueryVariables = Exact<{
+  cart: CartContextInput;
+}>;
 
+
+export type GetPromotionThresholdsQuery = { __typename?: 'Query', getPromotionThresholds: Array<{ __typename?: 'PromotionThreshold', id: string, name: string, code?: string | null, spendThreshold: number, eligibleBusinessIds?: Array<string> | null, priority: number, isActive: boolean }> };
+
+export type GetMyReferralStatsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetMyReferralStatsQuery = { __typename?: 'Query', myReferralStats: { __typename?: 'ReferralStats', totalReferrals: number, completedReferrals: number, pendingReferrals: number, totalRewardsEarned: number, referralCode: string, referrals: Array<{ __typename?: 'Referral', id: string, status: ReferralStatus, rewardGiven: boolean, rewardAmount?: number | null, completedAt?: any | null, createdAt: any, referredUser?: { __typename?: 'User', firstName: string, lastName: string } | null }> } };
+
+export type GenerateReferralCodeMutationVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GenerateReferralCodeMutation = { __typename?: 'Mutation', generateReferralCode: string };
+
+export type GetStoreStatusQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetStoreStatusQuery = { __typename?: 'Query', getStoreStatus: { __typename?: 'StoreStatus', isStoreClosed: boolean, closedMessage?: string | null } };
+
+
+export const GetMyAddressesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetMyAddresses"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"myAddresses"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"addressName"}},{"kind":"Field","name":{"kind":"Name","value":"displayName"}},{"kind":"Field","name":{"kind":"Name","value":"priority"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}}]} as unknown as DocumentNode<GetMyAddressesQuery, GetMyAddressesQueryVariables>;
+export const AddUserAddressDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"AddUserAddress"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"AddUserAddressInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"addUserAddress"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"addressName"}},{"kind":"Field","name":{"kind":"Name","value":"displayName"}},{"kind":"Field","name":{"kind":"Name","value":"priority"}}]}}]}}]} as unknown as DocumentNode<AddUserAddressMutation, AddUserAddressMutationVariables>;
+export const UpdateUserAddressDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateUserAddress"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateUserAddressInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateUserAddress"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"addressName"}},{"kind":"Field","name":{"kind":"Name","value":"displayName"}},{"kind":"Field","name":{"kind":"Name","value":"priority"}}]}}]}}]} as unknown as DocumentNode<UpdateUserAddressMutation, UpdateUserAddressMutationVariables>;
+export const DeleteUserAddressDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteUserAddress"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteUserAddress"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}]}}]} as unknown as DocumentNode<DeleteUserAddressMutation, DeleteUserAddressMutationVariables>;
+export const SetDefaultAddressDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SetDefaultAddress"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"setDefaultAddress"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}]}}]} as unknown as DocumentNode<SetDefaultAddressMutation, SetDefaultAddressMutationVariables>;
 export const InitiateSignupDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"InitiateSignup"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"InitiateSignupInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"initiateSignup"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"token"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"signupStep"}},{"kind":"Field","name":{"kind":"Name","value":"emailVerified"}},{"kind":"Field","name":{"kind":"Name","value":"phoneVerified"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}},{"kind":"Field","name":{"kind":"Name","value":"role"}}]}},{"kind":"Field","name":{"kind":"Name","value":"message"}}]}}]}}]} as unknown as DocumentNode<InitiateSignupMutation, InitiateSignupMutationVariables>;
 export const LoginDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"Login"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"LoginInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"login"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"token"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"signupStep"}},{"kind":"Field","name":{"kind":"Name","value":"emailVerified"}},{"kind":"Field","name":{"kind":"Name","value":"phoneVerified"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}},{"kind":"Field","name":{"kind":"Name","value":"role"}}]}},{"kind":"Field","name":{"kind":"Name","value":"message"}}]}}]}}]} as unknown as DocumentNode<LoginMutation, LoginMutationVariables>;
 export const MeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Me"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"me"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"signupStep"}},{"kind":"Field","name":{"kind":"Name","value":"emailVerified"}},{"kind":"Field","name":{"kind":"Name","value":"phoneVerified"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"role"}}]}}]}}]} as unknown as DocumentNode<MeQuery, MeQueryVariables>;
@@ -1436,3 +1620,7 @@ export const GetProductDocument = {"kind":"Document","definitions":[{"kind":"Ope
 export const ProductCategoriesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ProductCategories"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"productCategories"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"businessId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]} as unknown as DocumentNode<ProductCategoriesQuery, ProductCategoriesQueryVariables>;
 export const ProductSubcategoriesByBusinessDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ProductSubcategoriesByBusiness"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"productSubcategoriesByBusiness"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"businessId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"categoryId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]} as unknown as DocumentNode<ProductSubcategoriesByBusinessQuery, ProductSubcategoriesByBusinessQueryVariables>;
 export const ValidatePromotionsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ValidatePromotions"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"cart"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CartContextInput"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"manualCode"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"validatePromotions"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"cart"},"value":{"kind":"Variable","name":{"kind":"Name","value":"cart"}}},{"kind":"Argument","name":{"kind":"Name","value":"manualCode"},"value":{"kind":"Variable","name":{"kind":"Name","value":"manualCode"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"totalDiscount"}},{"kind":"Field","name":{"kind":"Name","value":"freeDeliveryApplied"}},{"kind":"Field","name":{"kind":"Name","value":"finalSubtotal"}},{"kind":"Field","name":{"kind":"Name","value":"finalDeliveryPrice"}},{"kind":"Field","name":{"kind":"Name","value":"finalTotal"}},{"kind":"Field","name":{"kind":"Name","value":"promotions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"target"}},{"kind":"Field","name":{"kind":"Name","value":"appliedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"freeDelivery"}},{"kind":"Field","name":{"kind":"Name","value":"priority"}}]}}]}}]}}]} as unknown as DocumentNode<ValidatePromotionsQuery, ValidatePromotionsQueryVariables>;
+export const GetPromotionThresholdsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetPromotionThresholds"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"cart"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CartContextInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getPromotionThresholds"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"cart"},"value":{"kind":"Variable","name":{"kind":"Name","value":"cart"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"spendThreshold"}},{"kind":"Field","name":{"kind":"Name","value":"eligibleBusinessIds"}},{"kind":"Field","name":{"kind":"Name","value":"priority"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}}]}}]}}]} as unknown as DocumentNode<GetPromotionThresholdsQuery, GetPromotionThresholdsQueryVariables>;
+export const GetMyReferralStatsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetMyReferralStats"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"myReferralStats"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"totalReferrals"}},{"kind":"Field","name":{"kind":"Name","value":"completedReferrals"}},{"kind":"Field","name":{"kind":"Name","value":"pendingReferrals"}},{"kind":"Field","name":{"kind":"Name","value":"totalRewardsEarned"}},{"kind":"Field","name":{"kind":"Name","value":"referralCode"}},{"kind":"Field","name":{"kind":"Name","value":"referrals"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"rewardGiven"}},{"kind":"Field","name":{"kind":"Name","value":"rewardAmount"}},{"kind":"Field","name":{"kind":"Name","value":"completedAt"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"referredUser"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetMyReferralStatsQuery, GetMyReferralStatsQueryVariables>;
+export const GenerateReferralCodeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"GenerateReferralCode"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"generateReferralCode"}}]}}]} as unknown as DocumentNode<GenerateReferralCodeMutation, GenerateReferralCodeMutationVariables>;
+export const GetStoreStatusDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetStoreStatus"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getStoreStatus"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"isStoreClosed"}},{"kind":"Field","name":{"kind":"Name","value":"closedMessage"}}]}}]}}]} as unknown as DocumentNode<GetStoreStatusQuery, GetStoreStatusQueryVariables>;

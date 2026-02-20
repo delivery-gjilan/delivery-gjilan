@@ -5,7 +5,13 @@ export const initiateSignup: NonNullable<MutationResolvers['initiateSignup']> = 
     { input },
     { authService },
 ) => {
-    const result = await authService.initiateSignup(input.firstName, input.lastName, input.email, input.password);
+    const result = await authService.initiateSignup(
+        input.firstName,
+        input.lastName,
+        input.email,
+        input.password,
+        input.referralCode || undefined
+    );
     return {
         token: result.token,
         user: result.user,

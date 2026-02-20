@@ -52,6 +52,14 @@ enum ActorType {
   SYSTEM
 }
 
+input AddUserAddressInput {
+  addressName: String
+  displayName: String
+  latitude: Float!
+  longitude: Float!
+  priority: Int
+}
+
 input AddWalletCreditInput {
   amount: Float!
   description: String
@@ -288,6 +296,7 @@ input InitiateSignupInput {
   firstName: String!
   lastName: String!
   password: String!
+  referralCode: String
 }
 
 scalar JSON
@@ -310,6 +319,7 @@ input LoginInput {
 }
 
 type Mutation {
+  addUserAddress(input: AddUserAddressInput!): UserAddress!
   addWalletCredit(input: AddWalletCreditInput!): WalletTransaction!
 
   """
@@ -335,6 +345,7 @@ type Mutation {
   deleteProductSubcategory(id: ID!): Boolean!
   deletePromotion(id: ID!): Boolean!
   deleteUser(id: ID!): Boolean!
+  deleteUserAddress(id: ID!): Boolean!
 
   """
   Driver heartbeat - call every 5 seconds while online.
@@ -342,6 +353,7 @@ type Mutation {
   Location is throttled: only written if >10s since last write OR moved >5m.
   """
   driverHeartbeat(latitude: Float!, longitude: Float!): DriverHeartbeatResult!
+  generateReferralCode: String!
   initiateSignup(input: InitiateSignupInput!): AuthResponse!
   login(input: LoginInput!): AuthResponse!
   markFirstOrderUsed(userId: ID!): UserPromoMetadata!
@@ -350,6 +362,7 @@ type Mutation {
   markSettlementsAsPaid(ids: [ID!]!): [Settlement!]!
   removeUserFromPromotion(promotionId: ID!, userId: ID!): Boolean!
   resendEmailVerification: SignupStepResponse!
+  setDefaultAddress(id: ID!): Boolean!
   submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
   unsettleSettlement(settlementId: ID!): Settlement!
   updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
@@ -362,7 +375,9 @@ type Mutation {
   updateProductSubcategory(id: ID!, input: UpdateProductSubcategoryInput!): ProductSubcategory!
   updateProductsOrder(businessId: ID!, products: [ProductOrderInput!]!): Boolean!
   updatePromotion(input: UpdatePromotionInput!): Promotion!
+  updateStoreStatus(input: UpdateStoreStatusInput!): StoreStatus!
   updateUser(input: UpdateUserInput!): User!
+  updateUserAddress(input: UpdateUserAddressInput!): UserAddress!
   updateUserNote(flagColor: String, note: String, userId: ID!): User!
   verifyEmail(input: VerifyEmailInput!): SignupStepResponse!
   verifyPhone(input: VerifyPhoneInput!): SignupStepResponse!
@@ -514,6 +529,16 @@ enum PromotionTarget {
   SPECIFIC_USERS
 }
 
+type PromotionThreshold {
+  code: String
+  eligibleBusinessIds: [ID!]
+  id: ID!
+  isActive: Boolean!
+  name: String!
+  priority: Int!
+  spendThreshold: Float!
+}
+
 enum PromotionType {
   FIXED_AMOUNT
   FREE_DELIVERY
@@ -548,13 +573,17 @@ type Query {
   getApplicablePromotions(cart: CartContextInput!, manualCode: String): [ApplicablePromotion!]!
   getPromotion(id: ID!): Promotion
   getPromotionAnalytics(promotionId: ID!): PromotionAnalyticsResult!
+  getPromotionThresholds(cart: CartContextInput!): [PromotionThreshold!]!
   getPromotionUsage(promotionId: ID!): [PromotionUsage!]!
+  getStoreStatus: StoreStatus!
   getUserPromoMetadata(userId: ID!): UserPromoMetadata
   getUserPromotions(userId: ID!): [UserPromotion!]!
   getUserWallet(userId: ID!): UserWallet
   getWalletTransactions(userId: ID!): [WalletTransaction!]!
   me: User
+  myAddresses: [UserAddress!]!
   myBehavior: UserBehavior
+  myReferralStats: ReferralStats!
   order(id: ID!): Order
   orders: [Order!]!
   ordersByStatus(status: OrderStatus!): [Order!]!
@@ -570,6 +599,34 @@ type Query {
   userBehavior(userId: ID!): UserBehavior
   users: [User!]!
   validatePromotions(cart: CartContextInput!, manualCode: String): PromotionResult!
+}
+
+type Referral {
+  completedAt: DateTime
+  createdAt: DateTime!
+  id: ID!
+  referralCode: String!
+  referredUser: User
+  referredUserId: ID
+  referrerUserId: ID!
+  rewardAmount: Float
+  rewardGiven: Boolean!
+  status: ReferralStatus!
+}
+
+type ReferralStats {
+  completedReferrals: Int!
+  pendingReferrals: Int!
+  referralCode: String!
+  referrals: [Referral!]!
+  totalReferrals: Int!
+  totalRewardsEarned: Float!
+}
+
+enum ReferralStatus {
+  COMPLETED
+  EXPIRED
+  PENDING
 }
 
 type Settlement {
@@ -615,6 +672,11 @@ type SignupStepResponse {
   currentStep: SignupStep!
   message: String!
   userId: ID!
+}
+
+type StoreStatus {
+  closedMessage: String
+  isStoreClosed: Boolean!
 }
 
 input SubmitPhoneNumberInput {
@@ -676,6 +738,7 @@ input UpdatePromotionInput {
   code: String
   description: String
   discountValue: Float
+  eligibleBusinessIds: [ID!]
   endsAt: String
   id: ID!
   isActive: Boolean
@@ -688,8 +751,21 @@ input UpdatePromotionInput {
   priority: Int
   spendThreshold: Float
   startsAt: String
+  target: PromotionTarget
   thresholdReward: String
   type: PromotionType
+}
+
+input UpdateStoreStatusInput {
+  closedMessage: String
+  isStoreClosed: Boolean!
+}
+
+input UpdateUserAddressInput {
+  addressName: String
+  displayName: String
+  id: ID!
+  priority: Int
 }
 
 input UpdateUserInput {
@@ -719,8 +795,21 @@ type User {
   lastName: String!
   phoneNumber: String
   phoneVerified: Boolean!
+  referralCode: String
   role: UserRole!
   signupStep: SignupStep!
+}
+
+type UserAddress {
+  addressName: String
+  createdAt: DateTime!
+  displayName: String
+  id: ID!
+  latitude: Float!
+  longitude: Float!
+  priority: Int!
+  updatedAt: DateTime!
+  userId: ID!
 }
 
 type UserBehavior {

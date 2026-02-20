@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert, Modal, TextInput, Animated, ImageBackground, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert, Modal, TextInput, Animated, ImageBackground, StyleSheet, Dimensions, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -10,36 +10,17 @@ import { useTheme } from '@/hooks/useTheme';
 import { useCart } from '../hooks/useCart';
 import { useCartActions } from '../hooks/useCartActions';
 import { useCreateOrder } from '../hooks/useCreateOrder';
-import { gql } from '@apollo/client';
-import { useLazyQuery } from '@apollo/client/react';
-
-const VALIDATE_PROMOTIONS = gql`
-    query ValidatePromotions($cart: CartContextInput!, $manualCode: String) {
-        validatePromotions(cart: $cart, manualCode: $manualCode) {
-            totalDiscount
-            freeDeliveryApplied
-            finalSubtotal
-            finalDeliveryPrice
-            finalTotal
-            promotions {
-                id
-                name
-                code
-                type
-                target
-                appliedAmount
-                freeDelivery
-                priority
-            }
-        }
-    }
-`;
+import { useLazyQuery, useQuery, useMutation } from '@apollo/client/react';
+import { VALIDATE_PROMOTIONS, GET_PROMOTION_THRESHOLDS } from '@/graphql/operations/promotions';
+import { GET_MY_ADDRESSES, ADD_USER_ADDRESS, SET_DEFAULT_ADDRESS } from '@/graphql/operations/addresses';
+import type { UserAddress } from '@/gql/graphql';
 
 type CheckoutLocation = {
     latitude: number;
     longitude: number;
     address: string;
     label?: string;
+    addressId?: number; // Track if this is a saved address
 };
 
 const formatAddress = (item: Location.LocationGeocodedAddress | null) => {
@@ -147,8 +128,26 @@ export const CartScreen = () => {
     const [deliveryPrice] = useState(2.0); // Base delivery fee
     const [isMapModalOpen, setIsMapModalOpen] = useState(false);
     const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
+    const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
     const [selectedLocation, setSelectedLocation] = useState<CheckoutLocation | null>(null);
     const [couponCode, setCouponCode] = useState('');
+    const [showSaveAddressPrompt, setShowSaveAddressPrompt] = useState(false);
+    const [pendingLocationToSave, setPendingLocationToSave] = useState<CheckoutLocation | null>(null);
+    const [addressName, setAddressName] = useState('');
+    
+    // Query saved addresses
+    const { data: addressesData, loading: addressesLoading } = useQuery(GET_MY_ADDRESSES, {
+        fetchPolicy: 'network-only',
+    });
+
+    // Mutation for adding address
+    const [addAddress, { loading: addingAddress }] = useMutation(ADD_USER_ADDRESS, {
+        refetchQueries: [{ query: GET_MY_ADDRESSES }],
+    });
+
+    const [setDefaultAddress] = useMutation(SET_DEFAULT_ADDRESS, {
+        refetchQueries: [{ query: GET_MY_ADDRESSES }],
+    });
     const [promoResult, setPromoResult] = useState<{
         code: string;
         discountAmount: number;
@@ -189,25 +188,162 @@ export const CartScreen = () => {
         };
     }, [items, total, deliveryPrice]);
 
-    const defaultAddresses = useMemo(
-        () => [
-            {
-                id: 'home',
-                label: 'Home',
-                address: 'Rruga e Kombit 12, Gjilan',
-                latitude: 42.463,
-                longitude: 21.469,
-            },
-            {
-                id: 'work',
-                label: 'Work',
-                address: 'Bulevardi i Pavaresise 3, Gjilan',
-                latitude: 42.458,
-                longitude: 21.471,
-            },
-        ],
-        [],
+    // Query server for promotion thresholds applicable to this cart (used for progress display)
+    const { data: thresholdsData, error: thresholdsError, loading: thresholdsLoading } = useQuery(
+        GET_PROMOTION_THRESHOLDS,
+        {
+            variables: { cart: cartContext },
+            skip: items.length === 0,
+            fetchPolicy: 'no-cache',
+        },
     );
+
+    // Debug: log thresholds response
+    useEffect(() => {
+        console.log('[Promos] GetPromotionThresholds response', { data: thresholdsData, error: thresholdsError, loading: thresholdsLoading });
+        if (thresholdsError) console.log('[Promos] thresholdsError', thresholdsError);
+    }, [thresholdsData, thresholdsError, thresholdsLoading]);
+
+    const applicableConditional = useMemo(() => {
+        if (!thresholdsData?.getPromotionThresholds) return null;
+        const thresholds = thresholdsData.getPromotionThresholds;
+        if (thresholds.length === 0) return null;
+        
+        const matching = thresholds.filter((p) => {
+            if (!p || !p.spendThreshold) return false;
+            const ids = p.eligibleBusinessIds || [];
+            if (ids.length === 0) return true; // global
+            return cartContext.businessIds.some((bId) => ids.includes(bId));
+        });
+        
+        if (matching.length === 0) return null;
+        matching.sort((a, b) => (b.priority || 0) - (a.priority || 0));
+        return matching[0];
+    }, [thresholdsData, cartContext.businessIds]);
+
+    const spendThreshold = applicableConditional?.spendThreshold;
+    const progress = spendThreshold ? Math.min(Number(total) / Number(spendThreshold), 1) : 0;
+    const amountRemaining = spendThreshold ? Math.max(0, Number(spendThreshold) - Number(total)) : 0;
+
+    // Debug: track progress
+    useEffect(() => {
+        console.log('[Promos] progress updated', { progress, amountRemaining, subtotal: total, spendThreshold });
+        if (applicableConditional) console.log('[Promos] applicableConditional', applicableConditional);
+    }, [progress, amountRemaining, total, applicableConditional, spendThreshold]);
+
+    // Notifier state/animation
+    const [notifier, setNotifier] = useState<null | { type: 'progress' | 'success'; message: string }>(null);
+    const notifierAnim = useRef(new Animated.Value(0)).current;
+    const showNotifier = (msg: string, type: 'progress' | 'success' = 'progress') => {
+        setNotifier({ type, message: msg });
+        Animated.timing(notifierAnim, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+        setTimeout(() => {
+            Animated.timing(notifierAnim, { toValue: 0, duration: 220, useNativeDriver: true }).start(() => setNotifier(null));
+        }, type === 'success' ? 4000 : 2000);
+    };
+
+    // Auto-apply helpers
+    const autoAppliedPromotionIdRef = useRef<string | null>(null);
+    const [autoApplying, setAutoApplying] = useState(false);
+
+    // When the cart reaches or exceeds a spend threshold, call the server to validate/apply promotions.
+    useEffect(() => {
+        console.log('[Promos] auto-apply useEffect triggered', { 
+            hasApplicable: !!applicableConditional, 
+            hasThreshold: !!spendThreshold, 
+            progress, 
+            hasPromoResult: !!promoResult,
+            alreadyApplied: autoAppliedPromotionIdRef.current,
+            applicableId: applicableConditional?.id 
+        });
+        
+        if (!applicableConditional || !spendThreshold) {
+            console.log('[Promos] auto-apply skipped - no applicable promo or threshold');
+            return;
+        }
+        if (progress < 1) {
+            console.log('[Promos] auto-apply skipped - progress not reached', { progress, spendThreshold });
+            return;
+        }
+        if (promoResult) {
+            console.log('[Promos] auto-apply skipped - promo already applied');
+            return;
+        }
+        if (autoAppliedPromotionIdRef.current === applicableConditional.id) {
+            console.log('[Promos] auto-apply skipped - already auto-applied this promo');
+            return;
+        }
+
+        let mounted = true;
+        const doAutoApply = async () => {
+            setAutoApplying(true);
+            try {
+                console.log('[Promos] auto-apply triggered', { promoId: applicableConditional.id, promoName: applicableConditional.name, subtotal: total, spendThreshold });
+                const response = await validatePromotionsManual({ variables: { cart: cartContext } });
+                console.log('[Promos] validatePromotions request sent');
+                const result = (response?.data as any)?.validatePromotions;
+                console.log('[Promos] validatePromotions response', result);
+                if (!result || (Array.isArray(result.promotions) && result.promotions.length === 0)) {
+                    console.log('[Promos] auto-apply failed - no promotions returned from server');
+                    return;
+                }
+
+                if (!mounted) return;
+
+                const firstPromo = Array.isArray(result.promotions) ? result.promotions[0] : null;
+                const promoCode = firstPromo?.code ?? applicableConditional.code ?? '';
+                setPromoResult({
+                    code: promoCode,
+                    discountAmount: Number(result.totalDiscount ?? 0),
+                    freeDeliveryApplied: result.freeDeliveryApplied ?? false,
+                    effectiveDeliveryPrice: Number(result.finalDeliveryPrice ?? deliveryPrice),
+                    totalPrice: Number(result.finalTotal ?? total + deliveryPrice),
+                });
+                setCouponCode(promoCode); // Show the code in the input field
+                console.log('[Promos] promoResult applied', { code: promoCode, discount: result.totalDiscount, freeDelivery: result.freeDeliveryApplied });
+
+                autoAppliedPromotionIdRef.current = firstPromo?.id ?? applicableConditional.id;
+                showNotifier(
+                    `Promotion applied${firstPromo?.name ? `: ${firstPromo.name}` : ''}`,
+                    'success',
+                );
+            } catch (err) {
+                console.log('[Promos] auto-apply error', err);
+                // ignore - best effort
+            } finally {
+                if (mounted) setAutoApplying(false);
+            }
+        };
+
+        doAutoApply();
+
+        return () => {
+            mounted = false;
+        };
+    }, [progress, applicableConditional, cartContext, total, deliveryPrice, promoResult]);
+
+    // Get saved addresses sorted by priority (default first)
+    const savedAddresses = useMemo(() => {
+        return (addressesData?.myAddresses ?? []) as UserAddress[];
+    }, [addressesData]);
+
+    // Auto-select default address on load
+    useEffect(() => {
+        if (!selectedLocation && savedAddresses.length > 0) {
+            const defaultAddress = savedAddresses.find((addr) => addr.priority === 1) || savedAddresses[0];
+            if (defaultAddress) {
+                const location: CheckoutLocation = {
+                    latitude: defaultAddress.latitude,
+                    longitude: defaultAddress.longitude,
+                    address: defaultAddress.displayName,
+                    label: defaultAddress.addressName,
+                    addressId: defaultAddress.id,
+                };
+                setSelectedLocation(location);
+                requestFeeForLocation(location);
+            }
+        }
+    }, [savedAddresses, selectedLocation]);
 
     const requestFeeForLocation = (next: CheckoutLocation) => {
         // Delivery price is fixed for now
@@ -276,6 +412,16 @@ export const CartScreen = () => {
         }).start();
     }, [isMapModalOpen, screenWidth, mapSlideX]);
 
+    useEffect(() => {
+        if (!isAddressModalOpen) return;
+        addressSlideX.setValue(screenWidth);
+        Animated.timing(addressSlideX, {
+            toValue: 0,
+            duration: 240,
+            useNativeDriver: true,
+        }).start();
+    }, [isAddressModalOpen, screenWidth, addressSlideX]);
+
     const closeSummaryModal = () => {
         Animated.timing(summarySlideX, {
             toValue: screenWidth,
@@ -290,6 +436,14 @@ export const CartScreen = () => {
             duration: 200,
             useNativeDriver: true,
         }).start(() => setIsMapModalOpen(false));
+    };
+
+    const closeAddressModal = () => {
+        Animated.timing(addressSlideX, {
+            toValue: screenWidth,
+            duration: 200,
+            useNativeDriver: true,
+        }).start(() => setIsAddressModalOpen(false));
     };
 
     const handleMapPress = async (event: any) => {
@@ -327,9 +481,87 @@ export const CartScreen = () => {
             latitudeDelta: 0.005,
             longitudeDelta: 0.005,
         });
-        // Close map modal and open summary so user can confirm the address
-        closeMapModal();
+        // Close any open modals and open summary so user can confirm the address
+        if (isAddressModalOpen) closeAddressModal();
+        if (isMapModalOpen) closeMapModal();
+        
+        // If this is a map-selected location (not a saved address), ask if they want to save it
+        if (!next.addressId) {
+            setPendingLocationToSave(next);
+            setAddressName(''); // Reset address name
+            setTimeout(() => setShowSaveAddressPrompt(true), 300);
+        } else {
+            setTimeout(() => setIsSummaryModalOpen(true), 260);
+        }
+    };
+
+    const handleSelectSavedAddress = (address: UserAddress) => {
+        const location: CheckoutLocation = {
+            latitude: address.latitude,
+            longitude: address.longitude,
+            address: address.displayName,
+            label: address.addressName,
+            addressId: address.id,
+        };
+        handleSelectLocation(location);
+    };
+
+    const handleChooseOnMap = () => {
+        closeAddressModal();
+        setTimeout(() => setIsMapModalOpen(true), 260);
+    };
+
+    const handleSaveAsDefault = async () => {
+        if (!pendingLocationToSave || !addressName.trim()) {
+            Alert.alert('Address Name Required', 'Please enter a name for this address.');
+            return;
+        }
+        
+        try {
+            // First add the address
+            const result = await addAddress({
+                variables: {
+                    input: {
+                        latitude: pendingLocationToSave.latitude,
+                        longitude: pendingLocationToSave.longitude,
+                        addressName: addressName.trim(),
+                        displayName: pendingLocationToSave.address,
+                    },
+                },
+            });
+            
+            // Then set it as default
+            const newAddressId = result.data?.addUserAddress?.id;
+            if (newAddressId) {
+                await setDefaultAddress({
+                    variables: { id: newAddressId },
+                });
+            }
+            
+            setShowSaveAddressPrompt(false);
+            setPendingLocationToSave(null);
+            setAddressName('');
+            setTimeout(() => setIsSummaryModalOpen(true), 260);
+        } catch (error) {
+            Alert.alert('Error', 'Failed to save address. Please try again.');
+            console.error('Error saving address:', error);
+        }
+    };
+
+    const handleSkipSaving = () => {
+        setShowSaveAddressPrompt(false);
+        setPendingLocationToSave(null);
+        setAddressName('');
         setTimeout(() => setIsSummaryModalOpen(true), 260);
+    };
+
+    const handleChooseAddress = () => {
+        // If no saved addresses, go directly to map
+        if (savedAddresses.length === 0) {
+            setIsMapModalOpen(true);
+        } else {
+            setIsAddressModalOpen(true);
+        }
     };
 
     const handleUseCurrentLocation = async () => {
@@ -382,17 +614,20 @@ export const CartScreen = () => {
         });
     };
 
-    const handleOpenMap = () => {
-        setIsMapModalOpen(true);
-    };
-
-
-
+    // Clear promo if cart total drops below threshold for auto-applied promos
     useEffect(() => {
-        if (promoResult) {
-            setPromoResult(null);
+        if (!promoResult) return;
+        
+        // If this was an auto-applied promo and we're now below threshold, clear it
+        if (autoAppliedPromotionIdRef.current && applicableConditional) {
+            if (progress < 1) {
+                console.log('[Promos] clearing auto-applied promo - below threshold');
+                setPromoResult(null);
+                autoAppliedPromotionIdRef.current = null;
+            }
         }
-    }, [total, deliveryPrice]);
+        // For manually applied promos, keep them even if total changes
+    }, [total, deliveryPrice, progress, applicableConditional]);
 
     // Manual promo application handler (previous auto-validation removed)
     const handleApplyCoupon = async () => {
@@ -432,14 +667,20 @@ export const CartScreen = () => {
     useEffect(() => {
         if (items.length === 0) {
             setPromoResult(null);
+            autoAppliedPromotionIdRef.current = null;
+            setCouponCode('');
         }
     }, [items.length]);
 
+    // Clear promo if user empties the coupon code field
     useEffect(() => {
-        if (promoResult && promoResult.code !== couponCode.trim()) {
+        // If user clears the input field, clear the applied promo
+        if (promoResult && !couponCode.trim()) {
+            console.log('[Promos] clearing promo - user cleared code field');
             setPromoResult(null);
+            autoAppliedPromotionIdRef.current = null;
         }
-    }, [couponCode, promoResult]);
+    }, [couponCode]);
 
     const manualPromoApplied = !!promoResult;
     const freeDeliveryApplied = manualPromoApplied
@@ -518,6 +759,8 @@ export const CartScreen = () => {
                 <View className="w-12 h-1 rounded-full" style={{ backgroundColor: theme.colors.border }} />
             </View>
 
+            {/* (notifier rendered at end to ensure it's above other content) */}
+
             {/* Header */}
             <View
                 className="flex-row items-center justify-between px-4 py-3 border-b"
@@ -531,6 +774,23 @@ export const CartScreen = () => {
                 </Text>
                 <View style={{ width: 28 }} />
             </View>
+
+            {/* Threshold progress indicator for conditional promotions */}
+            {applicableConditional && spendThreshold && progress > 0 && progress < 1 && !promoResult && (
+                <View className="px-4 py-3">
+                    <View className="flex-row items-center justify-between mb-2">
+                        <Text className="text-sm" style={{ color: theme.colors.subtext }}>
+                            Spend €{spendThreshold.toFixed(2)} to unlock: {applicableConditional.name || 'promotion'}
+                        </Text>
+                        <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
+                            €{amountRemaining.toFixed(2)}
+                        </Text>
+                    </View>
+                    <View style={{ height: 8, backgroundColor: theme.colors.border, borderRadius: 8, overflow: 'hidden' }}>
+                        <Animated.View style={{ height: 8, width: `${Math.round(progress * 100)}%`, backgroundColor: theme.colors.primary }} />
+                    </View>
+                </View>
+            )}
 
             {/* Cart Items */}
             <ScrollView className="flex-1">
@@ -644,7 +904,7 @@ export const CartScreen = () => {
                         opacity: isProcessing ? 0.6 : pulseAnim,
                     }}
                     activeOpacity={0.8}
-                    onPress={() => setIsMapModalOpen(true)}
+                    onPress={handleChooseAddress}
                     disabled={isProcessing}
                 >
                     {isProcessing ? (
@@ -657,6 +917,144 @@ export const CartScreen = () => {
                     )}
                 </AnimatedTouchable>
             </View>
+
+            {/* Address Selection Modal */}
+            <Modal visible={isAddressModalOpen} animationType="none" onRequestClose={closeAddressModal}>
+                <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }}>
+                    <Animated.View style={{ flex: 1, transform: [{ translateX: addressSlideX }] }}>
+                        <View className="flex-row items-center justify-between px-4 py-3 border-b" style={{ borderBottomColor: theme.colors.border }}>
+                            <TouchableOpacity onPress={closeAddressModal} className="p-2 -ml-2">
+                                <Ionicons name="close" size={26} color={theme.colors.text} />
+                            </TouchableOpacity>
+                            <Text className="text-lg font-bold" style={{ color: theme.colors.text }}>
+                                Select address
+                            </Text>
+                            <View style={{ width: 26 }} />
+                        </View>
+
+                        <ScrollView className="flex-1" contentContainerStyle={{ padding: 16 }}>
+                            {addressesLoading ? (
+                                <View className="py-8">
+                                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                                </View>
+                            ) : savedAddresses.length > 0 ? (
+                                <View className="gap-3">
+                                    {savedAddresses.map((address) => {
+                                        const isSelected = selectedLocation?.addressId === address.id;
+                                        const isDefault = address.priority === 1;
+                                        
+                                        // Select icon based on address name
+                                        let iconName: any = 'location';
+                                        if (address.addressName.toLowerCase().includes('home')) {
+                                            iconName = 'home';
+                                        } else if (address.addressName.toLowerCase().includes('work') || address.addressName.toLowerCase().includes('office')) {
+                                            iconName = 'briefcase';
+                                        }
+
+                                        return (
+                                            <TouchableOpacity
+                                                key={address.id}
+                                                onPress={() => handleSelectSavedAddress(address)}
+                                                className="rounded-xl p-4 border-2"
+                                                style={{
+                                                    backgroundColor: isSelected ? theme.colors.primary + '15' : theme.colors.card,
+                                                    borderColor: isSelected ? theme.colors.primary : theme.colors.border,
+                                                }}
+                                            >
+                                                <View className="flex-row items-start justify-between">
+                                                    <View className="flex-row items-start flex-1">
+                                                        <View
+                                                            className="w-10 h-10 rounded-full items-center justify-center mr-3"
+                                                            style={{ backgroundColor: theme.colors.primary + '20' }}
+                                                        >
+                                                            <Ionicons
+                                                                name={iconName}
+                                                                size={20}
+                                                                color={theme.colors.primary}
+                                                            />
+                                                        </View>
+                                                        <View className="flex-1">
+                                                            <View className="flex-row items-center gap-2">
+                                                                <Text
+                                                                    className="text-base font-semibold"
+                                                                    style={{ color: theme.colors.text }}
+                                                                >
+                                                                    {address.addressName}
+                                                                </Text>
+                                                                {isDefault && (
+                                                                    <View
+                                                                        className="px-2 py-0.5 rounded"
+                                                                        style={{ backgroundColor: theme.colors.primary + '20' }}
+                                                                    >
+                                                                        <Text
+                                                                            className="text-xs font-semibold"
+                                                                            style={{ color: theme.colors.primary }}
+                                                                        >
+                                                                            Default
+                                                                        </Text>
+                                                                    </View>
+                                                                )}
+                                                            </View>
+                                                            <Text
+                                                                className="text-sm mt-1"
+                                                                style={{ color: theme.colors.subtext }}
+                                                            >
+                                                                {address.displayName}
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+                                                    {isSelected && (
+                                                        <Ionicons
+                                                            name="checkmark-circle"
+                                                            size={24}
+                                                            color={theme.colors.primary}
+                                                        />
+                                                    )}
+                                                </View>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
+                            ) : (
+                                <View className="py-12 items-center">
+                                    <View
+                                        className="w-20 h-20 rounded-full items-center justify-center mb-4"
+                                        style={{ backgroundColor: theme.colors.border }}
+                                    >
+                                        <Ionicons name="location-outline" size={40} color={theme.colors.subtext} />
+                                    </View>
+                                    <Text className="text-lg font-semibold mb-2" style={{ color: theme.colors.text }}>
+                                        No saved addresses
+                                    </Text>
+                                    <Text className="text-center" style={{ color: theme.colors.subtext }}>
+                                        Add addresses from your profile for quick checkout
+                                    </Text>
+                                </View>
+                            )}
+                        </ScrollView>
+
+                        <View className="p-4 border-t gap-2" style={{ borderTopColor: theme.colors.border, backgroundColor: theme.colors.card }}>
+                            <TouchableOpacity
+                                className="py-3 rounded-xl items-center flex-row justify-center gap-2"
+                                style={{ backgroundColor: theme.colors.primary }}
+                                onPress={handleChooseOnMap}
+                            >
+                                <Ionicons name="map-outline" size={20} color="white" />
+                                <Text className="text-white font-semibold">Choose on map</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                className="py-3 rounded-xl items-center"
+                                style={{ backgroundColor: theme.colors.border }}
+                                onPress={closeAddressModal}
+                            >
+                                <Text className="font-semibold" style={{ color: theme.colors.text }}>
+                                    Cancel
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </Animated.View>
+                </SafeAreaView>
+            </Modal>
 
             {/* Map Picker Modal */}
             <Modal visible={isMapModalOpen} animationType="none" onRequestClose={closeMapModal}>
@@ -856,7 +1254,7 @@ export const CartScreen = () => {
                                 style={{ backgroundColor: theme.colors.border }}
                                 onPress={() => {
                                     closeSummaryModal();
-                                    setTimeout(() => setIsMapModalOpen(true), 260);
+                                    setTimeout(() => setIsAddressModalOpen(true), 260);
                                 }}
                             >
                                 <Text className="font-semibold" style={{ color: theme.colors.text }}>
@@ -867,6 +1265,177 @@ export const CartScreen = () => {
                         </Animated.View>
                     </View>
             </Modal>
+
+            {/* Save Address Prompt Modal */}
+            <Modal visible={showSaveAddressPrompt} transparent animationType="fade" onRequestClose={handleSkipSaving}>
+                <View className="flex-1 justify-center items-center px-6" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+                    <View className="w-full rounded-2xl p-6" style={{ backgroundColor: theme.colors.card }}>
+                        <View className="items-center mb-4">
+                            <View
+                                className="w-16 h-16 rounded-full items-center justify-center mb-3"
+                                style={{ backgroundColor: theme.colors.primary + '20' }}
+                            >
+                                <Ionicons name="bookmark-outline" size={32} color={theme.colors.primary} />
+                            </View>
+                            <Text className="text-xl font-bold text-center mb-2" style={{ color: theme.colors.text }}>
+                                Save this address?
+                            </Text>
+                            <Text className="text-center" style={{ color: theme.colors.subtext }}>
+                                Choose a name for quick access
+                            </Text>
+                        </View>
+
+                        {pendingLocationToSave && (
+                            <View
+                                className="rounded-xl p-3 mb-4"
+                                style={{ backgroundColor: theme.colors.background }}
+                            >
+                                <View className="flex-row items-start">
+                                    <Ionicons
+                                        name="location"
+                                        size={18}
+                                        color={theme.colors.primary}
+                                        style={{ marginRight: 8, marginTop: 2 }}
+                                    />
+                                    <View className="flex-1">
+                                        <Text className="text-sm" style={{ color: theme.colors.subtext }}>
+                                            {pendingLocationToSave.address}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+                        )}
+
+                        {/* Quick Select Buttons */}
+                        <View className="mb-4">
+                            <Text className="text-sm font-semibold mb-2" style={{ color: theme.colors.text }}>
+                                Quick select
+                            </Text>
+                            <View className="flex-row gap-3">
+                                <TouchableOpacity
+                                    className="flex-1 py-3 rounded-xl items-center border-2"
+                                    style={{
+                                        backgroundColor: addressName === 'Home' ? theme.colors.primary + '15' : theme.colors.background,
+                                        borderColor: addressName === 'Home' ? theme.colors.primary : theme.colors.border,
+                                    }}
+                                    onPress={() => setAddressName('Home')}
+                                >
+                                    <View className="flex-row items-center gap-2">
+                                        <Ionicons
+                                            name="home"
+                                            size={20}
+                                            color={addressName === 'Home' ? theme.colors.primary : theme.colors.text}
+                                        />
+                                        <Text
+                                            className="font-semibold"
+                                            style={{ color: addressName === 'Home' ? theme.colors.primary : theme.colors.text }}
+                                        >
+                                            Home
+                                        </Text>
+                                    </View>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    className="flex-1 py-3 rounded-xl items-center border-2"
+                                    style={{
+                                        backgroundColor: addressName === 'Work' ? theme.colors.primary + '15' : theme.colors.background,
+                                        borderColor: addressName === 'Work' ? theme.colors.primary : theme.colors.border,
+                                    }}
+                                    onPress={() => setAddressName('Work')}
+                                >
+                                    <View className="flex-row items-center gap-2">
+                                        <Ionicons
+                                            name="briefcase"
+                                            size={20}
+                                            color={addressName === 'Work' ? theme.colors.primary : theme.colors.text}
+                                        />
+                                        <Text
+                                            className="font-semibold"
+                                            style={{ color: addressName === 'Work' ? theme.colors.primary : theme.colors.text }}
+                                        >
+                                            Work
+                                        </Text>
+                                    </View>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        {/* Custom Name Input */}
+                        <View className="mb-4">
+                            <Text className="text-sm font-semibold mb-2" style={{ color: theme.colors.text }}>
+                                Or enter custom name
+                            </Text>
+                            <TextInput
+                                className="rounded-xl px-4 py-3 border-2"
+                                style={{
+                                    backgroundColor: theme.colors.background,
+                                    borderColor: addressName && addressName !== 'Home' && addressName !== 'Work' ? theme.colors.primary : theme.colors.border,
+                                    color: theme.colors.text,
+                                }}
+                                placeholder="e.g., Mom's house, Office, Gym..."
+                                placeholderTextColor={theme.colors.subtext}
+                                value={addressName !== 'Home' && addressName !== 'Work' ? addressName : ''}
+                                onChangeText={setAddressName}
+                                onFocus={() => {
+                                    if (addressName === 'Home' || addressName === 'Work') {
+                                        setAddressName('');
+                                    }
+                                }}
+                            />
+                        </View>
+
+                        <View className="gap-3">
+                            <TouchableOpacity
+                                className="py-3 rounded-xl items-center"
+                                style={{
+                                    backgroundColor: addressName.trim() ? theme.colors.primary : theme.colors.border,
+                                    opacity: addressName.trim() ? 1 : 0.5,
+                                }}
+                                onPress={handleSaveAsDefault}
+                                disabled={addingAddress || !addressName.trim()}
+                            >
+                                {addingAddress ? (
+                                    <ActivityIndicator size="small" color="white" />
+                                ) : (
+                                    <Text className="text-white font-semibold">Save as default</Text>
+                                )}
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                className="py-3 rounded-xl items-center"
+                                style={{ backgroundColor: theme.colors.border }}
+                                onPress={handleSkipSaving}
+                                disabled={addingAddress}
+                            >
+                                <Text className="font-semibold" style={{ color: theme.colors.text }}>
+                                    Skip, just use once
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Top-floating notifier (auto-apply success) - rendered last so it overlays everything */}
+            {notifier && (
+                <Animated.View
+                    pointerEvents="none"
+                    style={{
+                        position: 'absolute',
+                        top: 12,
+                        left: 16,
+                        right: 16,
+                        zIndex: 9999,
+                        elevation: 9999,
+                        transform: [{ translateY: notifierAnim.interpolate({ inputRange: [0, 1], outputRange: [-18, 0] }) }],
+                        opacity: notifierAnim,
+                        alignItems: 'center',
+                    }}
+                >
+                    <View style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: 12, backgroundColor: notifier.type === 'success' ? '#16a34a' : theme.colors.primary, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 6 }}>
+                        <Text style={{ color: '#fff', fontWeight: '600' }}>{notifier.message}</Text>
+                    </View>
+                </Animated.View>
+            )}
+
         </SafeAreaView>
     );
 };

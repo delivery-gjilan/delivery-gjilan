@@ -156,6 +156,7 @@ export default function Profile() {
                 <View className="px-4 mb-6">
                     <Text className="text-2xl font-bold text-white mb-4">Quick links</Text>
                     <View>
+                        <ProfileRow title="Invite Friends" icon="gift" onPress={() => router.push('/invite-friends')} />
                         <ProfileRow title="Redeem code" onPress={() => {}} />
                         <ProfileRow title="Contact Support" onPress={() => {}} />
                         <ProfileRow title="Order history" onPress={handleOrderHistoryPress} showDivider={false} />
@@ -166,6 +167,7 @@ export default function Profile() {
                 <View className="px-4 mb-8">
                     <Text className="text-2xl font-bold text-white mb-4">Settings</Text>
                     <View>
+                        <ProfileRow title="My Addresses" icon="location" onPress={() => router.push('/addresses')} />
                         <ProfileRow title="Account" onPress={() => {}} showDivider={false} />
                     </View>
                 </View>

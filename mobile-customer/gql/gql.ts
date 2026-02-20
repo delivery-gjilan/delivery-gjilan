@@ -14,6 +14,11 @@ import { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/
  * Learn more about it here: https://the-guild.dev/graphql/codegen/plugins/presets/preset-client#reducing-bundle-size
  */
 type Documents = {
+    "\n    query GetMyAddresses {\n        myAddresses {\n            id\n            latitude\n            longitude\n            addressName\n            displayName\n            priority\n            createdAt\n        }\n    }\n": typeof types.GetMyAddressesDocument,
+    "\n    mutation AddUserAddress($input: AddUserAddressInput!) {\n        addUserAddress(input: $input) {\n            id\n            latitude\n            longitude\n            addressName\n            displayName\n            priority\n        }\n    }\n": typeof types.AddUserAddressDocument,
+    "\n    mutation UpdateUserAddress($input: UpdateUserAddressInput!) {\n        updateUserAddress(input: $input) {\n            id\n            addressName\n            displayName\n            priority\n        }\n    }\n": typeof types.UpdateUserAddressDocument,
+    "\n    mutation DeleteUserAddress($id: ID!) {\n        deleteUserAddress(id: $id)\n    }\n": typeof types.DeleteUserAddressDocument,
+    "\n    mutation SetDefaultAddress($id: ID!) {\n        setDefaultAddress(id: $id)\n    }\n": typeof types.SetDefaultAddressDocument,
     "\n    mutation InitiateSignup($input: InitiateSignupInput!) {\n        initiateSignup(input: $input) {\n            token\n            user {\n                id\n                email\n                firstName\n                lastName\n                signupStep\n                emailVerified\n                phoneVerified\n                phoneNumber\n                role\n            }\n            message\n        }\n    }\n": typeof types.InitiateSignupDocument,
     "\n    mutation Login($input: LoginInput!) {\n        login(input: $input) {\n            token\n            user {\n                id\n                email\n                firstName\n                lastName\n                signupStep\n                emailVerified\n                phoneVerified\n                phoneNumber\n                role\n            }\n            message\n        }\n    }\n": typeof types.LoginDocument,
     "\n    query Me {\n        me {\n            id\n            email\n            firstName\n            lastName\n            signupStep\n            emailVerified\n            phoneVerified\n            phoneNumber\n            address\n            role\n        }\n    }\n": typeof types.MeDocument,
@@ -37,8 +42,17 @@ type Documents = {
     "\n    query ProductCategories($businessId: ID!) {\n        productCategories(businessId: $businessId) {\n            id\n            name\n        }\n    }\n": typeof types.ProductCategoriesDocument,
     "\n    query ProductSubcategoriesByBusiness($businessId: ID!) {\n        productSubcategoriesByBusiness(businessId: $businessId) {\n            id\n            categoryId\n            name\n        }\n    }\n": typeof types.ProductSubcategoriesByBusinessDocument,
     "\n    query ValidatePromotions($cart: CartContextInput!, $manualCode: String) {\n        validatePromotions(cart: $cart, manualCode: $manualCode) {\n            totalDiscount\n            freeDeliveryApplied\n            finalSubtotal\n            finalDeliveryPrice\n            finalTotal\n            promotions {\n                id\n                name\n                code\n                type\n                target\n                appliedAmount\n                freeDelivery\n                priority\n            }\n        }\n    }\n": typeof types.ValidatePromotionsDocument,
+    "\n    query GetPromotionThresholds($cart: CartContextInput!) {\n        getPromotionThresholds(cart: $cart) {\n            id\n            name\n            code\n            spendThreshold\n            eligibleBusinessIds\n            priority\n            isActive\n        }\n    }\n": typeof types.GetPromotionThresholdsDocument,
+    "\n    query GetMyReferralStats {\n        myReferralStats {\n            totalReferrals\n            completedReferrals\n            pendingReferrals\n            totalRewardsEarned\n            referralCode\n            referrals {\n                id\n                status\n                rewardGiven\n                rewardAmount\n                completedAt\n                createdAt\n                referredUser {\n                    firstName\n                    lastName\n                }\n            }\n        }\n    }\n": typeof types.GetMyReferralStatsDocument,
+    "\n    mutation GenerateReferralCode {\n        generateReferralCode\n    }\n": typeof types.GenerateReferralCodeDocument,
+    "\n    query GetStoreStatus {\n        getStoreStatus {\n            isStoreClosed\n            closedMessage\n        }\n    }\n": typeof types.GetStoreStatusDocument,
 };
 const documents: Documents = {
+    "\n    query GetMyAddresses {\n        myAddresses {\n            id\n            latitude\n            longitude\n            addressName\n            displayName\n            priority\n            createdAt\n        }\n    }\n": types.GetMyAddressesDocument,
+    "\n    mutation AddUserAddress($input: AddUserAddressInput!) {\n        addUserAddress(input: $input) {\n            id\n            latitude\n            longitude\n            addressName\n            displayName\n            priority\n        }\n    }\n": types.AddUserAddressDocument,
+    "\n    mutation UpdateUserAddress($input: UpdateUserAddressInput!) {\n        updateUserAddress(input: $input) {\n            id\n            addressName\n            displayName\n            priority\n        }\n    }\n": types.UpdateUserAddressDocument,
+    "\n    mutation DeleteUserAddress($id: ID!) {\n        deleteUserAddress(id: $id)\n    }\n": types.DeleteUserAddressDocument,
+    "\n    mutation SetDefaultAddress($id: ID!) {\n        setDefaultAddress(id: $id)\n    }\n": types.SetDefaultAddressDocument,
     "\n    mutation InitiateSignup($input: InitiateSignupInput!) {\n        initiateSignup(input: $input) {\n            token\n            user {\n                id\n                email\n                firstName\n                lastName\n                signupStep\n                emailVerified\n                phoneVerified\n                phoneNumber\n                role\n            }\n            message\n        }\n    }\n": types.InitiateSignupDocument,
     "\n    mutation Login($input: LoginInput!) {\n        login(input: $input) {\n            token\n            user {\n                id\n                email\n                firstName\n                lastName\n                signupStep\n                emailVerified\n                phoneVerified\n                phoneNumber\n                role\n            }\n            message\n        }\n    }\n": types.LoginDocument,
     "\n    query Me {\n        me {\n            id\n            email\n            firstName\n            lastName\n            signupStep\n            emailVerified\n            phoneVerified\n            phoneNumber\n            address\n            role\n        }\n    }\n": types.MeDocument,
@@ -62,6 +76,10 @@ const documents: Documents = {
     "\n    query ProductCategories($businessId: ID!) {\n        productCategories(businessId: $businessId) {\n            id\n            name\n        }\n    }\n": types.ProductCategoriesDocument,
     "\n    query ProductSubcategoriesByBusiness($businessId: ID!) {\n        productSubcategoriesByBusiness(businessId: $businessId) {\n            id\n            categoryId\n            name\n        }\n    }\n": types.ProductSubcategoriesByBusinessDocument,
     "\n    query ValidatePromotions($cart: CartContextInput!, $manualCode: String) {\n        validatePromotions(cart: $cart, manualCode: $manualCode) {\n            totalDiscount\n            freeDeliveryApplied\n            finalSubtotal\n            finalDeliveryPrice\n            finalTotal\n            promotions {\n                id\n                name\n                code\n                type\n                target\n                appliedAmount\n                freeDelivery\n                priority\n            }\n        }\n    }\n": types.ValidatePromotionsDocument,
+    "\n    query GetPromotionThresholds($cart: CartContextInput!) {\n        getPromotionThresholds(cart: $cart) {\n            id\n            name\n            code\n            spendThreshold\n            eligibleBusinessIds\n            priority\n            isActive\n        }\n    }\n": types.GetPromotionThresholdsDocument,
+    "\n    query GetMyReferralStats {\n        myReferralStats {\n            totalReferrals\n            completedReferrals\n            pendingReferrals\n            totalRewardsEarned\n            referralCode\n            referrals {\n                id\n                status\n                rewardGiven\n                rewardAmount\n                completedAt\n                createdAt\n                referredUser {\n                    firstName\n                    lastName\n                }\n            }\n        }\n    }\n": types.GetMyReferralStatsDocument,
+    "\n    mutation GenerateReferralCode {\n        generateReferralCode\n    }\n": types.GenerateReferralCodeDocument,
+    "\n    query GetStoreStatus {\n        getStoreStatus {\n            isStoreClosed\n            closedMessage\n        }\n    }\n": types.GetStoreStatusDocument,
 };
 
 /**
@@ -78,6 +96,26 @@ const documents: Documents = {
  */
 export function graphql(source: string): unknown;
 
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n    query GetMyAddresses {\n        myAddresses {\n            id\n            latitude\n            longitude\n            addressName\n            displayName\n            priority\n            createdAt\n        }\n    }\n"): (typeof documents)["\n    query GetMyAddresses {\n        myAddresses {\n            id\n            latitude\n            longitude\n            addressName\n            displayName\n            priority\n            createdAt\n        }\n    }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n    mutation AddUserAddress($input: AddUserAddressInput!) {\n        addUserAddress(input: $input) {\n            id\n            latitude\n            longitude\n            addressName\n            displayName\n            priority\n        }\n    }\n"): (typeof documents)["\n    mutation AddUserAddress($input: AddUserAddressInput!) {\n        addUserAddress(input: $input) {\n            id\n            latitude\n            longitude\n            addressName\n            displayName\n            priority\n        }\n    }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n    mutation UpdateUserAddress($input: UpdateUserAddressInput!) {\n        updateUserAddress(input: $input) {\n            id\n            addressName\n            displayName\n            priority\n        }\n    }\n"): (typeof documents)["\n    mutation UpdateUserAddress($input: UpdateUserAddressInput!) {\n        updateUserAddress(input: $input) {\n            id\n            addressName\n            displayName\n            priority\n        }\n    }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n    mutation DeleteUserAddress($id: ID!) {\n        deleteUserAddress(id: $id)\n    }\n"): (typeof documents)["\n    mutation DeleteUserAddress($id: ID!) {\n        deleteUserAddress(id: $id)\n    }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n    mutation SetDefaultAddress($id: ID!) {\n        setDefaultAddress(id: $id)\n    }\n"): (typeof documents)["\n    mutation SetDefaultAddress($id: ID!) {\n        setDefaultAddress(id: $id)\n    }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -170,6 +208,22 @@ export function graphql(source: "\n    query ProductSubcategoriesByBusiness($bus
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n    query ValidatePromotions($cart: CartContextInput!, $manualCode: String) {\n        validatePromotions(cart: $cart, manualCode: $manualCode) {\n            totalDiscount\n            freeDeliveryApplied\n            finalSubtotal\n            finalDeliveryPrice\n            finalTotal\n            promotions {\n                id\n                name\n                code\n                type\n                target\n                appliedAmount\n                freeDelivery\n                priority\n            }\n        }\n    }\n"): (typeof documents)["\n    query ValidatePromotions($cart: CartContextInput!, $manualCode: String) {\n        validatePromotions(cart: $cart, manualCode: $manualCode) {\n            totalDiscount\n            freeDeliveryApplied\n            finalSubtotal\n            finalDeliveryPrice\n            finalTotal\n            promotions {\n                id\n                name\n                code\n                type\n                target\n                appliedAmount\n                freeDelivery\n                priority\n            }\n        }\n    }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n    query GetPromotionThresholds($cart: CartContextInput!) {\n        getPromotionThresholds(cart: $cart) {\n            id\n            name\n            code\n            spendThreshold\n            eligibleBusinessIds\n            priority\n            isActive\n        }\n    }\n"): (typeof documents)["\n    query GetPromotionThresholds($cart: CartContextInput!) {\n        getPromotionThresholds(cart: $cart) {\n            id\n            name\n            code\n            spendThreshold\n            eligibleBusinessIds\n            priority\n            isActive\n        }\n    }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n    query GetMyReferralStats {\n        myReferralStats {\n            totalReferrals\n            completedReferrals\n            pendingReferrals\n            totalRewardsEarned\n            referralCode\n            referrals {\n                id\n                status\n                rewardGiven\n                rewardAmount\n                completedAt\n                createdAt\n                referredUser {\n                    firstName\n                    lastName\n                }\n            }\n        }\n    }\n"): (typeof documents)["\n    query GetMyReferralStats {\n        myReferralStats {\n            totalReferrals\n            completedReferrals\n            pendingReferrals\n            totalRewardsEarned\n            referralCode\n            referrals {\n                id\n                status\n                rewardGiven\n                rewardAmount\n                completedAt\n                createdAt\n                referredUser {\n                    firstName\n                    lastName\n                }\n            }\n        }\n    }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n    mutation GenerateReferralCode {\n        generateReferralCode\n    }\n"): (typeof documents)["\n    mutation GenerateReferralCode {\n        generateReferralCode\n    }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n    query GetStoreStatus {\n        getStoreStatus {\n            isStoreClosed\n            closedMessage\n        }\n    }\n"): (typeof documents)["\n    query GetStoreStatus {\n        getStoreStatus {\n            isStoreClosed\n            closedMessage\n        }\n    }\n"];
 
 export function graphql(source: string) {
   return (documents as any)[source] ?? {};

@@ -34,10 +34,10 @@ export const useAuth = () => {
         RESEND_EMAIL_VERIFICATION_MUTATION,
     );
 
-    const initiateSignup = async (email: string, password: string, firstName: string, lastName: string) => {
+    const initiateSignup = async (email: string, password: string, firstName: string, lastName: string, referralCode?: string) => {
         const { data } = await initiateSignupMutation({
             variables: {
-                input: { email, password, firstName, lastName },
+                input: { email, password, firstName, lastName, referralCode },
             },
         });
 

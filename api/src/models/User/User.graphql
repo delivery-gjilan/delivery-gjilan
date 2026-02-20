@@ -32,6 +32,7 @@ type User {
     isOnline: Boolean!
     driverLocation: Location
     driverLocationUpdatedAt: Date
+    referralCode: String
 }
 
 type UserBehavior {
@@ -65,6 +66,7 @@ input InitiateSignupInput {
     lastName: String!
     email: String!
     password: String!
+    referralCode: String
 }
 
 input VerifyEmailInput {
@@ -101,12 +103,41 @@ input UpdateUserInput {
     businessId: ID
 }
 
+enum ReferralStatus {
+    PENDING
+    COMPLETED
+    EXPIRED
+}
+
+type Referral {
+    id: ID!
+    referrerUserId: ID!
+    referredUserId: ID
+    referralCode: String!
+    status: ReferralStatus!
+    rewardGiven: Boolean!
+    rewardAmount: Float
+    completedAt: DateTime
+    createdAt: DateTime!
+    referredUser: User
+}
+
+type ReferralStats {
+    totalReferrals: Int!
+    completedReferrals: Int!
+    pendingReferrals: Int!
+    totalRewardsEarned: Float!
+    referralCode: String!
+    referrals: [Referral!]!
+}
+
 type Query {
     me: User
     myBehavior: UserBehavior
     userBehavior(userId: ID!): UserBehavior
     users: [User!]!
     drivers: [User!]!
+    myReferralStats: ReferralStats!
 }
 
 type Mutation {
@@ -123,6 +154,7 @@ type Mutation {
     updateDriverLocation(latitude: Float!, longitude: Float!): User!
     adminUpdateDriverLocation(driverId: ID!, latitude: Float!, longitude: Float!): User!
     updateDriverOnlineStatus(isOnline: Boolean!): User!
+    generateReferralCode: String!
 }
 
 type Subscription {

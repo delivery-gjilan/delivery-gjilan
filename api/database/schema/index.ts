@@ -13,3 +13,5 @@ export * from './promotions';
 export * from './productStock';
 export * from './orderPromotions';
 export * from './userAddress';
+export * from './storeSettings';
+export * from './referrals';

@@ -33,6 +33,7 @@ export const users = pgTable('users', {
     adminNote: text('admin_note'),
     flagColor: text('flag_color').default('yellow'),
     imageUrl: text('image_url'),
+    referralCode: text('referral_code').unique(),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull(),

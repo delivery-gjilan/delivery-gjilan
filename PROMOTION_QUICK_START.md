@@ -1,4 +1,4 @@
-# 🎯 Promotion System V2 - Quick Start Guide
+# 🎯 Promotion System - Quick Start Guide
 
 ## ✅ COMPLETED (Ready to Use)
 
@@ -10,7 +10,7 @@
 - Foreign keys and constraints in place
 
 ### 2. Core Engine (100% Done) ✅
-**File:** `api/src/services/PromotionEngineV2.ts`
+**File:** `api/src/services/PromotionEngine.ts`
 
 **Key Methods:**
 ```typescript
@@ -35,9 +35,9 @@ await promotionEngine.markFirstOrderUsed(userId);
 ### Example 1: Validate User's Cart with Promotions
 
 ```typescript
-import { PromotionEngineV2 } from '@/services/PromotionEngineV2';
+import { PromotionEngine } from '@/services/PromotionEngine';
 
-const promotionEngine = new PromotionEngineV2(db);
+const promotionEngine = new PromotionEngine(db);
 
 const cart = {
     items: [
@@ -111,7 +111,7 @@ if (wasFirstOrder) {
 **Replace the old promotion logic with:**
 ```typescript
 // In createOrder() method:
-const promotionEngine = new PromotionEngineV2(this.db);
+const promotionEngine = new PromotionEngine(this.db);
 
 const cart = {
     items: itemsToCreate,
@@ -140,11 +140,11 @@ if (promoResult.promotions.length > 0) {
 }
 ```
 
-### Priority 2: Admin Panel - Promotions V2 Page (2-3 hours)
-**Create:** `admin-panel/src/app/dashboard/promotions-v2/page.tsx`
+### Priority 2: Admin Panel - Promotions Page (2-3 hours)
+**Create:** `admin-panel/src/app/dashboard/promotions/page.tsx`
 
 **Features Needed:**
-- ✅ List all promotions (from `promotions_v2` table)
+- ✅ List all promotions (from `promotions` table)
 - ✅ Create new promotion modal
 - ✅ Edit existing promotion
 - ✅ Delete promotion
@@ -212,7 +212,7 @@ if (promoResult.promotions.length > 0) {
 ### 1. Test First Order Promo (5 minutes)
 ```sql
 -- Check if first order promo was created
-SELECT * FROM promotions_v2 WHERE code = 'FIRST_ORDER_AUTO';
+SELECT * FROM promotions WHERE code = 'FIRST_ORDER_AUTO';
 
 -- Test on a fresh user
 SELECT user_id, has_used_first_order_promo 
@@ -224,7 +224,7 @@ WHERE user_id = 'your-test-user-id';
 
 ### 2. Create a Simple Promo Code (SQL - 2 minutes)
 ```sql
-INSERT INTO promotions_v2 (name, code, type, target, discount_value, is_active, priority)
+INSERT INTO promotions (name, code, type, target, discount_value, is_active, priority)
 VALUES (
     '20% Off Summer Sale',
     'SUMMER20',
@@ -239,7 +239,7 @@ VALUES (
 ### 3. Test the Engine (Code - 5 minutes)
 ```typescript
 // In any resolver or service:
-const engine = new PromotionEngineV2(db);
+const engine = new PromotionEngine(db);
 
 const testCart = {
     items: [],
@@ -259,7 +259,7 @@ console.log('Applied discount:', result.totalDiscount); // Should be 5.00 (20% o
 ```
 USER CART
     ↓
-PromotionEngineV2.applyPromotions()
+PromotionEngine.applyPromotions()
     ↓
 1. Get applicable promotions (filters by target, dates, limits)
 2. Calculate discounts for each
@@ -290,7 +290,7 @@ Analytics updated automatically
 
 ### Get user's available promotions:
 ```typescript
-const engine = new PromotionEngineV2(db);
+const engine = new PromotionEngine(db);
 const promos = await engine.getApplicablePromotions(userId, cart);
 ```
 
@@ -309,7 +309,7 @@ SELECT balance FROM user_wallet WHERE user_id = $1;
 ### Analytics - Most used promo:
 ```sql
 SELECT name, total_usage_count, total_revenue
-FROM promotions_v2
+FROM promotions
 ORDER BY total_usage_count DESC
 LIMIT 10;
 ```
@@ -318,7 +318,7 @@ LIMIT 10;
 
 ## ✅ Next Session TODO
 
-1. [ ] Integrate PromotionEngineV2 into OrderService
+1. [ ] Integrate PromotionEngine into OrderService
 2. [ ] Create admin UI for promotions management
 3. [ ] Add wallet management to admin panel
 4. [ ] Update mobile cart to show auto-applied promos

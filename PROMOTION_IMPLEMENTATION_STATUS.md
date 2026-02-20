@@ -1,4 +1,4 @@
-# 🎯 Promotion System V2 - Complete Implementation
+# 🎯 Promotion System - Complete Implementation
 
 ## ✅ Migration Applied Successfully
 
@@ -16,7 +16,7 @@
 
 ### Tables Created:
 
-1. **`promotions_v2`** - Main promotion configurations
+1. **`promotions`** - Main promotion configurations
 2. **`user_promotions`** - User-specific promotion assignments
 3. **`promotion_usage`** - Redemption tracking & analytics
 4. **`promotion_business_eligibility`** - Business restrictions
@@ -87,7 +87,7 @@ VALUES ('user-uuid', 'promo-uuid', 'admin-uuid', '2026-12-31');
 ### 4️⃣ Conditional Promotions (Spend X, Get Y)
 **Status:** ✅ Schema ready via `spend_threshold` and `threshold_reward`
 
-**Configuration in `promotions_v2`:**
+**Configuration in `promotions`:**
 ```sql
 spend_threshold: 15.00  -- Spend $15
 threshold_reward: {
@@ -149,15 +149,15 @@ threshold_reward: {
 ### 🚧 To Implement:
 
 #### Backend (Urgent):
-1. **PromotionEngineV2 Service** - Core validation & application logic
+1. **PromotionEngine Service** - Core validation & application logic
 2. **WalletService** - Credit management
-3. **PromotionRepositoryV2** - Data access layer
+3. **PromotionRepository** - Data access layer
 4. **GraphQL resolvers** - CRUD + validation endpoints
 5. **OrderService integration** - Auto-apply promotions during checkout
 6. **Analytics queries** - Usage tracking
 
 #### Admin Panel:
-1. Promotions V2 page (all promotion types)
+1. Promotions page (all promotion types)
 2. User-specific promotion assignment UI
 3. Wallet management (view balance, add credit)
 4. Analytics dashboard (revenue impact, usage stats)
@@ -176,7 +176,7 @@ threshold_reward: {
 ### Phase 1: Backend Core (HIGH PRIORITY)
 **Goal:** Make promotion system functional
 
-1. Create `PromotionEngineV2Service` with methods:
+1. Create `PromotionEngineService` with methods:
    - `validatePromotionsForOrder(userId, cart, delivery)` → Returns applicable promos
    - `applyBestPromotion(promos)` → Picks best deal
    - `recordUsage(promo, order)` → Tracks analytics
@@ -188,7 +188,7 @@ threshold_reward: {
    - `deductCredit(userId, amount, orderId)` → Use at checkout
    - `refund(orderId)` → Process refund
 
-3. Create `PromotionRepositoryV2`:
+3. Create `PromotionRepository`:
    - Basic CRUD
    - `findApplicableForUser(userId, cart)` → Query logic
    - `findConditionalPromotions(businessIds)` → Conditional promos
@@ -216,10 +216,10 @@ threshold_reward: {
 
 ### Phase 3: Admin Panel
 **Pages:**
-- `/promotions-v2` → List all promotions
-- `/promotions-v2/create` → Create new promo
-- `/promotions-v2/[id]/edit` → Edit promo
-- `/promotions-v2/analytics` → Usage dashboard
+- `/promotions` → List all promotions
+- `/promotions/create` → Create new promo
+- `/promotions/[id]/edit` → Edit promo
+- `/promotions/analytics` → Usage dashboard
 - `/users/[id]/wallet` → Manage user wallet
 - `/users/[id]/promotions` → Assign user promos
 
@@ -249,7 +249,7 @@ SELECT balance FROM user_wallet WHERE user_id = 'user-uuid';
 
 ### Find applicable promotions for cart:
 ```sql
-SELECT p.* FROM promotions_v2 p
+SELECT p.* FROM promotions p
 WHERE p.is_active = true
 AND (p.starts_at IS NULL OR p.starts_at <= NOW())
 AND (p.ends_at IS NULL OR p.ends_at >= NOW())
@@ -288,9 +288,9 @@ AND (
 ## 📊 Analytics Tracking
 
 **Built-in Fields:**
-- `promotions_v2.total_revenue` - Revenue from promo
-- `promotions_v2.total_usage_count` - Times used
-- `promotions_v2.current_global_usage` - Real-time counter
+- `promotions.total_revenue` - Revenue from promo
+- `promotions.total_usage_count` - Times used
+- `promotions.current_global_usage` - Real-time counter
 - `user_promo_metadata.total_savings` - Per-user savings
 - `promotion_usage` - Full redemption history with order context
 

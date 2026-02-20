@@ -26,3 +26,21 @@ input WorkingHoursInput {
 input SubscriptionInput {
     token: String!
 }
+
+type StoreStatus {
+    isStoreClosed: Boolean!
+    closedMessage: String
+}
+
+input UpdateStoreStatusInput {
+    isStoreClosed: Boolean!
+    closedMessage: String
+}
+
+type Query {
+    getStoreStatus: StoreStatus!
+}
+
+type Mutation {
+    updateStoreStatus(input: UpdateStoreStatusInput!): StoreStatus!
+}
