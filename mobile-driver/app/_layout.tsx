@@ -7,7 +7,7 @@ import Providers from '@/lib/graphql/providers';
 import { useDriverTracking } from '@/hooks/useDriverTracking';
 import Mapbox from '@rnmapbox/maps';
 import { MAPBOX_TOKEN } from '@/utils/mapbox';
-import { initSentry, Sentry } from '@/lib/sentry';
+import { initSentry } from '@/lib/sentry';
 
 // ── Initialise Sentry before anything else renders ──
 initSentry();
@@ -47,5 +47,3 @@ export default function RootLayout() {
         </Providers>
     );
 }
-
-export default Sentry.wrap(RootLayout);

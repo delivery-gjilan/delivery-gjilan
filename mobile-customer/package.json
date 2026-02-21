@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "prestart": "npm run validate:translations",
-    "start": "graphql-codegen --watch > logs/codegen.log 2>&1 & expo start",
+    "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",

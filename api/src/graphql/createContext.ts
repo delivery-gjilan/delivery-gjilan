@@ -2,6 +2,7 @@ import { YogaInitialContext } from 'graphql-yoga';
 import jwt from 'jsonwebtoken';
 import { getDB } from '@/database';
 import { BusinessRepository } from '@/repositories/BusinessRepository';
+import { BusinessHoursRepository } from '@/repositories/BusinessHoursRepository';
 import { BusinessService } from '@/services/BusinessService';
 import { ProductCategoryRepository } from '@/repositories/ProductCategoryRepository';
 import { ProductCategoryService } from '@/services/ProductCategoryService';
@@ -88,6 +89,7 @@ export async function createContext(initialContext: YogaInitialContext): Promise
 
     // Initialize repositories
     const businessRepository = new BusinessRepository(db);
+    const businessHoursRepository = new BusinessHoursRepository(db);
     const productCategoryRepository = new ProductCategoryRepository(db);
     const productSubcategoryRepository = new ProductSubcategoryRepository(db);
     const productRepository = new ProductRepository(db);
@@ -95,7 +97,7 @@ export async function createContext(initialContext: YogaInitialContext): Promise
     const orderRepository = new OrderRepository();
 
     // Initialize services
-    const businessService = new BusinessService(businessRepository);
+    const businessService = new BusinessService(businessRepository, businessHoursRepository);
     const productCategoryService = new ProductCategoryService(productCategoryRepository);
     const productSubcategoryService = new ProductSubcategoryService(productSubcategoryRepository, productCategoryRepository);
     const productService = new ProductService(productRepository, db);

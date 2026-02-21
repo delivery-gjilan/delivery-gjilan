@@ -16,6 +16,7 @@ import {
     GET_BUSINESSES,
     UPDATE_BUSINESS,
 } from "@/graphql/operations/businesses";
+import ScheduleEditor from "@/components/businesses/ScheduleEditor";
 
 /* ---------------------------------------------------------
    GRAPHQL TYPES
@@ -43,6 +44,7 @@ interface Business {
     isActive: boolean;
     location?: Location;
     workingHours?: WorkingHours;
+    schedule?: Array<{ id: string; dayOfWeek: number; opensAt: string; closesAt: string }>;
 }
 
 interface GetBusinessesData {
@@ -299,7 +301,10 @@ export default function BusinessesPage() {
             },
         });
 
-        await refetch();
+        const result = await refetch();
+        // Update selected with fresh data so ScheduleEditor re-syncs
+        const freshBusiness = result.data?.businesses?.find((b: Business) => b.id === selected.id);
+        if (freshBusiness) setSelected(freshBusiness);
         setEditOpen(false);
     }
 
@@ -690,102 +695,109 @@ export default function BusinessesPage() {
                 onClose={() => setEditOpen(false)}
                 title="Edit Business"
             >
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Business Name *
-                        </label>
-                        <Input
-                            placeholder="e.g., My Restaurant"
-                            value={editForm.name}
-                            onChange={(e) =>
-                                setEditForm({ ...editForm, name: e.target.value })
-                            }
-                        />
-                    </div>
+                <div className="space-y-6">
+                    {/* Basic Information Section */}
+                    <div className="space-y-4">
+                        <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Basic Information</h3>
+                        
+                        <div>
+                            <label className="block text-sm font-medium text-gray-400 mb-1">
+                                Business Name *
+                            </label>
+                            <Input
+                                placeholder="e.g., My Restaurant"
+                                value={editForm.name}
+                                onChange={(e) =>
+                                    setEditForm({ ...editForm, name: e.target.value })
+                                }
+                            />
+                        </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Phone Number
-                        </label>
-                        <Input
-                            placeholder="e.g., +383 44 123 456"
-                            value={editForm.phoneNumber}
-                            onChange={(e) =>
-                                setEditForm({
-                                    ...editForm,
-                                    phoneNumber: e.target.value,
-                                })
-                            }
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Business Type *
-                        </label>
-                        <Select
-                            value={editForm.businessType}
-                            onChange={(e) =>
-                                setEditForm({
-                                    ...editForm,
-                                    businessType: e.target.value as BusinessType,
-                                })
-                            }
-                        >
-                            <option value="RESTAURANT">Restaurant</option>
-                            <option value="MARKET">Market</option>
-                            <option value="PHARMACY">Pharmacy</option>
-                        </Select>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Business Image (optional)
-                        </label>
-                        <input
-                            type="file"
-                            accept="image/jpeg,image/jpg,image/png,image/webp"
-                            onChange={handleEditImageChange}
-                            className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
-                        />
-                        {editImagePreview && (
-                            <div className="mt-2">
-                                <img
-                                    src={editImagePreview}
-                                    alt="Preview"
-                                    className="h-32 w-32 object-cover rounded"
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">
+                                    Phone Number
+                                </label>
+                                <Input
+                                    placeholder="e.g., +383 44 123 456"
+                                    value={editForm.phoneNumber}
+                                    onChange={(e) =>
+                                        setEditForm({
+                                            ...editForm,
+                                            phoneNumber: e.target.value,
+                                        })
+                                    }
                                 />
                             </div>
-                        )}
-                    </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Address *
-                        </label>
-                        <Input
-                            placeholder="e.g., 123 Main Street, City"
-                            value={editForm.location.address}
-                            onChange={(e) =>
-                                setEditForm({
-                                    ...editForm,
-                                    location: {
-                                        ...editForm.location,
-                                        address: e.target.value,
-                                    },
-                                })
-                            }
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-2">
-                            Location Coordinates
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
                             <div>
-                                <label className="block text-xs text-gray-500 mb-1">
+                                <label className="block text-sm font-medium text-gray-400 mb-1">
+                                    Business Type *
+                                </label>
+                                <Select
+                                    value={editForm.businessType}
+                                    onChange={(e) =>
+                                        setEditForm({
+                                            ...editForm,
+                                            businessType: e.target.value as BusinessType,
+                                        })
+                                    }
+                                >
+                                    <option value="RESTAURANT">Restaurant</option>
+                                    <option value="MARKET">Market</option>
+                                    <option value="PHARMACY">Pharmacy</option>
+                                </Select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-400 mb-1">
+                                Business Image (optional)
+                            </label>
+                            <input
+                                type="file"
+                                accept="image/jpeg,image/jpg,image/png,image/webp"
+                                onChange={handleEditImageChange}
+                                className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
+                            />
+                            {editImagePreview && (
+                                <div className="mt-2">
+                                    <img
+                                        src={editImagePreview}
+                                        alt="Preview"
+                                        className="h-32 w-32 object-cover rounded"
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Location Section */}
+                    <div className="border-t border-gray-700 pt-6 space-y-4">
+                        <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Location</h3>
+                        
+                        <div>
+                            <label className="block text-sm font-medium text-gray-400 mb-1">
+                                Address *
+                            </label>
+                            <Input
+                                placeholder="e.g., 123 Main Street, City"
+                                value={editForm.location.address}
+                                onChange={(e) =>
+                                    setEditForm({
+                                        ...editForm,
+                                        location: {
+                                            ...editForm.location,
+                                            address: e.target.value,
+                                        },
+                                    })
+                                }
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">
                                     Latitude
                                 </label>
                                 <Input
@@ -805,7 +817,7 @@ export default function BusinessesPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs text-gray-500 mb-1">
+                                <label className="block text-sm font-medium text-gray-400 mb-1">
                                     Longitude
                                 </label>
                                 <Input
@@ -827,13 +839,14 @@ export default function BusinessesPage() {
                         </div>
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-2">
-                            Working Hours *
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
+                    {/* Operating Hours (Legacy) */}
+                    <div className="border-t border-gray-700 pt-6 space-y-4">
+                        <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Default Hours</h3>
+                        <p className="text-xs text-gray-500">Fallback hours when no daily schedule is set</p>
+                        
+                        <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-xs text-gray-500 mb-1">
+                                <label className="block text-sm font-medium text-gray-400 mb-1">
                                     Opens At
                                 </label>
                                 <Input
@@ -851,7 +864,7 @@ export default function BusinessesPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs text-gray-500 mb-1">
+                                <label className="block text-sm font-medium text-gray-400 mb-1">
                                     Closes At
                                 </label>
                                 <Input
@@ -871,9 +884,24 @@ export default function BusinessesPage() {
                         </div>
                     </div>
 
+                    {/* Per-day Schedule Editor */}
+                    <div className="border-t border-gray-700 pt-6">
+                        {selected && (
+                            <ScheduleEditor
+                                businessId={selected.id}
+                                schedule={selected.schedule ?? []}
+                                onSaved={async () => {
+                                    const result = await refetch();
+                                    const freshBusiness = result.data?.businesses?.find((b: Business) => b.id === selected.id);
+                                    if (freshBusiness) setSelected(freshBusiness);
+                                }}
+                            />
+                        )}
+                    </div>
+
                     <Button
                         variant="primary"
-                        className="w-full mt-2"
+                        className="w-full"
                         onClick={handleEdit}
                         disabled={uploadingImage}
                     >

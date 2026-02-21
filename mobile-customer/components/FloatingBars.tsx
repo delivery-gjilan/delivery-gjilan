@@ -9,8 +9,8 @@ export const FloatingBars = () => {
     const insets = useSafeAreaInsets();
 
     // Routes where floating bars should not appear
-    const hiddenRoutes = ['/product/', '/cart', '/orders'];
-    const shouldHide = hiddenRoutes.some((route) => pathname.startsWith(route));
+    const hiddenRoutes = ['/product/', '/cart', '/orders', '/login', '/signup', '/auth-selection', '/invite-friends'];
+    const shouldHide = hiddenRoutes.some((route) => pathname.startsWith(route)) || pathname === '/';
 
     if (shouldHide) return null;
 

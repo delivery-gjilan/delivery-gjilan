@@ -20,6 +20,12 @@ export const CREATE_BUSINESS = graphql(`
                 opensAt
                 closesAt
             }
+            schedule {
+                id
+                dayOfWeek
+                opensAt
+                closesAt
+            }
         }
     }
 `);
@@ -44,6 +50,12 @@ export const UPDATE_BUSINESS = graphql(`
                 opensAt
                 closesAt
             }
+            schedule {
+                id
+                dayOfWeek
+                opensAt
+                closesAt
+            }
         }
     }
 `);
@@ -51,5 +63,16 @@ export const UPDATE_BUSINESS = graphql(`
 export const DELETE_BUSINESS = graphql(`
     mutation DeleteBusiness($id: ID!) {
         deleteBusiness(id: $id)
+    }
+`);
+
+export const SET_BUSINESS_SCHEDULE = graphql(`
+    mutation SetBusinessSchedule($businessId: ID!, $schedule: [BusinessDayHoursInput!]!) {
+        setBusinessSchedule(businessId: $businessId, schedule: $schedule) {
+            id
+            dayOfWeek
+            opensAt
+            closesAt
+        }
     }
 `);

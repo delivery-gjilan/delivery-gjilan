@@ -14,11 +14,29 @@ export const Business: BusinessResolvers = {
     isOpen: (parent) => {
         const now = new Date();
         const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        const currentDay = now.getDay(); // 0 = Sunday
+
+        // If a per-day schedule exists, use it
+        if (parent.schedule && parent.schedule.length > 0) {
+            const todaySlots = parent.schedule.filter((s) => s.dayOfWeek === currentDay);
+            if (todaySlots.length === 0) return false; // no slot → closed today
+
+            return todaySlots.some((slot) => {
+                const opensAt = parseTimeToMinutes(slot.opensAt);
+                const closesAt = parseTimeToMinutes(slot.closesAt);
+                if (closesAt <= opensAt) {
+                    // crosses midnight
+                    return currentMinutes >= opensAt || currentMinutes < closesAt;
+                }
+                return currentMinutes >= opensAt && currentMinutes < closesAt;
+            });
+        }
+
+        // Fallback to legacy workingHours on the business row
         const opensAt = parseTimeToMinutes(parent.workingHours.opensAt);
         const closesAt = parseTimeToMinutes(parent.workingHours.closesAt);
 
         if (closesAt <= opensAt) {
-            // Schedule crosses midnight (e.g. 22:00 – 02:00)
             return currentMinutes >= opensAt || currentMinutes < closesAt;
         }
         return currentMinutes >= opensAt && currentMinutes < closesAt;

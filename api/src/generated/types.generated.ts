@@ -149,8 +149,23 @@ export type Business = {
   name: Scalars['String']['output'];
   phoneNumber?: Maybe<Scalars['String']['output']>;
   prepTimeOverrideMinutes?: Maybe<Scalars['Int']['output']>;
+  schedule: Array<BusinessDayHours>;
   updatedAt: Scalars['Date']['output'];
   workingHours: WorkingHours;
+};
+
+export type BusinessDayHours = {
+  __typename?: 'BusinessDayHours';
+  closesAt: Scalars['String']['output'];
+  dayOfWeek: Scalars['Int']['output'];
+  id: Scalars['ID']['output'];
+  opensAt: Scalars['String']['output'];
+};
+
+export type BusinessDayHoursInput = {
+  closesAt: Scalars['String']['input'];
+  dayOfWeek: Scalars['Int']['input'];
+  opensAt: Scalars['String']['input'];
 };
 
 export type BusinessType =
@@ -391,6 +406,7 @@ export type Mutation = {
   markSettlementsAsPaid: Array<Settlement>;
   removeUserFromPromotion: Scalars['Boolean']['output'];
   resendEmailVerification: SignupStepResponse;
+  setBusinessSchedule: Array<BusinessDayHours>;
   setDefaultAddress: Scalars['Boolean']['output'];
   submitPhoneNumber: SignupStepResponse;
   unsettleSettlement: Settlement;
@@ -576,6 +592,12 @@ export type MutationmarkSettlementsAsPaidArgs = {
 export type MutationremoveUserFromPromotionArgs = {
   promotionId: Scalars['ID']['input'];
   userId: Scalars['ID']['input'];
+};
+
+
+export type MutationsetBusinessScheduleArgs = {
+  businessId: Scalars['ID']['input'];
+  schedule: Array<BusinessDayHoursInput>;
 };
 
 
@@ -1494,6 +1516,8 @@ export type ResolversTypes = {
   AuditLogConnection: ResolverTypeWrapper<Omit<AuditLogConnection, 'logs'> & { logs: Array<ResolversTypes['AuditLog']> }>;
   AuthResponse: ResolverTypeWrapper<Omit<AuthResponse, 'user'> & { user: ResolversTypes['User'] }>;
   Business: ResolverTypeWrapper<Omit<Business, 'businessType'> & { businessType: ResolversTypes['BusinessType'] }>;
+  BusinessDayHours: ResolverTypeWrapper<BusinessDayHours>;
+  BusinessDayHoursInput: BusinessDayHoursInput;
   BusinessType: ResolverTypeWrapper<'MARKET' | 'PHARMACY' | 'RESTAURANT'>;
   CartContextInput: CartContextInput;
   CartItemInput: CartItemInput;
@@ -1586,6 +1610,8 @@ export type ResolversParentTypes = {
   AuditLogConnection: Omit<AuditLogConnection, 'logs'> & { logs: Array<ResolversParentTypes['AuditLog']> };
   AuthResponse: Omit<AuthResponse, 'user'> & { user: ResolversParentTypes['User'] };
   Business: Business;
+  BusinessDayHours: BusinessDayHours;
+  BusinessDayHoursInput: BusinessDayHoursInput;
   CartContextInput: CartContextInput;
   CartItemInput: CartItemInput;
   CreateBusinessInput: CreateBusinessInput;
@@ -1714,8 +1740,17 @@ export type BusinessResolvers<ContextType = GraphQLContext, ParentType extends R
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   phoneNumber?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   prepTimeOverrideMinutes?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
+  schedule?: Resolver<Array<ResolversTypes['BusinessDayHours']>, ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
   workingHours?: Resolver<ResolversTypes['WorkingHours'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type BusinessDayHoursResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['BusinessDayHours'] = ResolversParentTypes['BusinessDayHours']> = {
+  closesAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  dayOfWeek?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  opensAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -1808,6 +1843,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   markSettlementsAsPaid?: Resolver<Array<ResolversTypes['Settlement']>, ParentType, ContextType, RequireFields<MutationmarkSettlementsAsPaidArgs, 'ids'>>;
   removeUserFromPromotion?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationremoveUserFromPromotionArgs, 'promotionId' | 'userId'>>;
   resendEmailVerification?: Resolver<ResolversTypes['SignupStepResponse'], ParentType, ContextType>;
+  setBusinessSchedule?: Resolver<Array<ResolversTypes['BusinessDayHours']>, ParentType, ContextType, RequireFields<MutationsetBusinessScheduleArgs, 'businessId' | 'schedule'>>;
   setDefaultAddress?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationsetDefaultAddressArgs, 'id'>>;
   submitPhoneNumber?: Resolver<ResolversTypes['SignupStepResponse'], ParentType, ContextType, RequireFields<MutationsubmitPhoneNumberArgs, 'input'>>;
   unsettleSettlement?: Resolver<ResolversTypes['Settlement'], ParentType, ContextType, RequireFields<MutationunsettleSettlementArgs, 'settlementId'>>;
@@ -2232,6 +2268,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   AuditLogConnection?: AuditLogConnectionResolvers<ContextType>;
   AuthResponse?: AuthResponseResolvers<ContextType>;
   Business?: BusinessResolvers<ContextType>;
+  BusinessDayHours?: BusinessDayHoursResolvers<ContextType>;
   BusinessType?: BusinessTypeResolvers;
   Date?: GraphQLScalarType;
   DateTime?: GraphQLScalarType;

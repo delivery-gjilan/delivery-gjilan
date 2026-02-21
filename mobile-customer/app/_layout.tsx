@@ -11,7 +11,7 @@ import { FloatingBars } from '@/components/FloatingBars';
 import { useActiveOrdersTracking } from '@/hooks/useActiveOrdersTracking';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import StoreClosedScreen from '@/components/StoreClosedScreen';
-import { initSentry, Sentry } from '@/lib/sentry';
+import { initSentry } from '@/lib/sentry';
 
 // ── Initialise Sentry before anything else renders ──
 initSentry();
@@ -95,5 +95,3 @@ export default function RootLayout() {
         </ApolloProvider>
     );
 }
-
-export default Sentry.wrap(RootLayout);

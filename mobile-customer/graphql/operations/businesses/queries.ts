@@ -19,6 +19,12 @@ export const GET_BUSINESSES = graphql(`
                 opensAt
                 closesAt
             }
+            schedule {
+                id
+                dayOfWeek
+                opensAt
+                closesAt
+            }
             isOpen
             createdAt
             updatedAt
@@ -42,6 +48,12 @@ export const GET_BUSINESS = graphql(`
                 address
             }
             workingHours {
+                opensAt
+                closesAt
+            }
+            schedule {
+                id
+                dayOfWeek
                 opensAt
                 closesAt
             }

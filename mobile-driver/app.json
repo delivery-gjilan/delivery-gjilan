@@ -67,7 +67,6 @@
           }
         }
       ],
-      "expo-sqlite",
       [
         "expo-location",
         {

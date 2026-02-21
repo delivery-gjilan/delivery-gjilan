@@ -23,6 +23,19 @@ input WorkingHoursInput {
     closesAt: String! # "23:00"
 }
 
+type BusinessDayHours {
+    id: ID!
+    dayOfWeek: Int!    # 0=Sun … 6=Sat
+    opensAt: String!   # "HH:MM"
+    closesAt: String!  # "HH:MM"
+}
+
+input BusinessDayHoursInput {
+    dayOfWeek: Int!    # 0=Sun … 6=Sat
+    opensAt: String!   # "HH:MM"
+    closesAt: String!  # "HH:MM"
+}
+
 input SubscriptionInput {
     token: String!
 }

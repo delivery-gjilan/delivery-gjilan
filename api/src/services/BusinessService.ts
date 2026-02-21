@@ -1,10 +1,14 @@
 import { BusinessRepository } from '@/repositories/BusinessRepository';
-import { Business, CreateBusinessInput, UpdateBusinessInput } from '@/generated/types.generated';
+import { BusinessHoursRepository, DbBusinessHours } from '@/repositories/BusinessHoursRepository';
+import { Business, BusinessDayHours, BusinessDayHoursInput, CreateBusinessInput, UpdateBusinessInput } from '@/generated/types.generated';
 import { businessValidator } from '@/validators/BusinessValidator';
 import { DbBusiness } from '@/database/schema/businesses';
 
 export class BusinessService {
-    constructor(private businessRepository: BusinessRepository) {}
+    constructor(
+        private businessRepository: BusinessRepository,
+        private businessHoursRepository: BusinessHoursRepository,
+    ) {}
 
     private timeStringToMinutes(time: string): number {
         const [hours, minutes] = time.split(':').map(Number);
@@ -17,7 +21,16 @@ export class BusinessService {
         return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
     }
 
-    private mapToBusiness(business: DbBusiness): Business {
+    private mapHoursRow(row: DbBusinessHours): BusinessDayHours {
+        return {
+            id: row.id,
+            dayOfWeek: row.dayOfWeek,
+            opensAt: this.minutesToTimeString(row.opensAt),
+            closesAt: this.minutesToTimeString(row.closesAt),
+        };
+    }
+
+    private mapToBusiness(business: DbBusiness, schedule: DbBusinessHours[] = []): Business {
         return {
             ...business,
             phoneNumber: business.phoneNumber ?? null,
@@ -30,12 +43,13 @@ export class BusinessService {
                 opensAt: this.minutesToTimeString(business.opensAt),
                 closesAt: this.minutesToTimeString(business.closesAt),
             },
+            schedule: schedule.map((r) => this.mapHoursRow(r)),
             avgPrepTimeMinutes: business.avgPrepTimeMinutes,
             prepTimeOverrideMinutes: business.prepTimeOverrideMinutes ?? null,
             isActive: business.isActive ?? true,
             createdAt: new Date(business.createdAt),
             updatedAt: new Date(business.updatedAt),
-            isOpen: true,
+            isOpen: true, // computed by field resolver
         };
     }
 
@@ -59,18 +73,32 @@ export class BusinessService {
             isActive: true,
         });
 
-        return this.mapToBusiness(createdBusiness);
+        return this.mapToBusiness(createdBusiness, []);
     }
 
     async getBusiness(id: string): Promise<Business | null> {
         const business = await this.businessRepository.findById(id);
         if (!business) return null;
-        return this.mapToBusiness(business);
+        const schedule = await this.businessHoursRepository.findByBusinessId(id);
+        return this.mapToBusiness(business, schedule);
     }
 
     async getBusinesses(): Promise<Business[]> {
-        const businesses = await this.businessRepository.findAll();
-        return businesses.map((b) => this.mapToBusiness(b));
+        const allBusinesses = await this.businessRepository.findAll();
+        if (allBusinesses.length === 0) return [];
+
+        const allIds = allBusinesses.map((b) => b.id);
+        const allHours = await this.businessHoursRepository.findByBusinessIds(allIds);
+
+        // Group hours by businessId
+        const hoursByBiz = new Map<string, DbBusinessHours[]>();
+        for (const h of allHours) {
+            const arr = hoursByBiz.get(h.businessId) ?? [];
+            arr.push(h);
+            hoursByBiz.set(h.businessId, arr);
+        }
+
+        return allBusinesses.map((b) => this.mapToBusiness(b, hoursByBiz.get(b.id) ?? []));
     }
 
     async updateBusiness(id: string, input: UpdateBusinessInput): Promise<Business> {
@@ -96,10 +124,40 @@ export class BusinessService {
         const updatedBusiness = await this.businessRepository.update(id, updateData);
         if (!updatedBusiness) throw new Error('Business not found');
 
-        return this.mapToBusiness(updatedBusiness);
+        const schedule = await this.businessHoursRepository.findByBusinessId(id);
+        return this.mapToBusiness(updatedBusiness, schedule);
     }
 
     async deleteBusiness(id: string): Promise<boolean> {
         return this.businessRepository.delete(id);
+    }
+
+    // ── Schedule (per-day hours) ────────────────────────────────
+
+    async setBusinessSchedule(businessId: string, slots: BusinessDayHoursInput[]): Promise<BusinessDayHours[]> {
+        // Validate
+        for (const s of slots) {
+            if (s.dayOfWeek < 0 || s.dayOfWeek > 6) throw new Error(`Invalid dayOfWeek: ${s.dayOfWeek}`);
+            const openMin = this.timeStringToMinutes(s.opensAt);
+            const closeMin = this.timeStringToMinutes(s.closesAt);
+            if (openMin < 0 || openMin > 1439) throw new Error(`Invalid opensAt: ${s.opensAt}`);
+            if (closeMin < 0 || closeMin > 1439) throw new Error(`Invalid closesAt: ${s.closesAt}`);
+        }
+
+        const rows = await this.businessHoursRepository.replaceSchedule(
+            businessId,
+            slots.map((s) => ({
+                dayOfWeek: s.dayOfWeek,
+                opensAt: this.timeStringToMinutes(s.opensAt),
+                closesAt: this.timeStringToMinutes(s.closesAt),
+            })),
+        );
+
+        return rows.map((r) => this.mapHoursRow(r));
+    }
+
+    async getBusinessSchedule(businessId: string): Promise<BusinessDayHours[]> {
+        const rows = await this.businessHoursRepository.findByBusinessId(businessId);
+        return rows.map((r) => this.mapHoursRow(r));
     }
 }

@@ -1,5 +1,6 @@
 import { getDB } from '.';
 import { businesses, NewDbBusiness } from './schema/businesses';
+import { businessHours } from './schema/businessHours';
 import { productCategories, NewDbProductCategory } from './schema/productCategories';
 import { productSubcategories, NewDbProductSubcategory } from './schema/productSubcategories';
 import { products, NewDbProduct } from './schema/products';
@@ -322,6 +323,19 @@ async function seed() {
         const [createdBusiness] = await db.insert(businesses).values(business).returning();
         console.log(`🏪 Created business: ${createdBusiness.name}`);
 
+        // Seed per-day schedule (Mon-Sat open, Sunday closed)
+        const scheduleSlots = [];
+        for (let day = 1; day <= 6; day++) { // Mon(1) - Sat(6)
+            scheduleSlots.push({
+                businessId: createdBusiness.id,
+                dayOfWeek: day,
+                opensAt: restaurantData.opensAt,
+                closesAt: restaurantData.closesAt,
+            });
+        }
+        await db.insert(businessHours).values(scheduleSlots);
+        console.log(`  🕐 Added ${scheduleSlots.length}-day schedule`);
+
         const businessProducts: Array<{ id: string; name: string; price: number }> = [];
 
         // Create categories and products
@@ -390,6 +404,19 @@ async function seed() {
 
         const [createdBusiness] = await db.insert(businesses).values(business).returning();
         console.log(`🏪 Created market: ${createdBusiness.name}`);
+
+        // Seed per-day schedule (all 7 days for a market)
+        const marketScheduleSlots = [];
+        for (let day = 0; day <= 6; day++) {
+            marketScheduleSlots.push({
+                businessId: createdBusiness.id,
+                dayOfWeek: day,
+                opensAt: marketData.opensAt,
+                closesAt: marketData.closesAt,
+            });
+        }
+        await db.insert(businessHours).values(marketScheduleSlots);
+        console.log(`  🕐 Added 7-day schedule`);
 
         const businessProducts: Array<{ id: string; name: string; price: number }> = [];
 

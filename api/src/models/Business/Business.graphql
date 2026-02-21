@@ -13,6 +13,7 @@ type Business {
     isActive: Boolean!
     location: Location!
     workingHours: WorkingHours!
+    schedule: [BusinessDayHours!]!
     avgPrepTimeMinutes: Int!
     prepTimeOverrideMinutes: Int
     commissionPercentage: Float!
@@ -53,4 +54,5 @@ type Mutation {
     createBusiness(input: CreateBusinessInput!): Business!
     updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
     deleteBusiness(id: ID!): Boolean!
+    setBusinessSchedule(businessId: ID!, schedule: [BusinessDayHoursInput!]!): [BusinessDayHours!]!
 }

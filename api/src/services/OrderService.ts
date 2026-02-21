@@ -6,6 +6,7 @@ import {
     orderItems as orderItemsTable,
     products as productsTable,
     businesses as businessesTable,
+    businessHours as businessHoursTable,
     userBehaviors as userBehaviorsTable,
     productStocks as productStocksTable,
     orderPromotions as orderPromotionsTable,
@@ -83,6 +84,47 @@ export class OrderService {
         }
 
         log.debug({ itemsTotal: calculatedItemsTotal, deliveryPrice: input.deliveryPrice }, 'order:totals');
+
+        // 2b. Check that all businesses are currently open
+        const now = new Date();
+        const currentDay = now.getDay(); // 0 = Sunday
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        const db = await getDB();
+
+        for (const bizId of businessIds) {
+            const hoursRows = await db
+                .select()
+                .from(businessHoursTable)
+                .where(
+                    sql`${businessHoursTable.businessId} = ${bizId} AND ${businessHoursTable.dayOfWeek} = ${currentDay}`,
+                );
+
+            if (hoursRows.length === 0) {
+                // No schedule rows for today — check legacy opensAt/closesAt on business row
+                const [biz] = await db.select().from(businessesTable).where(eq(businessesTable.id, bizId));
+                if (biz) {
+                    const isOpenLegacy =
+                        biz.closesAt <= biz.opensAt
+                            ? currentMinutes >= biz.opensAt || currentMinutes < biz.closesAt
+                            : currentMinutes >= biz.opensAt && currentMinutes < biz.closesAt;
+                    if (!isOpenLegacy) {
+                        throw new GraphQLError(`Business "${biz.name}" is currently closed.`);
+                    }
+                }
+            } else {
+                const isOpenNow = hoursRows.some((slot) => {
+                    if (slot.closesAt <= slot.opensAt) {
+                        return currentMinutes >= slot.opensAt || currentMinutes < slot.closesAt;
+                    }
+                    return currentMinutes >= slot.opensAt && currentMinutes < slot.closesAt;
+                });
+                if (!isOpenNow) {
+                    const [biz] = await db.select().from(businessesTable).where(eq(businessesTable.id, bizId));
+                    throw new GraphQLError(`Business "${biz?.name ?? bizId}" is currently closed.`);
+                }
+            }
+        }
+
         // 3. Apply PromotionEngine (server-side validation)
         const promotionEngine = new PromotionEngine(await getDB());
         const cartContext = {
@@ -173,7 +215,6 @@ export class OrderService {
         }
 
         // Decrement stock for ordered products (ensure it doesn't go below 0)
-        const db = await getDB();
         for (const item of itemsToCreate) {
             // Check if productStock entry exists
             const existingStock = await db.select().from(productStocksTable)

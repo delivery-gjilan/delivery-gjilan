@@ -279,13 +279,28 @@ export function BusinessHeader({ business, scrollY }: { business: Partial<Busine
                         </Text>
                     </View>
 
-                    <View
-                        className="px-2.5 py-1 rounded-md"
-                        style={{ backgroundColor: business.isOpen ? '#10b981' : '#ef4444' }}
-                    >
-                        <Text className="text-white text-xs font-semibold">
-                            {business.isOpen ? 'Open' : 'Closed'}
-                        </Text>
+                    <View className="flex-row items-center gap-2">
+                        <View
+                            className="px-2.5 py-1 rounded-md"
+                            style={{ backgroundColor: business.isOpen ? '#10b981' : '#ef4444' }}
+                        >
+                            <Text className="text-white text-xs font-semibold">
+                                {business.isOpen ? 'Open' : 'Closed'}
+                            </Text>
+                        </View>
+                        {(() => {
+                            const schedule = business.schedule;
+                            if (!schedule || schedule.length === 0) return null;
+                            const today = new Date().getDay();
+                            const todaySlots = schedule.filter((s) => s.dayOfWeek === today);
+                            if (todaySlots.length === 0) return null;
+                            const label = todaySlots.map((s) => `${s.opensAt}–${s.closesAt}`).join(', ');
+                            return (
+                                <Text className="text-xs" style={{ color: theme.colors.textSecondary }}>
+                                    {label}
+                                </Text>
+                            );
+                        })()}
                     </View>
                 </View>
             </Animated.View>

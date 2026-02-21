@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "prestart": "npm run validate:translations",
-    "start": "graphql-codegen --watch > logs/codegen.log 2>&1 & expo start",
+    "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
@@ -63,6 +63,7 @@
     "react-native-svg": "^15.15.0",
     "react-native-web": "~0.21.0",
     "react-native-worklets": "0.5.1",
+    "rxjs": "^7.8.2",
     "socket.io-client": "^4.8.3",
     "tailwind-merge": "^3.4.0",
     "zod": "^3.25.76",

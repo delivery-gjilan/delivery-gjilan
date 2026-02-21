@@ -1,4 +1,5 @@
 export * from './businesses';
+export * from './businessHours';
 export * from './orders';
 export * from './orderItems';
 export * from './products';

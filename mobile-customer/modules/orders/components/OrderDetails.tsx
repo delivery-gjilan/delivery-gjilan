@@ -294,8 +294,8 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                     )}
                 </View>
 
-                {/* Order Items by Business */
-                {order.businesses.map((businessOrder, index) => (
+                {/* Order Items by Business */}
+                {order.businesses?.map((businessOrder, index) => (
                     <View key={index} className="bg-white dark:bg-gray-800 rounded-3xl p-4 mb-4">
                         <View className="flex-row items-center mb-3">
                             {businessOrder.business.imageUrl ? (

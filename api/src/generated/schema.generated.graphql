@@ -124,8 +124,22 @@ type Business {
   name: String!
   phoneNumber: String
   prepTimeOverrideMinutes: Int
+  schedule: [BusinessDayHours!]!
   updatedAt: Date!
   workingHours: WorkingHours!
+}
+
+type BusinessDayHours {
+  closesAt: String!
+  dayOfWeek: Int!
+  id: ID!
+  opensAt: String!
+}
+
+input BusinessDayHoursInput {
+  closesAt: String!
+  dayOfWeek: Int!
+  opensAt: String!
 }
 
 enum BusinessType {
@@ -393,6 +407,7 @@ type Mutation {
   markSettlementsAsPaid(ids: [ID!]!): [Settlement!]!
   removeUserFromPromotion(promotionId: ID!, userId: ID!): Boolean!
   resendEmailVerification: SignupStepResponse!
+  setBusinessSchedule(businessId: ID!, schedule: [BusinessDayHoursInput!]!): [BusinessDayHours!]!
   setDefaultAddress(id: ID!): Boolean!
   submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
   unsettleSettlement(settlementId: ID!): Settlement!

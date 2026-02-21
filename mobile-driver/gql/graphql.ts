@@ -147,8 +147,23 @@ export type Business = {
   name: Scalars['String']['output'];
   phoneNumber?: Maybe<Scalars['String']['output']>;
   prepTimeOverrideMinutes?: Maybe<Scalars['Int']['output']>;
+  schedule: Array<BusinessDayHours>;
   updatedAt: Scalars['Date']['output'];
   workingHours: WorkingHours;
+};
+
+export type BusinessDayHours = {
+  __typename?: 'BusinessDayHours';
+  closesAt: Scalars['String']['output'];
+  dayOfWeek: Scalars['Int']['output'];
+  id: Scalars['ID']['output'];
+  opensAt: Scalars['String']['output'];
+};
+
+export type BusinessDayHoursInput = {
+  closesAt: Scalars['String']['input'];
+  dayOfWeek: Scalars['Int']['input'];
+  opensAt: Scalars['String']['input'];
 };
 
 export enum BusinessType {
@@ -392,6 +407,7 @@ export type Mutation = {
   markSettlementsAsPaid: Array<Settlement>;
   removeUserFromPromotion: Scalars['Boolean']['output'];
   resendEmailVerification: SignupStepResponse;
+  setBusinessSchedule: Array<BusinessDayHours>;
   setDefaultAddress: Scalars['Boolean']['output'];
   submitPhoneNumber: SignupStepResponse;
   unsettleSettlement: Settlement;
@@ -580,6 +596,12 @@ export type MutationRemoveUserFromPromotionArgs = {
 };
 
 
+export type MutationSetBusinessScheduleArgs = {
+  businessId: Scalars['ID']['input'];
+  schedule: Array<BusinessDayHoursInput>;
+};
+
+
 export type MutationSetDefaultAddressArgs = {
   id: Scalars['ID']['input'];
 };
@@ -697,10 +719,12 @@ export type Order = {
   orderPromotions?: Maybe<Array<OrderPromotion>>;
   originalDeliveryPrice?: Maybe<Scalars['Float']['output']>;
   originalPrice?: Maybe<Scalars['Float']['output']>;
+  pickupLocations: Array<Location>;
   status: OrderStatus;
   totalPrice: Scalars['Float']['output'];
   updatedAt: Scalars['Date']['output'];
   user?: Maybe<User>;
+  userId: Scalars['ID']['output'];
 };
 
 export type OrderBusiness = {
@@ -1277,6 +1301,8 @@ export type UpdateUserAddressInput = {
   addressName?: InputMaybe<Scalars['String']['input']>;
   displayName?: InputMaybe<Scalars['String']['input']>;
   id: Scalars['ID']['input'];
+  latitude?: InputMaybe<Scalars['Float']['input']>;
+  longitude?: InputMaybe<Scalars['Float']['input']>;
   priority?: InputMaybe<Scalars['Int']['input']>;
 };
 

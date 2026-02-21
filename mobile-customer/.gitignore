@@ -37,6 +37,10 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# logs
+logs/*
+!logs/.gitkeep
+
 app-example
 
 # generated native folders
