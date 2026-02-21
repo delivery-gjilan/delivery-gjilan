@@ -36,6 +36,7 @@ type OrderPromotion {
 
 type Order {
     id: ID!
+    userId: ID!
     orderPrice: Float!
     deliveryPrice: Float!
     originalPrice: Float
@@ -47,6 +48,7 @@ type Order {
     user: User
     driver: User
     dropOffLocation: Location!
+    pickupLocations: [Location!]!
     businesses: [OrderBusiness!]!
     orderPromotions: [OrderPromotion!]
 }

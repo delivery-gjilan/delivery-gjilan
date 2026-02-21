@@ -5,8 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Order } from '@/gql/graphql';
 import { Image } from 'expo-image';
-import { gql } from '@apollo/client';
 import { useQuery } from '@apollo/client/react';
+import { GET_ORDER_DRIVER } from '@/graphql/operations/orders';
 import { useEffect, useRef, useState } from 'react';
 import { useCartActions } from '@/modules/cart';
 
@@ -25,20 +25,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const [addressOverride, setAddressOverride] = useState<string | null>(null);
 
     const { data: driverData, refetch: refetchDriver } = useQuery(
-        gql`
-            query GetOrderDriver($id: ID!) {
-                order(id: $id) {
-                    id
-                    status
-                    driver {
-                        id
-                        firstName
-                        lastName
-                        phoneNumber
-                    }
-                }
-            }
-        `,
+        GET_ORDER_DRIVER,
         {
             variables: { id: order?.id ?? '' },
             skip: !order?.id,
@@ -307,38 +294,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                     )}
                 </View>
 
-                {/* Driver Info */}
-                <View className="bg-white dark:bg-gray-800 p-4 rounded-xl mb-4">
-                    <Text className="text-lg font-bold text-foreground mb-3">Driver</Text>
-                    <View className="flex-row items-center">
-                        <View
-                            className="w-12 h-12 rounded-full items-center justify-center mr-3"
-                            style={{ backgroundColor: theme.colors.border }}
-                        >
-                            <Ionicons name="person" size={20} color={theme.colors.subtext} />
-                        </View>
-                        <View className="flex-1">
-                            <Text className="text-base font-semibold text-foreground">
-                                {driverName || 'Driver not assigned yet'}
-                            </Text>
-                            <Text className="text-sm text-subtext">
-                                {driverVehicle || (driverPhone ? driverPhone : 'We’ll notify you once a driver is assigned.')}
-                            </Text>
-                        </View>
-                        <TouchableOpacity
-                            onPress={handleCallDriver}
-                            disabled={!driverPhone}
-                            className="px-3 py-2 rounded-full"
-                            style={{
-                                backgroundColor: driverPhone ? theme.colors.income : theme.colors.border,
-                            }}
-                        >
-                            <Ionicons name="call" size={18} color={driverPhone ? 'white' : theme.colors.subtext} />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                {/* Order Items by Business */}
+                {/* Order Items by Business */
                 {order.businesses.map((businessOrder, index) => (
                     <View key={index} className="bg-white dark:bg-gray-800 rounded-3xl p-4 mb-4">
                         <View className="flex-row items-center mb-3">

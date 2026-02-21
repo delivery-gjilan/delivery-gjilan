@@ -9,6 +9,7 @@ import { OrderService } from '@/services/OrderService';
 import { DriverService } from '@/services/DriverService';
 import { DriverAuthService } from '@/services/DriverAuthService';
 import { PubSub } from '@/lib/pubsub';
+import type { Logger } from '@/lib/logger';
 
 export interface ApiContextInterface {
     db: DbType;
@@ -17,6 +18,10 @@ export interface ApiContextInterface {
         role?: string;
         businessId?: string;
     };
+    /** Unique correlation id for this HTTP request / WS operation */
+    requestId: string;
+    /** Per-request child logger — already bound with requestId + userId */
+    log: Logger;
     businessService: BusinessService;
     productCategoryService: ProductCategoryService;
     productSubcategoryService: ProductSubcategoryService;

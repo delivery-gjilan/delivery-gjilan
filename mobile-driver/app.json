@@ -23,9 +23,6 @@
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION"
       ],
       "adaptiveIcon": {
@@ -50,6 +47,13 @@
           "root": "app"
         }
       ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "delivery-gjilan",
+          "project": "mobile-driver"
+        }
+      ],
       "@rnmapbox/maps",
       [
         "expo-splash-screen",
@@ -63,7 +67,18 @@
           }
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "We need your location in the background to track deliveries in real-time.",
+          "locationAlwaysPermission": "We need your location even when the app is closed to track deliveries.",
+          "locationWhenInUsePermission": "We use your location to show you on the map during deliveries.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -11,6 +11,8 @@ export const updateUserAddress: NonNullable<MutationResolvers['updateUserAddress
     const db = await getDB();
     
     const updateData: any = {};
+    if (input.latitude !== undefined) updateData.latitude = input.latitude;
+    if (input.longitude !== undefined) updateData.longitude = input.longitude;
     if (input.addressName !== undefined) updateData.addressName = input.addressName;
     if (input.displayName !== undefined) updateData.displayName = input.displayName;
     if (input.priority !== undefined) updateData.priority = input.priority;

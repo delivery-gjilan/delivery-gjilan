@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import logger from '@/lib/logger';
 const SALT_ROUNDS = 10;
 
 /**
@@ -26,7 +27,7 @@ export function generateVerificationCode(): string {
 export function decodeJwtToken(token: string): { userId: string; role?: string; businessId?: string | null } {
     const secret = process.env.JWT_SECRET;
     if (!secret) {
-        console.error('JWT_SECRET is not defined in environment variables');
+        logger.error('auth:decodeJwtToken JWT_SECRET is not defined');
         throw new Error('JWT_SECRET is not defined in environment variables');
     }
 

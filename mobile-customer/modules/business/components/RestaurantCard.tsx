@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, Pressable, Platform, Image, Dimensions, Animated } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
+import { useFavoritesStore } from '@/store/useFavoritesStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IMAGE_HEIGHT = 192; // h-48 equivalent
@@ -62,7 +63,8 @@ export function RestaurantCard({
     isSponsored,
 }: RestaurantCardProps) {
     const theme = useTheme();
-    const [isFavorite, setIsFavorite] = React.useState(false);
+    const isFavorite = useFavoritesStore((state) => state.isFavorite(id));
+    const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
 
     // Entrance animations
     const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -100,7 +102,7 @@ export function RestaurantCard({
     const prepTimeLabel = basePrepTime ? `${basePrepTime}-${basePrepTime + 10}` : '—';
 
     const handleFavoritePress = () => {
-        // Favorite animation
+        // Bounce animation on tap
         Animated.sequence([
             Animated.spring(scaleAnim, {
                 toValue: 1.05,
@@ -115,7 +117,7 @@ export function RestaurantCard({
                 useNativeDriver: true,
             }),
         ]).start();
-        setIsFavorite(!isFavorite);
+        toggleFavorite(id);
     };
 
     return (

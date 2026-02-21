@@ -31,14 +31,14 @@ export default function TabLayout() {
                     }}
                 />
                 <Tabs.Screen
-                    name="profile"
+                    name="market"
                     options={{
                         title: 'Market',
                         tabBarIcon: ({ color, size }) => <Ionicons name="cart" size={size} color={color} />,
                     }}
                 />
                 <Tabs.Screen
-                    name="analytics"
+                    name="profile"
                     options={{
                         title: 'Profile',
                         tabBarIcon: ({ color, size }) => <Ionicons name="person" size={size} color={color} />,

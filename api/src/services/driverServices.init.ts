@@ -3,6 +3,9 @@ import { DriverWatchdogService } from '@/services/DriverWatchdogService';
 import { DriverRepository } from '@/repositories/DriverRepository';
 import { AuthRepository } from '@/repositories/AuthRepository';
 import { getDB } from '@/database';
+import logger from '@/lib/logger';
+
+const log = logger.child({ service: 'DriverServices' });
 
 /**
  * Initialize Driver Services
@@ -23,11 +26,11 @@ let watchdogService: DriverWatchdogService | null = null;
 
 export async function initializeDriverServices() {
   if (driverService && watchdogService) {
-    console.log('[DriverServices] Already initialized');
+    log.debug('driverServices:alreadyInitialized');
     return { driverService, watchdogService };
   }
 
-  console.log('[DriverServices] Initializing...');
+  log.info('driverServices:initializing');
 
   // Get database connection (initializes if needed)
   const db = await getDB();
@@ -45,7 +48,7 @@ export async function initializeDriverServices() {
   // Start the watchdog
   watchdogService.start();
 
-  console.log('[DriverServices] Initialized and running');
+  log.info('driverServices:ready');
 
   return { driverService, watchdogService };
 }
@@ -58,7 +61,7 @@ export async function initializeDriverServices() {
 export function shutdownDriverServices() {
   if (watchdogService) {
     watchdogService.stop();
-    console.log('[DriverServices] Shutdown');
+    log.info('driverServices:shutdown');
   }
 }
 

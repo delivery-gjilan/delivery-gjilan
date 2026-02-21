@@ -3,6 +3,9 @@ import { DbUser } from '@/database/schema/users';
 import { hashPassword, comparePassword, generateVerificationCode } from '@/lib/utils/authUtils';
 import jwt from 'jsonwebtoken';
 import { AuthResponse, SignupStepResponse } from '@/generated/types.generated';
+import logger from '@/lib/logger';
+
+const log = logger.child({ service: 'AuthService' });
 
 export class AuthService {
     constructor(private authRepository: AuthRepository) {}
@@ -50,7 +53,7 @@ export class AuthService {
         await this.authRepository.setEmailVerificationCode(user.id, verificationCode);
 
         // In a real app, you would send this code via email
-        console.log(`Email verification code for ${email}: ${verificationCode}`);
+        log.info({ email }, 'auth:signup:verificationSent');
 
         // Generate JWT token for authenticated signup steps
         const token = await this.generateJWT(user.id);
@@ -98,7 +101,7 @@ export class AuthService {
         await this.authRepository.setEmailVerificationCode(user.id, verificationCode);
 
         // In a real app, you would send this code via email
-        console.log(`Email verification code for ${user.email}: ${verificationCode}`);
+        log.info({ email: user.email }, 'auth:resendVerification:sent');
 
         return {
             userId: user.id,
@@ -134,7 +137,7 @@ export class AuthService {
         await this.authRepository.setPhoneVerificationCode(userId, verificationCode);
 
         // In a real app, you would send this code via SMS
-        console.log(`Phone verification code for ${phoneNumber}: ${verificationCode}`);
+        log.info({ phoneNumber: phoneNumber.slice(-4) }, 'auth:phoneVerification:sent');
 
         return {
             userId: user.id,

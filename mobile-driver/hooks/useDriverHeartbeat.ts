@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { Alert, AppState, AppStateStatus } from 'react-native';
+import { Alert, AppState, AppStateStatus, Linking } from 'react-native';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { useMutation } from '@apollo/client/react';
@@ -53,6 +53,23 @@ async function sendBackgroundHeartbeat(latitude: number, longitude: number): Pro
     const endpoint = process.env.EXPO_PUBLIC_API_URL;
 
     if (!token || !endpoint) {
+      return;
+    }
+
+    // Decode JWT payload to check expiry without a full verify (no secret needed here).
+    // Avoids silent 401s when the token has expired while the app was backgrounded.
+    try {
+      const payloadB64 = token.split('.')[1];
+      if (payloadB64) {
+        const payload = JSON.parse(atob(payloadB64)) as { exp?: number };
+        if (payload.exp && Date.now() / 1000 > payload.exp) {
+          console.warn('[Heartbeat][Background] JWT expired – skipping heartbeat until foreground refresh');
+          return;
+        }
+      }
+    } catch {
+      // Malformed token – skip
+      console.warn('[Heartbeat][Background] Could not decode JWT, skipping heartbeat');
       return;
     }
 
@@ -170,14 +187,22 @@ export function useDriverHeartbeat() {
         return false;
       }
 
-      // Request background permissions non-blocking
-      Location.requestBackgroundPermissionsAsync()
-        .then((result) => {
-          console.log('[Heartbeat] Background permission:', result.status);
-        })
-        .catch((err) => {
-          console.warn('[Heartbeat] Background permission failed:', err);
-        });
+      // Request background permission – blocking so we know the result before
+      // attempting startLocationUpdatesAsync. iOS only shows the system dialog once;
+      // subsequent denials must be handled by directing the user to Settings.
+      const bgResult = await Location.requestBackgroundPermissionsAsync();
+      if (bgResult.status !== 'granted') {
+        console.warn('[Heartbeat] Background location permission denied');
+        Alert.alert(
+          'Background Location Needed',
+          'To keep tracking your position during deliveries, set location access to "Always" in Settings.',
+          [
+            { text: 'Open Settings', onPress: () => Linking.openSettings() },
+            { text: 'Not Now', style: 'cancel' },
+          ]
+        );
+        // Continue without background tracking – foreground-only mode
+      }
 
       return true;
     } catch (err) {
@@ -215,21 +240,28 @@ export function useDriverHeartbeat() {
       console.warn('[Heartbeat] GPS failed or timed out, using simulation');
     }
 
-    // Fallback: move ~10-15 meters per heartbeat (realistic drift)
-    // 15m ≈ 0.000135° latitude, 0.00018° longitude
-    const latOffset = (Math.random() - 0.5) * 0.00027; // ±15m latitude
-    const lngOffset = (Math.random() - 0.5) * 0.00036; // ±15m longitude
-    
-    simulatedLocationRef.current = {
-      latitude: simulatedLocationRef.current.latitude + latOffset,
-      longitude: simulatedLocationRef.current.longitude + lngOffset,
-    };
+    // Fallback: simulate location only in development builds.
+    // In production we skip the heartbeat rather than send false coordinates.
+    if (__DEV__) {
+      // Move ~10-15 meters per heartbeat (realistic drift for dev testing)
+      const latOffset = (Math.random() - 0.5) * 0.00027; // ±15m latitude
+      const lngOffset = (Math.random() - 0.5) * 0.00036; // ±15m longitude
 
-    console.log('[Heartbeat] SIMULATION: Random walk movement', { 
-      lat: simulatedLocationRef.current.latitude, 
-      lng: simulatedLocationRef.current.longitude,
-    });
-    return simulatedLocationRef.current;
+      simulatedLocationRef.current = {
+        latitude: simulatedLocationRef.current.latitude + latOffset,
+        longitude: simulatedLocationRef.current.longitude + lngOffset,
+      };
+
+      console.log('[Heartbeat] DEV SIMULATION: Random walk movement', {
+        lat: simulatedLocationRef.current.latitude,
+        lng: simulatedLocationRef.current.longitude,
+      });
+      return simulatedLocationRef.current;
+    }
+
+    // Production: GPS unavailable – caller will skip this heartbeat
+    console.warn('[Heartbeat] GPS unavailable, skipping heartbeat');
+    return null;
   }, []);
 
   const startLocationWatch = useCallback(async () => {
@@ -253,9 +285,6 @@ export function useDriverHeartbeat() {
             lat: location.coords.latitude,
             lng: location.coords.longitude,
           });
-        },
-        (error) => {
-          console.warn('[Heartbeat] Watch position error:', error);
         }
       );
       console.log('[Heartbeat] Location watch started');
@@ -368,15 +397,14 @@ export function useDriverHeartbeat() {
 
       if (wasBackground && isNowActive && isAuthenticated) {
         startLocationWatch();
-        // App came to foreground - ensure heartbeat is still running
-        console.log('[Heartbeat] App foregrounded, verifying heartbeat is active');
+        // App came to foreground – ensure the foreground heartbeat interval is running.
+        // Don't send an immediate extra heartbeat here; the background task may have
+        // just fired and the interval will pick up naturally on its next tick.
         if (!heartbeatIntervalRef.current) {
-          console.log('[Heartbeat] Heartbeat stopped, restarting...');
+          console.log('[Heartbeat] Heartbeat stopped while backgrounded, restarting...');
           startHeartbeat();
         } else {
-          // Send immediate heartbeat to refresh
-          console.log('[Heartbeat] Heartbeat active, sending immediate update');
-          doHeartbeat();
+          console.log('[Heartbeat] App foregrounded, heartbeat interval active');
         }
       }
 

@@ -1,6 +1,7 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { GraphQLError } from 'graphql';
 import { pubsub, publish, topics } from '@/lib/pubsub';
+import logger from '@/lib/logger';
 
 /**
  * Updated updateDriverOnlineStatus mutation
@@ -40,7 +41,7 @@ export const updateDriverOnlineStatus: NonNullable<
     const drivers = await authService.getDrivers();
     publish(pubsub, topics.allDriversChanged(), { drivers });
   } catch (error) {
-    console.error('[updateDriverOnlineStatus] Failed to publish update:', error);
+    logger.error({ err: error }, 'driver:updateDriverOnlineStatus publish failed');
   }
 
   // Return the full user object

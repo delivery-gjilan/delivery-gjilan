@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, ActivityIndicator, Pressable, StyleSheet, Alert } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable, StyleSheet, Alert, ScrollView, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Mapbox from '@rnmapbox/maps';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@apollo/client/react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ASSIGN_DRIVER_TO_ORDER, GET_ORDER, UPDATE_ORDER_STATUS } from '@/graphql/operations/orders';
+import { ASSIGN_DRIVER_TO_ORDER, GET_ORDER, GET_ORDERS, UPDATE_ORDER_STATUS } from '@/graphql/operations/orders';
 import { useTheme } from '@/hooks/useTheme';
 import { useDriverLocationOverrideStore } from '@/store/driverLocationOverrideStore';
 import { useAuthStore } from '@/store/authStore';
@@ -19,6 +19,7 @@ import { useNavigationRoute, type RouteData } from '@/hooks/useNavigationRoute';
 import { useOffRouteDetection } from '@/hooks/useOffRouteDetection';
 import { useNavigationSteps } from '@/hooks/useNavigationSteps';
 import { usePredictedTracking } from '@/hooks/usePredictedTracking';
+import { computeRouteProgress } from '@/utils/routeProgress';
 
 // ─────────────────────── Components ───────────────────────
 import { NavigationBottomPanel } from '@/components/navigation/NavigationBottomPanel';
@@ -116,7 +117,38 @@ export default function OrderMapScreen() {
     const [updateOrderStatus, { loading: updatingOrderStatus }] = useMutation(UPDATE_ORDER_STATUS);
     const [assignDriverToOrder] = useMutation(ASSIGN_DRIVER_TO_ORDER);
 
-    const order = (data as any)?.order;
+    // ═══════════════ All active orders (for side panel) ═══════════════
+    const { data: ordersData, refetch: refetchOrders } = useQuery(GET_ORDERS, {
+        // No poll interval — the subscription on the home screen keeps GET_ORDERS
+        // up to date in the normalized cache. This query just reads from it.
+        fetchPolicy: 'cache-and-network',
+        nextFetchPolicy: 'cache-first',
+    });
+    const activeOrders = useMemo<any[]>(
+        () => (ordersData as any)?.orders ?? [],
+        [ordersData],
+    );
+
+    // Focused order — driver can switch which order the map shows
+    const [focusedOrderId, setFocusedOrderId] = useState<string | undefined>(orderId);
+    useEffect(() => {
+        if (orderId) setFocusedOrderId(orderId);
+    }, [orderId]);
+
+    // Orders panel open/close
+    const [isPanelExpanded, setIsPanelExpanded] = useState(false);
+
+    const togglePanel = useCallback(() => {
+        setIsPanelExpanded((v) => !v);
+    }, []);
+
+    // Derive focused order from the list (fall back to single-order query)
+    const order = useMemo(() => {
+        if (activeOrders.length > 0) {
+            return activeOrders.find((o: any) => o.id === focusedOrderId) ?? (data as any)?.order;
+        }
+        return (data as any)?.order;
+    }, [activeOrders, focusedOrderId, data]);
     const [previewRoutePulse, setPreviewRoutePulse] = useState(0.6);
     const [destinationBlink, setDestinationBlink] = useState(1);
     const [routeRefreshKey, setRouteRefreshKey] = useState(0);
@@ -235,7 +267,8 @@ export default function OrderMapScreen() {
         fetchRoute,
         clearRoute,
         shouldReroute,
-        lastRerouteTime,
+        markRerouted,
+        resetRerouteCount,
     } = useNavigationRoute();
 
     const {
@@ -379,7 +412,8 @@ export default function OrderMapScreen() {
 
     useEffect(() => {
         lastRouteRef.current = null;
-    }, [orderId]);
+        resetRerouteCount();
+    }, [orderId, resetRerouteCount]);
 
     useEffect(() => {
         if (!pickup || !dropoff) return;
@@ -407,7 +441,7 @@ export default function OrderMapScreen() {
         };
     }, [clearLocationOverride]);
 
-    // Reroute logic: off-route detection + periodic updates
+    // Reroute logic: off-route detection only (no periodic timer), capped at maxReroutes
     useEffect(() => {
         if (!isNavigating || !effectiveLocation || !route) return;
 
@@ -415,9 +449,8 @@ export default function OrderMapScreen() {
         if (!destination) return;
 
         const offRoute = checkOffRoute(effectiveLocation, route.coordinates);
-        const needsReroute = shouldReroute(effectiveLocation, offRoute);
-
-        if (needsReroute) {
+        if (shouldReroute(effectiveLocation, offRoute)) {
+            markRerouted();
             fetchRoute(effectiveLocation, destination);
         }
     }, [
@@ -429,6 +462,7 @@ export default function OrderMapScreen() {
         isNavigatingToPickup,
         checkOffRoute,
         shouldReroute,
+        markRerouted,
         fetchRoute,
     ]);
 
@@ -516,7 +550,7 @@ export default function OrderMapScreen() {
         } catch (error) {
             console.error('[OrderMap] Failed to assign before OUT_FOR_DELIVERY', error);
             Alert.alert('Could not lock order', 'Please try again.');
-            await refetch();
+            await Promise.all([refetch(), refetchOrders()]);
             return;
         }
 
@@ -534,11 +568,11 @@ export default function OrderMapScreen() {
                     status: 'OUT_FOR_DELIVERY',
                 },
             });
-            await refetch();
+            await Promise.all([refetch(), refetchOrders()]);
         } catch (error) {
             console.error('[OrderMap] Failed to update status to OUT_FOR_DELIVERY', error);
             Alert.alert('Update failed', 'Order could not be moved to OUT_FOR_DELIVERY.');
-            await refetch();
+            await Promise.all([refetch(), refetchOrders()]);
         }
     };
 
@@ -749,9 +783,30 @@ export default function OrderMapScreen() {
     }, [pickupToDropoffRoute]);
 
     const headingTo = isNavigatingToPickup ? 'Pickup' : 'Drop-off';
-    // Fix: route.duration is in SECONDS from Mapbox API, convert to minutes
-    const eta = route ? Math.round(route.duration / 60) : null;
-    const distKm = route ? route.distance / 1000 : null;
+
+    // Live ETA: derived from remaining polyline distance — no API calls needed.
+    // computeRouteProgress walks the polyline to find how far the driver has gone
+    // and applies the original Mapbox speed to produce a decrementing estimate.
+    const routeProgress = useMemo(() => {
+        if (!effectiveLocation || !route || route.coordinates.length < 2) return null;
+        return computeRouteProgress(
+            effectiveLocation,
+            route.coordinates,
+            route.distance,   // metres
+            route.duration,   // seconds
+        );
+    }, [effectiveLocation, route]);
+
+    const eta = routeProgress != null
+        ? Math.max(0, Math.round(routeProgress.remainingDurationSec / 60))
+        : route
+        ? Math.round(route.duration / 60)   // fallback before first GPS fix
+        : null;
+    const distKm = routeProgress != null
+        ? routeProgress.remainingDistanceM / 1000
+        : route
+        ? route.distance / 1000
+        : null;
     const isPreviewMode = !isNavigating && order?.status === 'READY';
     const distanceToPickup = useMemo(() => {
         if (!effectiveLocation || !pickup) return null;
@@ -1000,6 +1055,36 @@ export default function OrderMapScreen() {
                             <Mapbox.Callout title={dropoffLabel} />
                         </Mapbox.PointAnnotation>
                     )}
+
+                    {/* ── Ghost markers for non-focused active orders ── */}
+                    {activeOrders
+                        .filter((o: any) => o.id !== focusedOrderId)
+                        .map((o: any) => {
+                            const bizLoc = o.businesses?.[0]?.business?.location;
+                            const dropLoc = o.dropOffLocation;
+                            return (
+                                <React.Fragment key={`ghost-${o.id}`}>
+                                    {bizLoc && (
+                                        <Mapbox.PointAnnotation
+                                            id={`ghost-pickup-${o.id}`}
+                                            coordinate={[Number(bizLoc.longitude), Number(bizLoc.latitude)]}
+                                            onSelected={() => setFocusedOrderId(o.id)}
+                                        >
+                                            <View style={styles.ghostPickupPin} />
+                                        </Mapbox.PointAnnotation>
+                                    )}
+                                    {dropLoc && (
+                                        <Mapbox.PointAnnotation
+                                            id={`ghost-dropoff-${o.id}`}
+                                            coordinate={[Number(dropLoc.longitude), Number(dropLoc.latitude)]}
+                                            onSelected={() => setFocusedOrderId(o.id)}
+                                        >
+                                            <View style={styles.ghostDropoffPin} />
+                                        </Mapbox.PointAnnotation>
+                                    )}
+                                </React.Fragment>
+                            );
+                        })}
                 </Mapbox.MapView>
 
                 <Pressable
@@ -1027,6 +1112,94 @@ export default function OrderMapScreen() {
                     bottom={isNavigating ? 180 : 220}
                     right={16}
                 />
+
+                {/* ── Orders panel toggle button (always visible on map) ── */}
+                {activeOrders.length >= 1 && (
+                    <TouchableOpacity
+                        style={[
+                            styles.ordersPillBtn,
+                            { bottom: isNavigating ? 188 : 228 },
+                        ]}
+                        onPress={togglePanel}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={styles.ordersPillBtnText}>
+                            {isPanelExpanded ? '✕' : `≡  Orders · ${activeOrders.length}`}
+                        </Text>
+                    </TouchableOpacity>
+                )}
+
+                {/* ════════════ ACTIVE ORDERS SLIDE PANEL (inside mapContainer) ════════════ */}
+                {activeOrders.length >= 1 && isPanelExpanded && (
+                <View
+                    style={styles.ordersPanel}
+                >
+                    {/* Handle + header — always tappable to expand/collapse */}
+                    <TouchableOpacity
+                        style={styles.ordersPanelHeader}
+                        onPress={togglePanel}
+                        activeOpacity={0.8}
+                    >
+                        <View style={styles.ordersPanelHandle} />
+                        <View style={styles.ordersPanelHeaderRow}>
+                            <Text style={styles.ordersPanelTitle}>
+                                Active Orders ({activeOrders.length})
+                            </Text>
+                            <Text style={styles.ordersPanelChevron}>
+                                {isPanelExpanded ? '▾' : '▴'}
+                            </Text>
+                        </View>
+                    </TouchableOpacity>
+
+                    {/* Order cards (only rendered/scrollable when expanded) */}
+                    <ScrollView
+                        style={styles.ordersPanelList}
+                        showsVerticalScrollIndicator={false}
+                        keyboardShouldPersistTaps="handled"
+                    >
+                        {activeOrders.map((o: any) => {
+                            const isFocused = o.id === focusedOrderId;
+                            const bizName = o.businesses?.[0]?.business?.name ?? 'Business';
+                            const customerName =
+                                [o.user?.firstName, o.user?.lastName]
+                                    .filter(Boolean)
+                                    .join(' ') || 'Customer';
+                            const address = o.dropOffLocation?.address ?? '';
+                            const statusColor =
+                                o.status === 'ACCEPTED' ? '#FBBF24' :
+                                o.status === 'READY' ? '#34D399' :
+                                o.status === 'OUT_FOR_DELIVERY' ? '#60A5FA' : '#9CA3AF';
+                            return (
+                                <TouchableOpacity
+                                    key={o.id}
+                                    style={[
+                                        styles.orderCard,
+                                        isFocused && styles.orderCardFocused,
+                                    ]}
+                                    onPress={() => setFocusedOrderId(o.id)}
+                                    activeOpacity={0.75}
+                                >
+                                    <View style={styles.orderCardLeft}>
+                                        <View style={[styles.orderStatusDot, { backgroundColor: statusColor }]} />
+                                    </View>
+                                    <View style={styles.orderCardContent}>
+                                        <Text style={styles.orderCardBiz} numberOfLines={1}>{bizName}</Text>
+                                        <Text style={styles.orderCardCustomer} numberOfLines={1}>{customerName}</Text>
+                                        {address ? (
+                                            <Text style={styles.orderCardAddress} numberOfLines={1}>{address}</Text>
+                                        ) : null}
+                                    </View>
+                                    {isFocused && (
+                                        <View style={styles.orderCardFocusedBadge}>
+                                            <Text style={styles.orderCardFocusedBadgeText}>ACTIVE</Text>
+                                        </View>
+                                    )}
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </ScrollView>
+                </View>
+                )}
             </View>
 
             {/* ════════════ BOTTOM PANEL ════════════ */}
@@ -1395,5 +1568,152 @@ const styles = StyleSheet.create({
         borderLeftColor: 'transparent',
         borderRightColor: 'transparent',
         borderBottomColor: GOOGLE_BLUE,
+    },
+
+    /* ── Ghost Pins (non-focused orders) ── */
+    ghostPickupPin: {
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        backgroundColor: '#34A853',
+        opacity: 0.45,
+        borderWidth: 1.5,
+        borderColor: '#fff',
+    },
+    ghostDropoffPin: {
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        backgroundColor: '#EA4335',
+        opacity: 0.45,
+        borderWidth: 1.5,
+        borderColor: '#fff',
+    },
+
+    /* ── Orders Panel (slide-up sheet, inside mapContainer) ── */
+    ordersPanel: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        maxHeight: 300,
+        backgroundColor: '#ffffff',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.18,
+        shadowRadius: 14,
+        elevation: 20,
+        overflow: 'hidden',
+        zIndex: 50,
+    },
+    /* ── Orders Pill Toggle Button (floating, always visible on map) ── */
+    ordersPillBtn: {
+        position: 'absolute',
+        left: 16,
+        paddingHorizontal: 14,
+        paddingVertical: 9,
+        borderRadius: 20,
+        backgroundColor: '#1F2937',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        elevation: 8,
+        zIndex: 40,
+    },
+    ordersPillBtnText: {
+        color: '#ffffff',
+        fontSize: 13,
+        fontWeight: '700',
+        letterSpacing: 0.2,
+    },
+    ordersPanelHeader: {
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        paddingBottom: 6,
+    },
+    ordersPanelHandle: {
+        width: 36,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: '#D1D5DB',
+        alignSelf: 'center',
+        marginBottom: 8,
+    },
+    ordersPanelHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    ordersPanelTitle: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#374151',
+        letterSpacing: 0.2,
+    },
+    ordersPanelChevron: {
+        fontSize: 14,
+        color: '#6B7280',
+    },
+    ordersPanelList: {
+        flex: 1,
+    },
+
+    /* ── Order Card ── */
+    orderCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: '#F3F4F6',
+        backgroundColor: '#ffffff',
+    },
+    orderCardFocused: {
+        backgroundColor: '#EFF6FF',
+        borderLeftWidth: 3,
+        borderLeftColor: '#3B82F6',
+    },
+    orderCardLeft: {
+        width: 28,
+        alignItems: 'center',
+    },
+    orderStatusDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+    },
+    orderCardContent: {
+        flex: 1,
+        marginLeft: 4,
+    },
+    orderCardBiz: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#1F2937',
+    },
+    orderCardCustomer: {
+        fontSize: 12,
+        color: '#6B7280',
+        marginTop: 1,
+    },
+    orderCardAddress: {
+        fontSize: 11,
+        color: '#9CA3AF',
+        marginTop: 1,
+    },
+    orderCardFocusedBadge: {
+        backgroundColor: '#DBEAFE',
+        borderRadius: 8,
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+    },
+    orderCardFocusedBadgeText: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#2563EB',
+        letterSpacing: 0.3,
     },
 });

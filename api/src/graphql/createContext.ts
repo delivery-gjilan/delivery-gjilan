@@ -20,6 +20,8 @@ import { OrderService } from '@/services/OrderService';
 import { pubsub } from '@/lib/pubsub';
 import { decodeJwtToken } from '@/lib/utils/authUtils';
 import { getDriverServices, initializeDriverServices } from '@/services/driverServices.init';
+import { setSentryContext } from '@/lib/sentry';
+import logger from '@/lib/logger';
 
 /**
  * Extracts and verifies JWT token from request Authorization header or WebSocket connection params
@@ -71,6 +73,16 @@ export async function createContext(initialContext: YogaInitialContext): Promise
     // Extract user data from request
     const userData = await extractUserData(initialContext);
 
+    // Extract requestId from the underlying Express req (set by requestLogger middleware)
+    const expressReq = (initialContext as any).req ?? (initialContext as any).request;
+    const requestId: string = (expressReq as any)?.requestId ?? '';
+
+    // Create a per-request child logger with correlation
+    const reqLog = logger.child({ requestId, userId: userData.userId, role: userData.role });
+
+    // Push context to Sentry so every error captured within this request is enriched
+    setSentryContext({ requestId, userId: userData.userId, role: userData.role });
+
     // Initialize database connection
     const db = await getDB();
 
@@ -97,12 +109,12 @@ export async function createContext(initialContext: YogaInitialContext): Promise
         const { driverService: ds } = getDriverServices();
         driverService = ds;
     } catch (error) {
-        console.warn('Driver services not yet initialized, initializing lazily');
+        reqLog.warn('Driver services not yet initialized, initializing lazily');
         try {
             const { driverService: ds } = await initializeDriverServices();
             driverService = ds;
         } catch (initError) {
-            console.warn('Driver services failed to initialize');
+            reqLog.warn('Driver services failed to initialize');
             driverService = undefined;
         }
     }
@@ -111,6 +123,8 @@ export async function createContext(initialContext: YogaInitialContext): Promise
         ...initialContext,
         db,
         userData,
+        requestId,
+        log: reqLog,
         businessService,
         productCategoryService,
         productSubcategoryService,

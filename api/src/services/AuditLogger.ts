@@ -2,6 +2,9 @@ import { AuditLogRepository, CreateAuditLogInput } from '@/repositories/AuditLog
 import { Database } from '@/database';
 import { ActionType, EntityType, ActorType } from '@/database/schema/auditLogs';
 import { GraphQLContext } from '@/graphql/context';
+import logger from '@/lib/logger';
+
+const log = logger.child({ service: 'AuditLogger' });
 
 /**
  * AuditLogger - Utility service for creating audit logs
@@ -42,7 +45,7 @@ export class AuditLogger {
             });
         } catch (error) {
             // Log the error but don't fail the main operation
-            console.error('Failed to create audit log:', error);
+            log.error({ err: error, action: params.action, entityType: params.entityType }, 'audit:log:failed');
         }
     }
 

@@ -4,6 +4,9 @@ import { BusinessRepository } from '@/repositories/BusinessRepository';
 import { DriverRepository } from '@/repositories/DriverRepository';
 import { DbOrder, DbOrderItem, products as productsTable } from '@/database/schema';
 import { inArray } from 'drizzle-orm';
+import logger from '@/lib/logger';
+
+const log = logger.child({ service: 'FinancialService' });
 
 /**
  * FinancialService handles all commission and settlement calculations
@@ -86,23 +89,24 @@ export class FinancialService {
                 }
             }
         } catch (error) {
-            console.error('Error creating order settlements:', error);
+            log.error({ err: error, orderId: order.id }, 'settlement:create:error');
             throw error;
         }
     }
 
     /**
-     * Cancel settlements when order is cancelled
-     * Mark all related settlements as cancelled/voided
+     * Cancel settlements when order is cancelled.
+     * Deletes all PENDING settlements for the order (PAID settlements are left intact
+     * since money has already been disbursed and must be handled manually).
      */
     async cancelOrderSettlements(orderId: string): Promise<void> {
         try {
-            const settlements = await this.settlementRepo.getSettlements({
-                // We'll need to add orderId filtering
-            });
-            // Implementation would cancel/void the settlements
+            const deleted = await this.settlementRepo.deletePendingByOrderId(orderId);
+            if (deleted > 0) {
+                log.info({ orderId, count: deleted }, 'settlement:cancel:voided');
+            }
         } catch (error) {
-            console.error('Error canceling order settlements:', error);
+            log.error({ err: error, orderId }, 'settlement:cancel:error');
             throw error;
         }
     }

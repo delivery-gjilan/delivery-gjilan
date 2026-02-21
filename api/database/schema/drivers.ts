@@ -75,6 +75,13 @@ export const drivers = pgTable('drivers', {
   // Commission and payment tracking
   commissionPercentage: numeric('commission_percentage', { precision: 5, scale: 2 }).default('0').notNull(),
 
+  /**
+   * Maximum number of active orders this driver can handle simultaneously
+   * Configurable per driver (default: 2)
+   * Used to prevent driver overload
+   */
+  maxActiveOrders: numeric('max_active_orders', { precision: 3, scale: 0 }).default('2').notNull(),
+
   // Metadata
   createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
     .default(sql`CURRENT_TIMESTAMP`)

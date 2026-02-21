@@ -70,6 +70,14 @@ export enum ActorType {
   System = 'SYSTEM'
 }
 
+export type AddUserAddressInput = {
+  addressName?: InputMaybe<Scalars['String']['input']>;
+  displayName?: InputMaybe<Scalars['String']['input']>;
+  latitude: Scalars['Float']['input'];
+  longitude: Scalars['Float']['input'];
+  priority?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type AddWalletCreditInput = {
   amount: Scalars['Float']['input'];
   description?: InputMaybe<Scalars['String']['input']>;
@@ -87,7 +95,7 @@ export type ApplicablePromotion = {
   name: Scalars['String']['output'];
   priority: Scalars['Int']['output'];
   target: PromotionTarget;
-  type: PromotionTypeV2;
+  type: PromotionType;
 };
 
 export type AssignPromotionToUserInput = {
@@ -211,7 +219,7 @@ export type CreateProductSubcategoryInput = {
   name: Scalars['String']['input'];
 };
 
-export type CreatePromotionV2Input = {
+export type CreatePromotionInput = {
   code?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   discountValue?: InputMaybe<Scalars['Float']['input']>;
@@ -230,7 +238,7 @@ export type CreatePromotionV2Input = {
   target: PromotionTarget;
   targetUserIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   thresholdReward?: InputMaybe<Scalars['String']['input']>;
-  type: PromotionTypeV2;
+  type: PromotionType;
 };
 
 export type CreateUserInput = {
@@ -270,6 +278,26 @@ export enum DriverConnectionStatus {
   Stale = 'STALE'
 }
 
+export type DriverDailyMetrics = {
+  __typename?: 'DriverDailyMetrics';
+  /** Number of active (uncompleted) orders this driver currently has */
+  activeOrdersCount: Scalars['Int']['output'];
+  /** Commission rate as a percentage (e.g. 10.0 for 10%) */
+  commissionPercentage: Scalars['Float']['output'];
+  /** Driver's current connection status */
+  connectionStatus: DriverConnectionStatus;
+  /** Number of orders delivered today */
+  deliveredTodayCount: Scalars['Int']['output'];
+  /** Total delivery earnings today (before commission deduction) */
+  grossEarningsToday: Scalars['Float']['output'];
+  /** Whether the driver is currently online (online preference) */
+  isOnline: Scalars['Boolean']['output'];
+  /** Driver's personal maximum active orders limit */
+  maxActiveOrders: Scalars['Int']['output'];
+  /** Driver's net earnings today (after commission deduction) */
+  netEarningsToday: Scalars['Float']['output'];
+};
+
 /** Result of driver heartbeat mutation */
 export type DriverHeartbeatResult = {
   __typename?: 'DriverHeartbeatResult';
@@ -300,6 +328,7 @@ export type InitiateSignupInput = {
   firstName: Scalars['String']['input'];
   lastName: Scalars['String']['input'];
   password: Scalars['String']['input'];
+  referralCode?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type Location = {
@@ -322,10 +351,13 @@ export type LoginInput = {
 
 export type Mutation = {
   __typename?: 'Mutation';
+  addUserAddress: UserAddress;
   addWalletCredit: WalletTransaction;
   /** Admin mutation to manually set connection status (for testing/recovery) */
   adminSetDriverConnectionStatus: User;
   adminUpdateDriverLocation: User;
+  /** Admin mutation to update per-driver settings (commission %, max active orders) */
+  adminUpdateDriverSettings: User;
   assignDriverToOrder: Order;
   assignPromotionToUsers: Array<UserPromotion>;
   backfillSettlementsForDeliveredOrders: Scalars['Int']['output'];
@@ -335,21 +367,23 @@ export type Mutation = {
   createProduct: Product;
   createProductCategory: ProductCategory;
   createProductSubcategory: ProductSubcategory;
-  createPromotionV2: PromotionV2;
+  createPromotion: Promotion;
   createUser: AuthResponse;
   deductWalletCredit: WalletTransaction;
   deleteBusiness: Scalars['Boolean']['output'];
   deleteProduct: Scalars['Boolean']['output'];
   deleteProductCategory: Scalars['Boolean']['output'];
   deleteProductSubcategory: Scalars['Boolean']['output'];
-  deletePromotionV2: Scalars['Boolean']['output'];
+  deletePromotion: Scalars['Boolean']['output'];
   deleteUser: Scalars['Boolean']['output'];
+  deleteUserAddress: Scalars['Boolean']['output'];
   /**
    * Driver heartbeat - call every 5 seconds while online.
    * Updates lastHeartbeatAt and connectionStatus to CONNECTED.
    * Location is throttled: only written if >10s since last write OR moved >5m.
    */
   driverHeartbeat: DriverHeartbeatResult;
+  generateReferralCode: Scalars['String']['output'];
   initiateSignup: AuthResponse;
   login: AuthResponse;
   markFirstOrderUsed: UserPromoMetadata;
@@ -358,6 +392,7 @@ export type Mutation = {
   markSettlementsAsPaid: Array<Settlement>;
   removeUserFromPromotion: Scalars['Boolean']['output'];
   resendEmailVerification: SignupStepResponse;
+  setDefaultAddress: Scalars['Boolean']['output'];
   submitPhoneNumber: SignupStepResponse;
   unsettleSettlement: Settlement;
   updateBusiness: Business;
@@ -369,11 +404,18 @@ export type Mutation = {
   updateProductCategory: ProductCategory;
   updateProductSubcategory: ProductSubcategory;
   updateProductsOrder: Scalars['Boolean']['output'];
-  updatePromotionV2: PromotionV2;
+  updatePromotion: Promotion;
+  updateStoreStatus: StoreStatus;
   updateUser: User;
+  updateUserAddress: UserAddress;
   updateUserNote: User;
   verifyEmail: SignupStepResponse;
   verifyPhone: SignupStepResponse;
+};
+
+
+export type MutationAddUserAddressArgs = {
+  input: AddUserAddressInput;
 };
 
 
@@ -392,6 +434,13 @@ export type MutationAdminUpdateDriverLocationArgs = {
   driverId: Scalars['ID']['input'];
   latitude: Scalars['Float']['input'];
   longitude: Scalars['Float']['input'];
+};
+
+
+export type MutationAdminUpdateDriverSettingsArgs = {
+  commissionPercentage?: InputMaybe<Scalars['Float']['input']>;
+  driverId: Scalars['ID']['input'];
+  maxActiveOrders?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -436,8 +485,8 @@ export type MutationCreateProductSubcategoryArgs = {
 };
 
 
-export type MutationCreatePromotionV2Args = {
-  input: CreatePromotionV2Input;
+export type MutationCreatePromotionArgs = {
+  input: CreatePromotionInput;
 };
 
 
@@ -473,12 +522,17 @@ export type MutationDeleteProductSubcategoryArgs = {
 };
 
 
-export type MutationDeletePromotionV2Args = {
+export type MutationDeletePromotionArgs = {
   id: Scalars['ID']['input'];
 };
 
 
 export type MutationDeleteUserArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type MutationDeleteUserAddressArgs = {
   id: Scalars['ID']['input'];
 };
 
@@ -523,6 +577,11 @@ export type MutationMarkSettlementsAsPaidArgs = {
 export type MutationRemoveUserFromPromotionArgs = {
   promotionId: Scalars['ID']['input'];
   userId: Scalars['ID']['input'];
+};
+
+
+export type MutationSetDefaultAddressArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -590,13 +649,23 @@ export type MutationUpdateProductsOrderArgs = {
 };
 
 
-export type MutationUpdatePromotionV2Args = {
-  input: UpdatePromotionV2Input;
+export type MutationUpdatePromotionArgs = {
+  input: UpdatePromotionInput;
+};
+
+
+export type MutationUpdateStoreStatusArgs = {
+  input: UpdateStoreStatusInput;
 };
 
 
 export type MutationUpdateUserArgs = {
   input: UpdateUserInput;
+};
+
+
+export type MutationUpdateUserAddressArgs = {
+  input: UpdateUserAddressInput;
 };
 
 
@@ -711,11 +780,39 @@ export type ProductSubcategory = {
   updatedAt: Scalars['String']['output'];
 };
 
+export type Promotion = {
+  __typename?: 'Promotion';
+  assignedUsers?: Maybe<Array<UserPromotion>>;
+  code?: Maybe<Scalars['String']['output']>;
+  createdAt: Scalars['String']['output'];
+  currentGlobalUsage: Scalars['Int']['output'];
+  description?: Maybe<Scalars['String']['output']>;
+  discountValue?: Maybe<Scalars['Float']['output']>;
+  eligibleBusinesses?: Maybe<Array<Business>>;
+  endsAt?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  isActive: Scalars['Boolean']['output'];
+  isStackable: Scalars['Boolean']['output'];
+  maxDiscountCap?: Maybe<Scalars['Float']['output']>;
+  maxGlobalUsage?: Maybe<Scalars['Int']['output']>;
+  maxUsagePerUser?: Maybe<Scalars['Int']['output']>;
+  minOrderAmount?: Maybe<Scalars['Float']['output']>;
+  name: Scalars['String']['output'];
+  priority: Scalars['Int']['output'];
+  spendThreshold?: Maybe<Scalars['Float']['output']>;
+  startsAt?: Maybe<Scalars['String']['output']>;
+  target: PromotionTarget;
+  thresholdReward?: Maybe<Scalars['String']['output']>;
+  totalRevenue: Scalars['Float']['output'];
+  totalUsageCount: Scalars['Int']['output'];
+  type: PromotionType;
+};
+
 export type PromotionAnalyticsResult = {
   __typename?: 'PromotionAnalyticsResult';
   averageOrderValue: Scalars['Float']['output'];
   conversionRate?: Maybe<Scalars['Float']['output']>;
-  promotion: PromotionV2;
+  promotion: Promotion;
   totalDiscountGiven: Scalars['Float']['output'];
   totalRevenue: Scalars['Float']['output'];
   totalUsageCount: Scalars['Int']['output'];
@@ -744,7 +841,18 @@ export enum PromotionTarget {
   SpecificUsers = 'SPECIFIC_USERS'
 }
 
-export enum PromotionTypeV2 {
+export type PromotionThreshold = {
+  __typename?: 'PromotionThreshold';
+  code?: Maybe<Scalars['String']['output']>;
+  eligibleBusinessIds?: Maybe<Array<Scalars['ID']['output']>>;
+  id: Scalars['ID']['output'];
+  isActive: Scalars['Boolean']['output'];
+  name: Scalars['String']['output'];
+  priority: Scalars['Int']['output'];
+  spendThreshold: Scalars['Float']['output'];
+};
+
+export enum PromotionType {
   FixedAmount = 'FIXED_AMOUNT',
   FreeDelivery = 'FREE_DELIVERY',
   Percentage = 'PERCENTAGE',
@@ -760,39 +868,11 @@ export type PromotionUsage = {
   order?: Maybe<Order>;
   orderId: Scalars['ID']['output'];
   orderSubtotal: Scalars['Float']['output'];
-  promotion?: Maybe<PromotionV2>;
+  promotion?: Maybe<Promotion>;
   promotionId: Scalars['ID']['output'];
   usedAt: Scalars['String']['output'];
   user?: Maybe<User>;
   userId: Scalars['ID']['output'];
-};
-
-export type PromotionV2 = {
-  __typename?: 'PromotionV2';
-  assignedUsers?: Maybe<Array<UserPromotion>>;
-  code?: Maybe<Scalars['String']['output']>;
-  createdAt: Scalars['String']['output'];
-  currentGlobalUsage: Scalars['Int']['output'];
-  description?: Maybe<Scalars['String']['output']>;
-  discountValue?: Maybe<Scalars['Float']['output']>;
-  eligibleBusinesses?: Maybe<Array<Business>>;
-  endsAt?: Maybe<Scalars['String']['output']>;
-  id: Scalars['ID']['output'];
-  isActive: Scalars['Boolean']['output'];
-  isStackable: Scalars['Boolean']['output'];
-  maxDiscountCap?: Maybe<Scalars['Float']['output']>;
-  maxGlobalUsage?: Maybe<Scalars['Int']['output']>;
-  maxUsagePerUser?: Maybe<Scalars['Int']['output']>;
-  minOrderAmount?: Maybe<Scalars['Float']['output']>;
-  name: Scalars['String']['output'];
-  priority: Scalars['Int']['output'];
-  spendThreshold?: Maybe<Scalars['Float']['output']>;
-  startsAt?: Maybe<Scalars['String']['output']>;
-  target: PromotionTarget;
-  thresholdReward?: Maybe<Scalars['String']['output']>;
-  totalRevenue: Scalars['Float']['output'];
-  totalUsageCount: Scalars['Int']['output'];
-  type: PromotionTypeV2;
 };
 
 export type Query = {
@@ -804,17 +884,23 @@ export type Query = {
   businesses: Array<Business>;
   driverBalance: SettlementSummary;
   drivers: Array<User>;
-  getAllPromotionsV2: Array<PromotionV2>;
-  getApplicablePromotionsV2: Array<ApplicablePromotion>;
+  getAllPromotions: Array<Promotion>;
+  getApplicablePromotions: Array<ApplicablePromotion>;
+  getPromotion?: Maybe<Promotion>;
   getPromotionAnalytics: PromotionAnalyticsResult;
+  getPromotionThresholds: Array<PromotionThreshold>;
   getPromotionUsage: Array<PromotionUsage>;
-  getPromotionV2?: Maybe<PromotionV2>;
+  getStoreStatus: StoreStatus;
   getUserPromoMetadata?: Maybe<UserPromoMetadata>;
   getUserPromotions: Array<UserPromotion>;
   getUserWallet?: Maybe<UserWallet>;
   getWalletTransactions: Array<WalletTransaction>;
   me?: Maybe<User>;
+  myAddresses: Array<UserAddress>;
   myBehavior?: Maybe<UserBehavior>;
+  /** Get live metrics for the authenticated driver */
+  myDriverMetrics: DriverDailyMetrics;
+  myReferralStats: ReferralStats;
   order?: Maybe<Order>;
   orders: Array<Order>;
   ordersByStatus: Array<Order>;
@@ -829,7 +915,7 @@ export type Query = {
   uncompletedOrders: Array<Order>;
   userBehavior?: Maybe<UserBehavior>;
   users: Array<User>;
-  validatePromotionsV2: PromotionResult;
+  validatePromotions: PromotionResult;
 };
 
 
@@ -866,14 +952,19 @@ export type QueryDriverBalanceArgs = {
 };
 
 
-export type QueryGetAllPromotionsV2Args = {
+export type QueryGetAllPromotionsArgs = {
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 
-export type QueryGetApplicablePromotionsV2Args = {
+export type QueryGetApplicablePromotionsArgs = {
   cart: CartContextInput;
   manualCode?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryGetPromotionArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -882,13 +973,13 @@ export type QueryGetPromotionAnalyticsArgs = {
 };
 
 
-export type QueryGetPromotionUsageArgs = {
-  promotionId: Scalars['ID']['input'];
+export type QueryGetPromotionThresholdsArgs = {
+  cart: CartContextInput;
 };
 
 
-export type QueryGetPromotionV2Args = {
-  id: Scalars['ID']['input'];
+export type QueryGetPromotionUsageArgs = {
+  promotionId: Scalars['ID']['input'];
 };
 
 
@@ -978,10 +1069,40 @@ export type QueryUserBehaviorArgs = {
 };
 
 
-export type QueryValidatePromotionsV2Args = {
+export type QueryValidatePromotionsArgs = {
   cart: CartContextInput;
   manualCode?: InputMaybe<Scalars['String']['input']>;
 };
+
+export type Referral = {
+  __typename?: 'Referral';
+  completedAt?: Maybe<Scalars['DateTime']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  id: Scalars['ID']['output'];
+  referralCode: Scalars['String']['output'];
+  referredUser?: Maybe<User>;
+  referredUserId?: Maybe<Scalars['ID']['output']>;
+  referrerUserId: Scalars['ID']['output'];
+  rewardAmount?: Maybe<Scalars['Float']['output']>;
+  rewardGiven: Scalars['Boolean']['output'];
+  status: ReferralStatus;
+};
+
+export type ReferralStats = {
+  __typename?: 'ReferralStats';
+  completedReferrals: Scalars['Int']['output'];
+  pendingReferrals: Scalars['Int']['output'];
+  referralCode: Scalars['String']['output'];
+  referrals: Array<Referral>;
+  totalReferrals: Scalars['Int']['output'];
+  totalRewardsEarned: Scalars['Float']['output'];
+};
+
+export enum ReferralStatus {
+  Completed = 'COMPLETED',
+  Expired = 'EXPIRED',
+  Pending = 'PENDING'
+}
 
 export type Settlement = {
   __typename?: 'Settlement';
@@ -1029,6 +1150,12 @@ export type SignupStepResponse = {
   currentStep: SignupStep;
   message: Scalars['String']['output'];
   userId: Scalars['ID']['output'];
+};
+
+export type StoreStatus = {
+  __typename?: 'StoreStatus';
+  closedMessage?: Maybe<Scalars['String']['output']>;
+  isStoreClosed: Scalars['Boolean']['output'];
 };
 
 export type SubmitPhoneNumberInput = {
@@ -1119,10 +1246,11 @@ export type UpdateProductSubcategoryInput = {
   name?: InputMaybe<Scalars['String']['input']>;
 };
 
-export type UpdatePromotionV2Input = {
+export type UpdatePromotionInput = {
   code?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   discountValue?: InputMaybe<Scalars['Float']['input']>;
+  eligibleBusinessIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   endsAt?: InputMaybe<Scalars['String']['input']>;
   id: Scalars['ID']['input'];
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
@@ -1135,8 +1263,21 @@ export type UpdatePromotionV2Input = {
   priority?: InputMaybe<Scalars['Int']['input']>;
   spendThreshold?: InputMaybe<Scalars['Float']['input']>;
   startsAt?: InputMaybe<Scalars['String']['input']>;
+  target?: InputMaybe<PromotionTarget>;
   thresholdReward?: InputMaybe<Scalars['String']['input']>;
-  type?: InputMaybe<PromotionTypeV2>;
+  type?: InputMaybe<PromotionType>;
+};
+
+export type UpdateStoreStatusInput = {
+  closedMessage?: InputMaybe<Scalars['String']['input']>;
+  isStoreClosed: Scalars['Boolean']['input'];
+};
+
+export type UpdateUserAddressInput = {
+  addressName?: InputMaybe<Scalars['String']['input']>;
+  displayName?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['ID']['input'];
+  priority?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type UpdateUserInput = {
@@ -1165,10 +1306,25 @@ export type User = {
   imageUrl?: Maybe<Scalars['String']['output']>;
   isOnline: Scalars['Boolean']['output'];
   lastName: Scalars['String']['output'];
+  maxActiveOrders?: Maybe<Scalars['Int']['output']>;
   phoneNumber?: Maybe<Scalars['String']['output']>;
   phoneVerified: Scalars['Boolean']['output'];
+  referralCode?: Maybe<Scalars['String']['output']>;
   role: UserRole;
   signupStep: SignupStep;
+};
+
+export type UserAddress = {
+  __typename?: 'UserAddress';
+  addressName?: Maybe<Scalars['String']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  displayName?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  latitude: Scalars['Float']['output'];
+  longitude: Scalars['Float']['output'];
+  priority: Scalars['Int']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+  userId: Scalars['ID']['output'];
 };
 
 export type UserBehavior = {
@@ -1201,7 +1357,7 @@ export type UserPromotion = {
   assignedAt: Scalars['String']['output'];
   expiresAt?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
-  promotion?: Maybe<PromotionV2>;
+  promotion?: Maybe<Promotion>;
   promotionId: Scalars['ID']['output'];
   usageCount: Scalars['Int']['output'];
   user?: Maybe<User>;

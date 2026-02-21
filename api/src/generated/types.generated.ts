@@ -278,6 +278,26 @@ export type DriverConnectionStatus =
   | 'LOST'
   | 'STALE';
 
+export type DriverDailyMetrics = {
+  __typename?: 'DriverDailyMetrics';
+  /** Number of active (uncompleted) orders this driver currently has */
+  activeOrdersCount: Scalars['Int']['output'];
+  /** Commission rate as a percentage (e.g. 10.0 for 10%) */
+  commissionPercentage: Scalars['Float']['output'];
+  /** Driver's current connection status */
+  connectionStatus: DriverConnectionStatus;
+  /** Number of orders delivered today */
+  deliveredTodayCount: Scalars['Int']['output'];
+  /** Total delivery earnings today (before commission deduction) */
+  grossEarningsToday: Scalars['Float']['output'];
+  /** Whether the driver is currently online (online preference) */
+  isOnline: Scalars['Boolean']['output'];
+  /** Driver's personal maximum active orders limit */
+  maxActiveOrders: Scalars['Int']['output'];
+  /** Driver's net earnings today (after commission deduction) */
+  netEarningsToday: Scalars['Float']['output'];
+};
+
 /** Result of driver heartbeat mutation */
 export type DriverHeartbeatResult = {
   __typename?: 'DriverHeartbeatResult';
@@ -335,6 +355,8 @@ export type Mutation = {
   /** Admin mutation to manually set connection status (for testing/recovery) */
   adminSetDriverConnectionStatus: User;
   adminUpdateDriverLocation: User;
+  /** Admin mutation to update per-driver settings (commission %, max active orders) */
+  adminUpdateDriverSettings: User;
   assignDriverToOrder: Order;
   assignPromotionToUsers: Array<UserPromotion>;
   backfillSettlementsForDeliveredOrders: Scalars['Int']['output'];
@@ -411,6 +433,13 @@ export type MutationadminUpdateDriverLocationArgs = {
   driverId: Scalars['ID']['input'];
   latitude: Scalars['Float']['input'];
   longitude: Scalars['Float']['input'];
+};
+
+
+export type MutationadminUpdateDriverSettingsArgs = {
+  commissionPercentage?: InputMaybe<Scalars['Float']['input']>;
+  driverId: Scalars['ID']['input'];
+  maxActiveOrders?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -667,10 +696,12 @@ export type Order = {
   orderPromotions?: Maybe<Array<OrderPromotion>>;
   originalDeliveryPrice?: Maybe<Scalars['Float']['output']>;
   originalPrice?: Maybe<Scalars['Float']['output']>;
+  pickupLocations: Array<Location>;
   status: OrderStatus;
   totalPrice: Scalars['Float']['output'];
   updatedAt: Scalars['Date']['output'];
   user?: Maybe<User>;
+  userId: Scalars['ID']['output'];
 };
 
 export type OrderBusiness = {
@@ -864,6 +895,8 @@ export type Query = {
   me?: Maybe<User>;
   myAddresses: Array<UserAddress>;
   myBehavior?: Maybe<UserBehavior>;
+  /** Get live metrics for the authenticated driver */
+  myDriverMetrics: DriverDailyMetrics;
   myReferralStats: ReferralStats;
   order?: Maybe<Order>;
   orders: Array<Order>;
@@ -1237,6 +1270,8 @@ export type UpdateUserAddressInput = {
   addressName?: InputMaybe<Scalars['String']['input']>;
   displayName?: InputMaybe<Scalars['String']['input']>;
   id: Scalars['ID']['input'];
+  latitude?: InputMaybe<Scalars['Float']['input']>;
+  longitude?: InputMaybe<Scalars['Float']['input']>;
   priority?: InputMaybe<Scalars['Int']['input']>;
 };
 
@@ -1266,6 +1301,7 @@ export type User = {
   imageUrl?: Maybe<Scalars['String']['output']>;
   isOnline: Scalars['Boolean']['output'];
   lastName: Scalars['String']['output'];
+  maxActiveOrders?: Maybe<Scalars['Int']['output']>;
   phoneNumber?: Maybe<Scalars['String']['output']>;
   phoneVerified: Scalars['Boolean']['output'];
   referralCode?: Maybe<Scalars['String']['output']>;
@@ -1473,6 +1509,7 @@ export type ResolversTypes = {
   DateTime: ResolverTypeWrapper<Scalars['DateTime']['output']>;
   DriverConnection: ResolverTypeWrapper<Omit<DriverConnection, 'connectionStatus'> & { connectionStatus: ResolversTypes['DriverConnectionStatus'] }>;
   DriverConnectionStatus: ResolverTypeWrapper<'CONNECTED' | 'STALE' | 'LOST' | 'DISCONNECTED'>;
+  DriverDailyMetrics: ResolverTypeWrapper<Omit<DriverDailyMetrics, 'connectionStatus'> & { connectionStatus: ResolversTypes['DriverConnectionStatus'] }>;
   DriverHeartbeatResult: ResolverTypeWrapper<Omit<DriverHeartbeatResult, 'connectionStatus'> & { connectionStatus: ResolversTypes['DriverConnectionStatus'] }>;
   EntityType: ResolverTypeWrapper<'USER' | 'BUSINESS' | 'PRODUCT' | 'ORDER' | 'SETTLEMENT' | 'DRIVER' | 'CATEGORY' | 'SUBCATEGORY' | 'DELIVERY_ZONE'>;
   InitiateSignupInput: InitiateSignupInput;
@@ -1562,6 +1599,7 @@ export type ResolversParentTypes = {
   Date: Scalars['Date']['output'];
   DateTime: Scalars['DateTime']['output'];
   DriverConnection: DriverConnection;
+  DriverDailyMetrics: DriverDailyMetrics;
   DriverHeartbeatResult: DriverHeartbeatResult;
   InitiateSignupInput: InitiateSignupInput;
   JSON: Scalars['JSON']['output'];
@@ -1702,6 +1740,18 @@ export type DriverConnectionResolvers<ContextType = GraphQLContext, ParentType e
 
 export type DriverConnectionStatusResolvers = EnumResolverSignature<{ CONNECTED?: any, DISCONNECTED?: any, LOST?: any, STALE?: any }, ResolversTypes['DriverConnectionStatus']>;
 
+export type DriverDailyMetricsResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['DriverDailyMetrics'] = ResolversParentTypes['DriverDailyMetrics']> = {
+  activeOrdersCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  commissionPercentage?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  connectionStatus?: Resolver<ResolversTypes['DriverConnectionStatus'], ParentType, ContextType>;
+  deliveredTodayCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  grossEarningsToday?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  isOnline?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  maxActiveOrders?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  netEarningsToday?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
 export type DriverHeartbeatResultResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['DriverHeartbeatResult'] = ResolversParentTypes['DriverHeartbeatResult']> = {
   connectionStatus?: Resolver<ResolversTypes['DriverConnectionStatus'], ParentType, ContextType>;
   lastHeartbeatAt?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
@@ -1728,6 +1778,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   addWalletCredit?: Resolver<ResolversTypes['WalletTransaction'], ParentType, ContextType, RequireFields<MutationaddWalletCreditArgs, 'input'>>;
   adminSetDriverConnectionStatus?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationadminSetDriverConnectionStatusArgs, 'driverId' | 'status'>>;
   adminUpdateDriverLocation?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationadminUpdateDriverLocationArgs, 'driverId' | 'latitude' | 'longitude'>>;
+  adminUpdateDriverSettings?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationadminUpdateDriverSettingsArgs, 'driverId'>>;
   assignDriverToOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationassignDriverToOrderArgs, 'id'>>;
   assignPromotionToUsers?: Resolver<Array<ResolversTypes['UserPromotion']>, ParentType, ContextType, RequireFields<MutationassignPromotionToUsersArgs, 'input'>>;
   backfillSettlementsForDeliveredOrders?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
@@ -1789,10 +1840,12 @@ export type OrderResolvers<ContextType = GraphQLContext, ParentType extends Reso
   orderPromotions?: Resolver<Maybe<Array<ResolversTypes['OrderPromotion']>>, ParentType, ContextType>;
   originalDeliveryPrice?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   originalPrice?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  pickupLocations?: Resolver<Array<ResolversTypes['Location']>, ParentType, ContextType>;
   status?: Resolver<ResolversTypes['OrderStatus'], ParentType, ContextType>;
   totalPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
   user?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
+  userId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -1965,6 +2018,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   me?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
   myAddresses?: Resolver<Array<ResolversTypes['UserAddress']>, ParentType, ContextType>;
   myBehavior?: Resolver<Maybe<ResolversTypes['UserBehavior']>, ParentType, ContextType>;
+  myDriverMetrics?: Resolver<ResolversTypes['DriverDailyMetrics'], ParentType, ContextType>;
   myReferralStats?: Resolver<ResolversTypes['ReferralStats'], ParentType, ContextType>;
   order?: Resolver<Maybe<ResolversTypes['Order']>, ParentType, ContextType, RequireFields<QueryorderArgs, 'id'>>;
   orders?: Resolver<Array<ResolversTypes['Order']>, ParentType, ContextType>;
@@ -2079,6 +2133,7 @@ export type UserResolvers<ContextType = GraphQLContext, ParentType extends Resol
   imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   isOnline?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   lastName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  maxActiveOrders?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
   phoneNumber?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   phoneVerified?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   referralCode?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
@@ -2182,6 +2237,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   DateTime?: GraphQLScalarType;
   DriverConnection?: DriverConnectionResolvers<ContextType>;
   DriverConnectionStatus?: DriverConnectionStatusResolvers;
+  DriverDailyMetrics?: DriverDailyMetricsResolvers<ContextType>;
   DriverHeartbeatResult?: DriverHeartbeatResultResolvers<ContextType>;
   EntityType?: EntityTypeResolvers;
   JSON?: GraphQLScalarType;

@@ -20,6 +20,8 @@ input AddUserAddressInput {
 
 input UpdateUserAddressInput {
     id: ID!
+    latitude: Float
+    longitude: Float
     addressName: String
     displayName: String
     priority: Int

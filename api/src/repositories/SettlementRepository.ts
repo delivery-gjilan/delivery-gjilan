@@ -261,4 +261,22 @@ export class SettlementRepository {
 
         return result[0];
     }
+
+    /**
+     * Delete all PENDING settlements for a given order (used when an order is cancelled
+     * before any settlement has been paid out).
+     * Returns the number of rows deleted.
+     */
+    async deletePendingByOrderId(orderId: string): Promise<number> {
+        const deleted = await this.db
+            .delete(settlements)
+            .where(
+                and(
+                    eq(settlements.orderId, orderId),
+                    eq(settlements.status, 'PENDING' as any),
+                ),
+            )
+            .returning({ id: settlements.id });
+        return deleted.length;
+    }
 }

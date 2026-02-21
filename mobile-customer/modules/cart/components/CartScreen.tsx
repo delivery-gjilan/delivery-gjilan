@@ -137,7 +137,7 @@ export const CartScreen = () => {
     
     // Query saved addresses
     const { data: addressesData, loading: addressesLoading } = useQuery(GET_MY_ADDRESSES, {
-        fetchPolicy: 'network-only',
+        fetchPolicy: 'cache-and-network',
     });
 
     // Mutation for adding address
@@ -198,12 +198,6 @@ export const CartScreen = () => {
         },
     );
 
-    // Debug: log thresholds response
-    useEffect(() => {
-        console.log('[Promos] GetPromotionThresholds response', { data: thresholdsData, error: thresholdsError, loading: thresholdsLoading });
-        if (thresholdsError) console.log('[Promos] thresholdsError', thresholdsError);
-    }, [thresholdsData, thresholdsError, thresholdsLoading]);
-
     const applicableConditional = useMemo(() => {
         if (!thresholdsData?.getPromotionThresholds) return null;
         const thresholds = thresholdsData.getPromotionThresholds;
@@ -225,12 +219,6 @@ export const CartScreen = () => {
     const progress = spendThreshold ? Math.min(Number(total) / Number(spendThreshold), 1) : 0;
     const amountRemaining = spendThreshold ? Math.max(0, Number(spendThreshold) - Number(total)) : 0;
 
-    // Debug: track progress
-    useEffect(() => {
-        console.log('[Promos] progress updated', { progress, amountRemaining, subtotal: total, spendThreshold });
-        if (applicableConditional) console.log('[Promos] applicableConditional', applicableConditional);
-    }, [progress, amountRemaining, total, applicableConditional, spendThreshold]);
-
     // Notifier state/animation
     const [notifier, setNotifier] = useState<null | { type: 'progress' | 'success'; message: string }>(null);
     const notifierAnim = useRef(new Animated.Value(0)).current;
@@ -248,29 +236,16 @@ export const CartScreen = () => {
 
     // When the cart reaches or exceeds a spend threshold, call the server to validate/apply promotions.
     useEffect(() => {
-        console.log('[Promos] auto-apply useEffect triggered', { 
-            hasApplicable: !!applicableConditional, 
-            hasThreshold: !!spendThreshold, 
-            progress, 
-            hasPromoResult: !!promoResult,
-            alreadyApplied: autoAppliedPromotionIdRef.current,
-            applicableId: applicableConditional?.id 
-        });
-        
         if (!applicableConditional || !spendThreshold) {
-            console.log('[Promos] auto-apply skipped - no applicable promo or threshold');
             return;
         }
         if (progress < 1) {
-            console.log('[Promos] auto-apply skipped - progress not reached', { progress, spendThreshold });
             return;
         }
         if (promoResult) {
-            console.log('[Promos] auto-apply skipped - promo already applied');
             return;
         }
         if (autoAppliedPromotionIdRef.current === applicableConditional.id) {
-            console.log('[Promos] auto-apply skipped - already auto-applied this promo');
             return;
         }
 
@@ -278,13 +253,9 @@ export const CartScreen = () => {
         const doAutoApply = async () => {
             setAutoApplying(true);
             try {
-                console.log('[Promos] auto-apply triggered', { promoId: applicableConditional.id, promoName: applicableConditional.name, subtotal: total, spendThreshold });
                 const response = await validatePromotionsManual({ variables: { cart: cartContext } });
-                console.log('[Promos] validatePromotions request sent');
                 const result = (response?.data as any)?.validatePromotions;
-                console.log('[Promos] validatePromotions response', result);
                 if (!result || (Array.isArray(result.promotions) && result.promotions.length === 0)) {
-                    console.log('[Promos] auto-apply failed - no promotions returned from server');
                     return;
                 }
 
@@ -300,15 +271,12 @@ export const CartScreen = () => {
                     totalPrice: Number(result.finalTotal ?? total + deliveryPrice),
                 });
                 setCouponCode(promoCode); // Show the code in the input field
-                console.log('[Promos] promoResult applied', { code: promoCode, discount: result.totalDiscount, freeDelivery: result.freeDeliveryApplied });
-
                 autoAppliedPromotionIdRef.current = firstPromo?.id ?? applicableConditional.id;
                 showNotifier(
                     `Promotion applied${firstPromo?.name ? `: ${firstPromo.name}` : ''}`,
                     'success',
                 );
-            } catch (err) {
-                console.log('[Promos] auto-apply error', err);
+            } catch {
                 // ignore - best effort
             } finally {
                 if (mounted) setAutoApplying(false);
@@ -621,7 +589,6 @@ export const CartScreen = () => {
         // If this was an auto-applied promo and we're now below threshold, clear it
         if (autoAppliedPromotionIdRef.current && applicableConditional) {
             if (progress < 1) {
-                console.log('[Promos] clearing auto-applied promo - below threshold');
                 setPromoResult(null);
                 autoAppliedPromotionIdRef.current = null;
             }
@@ -676,7 +643,6 @@ export const CartScreen = () => {
     useEffect(() => {
         // If user clears the input field, clear the applied promo
         if (promoResult && !couponCode.trim()) {
-            console.log('[Promos] clearing promo - user cleared code field');
             setPromoResult(null);
             autoAppliedPromotionIdRef.current = null;
         }

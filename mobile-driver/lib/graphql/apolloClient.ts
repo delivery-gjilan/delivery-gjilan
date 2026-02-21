@@ -3,6 +3,8 @@ import { getMainDefinition } from '@apollo/client/utilities';
 import { SetContextLink } from '@apollo/client/link/context';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { createClient, Client } from 'graphql-ws';
+import { persistCache, AsyncStorageWrapper } from 'apollo3-cache-persist';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '@/store/authStore';
 
 /**
@@ -105,9 +107,59 @@ const splitLink = ApolloLink.split(
     authLink.concat(httpLink),
 );
 
+/**
+ * Normalise every entity by its `id` field so Apollo can merge updates from
+ * subscriptions and queries into the same cache entries instead of duplicating.
+ * The `merge: false` on list fields suppresses the "existing data will be lost"
+ * warning when a subscription payload replaces a list.
+ */
+export const cache = new InMemoryCache({
+    typePolicies: {
+        Order:       { keyFields: ['id'], fields: { businesses: { merge: false } } },
+        Business:    { keyFields: ['id'], fields: { products:   { merge: false } } },
+        Product:     { keyFields: ['id'] },
+        User:        { keyFields: ['id'] },
+        Driver:      { keyFields: ['id'] },
+        Settlement:  { keyFields: ['id'] },
+        UserAddress: { keyFields: ['id'] },
+        Query: {
+            fields: {
+                // Return cached order by id without a round-trip when navigating
+                // from the orders list to an individual order screen.
+                order: { read(_, { args, toReference }) {
+                    return toReference({ __typename: 'Order', id: args?.id });
+                }},
+            },
+        },
+    },
+});
+
+/**
+ * Restore the Apollo cache from AsyncStorage on cold start.
+ * Call (await) this before rendering the first screen so data is available
+ * before the first paint. 5 MB cap prevents runaway growth.
+ */
+export const cacheReady: Promise<void> = persistCache({
+    cache,
+    storage: new AsyncStorageWrapper(AsyncStorage),
+    maxSize: 5 * 1024 * 1024,
+    debug: __DEV__,
+}).catch((err) => {
+    // Persistence failure is non-fatal — the app works with an empty cache.
+    console.warn('[ApolloCache] Failed to persist cache:', err);
+});
+
 const client = new ApolloClient({
     link: ApolloLink.from([logLink, splitLink]),
-    cache: new InMemoryCache(),
+    cache,
+    defaultOptions: {
+        watchQuery: {
+            // Show cached data immediately and refresh in background.
+            // Individual queries can still override this per-call.
+            fetchPolicy: 'cache-and-network',
+            nextFetchPolicy: 'cache-first',
+        },
+    },
 });
 
 export default client;

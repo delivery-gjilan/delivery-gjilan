@@ -1,5 +1,6 @@
 import { MutationResolvers } from '@/generated/types.generated';
 import { AppContext } from '@/index';
+import logger from '@/lib/logger';
 import { SettlementRepository } from '@/repositories/SettlementRepository';
 import { FinancialService } from '@/services/FinancialService';
 import { eq } from 'drizzle-orm';
@@ -49,7 +50,7 @@ export const Mutation: MutationResolvers<AppContext> = {
     },
     backfillSettlementsForDeliveredOrders: async (_, __, { db, orderService }) => {
         if (!orderService) {
-            console.error('[backfillSettlementsForDeliveredOrders] orderService missing from context');
+            logger.error('settlement:backfillSettlements orderService missing from context');
             return 0;
         }
 
@@ -63,7 +64,7 @@ export const Mutation: MutationResolvers<AppContext> = {
                 await financialService.createOrderSettlements(order, items, order.driverId);
                 processed += 1;
             } catch (error) {
-                console.error('[backfillSettlementsForDeliveredOrders] Failed for order:', order.id, error);
+                logger.error({ err: error, orderId: order.id }, 'settlement:backfillSettlements failed for order');
             }
         }
 

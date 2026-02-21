@@ -13,7 +13,8 @@ export default function AddressesScreen() {
     const theme = useTheme();
 
     const { data, loading, refetch } = useQuery(GET_MY_ADDRESSES, {
-        fetchPolicy: 'network-only',
+        // Show cached addresses immediately; refresh in background.
+        fetchPolicy: 'cache-and-network',
     });
 
     const [deleteAddress] = useMutation(DELETE_USER_ADDRESS, {

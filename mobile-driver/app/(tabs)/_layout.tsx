@@ -1,5 +1,4 @@
 import { Tabs, useRouter } from 'expo-router';
-import { View, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,18 +35,8 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="add"
                 options={{
-                    title: t.tabs.create,
-                    tabBarButton: () => (
-                        <View className="items-center justify-center -mt-8">
-                            <TouchableOpacity
-                                onPress={() => router.push('/create-transaction')}
-                                className="bg-primary w-16 h-16 rounded-full items-center justify-center shadow-lg"
-                                activeOpacity={0.9}
-                            >
-                                <Ionicons name="add" size={32} color="white" />
-                            </TouchableOpacity>
-                        </View>
-                    ),
+                    title: 'Earnings',
+                    tabBarIcon: ({ color, size }) => <Ionicons name="cash-outline" size={size} color={color} />,
                 }}
             />
 

@@ -1,0 +1,53 @@
+# Promtail configuration — reads Pino JSON logs from the API log folder
+# and pushes them to Loki.
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    batchwait: 1s
+    batchsize: 1048576
+
+scrape_configs:
+  - job_name: delivery-api
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: delivery-api
+          environment: production
+          __path__: /var/log/api/*.log
+
+    # Parse Pino JSON — extract level, service, msg for Loki labels
+    pipeline_stages:
+      - json:
+          expressions:
+            level: level
+            service: service
+            msg: msg
+            requestId: requestId
+            durationMs: durationMs
+            statusCode: statusCode
+            method: method
+            url: url
+
+      # Map Pino numeric levels to human-readable labels
+      - template:
+          source: level
+          template: >-
+            {{ if eq .Value "10" }}trace{{ else if eq .Value "20" }}debug{{ else if eq .Value "30" }}info{{ else if eq .Value "40" }}warn{{ else if eq .Value "50" }}error{{ else if eq .Value "60" }}fatal{{ else }}unknown{{ end }}
+
+      - labels:
+          level:
+          service:
+
+      # Drop debug-level logs in production to save storage
+      - match:
+          selector: '{level="debug"}'
+          action: drop
+          drop_counter_reason: debug_filtered

@@ -30,6 +30,8 @@ export const DRIVERS_QUERY = graphql(`
       role
       imageUrl
       phoneNumber
+      commissionPercentage
+      maxActiveOrders
       driverLocation {
         latitude
         longitude

@@ -15,7 +15,7 @@ export const FloatingBars = () => {
     if (shouldHide) return null;
 
     // Check if we're on a tab route
-    const tabRoutes = ['/analytics', '/home', '/profile'];
+    const tabRoutes = ['/market', '/home', '/profile'];
     const isOnTabRoute = tabRoutes.some((route) => pathname === route || pathname.startsWith(route));
 
     // Calculate bottom position based on whether tab bar is visible

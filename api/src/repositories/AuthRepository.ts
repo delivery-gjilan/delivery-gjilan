@@ -26,8 +26,6 @@ export class AuthRepository {
     }
 
     async findByEmail(email: string): Promise<DbUser | undefined> {
-        console.log(this.db);
-        console.log('email', email);
         const [user] = await this.db.select().from(users).where(eq(users.email, email));
         return user;
     }

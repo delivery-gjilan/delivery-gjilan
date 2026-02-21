@@ -7,6 +7,10 @@ import Providers from '@/lib/graphql/providers';
 import { useDriverTracking } from '@/hooks/useDriverTracking';
 import Mapbox from '@rnmapbox/maps';
 import { MAPBOX_TOKEN } from '@/utils/mapbox';
+import { initSentry, Sentry } from '@/lib/sentry';
+
+// ── Initialise Sentry before anything else renders ──
+initSentry();
 
 function AppContent() {
     // Start heartbeat as soon as auth is established
@@ -43,3 +47,5 @@ export default function RootLayout() {
         </Providers>
     );
 }
+
+export default Sentry.wrap(RootLayout);

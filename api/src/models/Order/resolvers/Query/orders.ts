@@ -12,8 +12,14 @@ export const orders: NonNullable<QueryResolvers['orders']> = async (_parent, _ar
 
     switch (userData.role) {
         case 'SUPER_ADMIN':
-        case 'DRIVER':
             return allOrders;
+
+        case 'DRIVER':
+            // Drivers see their own assigned orders + all active (pickable) orders
+            return allOrders.filter(order =>
+                order.driver?.id === userData.userId ||
+                !['DELIVERED', 'CANCELLED'].includes(order.status)
+            );
 
         case 'CUSTOMER':
             return allOrders.filter(order => order.userId === userData.userId);

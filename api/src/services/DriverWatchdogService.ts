@@ -11,6 +11,9 @@
 import { DriverRepository, CONNECTION_THRESHOLDS } from '@/repositories/DriverRepository';
 import { AuthRepository } from '@/repositories/AuthRepository';
 import { pubsub, publish, topics } from '@/lib/pubsub';
+import logger from '@/lib/logger';
+
+const log = logger.child({ service: 'DriverWatchdog' });
 
 const WATCHDOG_INTERVAL_MS = 10000; // Check every 10 seconds
 
@@ -28,20 +31,20 @@ export class DriverWatchdogService {
    */
   start(): void {
     if (this.isRunning) {
-      console.log('[DriverWatchdog] Already running');
+      log.debug('watchdog:alreadyRunning');
       return;
     }
 
     this.isRunning = true;
     this.watchdogInterval = setInterval(() => {
       this.checkDriverStates().catch((error) => {
-        console.error('[DriverWatchdog] Error during check:', error);
+        log.error({ err: error }, 'watchdog:check:error');
       });
     }, WATCHDOG_INTERVAL_MS);
 
-    console.log(
-      `[DriverWatchdog] Started (interval: ${WATCHDOG_INTERVAL_MS}ms, ` +
-      `stale: ${CONNECTION_THRESHOLDS.STALE}s, lost: ${CONNECTION_THRESHOLDS.LOST}s)`
+    log.info(
+      { intervalMs: WATCHDOG_INTERVAL_MS, staleThreshold: CONNECTION_THRESHOLDS.STALE, lostThreshold: CONNECTION_THRESHOLDS.LOST },
+      'watchdog:started',
     );
   }
 
@@ -54,7 +57,7 @@ export class DriverWatchdogService {
       this.watchdogInterval = null;
     }
     this.isRunning = false;
-    console.log('[DriverWatchdog] Stopped');
+    log.info('watchdog:stopped');
   }
 
   /**
@@ -70,16 +73,16 @@ export class DriverWatchdogService {
 
       // Log state changes
       if (staleDrivers.length > 0) {
-        console.log(
-          `[DriverWatchdog] Marked ${staleDrivers.length} driver(s) as STALE:`,
-          staleDrivers.map(d => d.userId)
+        log.info(
+          { count: staleDrivers.length, driverIds: staleDrivers.map(d => d.userId) },
+          'watchdog:marked:stale',
         );
       }
 
       if (lostDrivers.length > 0) {
-        console.log(
-          `[DriverWatchdog] Marked ${lostDrivers.length} driver(s) as LOST:`,
-          lostDrivers.map(d => d.userId)
+        log.info(
+          { count: lostDrivers.length, driverIds: lostDrivers.map(d => d.userId) },
+          'watchdog:marked:lost',
         );
       }
 
@@ -89,27 +92,18 @@ export class DriverWatchdogService {
         await this.publishDriverUpdate();
       }
 
-      // Periodic status log
-      const allDrivers = await this.driverRepository.getAllDrivers();
-      const counts = {
-        CONNECTED: 0,
-        STALE: 0,
-        LOST: 0,
-        DISCONNECTED: 0,
-      };
-      allDrivers.forEach(d => {
-        counts[d.connectionStatus]++;
-      });
+      // Periodic status log — single COUNT(*) GROUP BY query, not a full table scan
+      const counts = await this.driverRepository.getConnectionStatusCounts();
+      const total = (counts.CONNECTED + counts.STALE + counts.LOST + counts.DISCONNECTED);
 
-      if (allDrivers.length > 0) {
-        console.log(
-          `[DriverWatchdog] Status: total=${allDrivers.length} ` +
-          `connected=${counts.CONNECTED} stale=${counts.STALE} ` +
-          `lost=${counts.LOST} disconnected=${counts.DISCONNECTED}`
+      if (total > 0) {
+        log.debug(
+          { total, connected: counts.CONNECTED, stale: counts.STALE, lost: counts.LOST, disconnected: counts.DISCONNECTED },
+          'watchdog:status',
         );
       }
     } catch (error) {
-      console.error('[DriverWatchdog] Check failed:', error);
+      log.error({ err: error }, 'watchdog:check:failed');
     }
   }
 
@@ -121,7 +115,7 @@ export class DriverWatchdogService {
       const drivers = await this.authRepository.findDrivers();
       publish(pubsub, topics.allDriversChanged(), { drivers });
     } catch (error) {
-      console.error('[DriverWatchdog] Failed to publish update:', error);
+      log.error({ err: error }, 'watchdog:publish:error');
     }
   }
 

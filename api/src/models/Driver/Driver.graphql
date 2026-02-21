@@ -48,6 +48,38 @@ type DriverHeartbeatResult {
 extend type User {
     driverConnection: DriverConnection
     commissionPercentage: Float
+    maxActiveOrders: Int
+}
+
+type DriverDailyMetrics {
+    """Number of active (uncompleted) orders this driver currently has"""
+    activeOrdersCount: Int!
+
+    """Driver's personal maximum active orders limit"""
+    maxActiveOrders: Int!
+
+    """Number of orders delivered today"""
+    deliveredTodayCount: Int!
+
+    """Total delivery earnings today (before commission deduction)"""
+    grossEarningsToday: Float!
+
+    """Commission rate as a percentage (e.g. 10.0 for 10%)"""
+    commissionPercentage: Float!
+
+    """Driver's net earnings today (after commission deduction)"""
+    netEarningsToday: Float!
+
+    """Whether the driver is currently online (online preference)"""
+    isOnline: Boolean!
+
+    """Driver's current connection status"""
+    connectionStatus: DriverConnectionStatus!
+}
+
+extend type Query {
+    """Get live metrics for the authenticated driver"""
+    myDriverMetrics: DriverDailyMetrics!
 }
 
 extend type Mutation {
@@ -63,6 +95,13 @@ extend type Mutation {
     
     """Admin mutation to manually set connection status (for testing/recovery)"""
     adminSetDriverConnectionStatus(driverId: ID!, status: DriverConnectionStatus!): User!
+
+    """Admin mutation to update per-driver settings (commission %, max active orders)"""
+    adminUpdateDriverSettings(
+        driverId: ID!
+        commissionPercentage: Float
+        maxActiveOrders: Int
+    ): User!
 }
 
 # Per-driver subscription (optional - for more granular updates)

@@ -10,6 +10,9 @@ import {
 } from '@/database/schema/promotions';
 import { orders } from '@/database/schema';
 import { eq, and, or, sql, gte, lte, isNull, inArray } from 'drizzle-orm';
+import logger from '@/lib/logger';
+
+const log = logger.child({ service: 'PromotionEngine' });
 
 export type CartItem = {
     productId: string;
@@ -94,15 +97,15 @@ export class PromotionEngine {
                 )
             );
 
-        console.log('[PromotionEngine] found promotions', { count: allPromos.length, manualPromoCode, cartSubtotal: cart.subtotal });
+        log.debug({ count: allPromos.length, manualPromoCode, cartSubtotal: cart.subtotal }, 'promo:found');
 
         // 3. Filter by target type and eligibility
         for (const promo of allPromos) {
-            console.log('[PromotionEngine] checking promo', { id: promo.id, name: promo.name, code: promo.code, target: promo.target, spendThreshold: promo.spendThreshold });
+            log.debug({ id: promo.id, name: promo.name, code: promo.code, target: promo.target, spendThreshold: promo.spendThreshold }, 'promo:checking');
             
             // If user entered a manual code, only consider that one
             if (manualPromoCode && promo.code !== manualPromoCode.trim().toUpperCase()) {
-                console.log('[PromotionEngine] skipping - code mismatch');
+                log.debug({ promoCode: promo.code }, 'promo:skip:codeMismatch');
                 continue;
             }
 
@@ -113,43 +116,43 @@ export class PromotionEngine {
                 case 'ALL_USERS':
                     // Check basic code eligibility (usage limits)
                     isEligible = await this.checkCodeEligibility(promo, userId);
-                    console.log('[PromotionEngine] ALL_USERS code eligibility', { isEligible });
+                    log.debug({ isEligible }, 'promo:allUsers:codeEligibility');
                     // If promo has a spend threshold, also check if it's met
                     if (isEligible && promo.spendThreshold) {
                         isEligible = await this.checkConditionalEligibility(promo, cart);
-                        console.log('[PromotionEngine] ALL_USERS spend threshold check', { isEligible, spendThreshold: promo.spendThreshold, cartSubtotal: cart.subtotal });
+                        log.debug({ isEligible, spendThreshold: promo.spendThreshold, cartSubtotal: cart.subtotal }, 'promo:allUsers:thresholdCheck');
                     }
                     break;
 
                 case 'FIRST_ORDER':
                     isEligible = isFirstOrder && await this.checkCodeEligibility(promo, userId);
-                    console.log('[PromotionEngine] FIRST_ORDER eligibility', { isEligible, isFirstOrder });
+                    log.debug({ isEligible, isFirstOrder }, 'promo:firstOrder');
                     break;
 
                 case 'SPECIFIC_USERS':
                     isEligible = await this.checkUserAssignment(promo.id, userId);
-                    console.log('[PromotionEngine] SPECIFIC_USERS eligibility', { isEligible });
+                    log.debug({ isEligible }, 'promo:specificUsers');
                     break;
 
                 case 'CONDITIONAL':
                     isEligible = await this.checkConditionalEligibility(promo, cart);
-                    console.log('[PromotionEngine] CONDITIONAL eligibility', { isEligible, spendThreshold: promo.spendThreshold, cartSubtotal: cart.subtotal });
+                    log.debug({ isEligible, spendThreshold: promo.spendThreshold, cartSubtotal: cart.subtotal }, 'promo:conditional');
                     break;
             }
 
             if (!isEligible) {
-                console.log('[PromotionEngine] skipping - not eligible');
+                log.debug({ promoId: promo.id }, 'promo:skip:notEligible');
                 continue;
             }
 
             // Check business eligibility
             const businessEligible = await this.checkBusinessEligibility(promo.id, cart.businessIds);
-            console.log('[PromotionEngine] business eligibility', { businessEligible, cartBusinessIds: cart.businessIds });
+            log.debug({ businessEligible, cartBusinessIds: cart.businessIds }, 'promo:businessEligibility');
             if (!businessEligible) continue;
 
             // Check usage limits
             const usageLimitOk = await this.checkUsageLimits(promo, userId);
-            console.log('[PromotionEngine] usage limits', { usageLimitOk });
+            log.debug({ usageLimitOk }, 'promo:usageLimits');
             if (!usageLimitOk) continue;
 
             // Calculate discount amount
@@ -183,9 +186,9 @@ export class PromotionEngine {
         cart: CartContext,
         manualPromoCode?: string
     ): Promise<PromotionResult> {
-        console.log('[PromotionEngine] applyPromotions called', { userId, cartSubtotal: cart.subtotal, manualPromoCode });
+        log.info({ userId, cartSubtotal: cart.subtotal, manualPromoCode }, 'promo:applyPromotions');
         const applicable = await this.getApplicablePromotions(userId, cart, manualPromoCode);
-        console.log('[PromotionEngine] applicable promotions found', { count: applicable.length, promotions: applicable.map(p => ({ id: p.id, name: p.name, code: p.code, target: p.target, appliedAmount: p.appliedAmount })) });
+        log.info({ count: applicable.length, promotions: applicable.map(p => ({ id: p.id, name: p.name })) }, 'promo:applicable');
 
         if (applicable.length === 0) {
             return {

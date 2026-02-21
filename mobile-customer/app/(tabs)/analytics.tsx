@@ -4,7 +4,8 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
-import { useOrders } from '@/modules/orders';
+import { GET_ORDERS } from '@/graphql/operations/orders';
+import { useQuery } from '@apollo/client/react';
 import { ProfileRow } from '@/components/ProfileRow';
 import { useAuthStore } from '@/store/authStore';
 
@@ -13,7 +14,9 @@ export default function Profile() {
     const router = useRouter();
     const { logout } = useAuth();
     const user = useAuthStore((state) => state.user);
-    const { orders, loading: ordersLoading } = useOrders();
+    // Read from Apollo cache only — the root subscription already keeps it fresh
+    const { data: ordersData } = useQuery(GET_ORDERS, { fetchPolicy: 'cache-only' });
+    const orders: any[] = (ordersData as any)?.orders ?? [];
 
     // Get user initials
     const getInitials = () => {
@@ -37,9 +40,8 @@ export default function Profile() {
         router.push('/orders/history');
     };
 
-    const ordersSubtitle = ordersLoading
-        ? 'Loading...'
-        : orders.length > 0
+    const ordersSubtitle =
+        orders.length > 0
             ? `${orders.length} order${orders.length !== 1 ? 's' : ''}`
             : 'No orders';
 

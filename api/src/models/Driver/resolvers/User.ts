@@ -1,10 +1,11 @@
 import type { UserResolvers } from './../../../generated/types.generated';
+import logger from '@/lib/logger';
 
 /**
  * Driver-related User resolver
  * Resolves the driverConnection field for driver users
  */
-export const User: Pick<UserResolvers, 'commissionPercentage'|'driverConnection'|'__isTypeOf'> = {
+export const User: Pick<UserResolvers, 'commissionPercentage'|'driverConnection'|'maxActiveOrders'|'__isTypeOf'> = {
   driverConnection: async (parent, _args, { driverService }) => {
     // Only drivers have connection info
     if (parent.role !== 'DRIVER') {
@@ -36,7 +37,7 @@ export const User: Pick<UserResolvers, 'commissionPercentage'|'driverConnection'
         disconnectedAt: parseDate(driver.disconnectedAt),
       };
     } catch (error) {
-      console.error('[Driver.User.driverConnection] Error resolving driver connection:', error);
+      logger.error({ err: error, userId: parent.id }, 'driver:driverConnection resolve failed');
       return null;
     }
   },

@@ -79,9 +79,6 @@ export default function Home() {
             <View className="flex-1">
                 {/* Wolt-style Header */}
                 <WoltHeader
-                    location="Pristina"
-                    onPressLocation={() => console.log('Open location selector')}
-                    onPressProfile={() => router.push('/profile')}
                     onPressNotifications={() => console.log('Open notifications')}
                 />
 

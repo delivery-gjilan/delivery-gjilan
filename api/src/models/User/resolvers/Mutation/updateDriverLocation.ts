@@ -1,6 +1,7 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { GraphQLError } from 'graphql';
 import { pubsub, publish, topics } from '@/lib/pubsub';
+import logger from '@/lib/logger';
 
 export const updateDriverLocation: NonNullable<MutationResolvers['updateDriverLocation']> = async (
         _parent,
@@ -29,7 +30,7 @@ export const updateDriverLocation: NonNullable<MutationResolvers['updateDriverLo
                 const drivers = await authService.authRepository.findDrivers();
                 publish(pubsub, topics.allDriversChanged(), { drivers });
         } catch (error) {
-                console.error('Failed to publish driver update:', error);
+		logger.error({ err: error }, 'user:updateDriverLocation publish failed');
         }
 
         const user = await authService.authRepository.findById(userData.userId);

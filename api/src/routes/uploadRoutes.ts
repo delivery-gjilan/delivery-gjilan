@@ -1,7 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { uploadMiddleware } from '../lib/middleware/uploadMiddleware';
 import S3Service from '../services/S3Service';
+import logger from '@/lib/logger';
 
+const log = logger.child({ service: 'UploadRoutes' });
 const router = Router();
 
 /**
@@ -48,7 +50,7 @@ router.post('/image', uploadMiddleware.single('image'), async (req: Request, res
             url: result.url,
         });
     } catch (error) {
-        console.error('Upload error:', error);
+        log.error({ err: error }, 'upload:image:error');
         return res.status(500).json({
             success: false,
             error: error instanceof Error ? error.message : 'Internal server error',
@@ -89,7 +91,7 @@ router.delete('/image', async (req: Request, res: Response) => {
             message: deleted ? 'Image deleted successfully' : 'Failed to delete image',
         });
     } catch (error) {
-        console.error('Delete error:', error);
+        log.error({ err: error }, 'upload:deleteError');
         return res.status(500).json({
             success: false,
             error: error instanceof Error ? error.message : 'Internal server error',

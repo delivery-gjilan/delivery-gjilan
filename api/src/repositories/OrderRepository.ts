@@ -69,14 +69,12 @@ export class OrderRepository {
     }
 
     async findUncompletedOrdersByUserId(userId: string): Promise<DbOrder[]> {
-        console.log('ID e userit', userId);
         const db = await getDB();
         const result = await db.query.orders.findMany({
             where: (tbl, { and, eq, notInArray }) =>
                 and(eq(tbl.userId, userId), notInArray(tbl.status, ['DELIVERED', 'CANCELLED'] as OrderStatus[])),
             orderBy: (tbl, { asc }) => [asc(tbl.createdAt)],
         });
-        console.log('rezultatet', result);
         return result;
     }
 

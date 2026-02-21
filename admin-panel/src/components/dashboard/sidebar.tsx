@@ -11,7 +11,6 @@ import {
   Package,
   Truck,
   Map,
-  MapPinned,
   Tag,
   Percent,
   Users,
@@ -21,6 +20,7 @@ import {
   ChevronLeft,
   ChevronRight,
   DollarSign,
+  Activity,
 } from "lucide-react";
 
 const menu = [
@@ -34,11 +34,10 @@ const menu = [
   { name: "Businesses", href: "/dashboard/businesses", icon: Store, superAdminOnly: true },
   { name: "Drivers", href: "/dashboard/drivers", icon: Truck, superAdminOnly: true },
   { name: "Map", href: "/dashboard/map", icon: Map, superAdminOnly: true },
-  { name: "Delivery Zones", href: "/dashboard/zones", icon: MapPinned, superAdminOnly: true },
   { name: "Promotions", href: "/dashboard/promotions", icon: Tag, superAdminOnly: true },
   { name: "Admins", href: "/dashboard/admins", icon: UserCog, superAdminOnly: true },
   { name: "Users", href: "/dashboard/users", icon: Users, superAdminOnly: true },
-  { name: "Commission Settings", href: "/dashboard/settings/commissions", icon: DollarSign, superAdminOnly: true },
+  { name: "Logs", href: "/dashboard/logs", icon: Activity, superAdminOnly: true },
 ];
 
 export default function Sidebar() {

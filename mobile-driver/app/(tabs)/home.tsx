@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useMutation, useQuery, useSubscription } from '@apollo/client/react';
 import { ALL_ORDERS_UPDATED, ASSIGN_DRIVER_TO_ORDER, GET_ORDERS, UPDATE_ORDER_STATUS } from '@/graphql/operations/orders';
 import { UPDATE_DRIVER_ONLINE_STATUS } from '@/graphql/operations/driverLocation';
+import { GET_MY_DRIVER_METRICS } from '@/graphql/operations/driver';
 import { Button } from '@/components/Button';
 import { calculateRouteDistance } from '@/utils/mapbox';
 import { useAuthStore } from '@/store/authStore';
@@ -29,8 +30,22 @@ export default function Home() {
     const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
 
     const { data, loading, error, refetch } = useQuery(GET_ORDERS, {
-        fetchPolicy: 'network-only',
+        // cache-and-network: shows cached orders instantly, then updates from the network.
+        // The ALL_ORDERS_UPDATED subscription keeps this fresh in real time, so we
+        // don't need network-only or a poll interval.
+        fetchPolicy: 'cache-and-network',
+        nextFetchPolicy: 'cache-first',
     });
+
+    const { data: metricsData, refetch: refetchMetrics } = useQuery(GET_MY_DRIVER_METRICS, {
+        // Metrics only change meaningfully when an order is delivered.
+        // We refetch manually in handleUpdate when status === 'DELIVERED'.
+        // No poll interval needed.
+        fetchPolicy: 'cache-and-network',
+        nextFetchPolicy: 'cache-first',
+    });
+
+    const metrics = (metricsData as any)?.myDriverMetrics;
 
     useSubscription(ALL_ORDERS_UPDATED, {
         onData: ({ client, data: subData }) => {
@@ -197,53 +212,54 @@ export default function Home() {
         await Linking.openURL(canOpenGoogle ? googleScheme : googleUrl);
     };
 
-    // Calculate distances for all active orders
+// Calculate distances for all active orders in parallel
     useEffect(() => {
         const calculateDistances = async () => {
-            for (const order of activeOrders) {
-                if (orderDistances[order.id]) continue; // Already calculated
-                
-                // Get first business location (pickup)
+            const ordersNeedingDistance = activeOrders.filter((order: any) => {
+                if (orderDistances[order.id]) return false; // Already calculated
                 const firstBusiness = order.businesses?.[0]?.business;
-                if (!firstBusiness?.location) continue;
-                
-                console.log('Calculating distance for order:', order.id);
-                console.log('Pickup location:', firstBusiness.location);
-                console.log('Drop-off location:', order.dropOffLocation);
-                
-                const pickup = {
-                    longitude: firstBusiness.location.longitude,
-                    latitude: firstBusiness.location.latitude,
-                };
-                
-                const dropoff = {
-                    longitude: order.dropOffLocation.longitude,
-                    latitude: order.dropOffLocation.latitude,
-                };
-                
-                try {
-                    const distance = await calculateRouteDistance(pickup, dropoff);
-                    console.log('Distance result:', distance);
-                    if (distance) {
-                        setOrderDistances((prev) => ({
-                            ...prev,
-                            [order.id]: distance,
-                        }));
+                return Boolean(firstBusiness?.location);
+            });
+
+            if (ordersNeedingDistance.length === 0) return;
+
+            await Promise.all(
+                ordersNeedingDistance.map(async (order: any) => {
+                    const firstBusiness = order.businesses[0].business;
+                    const pickup = {
+                        longitude: firstBusiness.location.longitude,
+                        latitude: firstBusiness.location.latitude,
+                    };
+                    const dropoff = {
+                        longitude: order.dropOffLocation.longitude,
+                        latitude: order.dropOffLocation.latitude,
+                    };
+                    try {
+                        const distance = await calculateRouteDistance(pickup, dropoff);
+                        if (distance) {
+                            setOrderDistances((prev) => ({
+                                ...prev,
+                                [order.id]: distance,
+                            }));
+                        }
+                    } catch (error) {
+                        console.error('Error calculating distance for order', order.id, error);
                     }
-                } catch (error) {
-                    console.error('Error calculating distance:', error);
-                }
-            }
+                }),
+            );
         };
 
         calculateDistances();
-    }, [activeOrders.map((o: any) => o.id).join(',')]);
+    }, [activeOrders.map((o: any) => o.id).join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleUpdate = async (id: string, status: string) => {
         setUpdatingId(id);
         try {
             await updateStatus({ variables: { id, status } });
             await refetch();
+            if (status === 'DELIVERED') {
+                refetchMetrics();
+            }
             if (status === 'OUT_FOR_DELIVERY') {
                 router.push({ pathname: '/order-map', params: { orderId: id } });
             }
@@ -531,6 +547,7 @@ export default function Home() {
                             />
                         </View>
 
+                        {/* Stats row: order queue */}
                         <View className="mt-4 flex-row gap-2">
                             <View className="flex-1 rounded-2xl p-4" style={{ backgroundColor: theme.colors.income + '15', borderWidth: 1, borderColor: theme.colors.income + '30' }}>
                                 <Text className="text-xs font-semibold" style={{ color: theme.colors.income }}>READY NOW</Text>
@@ -538,7 +555,32 @@ export default function Home() {
                             </View>
                             <View className="flex-1 rounded-2xl p-4" style={{ backgroundColor: theme.colors.primary + '15', borderWidth: 1, borderColor: theme.colors.primary + '30' }}>
                                 <Text className="text-xs font-semibold" style={{ color: theme.colors.primary }}>ACTIVE</Text>
-                                <Text className="text-3xl font-bold mt-1" style={{ color: theme.colors.text }}>{inDeliveryOrders.length}</Text>
+                                <Text className="text-3xl font-bold mt-1" style={{ color: theme.colors.text }}>
+                                    {metrics
+                                        ? `${metrics.activeOrdersCount}/${metrics.maxActiveOrders}`
+                                        : `${inDeliveryOrders.length}`}
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* Today's earnings metrics */}
+                        <View className="mt-2 flex-row gap-2">
+                            <View className="flex-1 rounded-2xl p-4" style={{ backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border }}>
+                                <Text className="text-xs font-semibold" style={{ color: theme.colors.subtext }}>DELIVERED TODAY</Text>
+                                <Text className="text-3xl font-bold mt-1" style={{ color: theme.colors.text }}>
+                                    {metrics ? metrics.deliveredTodayCount : '—'}
+                                </Text>
+                            </View>
+                            <View className="flex-1 rounded-2xl p-4" style={{ backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border }}>
+                                <Text className="text-xs font-semibold" style={{ color: theme.colors.subtext }}>TODAY'S EARNINGS</Text>
+                                <Text className="text-2xl font-bold mt-1" style={{ color: theme.colors.income }}>
+                                    {metrics ? `$${metrics.netEarningsToday.toFixed(2)}` : '—'}
+                                </Text>
+                                {metrics && metrics.commissionPercentage > 0 && (
+                                    <Text className="text-xs mt-0.5" style={{ color: theme.colors.subtext }}>
+                                        after {metrics.commissionPercentage}% commission
+                                    </Text>
+                                )}
                             </View>
                         </View>
                     </View>

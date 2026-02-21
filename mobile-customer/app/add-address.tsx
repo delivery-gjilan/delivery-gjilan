@@ -33,23 +33,25 @@ export default function AddEditAddressScreen() {
 
     const { data: addressesData } = useQuery(GET_MY_ADDRESSES, {
         skip: !isEdit,
-        onCompleted: (data) => {
-            if (isEdit) {
-                const address = data.myAddresses.find((a: any) => a.id === id);
-                if (address) {
-                    setAddressName(address.addressName || '');
-                    setDisplayName(address.displayName || '');
-                    setMarkerCoordinate({ latitude: address.latitude, longitude: address.longitude });
-                    setMapRegion({
-                        latitude: address.latitude,
-                        longitude: address.longitude,
-                        latitudeDelta: 0.01,
-                        longitudeDelta: 0.01,
-                    });
-                }
-            }
-        },
+        fetchPolicy: 'cache-and-network',
     });
+
+    // Pre-fill form fields when editing an existing address
+    useEffect(() => {
+        if (!isEdit || !addressesData?.myAddresses) return;
+        const address = addressesData.myAddresses.find((a: any) => String(a.id) === String(id));
+        if (address) {
+            setAddressName(address.addressName || '');
+            setDisplayName(address.displayName || '');
+            setMarkerCoordinate({ latitude: address.latitude, longitude: address.longitude });
+            setMapRegion({
+                latitude: address.latitude,
+                longitude: address.longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+            });
+        }
+    }, [isEdit, id, addressesData]);
 
     const [addAddress] = useMutation(ADD_USER_ADDRESS, {
         refetchQueries: [{ query: GET_MY_ADDRESSES }],

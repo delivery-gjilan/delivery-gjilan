@@ -5,6 +5,9 @@ import { DbProduct } from '@/database/schema/products';
 import type { DbType } from '@/database';
 import { productStocks } from '@/database/schema/productStock';
 import { eq } from 'drizzle-orm';
+import logger from '@/lib/logger';
+
+const log = logger.child({ service: 'ProductService' });
 
 export class ProductService {
     constructor(
@@ -119,7 +122,7 @@ export class ProductService {
             await this.productRepository.updateProductsOrder(businessId, products);
             return true;
         } catch (error) {
-            console.error('Error updating products order:', error);
+            log.error({ err: error, businessId }, 'product:updateOrder:error');
             return false;
         }
     }

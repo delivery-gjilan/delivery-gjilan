@@ -1,0 +1,201 @@
+# Grafana alert rules — provisioned on startup
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: delivery-api-alerts
+    folder: Delivery Alerts
+    interval: 1m
+    rules:
+      # ────────────────────────────────────────────
+      # 1. High 5xx Error Rate (>5% over 5 min)
+      # ────────────────────────────────────────────
+      - uid: high-error-rate
+        title: "High API Error Rate (>5%)"
+        condition: error_rate
+        data:
+          - refId: errors
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: loki
+            model:
+              expr: >
+                sum(count_over_time({job="delivery-api"} | json | msg=`request:finish` | statusCode >= 500 [5m]))
+              refId: errors
+          - refId: total
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: loki
+            model:
+              expr: >
+                sum(count_over_time({job="delivery-api"} | json | msg=`request:finish` [5m]))
+              refId: total
+          - refId: error_rate
+            datasourceUid: "__expr__"
+            model:
+              type: math
+              expression: "$errors / $total * 100"
+              conditions:
+                - evaluator: { type: gt, params: [5] }
+                  operator: { type: and }
+                  reducer: { type: last }
+        for: 5m
+        labels:
+          severity: critical
+          service: api
+        annotations:
+          summary: "API error rate exceeds 5%"
+          description: "More than 5% of API requests returned 5xx status codes over the last 5 minutes."
+
+      # ────────────────────────────────────────────
+      # 2. Slow API (p95 > 2s over 5 min)
+      # ────────────────────────────────────────────
+      - uid: slow-api-p95
+        title: "Slow API Response (p95 > 2s)"
+        condition: latency_check
+        data:
+          - refId: p95
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: loki
+            model:
+              expr: >
+                quantile_over_time(0.95, {job="delivery-api"} | json | msg=`request:finish` | unwrap durationMs [5m]) by ()
+              refId: p95
+          - refId: latency_check
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: "$p95"
+              conditions:
+                - evaluator: { type: gt, params: [2000] }
+                  operator: { type: and }
+                  reducer: { type: last }
+        for: 5m
+        labels:
+          severity: warning
+          service: api
+        annotations:
+          summary: "API p95 latency exceeds 2 seconds"
+          description: "The 95th percentile response time has been above 2000ms for 5 minutes."
+
+      # ────────────────────────────────────────────
+      # 3. Payment / Settlement Failures
+      # ────────────────────────────────────────────
+      - uid: payment-failures
+        title: "Payment Failures Spike"
+        condition: payment_fail_check
+        data:
+          - refId: payment_errors
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: loki
+            model:
+              expr: >
+                sum(count_over_time({job="delivery-api"} | json | service=`FinancialService` | level=`error` [5m]))
+              refId: payment_errors
+          - refId: payment_fail_check
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: "$payment_errors"
+              conditions:
+                - evaluator: { type: gt, params: [3] }
+                  operator: { type: and }
+                  reducer: { type: last }
+        for: 2m
+        labels:
+          severity: critical
+          service: payments
+        annotations:
+          summary: "Multiple payment failures detected"
+          description: "More than 3 payment/settlement errors occurred in the last 5 minutes."
+
+      # ────────────────────────────────────────────
+      # 4. Driver Watchdog — Mass Disconnects
+      # ────────────────────────────────────────────
+      - uid: driver-mass-disconnect
+        title: "Mass Driver Disconnects"
+        condition: disconnect_check
+        data:
+          - refId: disconnects
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: loki
+            model:
+              expr: >
+                sum(count_over_time({job="delivery-api"} | json | service=`DriverWatchdog` | msg=~`.*force.*offline.*|.*timed out.*` [5m]))
+              refId: disconnects
+          - refId: disconnect_check
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: "$disconnects"
+              conditions:
+                - evaluator: { type: gt, params: [5] }
+                  operator: { type: and }
+                  reducer: { type: last }
+        for: 3m
+        labels:
+          severity: warning
+          service: drivers
+        annotations:
+          summary: "Multiple drivers forced offline"
+          description: "More than 5 drivers were forced offline by the watchdog in 5 minutes — possible infrastructure issue."
+
+      # ────────────────────────────────────────────
+      # 5. Zero Request Volume (API Down?)
+      # ────────────────────────────────────────────
+      - uid: zero-traffic
+        title: "No API Traffic Detected"
+        condition: traffic_check
+        data:
+          - refId: requests
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: loki
+            model:
+              expr: >
+                sum(count_over_time({job="delivery-api"} | json | msg=`request:finish` [5m]))
+              refId: requests
+          - refId: traffic_check
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: "$requests"
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+                  operator: { type: and }
+                  reducer: { type: last }
+        for: 10m
+        labels:
+          severity: critical
+          service: api
+        annotations:
+          summary: "No API traffic for 10 minutes"
+          description: "The API has received zero requests in the last 10 minutes — it may be down."
+
+      # ────────────────────────────────────────────
+      # 6. Fatal Errors (immediate)
+      # ────────────────────────────────────────────
+      - uid: fatal-errors
+        title: "Fatal Error Logged"
+        condition: fatal_check
+        data:
+          - refId: fatals
+            relativeTimeRange: { from: 60, to: 0 }
+            datasourceUid: loki
+            model:
+              expr: >
+                sum(count_over_time({job="delivery-api", level="fatal"} [1m]))
+              refId: fatals
+          - refId: fatal_check
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: "$fatals"
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+                  operator: { type: and }
+                  reducer: { type: last }
+        for: 0m
+        labels:
+          severity: critical
+          service: api
+        annotations:
+          summary: "Fatal error in API"
+          description: "A fatal-level error was logged — the process may have crashed."

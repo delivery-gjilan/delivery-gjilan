@@ -69,6 +69,16 @@ export const DELETE_USER_MUTATION = graphql(`
   }
 `);
 
+export const ADMIN_UPDATE_DRIVER_SETTINGS_MUTATION = graphql(`
+  mutation AdminUpdateDriverSettings($driverId: ID!, $commissionPercentage: Float, $maxActiveOrders: Int) {
+    adminUpdateDriverSettings(driverId: $driverId, commissionPercentage: $commissionPercentage, maxActiveOrders: $maxActiveOrders) {
+      id
+      commissionPercentage
+      maxActiveOrders
+    }
+  }
+`);
+
 export const UPDATE_USER_NOTE_MUTATION = graphql(`
   mutation UpdateUserNote($userId: ID!, $note: String, $flagColor: String) {
     updateUserNote(userId: $userId, note: $note, flagColor: $flagColor) {

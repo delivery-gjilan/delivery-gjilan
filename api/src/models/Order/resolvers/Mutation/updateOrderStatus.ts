@@ -4,6 +4,7 @@ import { orderItems as orderItemsTable } from '@/database/schema';
 import { eq } from 'drizzle-orm';
 import { FinancialService } from '@/services/FinancialService';
 import { createAuditLogger } from '@/services/AuditLogger';
+import logger from '@/lib/logger';
 
 export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus']> = async (
     _parent,
@@ -11,7 +12,7 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
     context,
 ) => {
     const { orderService, userData, db } = context;
-    console.log('Updating order status:', id, status);
+    logger.info({ orderId: id, status }, 'order:updateOrderStatus');
 
     const role = userData?.role;
     if (!role) {
@@ -103,8 +104,7 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
         dbOrder.orderDate || null,
     );
 
-    console.log(`[Server] Publishing to channel: orderStatusUpdated:${id}`);
-    console.log('publishing to haha:', userData);
+    logger.debug({ orderId: id }, 'order:updateOrderStatus publishing status update');
     
     // Find the order to get the user ID
     await orderService.publishUserOrders(dbOrder.userId);

@@ -1,18 +1,20 @@
-"use client";
+﻿"use client";
 
 import { useState, FormEvent } from "react";
 import { useQuery, useMutation, useSubscription } from "@apollo/client/react";
 import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
 import { DRIVERS_UPDATED_SUBSCRIPTION } from "@/graphql/operations/users/subscriptions";
-import { CREATE_USER_MUTATION, DELETE_USER_MUTATION } from "@/graphql/operations/users/mutations";
-import { GET_BUSINESSES } from "@/graphql/operations/businesses/queries";
+import {
+    CREATE_USER_MUTATION,
+    DELETE_USER_MUTATION,
+    ADMIN_UPDATE_DRIVER_SETTINGS_MUTATION,
+} from "@/graphql/operations/users/mutations";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
-import Select from "@/components/ui/Select";
 import { Table, Th, Td } from "@/components/ui/Table";
 import Modal from "@/components/ui/Modal";
 import { useAuth } from "@/lib/auth-context";
-import { Pencil, Trash2, Plus, Signal, AlertCircle } from "lucide-react";
+import { Trash2, Plus, Signal, Settings2 } from "lucide-react";
 
 interface DriverItem {
     id: string;
@@ -21,27 +23,20 @@ interface DriverItem {
     lastName: string;
     role: string;
     phoneNumber?: string;
-    address?: string;
     imageUrl?: string;
-    isOnline?: boolean;
+    commissionPercentage?: number | null;
+    maxActiveOrders?: number | null;
     driverConnection?: {
         onlinePreference: boolean;
-        connectionStatus: "CONNECTED" | "DISCONNECTED";
+        connectionStatus: "CONNECTED" | "STALE" | "LOST" | "DISCONNECTED";
+        lastHeartbeatAt?: string;
         lastLocationUpdate?: string;
+        disconnectedAt?: string;
     };
 }
 
 interface DriversResponse {
     drivers: DriverItem[];
-}
-
-interface BusinessItem {
-    id: string;
-    name: string;
-}
-
-interface BusinessesResponse {
-    businesses: BusinessItem[];
 }
 
 interface CreateUserResponse {
@@ -57,121 +52,124 @@ export default function DriversPage() {
     const isSuperAdmin = admin?.role === "SUPER_ADMIN";
 
     const { data, loading, error, refetch } = useQuery<DriversResponse>(DRIVERS_QUERY);
-    const { data: businessesData } = useQuery<BusinessesResponse>(GET_BUSINESSES);
 
-    // Subscribe to real-time driver updates
     useSubscription(DRIVERS_UPDATED_SUBSCRIPTION, {
-        onData: ({ data: subData }) => {
-            if (subData?.data?.driversUpdated) {
-                // Refetch drivers to get updated list
-                refetch();
-            }
-        },
+        onData: () => { refetch(); },
     });
 
-    const [createDriver] = useMutation<CreateUserResponse>(CREATE_USER_MUTATION, {
-        onCompleted: () => {
-            refetch();
-            handleCloseModal();
-        },
+    const [createDriver] = useMutation(CREATE_USER_MUTATION, {
+        onCompleted: () => { refetch(); handleCloseCreateModal(); },
     });
-
     const [deleteDriver] = useMutation(DELETE_USER_MUTATION, {
-        onCompleted: () => {
-            refetch();
-        },
+        onCompleted: () => refetch(),
+    });
+    const [updateDriverSettings] = useMutation(ADMIN_UPDATE_DRIVER_SETTINGS_MUTATION, {
+        onCompleted: () => { refetch(); setShowSettingsModal(false); setSettingsTarget(null); },
     });
 
-    const [showModal, setShowModal] = useState(false);
+    // Create modal state
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [createForm, setCreateForm] = useState({ email: "", password: "", firstName: "", lastName: "" });
+
+    // Delete modal state
     const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [selectedDriverForDelete, setSelectedDriverForDelete] = useState<DriverItem | null>(null);
-    const [formData, setFormData] = useState({
-        email: "",
-        password: "",
-        firstName: "",
-        lastName: "",
-    });
+    const [deleteTarget, setDeleteTarget] = useState<DriverItem | null>(null);
+
+    // Settings modal state
+    const [showSettingsModal, setShowSettingsModal] = useState(false);
+    const [settingsTarget, setSettingsTarget] = useState<DriverItem | null>(null);
+    const [settingsForm, setSettingsForm] = useState({ commissionPercentage: "", maxActiveOrders: "" });
+    const [settingsError, setSettingsError] = useState("");
+
     const [formError, setFormError] = useState("");
     const [formSuccess, setFormSuccess] = useState("");
 
-    const handleCloseModal = () => {
-        setShowModal(false);
-        setFormData({ email: "", password: "", firstName: "", lastName: "" });
+    const handleCloseCreateModal = () => {
+        setShowCreateModal(false);
+        setCreateForm({ email: "", password: "", firstName: "", lastName: "" });
         setFormError("");
-        setFormSuccess("");
     };
 
-    const handleDelete = async (driver: DriverItem) => {
-        setSelectedDriverForDelete(driver);
-        setShowDeleteModal(true);
+    const openSettingsModal = (driver: DriverItem) => {
+        setSettingsTarget(driver);
+        setSettingsForm({
+            commissionPercentage: driver.commissionPercentage !== null && driver.commissionPercentage !== undefined
+                ? String(driver.commissionPercentage) : "0",
+            maxActiveOrders: driver.maxActiveOrders !== null && driver.maxActiveOrders !== undefined
+                ? String(driver.maxActiveOrders) : "2",
+        });
+        setSettingsError("");
+        setShowSettingsModal(true);
     };
 
-    const confirmDelete = async () => {
-        if (!selectedDriverForDelete) return;
-
-        try {
-            await deleteDriver({ variables: { id: selectedDriverForDelete.id } });
-            setFormSuccess("Driver deleted successfully");
-            setTimeout(() => setFormSuccess(""), 3000);
-            setShowDeleteModal(false);
-            setSelectedDriverForDelete(null);
-        } catch (err) {
-            setFormError(err instanceof Error ? err.message : "Failed to delete driver");
-            setTimeout(() => setFormError(""), 3000);
-        }
-    };
-
-    const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    const handleSettingsSubmit = async (e: FormEvent) => {
         e.preventDefault();
-        setFormError("");
-        setFormSuccess("");
+        if (!settingsTarget) return;
+        setSettingsError("");
 
-        if (!formData.email || !formData.password || !formData.firstName || !formData.lastName) {
-            setFormError("All fields are required");
+        const commission = parseFloat(settingsForm.commissionPercentage);
+        const maxOrders = parseInt(settingsForm.maxActiveOrders, 10);
+
+        if (isNaN(commission) || commission < 0 || commission > 100) {
+            setSettingsError("Commission must be between 0 and 100");
+            return;
+        }
+        if (isNaN(maxOrders) || maxOrders < 1 || maxOrders > 99) {
+            setSettingsError("Max active orders must be between 1 and 99");
             return;
         }
 
         try {
-            const { data: created } = await createDriver({
-                variables: {
-                    email: formData.email,
-                    password: formData.password,
-                    firstName: formData.firstName,
-                    lastName: formData.lastName,
-                    role: "DRIVER",
-                },
+            await updateDriverSettings({
+                variables: { driverId: settingsTarget.id, commissionPercentage: commission, maxActiveOrders: maxOrders },
             });
+            setFormSuccess(`Settings updated for ${settingsTarget.firstName} ${settingsTarget.lastName}`);
+            setTimeout(() => setFormSuccess(""), 3000);
+        } catch (err) {
+            setSettingsError(err instanceof Error ? err.message : "Failed to update settings");
+        }
+    };
 
-            if (created && created.createUser) {
+    const handleCreateSubmit = async (e: FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        setFormError("");
+        if (!createForm.email || !createForm.password || !createForm.firstName || !createForm.lastName) {
+            setFormError("All fields are required");
+            return;
+        }
+        try {
+            const { data: created } = await createDriver({
+                variables: { ...createForm, role: "DRIVER" },
+            }) as any;
+            if (created?.createUser) {
                 setFormSuccess(created.createUser.message || "Driver created successfully");
+                setTimeout(() => setFormSuccess(""), 3000);
             }
         } catch (err) {
             setFormError(err instanceof Error ? err.message : "Failed to create driver");
         }
     };
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value,
-        });
-    };
-
-    const getConnectionStatusColor = (status?: "CONNECTED" | "DISCONNECTED") => {
-        switch (status) {
-            case "CONNECTED":
-                return "bg-emerald-500/10 text-emerald-400 border-emerald-500/30";
-            case "DISCONNECTED":
-                return "bg-red-500/10 text-red-400 border-red-500/30";
-            default:
-                return "bg-gray-500/10 text-gray-400 border-gray-500/30";
+    const confirmDelete = async () => {
+        if (!deleteTarget) return;
+        try {
+            await deleteDriver({ variables: { id: deleteTarget.id } });
+            setFormSuccess("Driver deleted successfully");
+            setTimeout(() => setFormSuccess(""), 3000);
+            setShowDeleteModal(false);
+            setDeleteTarget(null);
+        } catch (err) {
+            setFormError(err instanceof Error ? err.message : "Failed to delete driver");
         }
     };
 
-    const getOnlinePreferenceColor = (preferred?: boolean) => {
-        return preferred
-            ? "bg-blue-500/10 text-blue-400"
-            : "bg-gray-500/10 text-gray-400";
+    const getConnectionBadge = (status?: string) => {
+        switch (status) {
+            case "CONNECTED": return "bg-emerald-500/10 text-emerald-400 border-emerald-500/30";
+            case "STALE": return "bg-yellow-500/10 text-yellow-400 border-yellow-500/30";
+            case "LOST": return "bg-orange-500/10 text-orange-400 border-orange-500/30";
+            default: return "bg-gray-500/10 text-gray-400 border-gray-500/30";
+        }
     };
 
     return (
@@ -179,10 +177,10 @@ export default function DriversPage() {
             <div className="mb-6 flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-semibold">Drivers</h1>
-                    <p className="text-gray-400 mt-1">Manage driver accounts and track connection status.</p>
+                    <p className="text-gray-400 mt-1">Manage drivers, commissions, and capacity limits.</p>
                 </div>
                 {isSuperAdmin && (
-                    <Button onClick={() => setShowModal(true)} className="bg-emerald-600 hover:bg-emerald-700 flex items-center gap-2">
+                    <Button onClick={() => setShowCreateModal(true)} className="bg-emerald-600 hover:bg-emerald-700 flex items-center gap-2">
                         <Plus size={18} />
                         Create Driver
                     </Button>
@@ -194,7 +192,6 @@ export default function DriversPage() {
                     {error.message}
                 </div>
             )}
-
             {formSuccess && (
                 <div className="bg-emerald-900/20 border border-emerald-800 rounded-lg p-4 text-emerald-300 text-sm mb-4">
                     {formSuccess}
@@ -211,63 +208,76 @@ export default function DriversPage() {
                                 <Th>Name</Th>
                                 <Th>Email</Th>
                                 <Th>Phone</Th>
-                                <Th>Online Preference</Th>
-                                <Th>Connection Status</Th>
+                                <Th>Status</Th>
+                                <Th>Commission</Th>
+                                <Th>Max Orders</Th>
                                 <Th>Actions</Th>
                             </tr>
                         </thead>
                         <tbody>
                             {data?.drivers?.map((driver) => {
-                                const driverConn = driver.driverConnection;
-                                const connectionStatus = driverConn?.connectionStatus || "DISCONNECTED";
-                                const onlinePreference = driverConn?.onlinePreference ?? driver.isOnline ?? false;
+                                const conn = driver.driverConnection;
+                                const status = conn?.connectionStatus ?? "DISCONNECTED";
+                                const isOnline = conn?.onlinePreference ?? false;
 
                                 return (
                                     <tr key={driver.id}>
                                         <Td>
-                                            <div className="font-medium text-white">
-                                                {`${driver.firstName} ${driver.lastName}`}
+                                            <div className="font-medium text-white">{driver.firstName} {driver.lastName}</div>
+                                            <div className="mt-0.5">
+                                                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs border ${isOnline ? "bg-blue-500/10 text-blue-400 border-blue-500/30" : "bg-gray-500/10 text-gray-500 border-gray-700"}`}>
+                                                    {isOnline ? "ðŸŸ¢ Online" : "âš« Offline"}
+                                                </span>
                                             </div>
                                         </Td>
+                                        <Td><span className="text-gray-300">{driver.email}</span></Td>
+                                        <Td><span className="text-gray-300">{driver.phoneNumber || "â€”"}</span></Td>
                                         <Td>
-                                            <div className="text-gray-300">{driver.email}</div>
-                                        </Td>
-                                        <Td>
-                                            <div className="text-gray-300">{driver.phoneNumber || "-"}</div>
-                                        </Td>
-                                        <Td>
-                                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border ${getOnlinePreferenceColor(onlinePreference)}`}>
-                                                {onlinePreference ? "🟢 Online" : "🔴 Offline"}
+                                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border ${getConnectionBadge(status)}`}>
+                                                <Signal size={11} />
+                                                {status}
                                             </span>
                                         </Td>
                                         <Td>
-                                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border ${getConnectionStatusColor(connectionStatus)}`}>
-                                                <Signal size={12} />
-                                                {connectionStatus === "CONNECTED" ? "Connected" : "Disconnected"}
+                                            <span className="text-white font-mono">
+                                                {driver.commissionPercentage !== null && driver.commissionPercentage !== undefined
+                                                    ? `${driver.commissionPercentage}%` : "0%"}
                                             </span>
                                         </Td>
                                         <Td>
-                                            {isSuperAdmin && (
+                                            <span className="text-white font-mono">{driver.maxActiveOrders ?? 2}</span>
+                                        </Td>
+                                        <Td>
+                                            <div className="flex items-center gap-2">
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
-                                                    onClick={() => handleDelete(driver)}
-                                                    className="text-red-400 hover:text-red-300"
+                                                    onClick={() => openSettingsModal(driver)}
+                                                    className="text-blue-400 hover:text-blue-300"
                                                 >
-                                                    <Trash2 size={14} className="mr-1" />
-                                                    Delete
+                                                    <Settings2 size={14} className="mr-1" />
+                                                    Settings
                                                 </Button>
-                                            )}
+                                                {isSuperAdmin && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => { setDeleteTarget(driver); setShowDeleteModal(true); }}
+                                                        className="text-red-400 hover:text-red-300"
+                                                    >
+                                                        <Trash2 size={14} className="mr-1" />
+                                                        Delete
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </Td>
                                     </tr>
                                 );
                             })}
                             {!data?.drivers?.length && (
                                 <tr>
-                                    <Td colSpan={6}>
-                                        <div className="text-center text-gray-500 py-8">
-                                            No drivers found.
-                                        </div>
+                                    <Td colSpan={7}>
+                                        <div className="text-center text-gray-500 py-8">No drivers found.</div>
                                     </Td>
                                 </tr>
                             )}
@@ -276,73 +286,52 @@ export default function DriversPage() {
                 )}
             </div>
 
-            {showModal && isSuperAdmin && (
+            {/* Settings Modal */}
+            {showSettingsModal && settingsTarget && (
                 <Modal
-                    isOpen={showModal}
-                    onClose={handleCloseModal}
-                    title="Create New Driver"
+                    isOpen={showSettingsModal}
+                    onClose={() => { setShowSettingsModal(false); setSettingsTarget(null); }}
+                    title={`Settings â€” ${settingsTarget.firstName} ${settingsTarget.lastName}`}
                 >
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        {formError && (
+                    <form onSubmit={handleSettingsSubmit} className="space-y-4">
+                        {settingsError && (
                             <div className="bg-red-900/20 border border-red-800 rounded-lg p-3 text-red-300 text-sm">
-                                {formError}
+                                {settingsError}
                             </div>
                         )}
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">First Name *</label>
-                                <Input
-                                    type="text"
-                                    name="firstName"
-                                    value={formData.firstName}
-                                    onChange={handleInputChange}
-                                    placeholder="John"
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">Last Name *</label>
-                                <Input
-                                    type="text"
-                                    name="lastName"
-                                    value={formData.lastName}
-                                    onChange={handleInputChange}
-                                    placeholder="Doe"
-                                    required
-                                />
-                            </div>
-                        </div>
-
                         <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">Email *</label>
+                            <label className="block text-sm font-medium text-gray-300 mb-1">
+                                Commission Percentage (%)
+                            </label>
+                            <p className="text-xs text-gray-500 mb-2">Platform deducts this % from each delivery fee earned by the driver.</p>
                             <Input
-                                type="email"
-                                name="email"
-                                value={formData.email}
-                                onChange={handleInputChange}
-                                placeholder="john@example.com"
-                                required
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.5"
+                                value={settingsForm.commissionPercentage}
+                                onChange={(e) => setSettingsForm(f => ({ ...f, commissionPercentage: e.target.value }))}
+                                placeholder="e.g. 10"
                             />
                         </div>
-
                         <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">Password *</label>
+                            <label className="block text-sm font-medium text-gray-300 mb-1">
+                                Max Active Orders
+                            </label>
+                            <p className="text-xs text-gray-500 mb-2">Maximum simultaneous orders this driver can accept at once.</p>
                             <Input
-                                type="password"
-                                name="password"
-                                value={formData.password}
-                                onChange={handleInputChange}
-                                placeholder="••••••••"
-                                required
+                                type="number"
+                                min="1"
+                                max="99"
+                                step="1"
+                                value={settingsForm.maxActiveOrders}
+                                onChange={(e) => setSettingsForm(f => ({ ...f, maxActiveOrders: e.target.value }))}
+                                placeholder="e.g. 2"
                             />
                         </div>
-
-                        <div className="flex gap-3 pt-4">
-                            <Button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-700">
-                                Create Driver
-                            </Button>
-                            <Button type="button" onClick={handleCloseModal} variant="outline" className="flex-1">
+                        <div className="flex gap-3 pt-2">
+                            <Button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700">Save Settings</Button>
+                            <Button type="button" variant="outline" className="flex-1" onClick={() => { setShowSettingsModal(false); setSettingsTarget(null); }}>
                                 Cancel
                             </Button>
                         </div>
@@ -350,40 +339,55 @@ export default function DriversPage() {
                 </Modal>
             )}
 
-            {showDeleteModal && selectedDriverForDelete && (
+            {/* Create Modal */}
+            {showCreateModal && isSuperAdmin && (
+                <Modal isOpen={showCreateModal} onClose={handleCloseCreateModal} title="Create New Driver">
+                    <form onSubmit={handleCreateSubmit} className="space-y-4">
+                        {formError && (
+                            <div className="bg-red-900/20 border border-red-800 rounded-lg p-3 text-red-300 text-sm">
+                                {formError}
+                            </div>
+                        )}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-2">First Name *</label>
+                                <Input type="text" value={createForm.firstName} onChange={(e) => setCreateForm(f => ({ ...f, firstName: e.target.value }))} placeholder="John" required />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-2">Last Name *</label>
+                                <Input type="text" value={createForm.lastName} onChange={(e) => setCreateForm(f => ({ ...f, lastName: e.target.value }))} placeholder="Doe" required />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Email *</label>
+                            <Input type="email" value={createForm.email} onChange={(e) => setCreateForm(f => ({ ...f, email: e.target.value }))} placeholder="john@example.com" required />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Password *</label>
+                            <Input type="password" value={createForm.password} onChange={(e) => setCreateForm(f => ({ ...f, password: e.target.value }))} placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" required />
+                        </div>
+                        <div className="flex gap-3 pt-4">
+                            <Button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-700">Create Driver</Button>
+                            <Button type="button" onClick={handleCloseCreateModal} variant="outline" className="flex-1">Cancel</Button>
+                        </div>
+                    </form>
+                </Modal>
+            )}
+
+            {/* Delete Modal */}
+            {showDeleteModal && deleteTarget && (
                 <Modal
                     isOpen={showDeleteModal}
-                    onClose={() => {
-                        setShowDeleteModal(false);
-                        setSelectedDriverForDelete(null);
-                    }}
+                    onClose={() => { setShowDeleteModal(false); setDeleteTarget(null); }}
                     title="Confirm Delete"
                 >
                     <div className="space-y-4">
                         <p className="text-gray-300">
-                            Are you sure you want to delete driver{" "}
-                            <span className="font-semibold">
-                                {selectedDriverForDelete.firstName} {selectedDriverForDelete.lastName}
-                            </span>
-                            ?
+                            Delete driver <span className="font-semibold text-white">{deleteTarget.firstName} {deleteTarget.lastName}</span>? This cannot be undone.
                         </p>
                         <div className="flex gap-3">
-                            <Button
-                                onClick={confirmDelete}
-                                className="flex-1 bg-red-600 hover:bg-red-700"
-                            >
-                                Delete
-                            </Button>
-                            <Button
-                                onClick={() => {
-                                    setShowDeleteModal(false);
-                                    setSelectedDriverForDelete(null);
-                                }}
-                                variant="outline"
-                                className="flex-1"
-                            >
-                                Cancel
-                            </Button>
+                            <Button onClick={confirmDelete} className="flex-1 bg-red-600 hover:bg-red-700">Delete</Button>
+                            <Button onClick={() => { setShowDeleteModal(false); setDeleteTarget(null); }} variant="outline" className="flex-1">Cancel</Button>
                         </div>
                     </div>
                 </Modal>

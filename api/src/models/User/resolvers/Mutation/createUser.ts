@@ -1,6 +1,7 @@
 import type { MutationResolvers } from '@/generated/types.generated';
 import { GraphQLError } from 'graphql';
 import { createAuditLogger } from '@/services/AuditLogger';
+import logger from '@/lib/logger';
 
 export const createUser: NonNullable<MutationResolvers['createUser']> = async (_parent, { input }, context) => {
     const { authService, driverService, userData, db } = context;
@@ -26,7 +27,7 @@ export const createUser: NonNullable<MutationResolvers['createUser']> = async (_
         try {
             await driverService.createDriverProfile(result.user.id);
         } catch (error) {
-            console.error(`Failed to create driver profile for ${result.user.id}:`, error);
+            logger.error({ err: error, userId: result.user.id }, 'user:createUser driver profile creation failed');
             // Don't fail the entire request, just log the error
         }
     }

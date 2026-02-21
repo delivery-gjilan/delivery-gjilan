@@ -1,6 +1,9 @@
 import { DbType } from '@/database';
 import { promotions, DbPromotion, NewDbPromotion } from '@/database/schema';
 import { PromotionRepository, PromotionFilters } from '@/repositories/PromotionRepository';
+import logger from '@/lib/logger';
+
+const log = logger.child({ service: 'PromotionService' });
 
 export interface CreatePromotionInput {
     name: string;
@@ -139,7 +142,7 @@ export class PromotionService {
     async assignPromotionToUsers(promotionId: string, userIds: string[]): Promise<void> {
         const promo = await this.getPromotion(promotionId);
         if (promo.target !== 'SPECIFIC_USERS') {
-            console.warn(`Promotion ${promotionId} is not configured for specific user assignment`);
+            log.warn({ promotionId }, 'promo:assignUsers:wrongTarget');
         }
         await this.repository.assignToUsers(promotionId, userIds);
     }

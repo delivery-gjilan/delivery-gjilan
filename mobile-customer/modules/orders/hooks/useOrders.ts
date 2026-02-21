@@ -6,14 +6,11 @@ import {
     GET_ORDERS_BY_STATUS,
     UPDATE_ORDER_STATUS,
 } from '@/graphql/operations/orders';
-import { USER_ORDERS_UPDATED } from '@/graphql/operations/orders/subscriptions';
-import { useMutation, useQuery, useSubscription } from '@apollo/client/react';
-import { useAuthStore } from '@/store/authStore';
+import { useMutation, useQuery } from '@apollo/client/react';
 import { useActiveOrdersStore } from '../store/activeOrdersStore';
 import { useEffect } from 'react';
 
 export function useOrders() {
-    const token = useAuthStore((state) => state.token);
     const setActiveOrders = useActiveOrdersStore((state) => state.setActiveOrders);
     
     // Initial query to load data
@@ -21,38 +18,12 @@ export function useOrders() {
         fetchPolicy: 'cache-and-network',
     });
 
-    // Real-time subscription for updates - automatically updates cache AND store
-    useSubscription(USER_ORDERS_UPDATED, {
-        variables: { input: { token: token || '' } },
-        skip: !token,
-        onData: ({ client, data: subData }) => {
-            if (subData?.data?.userOrdersUpdated) {
-                const orders = subData.data.userOrdersUpdated;
-                console.log('[useOrders] Subscription received orders:', orders.length);
-                
-                // Update Apollo cache
-                client.writeQuery({
-                    query: GET_ORDERS,
-                    data: { orders } as any,
-                });
-
-                // Update Zustand store with active orders
-                const activeOrders = orders.filter(
-                    (order: any) => order.status !== 'DELIVERED' && order.status !== 'CANCELLED'
-                );
-                console.log('[useOrders] Filtered active orders:', activeOrders.length);
-                setActiveOrders(activeOrders as unknown as any);
-            }
-        },
-    });
-
-    // Update store when data changes
+    // Update store when query data changes (subscription updates are handled by useOrdersSubscription)
     useEffect(() => {
         if (data?.orders) {
             const activeOrders = (data.orders as any[]).filter(
                 (order) => order.status !== 'DELIVERED' && order.status !== 'CANCELLED'
             );
-            console.log('[useOrders] Query data - Total orders:', data.orders.length, 'Active:', activeOrders.length);
             setActiveOrders(activeOrders as unknown as any);
         }
     }, [data, setActiveOrders]);

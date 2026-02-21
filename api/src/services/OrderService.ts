@@ -17,6 +17,10 @@ import type { DbOrder } from '@/database/schema/orders';
 import { PubSub, publish, subscribe, topics } from '@/lib/pubsub';
 import { GraphQLError } from 'graphql';
 import { PromotionEngine } from '@/services/PromotionEngine';
+import { FinancialService } from '@/services/FinancialService';
+import logger from '@/lib/logger';
+
+const log = logger.child({ service: 'OrderService' });
 
 export class OrderService {
     public orderRepository: OrderRepository; // Made public for resolver access
@@ -59,7 +63,7 @@ export class OrderService {
             // Use DB price for security, or validate input price
             // Here taking DB price to be safe
             const price = Number(product.isOnSale && product.salePrice ? product.salePrice : product.price);
-            console.log(price, itemInput.quantity);
+            log.debug({ price, quantity: itemInput.quantity, productId: itemInput.productId }, 'order:item:price');
             calculatedItemsTotal += price * itemInput.quantity;
 
             itemsToCreate.push({
@@ -78,7 +82,7 @@ export class OrderService {
             businessIds.add(product.businessId);
         }
 
-        console.log('prices,', calculatedItemsTotal, input.deliveryPrice);
+        log.debug({ itemsTotal: calculatedItemsTotal, deliveryPrice: input.deliveryPrice }, 'order:totals');
         // 3. Apply PromotionEngine (server-side validation)
         const promotionEngine = new PromotionEngine(await getDB());
         const cartContext = {
@@ -122,7 +126,7 @@ export class OrderService {
         const createdOrder = await this.orderRepository.create(orderData, itemsToCreate);
 
         if (!createdOrder) {
-            throw new GraphQLError('Fix the error messages');
+            throw new GraphQLError('Failed to create order: no items were associated or the database insert failed');
         }
 
         await this.updateUserBehaviorOnOrderCreated(userId, createdOrder.orderDate || null);
@@ -204,29 +208,34 @@ export class OrderService {
     private async mapToOrder(dbOrder: DbOrder): Promise<Order> {
         const db = await getDB();
 
-        // Get all items for this order
+        // Fetch all items for this order (1 query)
         const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, dbOrder.id));
 
-        // Group items by business
+        // Batch-fetch all products for those items (1 query)
+        const productIds = [...new Set(items.map(i => i.productId))];
+        const productsRows = productIds.length > 0
+            ? await db.select().from(productsTable).where(inArray(productsTable.id, productIds))
+            : [];
+        const productById = new Map(productsRows.map(p => [p.id, p]));
+
+        // Batch-fetch all stock records (1 query)
+        const stockRows = productIds.length > 0
+            ? await db.select().from(productStocksTable).where(inArray(productStocksTable.productId, productIds))
+            : [];
+        const stockByProductId = new Map(stockRows.map(s => [s.productId, s]));
+
+        // Build businessMap in memory — zero per-item queries
         const businessMap = new Map<string, OrderItem[]>();
 
         for (const item of items) {
-            const product = await db
-                .select()
-                .from(productsTable)
-                .where(eq(productsTable.id, item.productId))
-                .then((rows) => rows[0] || null);
-
+            const product = productById.get(item.productId);
             if (!product) continue;
 
             if (!businessMap.has(product.businessId)) {
                 businessMap.set(product.businessId, []);
             }
 
-            // Fetch stock from separate productStocks table
-            const stockRecord = await db.select().from(productStocksTable)
-                .where(eq(productStocksTable.productId, product.id))
-                .then(rows => rows[0]);
+            const stockRecord = stockByProductId.get(product.id);
             const currentStock = stockRecord?.stock ?? 0;
             const originalStock = Math.max(0, currentStock + item.quantity);
             businessMap.get(product.businessId)!.push({
@@ -240,16 +249,18 @@ export class OrderService {
             });
         }
 
-        // Get business details for each group
+        // Batch-fetch all businesses (1 query)
+        const businessIds = [...businessMap.keys()];
+        const businessRows = businessIds.length > 0
+            ? await db.select().from(businessesTable).where(inArray(businessesTable.id, businessIds))
+            : [];
+        const businessById = new Map(businessRows.map(b => [b.id, b]));
+
+        // Build businessOrderList in memory — zero per-business queries
         const businessOrderList: OrderBusiness[] = [];
 
         for (const [businessId, orderItems] of businessMap) {
-            const business = await db
-                .select()
-                .from(businessesTable)
-                .where(eq(businessesTable.id, businessId))
-                .then((rows) => rows[0] || null);
-
+            const business = businessById.get(businessId);
             if (business) {
                 businessOrderList.push({
                     business: {
@@ -267,9 +278,11 @@ export class OrderService {
                             opensAt: this.minutesToTimeString(business.opensAt),
                             closesAt: this.minutesToTimeString(business.closesAt),
                         },
+                        avgPrepTimeMinutes: business.avgPrepTimeMinutes,
+                        commissionPercentage: Number(business.commissionPercentage),
                         createdAt: new Date(business.createdAt),
                         updatedAt: new Date(business.updatedAt),
-                        isOpen: true,
+                        isOpen: true, // field-level resolver on Business type computes the real value
                     },
                     items: orderItems,
                 });
@@ -327,6 +340,11 @@ export class OrderService {
 
     async getAllOrders(): Promise<Order[]> {
         const dbOrders = await this.orderRepository.findAll();
+        return Promise.all(dbOrders.map((order) => this.mapToOrder(order)));
+    }
+
+    async getUncompletedOrders(): Promise<Order[]> {
+        const dbOrders = await this.orderRepository.findUncompleted();
         return Promise.all(dbOrders.map((order) => this.mapToOrder(order)));
     }
 
@@ -400,6 +418,11 @@ export class OrderService {
         }
 
         const order = await this.updateOrderStatus(id, 'CANCELLED');
+
+        // Void any pending financial settlements for this order
+        const financialService = new FinancialService(db);
+        await financialService.cancelOrderSettlements(id);
+
         await this.updateUserBehaviorOnStatusChange(
             dbOrder.userId,
             dbOrder.status as OrderStatus,
@@ -573,7 +596,7 @@ export class OrderService {
             
             return filteredOrders;
         } catch (error) {
-            console.error('[OrderService] Error filtering orders by businessId:', error);
+            log.error({ err: error, businessId }, 'order:filterByBusiness:error');
             throw error;
         }
     }
@@ -588,7 +611,7 @@ export class OrderService {
                 orderBusiness => orderBusiness.business.id === businessId
             );
         } catch (error) {
-            console.error('[OrderService] Error checking if order contains business:', error);
+            log.error({ err: error, orderId, businessId }, 'order:containsBusiness:error');
             return false;
         }
     }

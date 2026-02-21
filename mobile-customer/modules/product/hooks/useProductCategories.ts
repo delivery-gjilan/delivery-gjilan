@@ -5,6 +5,7 @@ export function useProductCategories(businessId: string) {
     const { data, loading, error, refetch } = useQuery(GET_PRODUCT_CATEGORIES, {
         variables: { businessId },
         skip: !businessId,
+        fetchPolicy: 'cache-first',
     });
 
     return {
@@ -19,6 +20,7 @@ export function useProductSubcategoriesByBusiness(businessId: string) {
     const { data, loading, error, refetch } = useQuery(GET_PRODUCT_SUBCATEGORIES_BY_BUSINESS, {
         variables: { businessId },
         skip: !businessId,
+        fetchPolicy: 'cache-first',
     });
 
     return {

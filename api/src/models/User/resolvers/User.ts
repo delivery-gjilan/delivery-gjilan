@@ -1,4 +1,5 @@
 import type { UserResolvers } from './../../../generated/types.generated';
+import logger from '@/lib/logger';
 export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'businessId'|'driverLocation'|'driverLocationUpdatedAt'|'email'|'emailVerified'|'firstName'|'flagColor'|'id'|'imageUrl'|'isOnline'|'lastName'|'phoneNumber'|'phoneVerified'|'referralCode'|'role'|'signupStep'|'__isTypeOf'> = {
     business: async (parent, _args, { businessService }) => {
         if (!parent.businessId) {
@@ -15,7 +16,7 @@ export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'busines
             const driver = await driverService.getDriverWithConnection(String(parent.id));
             return driver?.onlinePreference ?? false;
         } catch (error) {
-            console.error('[User.isOnline] Error resolving driver online preference:', error);
+            logger.error({ err: error }, 'user:isOnline resolve failed');
             return false;
         }
     },
@@ -35,7 +36,7 @@ export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'busines
                 address: 'Driver location',
             };
         } catch (error) {
-            console.error('[User.driverLocation] Error resolving driver location:', error);
+            logger.error({ err: error }, 'user:driverLocation resolve failed');
             return null;
         }
     },
@@ -46,7 +47,7 @@ export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'busines
                 const driver = await driverService.getDriverWithConnection(String(parent.id));
                 value = driver?.lastLocationUpdate ?? null;
             } catch (error) {
-                console.error('[User.driverLocationUpdatedAt] Error resolving driver location timestamp:', error);
+                logger.error({ err: error }, 'user:driverLocationUpdatedAt resolve failed');
             }
         }
         if (!value) return null;
@@ -73,7 +74,7 @@ export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'busines
             }
             return parseFloat(driver.commissionPercentage);
         } catch (error) {
-            console.error('[User.commissionPercentage] Error resolving driver commission:', error);
+            logger.error({ err: error }, 'user:commissionPercentage resolve failed');
             return null;
         }
     },
@@ -95,7 +96,7 @@ export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'busines
                 disconnectedAt: driver.disconnectedAt,
             };
         } catch (error) {
-            console.error('[User.driverConnection] Error resolving driver connection:', error);
+            logger.error({ err: error }, 'user:driverConnection resolve failed');
             return null;
         }
     },

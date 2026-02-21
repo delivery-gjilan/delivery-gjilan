@@ -4,8 +4,8 @@ import { eq, sql, and, isNotNull, or } from 'drizzle-orm';
 
 // Thresholds for connection state transitions (in seconds)
 export const CONNECTION_THRESHOLDS = {
-  STALE: 15,      // No heartbeat for 15s -> STALE
-  LOST: 30,       // No heartbeat for 30s -> LOST
+  STALE: 45,      // No heartbeat for 45s -> STALE (iOS background location fires every ~30-60s)
+  LOST: 90,       // No heartbeat for 90s -> LOST
   LOCATION_THROTTLE: 10, // Only write location every 10s
   LOCATION_DISTANCE_METERS: 5, // Only write if moved more than 5m
 } as const;
@@ -247,6 +247,31 @@ export class DriverRepository {
       .where(eq(driversTable.userId, userId))
       .returning();
     return driver;
+  }
+
+  /**
+   * Get driver count grouped by connection status — single SQL query, no full table scan.
+   * Use this instead of getAllDrivers() + forEach for monitoring/logging.
+   */
+  async getConnectionStatusCounts(): Promise<Record<DriverConnectionStatusType, number>> {
+    const rows = await this.db
+      .select({
+        status: driversTable.connectionStatus,
+        count: sql<number>`COUNT(*)::INT`,
+      })
+      .from(driversTable)
+      .groupBy(driversTable.connectionStatus);
+
+    const counts: Record<DriverConnectionStatusType, number> = {
+      CONNECTED: 0,
+      STALE: 0,
+      LOST: 0,
+      DISCONNECTED: 0,
+    };
+    rows.forEach((row) => {
+      counts[row.status] = row.count;
+    });
+    return counts;
   }
 
   /**

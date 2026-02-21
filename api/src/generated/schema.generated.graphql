@@ -264,6 +264,32 @@ enum DriverConnectionStatus {
   STALE
 }
 
+type DriverDailyMetrics {
+  """Number of active (uncompleted) orders this driver currently has"""
+  activeOrdersCount: Int!
+
+  """Commission rate as a percentage (e.g. 10.0 for 10%)"""
+  commissionPercentage: Float!
+
+  """Driver's current connection status"""
+  connectionStatus: DriverConnectionStatus!
+
+  """Number of orders delivered today"""
+  deliveredTodayCount: Int!
+
+  """Total delivery earnings today (before commission deduction)"""
+  grossEarningsToday: Float!
+
+  """Whether the driver is currently online (online preference)"""
+  isOnline: Boolean!
+
+  """Driver's personal maximum active orders limit"""
+  maxActiveOrders: Int!
+
+  """Driver's net earnings today (after commission deduction)"""
+  netEarningsToday: Float!
+}
+
 """Result of driver heartbeat mutation"""
 type DriverHeartbeatResult {
   """Current connection status after processing"""
@@ -327,6 +353,11 @@ type Mutation {
   """
   adminSetDriverConnectionStatus(driverId: ID!, status: DriverConnectionStatus!): User!
   adminUpdateDriverLocation(driverId: ID!, latitude: Float!, longitude: Float!): User!
+
+  """
+  Admin mutation to update per-driver settings (commission %, max active orders)
+  """
+  adminUpdateDriverSettings(commissionPercentage: Float, driverId: ID!, maxActiveOrders: Int): User!
   assignDriverToOrder(driverId: ID, id: ID!): Order!
   assignPromotionToUsers(input: AssignPromotionToUserInput!): [UserPromotion!]!
   backfillSettlementsForDeliveredOrders: Int!
@@ -394,10 +425,12 @@ type Order {
   orderPromotions: [OrderPromotion!]
   originalDeliveryPrice: Float
   originalPrice: Float
+  pickupLocations: [Location!]!
   status: OrderStatus!
   totalPrice: Float!
   updatedAt: Date!
   user: User
+  userId: ID!
 }
 
 type OrderBusiness {
@@ -583,6 +616,9 @@ type Query {
   me: User
   myAddresses: [UserAddress!]!
   myBehavior: UserBehavior
+
+  """Get live metrics for the authenticated driver"""
+  myDriverMetrics: DriverDailyMetrics!
   myReferralStats: ReferralStats!
   order(id: ID!): Order
   orders: [Order!]!
@@ -765,6 +801,8 @@ input UpdateUserAddressInput {
   addressName: String
   displayName: String
   id: ID!
+  latitude: Float
+  longitude: Float
   priority: Int
 }
 
@@ -793,6 +831,7 @@ type User {
   imageUrl: String
   isOnline: Boolean!
   lastName: String!
+  maxActiveOrders: Int
   phoneNumber: String
   phoneVerified: Boolean!
   referralCode: String

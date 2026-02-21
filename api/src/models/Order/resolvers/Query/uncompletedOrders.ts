@@ -17,9 +17,8 @@ export const uncompletedOrders: NonNullable<QueryResolvers['uncompletedOrders']>
     switch (userData.role) {
         case 'SUPER_ADMIN':
         case 'DRIVER':
-            // Super admins and drivers can see all uncompleted orders
-            const allOrders = await orderService.getAllOrders();
-            return allOrders.filter(order => order.status !== 'DELIVERED' && order.status !== 'CANCELLED');
+            // Use DB-level filter instead of fetching all orders and filtering in memory
+            return orderService.getUncompletedOrders();
 
         case 'CUSTOMER':
             // Customers can only see their own uncompleted orders

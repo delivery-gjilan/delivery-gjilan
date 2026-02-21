@@ -1,5 +1,8 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { createAuditLogger } from '@/services/AuditLogger';
+import logger from '@/lib/logger';
+import { drivers as driversTable } from '@/database/schema';
+import { eq } from 'drizzle-orm';
 
 export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToOrder']> = async (
     _parent,
@@ -7,7 +10,7 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
     context,
 ) => {
     const { orderService, authService, userData, db } = context;
-    console.log('Assigning driver to order:', id, driverId);
+    logger.info({ orderId: id, driverId }, 'order:assignDriverToOrder');
 
     const role = userData?.role;
     if (!role) {
@@ -23,6 +26,12 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
 
     let effectiveDriverId = driverId;
 
+    // Race condition check: Fetch order early
+    const dbOrderBefore = await orderService.orderRepository.findById(id);
+    if (!dbOrderBefore) {
+        throw new Error('Order not found');
+    }
+
     if (isDriver) {
         if (!userData?.userId) {
             throw new Error('Driver not authenticated');
@@ -33,16 +42,12 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
             throw new Error('Drivers can only assign themselves');
         }
 
-        const dbOrder = await orderService.orderRepository.findById(id);
-        if (!dbOrder) {
-            throw new Error('Order not found');
+        // Race condition check: Verify order isn't already assigned to someone else
+        if (dbOrderBefore.driverId && dbOrderBefore.driverId !== userData.userId) {
+            throw new Error('This order has already been taken by another driver');
         }
 
-        if (dbOrder.driverId && dbOrder.driverId !== userData.userId) {
-            throw new Error('Order already assigned to another driver');
-        }
-
-        if (dbOrder.status !== 'READY' && dbOrder.status !== 'ACCEPTED') {
+        if (dbOrderBefore.status !== 'READY' && dbOrderBefore.status !== 'ACCEPTED') {
             throw new Error('Order is not available for driver assignment');
         }
 
@@ -51,6 +56,8 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
 
     // If driverId is provided, validate that it's a driver
     let driverName = 'Unassigned';
+    let maxActiveOrders = 2; // Default fallback
+    
     if (effectiveDriverId) {
         const driver = await authService.authRepository.findById(effectiveDriverId);
         if (!driver) {
@@ -60,17 +67,25 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
             throw new Error('Specified user is not a driver');
         }
         driverName = `${driver.firstName} ${driver.lastName}`;
+
+        // Fetch driver's maxActiveOrders from drivers table
+        const driverRecord = await db.query.drivers.findFirst({
+            where: eq(driversTable.userId, effectiveDriverId),
+        });
+
+        if (driverRecord?.maxActiveOrders) {
+            maxActiveOrders = Number(driverRecord.maxActiveOrders);
+        }
     }
 
-    // Server-side guard: prevent assigning a driver more than MAX_ACTIVE_ORDERS
-    const MAX_ACTIVE_ORDERS = 2;
+    // Server-side guard: prevent assigning a driver more than their maxActiveOrders
     if (effectiveDriverId) {
         const existingOrders = await orderService.orderRepository.findUncompletedOrdersByUserId(effectiveDriverId);
-        // If the order already has this driver assigned, allow it
-        const dbOrderBefore = await orderService.orderRepository.findById(id);
-        const alreadyAssignedToSameDriver = dbOrderBefore?.driverId === effectiveDriverId;
-        if (!alreadyAssignedToSameDriver && existingOrders.length >= MAX_ACTIVE_ORDERS) {
-            throw new Error('Driver already has maximum number of active orders');
+        // If the order already has this driver assigned, allow it (re-assignment)
+        const alreadyAssignedToSameDriver = dbOrderBefore.driverId === effectiveDriverId;
+        
+        if (!alreadyAssignedToSameDriver && existingOrders.length >= maxActiveOrders) {
+            throw new Error(`Driver already has maximum number of active orders (${maxActiveOrders}/${maxActiveOrders})`);
         }
     }
 
@@ -96,6 +111,7 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
             orderId: id,
             driverId: effectiveDriverId || null,
             driverName,
+            maxActiveOrders,
         },
     });
 

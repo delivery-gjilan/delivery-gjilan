@@ -19,9 +19,14 @@ export const ordersByStatus: NonNullable<QueryResolvers['ordersByStatus']> = asy
     // Filter based on role
     switch (userData.role) {
         case 'SUPER_ADMIN':
-        case 'DRIVER':
-            // Super admins and drivers can see all orders
             return statusOrders;
+
+        case 'DRIVER':
+            // Drivers see their own assigned orders + all active (pickable) orders for this status
+            return statusOrders.filter(order =>
+                order.driver?.id === userData.userId ||
+                !['DELIVERED', 'CANCELLED'].includes(order.status)
+            );
 
         case 'CUSTOMER':
             // Customers can only see their own orders

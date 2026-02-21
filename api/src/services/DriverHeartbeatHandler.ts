@@ -15,6 +15,9 @@ import { DriverRepository, CONNECTION_THRESHOLDS } from '@/repositories/DriverRe
 import { AuthRepository } from '@/repositories/AuthRepository';
 import { pubsub, publish, topics } from '@/lib/pubsub';
 import { DbDriver } from '@/database/schema/drivers';
+import logger from '@/lib/logger';
+
+const log = logger.child({ service: 'HeartbeatHandler' });
 
 // Haversine distance calculation (returns meters)
 function haversineDistance(
@@ -111,7 +114,7 @@ export class DriverHeartbeatHandler {
     // This keeps admin driver lists/maps in sync without waiting for watchdog transitions.
     if (wasDisconnected || shouldUpdateLocation) {
       if (wasDisconnected) {
-        console.log(`[HeartbeatHandler] Driver ${userId} reconnected (was ${driver.connectionStatus})`);
+        log.info({ userId, previousStatus: driver.connectionStatus }, 'heartbeat:reconnected');
       }
       await this.publishDriverUpdate();
     }
@@ -174,7 +177,7 @@ export class DriverHeartbeatHandler {
       const drivers = await this.authRepository.findDrivers();
       publish(pubsub, topics.allDriversChanged(), { drivers });
     } catch (error) {
-      console.error('[HeartbeatHandler] Failed to publish update:', error);
+      log.error({ err: error }, 'heartbeat:publish:error');
     }
   }
 
@@ -182,7 +185,7 @@ export class DriverHeartbeatHandler {
    * Handle driver disconnection (subscription closed)
    */
   async handleDisconnect(userId: string): Promise<void> {
-    console.log(`[HeartbeatHandler] Driver ${userId} disconnected`);
+    log.info({ userId }, 'heartbeat:disconnect');
     
     await this.driverRepository.markDriverDisconnected(userId);
     await this.publishDriverUpdate();
@@ -192,7 +195,7 @@ export class DriverHeartbeatHandler {
    * Handle driver reconnection
    */
   async handleReconnect(userId: string): Promise<DbDriver | undefined> {
-    console.log(`[HeartbeatHandler] Driver ${userId} reconnecting`);
+    log.info({ userId }, 'heartbeat:reconnecting');
     
     const driver = await this.driverRepository.restoreDriverSession(userId);
     await this.publishDriverUpdate();

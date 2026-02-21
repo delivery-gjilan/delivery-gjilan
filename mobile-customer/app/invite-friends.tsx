@@ -15,7 +15,7 @@ export default function InviteFriendsScreen() {
     const [copiedCode, setCopiedCode] = useState(false);
 
     const { data, loading, refetch } = useQuery(GET_MY_REFERRAL_STATS, {
-        fetchPolicy: 'network-only',
+        fetchPolicy: 'cache-and-network',
     });
 
     const [generateCode, { loading: generating }] = useMutation(GENERATE_REFERRAL_CODE, {

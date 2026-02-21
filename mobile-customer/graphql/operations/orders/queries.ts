@@ -135,6 +135,21 @@ export const GET_ORDERS_BY_STATUS = graphql(`
     }
 `);
 
+export const GET_ORDER_DRIVER = graphql(`
+    query GetOrderDriver($id: ID!) {
+        order(id: $id) {
+            id
+            status
+            driver {
+                id
+                firstName
+                lastName
+                phoneNumber
+            }
+        }
+    }
+`);
+
 export const UNCOMPLETED_ORDERS = graphql(`
     query UncompletedOrders {
         uncompletedOrders {

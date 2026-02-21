@@ -1,6 +1,7 @@
 
         import type { MutationResolvers } from './../../../../generated/types.generated';
         import { FinancialService } from '@/services/FinancialService';
+        import logger from '@/lib/logger';
         import { orderItems as orderItemsTable } from '@/database/schema';
         import { eq } from 'drizzle-orm';
 
@@ -8,7 +9,7 @@
                 MutationResolvers['backfillSettlementsForDeliveredOrders']
         > = async (_parent, _arg, { db, orderService }) => {
                 if (!orderService) {
-                        console.error('[backfillSettlementsForDeliveredOrders] orderService missing from context');
+                        logger.error('settlement:backfillSettlements orderService missing from context');
                         return 0;
                 }
 
@@ -22,7 +23,7 @@
                                 await financialService.createOrderSettlements(order, items, order.driverId);
                                 processed += 1;
                         } catch (error) {
-                                console.error('[backfillSettlementsForDeliveredOrders] Failed for order:', order.id, error);
+                                logger.error({ err: error, orderId: order.id }, 'settlement:backfillSettlements failed for order');
                         }
                 }
 

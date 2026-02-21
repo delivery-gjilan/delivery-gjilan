@@ -3,6 +3,8 @@ import { getMainDefinition } from '@apollo/client/utilities';
 import { SetContextLink } from '@apollo/client/link/context';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { createClient } from 'graphql-ws';
+import { persistCache, AsyncStorageWrapper } from 'apollo3-cache-persist';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../../store/authStore';
 
 const logLink = new ApolloLink((operation, forward) => {
@@ -65,9 +67,50 @@ const splitLink = wsLink
       )
     : authLink.concat(httpLink);
 
+export const cache = new InMemoryCache({
+    typePolicies: {
+        Order:       { keyFields: ['id'], fields: { businesses: { merge: false } } },
+        Business:    { keyFields: ['id'], fields: { products:   { merge: false } } },
+        Product:     { keyFields: ['id'] },
+        User:        { keyFields: ['id'] },
+        Driver:      { keyFields: ['id'] },
+        Settlement:  { keyFields: ['id'] },
+        UserAddress: { keyFields: ['id'] },
+        Promotion:   { keyFields: ['id'] },
+        Query: {
+            fields: {
+                order: { read(_, { args, toReference }) {
+                    return toReference({ __typename: 'Order', id: args?.id });
+                }},
+                business: { read(_, { args, toReference }) {
+                    return toReference({ __typename: 'Business', id: args?.id });
+                }},
+                product: { read(_, { args, toReference }) {
+                    return toReference({ __typename: 'Product', id: args?.id });
+                }},
+            },
+        },
+    },
+});
+
+export const cacheReady: Promise<void> = persistCache({
+    cache,
+    storage: new AsyncStorageWrapper(AsyncStorage),
+    maxSize: 5 * 1024 * 1024,
+    debug: __DEV__,
+}).catch((err) => {
+    console.warn('[ApolloCache] Failed to persist cache:', err);
+});
+
 const client = new ApolloClient({
     link: ApolloLink.from([logLink, splitLink]),
-    cache: new InMemoryCache(),
+    cache,
+    defaultOptions: {
+        watchQuery: {
+            fetchPolicy: 'cache-and-network',
+            nextFetchPolicy: 'cache-first',
+        },
+    },
 });
 
 export default client;

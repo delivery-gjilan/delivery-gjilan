@@ -1,5 +1,8 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { randomUUID } from 'crypto';
+import logger from '@/lib/logger';
+
+const log = logger.child({ service: 'S3Service' });
 
 interface UploadOptions {
     folder: 'businesses' | 'products' | 'categories';
@@ -66,7 +69,7 @@ class S3Service {
                 url,
             };
         } catch (error) {
-            console.error('S3 upload error:', error);
+            log.error({ err: error }, 's3:upload:error');
             return {
                 success: false,
                 error: error instanceof Error ? error.message : 'Upload failed',
@@ -85,7 +88,7 @@ class S3Service {
             const match = imageUrl.match(urlPattern);
 
             if (!match || !match[1]) {
-                console.warn('Invalid S3 URL format:', imageUrl);
+                log.warn({ imageUrl }, 's3:delete:invalidUrl');
                 return false;
             }
 
@@ -99,7 +102,7 @@ class S3Service {
             await this.s3Client.send(command);
             return true;
         } catch (error) {
-            console.error('S3 delete error:', error);
+            log.error({ err: error, imageUrl }, 's3:delete:error');
             return false;
         }
     }
