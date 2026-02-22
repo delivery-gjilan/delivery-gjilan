@@ -85,6 +85,11 @@ input AssignPromotionToUserInput {
   userIds: [ID!]!
 }
 
+type AudiencePreview {
+  count: Int!
+  sampleUsers: [User!]!
+}
+
 type AuditLog {
   action: ActionType!
   actor: User
@@ -148,6 +153,13 @@ enum BusinessType {
   RESTAURANT
 }
 
+enum CampaignStatus {
+  DRAFT
+  FAILED
+  SENDING
+  SENT
+}
+
 input CartContextInput {
   businessIds: [ID!]!
   deliveryPrice: Float!
@@ -170,6 +182,13 @@ input CreateBusinessInput {
   name: String!
   phoneNumber: String
   workingHours: WorkingHoursInput!
+}
+
+input CreateCampaignInput {
+  body: String!
+  data: JSON
+  query: JSON!
+  title: String!
 }
 
 input CreateOrderInput {
@@ -244,6 +263,27 @@ input CreateUserInput {
 scalar Date
 
 scalar DateTime
+
+enum DeviceAppType {
+  CUSTOMER
+  DRIVER
+}
+
+enum DevicePlatform {
+  ANDROID
+  IOS
+}
+
+type DeviceToken {
+  appType: DeviceAppType!
+  createdAt: DateTime!
+  deviceId: String!
+  id: ID!
+  platform: DevicePlatform!
+  token: String!
+  updatedAt: DateTime!
+  userId: ID!
+}
 
 type DriverConnection {
   """System-calculated: current connection state"""
@@ -377,6 +417,7 @@ type Mutation {
   backfillSettlementsForDeliveredOrders: Int!
   cancelOrder(id: ID!): Order!
   createBusiness(input: CreateBusinessInput!): Business!
+  createCampaign(input: CreateCampaignInput!): NotificationCampaign!
   createOrder(input: CreateOrderInput!): Order!
   createProduct(input: CreateProductInput!): Product!
   createProductCategory(input: CreateProductCategoryInput!): ProductCategory!
@@ -386,6 +427,7 @@ type Mutation {
   createUser(input: CreateUserInput!): AuthResponse!
   deductWalletCredit(amount: Float!, orderId: ID!, userId: ID!): WalletTransaction!
   deleteBusiness(id: ID!): Boolean!
+  deleteCampaign(id: ID!): Boolean!
   deleteProduct(id: ID!): Boolean!
   deleteProductCategory(id: ID!): Boolean!
   deleteProductSubcategory(id: ID!): Boolean!
@@ -406,18 +448,24 @@ type Mutation {
   markSettlementAsPaid(settlementId: ID!): Settlement!
   markSettlementAsPartiallyPaid(amount: Float!, settlementId: ID!): Settlement!
   markSettlementsAsPaid(ids: [ID!]!): [Settlement!]!
+  registerDeviceToken(input: RegisterDeviceTokenInput!): Boolean!
   removeUserFromPromotion(promotionId: ID!, userId: ID!): Boolean!
   resendEmailVerification: SignupStepResponse!
+  sendCampaign(id: ID!): NotificationCampaign!
+  sendPushNotification(input: SendPushNotificationInput!): SendNotificationResult!
   setBusinessSchedule(businessId: ID!, schedule: [BusinessDayHoursInput!]!): [BusinessDayHours!]!
   setDefaultAddress(id: ID!): Boolean!
   setUserPermissions(permissions: [UserPermission!]!, userId: ID!): User!
+  startPreparing(id: ID!, preparationMinutes: Int!): Order!
   submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
+  unregisterDeviceToken(token: String!): Boolean!
   unsettleSettlement(settlementId: ID!): Settlement!
   updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
   updateCommissionPercentage(businessId: ID, driverId: ID, percentage: Float!): Boolean!
   updateDriverLocation(latitude: Float!, longitude: Float!): User!
   updateDriverOnlineStatus(isOnline: Boolean!): User!
   updateOrderStatus(id: ID!, status: OrderStatus!): Order!
+  updatePreparationTime(id: ID!, preparationMinutes: Int!): Order!
   updateProduct(id: ID!, input: UpdateProductInput!): Product!
   updateProductCategory(id: ID!, input: UpdateProductCategoryInput!): ProductCategory!
   updateProductSubcategory(id: ID!, input: UpdateProductSubcategoryInput!): ProductSubcategory!
@@ -431,18 +479,58 @@ type Mutation {
   verifyPhone(input: VerifyPhoneInput!): SignupStepResponse!
 }
 
+type Notification {
+  body: String!
+  campaignId: ID
+  data: JSON
+  id: ID!
+  sentAt: DateTime!
+  title: String!
+  type: NotificationType!
+  userId: ID
+}
+
+type NotificationCampaign {
+  body: String!
+  createdAt: DateTime!
+  data: JSON
+  failedCount: Int!
+  id: ID!
+  query: JSON
+  sender: User
+  sentAt: DateTime
+  sentBy: ID
+  sentCount: Int!
+  status: CampaignStatus!
+  targetCount: Int!
+  title: String!
+}
+
+enum NotificationType {
+  ADMIN_ALERT
+  ORDER_ASSIGNED
+  ORDER_STATUS
+  PROMOTIONAL
+}
+
 type Order {
   businesses: [OrderBusiness!]!
+  deliveredAt: Date
   deliveryPrice: Float!
   driver: User
   dropOffLocation: Location!
+  estimatedReadyAt: Date
   id: ID!
   orderDate: Date!
   orderPrice: Float!
   orderPromotions: [OrderPromotion!]
   originalDeliveryPrice: Float
   originalPrice: Float
+  outForDeliveryAt: Date
   pickupLocations: [Location!]!
+  preparationMinutes: Int
+  preparingAt: Date
+  readyAt: Date
   status: OrderStatus!
   totalPrice: Float!
   updatedAt: Date!
@@ -473,11 +561,11 @@ type OrderPromotion {
 }
 
 enum OrderStatus {
-  ACCEPTED
   CANCELLED
   DELIVERED
   OUT_FOR_DELIVERY
   PENDING
+  PREPARING
   READY
 }
 
@@ -637,9 +725,12 @@ type Query {
   """Get live metrics for the authenticated driver"""
   myDriverMetrics: DriverDailyMetrics!
   myReferralStats: ReferralStats!
+  notificationCampaign(id: ID!): NotificationCampaign
+  notificationCampaigns: [NotificationCampaign!]!
   order(id: ID!): Order
   orders: [Order!]!
   ordersByStatus(status: OrderStatus!): [Order!]!
+  previewCampaignAudience(query: JSON!): AudiencePreview!
   product(id: ID!): Product
   productCategories(businessId: ID!): [ProductCategory!]!
   productCategory(id: ID!): ProductCategory
@@ -680,6 +771,26 @@ enum ReferralStatus {
   COMPLETED
   EXPIRED
   PENDING
+}
+
+input RegisterDeviceTokenInput {
+  appType: DeviceAppType!
+  deviceId: String!
+  platform: DevicePlatform!
+  token: String!
+}
+
+type SendNotificationResult {
+  failureCount: Int!
+  success: Boolean!
+  successCount: Int!
+}
+
+input SendPushNotificationInput {
+  body: String!
+  data: JSON
+  title: String!
+  userIds: [ID!]!
 }
 
 type Settlement {

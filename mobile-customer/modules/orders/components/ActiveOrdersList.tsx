@@ -13,7 +13,7 @@ const OrderStatusBadge = ({ status }: { status: string }) => {
         switch (status) {
             case 'PENDING':
                 return theme.colors.notification;
-            case 'ACCEPTED':
+            case 'PREPARING':
                 return theme.colors.income;
             case 'READY':
                 return theme.colors.income;

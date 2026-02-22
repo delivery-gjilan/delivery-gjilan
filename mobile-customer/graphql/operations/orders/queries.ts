@@ -10,6 +10,9 @@ export const GET_ORDERS = graphql(`
             orderDate
             updatedAt
             status
+            preparationMinutes
+            estimatedReadyAt
+            preparingAt
             dropOffLocation {
                 latitude
                 longitude
@@ -54,6 +57,9 @@ export const GET_ORDER = graphql(`
             orderDate
             updatedAt
             status
+            preparationMinutes
+            estimatedReadyAt
+            preparingAt
             dropOffLocation {
                 latitude
                 longitude
@@ -101,6 +107,9 @@ export const GET_ORDERS_BY_STATUS = graphql(`
             orderDate
             updatedAt
             status
+            preparationMinutes
+            estimatedReadyAt
+            preparingAt
             dropOffLocation {
                 latitude
                 longitude
@@ -160,6 +169,9 @@ export const UNCOMPLETED_ORDERS = graphql(`
             orderDate
             updatedAt
             status
+            preparationMinutes
+            estimatedReadyAt
+            preparingAt
             dropOffLocation {
                 latitude
                 longitude

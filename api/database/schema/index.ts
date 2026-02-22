@@ -17,3 +17,5 @@ export * from './orderPromotions';
 export * from './userAddress';
 export * from './storeSettings';
 export * from './referrals';
+export * from './deviceTokens';
+export * from './notifications';

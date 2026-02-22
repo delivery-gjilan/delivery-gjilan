@@ -341,6 +341,12 @@ export class OrderService {
             orderDate: new Date(dbOrder.orderDate || new Date()),
             updatedAt: new Date(dbOrder.updatedAt),
             status: dbOrder.status as OrderStatus,
+            preparationMinutes: dbOrder.preparationMinutes ?? undefined,
+            estimatedReadyAt: dbOrder.estimatedReadyAt ? new Date(dbOrder.estimatedReadyAt) : undefined,
+            preparingAt: dbOrder.preparingAt ? new Date(dbOrder.preparingAt) : undefined,
+            readyAt: dbOrder.readyAt ? new Date(dbOrder.readyAt) : undefined,
+            outForDeliveryAt: dbOrder.outForDeliveryAt ? new Date(dbOrder.outForDeliveryAt) : undefined,
+            deliveredAt: dbOrder.deliveredAt ? new Date(dbOrder.deliveredAt) : undefined,
             driver: driverUser
                 ? {
                       id: driverUser.id,
@@ -401,9 +407,37 @@ export class OrderService {
     }
 
     async updateOrderStatus(id: string, status: OrderStatus): Promise<Order> {
-        const updated = await this.orderRepository.updateStatus(id, status);
+        // Set timestamp based on status transition
+        const timestampMap: Record<string, 'readyAt' | 'outForDeliveryAt' | 'deliveredAt'> = {
+            READY: 'readyAt',
+            OUT_FOR_DELIVERY: 'outForDeliveryAt',
+            DELIVERED: 'deliveredAt',
+        };
+        const tsField = timestampMap[status];
+        let updated;
+        if (tsField) {
+            updated = await this.orderRepository.updateStatusWithTimestamp(id, status, tsField);
+        } else {
+            updated = await this.orderRepository.updateStatus(id, status);
+        }
         if (!updated) {
             throw new Error('Order not found');
+        }
+        return this.mapToOrder(updated);
+    }
+
+    async startPreparing(id: string, preparationMinutes: number): Promise<Order> {
+        const updated = await this.orderRepository.startPreparing(id, preparationMinutes);
+        if (!updated) {
+            throw new Error('Order not found or not in PENDING status');
+        }
+        return this.mapToOrder(updated);
+    }
+
+    async updatePreparationTime(id: string, preparationMinutes: number): Promise<Order> {
+        const updated = await this.orderRepository.updatePreparationTime(id, preparationMinutes);
+        if (!updated) {
+            throw new Error('Order not found or not in PREPARING status');
         }
         return this.mapToOrder(updated);
     }
@@ -411,7 +445,7 @@ export class OrderService {
     async updateOrderStatusWithDriver(id: string, status: OrderStatus, driverId: string): Promise<Order> {
         let updated = await this.orderRepository.updateStatusAndDriver(id, status, driverId, 'READY');
         if (!updated) {
-            updated = await this.orderRepository.updateStatusAndDriver(id, status, driverId, 'ACCEPTED');
+            updated = await this.orderRepository.updateStatusAndDriver(id, status, driverId, 'PREPARING');
         }
         if (!updated) {
             throw new Error('Order already assigned or not ready');

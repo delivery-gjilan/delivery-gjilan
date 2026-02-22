@@ -111,7 +111,8 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const getStatusColor = (status: string) => {
         const statusColors: Record<string, { bg: string; dot: string }> = {
             PENDING: { bg: '#FEF3C7', dot: '#FBBF24' },
-            CONFIRMED: { bg: '#DBEAFE', dot: '#3B82F6' },
+            PREPARING: { bg: '#DBEAFE', dot: '#3B82F6' },
+            READY: { bg: '#D1FAE5', dot: '#10B981' },
             OUT_FOR_DELIVERY: { bg: '#CFFAFE', dot: '#06B6D4' },
             DELIVERED: { bg: '#DCFCE7', dot: '#22C55E' },
             CANCELLED: { bg: '#FEE2E2', dot: '#EF4444' },
@@ -202,6 +203,19 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                         </View>
                     </View>
                 </View>
+
+                {/* Preparation Info Card */}
+                {order.status === 'PREPARING' && (order as any).preparationMinutes && (
+                    <View className="bg-white dark:bg-gray-800 rounded-3xl p-4 mb-4 border border-blue-200 dark:border-blue-800">
+                        <View className="flex-row items-center mb-2">
+                            <Ionicons name="restaurant" size={20} color="#3B82F6" />
+                            <Text className="text-base font-bold text-foreground ml-2">Being Prepared</Text>
+                        </View>
+                        <Text className="text-sm text-subtext">
+                            Average prep time: ~{(order as any).preparationMinutes} minutes
+                        </Text>
+                    </View>
+                )}
 
                 {/* Driver Info Card */}
                 {(driverName || order.status === 'OUT_FOR_DELIVERY' || order.status === 'DELIVERED') && (

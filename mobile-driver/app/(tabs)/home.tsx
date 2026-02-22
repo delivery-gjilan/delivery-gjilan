@@ -291,7 +291,7 @@ export default function Home() {
     );
 
     const inDeliveryOrders = useMemo(
-        () => activeOrders.filter((order: any) => order.status === 'OUT_FOR_DELIVERY' || order.status === 'ACCEPTED'),
+        () => activeOrders.filter((order: any) => order.status === 'OUT_FOR_DELIVERY' || order.status === 'PREPARING'),
         [activeOrders],
     );
 
@@ -724,7 +724,7 @@ export default function Home() {
                                                 <View className="w-2.5 h-2.5 rounded-full mr-2" 
                                                     style={{ backgroundColor: theme.colors.primary }} />
                                                 <Text className="text-xs font-bold" style={{ color: theme.colors.primary }}>
-                                                    {order.status === 'ACCEPTED' ? 'HEADING TO PICKUP' : 'OUT FOR DELIVERY'}
+                                                    {order.status === 'PREPARING' ? 'PREPARING' : 'OUT FOR DELIVERY'}
                                                 </Text>
                                             </View>
 

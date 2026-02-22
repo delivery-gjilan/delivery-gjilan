@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import Providers from '@/lib/graphql/providers';
 import { useDriverTracking } from '@/hooks/useDriverTracking';
+import { useNotifications } from '@/hooks/useNotifications';
 import Mapbox from '@rnmapbox/maps';
 import { MAPBOX_TOKEN } from '@/utils/mapbox';
 import { initSentry } from '@/lib/sentry';
@@ -15,11 +16,21 @@ initSentry();
 function AppContent() {
     // Start heartbeat as soon as auth is established
     useDriverTracking();
+    useNotifications();
 
     return (
         <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="login" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen
+                name="navigation"
+                options={{
+                    presentation: 'fullScreenModal',
+                    headerShown: false,
+                    gestureEnabled: false,
+                    animation: 'fade',
+                }}
+            />
         </Stack>
     );
 }

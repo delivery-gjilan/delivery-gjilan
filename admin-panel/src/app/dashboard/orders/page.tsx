@@ -9,15 +9,15 @@ import Select from "@/components/ui/Select";
 import Input from "@/components/ui/Input";
 import { useOrders, useUpdateOrderStatus } from "@/lib/hooks/useOrders";
 import { useAuth } from "@/lib/auth-context";
-import { ASSIGN_DRIVER_TO_ORDER, CREATE_TEST_ORDER } from "@/graphql/operations/orders";
+import { ASSIGN_DRIVER_TO_ORDER, CREATE_TEST_ORDER, START_PREPARING, UPDATE_PREPARATION_TIME } from "@/graphql/operations/orders";
 import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
-import { Package, Store, Search, ArrowRight, Clock, CheckCircle2, Eye, EyeOff, MapPin, User, Plus } from "lucide-react";
+import { Package, Store, Search, ArrowRight, Clock, CheckCircle2, Eye, EyeOff, MapPin, User, Plus, ChefHat, Timer } from "lucide-react";
 
 /* ---------------------------------------------------------
    TYPES
 --------------------------------------------------------- */
 
-type OrderStatus = "PENDING" | "ACCEPTED" | "READY" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED";
+type OrderStatus = "PENDING" | "PREPARING" | "READY" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED";
 
 interface OrderItem {
     productId: string;
@@ -51,6 +51,9 @@ interface Order {
     totalPrice: number;
     orderDate: string;
     status: OrderStatus;
+    preparationMinutes?: number;
+    estimatedReadyAt?: string;
+    preparingAt?: string;
     dropOffLocation: Location;
     businesses: OrderBusiness[];
     user?: {
@@ -69,7 +72,7 @@ interface Order {
 
 const STATUS_COLORS: Record<OrderStatus, { bg: string; text: string; border: string }> = {
     PENDING: { bg: "bg-amber-500/10", text: "text-amber-400", border: "border-amber-500/30" },
-    ACCEPTED: { bg: "bg-cyan-500/10", text: "text-cyan-400", border: "border-cyan-500/30" },
+    PREPARING: { bg: "bg-cyan-500/10", text: "text-cyan-400", border: "border-cyan-500/30" },
     READY: { bg: "bg-blue-500/10", text: "text-blue-400", border: "border-blue-500/30" },
     OUT_FOR_DELIVERY: { bg: "bg-purple-500/10", text: "text-purple-400", border: "border-purple-500/30" },
     DELIVERED: { bg: "bg-green-500/10", text: "text-green-400", border: "border-green-500/30" },
@@ -77,8 +80,8 @@ const STATUS_COLORS: Record<OrderStatus, { bg: string; text: string; border: str
 };
 
 const STATUS_FLOW: Record<OrderStatus, OrderStatus | null> = {
-    PENDING: "ACCEPTED",
-    ACCEPTED: "READY",
+    PENDING: "PREPARING",
+    PREPARING: "READY",
     READY: "OUT_FOR_DELIVERY",
     OUT_FOR_DELIVERY: "DELIVERED",
     DELIVERED: null,
@@ -87,7 +90,7 @@ const STATUS_FLOW: Record<OrderStatus, OrderStatus | null> = {
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
     PENDING: "Pending",
-    ACCEPTED: "Accepted",
+    PREPARING: "Preparing",
     READY: "Ready",
     OUT_FOR_DELIVERY: "Out for Delivery",
     DELIVERED: "Delivered",
@@ -105,6 +108,8 @@ export default function OrdersPage() {
     const { data: driversData } = useQuery(DRIVERS_QUERY, { pollInterval: 10000 });
     const [assignDriver] = useMutation(ASSIGN_DRIVER_TO_ORDER);
     const [createTestOrder, { loading: creatingTestOrder }] = useMutation(CREATE_TEST_ORDER);
+    const [startPreparingMut, { loading: startPreparingLoading }] = useMutation(START_PREPARING, { refetchQueries: ['GetOrders'] });
+    const [updatePrepTimeMut] = useMutation(UPDATE_PREPARATION_TIME, { refetchQueries: ['GetOrders'] });
 
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
@@ -113,6 +118,10 @@ export default function OrdersPage() {
     const [showCompleted, setShowCompleted] = useState(false);
     const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
     const [assigningDriverOrderId, setAssigningDriverOrderId] = useState<string | null>(null);
+    const [prepTimeModalOrder, setPrepTimeModalOrder] = useState<Order | null>(null);
+    const [prepTimeMinutes, setPrepTimeMinutes] = useState<string>("20");
+    const [editPrepTimeOrder, setEditPrepTimeOrder] = useState<Order | null>(null);
+    const [editPrepTimeMinutes, setEditPrepTimeMinutes] = useState<string>("");
 
     const drivers = useMemo(() => driversData?.drivers ?? [], [driversData]);
 
@@ -161,14 +170,33 @@ export default function OrdersPage() {
     }, [filteredOrders]);
 
     const handleNextStatus = async (order: Order) => {
-        const nextStatus = isBusinessUser
-            ? order.status === "PENDING"
-                ? "ACCEPTED"
-                : order.status === "ACCEPTED"
-                  ? "READY"
-                  : null
-            : STATUS_FLOW[order.status];
+        // For business users: PENDING → open prep time modal, PREPARING → READY
+        if (isBusinessUser) {
+            if (order.status === "PENDING") {
+                setPrepTimeModalOrder(order);
+                setPrepTimeMinutes("20");
+                return;
+            }
+            if (order.status === "PREPARING") {
+                setUpdatingOrderId(order.id);
+                const result = await updateStatus(order.id, "READY");
+                setUpdatingOrderId(null);
+                if (!result.success) {
+                    alert(result.error || "Failed to update order status.");
+                }
+                return;
+            }
+            return;
+        }
 
+        // For super admin
+        if (order.status === "PENDING") {
+            setPrepTimeModalOrder(order);
+            setPrepTimeMinutes("20");
+            return;
+        }
+
+        const nextStatus = STATUS_FLOW[order.status];
         if (!nextStatus) return;
 
         setUpdatingOrderId(order.id);
@@ -180,9 +208,50 @@ export default function OrdersPage() {
         }
     };
 
-    const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
-        setUpdatingOrderId(orderId);
-        const result = await updateStatus(orderId, newStatus);
+    const handleStartPreparing = async () => {
+        if (!prepTimeModalOrder) return;
+        const minutes = parseInt(prepTimeMinutes, 10);
+        if (!minutes || minutes < 1) {
+            alert("Please enter a valid preparation time.");
+            return;
+        }
+        try {
+            await startPreparingMut({
+                variables: { id: prepTimeModalOrder.id, preparationMinutes: minutes },
+            });
+            setPrepTimeModalOrder(null);
+        } catch (err: any) {
+            alert(err.message || "Failed to start preparing.");
+        }
+    };
+
+    const handleUpdatePrepTime = async () => {
+        if (!editPrepTimeOrder) return;
+        const minutes = parseInt(editPrepTimeMinutes, 10);
+        if (!minutes || minutes < 1) {
+            alert("Please enter a valid preparation time.");
+            return;
+        }
+        try {
+            await updatePrepTimeMut({
+                variables: { id: editPrepTimeOrder.id, preparationMinutes: minutes },
+            });
+            setEditPrepTimeOrder(null);
+        } catch (err: any) {
+            alert(err.message || "Failed to update preparation time.");
+        }
+    };
+
+    const handleStatusChange = async (order: Order, newStatus: OrderStatus) => {
+        // If transitioning from PENDING to PREPARING, show prep time modal
+        if (order.status === "PENDING" && newStatus === "PREPARING") {
+            setPrepTimeModalOrder(order);
+            setPrepTimeMinutes("20");
+            return;
+        }
+
+        setUpdatingOrderId(order.id);
+        const result = await updateStatus(order.id, newStatus);
         setUpdatingOrderId(null);
 
         if (!result.success) {
@@ -299,8 +368,8 @@ export default function OrdersPage() {
                             activeOrders.map((order) => {
                                 const nextStatus =
                                     order.status === "PENDING"
-                                        ? "ACCEPTED"
-                                        : order.status === "ACCEPTED"
+                                        ? "PREPARING"
+                                        : order.status === "PREPARING"
                                           ? "READY"
                                           : null;
                                 return (
@@ -351,6 +420,27 @@ export default function OrdersPage() {
                                                 {order.dropOffLocation.address}
                                             </div>
                                         </div>
+
+                                        {/* Preparation Info */}
+                                        {order.status === "PREPARING" && order.preparationMinutes && (
+                                            <div className="mb-3 flex items-center justify-between bg-cyan-500/10 border border-cyan-500/20 rounded-lg px-3 py-2">
+                                                <div className="flex items-center gap-2 text-cyan-400 text-sm">
+                                                    <Timer size={14} />
+                                                    <span>Prep: ~{order.preparationMinutes} min</span>
+                                                </div>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        setEditPrepTimeOrder(order);
+                                                        setEditPrepTimeMinutes(String(order.preparationMinutes || 20));
+                                                    }}
+                                                    className="text-xs text-cyan-400 hover:text-cyan-300 px-2 py-1"
+                                                >
+                                                    Edit
+                                                </Button>
+                                            </div>
+                                        )}
 
                                         {/* Footer */}
                                         <div className="flex items-center justify-between pt-3 border-t border-[#262626]">
@@ -476,12 +566,12 @@ export default function OrdersPage() {
                                                 )}
                                                 <Select
                                                     value={order.status}
-                                                    onChange={(e) => handleStatusChange(order.id, e.target.value as OrderStatus)}
+                                                    onChange={(e) => handleStatusChange(order, e.target.value as OrderStatus)}
                                                     disabled={updateLoading && updatingOrderId === order.id}
                                                     className={`text-xs font-medium ${STATUS_COLORS[order.status].bg} ${STATUS_COLORS[order.status].text} ${STATUS_COLORS[order.status].border} border`}
                                                 >
                                                     <option value="PENDING">Pending</option>
-                                                    <option value="ACCEPTED">Accepted</option>
+                                                    <option value="PREPARING">Preparing</option>
                                                     <option value="READY">Ready</option>
                                                     <option value="OUT_FOR_DELIVERY">Out for Delivery</option>
                                                     <option value="DELIVERED">Delivered</option>
@@ -810,6 +900,116 @@ export default function OrdersPage() {
                         <div className="bg-[#0a0a0a] border border-[#262626] rounded-lg p-4">
                             <div className="text-xs text-neutral-400 mb-1">Delivery Address</div>
                             <div className="text-white text-sm">{selectedOrder.dropOffLocation.address}</div>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
+            {/* PREP TIME MODAL - Start Preparing */}
+            <Modal
+                isOpen={!!prepTimeModalOrder}
+                onClose={() => setPrepTimeModalOrder(null)}
+                title="Start Preparing"
+            >
+                {prepTimeModalOrder && (
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-3 text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-4">
+                            <ChefHat size={24} />
+                            <div>
+                                <div className="font-medium">Order #{prepTimeModalOrder.id.slice(0, 8)}</div>
+                                <div className="text-sm text-neutral-400 mt-1">
+                                    How long will it take to prepare this order?
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm text-neutral-400 mb-2">Preparation Time (minutes)</label>
+                            <Input
+                                type="number"
+                                min="1"
+                                max="180"
+                                value={prepTimeMinutes}
+                                onChange={(e) => setPrepTimeMinutes(e.target.value)}
+                                className="text-center text-lg"
+                                placeholder="20"
+                            />
+                            <div className="flex gap-2 mt-2">
+                                {[10, 15, 20, 30, 45, 60].map((m) => (
+                                    <button
+                                        key={m}
+                                        onClick={() => setPrepTimeMinutes(String(m))}
+                                        className={`px-3 py-1 rounded text-xs border transition-colors ${
+                                            prepTimeMinutes === String(m)
+                                                ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-400"
+                                                : "border-[#262626] text-neutral-400 hover:border-[#404040]"
+                                        }`}
+                                    >
+                                        {m} min
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex gap-3 pt-2">
+                            <Button
+                                variant="outline"
+                                className="flex-1"
+                                onClick={() => setPrepTimeModalOrder(null)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                className="flex-1"
+                                onClick={handleStartPreparing}
+                                disabled={startPreparingLoading}
+                            >
+                                {startPreparingLoading ? "Starting..." : "Start Preparing"}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
+            {/* EDIT PREP TIME MODAL */}
+            <Modal
+                isOpen={!!editPrepTimeOrder}
+                onClose={() => setEditPrepTimeOrder(null)}
+                title="Update Preparation Time"
+            >
+                {editPrepTimeOrder && (
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm text-neutral-400 mb-2">New Preparation Time (minutes)</label>
+                            <Input
+                                type="number"
+                                min="1"
+                                max="180"
+                                value={editPrepTimeMinutes}
+                                onChange={(e) => setEditPrepTimeMinutes(e.target.value)}
+                                className="text-center text-lg"
+                            />
+                            <div className="flex gap-2 mt-2">
+                                {[10, 15, 20, 30, 45, 60].map((m) => (
+                                    <button
+                                        key={m}
+                                        onClick={() => setEditPrepTimeMinutes(String(m))}
+                                        className={`px-3 py-1 rounded text-xs border transition-colors ${
+                                            editPrepTimeMinutes === String(m)
+                                                ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-400"
+                                                : "border-[#262626] text-neutral-400 hover:border-[#404040]"
+                                        }`}
+                                    >
+                                        {m} min
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex gap-3 pt-2">
+                            <Button variant="outline" className="flex-1" onClick={() => setEditPrepTimeOrder(null)}>
+                                Cancel
+                            </Button>
+                            <Button className="flex-1" onClick={handleUpdatePrepTime}>
+                                Update Time
+                            </Button>
                         </div>
                     </div>
                 )}

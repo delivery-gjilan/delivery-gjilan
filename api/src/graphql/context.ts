@@ -10,6 +10,7 @@ import { DriverService } from '@/services/DriverService';
 import { DriverAuthService } from '@/services/DriverAuthService';
 import { PubSub } from '@/lib/pubsub';
 import type { Logger } from '@/lib/logger';
+import { NotificationService } from '@/services/NotificationService';
 
 export interface ApiContextInterface {
     db: DbType;
@@ -30,6 +31,7 @@ export interface ApiContextInterface {
     orderService: OrderService;
     driverAuthService?: DriverAuthService;
     driverService?: DriverService;
+    notificationService: NotificationService;
     pubsub: PubSub;
 }
 

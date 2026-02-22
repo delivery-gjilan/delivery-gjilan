@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "283403304701",
+    "project_id": "delivery-gjilan",
+    "storage_bucket": "delivery-gjilan.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:283403304701:android:ebf6fff09994b5c4ca0894",
+        "android_client_info": {
+          "package_name": "com.anonymous.financetracker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCeZ3toVyDXjBRqFArqAo8R-f6u_MmP_pE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

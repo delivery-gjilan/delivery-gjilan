@@ -104,6 +104,12 @@ export type AssignPromotionToUserInput = {
   userIds: Array<Scalars['ID']['input']>;
 };
 
+export type AudiencePreview = {
+  __typename?: 'AudiencePreview';
+  count: Scalars['Int']['output'];
+  sampleUsers: Array<User>;
+};
+
 export type AuditLog = {
   __typename?: 'AuditLog';
   action: ActionType;
@@ -172,6 +178,13 @@ export enum BusinessType {
   Restaurant = 'RESTAURANT'
 }
 
+export enum CampaignStatus {
+  Draft = 'DRAFT',
+  Failed = 'FAILED',
+  Sending = 'SENDING',
+  Sent = 'SENT'
+}
+
 export type CartContextInput = {
   businessIds: Array<Scalars['ID']['input']>;
   deliveryPrice: Scalars['Float']['input'];
@@ -194,6 +207,13 @@ export type CreateBusinessInput = {
   name: Scalars['String']['input'];
   phoneNumber?: InputMaybe<Scalars['String']['input']>;
   workingHours: WorkingHoursInput;
+};
+
+export type CreateCampaignInput = {
+  body: Scalars['String']['input'];
+  data?: InputMaybe<Scalars['JSON']['input']>;
+  query: Scalars['JSON']['input'];
+  title: Scalars['String']['input'];
 };
 
 export type CreateOrderInput = {
@@ -263,6 +283,28 @@ export type CreateUserInput = {
   lastName: Scalars['String']['input'];
   password: Scalars['String']['input'];
   role: UserRole;
+};
+
+export enum DeviceAppType {
+  Customer = 'CUSTOMER',
+  Driver = 'DRIVER'
+}
+
+export enum DevicePlatform {
+  Android = 'ANDROID',
+  Ios = 'IOS'
+}
+
+export type DeviceToken = {
+  __typename?: 'DeviceToken';
+  appType: DeviceAppType;
+  createdAt: Scalars['DateTime']['output'];
+  deviceId: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  platform: DevicePlatform;
+  token: Scalars['String']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+  userId: Scalars['ID']['output'];
 };
 
 export type DriverConnection = {
@@ -378,14 +420,17 @@ export type Mutation = {
   backfillSettlementsForDeliveredOrders: Scalars['Int']['output'];
   cancelOrder: Order;
   createBusiness: Business;
+  createCampaign: NotificationCampaign;
   createOrder: Order;
   createProduct: Product;
   createProductCategory: ProductCategory;
   createProductSubcategory: ProductSubcategory;
   createPromotion: Promotion;
+  createTestOrder: Order;
   createUser: AuthResponse;
   deductWalletCredit: WalletTransaction;
   deleteBusiness: Scalars['Boolean']['output'];
+  deleteCampaign: Scalars['Boolean']['output'];
   deleteProduct: Scalars['Boolean']['output'];
   deleteProductCategory: Scalars['Boolean']['output'];
   deleteProductSubcategory: Scalars['Boolean']['output'];
@@ -405,18 +450,24 @@ export type Mutation = {
   markSettlementAsPaid: Settlement;
   markSettlementAsPartiallyPaid: Settlement;
   markSettlementsAsPaid: Array<Settlement>;
+  registerDeviceToken: Scalars['Boolean']['output'];
   removeUserFromPromotion: Scalars['Boolean']['output'];
   resendEmailVerification: SignupStepResponse;
+  sendCampaign: NotificationCampaign;
+  sendPushNotification: SendNotificationResult;
   setBusinessSchedule: Array<BusinessDayHours>;
   setDefaultAddress: Scalars['Boolean']['output'];
   setUserPermissions: User;
+  startPreparing: Order;
   submitPhoneNumber: SignupStepResponse;
+  unregisterDeviceToken: Scalars['Boolean']['output'];
   unsettleSettlement: Settlement;
   updateBusiness: Business;
   updateCommissionPercentage: Scalars['Boolean']['output'];
   updateDriverLocation: User;
   updateDriverOnlineStatus: User;
   updateOrderStatus: Order;
+  updatePreparationTime: Order;
   updateProduct: Product;
   updateProductCategory: ProductCategory;
   updateProductSubcategory: ProductSubcategory;
@@ -482,6 +533,11 @@ export type MutationCreateBusinessArgs = {
 };
 
 
+export type MutationCreateCampaignArgs = {
+  input: CreateCampaignInput;
+};
+
+
 export type MutationCreateOrderArgs = {
   input: CreateOrderInput;
 };
@@ -520,6 +576,11 @@ export type MutationDeductWalletCreditArgs = {
 
 
 export type MutationDeleteBusinessArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type MutationDeleteCampaignArgs = {
   id: Scalars['ID']['input'];
 };
 
@@ -591,9 +652,24 @@ export type MutationMarkSettlementsAsPaidArgs = {
 };
 
 
+export type MutationRegisterDeviceTokenArgs = {
+  input: RegisterDeviceTokenInput;
+};
+
+
 export type MutationRemoveUserFromPromotionArgs = {
   promotionId: Scalars['ID']['input'];
   userId: Scalars['ID']['input'];
+};
+
+
+export type MutationSendCampaignArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type MutationSendPushNotificationArgs = {
+  input: SendPushNotificationInput;
 };
 
 
@@ -614,8 +690,19 @@ export type MutationSetUserPermissionsArgs = {
 };
 
 
+export type MutationStartPreparingArgs = {
+  id: Scalars['ID']['input'];
+  preparationMinutes: Scalars['Int']['input'];
+};
+
+
 export type MutationSubmitPhoneNumberArgs = {
   input: SubmitPhoneNumberInput;
+};
+
+
+export type MutationUnregisterDeviceTokenArgs = {
+  token: Scalars['String']['input'];
 };
 
 
@@ -651,6 +738,12 @@ export type MutationUpdateDriverOnlineStatusArgs = {
 export type MutationUpdateOrderStatusArgs = {
   id: Scalars['ID']['input'];
   status: OrderStatus;
+};
+
+
+export type MutationUpdatePreparationTimeArgs = {
+  id: Scalars['ID']['input'];
+  preparationMinutes: Scalars['Int']['input'];
 };
 
 
@@ -714,19 +807,61 @@ export type MutationVerifyPhoneArgs = {
   input: VerifyPhoneInput;
 };
 
+export type Notification = {
+  __typename?: 'Notification';
+  body: Scalars['String']['output'];
+  campaignId?: Maybe<Scalars['ID']['output']>;
+  data?: Maybe<Scalars['JSON']['output']>;
+  id: Scalars['ID']['output'];
+  sentAt: Scalars['DateTime']['output'];
+  title: Scalars['String']['output'];
+  type: NotificationType;
+  userId?: Maybe<Scalars['ID']['output']>;
+};
+
+export type NotificationCampaign = {
+  __typename?: 'NotificationCampaign';
+  body: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  data?: Maybe<Scalars['JSON']['output']>;
+  failedCount: Scalars['Int']['output'];
+  id: Scalars['ID']['output'];
+  query?: Maybe<Scalars['JSON']['output']>;
+  sender?: Maybe<User>;
+  sentAt?: Maybe<Scalars['DateTime']['output']>;
+  sentBy?: Maybe<Scalars['ID']['output']>;
+  sentCount: Scalars['Int']['output'];
+  status: CampaignStatus;
+  targetCount: Scalars['Int']['output'];
+  title: Scalars['String']['output'];
+};
+
+export enum NotificationType {
+  AdminAlert = 'ADMIN_ALERT',
+  OrderAssigned = 'ORDER_ASSIGNED',
+  OrderStatus = 'ORDER_STATUS',
+  Promotional = 'PROMOTIONAL'
+}
+
 export type Order = {
   __typename?: 'Order';
   businesses: Array<OrderBusiness>;
+  deliveredAt?: Maybe<Scalars['Date']['output']>;
   deliveryPrice: Scalars['Float']['output'];
   driver?: Maybe<User>;
   dropOffLocation: Location;
+  estimatedReadyAt?: Maybe<Scalars['Date']['output']>;
   id: Scalars['ID']['output'];
   orderDate: Scalars['Date']['output'];
   orderPrice: Scalars['Float']['output'];
   orderPromotions?: Maybe<Array<OrderPromotion>>;
   originalDeliveryPrice?: Maybe<Scalars['Float']['output']>;
   originalPrice?: Maybe<Scalars['Float']['output']>;
+  outForDeliveryAt?: Maybe<Scalars['Date']['output']>;
   pickupLocations: Array<Location>;
+  preparationMinutes?: Maybe<Scalars['Int']['output']>;
+  preparingAt?: Maybe<Scalars['Date']['output']>;
+  readyAt?: Maybe<Scalars['Date']['output']>;
   status: OrderStatus;
   totalPrice: Scalars['Float']['output'];
   updatedAt: Scalars['Date']['output'];
@@ -760,11 +895,11 @@ export type OrderPromotion = {
 };
 
 export enum OrderStatus {
-  Accepted = 'ACCEPTED',
   Cancelled = 'CANCELLED',
   Delivered = 'DELIVERED',
   OutForDelivery = 'OUT_FOR_DELIVERY',
   Pending = 'PENDING',
+  Preparing = 'PREPARING',
   Ready = 'READY'
 }
 
@@ -932,9 +1067,12 @@ export type Query = {
   /** Get live metrics for the authenticated driver */
   myDriverMetrics: DriverDailyMetrics;
   myReferralStats: ReferralStats;
+  notificationCampaign?: Maybe<NotificationCampaign>;
+  notificationCampaigns: Array<NotificationCampaign>;
   order?: Maybe<Order>;
   orders: Array<Order>;
   ordersByStatus: Array<Order>;
+  previewCampaignAudience: AudiencePreview;
   product?: Maybe<Product>;
   productCategories: Array<ProductCategory>;
   productCategory?: Maybe<ProductCategory>;
@@ -1034,6 +1172,11 @@ export type QueryGetWalletTransactionsArgs = {
 };
 
 
+export type QueryNotificationCampaignArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
 export type QueryOrderArgs = {
   id: Scalars['ID']['input'];
 };
@@ -1041,6 +1184,11 @@ export type QueryOrderArgs = {
 
 export type QueryOrdersByStatusArgs = {
   status: OrderStatus;
+};
+
+
+export type QueryPreviewCampaignAudienceArgs = {
+  query: Scalars['JSON']['input'];
 };
 
 
@@ -1134,6 +1282,27 @@ export enum ReferralStatus {
   Expired = 'EXPIRED',
   Pending = 'PENDING'
 }
+
+export type RegisterDeviceTokenInput = {
+  appType: DeviceAppType;
+  deviceId: Scalars['String']['input'];
+  platform: DevicePlatform;
+  token: Scalars['String']['input'];
+};
+
+export type SendNotificationResult = {
+  __typename?: 'SendNotificationResult';
+  failureCount: Scalars['Int']['output'];
+  success: Scalars['Boolean']['output'];
+  successCount: Scalars['Int']['output'];
+};
+
+export type SendPushNotificationInput = {
+  body: Scalars['String']['input'];
+  data?: InputMaybe<Scalars['JSON']['input']>;
+  title: Scalars['String']['input'];
+  userIds: Array<Scalars['ID']['input']>;
+};
 
 export type Settlement = {
   __typename?: 'Settlement';

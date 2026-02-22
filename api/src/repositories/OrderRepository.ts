@@ -54,7 +54,11 @@ export class OrderRepository {
               )
             : and(eq(ordersTable.id, id), or(isNull(ordersTable.driverId), eq(ordersTable.driverId, driverId)));
 
-        const result = await db.update(ordersTable).set({ status, driverId }).where(whereClause).returning();
+        const result = await db.update(ordersTable).set({
+            status,
+            driverId,
+            ...(status === 'OUT_FOR_DELIVERY' ? { outForDeliveryAt: new Date().toISOString() } : {}),
+        }).where(whereClause).returning();
         return result[0] || null;
     }
 
@@ -86,6 +90,61 @@ export class OrderRepository {
             orderBy: (tbl, { asc }) => [asc(tbl.createdAt)],
         });
         return result;
+    }
+
+    async startPreparing(
+        id: string,
+        preparationMinutes: number,
+    ): Promise<DbOrder | null> {
+        const db = await getDB();
+        const now = new Date();
+        const estimatedReadyAt = new Date(now.getTime() + preparationMinutes * 60_000);
+        const result = await db
+            .update(ordersTable)
+            .set({
+                status: 'PREPARING' as OrderStatus,
+                preparationMinutes,
+                estimatedReadyAt: estimatedReadyAt.toISOString(),
+                preparingAt: now.toISOString(),
+            })
+            .where(and(eq(ordersTable.id, id), eq(ordersTable.status, 'PENDING' as OrderStatus)))
+            .returning();
+        return result[0] || null;
+    }
+
+    async updatePreparationTime(
+        id: string,
+        preparationMinutes: number,
+    ): Promise<DbOrder | null> {
+        const db = await getDB();
+        const order = await this.findById(id);
+        if (!order || order.status !== 'PREPARING') return null;
+
+        const preparingAt = order.preparingAt ? new Date(order.preparingAt) : new Date();
+        const estimatedReadyAt = new Date(preparingAt.getTime() + preparationMinutes * 60_000);
+        const result = await db
+            .update(ordersTable)
+            .set({
+                preparationMinutes,
+                estimatedReadyAt: estimatedReadyAt.toISOString(),
+            })
+            .where(and(eq(ordersTable.id, id), eq(ordersTable.status, 'PREPARING' as OrderStatus)))
+            .returning();
+        return result[0] || null;
+    }
+
+    async updateStatusWithTimestamp(
+        id: string,
+        status: OrderStatus,
+        timestampField: 'readyAt' | 'outForDeliveryAt' | 'deliveredAt',
+    ): Promise<DbOrder | null> {
+        const db = await getDB();
+        const result = await db
+            .update(ordersTable)
+            .set({ status, [timestampField]: new Date().toISOString() })
+            .where(eq(ordersTable.id, id))
+            .returning();
+        return result[0] || null;
     }
 
     async create(

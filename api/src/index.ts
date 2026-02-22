@@ -10,6 +10,7 @@ import { initializeDriverServices, shutdownDriverServices } from '@/services/dri
 import { initSentry, Sentry } from '@/lib/sentry';
 import { requestLogger } from '@/lib/middleware/requestLogger';
 import logger from '@/lib/logger';
+import { initializeFirebase } from '@/lib/firebase';
 
 // ── Sentry must be initialised before any other middleware ──
 initSentry();
@@ -44,6 +45,13 @@ app.use(yoga.graphqlEndpoint, yoga);
 const httpServer = app.listen(port, async () => {
     logger.info({ port }, 'Server started on http://localhost:%d/graphql', port);
     
+    // Initialize Firebase Admin SDK for push notifications
+    try {
+        initializeFirebase();
+    } catch (error) {
+        logger.warn({ err: error }, 'Firebase not initialized — push notifications disabled. Set FIREBASE_SERVICE_ACCOUNT_KEY env var.');
+    }
+
     // Initialize driver services (heartbeat checker)
     try {
         await initializeDriverServices();

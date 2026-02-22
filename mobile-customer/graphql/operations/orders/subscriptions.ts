@@ -18,6 +18,9 @@ export const USER_ORDERS_UPDATED = graphql(`
             totalPrice
             orderDate
             status
+            preparationMinutes
+            estimatedReadyAt
+            preparingAt
             dropOffLocation {
                 latitude
                 longitude

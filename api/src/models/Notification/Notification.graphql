@@ -1,0 +1,112 @@
+enum DevicePlatform {
+    IOS
+    ANDROID
+}
+
+enum DeviceAppType {
+    CUSTOMER
+    DRIVER
+}
+
+enum NotificationType {
+    ORDER_STATUS
+    ORDER_ASSIGNED
+    PROMOTIONAL
+    ADMIN_ALERT
+}
+
+enum CampaignStatus {
+    DRAFT
+    SENDING
+    SENT
+    FAILED
+}
+
+type DeviceToken {
+    id: ID!
+    userId: ID!
+    token: String!
+    platform: DevicePlatform!
+    deviceId: String!
+    appType: DeviceAppType!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+}
+
+type Notification {
+    id: ID!
+    userId: ID
+    title: String!
+    body: String!
+    data: JSON
+    type: NotificationType!
+    campaignId: ID
+    sentAt: DateTime!
+}
+
+type NotificationCampaign {
+    id: ID!
+    title: String!
+    body: String!
+    data: JSON
+    query: JSON
+    targetCount: Int!
+    sentCount: Int!
+    failedCount: Int!
+    status: CampaignStatus!
+    sentBy: ID
+    sender: User
+    createdAt: DateTime!
+    sentAt: DateTime
+}
+
+type AudiencePreview {
+    count: Int!
+    sampleUsers: [User!]!
+}
+
+type SendNotificationResult {
+    success: Boolean!
+    successCount: Int!
+    failureCount: Int!
+}
+
+# ── Inputs ────────────────────────────────────────────────────────
+
+input RegisterDeviceTokenInput {
+    token: String!
+    platform: DevicePlatform!
+    deviceId: String!
+    appType: DeviceAppType!
+}
+
+input SendPushNotificationInput {
+    userIds: [ID!]!
+    title: String!
+    body: String!
+    data: JSON
+}
+
+input CreateCampaignInput {
+    title: String!
+    body: String!
+    data: JSON
+    query: JSON!
+}
+
+# ── Operations ────────────────────────────────────────────────────
+
+type Query {
+    notificationCampaigns: [NotificationCampaign!]!
+    notificationCampaign(id: ID!): NotificationCampaign
+    previewCampaignAudience(query: JSON!): AudiencePreview!
+}
+
+type Mutation {
+    registerDeviceToken(input: RegisterDeviceTokenInput!): Boolean!
+    unregisterDeviceToken(token: String!): Boolean!
+    sendPushNotification(input: SendPushNotificationInput!): SendNotificationResult!
+    createCampaign(input: CreateCampaignInput!): NotificationCampaign!
+    sendCampaign(id: ID!): NotificationCampaign!
+    deleteCampaign(id: ID!): Boolean!
+}

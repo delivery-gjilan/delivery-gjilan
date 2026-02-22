@@ -1,6 +1,6 @@
 enum OrderStatus {
     PENDING
-    ACCEPTED
+    PREPARING
     READY
     OUT_FOR_DELIVERY
     DELIVERED
@@ -45,6 +45,12 @@ type Order {
     orderDate: Date!
     updatedAt: Date!
     status: OrderStatus!
+    preparationMinutes: Int
+    estimatedReadyAt: Date
+    preparingAt: Date
+    readyAt: Date
+    outForDeliveryAt: Date
+    deliveredAt: Date
     user: User
     driver: User
     dropOffLocation: Location!
@@ -62,6 +68,8 @@ type Query {
 
 type Mutation {
     updateOrderStatus(id: ID!, status: OrderStatus!): Order!
+    startPreparing(id: ID!, preparationMinutes: Int!): Order!
+    updatePreparationTime(id: ID!, preparationMinutes: Int!): Order!
     assignDriverToOrder(id: ID!, driverId: ID): Order!
     cancelOrder(id: ID!): Order!
     createOrder(input: CreateOrderInput!): Order!

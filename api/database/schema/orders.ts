@@ -1,11 +1,11 @@
 import { relations, sql } from 'drizzle-orm';
-import { pgTable, varchar, numeric, timestamp, uuid, pgEnum, doublePrecision } from 'drizzle-orm/pg-core';
+import { pgTable, varchar, numeric, timestamp, uuid, pgEnum, doublePrecision, integer } from 'drizzle-orm/pg-core';
 import { orderItems } from './orderItems';
 import { OrderStatus } from '@/generated/types.generated';
 import { users } from './users';
 import { orderPromotions } from './orderPromotions';
 
-const orderStatusValues = ['PENDING', 'ACCEPTED', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'] as const;
+const orderStatusValues = ['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'] as const;
 [...orderStatusValues] satisfies OrderStatus[];
 export const orderStatus = pgEnum('order_status', orderStatusValues);
 
@@ -23,6 +23,12 @@ export const orders = pgTable('orders', {
     dropoffLat: doublePrecision('dropoff_lat').notNull(),
     dropoffLng: doublePrecision('dropoff_lng').notNull(),
     dropoffAddress: varchar('dropoff_address', { length: 500 }).notNull(),
+    preparationMinutes: integer('preparation_minutes'),
+    estimatedReadyAt: timestamp('estimated_ready_at', { withTimezone: true, mode: 'string' }),
+    preparingAt: timestamp('preparing_at', { withTimezone: true, mode: 'string' }),
+    readyAt: timestamp('ready_at', { withTimezone: true, mode: 'string' }),
+    outForDeliveryAt: timestamp('out_for_delivery_at', { withTimezone: true, mode: 'string' }),
+    deliveredAt: timestamp('delivered_at', { withTimezone: true, mode: 'string' }),
     orderDate: timestamp('order_date', { mode: 'string' }).defaultNow(),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
         .default(sql`CURRENT_TIMESTAMP`)

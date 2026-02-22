@@ -1,0 +1,77 @@
+import type { MutationResolvers } from './../../../../generated/types.generated';
+import { createAuditLogger } from '@/services/AuditLogger';
+import logger from '@/lib/logger';
+import { notifyCustomerOrderStatus } from '@/services/orderNotifications';
+
+export const startPreparing: NonNullable<MutationResolvers['startPreparing']> = async (
+    _parent,
+    { id, preparationMinutes },
+    context,
+) => {
+    const { orderService, userData, db } = context;
+    logger.info({ orderId: id, preparationMinutes }, 'order:startPreparing');
+
+    const role = userData?.role;
+    if (!role) {
+        throw new Error('Unauthorized');
+    }
+
+    const isBusinessAdmin = role === 'BUSINESS_ADMIN';
+    const isSuperAdmin = role === 'SUPER_ADMIN';
+
+    if (!isBusinessAdmin && !isSuperAdmin) {
+        throw new Error('Not authorized to start preparing');
+    }
+
+    if (isBusinessAdmin) {
+        if (!userData.businessId) {
+            throw new Error('Business admin has no business assigned');
+        }
+        const canAccess = await orderService.orderContainsBusiness(id, userData.businessId);
+        if (!canAccess) {
+            throw new Error('Not authorized to update this order');
+        }
+    }
+
+    if (preparationMinutes < 1 || preparationMinutes > 180) {
+        throw new Error('Preparation time must be between 1 and 180 minutes');
+    }
+
+    const currentOrder = await orderService.getOrderById(id);
+    if (!currentOrder) {
+        throw new Error('Order not found');
+    }
+
+    const order = await orderService.startPreparing(id, preparationMinutes);
+
+    const dbOrder = await orderService.orderRepository.findById(id);
+    if (dbOrder) {
+        await orderService.updateUserBehaviorOnStatusChange(
+            dbOrder.userId,
+            'PENDING',
+            'PREPARING',
+            dbOrder.price + dbOrder.deliveryPrice,
+            dbOrder.orderDate || null,
+        );
+
+        await orderService.publishUserOrders(dbOrder.userId);
+        await orderService.publishAllOrders();
+
+        notifyCustomerOrderStatus(context.notificationService, dbOrder.userId, id, 'PREPARING');
+
+        const auditLog = createAuditLogger(db, context);
+        await auditLog.log({
+            action: 'ORDER_STATUS_CHANGED',
+            entityType: 'ORDER',
+            entityId: id,
+            metadata: {
+                orderId: id,
+                oldValue: { status: 'PENDING' },
+                newValue: { status: 'PREPARING', preparationMinutes },
+                changedFields: ['status', 'preparationMinutes'],
+            },
+        });
+    }
+
+    return order;
+};

@@ -16,7 +16,7 @@ const getStatusStyles = (status: string, fallback: string): StatusStyles => {
     switch (status) {
         case 'PENDING':
             return { color: '#F59E0B', background: '#F59E0B20' };
-        case 'ACCEPTED':
+        case 'PREPARING':
         case 'READY':
         case 'OUT_FOR_DELIVERY':
             return { color: '#3B82F6', background: '#3B82F620' };

@@ -8,3 +8,6 @@ export * from './useNavigationSteps';
 export * from './useNavigationSimulation';
 export * from './useSmoothCameraTracking';
 export * from './usePredictedTracking';
+
+// Notifications
+export * from './useNotifications';

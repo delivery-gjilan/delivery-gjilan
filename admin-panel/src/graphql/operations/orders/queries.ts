@@ -10,6 +10,9 @@ export const GET_ORDERS = graphql(`
             orderDate
             updatedAt
             status
+            preparationMinutes
+            estimatedReadyAt
+            preparingAt
             user {
                 id
                 firstName

@@ -23,6 +23,8 @@ import { decodeJwtToken } from '@/lib/utils/authUtils';
 import { getDriverServices, initializeDriverServices } from '@/services/driverServices.init';
 import { setSentryContext } from '@/lib/sentry';
 import logger from '@/lib/logger';
+import { NotificationRepository } from '@/repositories/NotificationRepository';
+import { NotificationService } from '@/services/NotificationService';
 
 /**
  * Extracts and verifies JWT token from request Authorization header or WebSocket connection params
@@ -105,6 +107,9 @@ export async function createContext(initialContext: YogaInitialContext): Promise
     const driverAuthService = new DriverAuthService(authRepository, new DriverRepository(db));
     const orderService = new OrderService(orderRepository, authRepository, productRepository, pubsub);
 
+    const notificationRepository = new NotificationRepository(db);
+    const notificationService = new NotificationService(notificationRepository);
+
     // Get driver services (initialized on server startup)
     let driverService;
     try {
@@ -135,6 +140,7 @@ export async function createContext(initialContext: YogaInitialContext): Promise
         driverAuthService,
         orderService,
         driverService,
+        notificationService,
         pubsub,
     };
 }

@@ -47,6 +47,28 @@ export const CANCEL_ORDER = graphql(`
     }
 `);
 
+export const START_PREPARING = graphql(`
+    mutation StartPreparing($id: ID!, $preparationMinutes: Int!) {
+        startPreparing(id: $id, preparationMinutes: $preparationMinutes) {
+            id
+            status
+            preparationMinutes
+            estimatedReadyAt
+            preparingAt
+        }
+    }
+`);
+
+export const UPDATE_PREPARATION_TIME = graphql(`
+    mutation UpdatePreparationTime($id: ID!, $preparationMinutes: Int!) {
+        updatePreparationTime(id: $id, preparationMinutes: $preparationMinutes) {
+            id
+            preparationMinutes
+            estimatedReadyAt
+        }
+    }
+`);
+
 export const ASSIGN_DRIVER_TO_ORDER = graphql(`
     mutation AssignDriverToOrder($id: ID!, $driverId: ID) {
         assignDriverToOrder(id: $id, driverId: $driverId) {

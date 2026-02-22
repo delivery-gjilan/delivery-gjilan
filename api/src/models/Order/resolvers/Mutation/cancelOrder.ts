@@ -1,6 +1,8 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { GraphQLError } from 'graphql';
 import { createAuditLogger } from '@/services/AuditLogger';
+import { notifyCustomerOrderStatus } from '@/services/orderNotifications';
+import logger from '@/lib/logger';
 
 export const cancelOrder: NonNullable<MutationResolvers['cancelOrder']> = async (
     _parent,
@@ -36,6 +38,9 @@ export const cancelOrder: NonNullable<MutationResolvers['cancelOrder']> = async 
 
     await orderService.publishUserOrders(dbOrder.userId);
     await orderService.publishAllOrders();
+
+    // Push notification to customer (fire-and-forget)
+    notifyCustomerOrderStatus(context.notificationService, dbOrder.userId, id, 'CANCELLED');
 
     const logger = createAuditLogger(db, context);
     await logger.log({

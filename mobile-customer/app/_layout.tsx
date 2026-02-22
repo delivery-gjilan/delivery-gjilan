@@ -10,6 +10,7 @@ import LoadingScreen from '@/components/LoadingScreen';
 import { FloatingBars } from '@/components/FloatingBars';
 import { useActiveOrdersTracking } from '@/hooks/useActiveOrdersTracking';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
+import { useNotifications } from '@/hooks/useNotifications';
 import StoreClosedScreen from '@/components/StoreClosedScreen';
 import { initSentry } from '@/lib/sentry';
 
@@ -20,6 +21,9 @@ initSentry();
 function AppContent() {
     const theme = useTheme();
     const { isStoreClosed, closedMessage, loading: storeStatusLoading } = useStoreStatus();
+
+    // Initialize push notifications
+    useNotifications();
 
     // Track active orders (query + subscription)
     useActiveOrdersTracking();

@@ -3,6 +3,7 @@ import { createAuditLogger } from '@/services/AuditLogger';
 import logger from '@/lib/logger';
 import { drivers as driversTable } from '@/database/schema';
 import { eq } from 'drizzle-orm';
+import { notifyDriverOrderAssigned } from '@/services/orderNotifications';
 
 export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToOrder']> = async (
     _parent,
@@ -47,7 +48,7 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
             throw new Error('This order has already been taken by another driver');
         }
 
-        if (dbOrderBefore.status !== 'READY' && dbOrderBefore.status !== 'ACCEPTED') {
+        if (dbOrderBefore.status !== 'READY' && dbOrderBefore.status !== 'PREPARING') {
             throw new Error('Order is not available for driver assignment');
         }
 
@@ -99,6 +100,16 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
         
         // Publish to all admins for real-time updates
         await orderService.publishAllOrders();
+    }
+
+    // Push notification to driver (fire-and-forget)
+    if (effectiveDriverId) {
+        notifyDriverOrderAssigned(
+            context.notificationService,
+            effectiveDriverId,
+            id,
+            dbOrder?.dropoffAddress || undefined,
+        );
     }
     
     // Log the action

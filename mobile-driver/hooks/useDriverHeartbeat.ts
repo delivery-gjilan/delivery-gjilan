@@ -19,6 +19,7 @@ import { gql } from '@apollo/client';
 import { useAuthStore } from '@/store/authStore';
 import { getToken } from '@/utils/secureTokenStore';
 import { useDriverLocationOverrideStore } from '@/store/driverLocationOverrideStore';
+import { useNavigationLocationStore } from '@/store/navigationLocationStore';
 
 const HEARTBEAT_INTERVAL_MS = 5000; // Every 5 seconds
 const BACKGROUND_HEARTBEAT_TASK = 'driver-heartbeat-background-task';
@@ -213,12 +214,20 @@ export function useDriverHeartbeat() {
 
   // Get current location with fast timeout fallback to simulation
   const getCurrentLocation = useCallback(async (): Promise<{ latitude: number; longitude: number } | null> => {
+    // Priority 1: Check for navigation SDK location (when actively navigating)
+    const navLocationState = useNavigationLocationStore.getState();
+    if (navLocationState.isFresh() && navLocationState.location) {
+      console.log('[Heartbeat] Using Navigation SDK location', navLocationState.location);
+      return navLocationState.location;
+    }
+
+    // Priority 2: Manual simulation override
     const overrideState = useDriverLocationOverrideStore.getState();
     if (overrideState.isSimulationOverrideEnabled && overrideState.locationOverride) {
       return overrideState.locationOverride;
     }
 
-    // Try real GPS with aggressive timeout (2 seconds max)
+    // Priority 3: Try real GPS with aggressive timeout (2 seconds max)
     try {
       const location = await Promise.race([
         Location.getCurrentPositionAsync({

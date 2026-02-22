@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import { FinancialService } from '@/services/FinancialService';
 import { createAuditLogger } from '@/services/AuditLogger';
 import logger from '@/lib/logger';
+import { notifyCustomerOrderStatus } from '@/services/orderNotifications';
 
 export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus']> = async (
     _parent,
@@ -48,17 +49,16 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
         }
 
         const allowed: Record<string, string[]> = {
-            PENDING: ['ACCEPTED'],
-            ACCEPTED: ['READY'],
+            PREPARING: ['READY'],
         };
 
         if (!allowed[currentStatus]?.includes(status)) {
-            throw new Error('Invalid status transition for business admin');
+            throw new Error('Invalid status transition for business admin. Use startPreparing mutation for PENDING → PREPARING');
         }
         order = await orderService.updateOrderStatus(id, status);
     } else if (isDriver) {
         const allowed: Record<string, string[]> = {
-            ACCEPTED: ['OUT_FOR_DELIVERY'],
+            PREPARING: ['OUT_FOR_DELIVERY'],
             READY: ['OUT_FOR_DELIVERY'],
             OUT_FOR_DELIVERY: ['DELIVERED'],
         };
@@ -111,6 +111,9 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
     
     // Publish to all admins for real-time updates
     await orderService.publishAllOrders();
+    
+    // Send push notification to customer
+    notifyCustomerOrderStatus(context.notificationService, dbOrder.userId, id, status);
     
     // Log the status change
     const auditLog = createAuditLogger(db, context);

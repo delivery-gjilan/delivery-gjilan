@@ -1,15 +1,17 @@
 import React, { useMemo, useCallback, useRef, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Pressable, Linking, Platform } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import Mapbox from '@rnmapbox/maps';
 import { useQuery, useSubscription } from '@apollo/client/react';
 import { GET_ORDERS, ALL_ORDERS_UPDATED } from '@/graphql/operations/orders';
 import { useDriverLocation } from '@/hooks/useDriverLocation';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuthStore } from '@/store/authStore';
+import { useNavigationStore } from '@/store/navigationStore';
+import type { NavigationPhase } from '@/store/navigationStore';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchRouteGeometry } from '@/utils/mapbox';
-import { useNavigationSimulation } from '@/hooks/useNavigationSimulation';
 import type { Feature, LineString } from 'geojson';
 
 /* ─── Constants ─── */
@@ -20,21 +22,21 @@ const MAP_STYLE = 'mapbox://styles/artshabani2002/cmls0528e002701p93dejgdri';
 
 const STATUS_COLORS: Record<string, string> = {
     PENDING: '#F59E0B',
-    ACCEPTED: '#06B6D4',
+    PREPARING: '#06B6D4',
     READY: '#3B82F6',
     OUT_FOR_DELIVERY: '#8B5CF6',
 };
 
 const STATUS_LABELS: Record<string, string> = {
     PENDING: 'Pending',
-    ACCEPTED: 'Accepted',
+    PREPARING: 'Preparing',
     READY: 'Ready',
     OUT_FOR_DELIVERY: 'Delivering',
 };
 
 const STATUS_ICONS: Record<string, string> = {
     PENDING: 'time-outline',
-    ACCEPTED: 'checkmark-circle-outline',
+    PREPARING: 'restaurant-outline',
     READY: 'bag-check-outline',
     OUT_FOR_DELIVERY: 'bicycle-outline',
 };
@@ -42,7 +44,9 @@ const STATUS_ICONS: Record<string, string> = {
 export default function MapScreen() {
     const theme = useTheme();
     const insets = useSafeAreaInsets();
+    const router = useRouter();
     const currentDriverId = useAuthStore((state) => state.user?.id);
+    const startNavigation = useNavigationStore((s) => s.startNavigation);
     const cameraRef = useRef<Mapbox.Camera>(null);
 
     const [focusedOrderId, setFocusedOrderId] = useState<string | null>(null);
@@ -96,42 +100,27 @@ export default function MapScreen() {
         distanceFilter: hasActiveNavigation ? 5 : 10,
     });
 
-    // ── Simulation ──
-    const { isSimulating, simulatedLocation, startSimulation, stopSimulation } = useNavigationSimulation({ speedKmh: 40, updateIntervalMs: 200 });
-    const effectiveLocation = (isSimulating && simulatedLocation) ? simulatedLocation : location;
-
     // ── Camera follow ──
     const [followDriver, setFollowDriver] = useState(false);
-    const smoothedHeadingRef = useRef(0);
-    const snapBackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const snapBackToDriver = useCallback(() => {
-        if (!followDriver || !effectiveLocation) return;
+    const recenterOnDriver = useCallback(() => {
+        if (location) {
+            cameraRef.current?.setCamera({
+                centerCoordinate: [location.longitude, location.latitude],
+                animationDuration: 300,
+                animationMode: 'easeTo',
+            });
+        }
+    }, [location]);
+
+    const handleMapTouchEnd = useCallback(() => {
+        if (!followDriver || !location) return;
         cameraRef.current?.setCamera({
-            centerCoordinate: [effectiveLocation.longitude, effectiveLocation.latitude],
+            centerCoordinate: [location.longitude, location.latitude],
             animationDuration: 300,
             animationMode: 'easeTo',
         });
-    }, [followDriver, effectiveLocation]);
-
-    const handleMapTouchEnd = useCallback(() => {
-        if (!followDriver) return;
-        if (snapBackTimerRef.current) clearTimeout(snapBackTimerRef.current);
-        snapBackToDriver();
-    }, [followDriver, snapBackToDriver]);
-
-    // Smooth heading to avoid jerky rotation on roundabouts
-    useEffect(() => {
-        if (!effectiveLocation?.heading && effectiveLocation?.heading !== 0) return;
-        const target = effectiveLocation.heading ?? 0;
-        const current = smoothedHeadingRef.current;
-        let diff = target - current;
-        // Normalize to -180..180
-        while (diff > 180) diff -= 360;
-        while (diff < -180) diff += 360;
-        // Lerp toward target (0.25 = smooth, higher = snappier)
-        smoothedHeadingRef.current = (current + diff * 0.25 + 360) % 360;
-    }, [effectiveLocation?.heading]);
+    }, [followDriver, location]);
 
     const availableOrders = useMemo(() => {
         const orders = (data as any)?.orders ?? [];
@@ -153,15 +142,15 @@ export default function MapScreen() {
     );
 
     // ── Fetch route when focused order changes ──
-    const effectiveLocationRef = useRef(effectiveLocation);
-    effectiveLocationRef.current = effectiveLocation;
-    const hasLocation = Boolean(effectiveLocation);
+    const locationRef = useRef(location);
+    locationRef.current = location;
+    const hasLocation = Boolean(location);
 
     useEffect(() => {
         let cancelled = false;
 
         const fetchRoutes = async () => {
-            const loc = effectiveLocationRef.current;
+            const loc = locationRef.current;
             if (!focusedOrder || !loc) {
                 if (!focusedOrder) {
                     setRouteCoords(null);
@@ -208,41 +197,16 @@ export default function MapScreen() {
         return () => { cancelled = true; };
     }, [focusedOrder?.id, focusedOrder?.status, hasLocation]);
 
-    // ── Trim route ahead of driver (remove already-traveled portion) ──
-    const trimmedRouteCoords = useMemo(() => {
-        if (!routeCoords || routeCoords.length < 2 || !effectiveLocation) return routeCoords;
-        if (!isSimulating) return routeCoords;
-
-        const driverLon = effectiveLocation.longitude;
-        const driverLat = effectiveLocation.latitude;
-
-        // Find the closest point on the route
-        let closestIdx = 0;
-        let closestDist = Infinity;
-        for (let i = 0; i < routeCoords.length; i++) {
-            const [lon, lat] = routeCoords[i]!;
-            const d = (lon - driverLon) ** 2 + (lat - driverLat) ** 2;
-            if (d < closestDist) {
-                closestDist = d;
-                closestIdx = i;
-            }
-        }
-
-        // Keep from closest point onward, prepend driver's current position
-        const remaining = routeCoords.slice(closestIdx);
-        return [[driverLon, driverLat] as [number, number], ...remaining];
-    }, [routeCoords, effectiveLocation?.latitude, effectiveLocation?.longitude, isSimulating]);
-
     // ── GeoJSON shapes for route lines ──
     const routeShape = useMemo<Feature<LineString> | null>(() => {
-        const coords = trimmedRouteCoords;
+        const coords = routeCoords;
         if (!coords || coords.length < 2) return null;
         return {
             type: 'Feature',
             properties: {},
             geometry: { type: 'LineString', coordinates: coords },
         };
-    }, [trimmedRouteCoords]);
+    }, [routeCoords]);
 
     const previewRouteShape = useMemo<Feature<LineString> | null>(() => {
         if (!previewRouteCoords || previewRouteCoords.length < 2) return null;
@@ -261,17 +225,17 @@ export default function MapScreen() {
         setFocusedOrderId(order.id);
 
         // OUT_FOR_DELIVERY: show driver + dropoff only
-        if (order.status === 'OUT_FOR_DELIVERY' && dropLoc && effectiveLocation) {
-            const lats = [Number(dropLoc.latitude), effectiveLocation.latitude];
-            const lngs = [Number(dropLoc.longitude), effectiveLocation.longitude];
+        if (order.status === 'OUT_FOR_DELIVERY' && dropLoc && location) {
+            const lats = [Number(dropLoc.latitude), location.latitude];
+            const lngs = [Number(dropLoc.longitude), location.longitude];
             const ne: [number, number] = [Math.max(...lngs) + 0.005, Math.max(...lats) + 0.005];
             const sw: [number, number] = [Math.min(...lngs) - 0.005, Math.min(...lats) - 0.005];
 
             cameraRef.current?.fitBounds(ne, sw, [60, 60, 120, 60], 1200);
-        } else if (bizLoc && dropLoc && effectiveLocation) {
+        } else if (bizLoc && dropLoc && location) {
             // Not delivering yet: show driver + pickup + dropoff (3 points)
-            const lats = [effectiveLocation.latitude, Number(bizLoc.latitude), Number(dropLoc.latitude)];
-            const lngs = [effectiveLocation.longitude, Number(bizLoc.longitude), Number(dropLoc.longitude)];
+            const lats = [location.latitude, Number(bizLoc.latitude), Number(dropLoc.latitude)];
+            const lngs = [location.longitude, Number(bizLoc.longitude), Number(dropLoc.longitude)];
             const ne: [number, number] = [Math.max(...lngs) + 0.005, Math.max(...lats) + 0.005];
             const sw: [number, number] = [Math.min(...lngs) - 0.005, Math.min(...lats) - 0.005];
 
@@ -284,113 +248,61 @@ export default function MapScreen() {
                 animationDuration: 1200,
             });
         }
-    }, [effectiveLocation]);
-
-    // ── Recenter on driver ──
-    const recenterOnDriver = useCallback(() => {
-        if (effectiveLocation) {
-            cameraRef.current?.setCamera({
-                centerCoordinate: [effectiveLocation.longitude, effectiveLocation.latitude],
-                animationMode: 'flyTo',
-                animationDuration: 800,
-            });
-        }
-    }, [effectiveLocation]);
+    }, [location]);
 
     const toggleFollowDriver = useCallback(() => {
         if (followDriver) {
             setFollowDriver(false);
         } else {
             setFollowDriver(true);
-            if (effectiveLocation) {
+            if (location) {
                 cameraRef.current?.setCamera({
-                    centerCoordinate: [effectiveLocation.longitude, effectiveLocation.latitude],
+                    centerCoordinate: [location.longitude, location.latitude],
                     animationDuration: 600,
                 });
             }
         }
-    }, [followDriver, effectiveLocation]);
+    }, [followDriver, location]);
 
-    const handleStartSimulation = useCallback(() => {
-        if (isSimulating) {
-            stopSimulation();
-            setFollowDriver(false);
-            // Zoom back out to overview
-            if (effectiveLocation) {
-                cameraRef.current?.setCamera({
-                    centerCoordinate: [effectiveLocation.longitude, effectiveLocation.latitude],
-                    zoomLevel: 14.5,
-                    pitch: 0,
-                    heading: 0,
-                    animationDuration: 800,
-                });
-            }
-            return;
-        }
-        if (routeCoords && routeCoords.length >= 2) {
-            startSimulation(routeCoords);
-            setFollowDriver(true);
-            // Set initial navigation view
-            if (effectiveLocation) {
-                cameraRef.current?.setCamera({
-                    centerCoordinate: [effectiveLocation.longitude, effectiveLocation.latitude],
-                    zoomLevel: 17.5,
-                    pitch: 55,
-                    heading: effectiveLocation.heading ?? 0,
-                    animationDuration: 600,
-                });
-            }
-        }
-    }, [isSimulating, routeCoords, startSimulation, stopSimulation, effectiveLocation]);
-
-    // ── Open external navigation (Google Maps / Apple Maps) ──
-    const openExternalNavigation = useCallback(async () => {
-        if (!focusedOrder || !effectiveLocation) return;
+    // ── Launch Mapbox Navigation SDK ──
+    const handleStartNavigation = useCallback(() => {
+        if (!focusedOrder || !location) return;
         const bizLoc = focusedOrder.businesses?.[0]?.business?.location;
         const dropLoc = focusedOrder.dropOffLocation;
         if (!bizLoc) return;
 
-        const origin = `${effectiveLocation.latitude},${effectiveLocation.longitude}`;
-        const pickup = `${Number(bizLoc.latitude)},${Number(bizLoc.longitude)}`;
-        const dropoff = dropLoc ? `${Number(dropLoc.latitude)},${Number(dropLoc.longitude)}` : null;
-
-        let destination: string;
-        let waypoint: string | null = null;
-
-        if (focusedOrder.status === 'OUT_FOR_DELIVERY' && dropoff) {
-            destination = dropoff;
-        } else if (dropoff) {
-            destination = dropoff;
-            waypoint = pickup;
-        } else {
-            destination = pickup;
-        }
-
-        const base = 'https://www.google.com/maps/dir/?api=1';
-        const googleUrl = waypoint
-            ? `${base}&origin=${origin}&destination=${destination}&waypoints=${waypoint}&travelmode=driving&dir_action=navigate`
-            : `${base}&origin=${origin}&destination=${destination}&travelmode=driving&dir_action=navigate`;
-
-        const googleScheme = waypoint
-            ? `comgooglemaps://?saddr=${origin}&daddr=${destination}&waypoints=${waypoint}&directionsmode=driving`
-            : `comgooglemaps://?saddr=${origin}&daddr=${destination}&directionsmode=driving`;
-
-        if (Platform.OS === 'ios') {
-            const canOpenGoogle = await Linking.canOpenURL('comgooglemaps://');
-            if (canOpenGoogle) {
-                await Linking.openURL(googleScheme);
-                return;
+        const pickup = {
+            latitude: Number(bizLoc.latitude),
+            longitude: Number(bizLoc.longitude),
+            label: focusedOrder.businesses?.[0]?.business?.name ?? 'Pickup',
+        };
+        const dropoff = dropLoc
+            ? {
+                latitude: Number(dropLoc.latitude),
+                longitude: Number(dropLoc.longitude),
+                label: dropLoc.address ?? 'Drop-off',
             }
-            const appleUrl = waypoint
-                ? `maps://?saddr=${origin}&daddr=${waypoint}+to:${destination}&dirflg=d`
-                : `maps://?saddr=${origin}&daddr=${destination}&dirflg=d`;
-            await Linking.openURL(appleUrl);
-            return;
-        }
+            : null;
+        const customerName = focusedOrder.user
+            ? `${focusedOrder.user.firstName} ${focusedOrder.user.lastName}`
+            : 'Customer';
 
-        const canOpenGoogle = await Linking.canOpenURL(googleScheme);
-        await Linking.openURL(canOpenGoogle ? googleScheme : googleUrl);
-    }, [focusedOrder, effectiveLocation]);
+        const navOrder = {
+            id: focusedOrder.id,
+            status: focusedOrder.status,
+            businessName: focusedOrder.businesses?.[0]?.business?.name ?? 'Business',
+            customerName,
+            pickup,
+            dropoff,
+        };
+
+        const phase: NavigationPhase =
+            focusedOrder.status === 'OUT_FOR_DELIVERY' ? 'to_dropoff' : 'to_pickup';
+
+        const origin = { latitude: location.latitude, longitude: location.longitude };
+        startNavigation(navOrder, phase, origin);
+        router.push('/navigation' as any);
+    }, [focusedOrder, location, startNavigation, router]);
 
     // ── Initial camera center ──
     const initialCenter = useMemo<[number, number]>(() => {
@@ -424,11 +336,9 @@ export default function MapScreen() {
                         ne: GJILAN_NE,
                         sw: GJILAN_SW,
                     }}
-                    {...(followDriver && effectiveLocation ? {
-                        centerCoordinate: [effectiveLocation.longitude, effectiveLocation.latitude],
-                        pitch: isSimulating ? 55 : undefined,
-                        heading: isSimulating ? smoothedHeadingRef.current : undefined,
-                        animationDuration: isSimulating ? 250 : 300,
+                    {...(followDriver && location ? {
+                        centerCoordinate: [location.longitude, location.latitude],
+                        animationDuration: 300,
                         animationMode: 'easeTo' as const,
                     } : {})}
                 />
@@ -495,10 +405,10 @@ export default function MapScreen() {
                 )}
 
                 {/* Driver position */}
-                {effectiveLocation && (
+                {location && (
                     <Mapbox.PointAnnotation
                         id="driver-location"
-                        coordinate={[effectiveLocation.longitude, effectiveLocation.latitude]}
+                        coordinate={[location.longitude, location.latitude]}
                     >
                         <View style={styles.driverDot} />
                     </Mapbox.PointAnnotation>
@@ -569,26 +479,6 @@ export default function MapScreen() {
 
             {/* ═══ Right-side buttons ═══ */}
             <View style={[styles.rightButtons, { bottom: focusedOrder ? 100 + insets.bottom : 20 + insets.bottom }]}>
-                {/* Simulate button */}
-                <Pressable
-                    style={[
-                        styles.mapBtn,
-                        isSimulating && styles.mapBtnActive,
-                        !(routeCoords && routeCoords.length >= 2) && !isSimulating && { opacity: 0.35 },
-                    ]}
-                    onPress={handleStartSimulation}
-                    disabled={!(routeCoords && routeCoords.length >= 2) && !isSimulating}
-                >
-                    <Ionicons
-                        name={isSimulating ? 'stop-circle' : 'play-circle'}
-                        size={22}
-                        color={isSimulating ? '#EF4444' : '#22C55E'}
-                    />
-                    <Text style={[styles.mapBtnLabel, { color: isSimulating ? '#EF4444' : '#22C55E' }]}>
-                        {isSimulating ? 'Stop' : 'Sim'}
-                    </Text>
-                </Pressable>
-
                 {/* Lock camera button */}
                 <Pressable
                     style={[styles.mapBtn, followDriver && styles.mapBtnActive]}
@@ -701,10 +591,10 @@ export default function MapScreen() {
                         </View>
                         <Pressable
                             style={[styles.focusedNavBtn, { backgroundColor: 'rgba(255,255,255,0.25)' }]}
-                            onPress={handleStartSimulation}
+                            onPress={handleStartNavigation}
                             hitSlop={8}
                         >
-                            <Ionicons name={isSimulating ? 'stop-circle' : 'navigate'} size={20} color="#fff" />
+                            <Ionicons name="navigate" size={20} color="#fff" />
                         </Pressable>
                         <Pressable
                             style={styles.focusedCloseBtn}
@@ -818,11 +708,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#EFF6FF',
         borderWidth: 1.5,
         borderColor: '#4285F4',
-    },
-    mapBtnLabel: {
-        fontSize: 9,
-        fontWeight: '700',
-        marginTop: -2,
     },
 
     /* ── Discord-style avatar sidebar ── */
