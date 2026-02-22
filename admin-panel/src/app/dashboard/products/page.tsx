@@ -22,15 +22,15 @@ interface GetBusinessesData {
 export default function ProductsPage() {
     const [selectedBusinessId, setSelectedBusinessId] = useState<string>("");
     const { admin } = useAuth();
-    const isBusinessAdmin = admin?.role === "BUSINESS_ADMIN";
+    const isBusinessOwner = admin?.role === "BUSINESS_OWNER";
     const { data, loading } = useQuery<GetBusinessesData>(GET_BUSINESSES, {
-        skip: isBusinessAdmin,
+        skip: isBusinessOwner,
     });
 
     const businesses = data?.businesses || [];
     const effectiveBusinessId = useMemo(
-        () => (isBusinessAdmin ? admin?.businessId ?? "" : selectedBusinessId),
-        [admin?.businessId, isBusinessAdmin, selectedBusinessId]
+        () => (isBusinessOwner ? admin?.businessId ?? "" : selectedBusinessId),
+        [admin?.businessId, isBusinessOwner, selectedBusinessId]
     );
 
     if (loading) {
@@ -44,7 +44,7 @@ export default function ProductsPage() {
             </div>
 
             {/* Business Selector (Super Admin only) */}
-            {!isBusinessAdmin && (
+            {!isBusinessOwner && (
                 <div className="mb-6 bg-gray-900 border border-gray-800 rounded-xl p-6">
                     <label className="block text-sm font-medium text-gray-400 mb-2">
                         Select a Business
@@ -70,7 +70,7 @@ export default function ProductsPage() {
             ) : (
                 <div className="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center">
                     <p className="text-gray-400">
-                        {isBusinessAdmin
+                        {isBusinessOwner
                             ? "Your business profile is missing a business ID."
                             : "Please select a business to view and manage its products"}
                     </p>

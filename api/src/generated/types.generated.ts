@@ -382,6 +382,7 @@ export type Mutation = {
   createProductCategory: ProductCategory;
   createProductSubcategory: ProductSubcategory;
   createPromotion: Promotion;
+  createTestOrder: Order;
   createUser: AuthResponse;
   deductWalletCredit: WalletTransaction;
   deleteBusiness: Scalars['Boolean']['output'];
@@ -408,6 +409,7 @@ export type Mutation = {
   resendEmailVerification: SignupStepResponse;
   setBusinessSchedule: Array<BusinessDayHours>;
   setDefaultAddress: Scalars['Boolean']['output'];
+  setUserPermissions: User;
   submitPhoneNumber: SignupStepResponse;
   unsettleSettlement: Settlement;
   updateBusiness: Business;
@@ -603,6 +605,12 @@ export type MutationsetBusinessScheduleArgs = {
 
 export type MutationsetDefaultAddressArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type MutationsetUserPermissionsArgs = {
+  permissions: Array<UserPermission>;
+  userId: Scalars['ID']['input'];
 };
 
 
@@ -1324,6 +1332,7 @@ export type User = {
   isOnline: Scalars['Boolean']['output'];
   lastName: Scalars['String']['output'];
   maxActiveOrders?: Maybe<Scalars['Int']['output']>;
+  permissions: Array<UserPermission>;
   phoneNumber?: Maybe<Scalars['String']['output']>;
   phoneVerified: Scalars['Boolean']['output'];
   referralCode?: Maybe<Scalars['String']['output']>;
@@ -1359,6 +1368,15 @@ export type UserBehavior = {
   userId: Scalars['ID']['output'];
 };
 
+export type UserPermission =
+  | 'manage_orders'
+  | 'manage_products'
+  | 'manage_settings'
+  | 'view_analytics'
+  | 'view_finances'
+  | 'view_orders'
+  | 'view_products';
+
 export type UserPromoMetadata = {
   __typename?: 'UserPromoMetadata';
   hasUsedFirstOrderPromo: Scalars['Boolean']['output'];
@@ -1382,7 +1400,9 @@ export type UserPromotion = {
 };
 
 export type UserRole =
-  | 'BUSINESS_ADMIN'
+  | 'ADMIN'
+  | 'BUSINESS_EMPLOYEE'
+  | 'BUSINESS_OWNER'
   | 'CUSTOMER'
   | 'DRIVER'
   | 'SUPER_ADMIN';
@@ -1581,12 +1601,13 @@ export type ResolversTypes = {
   UpdateStoreStatusInput: UpdateStoreStatusInput;
   UpdateUserAddressInput: UpdateUserAddressInput;
   UpdateUserInput: UpdateUserInput;
-  User: ResolverTypeWrapper<Omit<User, 'business' | 'driverConnection' | 'role' | 'signupStep'> & { business?: Maybe<ResolversTypes['Business']>, driverConnection?: Maybe<ResolversTypes['DriverConnection']>, role: ResolversTypes['UserRole'], signupStep: ResolversTypes['SignupStep'] }>;
+  User: ResolverTypeWrapper<Omit<User, 'business' | 'driverConnection' | 'permissions' | 'role' | 'signupStep'> & { business?: Maybe<ResolversTypes['Business']>, driverConnection?: Maybe<ResolversTypes['DriverConnection']>, permissions: Array<ResolversTypes['UserPermission']>, role: ResolversTypes['UserRole'], signupStep: ResolversTypes['SignupStep'] }>;
   UserAddress: ResolverTypeWrapper<UserAddress>;
   UserBehavior: ResolverTypeWrapper<UserBehavior>;
+  UserPermission: ResolverTypeWrapper<'view_orders' | 'manage_orders' | 'view_products' | 'manage_products' | 'view_finances' | 'manage_settings' | 'view_analytics'>;
   UserPromoMetadata: ResolverTypeWrapper<Omit<UserPromoMetadata, 'user'> & { user?: Maybe<ResolversTypes['User']> }>;
   UserPromotion: ResolverTypeWrapper<Omit<UserPromotion, 'promotion' | 'user'> & { promotion?: Maybe<ResolversTypes['Promotion']>, user?: Maybe<ResolversTypes['User']> }>;
-  UserRole: ResolverTypeWrapper<'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN' | 'BUSINESS_ADMIN'>;
+  UserRole: ResolverTypeWrapper<'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN' | 'ADMIN' | 'BUSINESS_OWNER' | 'BUSINESS_EMPLOYEE'>;
   UserWallet: ResolverTypeWrapper<UserWallet>;
   VerifyEmailInput: VerifyEmailInput;
   VerifyPhoneInput: VerifyPhoneInput;
@@ -1824,6 +1845,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   createProductCategory?: Resolver<ResolversTypes['ProductCategory'], ParentType, ContextType, RequireFields<MutationcreateProductCategoryArgs, 'input'>>;
   createProductSubcategory?: Resolver<ResolversTypes['ProductSubcategory'], ParentType, ContextType, RequireFields<MutationcreateProductSubcategoryArgs, 'input'>>;
   createPromotion?: Resolver<ResolversTypes['Promotion'], ParentType, ContextType, RequireFields<MutationcreatePromotionArgs, 'input'>>;
+  createTestOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType>;
   createUser?: Resolver<ResolversTypes['AuthResponse'], ParentType, ContextType, RequireFields<MutationcreateUserArgs, 'input'>>;
   deductWalletCredit?: Resolver<ResolversTypes['WalletTransaction'], ParentType, ContextType, RequireFields<MutationdeductWalletCreditArgs, 'amount' | 'orderId' | 'userId'>>;
   deleteBusiness?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteBusinessArgs, 'id'>>;
@@ -1845,6 +1867,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   resendEmailVerification?: Resolver<ResolversTypes['SignupStepResponse'], ParentType, ContextType>;
   setBusinessSchedule?: Resolver<Array<ResolversTypes['BusinessDayHours']>, ParentType, ContextType, RequireFields<MutationsetBusinessScheduleArgs, 'businessId' | 'schedule'>>;
   setDefaultAddress?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationsetDefaultAddressArgs, 'id'>>;
+  setUserPermissions?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationsetUserPermissionsArgs, 'permissions' | 'userId'>>;
   submitPhoneNumber?: Resolver<ResolversTypes['SignupStepResponse'], ParentType, ContextType, RequireFields<MutationsubmitPhoneNumberArgs, 'input'>>;
   unsettleSettlement?: Resolver<ResolversTypes['Settlement'], ParentType, ContextType, RequireFields<MutationunsettleSettlementArgs, 'settlementId'>>;
   updateBusiness?: Resolver<ResolversTypes['Business'], ParentType, ContextType, RequireFields<MutationupdateBusinessArgs, 'id' | 'input'>>;
@@ -2170,6 +2193,7 @@ export type UserResolvers<ContextType = GraphQLContext, ParentType extends Resol
   isOnline?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   lastName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   maxActiveOrders?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
+  permissions?: Resolver<Array<ResolversTypes['UserPermission']>, ParentType, ContextType>;
   phoneNumber?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   phoneVerified?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   referralCode?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
@@ -2206,6 +2230,8 @@ export type UserBehaviorResolvers<ContextType = GraphQLContext, ParentType exten
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
+export type UserPermissionResolvers = EnumResolverSignature<{ manage_orders?: any, manage_products?: any, manage_settings?: any, view_analytics?: any, view_finances?: any, view_orders?: any, view_products?: any }, ResolversTypes['UserPermission']>;
+
 export type UserPromoMetadataResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['UserPromoMetadata'] = ResolversParentTypes['UserPromoMetadata']> = {
   hasUsedFirstOrderPromo?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   lastPromoUsedAt?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
@@ -2228,7 +2254,7 @@ export type UserPromotionResolvers<ContextType = GraphQLContext, ParentType exte
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
-export type UserRoleResolvers = EnumResolverSignature<{ BUSINESS_ADMIN?: any, CUSTOMER?: any, DRIVER?: any, SUPER_ADMIN?: any }, ResolversTypes['UserRole']>;
+export type UserRoleResolvers = EnumResolverSignature<{ ADMIN?: any, BUSINESS_EMPLOYEE?: any, BUSINESS_OWNER?: any, CUSTOMER?: any, DRIVER?: any, SUPER_ADMIN?: any }, ResolversTypes['UserRole']>;
 
 export type UserWalletResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['UserWallet'] = ResolversParentTypes['UserWallet']> = {
   balance?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
@@ -2311,6 +2337,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   User?: UserResolvers<ContextType>;
   UserAddress?: UserAddressResolvers<ContextType>;
   UserBehavior?: UserBehaviorResolvers<ContextType>;
+  UserPermission?: UserPermissionResolvers;
   UserPromoMetadata?: UserPromoMetadataResolvers<ContextType>;
   UserPromotion?: UserPromotionResolvers<ContextType>;
   UserRole?: UserRoleResolvers;

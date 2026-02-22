@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             // Only allow admins to access admin panel
             const userRole = loginResult.user?.role;
-            if (userRole !== "BUSINESS_ADMIN" && userRole !== "SUPER_ADMIN") {
+            if (userRole !== "BUSINESS_OWNER" && userRole !== "BUSINESS_EMPLOYEE" && userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
                 throw new Error("Access denied. Only administrators can access this panel.");
             }
 

@@ -27,4 +27,6 @@ export async function getDB() {
     return db;
 }
 
+// Export db instance for permission checking
+export { db };
 export type DbType = typeof db;

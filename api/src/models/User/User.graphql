@@ -10,7 +10,19 @@ enum UserRole {
     CUSTOMER
     DRIVER
     SUPER_ADMIN
-    BUSINESS_ADMIN
+    ADMIN
+    BUSINESS_OWNER
+    BUSINESS_EMPLOYEE
+}
+
+enum UserPermission {
+    view_orders
+    manage_orders
+    view_products
+    manage_products
+    view_finances
+    manage_settings
+    view_analytics
 }
 
 type User {
@@ -33,6 +45,7 @@ type User {
     driverLocation: Location
     driverLocationUpdatedAt: Date
     referralCode: String
+    permissions: [UserPermission!]!
 }
 
 type UserBehavior {
@@ -151,6 +164,7 @@ type Mutation {
     updateUser(input: UpdateUserInput!): User!
     deleteUser(id: ID!): Boolean!
     updateUserNote(userId: ID!, note: String, flagColor: String): User!
+    setUserPermissions(userId: ID!, permissions: [UserPermission!]!): User!
     updateDriverLocation(latitude: Float!, longitude: Float!): User!
     adminUpdateDriverLocation(driverId: ID!, latitude: Float!, longitude: Float!): User!
     updateDriverOnlineStatus(isOnline: Boolean!): User!

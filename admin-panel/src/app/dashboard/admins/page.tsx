@@ -3,7 +3,7 @@
 import { useState, FormEvent, useMemo } from "react";
 import { useQuery, useMutation } from "@apollo/client/react";
 import { USERS_QUERY } from "@/graphql/operations/users/queries";
-import { CREATE_USER_MUTATION, UPDATE_USER_MUTATION, DELETE_USER_MUTATION } from "@/graphql/operations/users/mutations";
+import { CREATE_USER_MUTATION, UPDATE_USER_MUTATION, DELETE_USER_MUTATION, SET_USER_PERMISSIONS } from "@/graphql/operations/users/mutations";
 import { GET_BUSINESSES } from "@/graphql/operations/businesses/queries";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -12,6 +12,8 @@ import { Table, Th, Td } from "@/components/ui/Table";
 import Modal from "@/components/ui/Modal";
 import { useAuth } from "@/lib/auth-context";
 import { Pencil, Trash2, Building2, UserCog, AlertCircle } from "lucide-react";
+import { PermissionSelector } from "@/components/dashboard/PermissionSelector";
+import { UserPermission } from "@/gql/graphql";
 
 interface UserItem {
     id: string;
@@ -19,6 +21,7 @@ interface UserItem {
     firstName: string;
     lastName: string;
     role: string;
+    permissions?: UserPermission[];
     business?: {
         id: string;
         name: string;
@@ -70,6 +73,8 @@ export default function AdminsPage() {
             refetch();
         },
     });
+    
+    const [setUserPermissions] = useMutation(SET_USER_PERMISSIONS);
 
     const [showModal, setShowModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -81,8 +86,9 @@ export default function AdminsPage() {
         password: "",
         firstName: "",
         lastName: "",
-        role: "BUSINESS_ADMIN",
+        role: "BUSINESS_OWNER",
         businessId: "",
+        permissions: [] as UserPermission[],
     });
 
     const [formError, setFormError] = useState("");
@@ -97,6 +103,7 @@ export default function AdminsPage() {
             lastName: user.lastName,
             role: user.role,
             businessId: user.business?.id || "",
+            permissions: user.permissions || [],
         });
         setShowModal(true);
     };
@@ -125,7 +132,7 @@ export default function AdminsPage() {
     const handleCloseModal = () => {
         setShowModal(false);
         setEditingUser(null);
-        setFormData({ email: "", password: "", firstName: "", lastName: "", role: "BUSINESS_ADMIN", businessId: "" });
+        setFormData({ email: "", password: "", firstName: "", lastName: "", role: "BUSINESS_OWNER", businessId: "", permissions: [] });
         setFormError("");
         setFormSuccess("");
     };
@@ -144,15 +151,36 @@ export default function AdminsPage() {
                         firstName: formData.firstName,
                         lastName: formData.lastName,
                         role: formData.role,
-                        businessId: formData.role === 'BUSINESS_ADMIN' ? formData.businessId : null,
+                        businessId: (formData.role === 'BUSINESS_OWNER' || formData.role === 'BUSINESS_EMPLOYEE') ? formData.businessId : null,
                     },
                 });
+                
+                // If updating a business employee, update their permissions
+                if (formData.role === 'BUSINESS_EMPLOYEE') {
+                    await setUserPermissions({
+                        variables: {
+                            userId: editingUser.id,
+                            permissions: formData.permissions,
+                        },
+                    });
+                }
+                
                 setFormSuccess("Admin updated successfully");
                 setTimeout(() => {
                     handleCloseModal();
                 }, 1000);
             } else {
                 // Create new admin
+                console.log('[DEBUG] Creating admin with data:', {
+                    email: formData.email,
+                    password: formData.password, // TEMPORARY: Log actual password for debugging
+                    passwordLength: formData.password.length,
+                    firstName: formData.firstName,
+                    lastName: formData.lastName,
+                    role: formData.role,
+                    businessId: (formData.role === 'BUSINESS_OWNER' || formData.role === 'BUSINESS_EMPLOYEE') ? formData.businessId : null,
+                });
+                
                 const { data: created } = await createUser({
                     variables: {
                         email: formData.email,
@@ -160,16 +188,31 @@ export default function AdminsPage() {
                         firstName: formData.firstName,
                         lastName: formData.lastName,
                         role: formData.role,
-                        businessId: formData.role === 'BUSINESS_ADMIN' ? formData.businessId : null,
+                        businessId: (formData.role === 'BUSINESS_OWNER' || formData.role === 'BUSINESS_EMPLOYEE') ? formData.businessId : null,
                     },
                 });
 
+                console.log('[DEBUG] User created successfully:', created?.createUser?.user);
+
+                // If creating a business employee, set their permissions
+                if (formData.role === 'BUSINESS_EMPLOYEE' && created?.createUser?.user?.id) {
+                    await setUserPermissions({
+                        variables: {
+                            userId: created.createUser.user.id,
+                            permissions: formData.permissions,
+                        },
+                    });
+                }
+
                 if (created && created.createUser) {
-                    setFormSuccess(created.createUser.message || "Admin created successfully");
+                    const successMessage = `${created.createUser.message || "Admin created successfully"}. Email: ${formData.email}`;
+                    console.log('[DEBUG] Success message:', successMessage);
+                    setFormSuccess(successMessage);
                     handleCloseModal();
                 }
             }
         } catch (err) {
+            console.error('[DEBUG] Error creating/updating admin:', err);
             setFormError(err instanceof Error ? err.message : "Failed to " + (editingUser ? "update" : "create") + " admin");
         }
     };
@@ -179,16 +222,17 @@ export default function AdminsPage() {
         setFormData((prev) => ({ ...prev, [name]: value }));
     };
 
-    // Filter business admins and super admins
+    // Filter all admin roles (SUPER_ADMIN, ADMIN, BUSINESS_OWNER, BUSINESS_EMPLOYEE)
     const admins = useMemo(() => {
         if (!data?.users) return [];
         
-        let filtered = data.users.filter(user => user.role === "BUSINESS_ADMIN" || user.role === "SUPER_ADMIN");
+        const adminRoles = ["SUPER_ADMIN", "ADMIN", "BUSINESS_OWNER", "BUSINESS_EMPLOYEE"];
+        let filtered = data.users.filter(user => adminRoles.includes(user.role));
         
-        // Apply business filter (only applies to business admins)
+        // Apply business filter (only applies to business roles)
         if (selectedBusiness !== "all") {
             filtered = filtered.filter(user => 
-                user.role === "SUPER_ADMIN" || user.business?.id === selectedBusiness
+                user.role === "SUPER_ADMIN" || user.role === "ADMIN" || user.business?.id === selectedBusiness
             );
         }
         
@@ -203,7 +247,7 @@ export default function AdminsPage() {
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h1 className="text-3xl font-bold text-white mb-2">Admins</h1>
-                    <p className="text-gray-400">Manage business and super administrators</p>
+                    <p className="text-gray-400">Manage platform admins and business users</p>
                 </div>
                 {isSuperAdmin && (
                     <Button onClick={() => setShowModal(true)}>
@@ -270,9 +314,16 @@ export default function AdminsPage() {
                                 <span className={`px-3 py-1 rounded-full text-xs font-medium border ${
                                     admin.role === 'SUPER_ADMIN' 
                                         ? 'bg-purple-500/10 text-purple-400 border-purple-500/30'
-                                        : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
+                                        : admin.role === 'ADMIN'
+                                        ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30'
+                                        : admin.role === 'BUSINESS_OWNER'
+                                        ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
+                                        : 'bg-teal-500/10 text-teal-400 border-teal-500/30'
                                 }`}>
-                                    {admin.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Business Admin'}
+                                    {admin.role === 'SUPER_ADMIN' ? 'Super Admin' 
+                                        : admin.role === 'ADMIN' ? 'Admin'
+                                        : admin.role === 'BUSINESS_OWNER' ? 'Business Owner'
+                                        : 'Business Employee'}
                                 </span>
                             </Td>
                             <Td>
@@ -330,17 +381,27 @@ export default function AdminsPage() {
 
             {/* Modal for Create/Edit Admin */}
             {showModal && (
-                <Modal isOpen={showModal} onClose={handleCloseModal} title={editingUser ? "Edit Admin" : "Add Admin"}>
+                <Modal 
+                    isOpen={showModal} 
+                    onClose={handleCloseModal} 
+                    title={editingUser ? "Edit Admin" : "Create New Admin"}
+                >
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">Admin Type *</label>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Role Type *</label>
                             <Select name="role" value={formData.role} onChange={handleInputChange} required>
-                                <option value="BUSINESS_ADMIN">Business Admin</option>
-                                <option value="SUPER_ADMIN">Super Admin</option>
+                                <optgroup label="Platform Roles">
+                                    <option value="SUPER_ADMIN">Super Admin (Full system access)</option>
+                                    <option value="ADMIN">Admin (Platform management)</option>
+                                </optgroup>
+                                <optgroup label="Business Roles">
+                                    <option value="BUSINESS_OWNER">Business Owner (Full business access)</option>
+                                    <option value="BUSINESS_EMPLOYEE">Business Employee (Limited access)</option>
+                                </optgroup>
                             </Select>
                         </div>
 
-                        {formData.role === 'BUSINESS_ADMIN' && (
+                        {(formData.role === 'BUSINESS_OWNER' || formData.role === 'BUSINESS_EMPLOYEE') && (
                             <div>
                                 <label className="block text-sm font-medium text-gray-300 mb-2">Business *</label>
                                 <Select name="businessId" value={formData.businessId} onChange={handleInputChange} required>
@@ -351,7 +412,18 @@ export default function AdminsPage() {
                                         </option>
                                     ))}
                                 </Select>
-                                <p className="text-xs text-gray-500 mt-1">Required for Business Admin</p>
+                                <p className="text-xs text-gray-500 mt-1">Required for business roles</p>
+                            </div>
+                        )}
+                        
+                        {/* Permission Selector for Business Employees */}
+                        {formData.role === 'BUSINESS_EMPLOYEE' && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-3">Employee Permissions *</label>
+                                <PermissionSelector
+                                    selectedPermissions={formData.permissions}
+                                    onChange={(permissions) => setFormData({ ...formData, permissions })}
+                                />
                             </div>
                         )}
 

@@ -112,3 +112,12 @@ export const UPDATE_DRIVER_ONLINE_STATUS = graphql(`
     }
   }
 `);
+
+export const SET_USER_PERMISSIONS = graphql(`
+  mutation SetUserPermissions($userId: ID!, $permissions: [UserPermission!]!) {
+    setUserPermissions(userId: $userId, permissions: $permissions) {
+      id
+      permissions
+    }
+  }
+`);

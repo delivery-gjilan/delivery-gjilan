@@ -261,7 +261,7 @@ export default function Home() {
                 refetchMetrics();
             }
             if (status === 'OUT_FOR_DELIVERY') {
-                router.push({ pathname: '/order-map', params: { orderId: id } });
+                router.push({ pathname: '/(tabs)/map' });
             }
         } catch (err) {
             console.error(err);
@@ -295,8 +295,8 @@ export default function Home() {
         [activeOrders],
     );
 
-    const openOrderMap = (id: string) => {
-        router.push({ pathname: '/order-map', params: { orderId: id } });
+    const openOrderMap = (_id: string) => {
+        router.push({ pathname: '/(tabs)/map' });
     };
 
     return (
@@ -479,7 +479,7 @@ export default function Home() {
                                 style={{ backgroundColor: theme.colors.primary }}
                                 onPress={() => {
                                     if (!selectedOrder) return;
-                                    router.push({ pathname: '/order-map', params: { orderId: selectedOrder.id } });
+                                    router.push({ pathname: '/(tabs)/map' });
                                 }}
                             >
                                 <Text className="text-white font-semibold">Show location</Text>

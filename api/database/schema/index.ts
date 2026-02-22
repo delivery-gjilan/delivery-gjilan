@@ -6,6 +6,7 @@ export * from './products';
 export * from './productCategories';
 export * from './productSubcategories';
 export * from './users';
+export * from './userPermissions';
 export * from './drivers';
 export * from './settlements';
 export * from './auditLogs';

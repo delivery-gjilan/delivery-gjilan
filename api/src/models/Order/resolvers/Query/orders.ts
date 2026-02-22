@@ -24,9 +24,14 @@ export const orders: NonNullable<QueryResolvers['orders']> = async (_parent, _ar
         case 'CUSTOMER':
             return allOrders.filter(order => order.userId === userData.userId);
 
-        case 'BUSINESS_ADMIN':
+        case 'ADMIN':
+            // Platform admins can see all orders
+            return allOrders;
+
+        case 'BUSINESS_OWNER':
+        case 'BUSINESS_EMPLOYEE':
             if (!userData.businessId) {
-                throw new GraphQLError('Business admin must be associated with a business', {
+                throw new GraphQLError('Business user must be associated with a business', {
                     extensions: { code: 'FORBIDDEN' },
                 });
             }

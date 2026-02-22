@@ -102,8 +102,8 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
     }
     
     // Log the action
-    const logger = createAuditLogger(db, context);
-    await logger.log({
+    const auditLog = createAuditLogger(db, context);
+    await auditLog.log({
         action: 'ORDER_ASSIGNED',
         entityType: 'ORDER',
         entityId: id,

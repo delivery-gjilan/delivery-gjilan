@@ -1,5 +1,7 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { createAuditLogger } from '@/services/AuditLogger';
+import { hasPermission } from '@/lib/utils/permissions';
+import { GraphQLError } from 'graphql';
 
 export const updateBusiness: NonNullable<MutationResolvers['updateBusiness']> = async (
     _parent,
@@ -7,6 +9,25 @@ export const updateBusiness: NonNullable<MutationResolvers['updateBusiness']> = 
     context,
 ) => {
     const { businessService, db } = context;
+    const { userId, role, businessId } = context;
+    
+    // Check if user has permission to manage business settings
+    if (role === 'BUSINESS_EMPLOYEE') {
+        const canManage = await hasPermission({ userId, role, businessId }, 'manage_settings');
+        if (!canManage) {
+            throw new GraphQLError('You do not have permission to manage business settings', {
+                extensions: { code: 'FORBIDDEN' },
+            });
+        }
+        
+        // Business employees can only manage their own business
+        if (id !== businessId) {
+            throw new GraphQLError('You can only manage your own business settings', {
+                extensions: { code: 'FORBIDDEN' },
+            });
+        }
+    }
+    
     const oldBusiness = await businessService.getBusiness(id);
     const result = await businessService.updateBusiness(id, input);
     

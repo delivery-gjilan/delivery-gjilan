@@ -382,6 +382,7 @@ type Mutation {
   createProductCategory(input: CreateProductCategoryInput!): ProductCategory!
   createProductSubcategory(input: CreateProductSubcategoryInput!): ProductSubcategory!
   createPromotion(input: CreatePromotionInput!): Promotion!
+  createTestOrder: Order!
   createUser(input: CreateUserInput!): AuthResponse!
   deductWalletCredit(amount: Float!, orderId: ID!, userId: ID!): WalletTransaction!
   deleteBusiness(id: ID!): Boolean!
@@ -409,6 +410,7 @@ type Mutation {
   resendEmailVerification: SignupStepResponse!
   setBusinessSchedule(businessId: ID!, schedule: [BusinessDayHoursInput!]!): [BusinessDayHours!]!
   setDefaultAddress(id: ID!): Boolean!
+  setUserPermissions(permissions: [UserPermission!]!, userId: ID!): User!
   submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
   unsettleSettlement(settlementId: ID!): Settlement!
   updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
@@ -847,6 +849,7 @@ type User {
   isOnline: Boolean!
   lastName: String!
   maxActiveOrders: Int
+  permissions: [UserPermission!]!
   phoneNumber: String
   phoneVerified: Boolean!
   referralCode: String
@@ -880,6 +883,16 @@ type UserBehavior {
   userId: ID!
 }
 
+enum UserPermission {
+  manage_orders
+  manage_products
+  manage_settings
+  view_analytics
+  view_finances
+  view_orders
+  view_products
+}
+
 type UserPromoMetadata {
   hasUsedFirstOrderPromo: Boolean!
   lastPromoUsedAt: String
@@ -901,7 +914,9 @@ type UserPromotion {
 }
 
 enum UserRole {
-  BUSINESS_ADMIN
+  ADMIN
+  BUSINESS_EMPLOYEE
+  BUSINESS_OWNER
   CUSTOMER
   DRIVER
   SUPER_ADMIN

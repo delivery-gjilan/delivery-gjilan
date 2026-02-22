@@ -9,7 +9,7 @@ import { userAddress } from './userAddress';
 const signupStepValues = ['INITIAL', 'EMAIL_SENT', 'EMAIL_VERIFIED', 'PHONE_SENT', 'COMPLETED'] as const;
 [...signupStepValues] satisfies SignupStep[];
 
-const userRoleValues = ['CUSTOMER', 'DRIVER', 'SUPER_ADMIN', 'BUSINESS_ADMIN'] as const;
+const userRoleValues = ['CUSTOMER', 'DRIVER', 'SUPER_ADMIN', 'ADMIN', 'BUSINESS_OWNER', 'BUSINESS_EMPLOYEE'] as const;
 [...userRoleValues] satisfies UserRole[];
 
 export const signupStepEnum = pgEnum('signup_step', signupStepValues);

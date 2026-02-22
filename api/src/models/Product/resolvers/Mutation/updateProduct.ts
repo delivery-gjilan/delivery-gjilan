@@ -1,5 +1,7 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { createAuditLogger, createChangeMetadata } from '@/services/AuditLogger';
+import { hasPermission } from '@/lib/utils/permissions';
+import { GraphQLError } from 'graphql';
 
 export const updateProduct: NonNullable<MutationResolvers['updateProduct']> = async (
     _parent,
@@ -7,7 +9,25 @@ export const updateProduct: NonNullable<MutationResolvers['updateProduct']> = as
     context,
 ) => {
     const { productService, db } = context;
+    const { userId, role, businessId } = context;
     const oldProduct = await productService.getProduct(id);
+    
+    // Check if user has permission to manage products
+    if (role === 'BUSINESS_EMPLOYEE') {
+        const canManage = await hasPermission({ userId, role, businessId }, 'manage_products');
+        if (!canManage) {
+            throw new GraphQLError('You do not have permission to manage products', {
+                extensions: { code: 'FORBIDDEN' },
+            });
+        }
+        
+        // Business employees can only manage products for their own business
+        if (oldProduct?.businessId !== businessId) {
+            throw new GraphQLError('You can only manage products for your business', {
+                extensions: { code: 'FORBIDDEN' },
+            });
+        }
+    }
     const result = await productService.updateProduct(id, input);
     
     // Determine specific action based on what changed

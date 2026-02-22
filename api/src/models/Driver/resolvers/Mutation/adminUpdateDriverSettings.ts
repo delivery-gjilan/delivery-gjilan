@@ -8,8 +8,8 @@ export const adminUpdateDriverSettings: NonNullable<MutationResolvers['adminUpda
     { driverId, commissionPercentage, maxActiveOrders },
     { userData, authService, db },
 ) => {
-    if (userData.role !== 'BUSINESS_ADMIN' && userData.role !== 'SUPER_ADMIN') {
-        throw new GraphQLError('Only admins can update driver settings', {
+    if (userData.role !== 'ADMIN' && userData.role !== 'SUPER_ADMIN') {
+        throw new GraphQLError('Only platform admins can update driver settings', {
             extensions: { code: 'FORBIDDEN' },
         });
     }

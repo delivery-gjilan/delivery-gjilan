@@ -32,10 +32,14 @@ export const ordersByStatus: NonNullable<QueryResolvers['ordersByStatus']> = asy
             // Customers can only see their own orders
             return statusOrders.filter(order => order.userId === userData.userId);
 
-        case 'BUSINESS_ADMIN':
-            // Business admins can only see orders that contain items from their business
+        case 'ADMIN':
+            return statusOrders;
+
+        case 'BUSINESS_OWNER':
+        case 'BUSINESS_EMPLOYEE':
+            // Business users can only see orders that contain items from their business
             if (!userData.businessId) {
-                throw new GraphQLError('Business admin must be associated with a business', {
+                throw new GraphQLError('Business user must be associated with a business', {
                     extensions: { code: 'FORBIDDEN' },
                 });
             }

@@ -1,9 +1,10 @@
 import type { MutationResolvers } from '@/generated/types.generated';
 import { GraphQLError } from 'graphql';
+import { canViewUserData } from '@/lib/utils/permissions';
 
 export const updateUserNote: NonNullable<MutationResolvers['updateUserNote']> = async (_parent, { userId, note, flagColor }, { authService, userData }) => {
-    // Only SUPER_ADMIN and BUSINESS_ADMIN can update user notes
-    if (userData.role !== 'SUPER_ADMIN' && userData.role !== 'BUSINESS_ADMIN') {
+    // Only users with permission to view user data can update notes
+    if (!canViewUserData(userData)) {
         throw new GraphQLError('Unauthorized: Only admins can update user notes', {
             extensions: { code: 'FORBIDDEN' },
         });

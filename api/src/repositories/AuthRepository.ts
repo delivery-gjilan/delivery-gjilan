@@ -110,7 +110,7 @@ export class AuthRepository {
         lastName: string,
         email: string,
         hashedPassword: string,
-        role: 'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN' | 'BUSINESS_ADMIN',
+        role: 'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN' | 'ADMIN' | 'BUSINESS_OWNER' | 'BUSINESS_EMPLOYEE',
         businessId?: string,
     ): Promise<DbUser> {
         const [user] = await this.db
@@ -145,7 +145,7 @@ export class AuthRepository {
         data: {
             firstName?: string;
             lastName?: string;
-            role?: 'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN' | 'BUSINESS_ADMIN';
+            role?: 'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN' | 'ADMIN' | 'BUSINESS_OWNER' | 'BUSINESS_EMPLOYEE';
             businessId?: string | null;
             adminNote?: string | null;
             flagColor?: string | null;

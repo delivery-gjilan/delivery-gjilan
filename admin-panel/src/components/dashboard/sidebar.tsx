@@ -25,8 +25,8 @@ import {
 
 const menu = [
   { name: "Orders", href: "/dashboard/orders", icon: ClipboardList, businessAdminVisible: true },
-  { name: "Products", href: "/dashboard/products", icon: Package, businessAdminVisible: true },
   { name: "Market", href: "/dashboard/market", icon: Store, businessAdminVisible: true },
+  { name: "Products", href: "/dashboard/products", icon: Package, businessAdminVisible: true },
   { name: "Deals", href: "/dashboard/deals", icon: Percent, businessAdminVisible: true },
   { name: "Statistics", href: "/dashboard/statistics", icon: BarChart3, businessAdminVisible: true },
   { name: "Finances", href: "/dashboard/finances", icon: DollarSign, businessAdminVisible: true },
@@ -46,13 +46,28 @@ export default function Sidebar() {
   const { admin } = useAuth();
 
   const isSuperAdmin = admin?.role === "SUPER_ADMIN";
-  const isBusinessAdmin = admin?.role === "BUSINESS_ADMIN";
+  const isAdmin = admin?.role === "ADMIN";
+  const isBusinessOwner = admin?.role === "BUSINESS_OWNER";
+  const isBusinessEmployee = admin?.role === "BUSINESS_EMPLOYEE";
+  
+  // Platform admins can see platform-level features
+  const isPlatformAdmin = isSuperAdmin || isAdmin;
+  // Business users can see business-level features
+  const isBusinessUser = isBusinessOwner || isBusinessEmployee;
 
   const filteredMenu = menu.filter(item => {
     // Super admin sees everything
     if (isSuperAdmin) return true;
-    // Business admin only sees items marked as businessAdminVisible
-    if (isBusinessAdmin) return item.businessAdminVisible;
+    // Regular admin sees everything except super admin only items
+    if (isAdmin && !item.superAdminOnly) return true;
+   // Business users see business features
+    if (isBusinessUser && item.businessAdminVisible) {
+      // Business employees cannot see certain sensitive items
+      if (isBusinessEmployee && (item.href === '/dashboard/finances' || item.href === '/dashboard/settings')) {
+        return false;
+      }
+      return true;
+    }
     return false;
   });
 
@@ -95,11 +110,6 @@ export default function Sidebar() {
               <Icon size={20} className="flex-shrink-0" />
               {!collapsed && (
                 <span className="flex-1">{item.name}</span>
-              )}
-              {!collapsed && item.badge && (
-                <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
-                  3
-                </span>
               )}
             </Link>
           );

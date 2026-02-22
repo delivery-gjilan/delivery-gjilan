@@ -1,6 +1,18 @@
 import type { UserResolvers } from './../../../generated/types.generated';
 import logger from '@/lib/logger';
-export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'businessId'|'driverLocation'|'driverLocationUpdatedAt'|'email'|'emailVerified'|'firstName'|'flagColor'|'id'|'imageUrl'|'isOnline'|'lastName'|'phoneNumber'|'phoneVerified'|'referralCode'|'role'|'signupStep'|'__isTypeOf'> = {
+import { getUserPermissions } from '@/lib/utils/permissions';
+
+export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'businessId'|'driverLocation'|'driverLocationUpdatedAt'|'email'|'emailVerified'|'firstName'|'flagColor'|'id'|'imageUrl'|'isOnline'|'lastName'|'permissions'|'phoneNumber'|'phoneVerified'|'referralCode'|'role'|'signupStep'|'__isTypeOf'> = {
+    permissions: async (parent) => {
+        // Get permissions for this user
+        const perms = await getUserPermissions({
+            userId: parent.id,
+            role: parent.role as any,
+            businessId: parent.businessId ?? undefined,
+        });
+        
+        return perms as any;
+    },
     business: async (parent, _args, { businessService }) => {
         if (!parent.businessId) {
             return null;

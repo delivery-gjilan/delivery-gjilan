@@ -1,9 +1,10 @@
 import type { MutationResolvers } from '@/generated/types.generated';
 import { GraphQLError } from 'graphql';
+import { canManageUsers } from '@/lib/utils/permissions';
 
 export const updateUser: NonNullable<MutationResolvers['updateUser']> = async (_parent, { input }, { authService, userData }) => {
-    // Only SUPER_ADMIN can update users
-    if (userData.role !== 'SUPER_ADMIN') {
+    // Only users with user management permissions can update users
+    if (!canManageUsers(userData)) {
         throw new GraphQLError('Unauthorized: Only super admins can update users', {
             extensions: { code: 'FORBIDDEN' },
         });

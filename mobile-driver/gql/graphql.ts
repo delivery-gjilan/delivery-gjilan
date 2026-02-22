@@ -409,6 +409,7 @@ export type Mutation = {
   resendEmailVerification: SignupStepResponse;
   setBusinessSchedule: Array<BusinessDayHours>;
   setDefaultAddress: Scalars['Boolean']['output'];
+  setUserPermissions: User;
   submitPhoneNumber: SignupStepResponse;
   unsettleSettlement: Settlement;
   updateBusiness: Business;
@@ -604,6 +605,12 @@ export type MutationSetBusinessScheduleArgs = {
 
 export type MutationSetDefaultAddressArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type MutationSetUserPermissionsArgs = {
+  permissions: Array<UserPermission>;
+  userId: Scalars['ID']['input'];
 };
 
 
@@ -1333,6 +1340,7 @@ export type User = {
   isOnline: Scalars['Boolean']['output'];
   lastName: Scalars['String']['output'];
   maxActiveOrders?: Maybe<Scalars['Int']['output']>;
+  permissions: Array<UserPermission>;
   phoneNumber?: Maybe<Scalars['String']['output']>;
   phoneVerified: Scalars['Boolean']['output'];
   referralCode?: Maybe<Scalars['String']['output']>;
@@ -1368,6 +1376,16 @@ export type UserBehavior = {
   userId: Scalars['ID']['output'];
 };
 
+export enum UserPermission {
+  ManageOrders = 'manage_orders',
+  ManageProducts = 'manage_products',
+  ManageSettings = 'manage_settings',
+  ViewAnalytics = 'view_analytics',
+  ViewFinances = 'view_finances',
+  ViewOrders = 'view_orders',
+  ViewProducts = 'view_products'
+}
+
 export type UserPromoMetadata = {
   __typename?: 'UserPromoMetadata';
   hasUsedFirstOrderPromo: Scalars['Boolean']['output'];
@@ -1391,7 +1409,9 @@ export type UserPromotion = {
 };
 
 export enum UserRole {
-  BusinessAdmin = 'BUSINESS_ADMIN',
+  Admin = 'ADMIN',
+  BusinessEmployee = 'BUSINESS_EMPLOYEE',
+  BusinessOwner = 'BUSINESS_OWNER',
   Customer = 'CUSTOMER',
   Driver = 'DRIVER',
   SuperAdmin = 'SUPER_ADMIN'

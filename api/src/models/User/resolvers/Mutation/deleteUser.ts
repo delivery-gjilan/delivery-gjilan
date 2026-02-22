@@ -1,9 +1,10 @@
 import type { MutationResolvers } from '@/generated/types.generated';
 import { GraphQLError } from 'graphql';
+import { canManageUsers } from '@/lib/utils/permissions';
 
 export const deleteUser: NonNullable<MutationResolvers['deleteUser']> = async (_parent, { id }, { authService, userData }) => {
-    // Only SUPER_ADMIN can delete users
-    if (userData.role !== 'SUPER_ADMIN') {
+    // Only users with user management permissions can delete users
+    if (!canManageUsers(userData)) {
         throw new GraphQLError('Unauthorized: Only super admins can delete users', {
             extensions: { code: 'FORBIDDEN' },
         });

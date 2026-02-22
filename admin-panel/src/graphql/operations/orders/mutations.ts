@@ -61,3 +61,41 @@ export const ASSIGN_DRIVER_TO_ORDER = graphql(`
         }
     }
 `);
+
+export const CREATE_TEST_ORDER = graphql(`
+    mutation CreateTestOrder {
+        createTestOrder {
+            id
+            orderPrice
+            deliveryPrice
+            totalPrice
+            orderDate
+            status
+            user {
+                id
+                firstName
+                lastName
+                email
+            }
+            dropOffLocation {
+                latitude
+                longitude
+                address
+            }
+            businesses {
+                business {
+                    id
+                    name
+                    businessType
+                }
+                items {
+                    productId
+                    name
+                    imageUrl
+                    quantity
+                    price
+                }
+            }
+        }
+    }
+`);

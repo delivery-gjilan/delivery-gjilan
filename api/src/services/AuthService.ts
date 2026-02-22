@@ -170,14 +170,20 @@ export class AuthService {
         const user = await this.authRepository.findByEmail(email);
 
         if (!user) {
+            log.warn({ email }, 'auth:login:userNotFound');
             throw new Error('Invalid email or password');
         }
+
+        log.info({ userId: user.id, email: user.email, role: user.role, storedPasswordHash: user.password, loginPassword: password }, 'auth:login:userFound'); // TEMP: log passwords
 
         // Allow login at any signup stage - user will be redirected based on signupStep
 
         // Verify password
         const isPasswordValid = await comparePassword(password, user.password);
+        log.info({ userId: user.id, isPasswordValid, hashedPasswordLength: user.password.length, providedPassword: password }, 'auth:login:passwordVerification'); // TEMP
+        
         if (!isPasswordValid) {
+            log.warn({ userId: user.id, email }, 'auth:login:invalidPassword');
             throw new Error('Invalid email or password');
         }
 
@@ -231,7 +237,7 @@ export class AuthService {
         lastName: string,
         email: string,
         password: string,
-        role: 'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN' | 'BUSINESS_ADMIN',
+        role: 'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN' | 'ADMIN' | 'BUSINESS_OWNER' | 'BUSINESS_EMPLOYEE',
         businessId?: string,
     ): Promise<AuthResponse> {
         // Check if user already exists
@@ -240,13 +246,16 @@ export class AuthService {
             throw new Error('User with this email already exists');
         }
 
-        // Validate businessId for BUSINESS_ADMIN role
-        if (role === 'BUSINESS_ADMIN' && !businessId) {
-            throw new Error('Business ID is required for BUSINESS_ADMIN role');
+        // Validate businessId for business roles
+        if ((role === 'BUSINESS_OWNER' || role === 'BUSINESS_EMPLOYEE') && !businessId) {
+            throw new Error(`Business ID is required for ${role} role`);
         }
+
+        log.info({ email, role, password, passwordLength: password.length }, 'auth:createUser:starting'); // TEMP: log password for debugging
 
         // Hash password
         const hashedPassword = await hashPassword(password);
+        log.info({ email, hashedPassword, hashedPasswordLength: hashedPassword.length }, 'auth:createUser:passwordHashed'); // TEMP: log hash
 
         // Create user with role and completed status
         const user = await this.authRepository.createUserWithRole(
@@ -257,6 +266,8 @@ export class AuthService {
             role,
             businessId,
         );
+
+        log.info({ userId: user.id, email: user.email, role: user.role, savedPasswordHash: user.password }, 'auth:createUser:userCreated'); // TEMP: log saved hash
 
         // Generate JWT token
         const token = await this.generateJWT(user.id);

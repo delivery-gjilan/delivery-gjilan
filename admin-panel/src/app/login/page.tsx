@@ -18,10 +18,18 @@ export default function LoginPage() {
         setError("");
         setIsSubmitting(true);
 
+        console.log('[DEBUG] Attempting login with:', {
+            email,
+            password, // TEMPORARY: Log actual password for debugging
+            passwordLength: password.length,
+        });
+
         try {
             await login(email, password);
+            console.log('[DEBUG] Login successful');
             router.push("/dashboard");
         } catch (err) {
+            console.error('[DEBUG] Login failed:', err);
             setError(err instanceof Error ? err.message : "Login failed. Please try again.");
         } finally {
             setIsSubmitting(false);

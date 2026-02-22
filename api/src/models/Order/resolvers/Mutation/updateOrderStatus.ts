@@ -113,8 +113,8 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
     await orderService.publishAllOrders();
     
     // Log the status change
-    const logger = createAuditLogger(db, context);
-    await logger.log({
+    const auditLog = createAuditLogger(db, context);
+    await auditLog.log({
         action: 'ORDER_STATUS_CHANGED',
         entityType: 'ORDER',
         entityId: id,

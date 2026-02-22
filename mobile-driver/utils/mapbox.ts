@@ -156,7 +156,7 @@ async function _fetchSimpleRoute(from: Coord, to: Coord): Promise<{
     const existing = simpleInFlight.get(key);
     if (existing) return existing;
 
-    const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${from.longitude},${from.latitude};${to.longitude},${to.latitude}?access_token=${MAPBOX_TOKEN}&geometries=geojson`;
+    const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${from.longitude},${from.latitude};${to.longitude},${to.latitude}?access_token=${MAPBOX_TOKEN}&geometries=geojson&overview=full`;
 
     const promise = _doFetchSimpleRoute(url, key).then((result) => {
         simpleInFlight.delete(key);

@@ -2,12 +2,13 @@ import type { MutationResolvers } from '@/generated/types.generated';
 import { GraphQLError } from 'graphql';
 import { createAuditLogger } from '@/services/AuditLogger';
 import logger from '@/lib/logger';
+import { canManageUsers } from '@/lib/utils/permissions';
 
 export const createUser: NonNullable<MutationResolvers['createUser']> = async (_parent, { input }, context) => {
     const { authService, driverService, userData, db } = context;
     
-    // Only SUPER_ADMIN can create users
-    if (userData.role !== 'SUPER_ADMIN') {
+    // Only users with user management permissions can create users
+    if (!canManageUsers(userData)) {
         throw new GraphQLError('Unauthorized: Only super admins can create users', {
             extensions: { code: 'FORBIDDEN' },
         });

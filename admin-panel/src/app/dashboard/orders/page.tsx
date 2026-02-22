@@ -9,9 +9,9 @@ import Select from "@/components/ui/Select";
 import Input from "@/components/ui/Input";
 import { useOrders, useUpdateOrderStatus } from "@/lib/hooks/useOrders";
 import { useAuth } from "@/lib/auth-context";
-import { ASSIGN_DRIVER_TO_ORDER } from "@/graphql/operations/orders";
+import { ASSIGN_DRIVER_TO_ORDER, CREATE_TEST_ORDER } from "@/graphql/operations/orders";
 import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
-import { Package, Store, Search, ArrowRight, Clock, CheckCircle2, Eye, EyeOff, MapPin, User } from "lucide-react";
+import { Package, Store, Search, ArrowRight, Clock, CheckCircle2, Eye, EyeOff, MapPin, User, Plus } from "lucide-react";
 
 /* ---------------------------------------------------------
    TYPES
@@ -104,6 +104,7 @@ export default function OrdersPage() {
     const { admin } = useAuth();
     const { data: driversData } = useQuery(DRIVERS_QUERY, { pollInterval: 10000 });
     const [assignDriver] = useMutation(ASSIGN_DRIVER_TO_ORDER);
+    const [createTestOrder, { loading: creatingTestOrder }] = useMutation(CREATE_TEST_ORDER);
 
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
@@ -116,7 +117,9 @@ export default function OrdersPage() {
     const drivers = useMemo(() => driversData?.drivers ?? [], [driversData]);
 
     const isSuperAdmin = admin?.role === "SUPER_ADMIN";
-    const isBusinessAdmin = admin?.role === "BUSINESS_ADMIN";
+    const isBusinessOwner = admin?.role === "BUSINESS_OWNER";
+    const isBusinessEmployee = admin?.role === "BUSINESS_EMPLOYEE";
+    const isBusinessUser = isBusinessOwner || isBusinessEmployee;
 
     // Sort orders once by most recent first, then filter - this prevents re-sorting on status changes
     const filteredOrders = useMemo(() => {
@@ -158,7 +161,7 @@ export default function OrdersPage() {
     }, [filteredOrders]);
 
     const handleNextStatus = async (order: Order) => {
-        const nextStatus = isBusinessAdmin
+        const nextStatus = isBusinessUser
             ? order.status === "PENDING"
                 ? "ACCEPTED"
                 : order.status === "ACCEPTED"
@@ -254,18 +257,38 @@ export default function OrdersPage() {
                             Active Orders ({activeOrders.length})
                         </h2>
                     </div>
-                    <Button
-                        variant={showCompleted ? "outline" : "ghost"}
-                        size="sm"
-                        onClick={() => setShowCompleted(!showCompleted)}
-                        className="flex items-center gap-2"
-                    >
-                        {showCompleted ? <EyeOff size={16} /> : <Eye size={16} />}
-                        {showCompleted ? "Hide" : "Show"} Completed
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        {isSuperAdmin && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={async () => {
+                                    try {
+                                        await createTestOrder({ refetchQueries: ['GetOrders'] });
+                                    } catch (err: any) {
+                                        alert(err.message || 'Failed to create test order');
+                                    }
+                                }}
+                                disabled={creatingTestOrder}
+                                className="flex items-center gap-2 border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                            >
+                                <Plus size={16} />
+                                {creatingTestOrder ? 'Creating...' : 'Mock Order'}
+                            </Button>
+                        )}
+                        <Button
+                            variant={showCompleted ? "outline" : "ghost"}
+                            size="sm"
+                            onClick={() => setShowCompleted(!showCompleted)}
+                            className="flex items-center gap-2"
+                        >
+                            {showCompleted ? <EyeOff size={16} /> : <Eye size={16} />}
+                            {showCompleted ? "Hide" : "Show"} Completed
+                        </Button>
+                    </div>
                 </div>
                 
-                {isBusinessAdmin ? (
+                {isBusinessUser ? (
                     /* CARD VIEW FOR BUSINESS ADMIN */
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
                         {activeOrders.length === 0 ? (

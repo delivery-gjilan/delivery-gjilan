@@ -54,6 +54,7 @@
     },
     "tabs": {
         "home": "Home",
+        "map": "Map",
         "analytics": "Analytics",
         "create": "Create",
         "profile": "Profile"

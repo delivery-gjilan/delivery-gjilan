@@ -65,6 +65,7 @@ type Mutation {
     assignDriverToOrder(id: ID!, driverId: ID): Order!
     cancelOrder(id: ID!): Order!
     createOrder(input: CreateOrderInput!): Order!
+    createTestOrder: Order!
 }
 
 type Subscription {

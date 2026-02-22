@@ -105,7 +105,7 @@ export default function MarketPage() {
     }, [businesses]);
 
     const effectiveBusinessId = useMemo(() => {
-        if (admin?.role === "BUSINESS_ADMIN") return admin?.businessId ?? "";
+        if (admin?.role === "BUSINESS_OWNER" || admin?.role === "BUSINESS_EMPLOYEE") return admin?.businessId ?? "";
         return marketBusiness?.id ?? "";
     }, [admin?.businessId, admin?.role, marketBusiness?.id]);
 

@@ -86,7 +86,7 @@ export default function ScheduleEditor({ businessId, schedule, onSaved }: Props)
                         ? { dayOfWeek: i, opensAt: d.opensAt, closesAt: d.closesAt }
                         : null,
                 )
-                .filter(Boolean);
+                .filter((slot): slot is { dayOfWeek: number; opensAt: string; closesAt: string } => slot !== null);
 
             await setScheduleMutation({
                 variables: { businessId, schedule: slots },

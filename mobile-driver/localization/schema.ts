@@ -87,6 +87,7 @@ export const translationSchema = z.object(
         tabs: z.object(
             {
                 home: z.string({ message: 'Home tab title is required to be string' }),
+                map: z.string({ message: 'Map tab title is required to be string' }),
                 analytics: z.string({ message: 'Analytics tab title is required to be string' }),
                 create: z.string({ message: 'Create tab title is required to be string' }),
                 profile: z.string({ message: 'Profile tab title is required to be string' }),
