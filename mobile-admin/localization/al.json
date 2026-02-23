@@ -1,0 +1,132 @@
+{
+    "language": "Shqip",
+    "common": {
+        "ok": "Ok",
+        "cancel": "Anulo",
+        "save": "Ruaj",
+        "delete": "Fshi",
+        "error": "Gabim",
+        "loading": "Duke ngarkuar...",
+        "retry": "Provo përsëri",
+        "search": "Kërko...",
+        "noResults": "Nuk u gjetën rezultate",
+        "confirm": "Konfirmo",
+        "back": "Kthehu",
+        "edit": "Ndrysho",
+        "close": "Mbyll",
+        "refresh": "Rifresko"
+    },
+    "auth": {
+        "login": {
+            "title": "Hyrja e Adminit",
+            "description": "Hyni për të menaxhuar platformën e dërgesave",
+            "email": "Email",
+            "password": "Fjalëkalimi",
+            "actions": {
+                "login": "Hyr",
+                "forgotPassword": "Keni harruar fjalëkalimin?"
+            },
+            "errors": {
+                "invalid": "Email ose fjalëkalim i pavlefshëm",
+                "required": "Ju lutem shkruani emailin dhe fjalëkalimin",
+                "unauthorized": "Qasja e refuzuar. Nevojiten kredencialet e adminit."
+            }
+        }
+    },
+    "tabs": {
+        "map": "Harta",
+        "orders": "Porositë",
+        "dashboard": "Paneli",
+        "more": "Më shumë"
+    },
+    "map": {
+        "title": "Harta Live",
+        "filters": {
+            "all": "Të gjitha",
+            "orders": "Porositë",
+            "drivers": "Shoferët",
+            "businesses": "Bizneset"
+        },
+        "orderStatus": {
+            "all": "Të gjitha",
+            "pending": "Në pritje",
+            "preparing": "Duke u përgatitur",
+            "ready": "Gati",
+            "outForDelivery": "Në dërgesë"
+        },
+        "driverStatus": {
+            "online": "Online",
+            "offline": "Offline",
+            "delivering": "Duke dërguar"
+        },
+        "noDrivers": "Asnjë shofer online",
+        "noOrders": "Asnjë porosi aktive"
+    },
+    "orders": {
+        "title": "Porositë",
+        "empty": "Nuk u gjetën porosi",
+        "status": {
+            "PENDING": "Në pritje",
+            "PREPARING": "Duke u përgatitur",
+            "READY": "Gati",
+            "OUT_FOR_DELIVERY": "Në dërgesë",
+            "DELIVERED": "Dërguar",
+            "CANCELLED": "Anuluar"
+        },
+        "detail": {
+            "title": "Detajet e Porosisë",
+            "customer": "Klienti",
+            "driver": "Shoferi",
+            "unassigned": "Pa caktuar",
+            "business": "Biznesi",
+            "items": "Artikujt",
+            "orderPrice": "Çmimi i Porosisë",
+            "deliveryFee": "Tarifa e Dërgesës",
+            "total": "Totali",
+            "prepTime": "Koha e Përgatitjes",
+            "estimatedReady": "Gati së shpejti",
+            "assignDriver": "Cakto Shoferin",
+            "startPreparing": "Fillo Përgatitjen",
+            "markReady": "Shëno Gati",
+            "cancel": "Anulo Porosinë"
+        },
+        "prepModal": {
+            "title": "Cakto Kohën e Përgatitjes",
+            "subtitle": "Sa kohë do të marrë përgatitja e kësaj porosie?",
+            "minutes": "minuta",
+            "start": "Fillo Përgatitjen"
+        }
+    },
+    "dashboard": {
+        "title": "Paneli",
+        "todayOrders": "Porositë e Sotme",
+        "activeOrders": "Porosi Aktive",
+        "revenue": "Të ardhurat",
+        "avgDeliveryTime": "Koha Mesatare",
+        "onlineDrivers": "Shoferë Online",
+        "recentOrders": "Porositë e Fundit"
+    },
+    "more": {
+        "title": "Më shumë",
+        "businesses": "Bizneset",
+        "drivers": "Shoferët",
+        "users": "Përdoruesit",
+        "promotions": "Promocionet",
+        "notifications": "Njoftimet",
+        "settlements": "Shlyerjet",
+        "storeStatus": "Statusi i Dyqanit",
+        "settings": "Cilësimet",
+        "logout": "Dil"
+    },
+    "profile": {
+        "title": "Cilësimet",
+        "language_toggle": "Ndrysho Gjuhën",
+        "current_language": "Gjuha aktuale: Shqip",
+        "theme": "Tema",
+        "themeOptions": {
+            "light": "E ndritshme",
+            "dark": "E errët",
+            "system": "Sistemi"
+        }
+    }
+}

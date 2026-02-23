@@ -176,6 +176,7 @@ export default function MapPage() {
   const lastAnimationFrameTsRef = useRef<number>(0);
   const lastDriverLocationUpdateMsRef = useRef<Record<string, number>>({});
   const [hoveredOrderId, setHoveredOrderId] = useState<string | null>(null);
+  const [hoveredBusinessId, setHoveredBusinessId] = useState<string | null>(null);
   const [showDriversPanel, setShowDriversPanel] = useState(false);
   const [statusChangeTime, setStatusChangeTime] = useState<Record<string, number>>({});
   const orderRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -1039,6 +1040,9 @@ export default function MapPage() {
           {/* Business Markers */}
           {businesses.map((business: any) => {
             if (!business.location?.latitude || !business.location?.longitude) return null;
+            const isHovered = hoveredBusinessId === business.id;
+            const isInactive = !business.isActive;
+
             return (
               <Marker
                 key={`business-${business.id}`}
@@ -1046,7 +1050,85 @@ export default function MapPage() {
                 latitude={business.location.latitude}
                 anchor="center"
               >
-                <div className="bg-orange-500 rounded-full w-3 h-3 ring-2 ring-orange-300" title={business.name} />
+                <div
+                  className="relative flex items-center justify-center group cursor-pointer"
+                  onMouseEnter={() => setHoveredBusinessId(business.id)}
+                  onMouseLeave={() => setHoveredBusinessId(null)}
+                >
+                  {/* Main marker */}
+                  <div className={`relative w-3 h-3 rounded-full ${
+                    isInactive ? 'bg-slate-400' : 'bg-violet-600'
+                  } shadow-md hover:scale-125 transition-all ${
+                    isHovered ? 'ring-2 ring-violet-400 ring-offset-1' : ''
+                  }`}>
+                  </div>
+
+                  {/* Hover tooltip */}
+                  {isHovered && (
+                    <div className="absolute bottom-full mb-3 bg-black/95 text-white rounded-xl shadow-2xl z-[100] border border-white/20 overflow-hidden backdrop-blur-sm min-w-[240px] pointer-events-none">
+                      {/* Business image */}
+                      {business.imageUrl && (
+                        <div className="w-full h-32 bg-gradient-to-br from-violet-500/20 to-purple-500/20 relative overflow-hidden">
+                          <img
+                            src={business.imageUrl}
+                            alt={business.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      )}
+                      
+                      {/* Business info */}
+                      <div className="p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-violet-500/20 flex items-center justify-center flex-shrink-0">
+                            <Store size={20} className="text-violet-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-base mb-1">{business.name}</div>
+                            <div className="flex items-center gap-2 text-xs text-neutral-400 mb-2">
+                              <span className={`px-2 py-0.5 rounded ${
+                                business.businessType === 'RESTAURANT' 
+                                  ? 'bg-orange-500/20 text-orange-400' 
+                                  : 'bg-blue-500/20 text-blue-400'
+                              }`}>
+                                {business.businessType}
+                              </span>
+                              {isInactive && (
+                                <span className="px-2 py-0.5 rounded bg-slate-500/20 text-slate-400">
+                                  INACTIVE
+                                </span>
+                              )}
+                            </div>
+                            {business.location?.address && (
+                              <div className="text-xs text-neutral-400 flex items-start gap-1 mb-2">
+                                <MapPin size={12} className="mt-0.5 flex-shrink-0" />
+                                <span className="line-clamp-2">{business.location.address}</span>
+                              </div>
+                            )}
+                            {business.phoneNumber && (
+                              <div className="text-xs text-neutral-400 flex items-center gap-1">
+                                <Phone size={12} />
+                                <span>{business.phoneNumber}</span>
+                              </div>
+                            )}
+                            {business.avgPrepTimeMinutes && (
+                              <div className="text-xs text-neutral-400 flex items-center gap-1 mt-1">
+                                <Clock size={12} />
+                                <span>~{business.avgPrepTimeMinutes} min prep time</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Arrow pointer */}
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-transparent border-t-black/95" />
+                    </div>
+                  )}
+                </div>
               </Marker>
             );
           })}
