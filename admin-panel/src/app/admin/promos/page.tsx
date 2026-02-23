@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { gql } from '@apollo/client';
 import { useQuery, useMutation } from '@apollo/client/react';
 import Link from 'next/link';
@@ -91,7 +91,7 @@ export default function PromotionsPage() {
               <TableCell>
                 {promo.type === 'PERCENTAGE'
                   ? `${promo.discountValue}%`
-                  : `€${promo.discountValue}`}
+                  : `â‚¬${promo.discountValue}`}
               </TableCell>
               <TableCell>
                 <Badge>{promo.isActive ? 'Active' : 'Inactive'}</Badge>

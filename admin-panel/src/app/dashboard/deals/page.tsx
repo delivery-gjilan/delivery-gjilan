@@ -24,11 +24,11 @@ export default function DealsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+          <h1 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
             <Percent size={28} />
             Deals
           </h1>
-          <p className="text-neutral-400 mt-1">
+          <p className="text-zinc-500 mt-1">
             Create bundled product deals for your business
           </p>
         </div>
@@ -56,9 +56,9 @@ export default function DealsPage() {
             <tr>
               <Td colSpan={7}>
                 <div className="text-center py-12">
-                  <Percent size={48} className="mx-auto text-neutral-600 mb-4" />
-                  <p className="text-neutral-400 mb-2">No deals yet</p>
-                  <p className="text-neutral-500 text-sm mb-4">
+                  <Percent size={48} className="mx-auto text-zinc-600 mb-4" />
+                  <p className="text-zinc-500 mb-2">No deals yet</p>
+                  <p className="text-zinc-600 text-sm mb-4">
                     Bundle products together to create attractive deals
                   </p>
                   <Button size="sm">
@@ -73,18 +73,18 @@ export default function DealsPage() {
               <tr key={deal.id}>
                 <Td>
                   <div className="font-medium text-white">{deal.name}</div>
-                  <div className="text-xs text-neutral-400 mt-1">
+                  <div className="text-xs text-zinc-500 mt-1">
                     {deal.description}
                   </div>
                 </Td>
                 <Td>
                   <div className="flex items-center gap-2">
-                    <Package size={16} className="text-neutral-400" />
+                    <Package size={16} className="text-zinc-500" />
                     <span className="text-white">{deal.products.length} items</span>
                   </div>
                 </Td>
                 <Td>
-                  <span className="text-neutral-400 line-through">
+                  <span className="text-zinc-500 line-through">
                     ${deal.originalPrice.toFixed(2)}
                   </span>
                 </Td>
@@ -103,7 +103,7 @@ export default function DealsPage() {
                     className={`inline-flex px-3 py-1 rounded-full text-xs font-medium border ${
                       deal.isActive
                         ? "bg-green-500/10 text-green-400 border-green-500/30"
-                        : "bg-neutral-500/10 text-neutral-400 border-neutral-500/30"
+                        : "bg-neutral-500/10 text-zinc-500 border-neutral-500/30"
                     }`}
                   >
                     {deal.isActive ? "Active" : "Inactive"}

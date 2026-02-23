@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useMemo } from 'react';
 import { useQuery } from '@apollo/client/react';
@@ -129,8 +129,8 @@ export default function AuditLogsPage() {
         if (action.includes('DELETE')) return 'text-red-400';
         if (action.includes('CREATE')) return 'text-green-400';
         if (action.includes('UPDATE') || action.includes('CHANGE')) return 'text-yellow-400';
-        if (action.includes('PAID') || action.includes('SETTLEMENT')) return 'text-cyan-400';
-        return 'text-neutral-400';
+        if (action.includes('PAID') || action.includes('SETTLEMENT')) return 'text-violet-400';
+        return 'text-zinc-500';
     };
 
     const getActorBadge = (actorType: string) => {
@@ -151,10 +151,10 @@ export default function AuditLogsPage() {
         if (action === 'USER_CREATED' || action === 'DRIVER_CREATED') {
             const name = `${metadata.firstName} ${metadata.lastName}`;
             return (
-                <span className="text-neutral-300">
+                <span className="text-zinc-400">
                     Created: <span className="text-white font-medium">{name}</span>
-                    {metadata.email && <span className="text-neutral-500"> ({metadata.email})</span>}
-                    {metadata.role && <span className="text-cyan-400"> • {metadata.role}</span>}
+                    {metadata.email && <span className="text-zinc-600"> ({metadata.email})</span>}
+                    {metadata.role && <span className="text-violet-400"> â€¢ {metadata.role}</span>}
                 </span>
             );
         }
@@ -162,9 +162,9 @@ export default function AuditLogsPage() {
         // Business creation
         if (action === 'BUSINESS_CREATED') {
             return (
-                <span className="text-neutral-300">
+                <span className="text-zinc-400">
                     Created: <span className="text-white font-medium">{metadata.name}</span>
-                    {metadata.category && <span className="text-neutral-500"> ({metadata.category})</span>}
+                    {metadata.category && <span className="text-zinc-600"> ({metadata.category})</span>}
                 </span>
             );
         }
@@ -175,18 +175,18 @@ export default function AuditLogsPage() {
             
             if (metadata.oldValue && metadata.newValue) {
                 if (metadata.oldValue.name !== metadata.newValue.name) {
-                    changes.push(`Name: "${metadata.oldValue.name}" → "${metadata.newValue.name}"`);
+                    changes.push(`Name: "${metadata.oldValue.name}" â†’ "${metadata.newValue.name}"`);
                 }
                 if (metadata.oldValue.isOpen !== metadata.newValue.isOpen) {
-                    changes.push(`Status: ${metadata.oldValue.isOpen ? 'Open' : 'Closed'} → ${metadata.newValue.isOpen ? 'Open' : 'Closed'}`);
+                    changes.push(`Status: ${metadata.oldValue.isOpen ? 'Open' : 'Closed'} â†’ ${metadata.newValue.isOpen ? 'Open' : 'Closed'}`);
                 }
             }
 
             if (changes.length > 0) {
                 return (
-                    <span className="text-neutral-300">
+                    <span className="text-zinc-400">
                         {metadata.name && <span className="text-white font-medium">{metadata.name}</span>}
-                        {metadata.name && ' • '}
+                        {metadata.name && ' â€¢ '}
                         {changes.join(', ')}
                     </span>
                 );
@@ -196,7 +196,7 @@ export default function AuditLogsPage() {
         // Product creation
         if (action === 'PRODUCT_CREATED') {
             return (
-                <span className="text-neutral-300">
+                <span className="text-zinc-400">
                     Created: <span className="text-white font-medium">{metadata.name}</span>
                 </span>
             );
@@ -208,21 +208,21 @@ export default function AuditLogsPage() {
             
             if (metadata.oldValue && metadata.newValue) {
                 if (metadata.oldValue.price !== undefined && metadata.newValue.price !== undefined && metadata.oldValue.price !== metadata.newValue.price) {
-                    changes.push(`Price: $${metadata.oldValue.price} → $${metadata.newValue.price}`);
+                    changes.push(`Price: $${metadata.oldValue.price} â†’ $${metadata.newValue.price}`);
                 }
                 if (metadata.oldValue.isAvailable !== undefined && metadata.newValue.isAvailable !== undefined && metadata.oldValue.isAvailable !== metadata.newValue.isAvailable) {
-                    changes.push(`Available: ${metadata.oldValue.isAvailable ? 'Yes' : 'No'} → ${metadata.newValue.isAvailable ? 'Yes' : 'No'}`);
+                    changes.push(`Available: ${metadata.oldValue.isAvailable ? 'Yes' : 'No'} â†’ ${metadata.newValue.isAvailable ? 'Yes' : 'No'}`);
                 }
                 if (metadata.oldValue.name !== undefined && metadata.newValue.name !== undefined && metadata.oldValue.name !== metadata.newValue.name) {
-                    changes.push(`Name: "${metadata.oldValue.name}" → "${metadata.newValue.name}"`);
+                    changes.push(`Name: "${metadata.oldValue.name}" â†’ "${metadata.newValue.name}"`);
                 }
             }
 
             if (changes.length > 0) {
                 return (
-                    <span className="text-neutral-300">
+                    <span className="text-zinc-400">
                         {metadata.name && <span className="text-white font-medium">{metadata.name}</span>}
-                        {metadata.name && ' • '}
+                        {metadata.name && ' â€¢ '}
                         {changes.join(', ')}
                     </span>
                 );
@@ -232,7 +232,7 @@ export default function AuditLogsPage() {
         // Product deletion
         if (action === 'PRODUCT_DELETED') {
             return (
-                <span className="text-neutral-300">
+                <span className="text-zinc-400">
                     Deleted: <span className="text-white font-medium">{metadata.name}</span>
                 </span>
             );
@@ -241,9 +241,9 @@ export default function AuditLogsPage() {
         // Order status changes
         if (action === 'ORDER_STATUS_CHANGED') {
             return (
-                <span className="text-neutral-300">
+                <span className="text-zinc-400">
                     Status: <span className="text-red-400">{metadata.oldValue?.status}</span>
-                    {' → '}
+                    {' â†’ '}
                     <span className="text-green-400">{metadata.newValue?.status}</span>
                 </span>
             );
@@ -252,7 +252,7 @@ export default function AuditLogsPage() {
         // Order assignment
         if (action === 'ORDER_ASSIGNED') {
             return (
-                <span className="text-neutral-300">
+                <span className="text-zinc-400">
                     Assigned to: <span className="text-white font-medium">{metadata.driverName || 'Unassigned'}</span>
                 </span>
             );
@@ -261,9 +261,9 @@ export default function AuditLogsPage() {
         // Settlement actions
         if (action === 'SETTLEMENT_PAID' || action === 'SETTLEMENT_PARTIAL_PAID') {
             return (
-                <span className="text-neutral-300">
+                <span className="text-zinc-400">
                     Amount: <span className="text-green-400 font-medium">${metadata.amount?.toFixed(2)}</span>
-                    {metadata.type && <span className="text-neutral-500"> ({metadata.type})</span>}
+                    {metadata.type && <span className="text-zinc-600"> ({metadata.type})</span>}
                 </span>
             );
         }
@@ -280,7 +280,7 @@ export default function AuditLogsPage() {
             
             return (
                 <div className="space-y-3">
-                    <p className="text-neutral-500 font-semibold">Changes Made:</p>
+                    <p className="text-zinc-600 font-semibold">Changes Made:</p>
                     {changedFields.map((field: string) => {
                         const oldVal = metadata.oldValue[field];
                         const newVal = metadata.newValue[field];
@@ -288,20 +288,20 @@ export default function AuditLogsPage() {
                         if (oldVal === newVal) return null;
                         
                         return (
-                            <div key={field} className="bg-[#0a0a0a] border border-[#262626] rounded p-3">
-                                <p className="text-xs text-neutral-500 mb-2 uppercase">{field}</p>
+                            <div key={field} className="bg-[#09090b] border border-zinc-800 rounded p-3">
+                                <p className="text-xs text-zinc-600 mb-2 uppercase">{field}</p>
                                 <div className="flex items-center gap-3">
                                     <div className="flex-1">
-                                        <p className="text-xs text-neutral-500 mb-1">Old Value</p>
+                                        <p className="text-xs text-zinc-600 mb-1">Old Value</p>
                                         <p className="text-red-400 font-mono text-sm">
                                             {typeof oldVal === 'boolean' ? (oldVal ? 'Yes' : 'No') : 
                                              typeof oldVal === 'object' ? JSON.stringify(oldVal) : 
                                              String(oldVal)}
                                         </p>
                                     </div>
-                                    <span className="text-neutral-500">→</span>
+                                    <span className="text-zinc-600">â†’</span>
                                     <div className="flex-1">
-                                        <p className="text-xs text-neutral-500 mb-1">New Value</p>
+                                        <p className="text-xs text-zinc-600 mb-1">New Value</p>
                                         <p className="text-green-400 font-mono text-sm">
                                             {typeof newVal === 'boolean' ? (newVal ? 'Yes' : 'No') : 
                                              typeof newVal === 'object' ? JSON.stringify(newVal) : 
@@ -325,11 +325,11 @@ export default function AuditLogsPage() {
 
         return (
             <div className="space-y-2">
-                <p className="text-neutral-500 font-semibold mb-2">Details:</p>
-                <div className="bg-[#0a0a0a] border border-[#262626] rounded p-3 space-y-2">
+                <p className="text-zinc-600 font-semibold mb-2">Details:</p>
+                <div className="bg-[#09090b] border border-zinc-800 rounded p-3 space-y-2">
                     {importantFields.map(([key, value]) => (
                         <div key={key} className="flex items-start gap-2">
-                            <span className="text-neutral-500 text-xs uppercase min-w-[100px]">{key}:</span>
+                            <span className="text-zinc-600 text-xs uppercase min-w-[100px]">{key}:</span>
                             <span className="text-white text-sm font-mono">
                                 {typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}
                             </span>
@@ -343,21 +343,21 @@ export default function AuditLogsPage() {
     return (
         <div className="min-h-screen flex flex-col bg-[#0f0f0f]">
             {/* Header */}
-            <div className="bg-[#1a1a1a] border-b border-[#262626] p-6">
+            <div className="bg-[#1a1a1a] border-b border-zinc-800 p-6">
                 <div className="max-w-7xl mx-auto">
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-4">
-                            <Link href="/dashboard" className="text-neutral-400 hover:text-white transition-colors">
+                            <Link href="/dashboard" className="text-zinc-500 hover:text-white transition-colors">
                                 <ArrowLeft size={24} />
                             </Link>
                             <div>
-                                <h1 className="text-2xl font-bold text-white">Audit Logs</h1>
-                                <p className="text-sm text-neutral-400 mt-1">Track all system activities and changes</p>
+                                <h1 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Audit Logs</h1>
+                                <p className="text-sm text-zinc-500 mt-1">Track all system activities and changes</p>
                             </div>
                         </div>
                         <button
                             onClick={() => refetch()}
-                            className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 rounded px-4 py-2 text-sm font-semibold text-white transition-colors"
+                            className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 rounded px-4 py-2 text-sm font-semibold text-white transition-colors"
                         >
                             <Activity size={16} />
                             Refresh
@@ -367,8 +367,8 @@ export default function AuditLogsPage() {
                     {/* Filters */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div>
-                            <label className="block text-xs font-medium text-neutral-400 mb-2">Date Range</label>
-                            <div className="grid grid-cols-4 gap-1 bg-[#0a0a0a] border border-[#262626] rounded p-1">
+                            <label className="block text-xs font-medium text-zinc-500 mb-2">Date Range</label>
+                            <div className="grid grid-cols-4 gap-1 bg-[#09090b] border border-zinc-800 rounded p-1">
                                 {(['all', 'today', 'week', 'month'] as const).map((mode) => (
                                     <button
                                         key={mode}
@@ -378,8 +378,8 @@ export default function AuditLogsPage() {
                                         }}
                                         className={`px-2 py-1.5 text-xs font-medium rounded transition-colors ${
                                             dateMode === mode
-                                                ? 'bg-cyan-600 text-white'
-                                                : 'text-neutral-400 hover:text-white'
+                                                ? 'bg-violet-600 text-white'
+                                                : 'text-zinc-500 hover:text-white'
                                         }`}
                                     >
                                         {mode.charAt(0).toUpperCase() + mode.slice(1)}
@@ -389,14 +389,14 @@ export default function AuditLogsPage() {
                         </div>
 
                         <div>
-                            <label className="block text-xs font-medium text-neutral-400 mb-2">Action Type</label>
+                            <label className="block text-xs font-medium text-zinc-500 mb-2">Action Type</label>
                             <select
                                 value={actionFilter}
                                 onChange={(e) => {
                                     setActionFilter(e.target.value);
                                     setPage(0);
                                 }}
-                                className="w-full bg-[#0a0a0a] border border-[#262626] rounded px-3 py-2 text-sm text-white"
+                                className="w-full bg-[#09090b] border border-zinc-800 rounded px-3 py-2 text-sm text-white"
                             >
                                 {ACTION_TYPES.map((type) => (
                                     <option key={type.value} value={type.value}>
@@ -407,14 +407,14 @@ export default function AuditLogsPage() {
                         </div>
 
                         <div>
-                            <label className="block text-xs font-medium text-neutral-400 mb-2">Entity Type</label>
+                            <label className="block text-xs font-medium text-zinc-500 mb-2">Entity Type</label>
                             <select
                                 value={entityFilter}
                                 onChange={(e) => {
                                     setEntityFilter(e.target.value);
                                     setPage(0);
                                 }}
-                                className="w-full bg-[#0a0a0a] border border-[#262626] rounded px-3 py-2 text-sm text-white"
+                                className="w-full bg-[#09090b] border border-zinc-800 rounded px-3 py-2 text-sm text-white"
                             >
                                 {ENTITY_TYPES.map((type) => (
                                     <option key={type.value} value={type.value}>
@@ -425,14 +425,14 @@ export default function AuditLogsPage() {
                         </div>
 
                         <div>
-                            <label className="block text-xs font-medium text-neutral-400 mb-2">Actor Type</label>
+                            <label className="block text-xs font-medium text-zinc-500 mb-2">Actor Type</label>
                             <select
                                 value={actorFilter}
                                 onChange={(e) => {
                                     setActorFilter(e.target.value);
                                     setPage(0);
                                 }}
-                                className="w-full bg-[#0a0a0a] border border-[#262626] rounded px-3 py-2 text-sm text-white"
+                                className="w-full bg-[#09090b] border border-zinc-800 rounded px-3 py-2 text-sm text-white"
                             >
                                 {ACTOR_TYPES.map((type) => (
                                     <option key={type.value} value={type.value}>
@@ -450,7 +450,7 @@ export default function AuditLogsPage() {
                 <div className="max-w-7xl mx-auto">
                     {/* Summary */}
                     <div className="mb-6 flex items-center justify-between">
-                        <p className="text-sm text-neutral-400">
+                        <p className="text-sm text-zinc-500">
                             Showing {logs.length} of {total} logs
                         </p>
                         {(actionFilter || entityFilter || actorFilter || dateMode !== 'all') && (
@@ -462,7 +462,7 @@ export default function AuditLogsPage() {
                                     setDateMode('all');
                                     setPage(0);
                                 }}
-                                className="text-sm text-cyan-500 hover:text-cyan-400 transition-colors"
+                                className="text-sm text-violet-500 hover:text-violet-400 transition-colors"
                             >
                                 Clear Filters
                             </button>
@@ -472,19 +472,19 @@ export default function AuditLogsPage() {
                     {/* Logs List */}
                     {loading && logs.length === 0 ? (
                         <div className="text-center py-12">
-                            <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-neutral-700 border-t-cyan-500" />
+                            <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-zinc-800 border-t-violet-500" />
                         </div>
                     ) : logs.length === 0 ? (
                         <div className="text-center py-12">
-                            <Activity size={48} className="mx-auto text-neutral-600 mb-4" />
-                            <p className="text-neutral-400">No audit logs found</p>
+                            <Activity size={48} className="mx-auto text-zinc-600 mb-4" />
+                            <p className="text-zinc-500">No audit logs found</p>
                         </div>
                     ) : (
                         <div className="space-y-2">
                             {logs.map((log) => (
                                 <div
                                     key={log.id}
-                                    className="bg-[#1a1a1a] border border-[#262626] rounded overflow-hidden hover:border-[#404040] transition-colors"
+                                    className="bg-[#1a1a1a] border border-zinc-800 rounded overflow-hidden hover:border-zinc-700 transition-colors"
                                 >
                                     <button
                                         onClick={() => setExpandedLog(expandedLog === log.id ? null : log.id)}
@@ -500,8 +500,8 @@ export default function AuditLogsPage() {
                                                     <span className={`font-medium ${getActionColor(log.action)}`}>
                                                         {formatAction(log.action)}
                                                     </span>
-                                                    <span className="text-neutral-500">→</span>
-                                                    <span className="text-neutral-400">{log.entityType}</span>
+                                                    <span className="text-zinc-600">â†’</span>
+                                                    <span className="text-zinc-500">{log.entityType}</span>
                                                 </div>
                                                 
                                                 {/* Preview of what changed/created */}
@@ -511,7 +511,7 @@ export default function AuditLogsPage() {
                                                     </div>
                                                 )}
                                                 
-                                                <div className="flex items-center gap-3 text-xs text-neutral-500">
+                                                <div className="flex items-center gap-3 text-xs text-zinc-600">
                                                     {log.actor && (
                                                         <span className="flex items-center gap-1">
                                                             <User size={12} />
@@ -531,38 +531,38 @@ export default function AuditLogsPage() {
 
                                         <ChevronDown
                                             size={20}
-                                            className={`text-neutral-400 transition-transform ${
+                                            className={`text-zinc-500 transition-transform ${
                                                 expandedLog === log.id ? 'rotate-180' : ''
                                             }`}
                                         />
                                     </button>
 
                                     {expandedLog === log.id && (
-                                        <div className="border-t border-[#262626] p-4 bg-[#0f0f0f]">
+                                        <div className="border-t border-zinc-800 p-4 bg-[#0f0f0f]">
                                             <div className="grid grid-cols-2 gap-4 text-sm">
                                                 <div>
-                                                    <p className="text-neutral-500 mb-1">Log ID</p>
+                                                    <p className="text-zinc-600 mb-1">Log ID</p>
                                                     <p className="text-white font-mono text-xs">{log.id}</p>
                                                 </div>
                                                 {log.entityId && (
                                                     <div>
-                                                        <p className="text-neutral-500 mb-1">Entity ID</p>
+                                                        <p className="text-zinc-600 mb-1">Entity ID</p>
                                                         <p className="text-white font-mono text-xs">{log.entityId}</p>
                                                     </div>
                                                 )}
                                                 {log.actor && (
                                                     <div>
-                                                        <p className="text-neutral-500 mb-1">Actor</p>
+                                                        <p className="text-zinc-600 mb-1">Actor</p>
                                                         <p className="text-white">
                                                             {log.actor.firstName} {log.actor.lastName}
                                                         </p>
-                                                        <p className="text-neutral-400 text-xs">{log.actor.email}</p>
+                                                        <p className="text-zinc-500 text-xs">{log.actor.email}</p>
                                                     </div>
                                                 )}
                                                 {log.userAgent && (
                                                     <div className="col-span-2">
-                                                        <p className="text-neutral-500 mb-1">User Agent</p>
-                                                        <p className="text-neutral-400 text-xs font-mono truncate">
+                                                        <p className="text-zinc-600 mb-1">User Agent</p>
+                                                        <p className="text-zinc-500 text-xs font-mono truncate">
                                                             {log.userAgent}
                                                         </p>
                                                     </div>
@@ -586,17 +586,17 @@ export default function AuditLogsPage() {
                             <button
                                 onClick={() => setPage(Math.max(0, page - 1))}
                                 disabled={page === 0 || loading}
-                                className="px-4 py-2 bg-[#1a1a1a] border border-[#262626] rounded text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#262626] transition-colors"
+                                className="px-4 py-2 bg-[#111113] border border-zinc-800 rounded text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-800 transition-colors"
                             >
                                 Previous
                             </button>
-                            <span className="text-neutral-400">
+                            <span className="text-zinc-500">
                                 Page {page + 1} of {Math.ceil(total / PAGE_SIZE)}
                             </span>
                             <button
                                 onClick={() => setPage(page + 1)}
                                 disabled={!hasMore || loading}
-                                className="px-4 py-2 bg-[#1a1a1a] border border-[#262626] rounded text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#262626] transition-colors"
+                                className="px-4 py-2 bg-[#111113] border border-zinc-800 rounded text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-800 transition-colors"
                             >
                                 Next
                             </button>

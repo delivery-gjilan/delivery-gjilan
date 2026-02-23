@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 
 interface Props {
     checked?: boolean;
@@ -13,7 +13,7 @@ export const Checkbox = ({ checked = false, onChange, disabled = false }: Props)
             checked={checked}
             onChange={onChange}
             disabled={disabled}
-            className="w-4 h-4 rounded border-neutral-700 bg-neutral-900"
+            className="w-4 h-4 rounded border-zinc-800 bg-neutral-900"
         />
     );
 };

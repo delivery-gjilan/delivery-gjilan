@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useQuery, useMutation } from '@apollo/client/react';
 import { useParams } from 'next/navigation';

@@ -74,15 +74,15 @@ export default function SettingsPage() {
     <div className="space-y-6 max-w-3xl">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+        <h1 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
           <SettingsIcon size={28} />
           Settings
         </h1>
-        <p className="text-neutral-400 mt-1">Manage your account and preferences</p>
+        <p className="text-zinc-500 mt-1">Manage your account and preferences</p>
       </div>
 
       {/* Business Settings */}
-      <div className="bg-[#161616] border border-[#262626] rounded-lg p-6">
+      <div className="bg-[#111113] border border-zinc-800 rounded-lg p-6">
         <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
           <Clock size={18} /> Preparation Time
         </h3>
@@ -92,12 +92,12 @@ export default function SettingsPage() {
             <AlertCircle size={16} /> Business admin profile is missing a business ID.
           </div>
         ) : loading ? (
-          <div className="text-neutral-400">Loading business settings...</div>
+          <div className="text-zinc-500">Loading business settings...</div>
         ) : (
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-neutral-300 mb-2">
+                <label className="block text-sm font-medium text-zinc-400 mb-2">
                   Average Preparation Time (minutes)
                 </label>
                 <Input
@@ -107,13 +107,13 @@ export default function SettingsPage() {
                   onChange={(e) => setAvgPrepTime(e.target.value)}
                   placeholder="20"
                 />
-                <p className="text-xs text-neutral-500 mt-1">
+                <p className="text-xs text-zinc-600 mt-1">
                   Default prep time shown to customers
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-neutral-300 mb-2">
+                <label className="block text-sm font-medium text-zinc-400 mb-2">
                   Busy Hours Override (minutes)
                 </label>
                 <Input
@@ -124,7 +124,7 @@ export default function SettingsPage() {
                   placeholder="Leave empty to disable"
                 />
                 <div className="flex items-center justify-between mt-1">
-                  <p className="text-xs text-neutral-500">
+                  <p className="text-xs text-zinc-600">
                     Temporary override for peak hours
                   </p>
                   {overridePrepTime.trim().length > 0 && (
@@ -140,8 +140,8 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="bg-[#0f0f0f] border border-[#262626] rounded-lg p-4 text-sm">
-              <div className="text-neutral-400">Effective prep time shown to customers</div>
+            <div className="bg-[#0f0f0f] border border-zinc-800 rounded-lg p-4 text-sm">
+              <div className="text-zinc-500">Effective prep time shown to customers</div>
               <div className="text-white text-lg font-semibold mt-1">{effectivePrepTime} min</div>
             </div>
           </div>

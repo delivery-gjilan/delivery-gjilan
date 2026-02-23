@@ -67,55 +67,35 @@ export default function Topbar() {
 
   return (
     <>
-      <header className="h-14 bg-[#0a0a0a] border-b border-[#262626] flex items-center justify-between px-6 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-[#161616] border border-[#262626] rounded-lg">
-            {role === "SUPER_ADMIN" ? (
-              <>
-                <Shield size={16} className="text-cyan-500" />
-                <span className="text-sm font-medium text-white">Super Admin</span>
-              </>
-            ) : (
-              <>
-                <Briefcase size={16} className="text-neutral-400" />
-                <span className="text-sm font-medium text-white">Business Admin</span>
-              </>
-            )}
+      <header className="h-12 bg-[#09090b] border-b border-[#1e1e22] flex items-center justify-between px-5">
+        <div className="flex items-center gap-2">
+          <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium ${
+            isStoreClosed 
+              ? 'bg-red-500/10 text-red-400 border border-red-500/20' 
+              : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+          }`}>
+            <div className={`w-1.5 h-1.5 rounded-full ${isStoreClosed ? 'bg-red-400' : 'bg-emerald-400'}`} />
+            {isStoreClosed ? 'Closed' : 'Live'}
           </div>
-        </div>
-
-        <div className="flex items-center gap-4">
-          {/* Store Status Toggle */}
-          <Button
-            variant={isStoreClosed ? "danger" : "outline"}
-            size="sm"
+          <button
             onClick={() => handleToggleStore(!isStoreClosed)}
             disabled={updating}
+            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
           >
-            {isStoreClosed ? (
-              <>
-                <Clock size={16} className="mr-2" />
-                Store Closed
-              </>
-            ) : (
-              <>
-                <StoreIcon size={16} className="mr-2" />
-                Store Open
-              </>
-            )}
-          </Button>
+            {isStoreClosed ? 'Open store' : 'Close'}
+          </button>
+        </div>
 
-          <span className="text-sm text-neutral-400">
-            {admin?.email || "Loading..."}
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-zinc-500">
+            {admin?.email || ""}
           </span>
-          <Button
-            variant="outline"
-            size="sm"
+          <button
             onClick={handleLogout}
+            className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60 transition-all"
           >
-            <LogOut size={16} className="mr-2" />
-            Logout
-          </Button>
+            <LogOut size={15} />
+          </button>
         </div>
       </header>
 
@@ -126,10 +106,9 @@ export default function Topbar() {
         title="Close Store"
       >
         <div className="space-y-4">
-          <div className="bg-yellow-900/20 border border-yellow-700/30 rounded-lg p-4">
-            <p className="text-yellow-200 text-sm">
-              ⚠️ When you close the store, customers won&apos;t be able to place orders. 
-              They will see the message below when they open the app.
+          <div className="bg-amber-500/5 border border-amber-500/10 rounded-lg p-3">
+            <p className="text-amber-200/80 text-xs">
+              Customers won&apos;t be able to place orders while the store is closed.
             </p>
           </div>
 
@@ -143,7 +122,7 @@ export default function Topbar() {
             This message will be displayed to customers when they try to access the app.
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-neutral-800">
+          <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800/50">
             <Button variant="outline" onClick={() => setShowModal(false)}>
               Cancel
             </Button>

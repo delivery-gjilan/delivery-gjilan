@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, FormEvent, useMemo } from "react";
 import { useQuery, useMutation } from "@apollo/client/react";
@@ -314,7 +314,7 @@ export default function UsersPage() {
                 return 'bg-purple-500/10 text-purple-400 border-purple-500/30';
             case 'BUSINESS_OWNER':
             case 'BUSINESS_EMPLOYEE':
-                return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30';
+                return 'bg-violet-500/10 text-violet-400 border-violet-500/30';
             case 'DRIVER':
                 return 'bg-amber-500/10 text-amber-400 border-amber-500/30';
             case 'CUSTOMER':
@@ -420,7 +420,7 @@ export default function UsersPage() {
         <div className="text-white">
             <div className="mb-6 flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-semibold">Users</h1>
+                    <h1 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Users</h1>
                     <p className="text-gray-400 mt-1">Manage customer accounts. To manage drivers, go to the Drivers section.</p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -519,7 +519,7 @@ export default function UsersPage() {
                                                         variant="outline"
                                                         onClick={() => handleEdit(user)}
                                                         disabled={updating}
-                                                        className="text-cyan-400 hover:text-cyan-300"
+                                                        className="text-violet-400 hover:text-violet-300"
                                                     >
                                                         <Pencil size={14} className="mr-1" />
                                                         Edit
@@ -953,7 +953,7 @@ export default function UsersPage() {
                                         </div>
                                     </>
                                 ) : (
-                                    <div className="text-neutral-500">No driver assigned</div>
+                                    <div className="text-zinc-600">No driver assigned</div>
                                 )}
                             </div>
 

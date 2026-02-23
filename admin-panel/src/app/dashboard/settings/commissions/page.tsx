@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { useQuery, useMutation } from '@apollo/client/react';
@@ -78,14 +78,14 @@ export default function CommissionSettings() {
     return (
         <div className="min-h-screen bg-[#0f0f0f] text-white">
             {/* Header */}
-            <div className="bg-[#1a1a1a] border-b border-[#262626] p-6">
+            <div className="bg-[#1a1a1a] border-b border-zinc-800 p-6">
                 <div className="flex items-center gap-3">
-                    <Link href="/dashboard" className="text-neutral-400 hover:text-white transition-colors">
+                    <Link href="/dashboard" className="text-zinc-500 hover:text-white transition-colors">
                         <ArrowLeft size={24} />
                     </Link>
                     <h1 className="text-3xl font-bold">Commission Settings</h1>
                 </div>
-                <p className="text-neutral-400 mt-2">Manage commission percentages for drivers and businesses</p>
+                <p className="text-zinc-500 mt-2">Manage commission percentages for drivers and businesses</p>
             </div>
 
             <div className="p-6 space-y-8">
@@ -96,23 +96,23 @@ export default function CommissionSettings() {
                         Driver Commissions
                     </h2>
                     {driversLoading ? (
-                        <div className="text-neutral-400">Loading drivers...</div>
+                        <div className="text-zinc-500">Loading drivers...</div>
                     ) : (
-                        <div className="overflow-x-auto border border-[#262626] rounded-lg">
+                        <div className="overflow-x-auto border border-zinc-800 rounded-lg">
                             <table className="w-full">
                                 <thead>
-                                    <tr className="bg-[#0a0a0a] border-b border-[#262626]">
-                                        <th className="px-4 py-3 text-left text-sm font-bold text-neutral-400">Driver Name</th>
-                                        <th className="px-4 py-3 text-left text-sm font-bold text-neutral-400">Phone</th>
-                                        <th className="px-4 py-3 text-right text-sm font-bold text-neutral-400">Current %</th>
-                                        <th className="px-4 py-3 text-right text-sm font-bold text-neutral-400">Action</th>
+                                    <tr className="bg-[#09090b] border-b border-zinc-800">
+                                        <th className="px-4 py-3 text-left text-sm font-bold text-zinc-500">Driver Name</th>
+                                        <th className="px-4 py-3 text-left text-sm font-bold text-zinc-500">Phone</th>
+                                        <th className="px-4 py-3 text-right text-sm font-bold text-zinc-500">Current %</th>
+                                        <th className="px-4 py-3 text-right text-sm font-bold text-zinc-500">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {drivers.map((driver) => (
-                                        <tr key={driver.id} className="border-b border-[#262626] hover:bg-[#1a1a1a] transition-colors">
+                                        <tr key={driver.id} className="border-b border-zinc-800 hover:bg-[#1a1a1a] transition-colors">
                                             <td className="px-4 py-3 text-white font-semibold">{driver.firstName} {driver.lastName}</td>
-                                            <td className="px-4 py-3 text-neutral-400">{driver.phoneNumber}</td>
+                                            <td className="px-4 py-3 text-zinc-500">{driver.phoneNumber}</td>
                                             <td className="px-4 py-3 text-right text-blue-400 font-semibold">
                                                 {driver.commissionPercentage}%
                                             </td>
@@ -130,11 +130,11 @@ export default function CommissionSettings() {
                                                             }
                                                             min="0"
                                                             max="100"
-                                                            className="w-20 bg-[#0a0a0a] border border-[#262626] rounded px-2 py-1 text-white"
+                                                            className="w-20 bg-[#09090b] border border-zinc-800 rounded px-2 py-1 text-white"
                                                         />
                                                         <button
                                                             onClick={handleUpdateDriverCommission}
-                                                            className="bg-cyan-600 hover:bg-cyan-700 px-3 py-1 rounded text-sm"
+                                                            className="bg-violet-600 hover:bg-cyan-700 px-3 py-1 rounded text-sm"
                                                         >
                                                             Save
                                                         </button>
@@ -148,7 +148,7 @@ export default function CommissionSettings() {
                                                 ) : (
                                                     <button
                                                         onClick={() => setEditingDriver({ id: driver.id, percentage: driver.commissionPercentage })}
-                                                        className="bg-cyan-600 hover:bg-cyan-700 px-3 py-1 rounded text-sm transition-colors"
+                                                        className="bg-violet-600 hover:bg-cyan-700 px-3 py-1 rounded text-sm transition-colors"
                                                     >
                                                         Edit
                                                     </button>
@@ -169,23 +169,23 @@ export default function CommissionSettings() {
                         Business Commissions
                     </h2>
                     {businessesLoading ? (
-                        <div className="text-neutral-400">Loading businesses...</div>
+                        <div className="text-zinc-500">Loading businesses...</div>
                     ) : (
-                        <div className="overflow-x-auto border border-[#262626] rounded-lg">
+                        <div className="overflow-x-auto border border-zinc-800 rounded-lg">
                             <table className="w-full">
                                 <thead>
-                                    <tr className="bg-[#0a0a0a] border-b border-[#262626]">
-                                        <th className="px-4 py-3 text-left text-sm font-bold text-neutral-400">Business Name</th>
-                                        <th className="px-4 py-3 text-left text-sm font-bold text-neutral-400">Type</th>
-                                        <th className="px-4 py-3 text-right text-sm font-bold text-neutral-400">Current %</th>
-                                        <th className="px-4 py-3 text-right text-sm font-bold text-neutral-400">Action</th>
+                                    <tr className="bg-[#09090b] border-b border-zinc-800">
+                                        <th className="px-4 py-3 text-left text-sm font-bold text-zinc-500">Business Name</th>
+                                        <th className="px-4 py-3 text-left text-sm font-bold text-zinc-500">Type</th>
+                                        <th className="px-4 py-3 text-right text-sm font-bold text-zinc-500">Current %</th>
+                                        <th className="px-4 py-3 text-right text-sm font-bold text-zinc-500">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {businesses.map((business) => (
-                                        <tr key={business.id} className="border-b border-[#262626] hover:bg-[#1a1a1a] transition-colors">
+                                        <tr key={business.id} className="border-b border-zinc-800 hover:bg-[#1a1a1a] transition-colors">
                                             <td className="px-4 py-3 text-white font-semibold">{business.name}</td>
-                                            <td className="px-4 py-3 text-neutral-400">{business.businessType}</td>
+                                            <td className="px-4 py-3 text-zinc-500">{business.businessType}</td>
                                             <td className="px-4 py-3 text-right text-green-400 font-semibold">
                                                 {business.commissionPercentage}%
                                             </td>
@@ -203,7 +203,7 @@ export default function CommissionSettings() {
                                                             }
                                                             min="0"
                                                             max="100"
-                                                            className="w-20 bg-[#0a0a0a] border border-[#262626] rounded px-2 py-1 text-white"
+                                                            className="w-20 bg-[#09090b] border border-zinc-800 rounded px-2 py-1 text-white"
                                                         />
                                                         <button
                                                             onClick={handleUpdateBusinessCommission}

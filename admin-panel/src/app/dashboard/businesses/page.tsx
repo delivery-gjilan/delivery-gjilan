@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "@apollo/client/react";
@@ -338,10 +338,10 @@ export default function BusinessesPage() {
 
     return (
         <div className="text-white">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-semibold">Businesses</h1>
-                <Button variant="primary" onClick={() => setCreateOpen(true)}>
-                    + Create Business
+            <div className="flex justify-between items-center mb-5">
+                <h1 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Businesses</h1>
+                <Button variant="primary" size="sm" onClick={() => setCreateOpen(true)}>
+                    + Create
                 </Button>
             </div>
 

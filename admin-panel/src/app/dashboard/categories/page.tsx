@@ -29,7 +29,7 @@ export default function CategoriesPage() {
     return (
         <div className="text-white">
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-semibold">Product Categories</h1>
+                <h1 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Product Categories</h1>
             </div>
 
             {/* Business Selector */}

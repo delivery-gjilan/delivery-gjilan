@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useLazyQuery } from "@apollo/client/react";
@@ -36,7 +36,7 @@ import {
   X,
 } from "lucide-react";
 
-// ── Types ────────────────────────────────────────────────────────
+// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface Campaign {
   id: string;
@@ -64,11 +64,11 @@ interface UserItem {
 type Tab = "campaigns" | "direct";
 type StatusFilter = "ALL" | "DRAFT" | "SENDING" | "SENT" | "FAILED";
 
-// ── Status badge ─────────────────────────────────────────────────
+// â”€â”€ Status badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function StatusBadge({ status }: { status: string }) {
   const config: Record<string, { bg: string; text: string; icon: typeof Clock }> = {
-    DRAFT: { bg: "bg-neutral-800", text: "text-neutral-300", icon: Clock },
+    DRAFT: { bg: "bg-zinc-800/60", text: "text-zinc-400", icon: Clock },
     SENDING: { bg: "bg-yellow-950", text: "text-yellow-400", icon: AlertCircle },
     SENT: { bg: "bg-green-950", text: "text-green-400", icon: CheckCircle2 },
     FAILED: { bg: "bg-red-950", text: "text-red-400", icon: XCircle },
@@ -85,27 +85,27 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-// ── Stats Card ───────────────────────────────────────────────────
+// â”€â”€ Stats Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div className="bg-[#111] border border-[#262626] rounded-lg px-4 py-3">
-      <p className="text-xs text-neutral-500 uppercase tracking-wider">{label}</p>
+    <div className="bg-[#111] border border-zinc-800 rounded-lg px-4 py-3">
+      <p className="text-xs text-zinc-600 uppercase tracking-wider">{label}</p>
       <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
     </div>
   );
 }
 
-// ── Notification Preview Card ────────────────────────────────────
+// â”€â”€ Notification Preview Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function NotificationPreview({ title, body }: { title: string; body: string }) {
   if (!title && !body) return null;
 
   return (
     <div className="bg-[#1a1a1a] border border-[#333] rounded-xl p-3">
-      <p className="text-[10px] text-neutral-600 mb-2 uppercase tracking-wider">Push Preview</p>
+      <p className="text-[10px] text-zinc-600 mb-2 uppercase tracking-wider">Push Preview</p>
       <div className="bg-[#222] rounded-xl p-3 flex items-start gap-3 shadow-lg">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-cyan-700 flex items-center justify-center flex-shrink-0 shadow-md">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center flex-shrink-0 shadow-md">
           <Bell size={16} className="text-white" />
         </div>
         <div className="flex-1 min-w-0">
@@ -113,9 +113,9 @@ function NotificationPreview({ title, body }: { title: string; body: string }) {
             <p className="text-sm font-semibold text-white truncate">
               {title || "Notification Title"}
             </p>
-            <span className="text-[10px] text-neutral-600 flex-shrink-0 ml-2">now</span>
+            <span className="text-[10px] text-zinc-600 flex-shrink-0 ml-2">now</span>
           </div>
-          <p className="text-xs text-neutral-400 mt-0.5 line-clamp-2">
+          <p className="text-xs text-zinc-500 mt-0.5 line-clamp-2">
             {body || "Notification body text..."}
           </p>
         </div>
@@ -124,12 +124,12 @@ function NotificationPreview({ title, body }: { title: string; body: string }) {
   );
 }
 
-// ── Main Page ────────────────────────────────────────────────────
+// â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function NotificationsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("campaigns");
 
-  // ── Campaign state ──────────────────────────────
+  // â”€â”€ Campaign state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [showCreate, setShowCreate] = useState(false);
   const [showDetail, setShowDetail] = useState<Campaign | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<Campaign | null>(null);
@@ -142,14 +142,14 @@ export default function NotificationsPage() {
   const [previewUsers, setPreviewUsers] = useState<UserItem[]>([]);
   const [sendingId, setSendingId] = useState<string | null>(null);
 
-  // ── Direct send state ───────────────────────────
+  // â”€â”€ Direct send state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [directTitle, setDirectTitle] = useState("");
   const [directBody, setDirectBody] = useState("");
   const [directSearch, setDirectSearch] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<UserItem[]>([]);
   const [directSent, setDirectSent] = useState<{ success: boolean; successCount: number; failureCount: number } | null>(null);
 
-  // ── Queries & Mutations ─────────────────────────
+  // â”€â”€ Queries & Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const { data, loading, refetch } = useQuery(GET_NOTIFICATION_CAMPAIGNS);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const campaigns: Campaign[] = (data as any)?.notificationCampaigns || [];
@@ -164,7 +164,7 @@ export default function NotificationsPage() {
   const [sendPushMut, { loading: sendingDirect }] = useMutation(SEND_PUSH_NOTIFICATION);
   const [previewAudience, { loading: previewing }] = useLazyQuery(PREVIEW_CAMPAIGN_AUDIENCE);
 
-  // ── Computed ────────────────────────────────────
+  // â”€â”€ Computed â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const stats = useMemo(() => ({
     total: campaigns.length,
     draft: campaigns.filter((c) => c.status === "DRAFT").length,
@@ -202,7 +202,7 @@ export default function NotificationsPage() {
       .slice(0, 8);
   }, [allUsers, directSearch, selectedUsers]);
 
-  // ── Handlers ───────────────────────────────────
+  // â”€â”€ Handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handlePreview = async () => {
     try {
       const { data } = await previewAudience({ variables: { query: queryGroup } });
@@ -299,7 +299,7 @@ export default function NotificationsPage() {
     }
   };
 
-  // ── Render ──────────────────────────────────────
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   return (
     <div className="p-6 space-y-6">
@@ -307,12 +307,12 @@ export default function NotificationsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500 to-cyan-700 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center">
               <Bell size={18} className="text-white" />
             </div>
             Push Notifications
           </h1>
-          <p className="text-neutral-500 text-sm mt-1">
+          <p className="text-zinc-600 text-sm mt-1">
             Create targeted campaigns or send direct notifications
           </p>
         </div>
@@ -325,19 +325,19 @@ export default function NotificationsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-[#0a0a0a] border border-[#262626] rounded-lg p-1 w-fit">
+      <div className="flex gap-1 bg-[#09090b] border border-zinc-800 rounded-lg p-1 w-fit">
         <button
           onClick={() => setActiveTab("campaigns")}
           className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
             activeTab === "campaigns"
               ? "bg-[#1a1a1a] text-white border border-[#333]"
-              : "text-neutral-500 hover:text-neutral-300"
+              : "text-zinc-600 hover:text-zinc-400"
           }`}
         >
           <Megaphone size={15} />
           Campaigns
           {stats.draft > 0 && (
-            <span className="bg-cyan-900/60 text-cyan-300 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+            <span className="bg-violet-900/60 text-violet-300 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
               {stats.draft}
             </span>
           )}
@@ -347,7 +347,7 @@ export default function NotificationsPage() {
           className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
             activeTab === "direct"
               ? "bg-[#1a1a1a] text-white border border-[#333]"
-              : "text-neutral-500 hover:text-neutral-300"
+              : "text-zinc-600 hover:text-zinc-400"
           }`}
         >
           <Send size={15} />
@@ -355,13 +355,13 @@ export default function NotificationsPage() {
         </button>
       </div>
 
-      {/* ─── CAMPAIGNS TAB ───────────────────────────── */}
+      {/* â”€â”€â”€ CAMPAIGNS TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {activeTab === "campaigns" && (
         <>
           {/* Stats row */}
           <div className="grid grid-cols-4 gap-3">
             <StatCard label="Total" value={stats.total} color="text-white" />
-            <StatCard label="Drafts" value={stats.draft} color="text-neutral-400" />
+            <StatCard label="Drafts" value={stats.draft} color="text-zinc-500" />
             <StatCard label="Sent" value={stats.sent} color="text-green-400" />
             <StatCard label="Failed" value={stats.failed} color="text-red-400" />
           </div>
@@ -369,13 +369,13 @@ export default function NotificationsPage() {
           {/* Filters */}
           <div className="flex items-center gap-3">
             <div className="relative flex-1 max-w-sm">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search campaigns..."
-                className="w-full bg-[#0a0a0a] border border-[#262626] rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-cyan-600"
+                className="w-full bg-[#09090b] border border-zinc-800 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-violet-600"
               />
             </div>
             <div className="flex gap-1">
@@ -386,7 +386,7 @@ export default function NotificationsPage() {
                   className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                     statusFilter === s
                       ? "bg-[#1a1a1a] text-white border border-[#333]"
-                      : "text-neutral-500 hover:text-neutral-300 hover:bg-[#111]"
+                      : "text-zinc-600 hover:text-zinc-400 hover:bg-[#111]"
                   }`}
                 >
                   {s === "ALL" ? "All" : s.charAt(0) + s.slice(1).toLowerCase()}
@@ -411,7 +411,7 @@ export default function NotificationsPage() {
               {loading && (
                 <tr>
                   <Td colSpan={6}>
-                    <div className="text-center text-neutral-500 py-12">
+                    <div className="text-center text-zinc-600 py-12">
                       <div className="animate-pulse">Loading campaigns...</div>
                     </div>
                   </Td>
@@ -423,7 +423,7 @@ export default function NotificationsPage() {
                   <Td colSpan={6}>
                     <div className="text-center py-12">
                       <Megaphone size={32} className="text-neutral-700 mx-auto mb-3" />
-                      <p className="text-neutral-500 text-sm">
+                      <p className="text-zinc-600 text-sm">
                         {searchTerm || statusFilter !== "ALL"
                           ? "No campaigns match your filters"
                           : "No campaigns yet. Create your first one!"}
@@ -436,13 +436,13 @@ export default function NotificationsPage() {
               {filteredCampaigns.map((campaign) => (
                 <tr
                   key={campaign.id}
-                  className="border-t border-[#262626] hover:bg-[#0f0f0f] transition-colors cursor-pointer"
+                  className="border-t border-zinc-800 hover:bg-[#0f0f0f] transition-colors cursor-pointer"
                   onClick={() => setShowDetail(campaign)}
                 >
                   <Td>
                     <div className="max-w-[280px]">
                       <p className="font-medium text-white truncate">{campaign.title}</p>
-                      <p className="text-xs text-neutral-500 mt-0.5 truncate">{campaign.body}</p>
+                      <p className="text-xs text-zinc-600 mt-0.5 truncate">{campaign.body}</p>
                     </div>
                   </Td>
                   <Td>
@@ -450,8 +450,8 @@ export default function NotificationsPage() {
                   </Td>
                   <Td>
                     <div className="flex items-center gap-1.5 text-sm">
-                      <Users size={13} className="text-neutral-500" />
-                      <span className="text-neutral-300">{campaign.targetCount}</span>
+                      <Users size={13} className="text-zinc-600" />
+                      <span className="text-zinc-400">{campaign.targetCount}</span>
                     </div>
                   </Td>
                   <Td>
@@ -463,7 +463,7 @@ export default function NotificationsPage() {
                     </div>
                   </Td>
                   <Td>
-                    <span className="text-neutral-500 text-xs">
+                    <span className="text-zinc-600 text-xs">
                       {new Date(campaign.createdAt).toLocaleDateString("en-GB", {
                         day: "2-digit",
                         month: "short",
@@ -509,14 +509,14 @@ export default function NotificationsPage() {
         </>
       )}
 
-      {/* ─── DIRECT SEND TAB ─────────────────────────── */}
+      {/* â”€â”€â”€ DIRECT SEND TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {activeTab === "direct" && (
         <div className="grid grid-cols-2 gap-6">
           {/* Left: compose */}
           <div className="space-y-4">
-            <div className="bg-[#111] border border-[#262626] rounded-xl p-5 space-y-4">
-              <h3 className="text-sm font-semibold text-neutral-300 uppercase tracking-wider flex items-center gap-2">
-                <Send size={14} className="text-cyan-500" />
+            <div className="bg-[#111] border border-zinc-800 rounded-xl p-5 space-y-4">
+              <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+                <Send size={14} className="text-violet-500" />
                 Compose Notification
               </h3>
 
@@ -528,12 +528,12 @@ export default function NotificationsPage() {
               />
 
               <div>
-                <label className="block text-sm font-medium text-neutral-300 mb-1">Message</label>
+                <label className="block text-sm font-medium text-zinc-400 mb-1">Message</label>
                 <textarea
                   value={directBody}
                   onChange={(e) => setDirectBody(e.target.value)}
                   placeholder="Notification body..."
-                  className="w-full bg-[#0a0a0a] border border-[#262626] rounded-lg px-3 py-2 text-white placeholder-neutral-600 text-sm resize-none h-24 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                  className="w-full bg-[#09090b] border border-zinc-800 rounded-lg px-3 py-2 text-white placeholder-neutral-600 text-sm resize-none h-24 focus:outline-none focus:ring-1 focus:ring-violet-500"
                 />
               </div>
 
@@ -561,27 +561,27 @@ export default function NotificationsPage() {
           </div>
 
           {/* Right: user picker */}
-          <div className="bg-[#111] border border-[#262626] rounded-xl p-5 space-y-4">
-            <h3 className="text-sm font-semibold text-neutral-300 uppercase tracking-wider flex items-center gap-2">
-              <Users size={14} className="text-cyan-500" />
+          <div className="bg-[#111] border border-zinc-800 rounded-xl p-5 space-y-4">
+            <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+              <Users size={14} className="text-violet-500" />
               Select Recipients
             </h3>
 
             {/* Search users */}
             <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
               <input
                 type="text"
                 value={directSearch}
                 onChange={(e) => setDirectSearch(e.target.value)}
                 placeholder="Search by name or email..."
-                className="w-full bg-[#0a0a0a] border border-[#262626] rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-cyan-600"
+                className="w-full bg-[#09090b] border border-zinc-800 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-violet-600"
               />
             </div>
 
             {/* Search results */}
             {filteredUsers.length > 0 && (
-              <div className="border border-[#262626] rounded-lg overflow-hidden max-h-48 overflow-y-auto">
+              <div className="border border-zinc-800 rounded-lg overflow-hidden max-h-48 overflow-y-auto">
                 {filteredUsers.map((user) => (
                   <button
                     key={user.id}
@@ -591,16 +591,16 @@ export default function NotificationsPage() {
                     }}
                     className="w-full px-3 py-2 flex items-center gap-3 hover:bg-[#1a1a1a] transition-colors text-left border-b border-[#1a1a1a] last:border-0"
                   >
-                    <div className="w-7 h-7 rounded-full bg-neutral-800 flex items-center justify-center text-xs text-neutral-400 flex-shrink-0">
+                    <div className="w-7 h-7 rounded-full bg-zinc-800/60 flex items-center justify-center text-xs text-zinc-500 flex-shrink-0">
                       {user.firstName[0]}{user.lastName[0]}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-white truncate">
                         {user.firstName} {user.lastName}
                       </p>
-                      <p className="text-xs text-neutral-500 truncate">{user.email}</p>
+                      <p className="text-xs text-zinc-600 truncate">{user.email}</p>
                     </div>
-                    <span className="text-[10px] text-neutral-600 uppercase">{user.role}</span>
+                    <span className="text-[10px] text-zinc-600 uppercase">{user.role}</span>
                   </button>
                 ))}
               </div>
@@ -609,19 +609,19 @@ export default function NotificationsPage() {
             {/* Selected users */}
             {selectedUsers.length > 0 && (
               <div>
-                <p className="text-xs text-neutral-500 mb-2">
+                <p className="text-xs text-zinc-600 mb-2">
                   {selectedUsers.length} recipient{selectedUsers.length !== 1 ? "s" : ""} selected
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {selectedUsers.map((user) => (
                     <span
                       key={user.id}
-                      className="inline-flex items-center gap-1.5 bg-[#1a1a1a] border border-[#333] rounded-full pl-2.5 pr-1.5 py-1 text-xs text-neutral-300"
+                      className="inline-flex items-center gap-1.5 bg-[#1a1a1a] border border-[#333] rounded-full pl-2.5 pr-1.5 py-1 text-xs text-zinc-400"
                     >
                       {user.firstName} {user.lastName}
                       <button
                         onClick={() => setSelectedUsers((prev) => prev.filter((u) => u.id !== user.id))}
-                        className="p-0.5 rounded-full hover:bg-neutral-700 transition-colors"
+                        className="p-0.5 rounded-full hover:bg-zinc-800 transition-colors"
                       >
                         <X size={10} />
                       </button>
@@ -634,19 +634,19 @@ export default function NotificationsPage() {
             {selectedUsers.length === 0 && !directSearch && (
               <div className="text-center py-8">
                 <Users size={28} className="text-neutral-700 mx-auto mb-2" />
-                <p className="text-neutral-500 text-xs">Search and select users to send notifications to</p>
+                <p className="text-zinc-600 text-xs">Search and select users to send notifications to</p>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* ─── CREATE CAMPAIGN MODAL ────────────────────── */}
+      {/* â”€â”€â”€ CREATE CAMPAIGN MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Modal isOpen={showCreate} onClose={() => setShowCreate(false)} title="New Campaign">
         <div className="space-y-6">
           {/* Content */}
           <div className="space-y-3">
-            <h3 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
+            <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
               Notification Content
             </h3>
             <Input
@@ -656,12 +656,12 @@ export default function NotificationsPage() {
               placeholder="e.g., Weekend special offer!"
             />
             <div>
-              <label className="block text-sm font-medium text-neutral-300 mb-1">Message</label>
+              <label className="block text-sm font-medium text-zinc-400 mb-1">Message</label>
               <textarea
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 placeholder="e.g., Get 20% off all orders this weekend!"
-                className="w-full bg-[#0a0a0a] border border-[#262626] rounded-lg px-3 py-2 text-white placeholder-neutral-600 text-sm resize-none h-20 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                className="w-full bg-[#09090b] border border-zinc-800 rounded-lg px-3 py-2 text-white placeholder-neutral-600 text-sm resize-none h-20 focus:outline-none focus:ring-1 focus:ring-violet-500"
               />
             </div>
             <NotificationPreview title={title} body={body} />
@@ -670,10 +670,10 @@ export default function NotificationsPage() {
           {/* Query Builder */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
+              <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
                 Target Audience
               </h3>
-              <span className="text-[10px] text-neutral-600">
+              <span className="text-[10px] text-zinc-600">
                 Build rules to target specific users
               </span>
             </div>
@@ -694,30 +694,30 @@ export default function NotificationsPage() {
               </Button>
               {previewCount !== null && (
                 <div className="flex items-center gap-1.5 text-sm">
-                  <Users size={14} className="text-cyan-400" />
+                  <Users size={14} className="text-violet-400" />
                   <span className="text-white font-semibold">{previewCount}</span>
-                  <span className="text-neutral-500">users matched</span>
+                  <span className="text-zinc-600">users matched</span>
                 </div>
               )}
             </div>
 
             {previewUsers.length > 0 && (
-              <div className="bg-[#0a0a0a] border border-[#262626] rounded-lg overflow-hidden">
+              <div className="bg-[#09090b] border border-zinc-800 rounded-lg overflow-hidden">
                 <div className="px-3 py-1.5 border-b border-[#1f1f1f]">
-                  <p className="text-[10px] text-neutral-600 uppercase tracking-wider">
+                  <p className="text-[10px] text-zinc-600 uppercase tracking-wider">
                     Sample users (up to 10)
                   </p>
                 </div>
                 <div className="divide-y divide-[#1f1f1f]">
                   {previewUsers.map((u) => (
                     <div key={u.id} className="px-3 py-2 flex items-center gap-3">
-                      <div className="w-6 h-6 rounded-full bg-neutral-800 flex items-center justify-center text-[10px] text-neutral-400 flex-shrink-0">
+                      <div className="w-6 h-6 rounded-full bg-zinc-800/60 flex items-center justify-center text-[10px] text-zinc-500 flex-shrink-0">
                         {u.firstName[0]}{u.lastName[0]}
                       </div>
-                      <span className="text-xs text-neutral-300">
+                      <span className="text-xs text-zinc-400">
                         {u.firstName} {u.lastName}
                       </span>
-                      <span className="text-xs text-neutral-600 ml-auto">{u.email}</span>
+                      <span className="text-xs text-zinc-600 ml-auto">{u.email}</span>
                       <span className="text-[10px] text-neutral-700 uppercase">{u.role}</span>
                     </div>
                   ))}
@@ -727,7 +727,7 @@ export default function NotificationsPage() {
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-2 pt-3 border-t border-[#262626]">
+          <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800">
             <Button variant="outline" onClick={() => setShowCreate(false)}>
               Cancel
             </Button>
@@ -738,7 +738,7 @@ export default function NotificationsPage() {
         </div>
       </Modal>
 
-      {/* ─── CAMPAIGN DETAIL MODAL ────────────────────── */}
+      {/* â”€â”€â”€ CAMPAIGN DETAIL MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Modal
         isOpen={!!showDetail}
         onClose={() => setShowDetail(null)}
@@ -748,7 +748,7 @@ export default function NotificationsPage() {
           <div className="space-y-5">
             <div className="flex items-center gap-3">
               <StatusBadge status={showDetail.status} />
-              <span className="text-xs text-neutral-500">
+              <span className="text-xs text-zinc-600">
                 Created {new Date(showDetail.createdAt).toLocaleDateString("en-GB", {
                   day: "2-digit",
                   month: "long",
@@ -761,29 +761,29 @@ export default function NotificationsPage() {
 
             {/* Content */}
             <div className="space-y-2">
-              <h4 className="text-xs text-neutral-500 uppercase tracking-wider">Content</h4>
+              <h4 className="text-xs text-zinc-600 uppercase tracking-wider">Content</h4>
               <NotificationPreview title={showDetail.title} body={showDetail.body} />
             </div>
 
             {/* Delivery stats */}
             <div className="space-y-2">
-              <h4 className="text-xs text-neutral-500 uppercase tracking-wider">Delivery</h4>
+              <h4 className="text-xs text-zinc-600 uppercase tracking-wider">Delivery</h4>
               <div className="grid grid-cols-3 gap-3">
-                <div className="bg-[#0a0a0a] border border-[#262626] rounded-lg p-3 text-center">
-                  <p className="text-xs text-neutral-500">Target</p>
+                <div className="bg-[#09090b] border border-zinc-800 rounded-lg p-3 text-center">
+                  <p className="text-xs text-zinc-600">Target</p>
                   <p className="text-xl font-bold text-white mt-1">{showDetail.targetCount}</p>
                 </div>
-                <div className="bg-[#0a0a0a] border border-[#262626] rounded-lg p-3 text-center">
-                  <p className="text-xs text-neutral-500">Sent</p>
+                <div className="bg-[#09090b] border border-zinc-800 rounded-lg p-3 text-center">
+                  <p className="text-xs text-zinc-600">Sent</p>
                   <p className="text-xl font-bold text-green-400 mt-1">{showDetail.sentCount}</p>
                 </div>
-                <div className="bg-[#0a0a0a] border border-[#262626] rounded-lg p-3 text-center">
-                  <p className="text-xs text-neutral-500">Failed</p>
+                <div className="bg-[#09090b] border border-zinc-800 rounded-lg p-3 text-center">
+                  <p className="text-xs text-zinc-600">Failed</p>
                   <p className="text-xl font-bold text-red-400 mt-1">{showDetail.failedCount}</p>
                 </div>
               </div>
               {showDetail.sentAt && (
-                <p className="text-xs text-neutral-500">
+                <p className="text-xs text-zinc-600">
                   Sent at {new Date(showDetail.sentAt).toLocaleString("en-GB")}
                 </p>
               )}
@@ -792,9 +792,9 @@ export default function NotificationsPage() {
             {/* Query summary */}
             {showDetail.query && (
               <div className="space-y-2">
-                <h4 className="text-xs text-neutral-500 uppercase tracking-wider">Target Query</h4>
-                <div className="bg-[#0a0a0a] border border-[#262626] rounded-lg p-3">
-                  <pre className="text-xs text-neutral-400 overflow-x-auto whitespace-pre-wrap">
+                <h4 className="text-xs text-zinc-600 uppercase tracking-wider">Target Query</h4>
+                <div className="bg-[#09090b] border border-zinc-800 rounded-lg p-3">
+                  <pre className="text-xs text-zinc-500 overflow-x-auto whitespace-pre-wrap">
                     {JSON.stringify(showDetail.query, null, 2)}
                   </pre>
                 </div>
@@ -802,7 +802,7 @@ export default function NotificationsPage() {
             )}
 
             {/* Actions */}
-            <div className="flex justify-end gap-2 pt-3 border-t border-[#262626]">
+            <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800">
               <Button
                 variant="outline"
                 onClick={() => handleDuplicate(showDetail)}
@@ -838,7 +838,7 @@ export default function NotificationsPage() {
         )}
       </Modal>
 
-      {/* ─── DELETE CONFIRM MODAL ─────────────────────── */}
+      {/* â”€â”€â”€ DELETE CONFIRM MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Modal
         isOpen={!!showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(null)}
@@ -846,7 +846,7 @@ export default function NotificationsPage() {
       >
         {showDeleteConfirm && (
           <div className="space-y-4">
-            <p className="text-neutral-300 text-sm">
+            <p className="text-zinc-400 text-sm">
               Are you sure you want to delete <strong className="text-white">&quot;{showDeleteConfirm.title}&quot;</strong>?
               This action cannot be undone.
             </p>

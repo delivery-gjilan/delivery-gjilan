@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useMemo, useRef, useState, Fragment } from "react";
 import { useQuery, useSubscription, useMutation } from "@apollo/client/react";
@@ -804,7 +804,7 @@ export default function MapPage() {
   };
 
   return (
-    <div className="h-screen flex bg-[#0a0a0a] text-white">
+    <div className="h-screen flex bg-[#09090b] text-white">
       {/* ==== LEFT SIDEBAR ==== */}
       <div className="w-72 bg-[#111111] border-r border-[#1f1f1f] flex flex-col overflow-hidden">
         {/* Filters */}
@@ -821,7 +821,7 @@ export default function MapPage() {
               <select
                 value={filters.status}
                 onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                className="w-full bg-[#0a0a0a] border border-[#262626] rounded px-2 py-1 text-xs"
+                className="w-full bg-[#09090b] border border-zinc-800 rounded px-2 py-1 text-xs"
               >
                 <option value="ALL">All Status</option>
                 <option value="PENDING">Pending</option>
@@ -846,7 +846,7 @@ export default function MapPage() {
           <button
             onClick={() => setShowDriversPanel(false)}
             className={`flex-1 py-2 text-xs font-medium transition ${
-              !showDriversPanel ? "text-white border-b-2 border-emerald-400" : "text-neutral-400 hover:text-white"
+              !showDriversPanel ? "text-white border-b-2 border-emerald-400" : "text-zinc-500 hover:text-white"
             }`}
           >
             Orders ({filteredOrders.length})
@@ -854,7 +854,7 @@ export default function MapPage() {
           <button
             onClick={() => setShowDriversPanel(true)}
             className={`flex-1 py-2 text-xs font-medium transition flex items-center justify-center gap-2 ${
-              showDriversPanel ? "text-white border-b-2 border-blue-400" : "text-neutral-400 hover:text-white"
+              showDriversPanel ? "text-white border-b-2 border-blue-400" : "text-zinc-500 hover:text-white"
             }`}
           >
             <span>Drivers</span>
@@ -897,7 +897,7 @@ export default function MapPage() {
           ) : (
             <div className="flex flex-col h-full">
               {/* Driver Stats Summary */}
-              <div className="p-3 border-b border-[#1f1f1f] bg-[#0a0a0a]">
+              <div className="p-3 border-b border-[#1f1f1f] bg-[#09090b]">
                 <div className="grid grid-cols-5 gap-1 text-center">
                   <button 
                     onClick={() => setDriverFilter(driverFilter === 'CONNECTED' ? 'ALL' : 'CONNECTED')}
@@ -938,7 +938,7 @@ export default function MapPage() {
                 {driverFilter !== 'ALL' && (
                   <button 
                     onClick={() => setDriverFilter('ALL')}
-                    className="mt-2 w-full text-[10px] text-neutral-400 hover:text-white transition flex items-center justify-center gap-1"
+                    className="mt-2 w-full text-[10px] text-zinc-500 hover:text-white transition flex items-center justify-center gap-1"
                   >
                     <X size={10} />
                     Clear filter ({filteredDrivers.length} shown)
@@ -949,7 +949,7 @@ export default function MapPage() {
               {/* Driver List */}
               <div className="flex-1 overflow-y-auto p-3 space-y-2">
                 {filteredDrivers.length === 0 ? (
-                  <div className="text-center text-neutral-500 text-sm py-8">
+                  <div className="text-center text-zinc-600 text-sm py-8">
                     No drivers match filter
                   </div>
                 ) : (
@@ -982,7 +982,7 @@ export default function MapPage() {
               </div>
               
               {/* Legend */}
-              <div className="p-2 border-t border-[#1f1f1f] bg-[#0a0a0a] flex items-center justify-center gap-3 text-[9px]">
+              <div className="p-2 border-t border-[#1f1f1f] bg-[#09090b] flex items-center justify-center gap-3 text-[9px]">
                 <span className="text-emerald-400 flex items-center gap-1"><Signal size={10} /> Active</span>
                 <span className="text-amber-400 flex items-center gap-1"><SignalLow size={10} /> Warning</span>
                 <span className="text-rose-400 flex items-center gap-1"><SignalZero size={10} /> Offline</span>
@@ -998,7 +998,7 @@ export default function MapPage() {
         {/* Floating Driver Status Widget */}
         <div className="absolute top-4 right-4 z-20 bg-black/80 backdrop-blur-md rounded-lg border border-white/10 shadow-xl">
           <div className="px-3 py-2 border-b border-white/10">
-            <div className="text-[10px] text-neutral-400 uppercase font-semibold">Driver Status</div>
+            <div className="text-[10px] text-zinc-500 uppercase font-semibold">Driver Status</div>
           </div>
           <div className="px-3 py-2 flex items-center gap-3">
             <div className="flex items-center gap-1.5" title="Connected (Active)">
@@ -1088,7 +1088,7 @@ export default function MapPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="font-semibold text-base mb-1">{business.name}</div>
-                            <div className="flex items-center gap-2 text-xs text-neutral-400 mb-2">
+                            <div className="flex items-center gap-2 text-xs text-zinc-500 mb-2">
                               <span className={`px-2 py-0.5 rounded ${
                                 business.businessType === 'RESTAURANT' 
                                   ? 'bg-orange-500/20 text-orange-400' 
@@ -1103,19 +1103,19 @@ export default function MapPage() {
                               )}
                             </div>
                             {business.location?.address && (
-                              <div className="text-xs text-neutral-400 flex items-start gap-1 mb-2">
+                              <div className="text-xs text-zinc-500 flex items-start gap-1 mb-2">
                                 <MapPin size={12} className="mt-0.5 flex-shrink-0" />
                                 <span className="line-clamp-2">{business.location.address}</span>
                               </div>
                             )}
                             {business.phoneNumber && (
-                              <div className="text-xs text-neutral-400 flex items-center gap-1">
+                              <div className="text-xs text-zinc-500 flex items-center gap-1">
                                 <Phone size={12} />
                                 <span>{business.phoneNumber}</span>
                               </div>
                             )}
                             {business.avgPrepTimeMinutes && (
-                              <div className="text-xs text-neutral-400 flex items-center gap-1 mt-1">
+                              <div className="text-xs text-zinc-500 flex items-center gap-1 mt-1">
                                 <Clock size={12} />
                                 <span>~{business.avgPrepTimeMinutes} min prep time</span>
                               </div>
@@ -1223,7 +1223,6 @@ export default function MapPage() {
             const drop = order.dropOffLocation;
             if (!drop?.latitude || !drop?.longitude) return null;
             const statusColor = ORDER_STATUS_COLORS[order.status as keyof typeof ORDER_STATUS_COLORS] || ORDER_STATUS_COLORS.PENDING;
-            const isPending = order.status === 'PENDING';
             const businessNames = order.businesses?.map((b: any) => b.business?.name).filter(Boolean).join(", ") || "Order";
             const isHovered = hoveredOrderId === order.id;
 
@@ -1250,20 +1249,16 @@ export default function MapPage() {
                   onMouseEnter={() => setHoveredOrderId(order.id)}
                   onMouseLeave={() => setHoveredOrderId(null)}
                 >
-                  {isPending && (
-                    <div className="absolute inset-0 w-10 h-10 -top-1 -left-1 rounded-full bg-rose-500 animate-ping opacity-75" />
-                  )}
-                  <div className={`relative w-8 h-8 rounded-full ${statusColor.bg} ${statusColor.border} border-2 flex items-center justify-center shadow-lg ${
-                    isPending ? 'ring-2 ring-rose-500 ring-opacity-50 animate-pulse' : ''
-                  } hover:scale-110 transition-transform`}>
-                    <Package size={16} className={statusColor.text} />
+                  <div className="absolute inset-0 w-5 h-5 rounded-full bg-red-500 animate-ping opacity-50" />
+                  <div className="relative w-5 h-5 rounded-full bg-violet-600 border-2 border-white flex items-center justify-center shadow-lg hover:scale-125 transition-transform">
+                    <Package size={12} className="text-white" />
                   </div>
                   {isHovered && (
                     <div className="absolute bottom-full mb-3 px-4 py-3 bg-black text-white text-sm rounded-lg shadow-2xl whitespace-nowrap z-[100] pointer-events-none border-2 border-white/20">
                       <div className="font-semibold text-base">{businessNames}</div>
                       <div className={`${statusColor.text} mt-1.5 text-xs font-medium uppercase`}>{order.status.replace(/_/g, ' ')}</div>
                       {order.driver && (
-                        <div className="text-neutral-300 text-xs mt-1.5 flex items-center gap-1">
+                        <div className="text-zinc-400 text-xs mt-1.5 flex items-center gap-1">
                           <User size={12} />
                           {order.driver.firstName} {order.driver.lastName}
                         </div>
@@ -1347,7 +1342,7 @@ export default function MapPage() {
                       </div>
                       
                       {/* Last heartbeat */}
-                      <div className="text-[10px] text-neutral-400 mt-2 flex items-center gap-1">
+                      <div className="text-[10px] text-zinc-500 mt-2 flex items-center gap-1">
                         <Clock size={10} />
                         Last heartbeat: {formatHeartbeatElapsed(lastHeartbeat, now)}
                       </div>
@@ -1355,12 +1350,12 @@ export default function MapPage() {
                       {/* Online preference */}
                       <div className="text-[10px] mt-1 flex items-center gap-1">
                         <span className={onlinePreference ? 'text-emerald-400' : 'text-slate-400'}>
-                          {onlinePreference ? '✓ Online preference ON' : '✗ Online preference OFF'}
+                          {onlinePreference ? 'âœ“ Online preference ON' : 'âœ— Online preference OFF'}
                         </span>
                       </div>
                       
                       {/* Location coordinates */}
-                      <div className="text-[10px] text-neutral-300 mt-2 font-mono">
+                      <div className="text-[10px] text-zinc-400 mt-2 font-mono">
                         {pos.latitude.toFixed(4)}, {pos.longitude.toFixed(4)}
                       </div>
                       
@@ -1374,12 +1369,12 @@ export default function MapPage() {
                         </span>
                         {isFollowing && (
                           <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">
-                            👁️ TRACKING
+                            ðŸ‘ï¸ TRACKING
                           </span>
                         )}
                       </div>
                       
-                      <div className="text-[9px] text-neutral-400 mt-2 pt-2 border-t border-white/10">
+                      <div className="text-[9px] text-zinc-500 mt-2 pt-2 border-t border-white/10">
                         Click to {isFollowing ? 'stop' : 'start'} tracking
                       </div>
                     </div>
@@ -1413,7 +1408,7 @@ export default function MapPage() {
                   className="p-1 hover:bg-white/10 rounded-md transition-colors"
                   title="Stop tracking"
                 >
-                  <X size={16} className="text-neutral-400" />
+                  <X size={16} className="text-zinc-500" />
                 </button>
               </div>
               
@@ -1421,7 +1416,7 @@ export default function MapPage() {
               <div className="space-y-3">
                 {/* Name */}
                 <div>
-                  <div className="text-xs text-neutral-400 uppercase">Driver</div>
+                  <div className="text-xs text-zinc-500 uppercase">Driver</div>
                   <div className="text-sm font-semibold text-white">
                     {driver.firstName} {driver.lastName}
                   </div>
@@ -1430,7 +1425,7 @@ export default function MapPage() {
                 {/* Location */}
                 {pos && (
                   <div>
-                    <div className="text-xs text-neutral-400 uppercase">Location</div>
+                    <div className="text-xs text-zinc-500 uppercase">Location</div>
                     <div className="text-xs font-mono text-blue-300">
                       {pos.latitude.toFixed(5)}
                     </div>
@@ -1442,7 +1437,7 @@ export default function MapPage() {
                 
                 {/* Connection Status */}
                 <div>
-                  <div className="text-xs text-neutral-400 uppercase">Status</div>
+                  <div className="text-xs text-zinc-500 uppercase">Status</div>
                   <div className={`flex items-center gap-2 text-xs font-medium ${statusStyle.text}`}>
                     <StatusIcon size={12} />
                     {statusStyle.label}
@@ -1451,8 +1446,8 @@ export default function MapPage() {
                 
                 {/* Last Heartbeat */}
                 <div>
-                  <div className="text-xs text-neutral-400 uppercase">Last Heartbeat</div>
-                  <div className="text-xs text-neutral-300">
+                  <div className="text-xs text-zinc-500 uppercase">Last Heartbeat</div>
+                  <div className="text-xs text-zinc-400">
                     {formatHeartbeatElapsed(driver?.driverConnection?.lastHeartbeatAt, now)}
                   </div>
                 </div>
@@ -1503,13 +1498,13 @@ export default function MapPage() {
 
 function StatCard({ icon, label, value, color, subtitle }: { icon: React.ReactNode; label: string; value: string | number; color: string; subtitle?: string }) {
   return (
-    <div className="bg-[#0a0a0a] border border-[#1f1f1f] rounded-lg p-3">
+    <div className="bg-[#09090b] border border-[#1f1f1f] rounded-lg p-3">
       <div className="flex items-center gap-2 mb-1">
         <div className={color}>{icon}</div>
-        <span className="text-[10px] text-neutral-400 uppercase">{label}</span>
+        <span className="text-[10px] text-zinc-500 uppercase">{label}</span>
       </div>
       <div className={`text-lg font-semibold ${color}`}>{value}</div>
-      {subtitle && <div className="text-[9px] text-neutral-500 mt-0.5">{subtitle}</div>}
+      {subtitle && <div className="text-[9px] text-zinc-600 mt-0.5">{subtitle}</div>}
     </div>
   );
 }
@@ -1539,7 +1534,7 @@ const OrderCard = React.forwardRef(({ order, orderDistances, now, onClick, isSel
       className={`w-full text-left p-3 rounded-lg border transition ${
         isSelected
           ? `${statusColor.bg} ${statusColor.border} border-2`
-          : "bg-[#0a0a0a] border-[#1f1f1f] hover:border-[#2a2a2a]"
+          : "bg-[#09090b] border-[#1f1f1f] hover:border-[#2a2a2a]"
       } ${isPending ? 'ring-2 ring-rose-500 ring-opacity-50 animate-pulse' : ''}`}
     >
       <div className="flex items-start justify-between mb-1">
@@ -1547,27 +1542,27 @@ const OrderCard = React.forwardRef(({ order, orderDistances, now, onClick, isSel
           {isPending && <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />}
           {order.status.replace(/_/g, " ")}
         </div>
-        <div className="text-[10px] text-neutral-500 text-right space-y-0.5">
+        <div className="text-[10px] text-zinc-600 text-right space-y-0.5">
           {isPending ? (
-            <div className="text-neutral-400">{elapsedLabel}</div>
+            <div className="text-zinc-500">{elapsedLabel}</div>
           ) : (
             <>
               <div className="flex justify-end gap-1">
-                <span className="text-neutral-600">in status:</span>
-                <span className="text-neutral-400">{statusElapsed}</span>
+                <span className="text-zinc-600">in status:</span>
+                <span className="text-zinc-500">{statusElapsed}</span>
               </div>
               <div className="flex justify-end gap-1">
-                <span className="text-neutral-600">total:</span>
-                <span className="text-neutral-400">{elapsedLabel}</span>
+                <span className="text-zinc-600">total:</span>
+                <span className="text-zinc-500">{elapsedLabel}</span>
               </div>
             </>
           )}
         </div>
       </div>
       <div className="text-sm font-medium text-white mb-1">{businessNames}</div>
-      <div className="text-xs text-neutral-400">→ {customerName}</div>
+      <div className="text-xs text-zinc-500">â†’ {customerName}</div>
       {order.driver && (
-        <div className="text-[10px] text-neutral-500 mt-1">
+        <div className="text-[10px] text-zinc-600 mt-1">
           Driver: {order.driver.firstName} {order.driver.lastName}
         </div>
       )}
@@ -1607,20 +1602,20 @@ function OrderDetailDrawer({ order, drivers, activeOrders, orderDistances, onClo
             <div className={`text-xs font-semibold ${statusColor.text} uppercase mb-1`}>{order.status.replace(/_/g, " ")}</div>
             <h3 className="text-lg font-semibold text-white">Order Details</h3>
           </div>
-          <button onClick={onClose} className="text-neutral-400 hover:text-white transition">
+          <button onClick={onClose} className="text-zinc-500 hover:text-white transition">
             <X size={20} />
           </button>
         </div>
 
         {/* Business Info */}
-        <div className="bg-[#0a0a0a] border border-[#1f1f1f] rounded-lg p-3 mb-3">
+        <div className="bg-[#09090b] border border-[#1f1f1f] rounded-lg p-3 mb-3">
           <div className="flex items-center gap-2 mb-2">
             <Store size={14} className="text-amber-400" />
-            <span className="text-xs text-neutral-400 uppercase">Business</span>
+            <span className="text-xs text-zinc-500 uppercase">Business</span>
           </div>
           <div className="text-sm font-medium text-white">{businessNames}</div>
           {businessPhones && (
-            <div className="flex items-center gap-2 mt-1 text-xs text-neutral-400">
+            <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500">
               <Phone size={12} />
               {businessPhones}
             </div>
@@ -1628,31 +1623,31 @@ function OrderDetailDrawer({ order, drivers, activeOrders, orderDistances, onClo
         </div>
 
         {/* Customer Info */}
-        <div className="bg-[#0a0a0a] border border-[#1f1f1f] rounded-lg p-3 mb-3">
+        <div className="bg-[#09090b] border border-[#1f1f1f] rounded-lg p-3 mb-3">
           <div className="flex items-center gap-2 mb-2">
             <User size={14} className="text-blue-400" />
-            <span className="text-xs text-neutral-400 uppercase">Customer</span>
+            <span className="text-xs text-zinc-500 uppercase">Customer</span>
           </div>
           <div className="text-sm font-medium text-white">{customerName}</div>
           {customerPhone && (
-            <div className="flex items-center gap-2 mt-1 text-xs text-neutral-400">
+            <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500">
               <Phone size={12} />
               {customerPhone}
             </div>
           )}
           {order.dropOffLocation?.address && (
-            <div className="text-xs text-neutral-400 mt-2">{order.dropOffLocation.address}</div>
+            <div className="text-xs text-zinc-500 mt-2">{order.dropOffLocation.address}</div>
           )}
         </div>
 
         {/* Order Info */}
-        <div className="bg-[#0a0a0a] border border-[#1f1f1f] rounded-lg p-3 mb-3">
+        <div className="bg-[#09090b] border border-[#1f1f1f] rounded-lg p-3 mb-3">
           <div className="flex items-center gap-2 mb-2">
             <Package size={14} className="text-emerald-400" />
-            <span className="text-xs text-neutral-400 uppercase">Order Details</span>
+            <span className="text-xs text-zinc-500 uppercase">Order Details</span>
           </div>
-          <div className="text-xs text-neutral-400 space-y-1">
-            <div>Value: €{order.totalPrice?.toFixed(2) || "0.00"}</div>
+          <div className="text-xs text-zinc-500 space-y-1">
+            <div>Value: â‚¬{order.totalPrice?.toFixed(2) || "0.00"}</div>
             <div>Payment: {order.paymentMethod || "Cash"}</div>
             {order.orderDate && (
               <div className="flex items-center gap-1">
@@ -1661,24 +1656,24 @@ function OrderDetailDrawer({ order, drivers, activeOrders, orderDistances, onClo
               </div>
             )}
           </div>
-          {order.notes && <div className="text-xs text-neutral-400 mt-2 italic">{order.notes}</div>}
+          {order.notes && <div className="text-xs text-zinc-500 mt-2 italic">{order.notes}</div>}
           
           {/* Time Tracking */}
           <div className="mt-3 pt-3 border-t border-[#1f1f1f] space-y-1">
             {order.status === 'PENDING' ? (
               <div className="flex justify-between text-xs">
-                <span className="text-neutral-400">Time pending:</span>
-                <span className="text-neutral-300 font-medium">{formatElapsed(now - (order.orderDate ? new Date(order.orderDate).getTime() : now))}</span>
+                <span className="text-zinc-500">Time pending:</span>
+                <span className="text-zinc-400 font-medium">{formatElapsed(now - (order.orderDate ? new Date(order.orderDate).getTime() : now))}</span>
               </div>
             ) : (
               <>
                 <div className="flex justify-between text-xs">
-                  <span className="text-neutral-400">In {order.status.replace(/_/g, ' ')}:</span>
-                  <span className="text-neutral-300 font-medium">{statusChangeTime[order.id] ? formatElapsed(now - statusChangeTime[order.id]) : '--'}</span>
+                  <span className="text-zinc-500">In {order.status.replace(/_/g, ' ')}:</span>
+                  <span className="text-zinc-400 font-medium">{statusChangeTime[order.id] ? formatElapsed(now - statusChangeTime[order.id]) : '--'}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-neutral-400">Total time:</span>
-                  <span className="text-neutral-300 font-medium">{formatElapsed(now - (order.orderDate ? new Date(order.orderDate).getTime() : now))}</span>
+                  <span className="text-zinc-500">Total time:</span>
+                  <span className="text-zinc-400 font-medium">{formatElapsed(now - (order.orderDate ? new Date(order.orderDate).getTime() : now))}</span>
                 </div>
               </>
             )}
@@ -1689,9 +1684,9 @@ function OrderDetailDrawer({ order, drivers, activeOrders, orderDistances, onClo
             <div className="mt-3 pt-3 border-t border-[#1f1f1f]">
               <button
                 onClick={() => setShowItems(!showItems)}
-                className="flex items-center gap-2 text-[10px] text-neutral-500 uppercase mb-2 hover:text-neutral-300 transition"
+                className="flex items-center gap-2 text-[10px] text-zinc-600 uppercase mb-2 hover:text-zinc-400 transition"
               >
-                <span>{showItems ? '▼' : '▶'}</span>
+                <span>{showItems ? 'â–¼' : 'â–¶'}</span>
                 Items
               </button>
               {showItems && (
@@ -1699,10 +1694,10 @@ function OrderDetailDrawer({ order, drivers, activeOrders, orderDistances, onClo
                   {order.businesses.flatMap((b: any) => 
                     (b.items || []).map((item: any, idx: number) => (
                       <div key={`${b.business?.id}-${idx}`} className="flex justify-between text-xs">
-                        <span className="text-neutral-300">
+                        <span className="text-zinc-400">
                           {item.quantity}x {item.name || 'Item'}
                         </span>
-                        <span className="text-neutral-400">€{((item.price || 0) * item.quantity).toFixed(2)}</span>
+                        <span className="text-zinc-500">â‚¬{((item.price || 0) * item.quantity).toFixed(2)}</span>
                       </div>
                     ))
                   )}
@@ -1725,16 +1720,16 @@ function OrderDetailDrawer({ order, drivers, activeOrders, orderDistances, onClo
                 paddingRight: '2.5rem'
               }}
             >
-              <option value="PENDING" className="bg-[#0a0a0a] text-white">Pending</option>
-              <option value="READY" className="bg-[#0a0a0a] text-white">Ready</option>
-              <option value="OUT_FOR_DELIVERY" className="bg-[#0a0a0a] text-white">Out for Delivery</option>
-              <option value="DELIVERED" className="bg-[#0a0a0a] text-white">Delivered</option>
-              <option value="CANCELLED" className="bg-[#0a0a0a] text-white">Cancelled</option>
+              <option value="PENDING" className="bg-[#09090b] text-white">Pending</option>
+              <option value="READY" className="bg-[#09090b] text-white">Ready</option>
+              <option value="OUT_FOR_DELIVERY" className="bg-[#09090b] text-white">Out for Delivery</option>
+              <option value="DELIVERED" className="bg-[#09090b] text-white">Delivered</option>
+              <option value="CANCELLED" className="bg-[#09090b] text-white">Cancelled</option>
             </select>
           </div
         {/* Status Control */}
         <div className="mb-3">
-          <label className="text-xs text-neutral-400 uppercase mb-2 block">Update Status</label>
+          <label className="text-xs text-zinc-500 uppercase mb-2 block">Update Status</label>
           <select
             value={order.status}
             onChange={(e) => onUpdateStatus(order.id, e.target.value)}
@@ -1754,7 +1749,7 @@ function OrderDetailDrawer({ order, drivers, activeOrders, orderDistances, onClo
         {/* Driver Assignment */}
         {!order.driver ? (
           <div className="mb-3">
-            <label className="text-xs text-neutral-400 uppercase mb-2 block">Assign Driver</label>
+            <label className="text-xs text-zinc-500 uppercase mb-2 block">Assign Driver</label>
             
             {/* Enhanced Driver Selection */}
             <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
@@ -1775,8 +1770,8 @@ function OrderDetailDrawer({ order, drivers, activeOrders, orderDistances, onClo
                       isSelected 
                         ? 'border-blue-500 bg-blue-500/20' 
                         : canAssign && !isBusy
-                          ? 'border-[#262626] bg-[#0a0a0a] hover:border-[#3a3a3a] cursor-pointer'
-                          : 'border-[#1a1a1a] bg-[#0a0a0a] opacity-50 cursor-not-allowed'
+                          ? 'border-zinc-800 bg-[#09090b] hover:border-[#3a3a3a] cursor-pointer'
+                          : 'border-[#1a1a1a] bg-[#09090b] opacity-50 cursor-not-allowed'
                     }`}
                   >
                     <div className="flex items-center gap-2">
@@ -1806,7 +1801,7 @@ function OrderDetailDrawer({ order, drivers, activeOrders, orderDistances, onClo
                       </div>
                     )}
                     {(!canAssign || isBusy) && (
-                      <span className="text-[9px] text-neutral-500">
+                      <span className="text-[9px] text-zinc-600">
                         {isBusy ? 'Busy' : 'Unavailable'}
                       </span>
                     )}
@@ -1830,7 +1825,7 @@ function OrderDetailDrawer({ order, drivers, activeOrders, orderDistances, onClo
                 className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition ${
                   selectedDriverId 
                     ? 'bg-blue-500 hover:bg-blue-600 text-white' 
-                    : 'bg-[#1a1a1a] text-neutral-500 cursor-not-allowed'
+                    : 'bg-[#1a1a1a] text-zinc-600 cursor-not-allowed'
                 }`}
               >
                 Assign Selected
@@ -1846,9 +1841,9 @@ function OrderDetailDrawer({ order, drivers, activeOrders, orderDistances, onClo
           </div>
         ) : (
           <div className="mb-3">
-            <label className="text-xs text-neutral-400 uppercase mb-2 block">Assigned Driver</label>
+            <label className="text-xs text-zinc-500 uppercase mb-2 block">Assigned Driver</label>
             <div className="flex gap-2">
-              <div className="flex-1 bg-[#0a0a0a] border border-[#262626] rounded-lg px-3 py-2 text-sm text-emerald-400 font-medium flex items-center">
+              <div className="flex-1 bg-[#09090b] border border-zinc-800 rounded-lg px-3 py-2 text-sm text-emerald-400 font-medium flex items-center">
                 {order.driver.firstName} {order.driver.lastName}
               </div>
               <button
@@ -1870,7 +1865,7 @@ function OrderDetailDrawer({ order, drivers, activeOrders, orderDistances, onClo
                 className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition ${
                   showPolyline
                     ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
-                    : "bg-[#0a0a0a] text-neutral-300 border border-[#262626] hover:border-[#3a3a3a]"
+                    : "bg-[#09090b] text-zinc-400 border border-zinc-800 hover:border-[#3a3a3a]"
                 }`}
               >
                 {showPolyline ? "Hide Route" : "Show Route"}
@@ -1882,10 +1877,10 @@ function OrderDetailDrawer({ order, drivers, activeOrders, orderDistances, onClo
                   className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition ${
                     showDriverToBusinessRoute
                       ? "bg-blue-500/20 text-blue-300 border border-blue-500/30"
-                      : "bg-[#0a0a0a] text-neutral-300 border border-[#262626] hover:border-[#3a3a3a]"
+                      : "bg-[#09090b] text-zinc-400 border border-zinc-800 hover:border-[#3a3a3a]"
                   }`}
                 >
-                  {showDriverToBusinessRoute ? "Hide" : "Show"} Driver → Business
+                  {showDriverToBusinessRoute ? "Hide" : "Show"} Driver â†’ Business
                 </button>
               )}
             </>
@@ -1910,7 +1905,7 @@ function DriverCard({ driver, activeOrders, now, onTrack, isTracking }: any) {
   const canAssign = isDriverAssignable(driver) && getActiveCountForDriver(driver.id, activeOrders) < MAX_DRIVER_ACTIVE_ORDERS;
 
   return (
-    <div className={`bg-[#0a0a0a] border rounded-lg p-3 transition-all ${statusStyle.border} ${isTracking ? 'ring-2 ring-blue-500/50 bg-blue-500/5' : ''} ${connectionStatus === 'DISCONNECTED' || connectionStatus === 'LOST' ? 'opacity-60' : ''} cursor-pointer hover:border-blue-500/50`}
+    <div className={`bg-[#09090b] border rounded-lg p-3 transition-all ${statusStyle.border} ${isTracking ? 'ring-2 ring-blue-500/50 bg-blue-500/5' : ''} ${connectionStatus === 'DISCONNECTED' || connectionStatus === 'LOST' ? 'opacity-60' : ''} cursor-pointer hover:border-blue-500/50`}
       onClick={hasLocation ? onTrack : undefined}
     >
       <div className="flex items-start justify-between mb-2">
@@ -1924,7 +1919,7 @@ function DriverCard({ driver, activeOrders, now, onTrack, isTracking }: any) {
               {driver.firstName} {driver.lastName}
             </div>
             {driver.phoneNumber && (
-              <div className="flex items-center gap-1 text-[10px] text-neutral-400">
+              <div className="flex items-center gap-1 text-[10px] text-zinc-500">
                 <Phone size={9} />
                 {driver.phoneNumber}
               </div>
@@ -1951,13 +1946,13 @@ function DriverCard({ driver, activeOrders, now, onTrack, isTracking }: any) {
         </span>
         {isTracking && (
           <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 ml-auto flex items-center gap-1">
-            👁️ Tracking
+            ðŸ‘ï¸ Tracking
           </span>
         )}
       </div>
       
       {/* Last heartbeat */}
-      <div className="text-[10px] text-neutral-500 mt-2 flex items-center gap-1">
+      <div className="text-[10px] text-zinc-600 mt-2 flex items-center gap-1">
         <Clock size={10} />
         Last heartbeat: {formatHeartbeatElapsed(lastHeartbeat, now)}
       </div>
@@ -1972,14 +1967,14 @@ function DriverCard({ driver, activeOrders, now, onTrack, isTracking }: any) {
       
       {/* Current assignment */}
       {assignedOrder && (
-        <div className="mt-2 pt-2 border-t border-[#1f1f1f] text-[10px] text-neutral-400">
+        <div className="mt-2 pt-2 border-t border-[#1f1f1f] text-[10px] text-zinc-500">
           <span className="text-amber-400">Delivering:</span> {assignedOrder.businesses?.[0]?.business?.name || 'Order'}
         </div>
       )}
       
       {/* Track info */}
       {hasLocation && (
-        <div className="text-[9px] text-neutral-400 mt-2 pt-2 border-t border-[#1f1f1f]">
+        <div className="text-[9px] text-zinc-500 mt-2 pt-2 border-t border-[#1f1f1f]">
           Click to {isTracking ? 'stop' : 'track'} on map
         </div>
       )}

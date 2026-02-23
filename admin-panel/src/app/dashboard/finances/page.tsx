@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation } from '@apollo/client/react';
@@ -257,10 +257,10 @@ export default function FinancesDashboard() {
     return (
         <div className="min-h-screen bg-[#0f0f0f] text-white">
             {/* Header */}
-            <div className="border-b border-[#262626] p-6">
+            <div className="border-b border-zinc-800 p-6">
                 <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                        <Link href="/dashboard" className="text-neutral-400 hover:text-white transition-colors">
+                        <Link href="/dashboard" className="text-zinc-500 hover:text-white transition-colors">
                             <ArrowLeft size={20} />
                         </Link>
                         <h1 className="text-2xl font-bold">Finances</h1>
@@ -272,8 +272,8 @@ export default function FinancesDashboard() {
                             onClick={() => setActiveView('drivers')}
                             className={`px-4 py-2 rounded font-semibold transition-colors ${
                                 activeView === 'drivers'
-                                    ? 'bg-cyan-600 text-white'
-                                    : 'bg-[#0a0a0a] border border-[#262626] text-neutral-400 hover:text-white'
+                                    ? 'bg-violet-600 text-white'
+                                    : 'bg-[#09090b] border border-zinc-800 text-zinc-500 hover:text-white'
                             }`}
                         >
                             Drivers
@@ -282,8 +282,8 @@ export default function FinancesDashboard() {
                             onClick={() => setActiveView('businesses')}
                             className={`px-4 py-2 rounded font-semibold transition-colors ${
                                 activeView === 'businesses'
-                                    ? 'bg-cyan-600 text-white'
-                                    : 'bg-[#0a0a0a] border border-[#262626] text-neutral-400 hover:text-white'
+                                    ? 'bg-violet-600 text-white'
+                                    : 'bg-[#09090b] border border-zinc-800 text-zinc-500 hover:text-white'
                             }`}
                         >
                             Businesses
@@ -293,7 +293,7 @@ export default function FinancesDashboard() {
             </div>
 
             {/* Filters & Summary */}
-            <div className="bg-[#1a1a1a] border-b border-[#262626] p-6">
+            <div className="bg-[#1a1a1a] border-b border-zinc-800 p-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                     {/* Date Filters */}
                     <div className="space-y-4">
@@ -309,8 +309,8 @@ export default function FinancesDashboard() {
                                     }}
                                     className={`px-3 py-2 text-xs font-medium rounded transition-colors ${
                                         dateMode === mode
-                                            ? 'bg-cyan-600 text-white'
-                                            : 'bg-[#0a0a0a] border border-[#262626] text-neutral-400 hover:text-white'
+                                            ? 'bg-violet-600 text-white'
+                                            : 'bg-[#09090b] border border-zinc-800 text-zinc-500 hover:text-white'
                                     }`}
                                 >
                                     {mode === 'all' ? 'All' : mode === 'today' ? 'Today' : mode === 'month' ? 'This Month' : 'Custom'}
@@ -322,7 +322,7 @@ export default function FinancesDashboard() {
                             <div className="relative">
                                 <button
                                     onClick={() => setShowDatePicker(!showDatePicker)}
-                                    className="w-full flex items-center gap-2 bg-[#0a0a0a] border border-[#262626] rounded px-4 py-3 text-sm text-white hover:border-[#404040] transition-colors"
+                                    className="w-full flex items-center gap-2 bg-[#09090b] border border-zinc-800 rounded px-4 py-3 text-sm text-white hover:border-zinc-700 transition-colors"
                                 >
                                     <Calendar size={16} />
                                     <span>
@@ -333,7 +333,7 @@ export default function FinancesDashboard() {
                                 </button>
 
                                 {showDatePicker && (
-                                    <div className="absolute top-full left-0 mt-2 z-50 bg-[#1a1a1a] border border-[#262626] rounded shadow-lg">
+                                    <div className="absolute top-full left-0 mt-2 z-50 bg-[#1a1a1a] border border-zinc-800 rounded shadow-lg">
                                         <DateRange
                                             ranges={[dateRange]}
                                             onChange={(item) => setDateRange(item.selection)}
@@ -342,10 +342,10 @@ export default function FinancesDashboard() {
                                             className="rdrCalendarWrapper dark-theme"
                                             inputRanges={[]}
                                         />
-                                        <div className="p-3 border-t border-[#262626] flex gap-2">
+                                        <div className="p-3 border-t border-zinc-800 flex gap-2">
                                             <button
                                                 onClick={() => setShowDatePicker(false)}
-                                                className="flex-1 bg-cyan-600 hover:bg-cyan-700 rounded px-3 py-2 text-sm font-semibold text-white transition-colors"
+                                                className="flex-1 bg-violet-600 hover:bg-violet-700 rounded px-3 py-2 text-sm font-semibold text-white transition-colors"
                                             >
                                                 Done
                                             </button>
@@ -381,18 +381,18 @@ export default function FinancesDashboard() {
 
                     {/* Summary */}
                     <div className="space-y-3">
-                        <div className="bg-[#0a0a0a] border border-[#262626] rounded-lg p-4">
-                            <div className="text-xs text-neutral-500 uppercase font-semibold mb-1">Total Earned</div>
-                            <div className="text-3xl font-bold text-cyan-400">${totals.total.toFixed(2)}</div>
+                        <div className="bg-[#09090b] border border-zinc-800 rounded-lg p-4">
+                            <div className="text-xs text-zinc-600 uppercase font-semibold mb-1">Total Earned</div>
+                            <div className="text-3xl font-bold text-violet-400">${totals.total.toFixed(2)}</div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
-                            <div className="bg-[#0a0a0a] border border-[#262626] rounded-lg p-4">
-                                <div className="text-xs text-neutral-500 uppercase font-semibold mb-1">Pending</div>
+                            <div className="bg-[#09090b] border border-zinc-800 rounded-lg p-4">
+                                <div className="text-xs text-zinc-600 uppercase font-semibold mb-1">Pending</div>
                                 <div className="text-xl font-bold text-amber-400">${totals.pending.toFixed(2)}</div>
                             </div>
-                            <div className="bg-[#0a0a0a] border border-[#262626] rounded-lg p-4">
-                                <div className="text-xs text-neutral-500 uppercase font-semibold mb-1">Paid</div>
+                            <div className="bg-[#09090b] border border-zinc-800 rounded-lg p-4">
+                                <div className="text-xs text-zinc-600 uppercase font-semibold mb-1">Paid</div>
                                 <div className="text-xl font-bold text-green-400">${totals.paid.toFixed(2)}</div>
                             </div>
                         </div>
@@ -403,9 +403,9 @@ export default function FinancesDashboard() {
             {/* Settlements Grouped View */}
             <div className="p-6">
                 {settlementsLoading ? (
-                    <div className="text-center text-neutral-400 py-8">Loading...</div>
+                    <div className="text-center text-zinc-500 py-8">Loading...</div>
                 ) : filteredGroupedSettlements.length === 0 ? (
-                    <div className="text-center text-neutral-400 py-8">No settlements found.</div>
+                    <div className="text-center text-zinc-500 py-8">No settlements found.</div>
                 ) : (
                     <div className="space-y-3">
                         {filteredGroupedSettlements.map((group) => {
@@ -413,19 +413,19 @@ export default function FinancesDashboard() {
                             const isExpanded = expandedGroups[groupKey];
 
                             return (
-                                <div key={groupKey} className="border border-[#262626] rounded-lg overflow-hidden">
+                                <div key={groupKey} className="border border-zinc-800 rounded-lg overflow-hidden">
                                     {/* Group Header */}
-                                    <div className="bg-[#0a0a0a] p-4 cursor-pointer hover:bg-[#131313] transition-colors" onClick={() => toggleExpandedGroup(groupKey)}>
+                                    <div className="bg-[#09090b] p-4 cursor-pointer hover:bg-[#131313] transition-colors" onClick={() => toggleExpandedGroup(groupKey)}>
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-3 flex-1">
                                                 <ChevronDown
                                                     size={18}
-                                                    className={`transition-transform text-neutral-400 ${isExpanded ? 'rotate-180' : ''}`}
+                                                    className={`transition-transform text-zinc-500 ${isExpanded ? 'rotate-180' : ''}`}
                                                 />
                                                 <div>
                                                     <div className="font-semibold text-white">{group.name}</div>
-                                                    <div className="text-xs text-neutral-500">
-                                                        {group.type === 'DRIVER' ? 'Driver' : 'Business'} •{' '}
+                                                    <div className="text-xs text-zinc-600">
+                                                        {group.type === 'DRIVER' ? 'Driver' : 'Business'} â€¢{' '}
                                                         {group.settlements.length} settlement{group.settlements.length !== 1 ? 's' : ''}
                                                     </div>
                                                 </div>
@@ -433,15 +433,15 @@ export default function FinancesDashboard() {
 
                                             <div className="flex items-center gap-6 text-right">
                                                 <div>
-                                                    <div className="text-xs text-neutral-500 uppercase font-semibold">Total</div>
-                                                    <div className="text-lg font-bold text-cyan-400">${group.total.toFixed(2)}</div>
+                                                    <div className="text-xs text-zinc-600 uppercase font-semibold">Total</div>
+                                                    <div className="text-lg font-bold text-violet-400">${group.total.toFixed(2)}</div>
                                                 </div>
                                                 <div>
-                                                    <div className="text-xs text-neutral-500 uppercase font-semibold">Pending</div>
+                                                    <div className="text-xs text-zinc-600 uppercase font-semibold">Pending</div>
                                                     <div className="text-lg font-bold text-amber-400">${group.pending.toFixed(2)}</div>
                                                 </div>
                                                 <div>
-                                                    <div className="text-xs text-neutral-500 uppercase font-semibold">Paid</div>
+                                                    <div className="text-xs text-zinc-600 uppercase font-semibold">Paid</div>
                                                     <div className="text-lg font-bold text-green-400">${group.paid.toFixed(2)}</div>
                                                 </div>
 
@@ -459,7 +459,7 @@ export default function FinancesDashboard() {
                                                             }))
                                                         }
                                                         placeholder="Partial Amt"
-                                                        className="w-24 bg-[#0a0a0a] border border-[#262626] rounded px-2 py-2 text-sm text-white"
+                                                        className="w-24 bg-[#09090b] border border-zinc-800 rounded px-2 py-2 text-sm text-white"
                                                         onClick={(e) => e.stopPropagation()}
                                                     />
                                                     <button
@@ -493,16 +493,16 @@ export default function FinancesDashboard() {
 
                                     {/* Expandable History */}
                                     {isExpanded && (
-                                        <div className="bg-[#0a0a0a]/50 border-t border-[#262626] p-4">
+                                        <div className="bg-[#09090b]/50 border-t border-zinc-800 p-4">
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-xs">
                                                     <thead>
-                                                        <tr className="border-b border-[#262626]">
-                                                            <th className="px-3 py-2 text-left font-semibold text-neutral-400">Order Value</th>
-                                                            <th className="px-3 py-2 text-right font-semibold text-neutral-400">My Cut</th>
-                                                            <th className="px-3 py-2 text-left font-semibold text-neutral-400">Status</th>
-                                                            <th className="px-3 py-2 text-left font-semibold text-neutral-400">Date</th>
-                                                            <th className="px-3 py-2 text-right font-semibold text-neutral-400">Action</th>
+                                                        <tr className="border-b border-zinc-800">
+                                                            <th className="px-3 py-2 text-left font-semibold text-zinc-500">Order Value</th>
+                                                            <th className="px-3 py-2 text-right font-semibold text-zinc-500">My Cut</th>
+                                                            <th className="px-3 py-2 text-left font-semibold text-zinc-500">Status</th>
+                                                            <th className="px-3 py-2 text-left font-semibold text-zinc-500">Date</th>
+                                                            <th className="px-3 py-2 text-right font-semibold text-zinc-500">Action</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -514,9 +514,9 @@ export default function FinancesDashboard() {
                                                             const isPending = settlement.status === 'PENDING';
 
                                                             return (
-                                                                <tr key={settlement.id} className="border-b border-[#262626] hover:bg-[#131313] transition-colors">
-                                                                    <td className="px-3 py-2 text-neutral-300">${orderValue.toFixed(2)}</td>
-                                                                    <td className="px-3 py-2 text-right text-cyan-400 font-semibold">${settlement.amount.toFixed(2)}</td>
+                                                                <tr key={settlement.id} className="border-b border-zinc-800 hover:bg-[#131313] transition-colors">
+                                                                    <td className="px-3 py-2 text-zinc-400">${orderValue.toFixed(2)}</td>
+                                                                    <td className="px-3 py-2 text-right text-violet-400 font-semibold">${settlement.amount.toFixed(2)}</td>
                                                                     <td className="px-3 py-2">
                                                                         <span
                                                                             className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${
@@ -528,12 +528,12 @@ export default function FinancesDashboard() {
                                                                             {settlement.status}
                                                                         </span>
                                                                     </td>
-                                                                    <td className="px-3 py-2 text-neutral-400">
+                                                                    <td className="px-3 py-2 text-zinc-500">
                                                                         {format(new Date(settlement.createdAt), 'MMM dd, yyyy')}
                                                                     </td>
                                                                     <td className="px-3 py-2 text-right">
                                                                         {isPending ? (
-                                                                            <span className="text-neutral-400 text-[11px]">Pending</span>
+                                                                            <span className="text-zinc-500 text-[11px]">Pending</span>
                                                                         ) : (
                                                                             <button
                                                                                 onClick={() => handleUnsettle(settlement.id)}

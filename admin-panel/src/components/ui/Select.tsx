@@ -10,13 +10,13 @@ export default function Select({ label, children, className = "", ...props }: Se
   return (
     <div className="w-full">
       {label && (
-        <label className="block text-sm font-medium text-neutral-300 mb-1.5">
+        <label className="block text-xs font-medium text-zinc-400 mb-1.5">
           {label}
         </label>
       )}
       <select
         {...props}
-        className={`w-full px-3 py-2 bg-[#0a0a0a] border border-[#262626] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition ${className}`}
+        className={`w-full px-3 py-2 bg-[#09090b] border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all duration-150 ${className}`}
       >
         {children}
       </select>

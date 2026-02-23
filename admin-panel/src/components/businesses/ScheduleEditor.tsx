@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useMutation } from "@apollo/client/react";
@@ -115,7 +115,7 @@ export default function ScheduleEditor({ businessId, schedule, onSaved }: Props)
                     className="text-xs px-3 py-1.5 rounded-md bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 transition-colors border border-purple-600/30"
                     onClick={applyToAll}
                 >
-                    Copy Mon → All
+                    Copy Mon â†’ All
                 </button>
             </div>
 

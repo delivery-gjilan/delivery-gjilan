@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo } from "react";
 import { useMutation, useQuery } from "@apollo/client/react";
@@ -72,7 +72,7 @@ interface Order {
 
 const STATUS_COLORS: Record<OrderStatus, { bg: string; text: string; border: string }> = {
     PENDING: { bg: "bg-amber-500/10", text: "text-amber-400", border: "border-amber-500/30" },
-    PREPARING: { bg: "bg-cyan-500/10", text: "text-cyan-400", border: "border-cyan-500/30" },
+    PREPARING: { bg: "bg-violet-500/10", text: "text-violet-400", border: "border-violet-500/30" },
     READY: { bg: "bg-blue-500/10", text: "text-blue-400", border: "border-blue-500/30" },
     OUT_FOR_DELIVERY: { bg: "bg-purple-500/10", text: "text-purple-400", border: "border-purple-500/30" },
     DELIVERED: { bg: "bg-green-500/10", text: "text-green-400", border: "border-green-500/30" },
@@ -170,7 +170,7 @@ export default function OrdersPage() {
     }, [filteredOrders]);
 
     const handleNextStatus = async (order: Order) => {
-        // For business users: PENDING → open prep time modal, PREPARING → READY
+        // For business users: PENDING â†’ open prep time modal, PREPARING â†’ READY
         if (isBusinessUser) {
             if (order.status === "PENDING") {
                 setPrepTimeModalOrder(order);
@@ -311,21 +311,18 @@ export default function OrdersPage() {
                         />
                     </div>
                     <div className="text-sm text-gray-400">
-                        <span className="text-amber-400">{activeOrders.length}</span> active · 
+                        <span className="text-amber-400">{activeOrders.length}</span> active Â· 
                         <span className="text-green-400 ml-1">{completedOrders.length}</span> completed
                     </div>
                 </div>
             )}
 
             {/* ACTIVE ORDERS SECTION */}
-            <div className="mb-8">
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                        <Clock className="w-5 h-5 text-amber-400" />
-                        <h2 className="text-xl font-semibold text-white">
-                            Active Orders ({activeOrders.length})
-                        </h2>
-                    </div>
+            <div className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
+                        Active ({activeOrders.length})
+                    </h2>
                     <div className="flex items-center gap-2">
                         {isSuperAdmin && (
                             <Button
@@ -361,7 +358,7 @@ export default function OrdersPage() {
                     /* CARD VIEW FOR BUSINESS ADMIN */
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
                         {activeOrders.length === 0 ? (
-                            <div className="col-span-full text-center text-neutral-500 py-8">
+                            <div className="col-span-full text-center text-zinc-600 py-8">
                                 No active orders
                             </div>
                         ) : (
@@ -373,12 +370,12 @@ export default function OrdersPage() {
                                           ? "READY"
                                           : null;
                                 return (
-                                    <div key={order.id} className="bg-[#161616] border border-[#262626] rounded-lg p-4 hover:border-[#404040] transition-colors">
+                                    <div key={order.id} className="bg-[#111113] border border-zinc-800 rounded-xl p-4 hover:border-zinc-700 transition-colors">
                                         {/* Order Header */}
                                         <div className="flex items-start justify-between mb-3">
                                             <div>
-                                                <div className="font-mono text-xs text-neutral-400">#{order.id.slice(0, 8)}</div>
-                                                <div className="text-xs text-neutral-500 mt-1">
+                                                <div className="font-mono text-xs text-zinc-500">#{order.id.slice(0, 8)}</div>
+                                                <div className="text-xs text-zinc-600 mt-1">
                                                     {new Date(order.orderDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                                                 </div>
                                             </div>
@@ -389,7 +386,7 @@ export default function OrdersPage() {
 
                                         {/* Customer Info */}
                                         {order.user && (
-                                            <div className="mb-3 pb-3 border-b border-[#262626]">
+                                            <div className="mb-3 pb-3 border-b border-zinc-800">
                                                 <div className="text-white text-sm font-medium">
                                                     {order.user.firstName} {order.user.lastName}
                                                 </div>
@@ -401,13 +398,13 @@ export default function OrdersPage() {
                                             {order.businesses.map((biz, idx) => (
                                                 <div key={idx}>
                                                     {biz.items.slice(0, 2).map((item, itemIdx) => (
-                                                        <div key={itemIdx} className="text-sm text-neutral-400 flex items-center gap-2">
+                                                        <div key={itemIdx} className="text-sm text-zinc-500 flex items-center gap-2">
                                                             <Package size={14} />
                                                             <span>{item.quantity}x {item.name}</span>
                                                         </div>
                                                     ))}
                                                     {biz.items.length > 2 && (
-                                                        <div className="text-xs text-neutral-500 ml-6">+{biz.items.length - 2} more items</div>
+                                                        <div className="text-xs text-zinc-600 ml-6">+{biz.items.length - 2} more items</div>
                                                     )}
                                                 </div>
                                             ))}
@@ -415,16 +412,16 @@ export default function OrdersPage() {
 
                                         {/* Delivery Address */}
                                         <div className="mb-3 flex items-start gap-2">
-                                            <MapPin size={14} className="text-neutral-400 mt-0.5 flex-shrink-0" />
-                                            <div className="text-xs text-neutral-400 line-clamp-2">
+                                            <MapPin size={14} className="text-zinc-500 mt-0.5 flex-shrink-0" />
+                                            <div className="text-xs text-zinc-500 line-clamp-2">
                                                 {order.dropOffLocation.address}
                                             </div>
                                         </div>
 
                                         {/* Preparation Info */}
                                         {order.status === "PREPARING" && order.preparationMinutes && (
-                                            <div className="mb-3 flex items-center justify-between bg-cyan-500/10 border border-cyan-500/20 rounded-lg px-3 py-2">
-                                                <div className="flex items-center gap-2 text-cyan-400 text-sm">
+                                            <div className="mb-3 flex items-center justify-between bg-violet-500/10 border border-violet-500/20 rounded-xl px-3 py-2">
+                                                <div className="flex items-center gap-2 text-violet-400 text-sm">
                                                     <Timer size={14} />
                                                     <span>Prep: ~{order.preparationMinutes} min</span>
                                                 </div>
@@ -435,7 +432,7 @@ export default function OrdersPage() {
                                                         setEditPrepTimeOrder(order);
                                                         setEditPrepTimeMinutes(String(order.preparationMinutes || 20));
                                                     }}
-                                                    className="text-xs text-cyan-400 hover:text-cyan-300 px-2 py-1"
+                                                    className="text-xs text-violet-400 hover:text-violet-300 px-2 py-1"
                                                 >
                                                     Edit
                                                 </Button>
@@ -443,7 +440,7 @@ export default function OrdersPage() {
                                         )}
 
                                         {/* Footer */}
-                                        <div className="flex items-center justify-between pt-3 border-t border-[#262626]">
+                                        <div className="flex items-center justify-between pt-3 border-t border-zinc-800">
                                             <div className="text-lg font-bold text-white">
                                                 ${order.totalPrice.toFixed(2)}
                                             </div>
@@ -490,7 +487,7 @@ export default function OrdersPage() {
                             {activeOrders.length === 0 ? (
                                 <tr>
                                     <Td colSpan={8}>
-                                        <div className="text-center text-neutral-500 py-8">
+                                        <div className="text-center text-zinc-600 py-8">
                                             {searchOrderId || searchUserName ? "No active orders found matching your search" : "No active orders"}
                                         </div>
                                     </Td>
@@ -509,7 +506,7 @@ export default function OrdersPage() {
                                         <Td>
                                             <div className="text-sm">
                                                 <div className="text-white">{new Date(order.orderDate).toLocaleDateString()}</div>
-                                                <div className="text-neutral-400 text-xs">
+                                                <div className="text-zinc-500 text-xs">
                                                     {new Date(order.orderDate).toLocaleTimeString([], {
                                                         hour: "2-digit",
                                                         minute: "2-digit",
@@ -523,12 +520,12 @@ export default function OrdersPage() {
                                                     <div className="text-white font-medium">
                                                         {order.user.firstName} {order.user.lastName}
                                                     </div>
-                                                    <div className="text-neutral-400 text-xs">
+                                                    <div className="text-zinc-500 text-xs">
                                                         {order.user.email}
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <span className="text-neutral-500 text-sm">N/A</span>
+                                                <span className="text-zinc-600 text-sm">N/A</span>
                                             )}
                                         </Td>
                                         <Td>
@@ -601,13 +598,10 @@ export default function OrdersPage() {
 
             {/* COMPLETED ORDERS SECTION */}
             {showCompleted && (
-            <div className="mb-8">
-                <div className="flex items-center gap-2 mb-4">
-                    <CheckCircle2 className="w-5 h-5 text-green-400" />
-                    <h2 className="text-xl font-semibold text-white">
-                        Completed Orders ({completedOrders.length})
-                    </h2>
-                </div>
+            <div className="mb-6">
+                <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">
+                    Completed ({completedOrders.length})
+                </h2>
                 
                 <Table>
                     <thead>
@@ -626,7 +620,7 @@ export default function OrdersPage() {
                         {completedOrders.length === 0 ? (
                             <tr>
                                 <Td colSpan={8}>
-                                    <div className="text-center text-neutral-500 py-8">
+                                    <div className="text-center text-zinc-600 py-8">
                                         {searchOrderId || searchUserName ? "No completed orders found matching your search" : "No completed orders"}
                                     </div>
                                 </Td>
@@ -644,7 +638,7 @@ export default function OrdersPage() {
                                     <Td>
                                         <div className="text-sm">
                                             <div className="text-white">{new Date(order.orderDate).toLocaleDateString()}</div>
-                                            <div className="text-neutral-400 text-xs">
+                                            <div className="text-zinc-500 text-xs">
                                                 {new Date(order.orderDate).toLocaleTimeString([], {
                                                     hour: "2-digit",
                                                     minute: "2-digit",
@@ -658,12 +652,12 @@ export default function OrdersPage() {
                                                 <div className="text-white font-medium">
                                                     {order.user.firstName} {order.user.lastName}
                                                 </div>
-                                                <div className="text-neutral-400 text-xs">
+                                                <div className="text-zinc-500 text-xs">
                                                     {order.user.email}
                                                 </div>
                                             </div>
                                         ) : (
-                                            <span className="text-neutral-500 text-sm">N/A</span>
+                                            <span className="text-zinc-600 text-sm">N/A</span>
                                         )}
                                     </Td>
                                     <Td>
@@ -679,7 +673,7 @@ export default function OrdersPage() {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <span className="text-neutral-500 text-sm">Unassigned</span>
+                                            <span className="text-zinc-600 text-sm">Unassigned</span>
                                         )}
                                     </Td>
                                     <Td>
@@ -716,9 +710,9 @@ export default function OrdersPage() {
                 {selectedOrder && (
                     <div className="space-y-6">
                         {/* Order Info */}
-                        <div className="flex items-center justify-between pb-4 border-b border-[#262626]">
+                        <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
                             <div>
-                                <div className="text-xs text-neutral-400">Order ID</div>
+                                <div className="text-xs text-zinc-500">Order ID</div>
                                 <div className="font-mono text-sm text-white">{selectedOrder.id}</div>
                             </div>
                             <div className={`px-4 py-2 rounded-lg font-medium ${STATUS_COLORS[selectedOrder.status].bg} ${STATUS_COLORS[selectedOrder.status].text} ${STATUS_COLORS[selectedOrder.status].border} border-2`}>
@@ -728,31 +722,31 @@ export default function OrdersPage() {
 
                         {/* Customer Info */}
                         {selectedOrder.user && (
-                            <div className="bg-[#0a0a0a] border border-[#262626] rounded-lg p-4">
-                                <div className="text-xs text-neutral-400 mb-2">Customer</div>
+                            <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-4">
+                                <div className="text-xs text-zinc-500 mb-2">Customer</div>
                                 <div className="text-white font-medium">
                                     {selectedOrder.user.firstName} {selectedOrder.user.lastName}
                                 </div>
-                                <div className="text-sm text-neutral-400 mt-1">
+                                <div className="text-sm text-zinc-500 mt-1">
                                     {selectedOrder.user.email}
                                 </div>
                             </div>
                         )}
 
                         {/* Driver Info */}
-                        <div className="bg-[#0a0a0a] border border-[#262626] rounded-lg p-4">
-                            <div className="text-xs text-neutral-400 mb-2">Assigned Driver</div>
+                        <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-4">
+                            <div className="text-xs text-zinc-500 mb-2">Assigned Driver</div>
                             {selectedOrder.driver ? (
                                 <>
                                     <div className="text-white font-medium">
                                         {selectedOrder.driver.firstName} {selectedOrder.driver.lastName}
                                     </div>
-                                    <div className="text-sm text-neutral-400 mt-1">
+                                    <div className="text-sm text-zinc-500 mt-1">
                                         {selectedOrder.driver.email}
                                     </div>
                                 </>
                             ) : (
-                                <div className="text-neutral-500">No driver assigned</div>
+                                <div className="text-zinc-600">No driver assigned</div>
                             )}
                         </div>
 
@@ -760,25 +754,25 @@ export default function OrdersPage() {
                         <div className="space-y-6">
                             {selectedOrder.businesses.filter(biz => biz.business.businessType === 'MARKET').map((biz, idx) => (
                                 <div key={idx} className="space-y-3">
-                                    <div className="bg-[#0a0a0a] border border-[#262626] rounded-lg p-3">
+                                    <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-3">
                                         <div className="flex items-center gap-2">
-                                            <Store size={16} className="text-cyan-500" />
+                                            <Store size={16} className="text-violet-500" />
                                             <span className="font-semibold text-white text-sm">{biz.business.name}</span>
-                                            <span className="text-xs text-neutral-400">({biz.business.businessType})</span>
+                                            <span className="text-xs text-zinc-500">({biz.business.businessType})</span>
                                         </div>
                                     </div>
 
                                     {/* Products Table */}
-                                    <div className="overflow-x-auto border border-[#262626] rounded-lg">
+                                    <div className="overflow-x-auto border border-zinc-800 rounded-lg">
                                         <table className="w-full">
                                             <thead>
-                                                <tr className="bg-[#0a0a0a] border-b border-[#262626]">
-                                                    <th className="px-3 py-2 text-left text-xs font-bold text-neutral-400 uppercase">Product</th>
-                                                    <th className="px-3 py-2 text-center text-xs font-bold text-neutral-400 uppercase">In Stock</th>
-                                                    <th className="px-3 py-2 text-center text-xs font-bold text-neutral-400 uppercase">Need to Buy</th>
-                                                    <th className="px-3 py-2 text-right text-xs font-bold text-neutral-400 uppercase">Unit Price</th>
-                                                    <th className="px-3 py-2 text-right text-xs font-bold text-neutral-400 uppercase">Total</th>
-                                                    <th className="px-3 py-2 text-center text-xs font-bold text-neutral-400 uppercase">Status</th>
+                                                <tr className="bg-[#09090b] border-b border-zinc-800">
+                                                    <th className="px-3 py-2 text-left text-xs font-bold text-zinc-500 uppercase">Product</th>
+                                                    <th className="px-3 py-2 text-center text-xs font-bold text-zinc-500 uppercase">In Stock</th>
+                                                    <th className="px-3 py-2 text-center text-xs font-bold text-zinc-500 uppercase">Need to Buy</th>
+                                                    <th className="px-3 py-2 text-right text-xs font-bold text-zinc-500 uppercase">Unit Price</th>
+                                                    <th className="px-3 py-2 text-right text-xs font-bold text-zinc-500 uppercase">Total</th>
+                                                    <th className="px-3 py-2 text-center text-xs font-bold text-zinc-500 uppercase">Status</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -795,20 +789,20 @@ export default function OrdersPage() {
                                                     let statusBadge = "";
                                                     let statusColor = "";
                                                     if (isFullyInStock) {
-                                                        statusBadge = "✓ In Stock";
+                                                        statusBadge = "âœ“ In Stock";
                                                         statusColor = "bg-green-500/20 text-green-300";
                                                     } else if (isPartial) {
-                                                        statusBadge = "⚠ Partial";
+                                                        statusBadge = "âš  Partial";
                                                         statusColor = "bg-yellow-500/20 text-yellow-300";
                                                     } else if (isNeedToBuy) {
-                                                        statusBadge = "⚠ Need All";
+                                                        statusBadge = "âš  Need All";
                                                         statusColor = "bg-amber-500/20 text-amber-300";
                                                     }
 
                                                     return (
                                                         <tr
                                                             key={itemIdx}
-                                                            className={`border-b border-[#262626] hover:bg-[#15151] transition-colors ${rowBg}`}
+                                                            className={`border-b border-zinc-800 hover:bg-zinc-900 transition-colors ${rowBg}`}
                                                         >
                                                             <td className="px-3 py-3">
                                                                 <div className="flex items-center gap-2">
@@ -822,7 +816,7 @@ export default function OrdersPage() {
                                                                     <div className="min-w-0">
                                                                         <div className="text-white text-sm font-semibold truncate">{item.name}</div>
                                                                         {item.category && (
-                                                                            <div className="text-xs text-neutral-400">{item.category}</div>
+                                                                            <div className="text-xs text-zinc-500">{item.category}</div>
                                                                         )}
                                                                     </div>
                                                                 </div>
@@ -830,7 +824,7 @@ export default function OrdersPage() {
                                                             <td className="px-3 py-3 text-center">
                                                                 <div
                                                                     className={`inline-block px-2 py-1 rounded text-sm font-bold ${
-                                                                        item.quantityInStock > 0 ? "bg-green-500/20 text-green-300" : "text-neutral-500"
+                                                                        item.quantityInStock > 0 ? "bg-green-500/20 text-green-300" : "text-zinc-600"
                                                                     }`}
                                                                 >
                                                                     {item.quantityInStock}
@@ -839,7 +833,7 @@ export default function OrdersPage() {
                                                             <td className="px-3 py-3 text-center">
                                                                 <div
                                                                     className={`inline-block px-2 py-1 rounded text-sm font-bold ${
-                                                                        item.quantityNeeded > 0 ? "bg-amber-500/20 text-amber-300" : "text-neutral-500"
+                                                                        item.quantityNeeded > 0 ? "bg-amber-500/20 text-amber-300" : "text-zinc-600"
                                                                     }`}
                                                                 >
                                                                     {item.quantityNeeded}
@@ -854,7 +848,7 @@ export default function OrdersPage() {
                                                                         ${((item.quantityInStock + item.quantityNeeded) * item.price).toFixed(2)}
                                                                     </div>
                                                                     {isPartial && (
-                                                                        <div className="text-xs text-neutral-400">
+                                                                        <div className="text-xs text-zinc-500">
                                                                             ${(item.quantityInStock * item.price).toFixed(2)} have
                                                                         </div>
                                                                     )}
@@ -874,31 +868,31 @@ export default function OrdersPage() {
                                 </div>
                             ))}
                             {selectedOrder.businesses.filter(biz => biz.business.businessType === 'MARKET').length === 0 && (
-                                <div className="text-center text-neutral-400 py-8">
+                                <div className="text-center text-zinc-500 py-8">
                                     No market items in this order
                                 </div>
                             )}
                         </div>
 
                         {/* Totals */}
-                        <div className="bg-[#0a0a0a] border border-[#262626] rounded-lg p-4 space-y-2">
+                        <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-4 space-y-2">
                             <div className="flex justify-between text-sm">
-                                <span className="text-neutral-400">Subtotal</span>
+                                <span className="text-zinc-500">Subtotal</span>
                                 <span className="text-white">${selectedOrder.orderPrice.toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between text-sm">
-                                <span className="text-neutral-400">Delivery Fee</span>
+                                <span className="text-zinc-500">Delivery Fee</span>
                                 <span className="text-white">${selectedOrder.deliveryPrice.toFixed(2)}</span>
                             </div>
-                            <div className="flex justify-between text-lg font-bold pt-2 border-t border-[#262626]">
+                            <div className="flex justify-between text-lg font-bold pt-2 border-t border-zinc-800">
                                 <span className="text-white">Total</span>
-                                <span className="text-cyan-400">${selectedOrder.totalPrice.toFixed(2)}</span>
+                                <span className="text-violet-400">${selectedOrder.totalPrice.toFixed(2)}</span>
                             </div>
                         </div>
 
                         {/* Delivery Address */}
-                        <div className="bg-[#0a0a0a] border border-[#262626] rounded-lg p-4">
-                            <div className="text-xs text-neutral-400 mb-1">Delivery Address</div>
+                        <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-4">
+                            <div className="text-xs text-zinc-500 mb-1">Delivery Address</div>
                             <div className="text-white text-sm">{selectedOrder.dropOffLocation.address}</div>
                         </div>
                     </div>
@@ -913,17 +907,17 @@ export default function OrdersPage() {
             >
                 {prepTimeModalOrder && (
                     <div className="space-y-4">
-                        <div className="flex items-center gap-3 text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-4">
+                        <div className="flex items-center gap-3 text-violet-400 bg-violet-500/10 border border-violet-500/20 rounded-xl p-4">
                             <ChefHat size={24} />
                             <div>
                                 <div className="font-medium">Order #{prepTimeModalOrder.id.slice(0, 8)}</div>
-                                <div className="text-sm text-neutral-400 mt-1">
+                                <div className="text-sm text-zinc-500 mt-1">
                                     How long will it take to prepare this order?
                                 </div>
                             </div>
                         </div>
                         <div>
-                            <label className="block text-sm text-neutral-400 mb-2">Preparation Time (minutes)</label>
+                            <label className="block text-sm text-zinc-500 mb-2">Preparation Time (minutes)</label>
                             <Input
                                 type="number"
                                 min="1"
@@ -940,8 +934,8 @@ export default function OrdersPage() {
                                         onClick={() => setPrepTimeMinutes(String(m))}
                                         className={`px-3 py-1 rounded text-xs border transition-colors ${
                                             prepTimeMinutes === String(m)
-                                                ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-400"
-                                                : "border-[#262626] text-neutral-400 hover:border-[#404040]"
+                                                ? "bg-violet-500/20 border-violet-500/50 text-violet-400"
+                                                : "border-zinc-800 text-zinc-500 hover:border-zinc-700"
                                         }`}
                                     >
                                         {m} min
@@ -978,7 +972,7 @@ export default function OrdersPage() {
                 {editPrepTimeOrder && (
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-sm text-neutral-400 mb-2">New Preparation Time (minutes)</label>
+                            <label className="block text-sm text-zinc-500 mb-2">New Preparation Time (minutes)</label>
                             <Input
                                 type="number"
                                 min="1"
@@ -994,8 +988,8 @@ export default function OrdersPage() {
                                         onClick={() => setEditPrepTimeMinutes(String(m))}
                                         className={`px-3 py-1 rounded text-xs border transition-colors ${
                                             editPrepTimeMinutes === String(m)
-                                                ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-400"
-                                                : "border-[#262626] text-neutral-400 hover:border-[#404040]"
+                                                ? "bg-violet-500/20 border-violet-500/50 text-violet-400"
+                                                : "border-zinc-800 text-zinc-500 hover:border-zinc-700"
                                         }`}
                                     >
                                         {m} min

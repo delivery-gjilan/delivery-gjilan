@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@apollo/client/react";
@@ -222,18 +222,18 @@ export default function PromotionsPage() {
     const getStatusBadge = (isActive: boolean) => {
         return isActive
             ? "bg-green-500/10 text-green-400 border-green-500/30"
-            : "bg-neutral-500/10 text-neutral-400 border-neutral-500/30";
+            : "bg-neutral-500/10 text-zinc-500 border-neutral-500/30";
     };
 
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+                    <h1 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
                         <Tag size={26} />
                         Promotions
                     </h1>
-                    <p className="text-neutral-400 mt-1">
+                    <p className="text-zinc-500 mt-1">
                         Manage promotions, wallet credits, and targeted campaigns.
                     </p>
                 </div>
@@ -251,7 +251,7 @@ export default function PromotionsPage() {
 
             <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
                 {loading ? (
-                    <div className="p-6 text-neutral-400">Loading promotions...</div>
+                    <div className="p-6 text-zinc-500">Loading promotions...</div>
                 ) : (
                     <Table>
                         <thead>
@@ -269,7 +269,7 @@ export default function PromotionsPage() {
                             {promotions.length === 0 ? (
                                 <tr>
                                     <Td colSpan={7}>
-                                        <div className="text-center py-10 text-neutral-400">
+                                        <div className="text-center py-10 text-zinc-500">
                                             No promotions created yet.
                                         </div>
                                     </Td>
@@ -280,16 +280,16 @@ export default function PromotionsPage() {
                                         <Td>
                                             <div className="text-white font-semibold">{promotion.name}</div>
                                             {promotion.code && (
-                                                <div className="text-xs text-cyan-400 font-mono">{promotion.code}</div>
+                                                <div className="text-xs text-violet-400 font-mono">{promotion.code}</div>
                                             )}
                                         </Td>
                                         <Td>
-                                            <div className="text-sm text-neutral-300">
+                                            <div className="text-sm text-zinc-400">
                                                 {promotionTypeLabels[promotion.type]}
                                             </div>
                                         </Td>
                                         <Td>
-                                            <div className="text-sm text-neutral-300">
+                                            <div className="text-sm text-zinc-400">
                                                 {promotionTargetLabels[promotion.target]}
                                             </div>
                                         </Td>
@@ -299,16 +299,16 @@ export default function PromotionsPage() {
                                                     ? `${promotion.discountValue}%`
                                                     : promotion.type === "FREE_DELIVERY"
                                                         ? "Free delivery"
-                                                        : `€${promotion.discountValue?.toFixed(2) || "0.00"}`}
+                                                        : `â‚¬${promotion.discountValue?.toFixed(2) || "0.00"}`}
                                             </div>
                                             {promotion.maxDiscountCap && (
-                                                <div className="text-xs text-neutral-400">
-                                                    Cap: €{promotion.maxDiscountCap.toFixed(2)}
+                                                <div className="text-xs text-zinc-500">
+                                                    Cap: â‚¬{promotion.maxDiscountCap.toFixed(2)}
                                                 </div>
                                             )}
                                         </Td>
                                         <Td>
-                                            <div className="text-sm text-neutral-300">{promotion.priority}</div>
+                                            <div className="text-sm text-zinc-400">{promotion.priority}</div>
                                             {promotion.isStackable && (
                                                 <div className="text-xs text-purple-400">Stackable</div>
                                             )}
@@ -350,13 +350,13 @@ export default function PromotionsPage() {
                                 <div
                                     className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
                                         step === wizardStep
-                                            ? "bg-cyan-500 border-cyan-500 text-white"
+                                            ? "bg-violet-500 border-violet-500 text-white"
                                             : step < wizardStep
                                                 ? "bg-green-500 border-green-500 text-white"
                                                 : "bg-gray-800 border-gray-600 text-gray-400"
                                     }`}
                                 >
-                                    {step < wizardStep ? "✓" : step}
+                                    {step < wizardStep ? "âœ“" : step}
                                 </div>
                                 {step < 3 && (
                                     <div
@@ -371,12 +371,12 @@ export default function PromotionsPage() {
 
                     {/* Step Titles */}
                     <div className="text-center mb-4">
-                        <h3 className="text-xl font-bold text-white">
+                        <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
                             {wizardStep === 1 && "Step 1: Basic Information"}
                             {wizardStep === 2 && "Step 2: Discount & Conditions"}
                             {wizardStep === 3 && "Step 3: Advanced Settings"}
                         </h3>
-                        <p className="text-sm text-neutral-400 mt-1">
+                        <p className="text-sm text-zinc-500 mt-1">
                             {wizardStep === 1 && "Set up the basic details of your promotion"}
                             {wizardStep === 2 && "Configure discount values and eligibility"}
                             {wizardStep === 3 && "Configure priority, schedule, and status"}
@@ -394,7 +394,7 @@ export default function PromotionsPage() {
                                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                     placeholder="Summer Sale 2026"
                                 />
-                                <div className="text-xs text-neutral-500 -mt-2">
+                                <div className="text-xs text-zinc-600 -mt-2">
                                     Internal name for this promotion (visible to admins only)
                                 </div>
                                 
@@ -404,7 +404,7 @@ export default function PromotionsPage() {
                                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                                     placeholder="Get 20% off your first order!"
                                 />
-                                <div className="text-xs text-neutral-500 -mt-2">
+                                <div className="text-xs text-zinc-600 -mt-2">
                                     Customer-facing description shown in the app
                                 </div>
 
@@ -414,7 +414,7 @@ export default function PromotionsPage() {
                                     onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
                                     placeholder="SUMMER20"
                                 />
-                                <div className="text-xs text-neutral-500 -mt-2">
+                                <div className="text-xs text-zinc-600 -mt-2">
                                     Leave empty for auto-applied promotions. Enter a code for manual entry by customers.
                                 </div>
 
@@ -425,12 +425,12 @@ export default function PromotionsPage() {
                                             value={formData.type}
                                             onChange={(e) => setFormData({ ...formData, type: e.target.value as PromotionType })}
                                         >
-                                            <option value="FIXED_AMOUNT">💵 Fixed Amount (e.g., $5 off)</option>
-                                            <option value="PERCENTAGE">📊 Percentage (e.g., 20% off)</option>
-                                            <option value="FREE_DELIVERY">🚚 Free Delivery</option>
-                                            <option value="WALLET_CREDIT">💳 Wallet Credit</option>
+                                            <option value="FIXED_AMOUNT">ðŸ’µ Fixed Amount (e.g., $5 off)</option>
+                                            <option value="PERCENTAGE">ðŸ“Š Percentage (e.g., 20% off)</option>
+                                            <option value="FREE_DELIVERY">ðŸšš Free Delivery</option>
+                                            <option value="WALLET_CREDIT">ðŸ’³ Wallet Credit</option>
                                         </Select>
-                                        <div className="text-xs text-neutral-500 mt-1">
+                                        <div className="text-xs text-zinc-600 mt-1">
                                             {formData.type === "FIXED_AMOUNT" && "Subtract a fixed dollar amount"}
                                             {formData.type === "PERCENTAGE" && "Discount by percentage of order total"}
                                             {formData.type === "FREE_DELIVERY" && "Waive delivery fees"}
@@ -443,12 +443,12 @@ export default function PromotionsPage() {
                                             value={formData.target}
                                             onChange={(e) => setFormData({ ...formData, target: e.target.value as PromotionTarget })}
                                         >
-                                            <option value="ALL_USERS">👥 All Users</option>
-                                            <option value="SPECIFIC_USERS">🎁 Specific Users</option>
-                                            <option value="FIRST_ORDER">🆕 First Order Only</option>
-                                            <option value="CONDITIONAL">💰 Conditional (Spend X Get Y)</option>
+                                            <option value="ALL_USERS">ðŸ‘¥ All Users</option>
+                                            <option value="SPECIFIC_USERS">ðŸŽ Specific Users</option>
+                                            <option value="FIRST_ORDER">ðŸ†• First Order Only</option>
+                                            <option value="CONDITIONAL">ðŸ’° Conditional (Spend X Get Y)</option>
                                         </Select>
-                                        <div className="text-xs text-neutral-500 mt-1">
+                                        <div className="text-xs text-zinc-600 mt-1">
                                             {formData.target === "ALL_USERS" && "Anyone can use this promo"}
                                             {formData.target === "SPECIFIC_USERS" && "Manually assign to specific users"}
                                             {formData.target === "FIRST_ORDER" && "Auto-applies to user's first order"}
@@ -464,8 +464,8 @@ export default function PromotionsPage() {
                             <div className="space-y-6">
                                 {/* Discount Settings */}
                                 <div className="space-y-4">
-                                    <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-neutral-800 pb-2">
-                                        💸 Discount Configuration
+                                    <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-zinc-800 pb-2">
+                                        ðŸ’¸ Discount Configuration
                                     </h3>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
@@ -477,7 +477,7 @@ export default function PromotionsPage() {
                                                 onChange={(e) => setFormData({ ...formData, discountValue: e.target.value })}
                                                 placeholder={formData.type === "PERCENTAGE" ? "20" : "5.00"}
                                             />
-                                            <div className="text-xs text-neutral-500 mt-1">
+                                            <div className="text-xs text-zinc-600 mt-1">
                                                 {formData.type === "PERCENTAGE" ? "Enter value as number (e.g., 20 for 20%)" : "Enter dollar amount (e.g., 5 for $5 off)"}
                                             </div>
                                         </div>
@@ -490,7 +490,7 @@ export default function PromotionsPage() {
                                                 onChange={(e) => setFormData({ ...formData, maxDiscountCap: e.target.value })}
                                                 placeholder="50.00"
                                             />
-                                            <div className="text-xs text-neutral-500 mt-1">
+                                            <div className="text-xs text-zinc-600 mt-1">
                                                 Maximum discount amount (optional)
                                             </div>
                                         </div>
@@ -504,7 +504,7 @@ export default function PromotionsPage() {
                                         onChange={(e) => setFormData({ ...formData, minOrderAmount: e.target.value })}
                                         placeholder="20.00"
                                     />
-                                    <div className="text-xs text-neutral-500 -mt-2">
+                                    <div className="text-xs text-zinc-600 -mt-2">
                                         Order must be at least this amount to qualify (optional)
                                     </div>
                                 </div>
@@ -513,11 +513,11 @@ export default function PromotionsPage() {
                                 {(formData.target === "ALL_USERS" || formData.target === "CONDITIONAL") && (
                                     <div className="space-y-4 bg-blue-900/10 border border-blue-700/30 rounded-lg p-4">
                                         <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-blue-700/30 pb-2">
-                                            📊 Progress Bar Threshold (Optional)
+                                            ðŸ“Š Progress Bar Threshold (Optional)
                                         </h3>
                                         <div className="bg-blue-900/20 border border-blue-700/20 rounded p-3 text-xs text-blue-200">
-                                            <strong>💡 Progress Bar:</strong> If you set a spend threshold, customers will see a progress bar showing how close they are to unlocking this promotion.
-                                            {formData.target === "ALL_USERS" && " Perfect for \"Spend €20, get free delivery\" type promotions for all users!"}
+                                            <strong>ðŸ’¡ Progress Bar:</strong> If you set a spend threshold, customers will see a progress bar showing how close they are to unlocking this promotion.
+                                            {formData.target === "ALL_USERS" && " Perfect for \"Spend â‚¬20, get free delivery\" type promotions for all users!"}
                                         </div>
                                         
                                         <Input
@@ -528,8 +528,8 @@ export default function PromotionsPage() {
                                             onChange={(e) => setFormData({ ...formData, spendThreshold: e.target.value })}
                                             placeholder="20.00"
                                         />
-                                        <div className="text-xs text-neutral-500 -mt-2">
-                                            The amount customers need to spend to unlock this promotion (e.g., €20)
+                                        <div className="text-xs text-zinc-600 -mt-2">
+                                            The amount customers need to spend to unlock this promotion (e.g., â‚¬20)
                                         </div>
                                     </div>
                                 )}
@@ -538,7 +538,7 @@ export default function PromotionsPage() {
                                 {formData.target === "CONDITIONAL" && formData.spendThreshold.trim() && (
                                     <div className="space-y-4 bg-purple-900/10 border border-purple-700/30 rounded-lg p-4">
                                         <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-purple-700/30 pb-2">
-                                            🎁 Threshold Reward
+                                            ðŸŽ Threshold Reward
                                         </h3>
                                         <div className="bg-purple-900/20 border border-purple-700/20 rounded p-3 text-xs text-purple-200">
                                             <strong>How it works:</strong> When user spends the threshold amount, they automatically receive the reward you configure below.
@@ -551,9 +551,9 @@ export default function PromotionsPage() {
                                                     value={formData.thresholdRewardType}
                                                     onChange={(e) => setFormData({ ...formData, thresholdRewardType: e.target.value as "FIXED_AMOUNT" | "PERCENTAGE" | "FREE_DELIVERY" })}
                                                 >
-                                                    <option value="FIXED_AMOUNT">💵 Fixed Amount Off</option>
-                                                    <option value="PERCENTAGE">📊 Percentage Off</option>
-                                                    <option value="FREE_DELIVERY">🚚 Free Delivery</option>
+                                                    <option value="FIXED_AMOUNT">ðŸ’µ Fixed Amount Off</option>
+                                                    <option value="PERCENTAGE">ðŸ“Š Percentage Off</option>
+                                                    <option value="FREE_DELIVERY">ðŸšš Free Delivery</option>
                                                 </Select>
                                             </div>
                                             {formData.thresholdRewardType !== "FREE_DELIVERY" && (
@@ -574,10 +574,10 @@ export default function PromotionsPage() {
 
                                 {/* Eligible Businesses */}
                                 <div className="space-y-4">
-                                    <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-neutral-800 pb-2">
-                                        🏬 Eligible Businesses (Optional)
+                                    <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-zinc-800 pb-2">
+                                        ðŸ¬ Eligible Businesses (Optional)
                                     </h3>
-                                    <div className="text-xs text-neutral-500">
+                                    <div className="text-xs text-zinc-600">
                                         Select which businesses this promotion applies to. Leave empty for all businesses.
                                     </div>
 
@@ -590,11 +590,11 @@ export default function PromotionsPage() {
                                         />
                                     </div>
 
-                                    <div className="max-h-40 overflow-auto border border-neutral-800 rounded p-2 bg-gray-900">
+                                    <div className="max-h-40 overflow-auto border border-zinc-800 rounded p-2 bg-gray-900">
                                         {businessesLoading ? (
-                                            <div className="text-sm text-neutral-400">Loading businesses...</div>
+                                            <div className="text-sm text-zinc-500">Loading businesses...</div>
                                         ) : filteredBusinesses.length === 0 ? (
-                                            <div className="text-sm text-neutral-400">No businesses found</div>
+                                            <div className="text-sm text-zinc-500">No businesses found</div>
                                         ) : (
                                             filteredBusinesses.map((b: any) => (
                                                 <label key={b.id} className="flex items-center gap-2 py-1 hover:bg-gray-800 rounded px-1">
@@ -614,7 +614,7 @@ export default function PromotionsPage() {
                                             ))
                                         )}
                                     </div>
-                                    <div className="text-xs text-neutral-500">
+                                    <div className="text-xs text-zinc-600">
                                         Selected: {(formData.eligibleBusinessIds || []).length} {(formData.eligibleBusinessIds || []).length === 0 && "(applies to all businesses)"}
                                     </div>
                                 </div>
@@ -625,8 +625,8 @@ export default function PromotionsPage() {
                         {wizardStep === 3 && (
                             <div className="space-y-6">
                                 <div className="space-y-4">
-                                    <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-neutral-800 pb-2">
-                                        ⚙️ Advanced Settings
+                                    <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-zinc-800 pb-2">
+                                        âš™ï¸ Advanced Settings
                                     </h3>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
@@ -637,7 +637,7 @@ export default function PromotionsPage() {
                                                 onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
                                                 placeholder="50"
                                             />
-                                            <div className="text-xs text-neutral-500 mt-1">
+                                            <div className="text-xs text-zinc-600 mt-1">
                                                 Higher priority = applied first (0-100, default: 50)
                                             </div>
                                         </div>
@@ -647,10 +647,10 @@ export default function PromotionsPage() {
                                                 value={formData.isStackable}
                                                 onChange={(e) => setFormData({ ...formData, isStackable: e.target.value })}
                                             >
-                                                <option value="false">❌ No - Exclusive</option>
-                                                <option value="true">✅ Yes - Stackable</option>
+                                                <option value="false">âŒ No - Exclusive</option>
+                                                <option value="true">âœ… Yes - Stackable</option>
                                             </Select>
-                                            <div className="text-xs text-neutral-500 mt-1">
+                                            <div className="text-xs text-zinc-600 mt-1">
                                                 Allow combining with other promotions
                                             </div>
                                         </div>
@@ -658,8 +658,8 @@ export default function PromotionsPage() {
                                 </div>
 
                                 <div className="space-y-4">
-                                    <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-neutral-800 pb-2">
-                                        📅 Schedule & Status
+                                    <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-zinc-800 pb-2">
+                                        ðŸ“… Schedule & Status
                                     </h3>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
@@ -669,7 +669,7 @@ export default function PromotionsPage() {
                                                 value={formData.startsAt}
                                                 onChange={(e) => setFormData({ ...formData, startsAt: e.target.value })}
                                             />
-                                            <div className="text-xs text-neutral-500 mt-1">
+                                            <div className="text-xs text-zinc-600 mt-1">
                                                 When this promotion becomes active (optional)
                                             </div>
                                         </div>
@@ -680,7 +680,7 @@ export default function PromotionsPage() {
                                                 value={formData.endsAt}
                                                 onChange={(e) => setFormData({ ...formData, endsAt: e.target.value })}
                                             />
-                                            <div className="text-xs text-neutral-500 mt-1">
+                                            <div className="text-xs text-zinc-600 mt-1">
                                                 When this promotion expires (optional)
                                             </div>
                                         </div>
@@ -691,42 +691,42 @@ export default function PromotionsPage() {
                                         value={formData.isActive}
                                         onChange={(e) => setFormData({ ...formData, isActive: e.target.value })}
                                     >
-                                        <option value="true">✅ Active</option>
-                                        <option value="false">⏸️ Inactive</option>
+                                        <option value="true">âœ… Active</option>
+                                        <option value="false">â¸ï¸ Inactive</option>
                                     </Select>
-                                    <div className="text-xs text-neutral-500 -mt-2">
+                                    <div className="text-xs text-zinc-600 -mt-2">
                                         Inactive promotions won't be applied even if dates are valid
                                     </div>
                                 </div>
 
                                 {/* Summary Preview */}
                                 <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 space-y-2">
-                                    <h4 className="text-white font-semibold text-sm mb-3">📋 Promotion Summary</h4>
+                                    <h4 className="text-white font-semibold text-sm mb-3">ðŸ“‹ Promotion Summary</h4>
                                     <div className="grid grid-cols-2 gap-2 text-xs">
-                                        <div className="text-neutral-400">Name:</div>
+                                        <div className="text-zinc-500">Name:</div>
                                         <div className="text-white">{formData.name || "-"}</div>
                                         
-                                        <div className="text-neutral-400">Type:</div>
+                                        <div className="text-zinc-500">Type:</div>
                                         <div className="text-white">{promotionTypeLabels[formData.type]}</div>
                                         
-                                        <div className="text-neutral-400">Target:</div>
+                                        <div className="text-zinc-500">Target:</div>
                                         <div className="text-white">{promotionTargetLabels[formData.target]}</div>
                                         
-                                        <div className="text-neutral-400">Discount:</div>
+                                        <div className="text-zinc-500">Discount:</div>
                                         <div className="text-white">
                                             {formData.type === "PERCENTAGE" 
                                                 ? `${formData.discountValue || "0"}%` 
-                                                : `€${formData.discountValue || "0"}`}
+                                                : `â‚¬${formData.discountValue || "0"}`}
                                         </div>
                                         
                                         {formData.spendThreshold && (
                                             <>
-                                                <div className="text-neutral-400">Spend Threshold:</div>
-                                                <div className="text-cyan-400">€{formData.spendThreshold}</div>
+                                                <div className="text-zinc-500">Spend Threshold:</div>
+                                                <div className="text-violet-400">â‚¬{formData.spendThreshold}</div>
                                             </>
                                         )}
                                         
-                                        <div className="text-neutral-400">Businesses:</div>
+                                        <div className="text-zinc-500">Businesses:</div>
                                         <div className="text-white">
                                             {(formData.eligibleBusinessIds || []).length > 0 
                                                 ? `${formData.eligibleBusinessIds.length} selected` 
@@ -739,7 +739,7 @@ export default function PromotionsPage() {
                     </div>
 
                     {/* Navigation Buttons */}
-                    <div className="flex justify-between items-center pt-4 border-t border-neutral-800">
+                    <div className="flex justify-between items-center pt-4 border-t border-zinc-800">
                         <Button 
                             variant="outline" 
                             onClick={() => {
@@ -750,10 +750,10 @@ export default function PromotionsPage() {
                                 }
                             }}
                         >
-                            {wizardStep === 1 ? "Cancel" : "← Back"}
+                            {wizardStep === 1 ? "Cancel" : "â† Back"}
                         </Button>
                         
-                        <div className="text-xs text-neutral-400">
+                        <div className="text-xs text-zinc-500">
                             Step {wizardStep} of 3
                         </div>
                         
@@ -765,7 +765,7 @@ export default function PromotionsPage() {
                                     (wizardStep === 2 && !formData.discountValue.trim())
                                 }
                             >
-                                Next →
+                                Next â†’
                             </Button>
                         ) : (
                             <Button 
@@ -782,7 +782,7 @@ export default function PromotionsPage() {
             {/* Delete Confirmation Modal */}
             <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="Delete Promotion">
                 <div className="space-y-4">
-                    <p className="text-neutral-300">
+                    <p className="text-zinc-400">
                         Are you sure you want to delete &quot;{promotionToDelete?.name}&quot;?
                         This action cannot be undone.
                     </p>

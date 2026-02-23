@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, FormEvent, useMemo } from "react";
 import { useQuery, useMutation } from "@apollo/client/react";
@@ -317,7 +317,7 @@ export default function AdminsPage() {
                                         : admin.role === 'ADMIN'
                                         ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30'
                                         : admin.role === 'BUSINESS_OWNER'
-                                        ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
+                                        ? 'bg-violet-500/10 text-violet-400 border-violet-500/30'
                                         : 'bg-teal-500/10 text-teal-400 border-teal-500/30'
                                 }`}>
                                     {admin.role === 'SUPER_ADMIN' ? 'Super Admin' 
@@ -328,7 +328,7 @@ export default function AdminsPage() {
                             </Td>
                             <Td>
                                 {admin.business ? (
-                                    <div className="flex items-center gap-2 text-cyan-400">
+                                    <div className="flex items-center gap-2 text-violet-400">
                                         <Building2 size={16} />
                                         <span className="text-sm">{admin.business.name}</span>
                                     </div>
@@ -344,7 +344,7 @@ export default function AdminsPage() {
                                             variant="outline"
                                             onClick={() => handleEdit(admin)}
                                             disabled={updating}
-                                            className="text-cyan-400 hover:text-cyan-300"
+                                            className="text-violet-400 hover:text-violet-300"
                                         >
                                             <Pencil size={14} className="mr-1" />
                                             Edit

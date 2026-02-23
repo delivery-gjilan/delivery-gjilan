@@ -1,11 +1,11 @@
-"use client";
+﻿"use client";
 
 import { useState, useCallback, useMemo } from "react";
 import Select from "@/components/ui/Select";
 import Input from "@/components/ui/Input";
 import { Trash2, GripVertical, ChevronDown, ChevronRight } from "lucide-react";
 
-// ── Types ──────────────────────────────────────────────────────
+// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface Rule {
   field: string;
@@ -22,7 +22,7 @@ export function isRuleGroup(item: Rule | RuleGroup): item is RuleGroup {
   return "operator" in item && "rules" in item;
 }
 
-// ── Field definitions ──────────────────────────────────────────
+// â”€â”€ Field definitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface FieldDef {
   value: string;
@@ -43,8 +43,8 @@ const FIELD_DEFINITIONS: FieldDef[] = [
   { value: "totalOrders", label: "Total Orders", type: "number", category: "Behavior" },
   { value: "deliveredOrders", label: "Delivered Orders", type: "number", category: "Behavior" },
   { value: "cancelledOrders", label: "Cancelled Orders", type: "number", category: "Behavior" },
-  { value: "totalSpend", label: "Total Spend (€)", type: "number", category: "Behavior" },
-  { value: "avgOrderValue", label: "Avg Order Value (€)", type: "number", category: "Behavior" },
+  { value: "totalSpend", label: "Total Spend (â‚¬)", type: "number", category: "Behavior" },
+  { value: "avgOrderValue", label: "Avg Order Value (â‚¬)", type: "number", category: "Behavior" },
   { value: "firstOrderAt", label: "First Order Date", type: "date", category: "Behavior" },
   { value: "lastOrderAt", label: "Last Order Date", type: "date", category: "Behavior" },
   { value: "lastDeliveredAt", label: "Last Delivered", type: "date", category: "Behavior" },
@@ -61,11 +61,11 @@ const OPERATORS: Record<string, { value: string; label: string }[]> = {
   ],
   number: [
     { value: "eq", label: "=" },
-    { value: "ne", label: "≠" },
+    { value: "ne", label: "â‰ " },
     { value: "gt", label: ">" },
-    { value: "gte", label: "≥" },
+    { value: "gte", label: "â‰¥" },
     { value: "lt", label: "<" },
-    { value: "lte", label: "≤" },
+    { value: "lte", label: "â‰¤" },
   ],
   date: [
     { value: "gt", label: "after" },
@@ -75,7 +75,7 @@ const OPERATORS: Record<string, { value: string; label: string }[]> = {
   ],
 };
 
-// ── Utility ──────────────────────────────────────────────────────
+// â”€â”€ Utility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function getFieldDef(fieldValue: string): FieldDef | undefined {
   return FIELD_DEFINITIONS.find((f) => f.value === fieldValue);
@@ -95,7 +95,7 @@ function describeRule(rule: Rule): string {
   return `${field?.label || rule.field} ${op?.label || rule.op} ${rule.value || "?"}`;
 }
 
-// ── Default group factory ────────────────────────────────────────
+// â”€â”€ Default group factory â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function createDefaultGroup(): RuleGroup {
   return {
@@ -104,7 +104,7 @@ export function createDefaultGroup(): RuleGroup {
   };
 }
 
-// ── Rule Row ─────────────────────────────────────────────────────
+// â”€â”€ Rule Row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function RuleRow({
   rule,
@@ -138,16 +138,16 @@ function RuleRow({
       {/* Connector label */}
       {showConnector && (
         <div className="w-12 flex-shrink-0 flex items-center justify-center">
-          <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider">
+          <span className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">
             {connectorLabel}
           </span>
         </div>
       )}
       {!showConnector && <div className="w-12 flex-shrink-0" />}
 
-      <div className="flex items-center gap-2 flex-1 bg-[#0f0f0f] border border-[#262626] rounded-lg px-3 py-2 hover:border-[#333] transition-colors group">
+      <div className="flex items-center gap-2 flex-1 bg-[#0f0f0f] border border-zinc-800 rounded-lg px-3 py-2 hover:border-[#333] transition-colors group">
         {/* Drag handle */}
-        <GripVertical size={14} className="text-neutral-600 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab" />
+        <GripVertical size={14} className="text-zinc-600 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab" />
 
         {/* Field select with optgroups */}
         <select
@@ -176,7 +176,7 @@ function RuleRow({
         <select
           value={rule.op}
           onChange={(e) => onUpdate({ ...rule, op: e.target.value })}
-          className="bg-[#1a1a1a] border border-[#333] rounded px-2 py-1 text-neutral-300 text-xs focus:outline-none focus:border-cyan-600 min-w-[70px]"
+          className="bg-[#1a1a1a] border border-[#333] rounded px-2 py-1 text-zinc-400 text-xs focus:outline-none focus:border-violet-600 min-w-[70px]"
         >
           {operators.map((o) => (
             <option key={o.value} value={o.value} className="bg-[#1a1a1a]">
@@ -190,7 +190,7 @@ function RuleRow({
           <select
             value={rule.value}
             onChange={(e) => onUpdate({ ...rule, value: e.target.value })}
-            className="bg-[#1a1a1a] border border-[#333] rounded px-2 py-1 text-neutral-300 text-sm focus:outline-none focus:border-cyan-600 min-w-[130px]"
+            className="bg-[#1a1a1a] border border-[#333] rounded px-2 py-1 text-zinc-400 text-sm focus:outline-none focus:border-violet-600 min-w-[130px]"
           >
             <option value="" className="bg-[#1a1a1a]">Select...</option>
             {fieldDef.options?.map((opt) => (
@@ -205,14 +205,14 @@ function RuleRow({
             value={rule.value}
             onChange={(e) => onUpdate({ ...rule, value: e.target.value })}
             placeholder={fieldDef?.type === "number" ? "0" : fieldDef?.type === "date" ? "YYYY-MM-DD" : "value..."}
-            className="bg-[#1a1a1a] border border-[#333] rounded px-2 py-1 text-neutral-300 text-sm focus:outline-none focus:border-cyan-600 w-[130px] placeholder:text-neutral-600"
+            className="bg-[#1a1a1a] border border-[#333] rounded px-2 py-1 text-zinc-400 text-sm focus:outline-none focus:border-violet-600 w-[130px] placeholder:text-zinc-600"
           />
         )}
 
         {/* Remove */}
         <button
           onClick={onRemove}
-          className="ml-auto p-1 text-neutral-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+          className="ml-auto p-1 text-zinc-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
           title="Remove rule"
         >
           <Trash2 size={14} />
@@ -222,7 +222,7 @@ function RuleRow({
   );
 }
 
-// ── Rule Group ───────────────────────────────────────────────────
+// â”€â”€ Rule Group â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function RuleGroupBuilder({
   group,
@@ -273,7 +273,7 @@ function RuleGroupBuilder({
   }, [group, onUpdate]);
 
   // Colors per depth
-  const borderColors = ["border-cyan-800/40", "border-orange-800/40", "border-purple-800/40"];
+  const borderColors = ["border-violet-800/40", "border-orange-800/40", "border-purple-800/40"];
   const bgColors = ["bg-[#0a1015]", "bg-[#15100a]", "bg-[#100a15]"];
   const borderColor = borderColors[depth % borderColors.length];
   const bgColor = bgColors[depth % bgColors.length];
@@ -284,7 +284,7 @@ function RuleGroupBuilder({
       <div className="flex items-center gap-2 px-3 py-2 border-b border-[#1f1f1f]">
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="p-0.5 text-neutral-500 hover:text-neutral-300 transition-colors"
+          className="p-0.5 text-zinc-600 hover:text-zinc-400 transition-colors"
         >
           {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
         </button>
@@ -293,18 +293,18 @@ function RuleGroupBuilder({
           onClick={toggleOperator}
           className={`px-2.5 py-0.5 rounded text-[11px] font-bold tracking-wide transition-colors ${
             group.operator === "AND"
-              ? "bg-cyan-900/60 text-cyan-300 hover:bg-cyan-900/80 border border-cyan-700/30"
+              ? "bg-violet-900/60 text-cyan-300 hover:bg-violet-900/80 border border-violet-700/30"
               : "bg-orange-900/60 text-orange-300 hover:bg-orange-900/80 border border-orange-700/30"
           }`}
         >
           {group.operator}
         </button>
 
-        <span className="text-neutral-500 text-xs">
+        <span className="text-zinc-600 text-xs">
           {group.operator === "AND" ? "All conditions must match" : "Any condition can match"}
         </span>
 
-        <span className="text-neutral-600 text-[10px] ml-1">
+        <span className="text-zinc-600 text-[10px] ml-1">
           ({ruleCount} {ruleCount === 1 ? "rule" : "rules"})
         </span>
 
@@ -313,7 +313,7 @@ function RuleGroupBuilder({
         {onRemove && (
           <button
             onClick={onRemove}
-            className="p-1 text-neutral-600 hover:text-red-400 transition-colors"
+            className="p-1 text-zinc-600 hover:text-red-400 transition-colors"
             title="Remove group"
           >
             <Trash2 size={14} />
@@ -349,7 +349,7 @@ function RuleGroupBuilder({
           <div className="flex items-center gap-3 pt-1.5 pl-12">
             <button
               onClick={addRule}
-              className="flex items-center gap-1 text-xs text-cyan-500 hover:text-cyan-400 transition-colors font-medium"
+              className="flex items-center gap-1 text-xs text-violet-500 hover:text-violet-400 transition-colors font-medium"
             >
               <span className="text-base leading-none">+</span> Add condition
             </button>
@@ -368,7 +368,7 @@ function RuleGroupBuilder({
       {/* Collapsed summary */}
       {collapsed && (
         <div className="px-3 py-2">
-          <div className="text-xs text-neutral-500 truncate">
+          <div className="text-xs text-zinc-600 truncate">
             {group.rules
               .slice(0, 3)
               .map((item, i) => {
@@ -384,7 +384,7 @@ function RuleGroupBuilder({
   );
 }
 
-// ── Main Export ────────────────────────────────────────────────────
+// â”€â”€ Main Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface QueryBuilderProps {
   value: RuleGroup;

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, FormEvent } from "react";
 import { useQuery, useMutation, useSubscription } from "@apollo/client/react";
@@ -176,7 +176,7 @@ export default function DriversPage() {
         <div className="text-white">
             <div className="mb-6 flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-semibold">Drivers</h1>
+                    <h1 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Drivers</h1>
                     <p className="text-gray-400 mt-1">Manage drivers, commissions, and capacity limits.</p>
                 </div>
                 {isSuperAdmin && (
@@ -188,12 +188,12 @@ export default function DriversPage() {
             </div>
 
             {error && (
-                <div className="bg-red-900/20 border border-red-800 rounded-lg p-4 text-red-300 text-sm mb-4">
+                <div className="bg-red-900/20 border border-red-800 rounded-xl p-4 text-red-300 text-sm mb-4">
                     {error.message}
                 </div>
             )}
             {formSuccess && (
-                <div className="bg-emerald-900/20 border border-emerald-800 rounded-lg p-4 text-emerald-300 text-sm mb-4">
+                <div className="bg-emerald-900/20 border border-emerald-800 rounded-xl p-4 text-emerald-300 text-sm mb-4">
                     {formSuccess}
                 </div>
             )}
@@ -226,12 +226,12 @@ export default function DriversPage() {
                                             <div className="font-medium text-white">{driver.firstName} {driver.lastName}</div>
                                             <div className="mt-0.5">
                                                 <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs border ${isOnline ? "bg-blue-500/10 text-blue-400 border-blue-500/30" : "bg-gray-500/10 text-gray-500 border-gray-700"}`}>
-                                                    {isOnline ? "ðŸŸ¢ Online" : "âš« Offline"}
+                                                    {isOnline ? "🟢 Online" : "⚫ Offline"}
                                                 </span>
                                             </div>
                                         </Td>
                                         <Td><span className="text-gray-300">{driver.email}</span></Td>
-                                        <Td><span className="text-gray-300">{driver.phoneNumber || "â€”"}</span></Td>
+                                        <Td><span className="text-gray-300">{driver.phoneNumber || "—"}</span></Td>
                                         <Td>
                                             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border ${getConnectionBadge(status)}`}>
                                                 <Signal size={11} />
@@ -291,7 +291,7 @@ export default function DriversPage() {
                 <Modal
                     isOpen={showSettingsModal}
                     onClose={() => { setShowSettingsModal(false); setSettingsTarget(null); }}
-                    title={`Settings â€” ${settingsTarget.firstName} ${settingsTarget.lastName}`}
+                    title={`Settings — ${settingsTarget.firstName} ${settingsTarget.lastName}`}
                 >
                     <form onSubmit={handleSettingsSubmit} className="space-y-4">
                         {settingsError && (
@@ -364,7 +364,7 @@ export default function DriversPage() {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-300 mb-2">Password *</label>
-                            <Input type="password" value={createForm.password} onChange={(e) => setCreateForm(f => ({ ...f, password: e.target.value }))} placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" required />
+                            <Input type="password" value={createForm.password} onChange={(e) => setCreateForm(f => ({ ...f, password: e.target.value }))} placeholder="••••••••" required />
                         </div>
                         <div className="flex gap-3 pt-4">
                             <Button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-700">Create Driver</Button>

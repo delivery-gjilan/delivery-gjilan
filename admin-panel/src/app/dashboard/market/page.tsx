@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo, useEffect } from "react";
 import { useBusinesses } from "@/lib/hooks/useBusinesses";
@@ -805,7 +805,7 @@ function ManageCategoriesPanel({
                                 return (
                                     <div
                                         key={subcat.id}
-                                        className="bg-gray-800 border border-gray-700 rounded-lg p-3 flex items-center justify-between hover:border-cyan-500/50 transition-colors"
+                                        className="bg-gray-800 border border-gray-700 rounded-lg p-3 flex items-center justify-between hover:border-violet-500/50 transition-colors"
                                     >
                                         <div>
                                             <div className="font-medium text-white">{subcat.name}</div>
@@ -942,11 +942,11 @@ function ProductRow({
             {/* Subcategory */}
             <td className="px-4 py-3">
                 {subcategoryName ? (
-                    <span className="text-xs px-2 py-1 bg-cyan-500/20 text-cyan-300 rounded">
+                    <span className="text-xs px-2 py-1 bg-violet-500/20 text-violet-300 rounded">
                         {subcategoryName}
                     </span>
                 ) : (
-                    <span className="text-gray-600 text-xs">—</span>
+                    <span className="text-gray-600 text-xs">â€”</span>
                 )}
             </td>
 

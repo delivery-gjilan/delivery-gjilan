@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { BarChart3, TrendingUp, TrendingDown, Calendar } from "lucide-react";
@@ -34,26 +34,20 @@ export default function StatisticsPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <BarChart3 size={28} />
-            Statistics
-          </h1>
-          <p className="text-neutral-400 mt-1">
-            Platform-wide analytics and insights
-          </p>
-        </div>
+        <h1 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
+          Statistics
+        </h1>
 
         {/* Date Range Filter */}
         <div className="flex items-center gap-3">
-          <Calendar size={18} className="text-neutral-400" />
+          <Calendar size={18} className="text-zinc-500" />
           <select
             value={dateRange}
             onChange={(e) => setDateRange(e.target.value)}
-            className="px-4 py-2 bg-[#161616] border border-[#262626] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            className="px-4 py-2 bg-[#111113] border border-zinc-800 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
           >
             <option value="today">Today</option>
             <option value="7days">Last 7 Days</option>
@@ -68,9 +62,9 @@ export default function StatisticsPage() {
         {stats.map((stat, index) => (
           <div
             key={index}
-            className="bg-[#161616] border border-[#262626] rounded-lg p-6"
+            className="bg-[#111113] border border-zinc-800 rounded-xl p-5"
           >
-            <div className="text-neutral-400 text-sm mb-2">{stat.label}</div>
+            <div className="text-zinc-500 text-sm mb-2">{stat.label}</div>
             <div className="flex items-end justify-between">
               <div className="text-3xl font-bold text-white">{stat.value}</div>
               <div
@@ -93,35 +87,35 @@ export default function StatisticsPage() {
       {/* Chart Placeholders */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Orders Over Time */}
-        <div className="bg-[#161616] border border-[#262626] rounded-lg p-6">
+        <div className="bg-[#111113] border border-zinc-800 rounded-xl p-5">
           <h3 className="text-white font-semibold mb-4">Orders Over Time</h3>
           <div className="h-64 flex items-center justify-center">
             <div className="text-center">
-              <BarChart3 size={48} className="mx-auto text-neutral-600 mb-2" />
-              <p className="text-neutral-500 text-sm">Chart coming soon</p>
+              <BarChart3 size={48} className="mx-auto text-zinc-600 mb-2" />
+              <p className="text-zinc-600 text-sm">Chart coming soon</p>
             </div>
           </div>
         </div>
 
         {/* Revenue Over Time */}
-        <div className="bg-[#161616] border border-[#262626] rounded-lg p-6">
+        <div className="bg-[#111113] border border-zinc-800 rounded-xl p-5">
           <h3 className="text-white font-semibold mb-4">Revenue Over Time</h3>
           <div className="h-64 flex items-center justify-center">
             <div className="text-center">
-              <BarChart3 size={48} className="mx-auto text-neutral-600 mb-2" />
-              <p className="text-neutral-500 text-sm">Chart coming soon</p>
+              <BarChart3 size={48} className="mx-auto text-zinc-600 mb-2" />
+              <p className="text-zinc-600 text-sm">Chart coming soon</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Additional Metrics */}
-      <div className="bg-[#161616] border border-[#262626] rounded-lg p-6">
+      <div className="bg-[#111113] border border-zinc-800 rounded-xl p-5">
         <h3 className="text-white font-semibold mb-4">Performance Metrics</h3>
         <div className="h-48 flex items-center justify-center">
           <div className="text-center">
-            <BarChart3 size={48} className="mx-auto text-neutral-600 mb-2" />
-            <p className="text-neutral-500 text-sm">
+            <BarChart3 size={48} className="mx-auto text-zinc-600 mb-2" />
+            <p className="text-zinc-600 text-sm">
               Conversion metrics and detailed analytics coming soon
             </p>
           </div>
