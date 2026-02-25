@@ -1,0 +1,52 @@
+type DeliveryPricingTier {
+    id: ID!
+    minDistanceKm: Float!
+    maxDistanceKm: Float
+    price: Float!
+    sortOrder: Int!
+    isActive: Boolean!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+}
+
+type DeliveryPriceResult {
+    distanceKm: Float!
+    price: Float!
+    tierApplied: DeliveryPricingTier
+    zoneApplied: DeliveryZoneMatch
+}
+
+input CreateDeliveryPricingTierInput {
+    minDistanceKm: Float!
+    maxDistanceKm: Float
+    price: Float!
+    sortOrder: Int
+}
+
+input UpdateDeliveryPricingTierInput {
+    minDistanceKm: Float
+    maxDistanceKm: Float
+    price: Float
+    sortOrder: Int
+    isActive: Boolean
+}
+
+input SetDeliveryPricingTiersInput {
+    tiers: [CreateDeliveryPricingTierInput!]!
+}
+
+extend type Query {
+    deliveryPricingTiers: [DeliveryPricingTier!]!
+    calculateDeliveryPrice(
+        dropoffLat: Float!
+        dropoffLng: Float!
+        businessId: ID!
+    ): DeliveryPriceResult! @skipAuth
+}
+
+extend type Mutation {
+    setDeliveryPricingTiers(input: SetDeliveryPricingTiersInput!): [DeliveryPricingTier!]!
+    createDeliveryPricingTier(input: CreateDeliveryPricingTierInput!): DeliveryPricingTier!
+    updateDeliveryPricingTier(id: ID!, input: UpdateDeliveryPricingTierInput!): DeliveryPricingTier!
+    deleteDeliveryPricingTier(id: ID!): Boolean!
+}

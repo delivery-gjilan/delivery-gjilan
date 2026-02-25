@@ -1,16 +1,17 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Platform, Image } from 'react-native';
 import { router } from 'expo-router';
-import { Product } from '@/gql/graphql';
+import { Product, BusinessType } from '@/gql/graphql';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { CartControls } from './CartControls';
 
 interface ProductCardProps {
     product: Partial<Product>;
+    businessType?: BusinessType;
 }
 
-export function ProductCard({ product }: ProductCardProps) {
+export function ProductCard({ product, businessType }: ProductCardProps) {
     const theme = useTheme();
 
     const handlePress = () => {
@@ -123,7 +124,7 @@ export function ProductCard({ product }: ProductCardProps) {
                         {/* Cart Controls */}
                         {product.isAvailable && (
                             <View style={{ flexShrink: 0, marginLeft: 8 }}>
-                                <CartControls product={product} />
+                                <CartControls product={product} businessType={businessType} />
                             </View>
                         )}
                     </View>

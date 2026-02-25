@@ -1,12 +1,23 @@
 import { useState, useMemo } from 'react';
+import { Alert } from 'react-native';
 import { router } from 'expo-router';
+import { useQuery } from '@apollo/client/react';
 import { useCart } from '@/modules/cart/hooks/useCart';
 import { useCartActions } from '@/modules/cart/hooks/useCartActions';
 import { Product } from '@/gql/graphql';
+import { GET_BUSINESS } from '@/graphql/operations/businesses';
 
 export function useProductActions(product: Partial<Product>) {
     const { items } = useCart();
     const { addItem, updateQuantity, removeItem } = useCartActions();
+
+    // Fetch business type (should be cached from business screen)
+    const { data: businessData } = useQuery(GET_BUSINESS, {
+        variables: { id: product.businessId ?? '' },
+        skip: !product.businessId,
+        fetchPolicy: 'cache-first',
+    });
+    const businessType = businessData?.business?.businessType;
 
     // Find cart item
     const id = product.id ?? '';
@@ -30,15 +41,21 @@ export function useProductActions(product: Partial<Product>) {
 
     const addToCart = () => {
         if (!id) return;
-        addItem({
+        const error = addItem({
             productId: id,
             name: product.name ?? 'Unknown',
             price: product.isOnSale && product.salePrice ? product.salePrice : (product.price ?? 0),
             quantity: localQuantity,
             imageUrl: product.imageUrl || undefined,
             businessId: product.businessId ?? '',
+            businessType: businessType,
             originalPrice: product.isOnSale && product.salePrice ? product.price : undefined,
         });
+
+        if (error) {
+            Alert.alert('Cannot Add Item', error);
+            return;
+        }
 
         // Navigate back to business page with animation
         router.push(`/business/${product.businessId ?? ''}`);

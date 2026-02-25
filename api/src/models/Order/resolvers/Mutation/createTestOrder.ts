@@ -1,9 +1,9 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { getDB } from '@/database';
-import { orders, orderItems } from '@/database/schema';
+import { orders, orderItems, deliveryPricingTiers } from '@/database/schema';
 import { businesses as businessesTable, products as productsTable } from '@/database/schema';
 import { users as usersTable } from '@/database/schema';
-import { eq } from 'drizzle-orm';
+import { eq, asc } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 
 export const createTestOrder: NonNullable<MutationResolvers['createTestOrder']> = async (
@@ -59,7 +59,36 @@ export const createTestOrder: NonNullable<MutationResolvers['createTestOrder']> 
     }));
 
     const orderPrice = itemsData.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const deliveryPrice = 1.5;
+
+    // Calculate delivery price from tiers (use test dropoff → business distance)
+    const dropoffLat = 42.4602;
+    const dropoffLng = 21.4691;
+    let deliveryPrice = 1.5; // fallback
+
+    const tiers = await db
+        .select()
+        .from(deliveryPricingTiers)
+        .where(eq(deliveryPricingTiers.isActive, true))
+        .orderBy(asc(deliveryPricingTiers.sortOrder));
+
+    if (tiers.length > 0) {
+        const R = 6371;
+        const dLat = ((dropoffLat - casbasPizza.locationLat) * Math.PI) / 180;
+        const dLng = ((dropoffLng - casbasPizza.locationLng) * Math.PI) / 180;
+        const a =
+            Math.sin(dLat / 2) ** 2 +
+            Math.cos((casbasPizza.locationLat * Math.PI) / 180) *
+                Math.cos((dropoffLat * Math.PI) / 180) *
+                Math.sin(dLng / 2) ** 2;
+        const distanceKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        const matched = tiers.find((t) => {
+            if (t.maxDistanceKm === null) return distanceKm >= t.minDistanceKm;
+            return distanceKm >= t.minDistanceKm && distanceKm < t.maxDistanceKm;
+        });
+        if (matched) deliveryPrice = matched.price;
+        else deliveryPrice = tiers[tiers.length - 1].price;
+    }
 
     // 6. Create order directly in DB (bypass business hours / promo validation)
     const [createdOrder] = await db

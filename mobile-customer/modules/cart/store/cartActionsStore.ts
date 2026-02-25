@@ -4,8 +4,35 @@ import { useCartAnimationStore } from './cartAnimationStore';
 import { CartItem } from '../types';
 import * as Haptics from 'expo-haptics';
 
+/**
+ * Check whether adding `newItem` would violate the multi-restaurant rule.
+ * Rule: only ONE restaurant is allowed in the cart (markets/pharmacies are always OK).
+ * Returns an error message string if blocked, or null if allowed.
+ */
+function validateMultiRestaurant(currentItems: CartItem[], newItem: CartItem): string | null {
+    // If the new item is not from a restaurant, always allow
+    if (newItem.businessType && newItem.businessType !== 'RESTAURANT') return null;
+
+    // If the new product already exists in the cart (same productId), it's an increment — allow
+    if (currentItems.some((i) => i.productId === newItem.productId)) return null;
+
+    // Find existing restaurant businessIds in the cart
+    const restaurantBusinessIds = new Set(
+        currentItems
+            .filter((i) => !i.businessType || i.businessType === 'RESTAURANT')
+            .map((i) => i.businessId),
+    );
+
+    // If the new item is from a restaurant that's NOT already in the cart, and there's already another restaurant
+    if (restaurantBusinessIds.size > 0 && !restaurantBusinessIds.has(newItem.businessId)) {
+        return 'You can only order from one restaurant at a time. Please clear your cart or finish your current order first.';
+    }
+
+    return null;
+}
+
 interface CartActionsStore {
-    addItem: (item: CartItem) => void;
+    addItem: (item: CartItem) => string | null; // returns error message or null
     removeItem: (productId: string) => void;
     updateQuantity: (productId: string, quantity: number) => void;
     clearCart: () => void;
@@ -13,6 +40,11 @@ interface CartActionsStore {
 
 export const useCartActionsStore = create<CartActionsStore>((set) => ({
     addItem: (item) => {
+        // Validate multi-restaurant restriction
+        const currentItems = useCartDataStore.getState().items;
+        const error = validateMultiRestaurant(currentItems, item);
+        if (error) return error;
+
         useCartDataStore.setState((state) => {
             const existingItemIndex = state.items.findIndex((i) => i.productId === item.productId);
 
@@ -31,6 +63,7 @@ export const useCartActionsStore = create<CartActionsStore>((set) => ({
         // Trigger animation and haptic feedback
         useCartAnimationStore.getState().triggerAnimation();
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        return null;
     },
     removeItem: (productId) => {
         useCartDataStore.setState((state) => ({

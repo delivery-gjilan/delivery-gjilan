@@ -385,6 +385,7 @@ export default function Market() {
                                                 product={item}
                                                 onPress={handleProductPress}
                                                 descriptionOverride={item.description}
+                                                businessType="MARKET"
                                             />
                                         </View>
                                     )}

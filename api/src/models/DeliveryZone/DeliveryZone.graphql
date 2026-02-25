@@ -1,0 +1,56 @@
+type DeliveryZone {
+    id: ID!
+    name: String!
+    polygon: [PolygonPoint!]!
+    deliveryFee: Float!
+    sortOrder: Int!
+    isActive: Boolean!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+}
+
+type PolygonPoint {
+    lat: Float!
+    lng: Float!
+}
+
+"""
+Returned from calculateDeliveryPrice when a zone matches;
+tells the client which zone (if any) is being applied.
+"""
+type DeliveryZoneMatch {
+    id: ID!
+    name: String!
+    deliveryFee: Float!
+}
+
+input PolygonPointInput {
+    lat: Float!
+    lng: Float!
+}
+
+input CreateDeliveryZoneInput {
+    name: String!
+    polygon: [PolygonPointInput!]!
+    deliveryFee: Float!
+    sortOrder: Int
+    isActive: Boolean
+}
+
+input UpdateDeliveryZoneInput {
+    name: String
+    polygon: [PolygonPointInput!]
+    deliveryFee: Float
+    sortOrder: Int
+    isActive: Boolean
+}
+
+extend type Query {
+    deliveryZones: [DeliveryZone!]!
+}
+
+extend type Mutation {
+    createDeliveryZone(input: CreateDeliveryZoneInput!): DeliveryZone!
+    updateDeliveryZone(id: ID!, input: UpdateDeliveryZoneInput!): DeliveryZone!
+    deleteDeliveryZone(id: ID!): Boolean!
+}

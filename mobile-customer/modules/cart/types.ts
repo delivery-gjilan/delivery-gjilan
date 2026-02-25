@@ -8,6 +8,7 @@ export interface CartItem {
     name: string;
     imageUrl?: string;
     businessId: string; // To group by business or validate single-business orders if needed
+    businessType?: 'RESTAURANT' | 'MARKET' | 'PHARMACY'; // Needed for multi-restaurant validation
 }
 
 export type CartStoreState = {
@@ -15,7 +16,7 @@ export type CartStoreState = {
 };
 
 export type CartActions = {
-    addItem: (item: CartItem) => void;
+    addItem: (item: CartItem) => string | null; // returns error message or null
     removeItem: (productId: string) => void;
     updateQuantity: (productId: string, quantity: number) => void;
     clearCart: () => void;

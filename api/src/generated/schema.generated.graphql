@@ -191,6 +191,21 @@ input CreateCampaignInput {
   title: String!
 }
 
+input CreateDeliveryPricingTierInput {
+  maxDistanceKm: Float
+  minDistanceKm: Float!
+  price: Float!
+  sortOrder: Int
+}
+
+input CreateDeliveryZoneInput {
+  deliveryFee: Float!
+  isActive: Boolean
+  name: String!
+  polygon: [PolygonPointInput!]!
+  sortOrder: Int
+}
+
 input CreateOrderInput {
   deliveryPrice: Float!
   dropOffLocation: LocationInput!
@@ -263,6 +278,45 @@ input CreateUserInput {
 scalar Date
 
 scalar DateTime
+
+type DeliveryPriceResult {
+  distanceKm: Float!
+  price: Float!
+  tierApplied: DeliveryPricingTier
+  zoneApplied: DeliveryZoneMatch
+}
+
+type DeliveryPricingTier {
+  createdAt: DateTime!
+  id: ID!
+  isActive: Boolean!
+  maxDistanceKm: Float
+  minDistanceKm: Float!
+  price: Float!
+  sortOrder: Int!
+  updatedAt: DateTime!
+}
+
+type DeliveryZone {
+  createdAt: DateTime!
+  deliveryFee: Float!
+  id: ID!
+  isActive: Boolean!
+  name: String!
+  polygon: [PolygonPoint!]!
+  sortOrder: Int!
+  updatedAt: DateTime!
+}
+
+"""
+Returned from calculateDeliveryPrice when a zone matches;
+tells the client which zone (if any) is being applied.
+"""
+type DeliveryZoneMatch {
+  deliveryFee: Float!
+  id: ID!
+  name: String!
+}
 
 enum DeviceAppType {
   CUSTOMER
@@ -418,6 +472,8 @@ type Mutation {
   cancelOrder(id: ID!): Order!
   createBusiness(input: CreateBusinessInput!): Business!
   createCampaign(input: CreateCampaignInput!): NotificationCampaign!
+  createDeliveryPricingTier(input: CreateDeliveryPricingTierInput!): DeliveryPricingTier!
+  createDeliveryZone(input: CreateDeliveryZoneInput!): DeliveryZone!
   createOrder(input: CreateOrderInput!): Order!
   createProduct(input: CreateProductInput!): Product!
   createProductCategory(input: CreateProductCategoryInput!): ProductCategory!
@@ -428,6 +484,8 @@ type Mutation {
   deductWalletCredit(amount: Float!, orderId: ID!, userId: ID!): WalletTransaction!
   deleteBusiness(id: ID!): Boolean!
   deleteCampaign(id: ID!): Boolean!
+  deleteDeliveryPricingTier(id: ID!): Boolean!
+  deleteDeliveryZone(id: ID!): Boolean!
   deleteProduct(id: ID!): Boolean!
   deleteProductCategory(id: ID!): Boolean!
   deleteProductSubcategory(id: ID!): Boolean!
@@ -455,6 +513,7 @@ type Mutation {
   sendPushNotification(input: SendPushNotificationInput!): SendNotificationResult!
   setBusinessSchedule(businessId: ID!, schedule: [BusinessDayHoursInput!]!): [BusinessDayHours!]!
   setDefaultAddress(id: ID!): Boolean!
+  setDeliveryPricingTiers(input: SetDeliveryPricingTiersInput!): [DeliveryPricingTier!]!
   setUserPermissions(permissions: [UserPermission!]!, userId: ID!): User!
   startPreparing(id: ID!, preparationMinutes: Int!): Order!
   submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
@@ -462,6 +521,8 @@ type Mutation {
   unsettleSettlement(settlementId: ID!): Settlement!
   updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
   updateCommissionPercentage(businessId: ID, driverId: ID, percentage: Float!): Boolean!
+  updateDeliveryPricingTier(id: ID!, input: UpdateDeliveryPricingTierInput!): DeliveryPricingTier!
+  updateDeliveryZone(id: ID!, input: UpdateDeliveryZoneInput!): DeliveryZone!
   updateDriverLocation(latitude: Float!, longitude: Float!): User!
   updateDriverOnlineStatus(isOnline: Boolean!): User!
   updateOrderStatus(id: ID!, status: OrderStatus!): Order!
@@ -567,6 +628,16 @@ enum OrderStatus {
   PENDING
   PREPARING
   READY
+}
+
+type PolygonPoint {
+  lat: Float!
+  lng: Float!
+}
+
+input PolygonPointInput {
+  lat: Float!
+  lng: Float!
 }
 
 type Product {
@@ -705,6 +776,9 @@ type Query {
   business(id: ID!): Business
   businessBalance(businessId: ID!): SettlementSummary!
   businesses: [Business!]!
+  calculateDeliveryPrice(businessId: ID!, dropoffLat: Float!, dropoffLng: Float!): DeliveryPriceResult!
+  deliveryPricingTiers: [DeliveryPricingTier!]!
+  deliveryZones: [DeliveryZone!]!
   driverBalance(driverId: ID!): SettlementSummary!
   drivers: [User!]!
   getAllPromotions(isActive: Boolean): [Promotion!]!
@@ -793,6 +867,10 @@ input SendPushNotificationInput {
   userIds: [ID!]!
 }
 
+input SetDeliveryPricingTiersInput {
+  tiers: [CreateDeliveryPricingTierInput!]!
+}
+
 type Settlement {
   amount: Float!
   business: Business
@@ -873,6 +951,22 @@ input UpdateBusinessInput {
   phoneNumber: String
   prepTimeOverrideMinutes: Int
   workingHours: WorkingHoursInput
+}
+
+input UpdateDeliveryPricingTierInput {
+  isActive: Boolean
+  maxDistanceKm: Float
+  minDistanceKm: Float
+  price: Float
+  sortOrder: Int
+}
+
+input UpdateDeliveryZoneInput {
+  deliveryFee: Float
+  isActive: Boolean
+  name: String
+  polygon: [PolygonPointInput!]
+  sortOrder: Int
 }
 
 input UpdateProductCategoryInput {

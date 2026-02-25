@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
-import { Product } from '@/gql/graphql';
+import { Alert } from 'react-native';
+import { Product, BusinessType } from '@/gql/graphql';
 import { useCart } from '@/modules/cart/hooks/useCart';
 import { useCartActions } from '@/modules/cart/hooks/useCartActions';
 
-export function useProductInCart(product: Partial<Product>) {
+export function useProductInCart(product: Partial<Product>, businessType?: BusinessType) {
     const { items } = useCart();
     const { addItem, updateQuantity } = useCartActions();
 
@@ -19,15 +20,20 @@ export function useProductInCart(product: Partial<Product>) {
         if (!id) return;
         const price = product.isOnSale && product.salePrice ? product.salePrice : (product.price ?? 0);
 
-        addItem({
+        const error = addItem({
             productId: id,
             name: product.name ?? 'Unknown',
             price,
             quantity: 1,
             imageUrl: product.imageUrl || undefined,
             businessId: product.businessId ?? '',
+            businessType: businessType,
             originalPrice: product.isOnSale && product.salePrice ? product.price : undefined,
         });
+
+        if (error) {
+            Alert.alert('Cannot Add Item', error);
+        }
     };
 
     const incrementQuantity = () => {

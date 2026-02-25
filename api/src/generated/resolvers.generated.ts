@@ -5,6 +5,9 @@ import    { auditLogs as Query_auditLogs } from './../models/AuditLog/resolvers/
 import    { business as Query_business } from './../models/Business/resolvers/Query/business';
 import    { businessBalance as Query_businessBalance } from './../models/Settlement/resolvers/Query/businessBalance';
 import    { businesses as Query_businesses } from './../models/Business/resolvers/Query/businesses';
+import    { calculateDeliveryPrice as Query_calculateDeliveryPrice } from './../models/DeliveryPricing/resolvers/Query/calculateDeliveryPrice';
+import    { deliveryPricingTiers as Query_deliveryPricingTiers } from './../models/DeliveryPricing/resolvers/Query/deliveryPricingTiers';
+import    { deliveryZones as Query_deliveryZones } from './../models/DeliveryZone/resolvers/Query/deliveryZones';
 import    { driverBalance as Query_driverBalance } from './../models/Settlement/resolvers/Query/driverBalance';
 import    { drivers as Query_drivers } from './../models/User/resolvers/Query/drivers';
 import    { getAllPromotions as Query_getAllPromotions } from './../models/Promotion/resolvers/Query/getAllPromotions';
@@ -52,6 +55,8 @@ import    { backfillSettlementsForDeliveredOrders as Mutation_backfillSettlement
 import    { cancelOrder as Mutation_cancelOrder } from './../models/Order/resolvers/Mutation/cancelOrder';
 import    { createBusiness as Mutation_createBusiness } from './../models/Business/resolvers/Mutation/createBusiness';
 import    { createCampaign as Mutation_createCampaign } from './../models/Notification/resolvers/Mutation/createCampaign';
+import    { createDeliveryPricingTier as Mutation_createDeliveryPricingTier } from './../models/DeliveryPricing/resolvers/Mutation/createDeliveryPricingTier';
+import    { createDeliveryZone as Mutation_createDeliveryZone } from './../models/DeliveryZone/resolvers/Mutation/createDeliveryZone';
 import    { createOrder as Mutation_createOrder } from './../models/Order/resolvers/Mutation/createOrder';
 import    { createProduct as Mutation_createProduct } from './../models/Product/resolvers/Mutation/createProduct';
 import    { createProductCategory as Mutation_createProductCategory } from './../models/ProductCategory/resolvers/Mutation/createProductCategory';
@@ -62,6 +67,8 @@ import    { createUser as Mutation_createUser } from './../models/User/resolvers
 import    { deductWalletCredit as Mutation_deductWalletCredit } from './../models/Promotion/resolvers/Mutation/deductWalletCredit';
 import    { deleteBusiness as Mutation_deleteBusiness } from './../models/Business/resolvers/Mutation/deleteBusiness';
 import    { deleteCampaign as Mutation_deleteCampaign } from './../models/Notification/resolvers/Mutation/deleteCampaign';
+import    { deleteDeliveryPricingTier as Mutation_deleteDeliveryPricingTier } from './../models/DeliveryPricing/resolvers/Mutation/deleteDeliveryPricingTier';
+import    { deleteDeliveryZone as Mutation_deleteDeliveryZone } from './../models/DeliveryZone/resolvers/Mutation/deleteDeliveryZone';
 import    { deleteProduct as Mutation_deleteProduct } from './../models/Product/resolvers/Mutation/deleteProduct';
 import    { deleteProductCategory as Mutation_deleteProductCategory } from './../models/ProductCategory/resolvers/Mutation/deleteProductCategory';
 import    { deleteProductSubcategory as Mutation_deleteProductSubcategory } from './../models/ProductSubcategory/resolvers/Mutation/deleteProductSubcategory';
@@ -83,6 +90,7 @@ import    { sendCampaign as Mutation_sendCampaign } from './../models/Notificati
 import    { sendPushNotification as Mutation_sendPushNotification } from './../models/Notification/resolvers/Mutation/sendPushNotification';
 import    { setBusinessSchedule as Mutation_setBusinessSchedule } from './../models/Business/resolvers/Mutation/setBusinessSchedule';
 import    { setDefaultAddress as Mutation_setDefaultAddress } from './../models/UserAddress/resolvers/Mutation/setDefaultAddress';
+import    { setDeliveryPricingTiers as Mutation_setDeliveryPricingTiers } from './../models/DeliveryPricing/resolvers/Mutation/setDeliveryPricingTiers';
 import    { setUserPermissions as Mutation_setUserPermissions } from './../models/User/resolvers/Mutation/setUserPermissions';
 import    { startPreparing as Mutation_startPreparing } from './../models/Order/resolvers/Mutation/startPreparing';
 import    { submitPhoneNumber as Mutation_submitPhoneNumber } from './../models/User/resolvers/Mutation/submitPhoneNumber';
@@ -90,6 +98,8 @@ import    { unregisterDeviceToken as Mutation_unregisterDeviceToken } from './..
 import    { unsettleSettlement as Mutation_unsettleSettlement } from './../models/Settlement/resolvers/Mutation/unsettleSettlement';
 import    { updateBusiness as Mutation_updateBusiness } from './../models/Business/resolvers/Mutation/updateBusiness';
 import    { updateCommissionPercentage as Mutation_updateCommissionPercentage } from './../models/Settlement/resolvers/Mutation/updateCommissionPercentage';
+import    { updateDeliveryPricingTier as Mutation_updateDeliveryPricingTier } from './../models/DeliveryPricing/resolvers/Mutation/updateDeliveryPricingTier';
+import    { updateDeliveryZone as Mutation_updateDeliveryZone } from './../models/DeliveryZone/resolvers/Mutation/updateDeliveryZone';
 import    { updateDriverLocation as Mutation_updateDriverLocation } from './../models/User/resolvers/Mutation/updateDriverLocation';
 import    { updateDriverOnlineStatus as Mutation_updateDriverOnlineStatus } from './../models/User/resolvers/Mutation/updateDriverOnlineStatus';
 import    { updateOrderStatus as Mutation_updateOrderStatus } from './../models/Order/resolvers/Mutation/updateOrderStatus';
@@ -120,6 +130,10 @@ import    { AuditLogConnection } from './../models/AuditLog/resolvers/AuditLogCo
 import    { AuthResponse } from './../models/User/resolvers/AuthResponse';
 import    { Business } from './../models/Business/resolvers/Business';
 import    { BusinessDayHours } from './../models/General/resolvers/BusinessDayHours';
+import    { DeliveryPriceResult } from './../models/DeliveryPricing/resolvers/DeliveryPriceResult';
+import    { DeliveryPricingTier } from './../models/DeliveryPricing/resolvers/DeliveryPricingTier';
+import    { DeliveryZone } from './../models/DeliveryZone/resolvers/DeliveryZone';
+import    { DeliveryZoneMatch } from './../models/DeliveryZone/resolvers/DeliveryZoneMatch';
 import    { DeviceToken } from './../models/Notification/resolvers/DeviceToken';
 import    { DriverConnection } from './../models/Driver/resolvers/DriverConnection';
 import    { DriverDailyMetrics } from './../models/Driver/resolvers/DriverDailyMetrics';
@@ -131,6 +145,7 @@ import    { Order } from './../models/Order/resolvers/Order';
 import    { OrderBusiness } from './../models/Order/resolvers/OrderBusiness';
 import    { OrderItem } from './../models/Order/resolvers/OrderItem';
 import    { OrderPromotion } from './../models/Order/resolvers/OrderPromotion';
+import    { PolygonPoint } from './../models/DeliveryZone/resolvers/PolygonPoint';
 import    { Product } from './../models/Product/resolvers/Product';
 import    { ProductCategory } from './../models/ProductCategory/resolvers/ProductCategory';
 import    { ProductSubcategory } from './../models/ProductSubcategory/resolvers/ProductSubcategory';
@@ -157,8 +172,8 @@ import    { WalletTransaction } from './../models/Promotion/resolvers/WalletTran
 import    { WorkingHours } from './../models/General/resolvers/WorkingHours';
 import    { DateResolver,DateTimeResolver,JSONResolver } from 'graphql-scalars';
     export const resolvers: Resolvers = {
-      Query: { auditLog: Query_auditLog,auditLogs: Query_auditLogs,business: Query_business,businessBalance: Query_businessBalance,businesses: Query_businesses,driverBalance: Query_driverBalance,drivers: Query_drivers,getAllPromotions: Query_getAllPromotions,getApplicablePromotions: Query_getApplicablePromotions,getPromotion: Query_getPromotion,getPromotionAnalytics: Query_getPromotionAnalytics,getPromotionThresholds: Query_getPromotionThresholds,getPromotionUsage: Query_getPromotionUsage,getStoreStatus: Query_getStoreStatus,getUserPromoMetadata: Query_getUserPromoMetadata,getUserPromotions: Query_getUserPromotions,getUserWallet: Query_getUserWallet,getWalletTransactions: Query_getWalletTransactions,me: Query_me,myAddresses: Query_myAddresses,myBehavior: Query_myBehavior,myDriverMetrics: Query_myDriverMetrics,myReferralStats: Query_myReferralStats,notificationCampaign: Query_notificationCampaign,notificationCampaigns: Query_notificationCampaigns,order: Query_order,orders: Query_orders,ordersByStatus: Query_ordersByStatus,previewCampaignAudience: Query_previewCampaignAudience,product: Query_product,productCategories: Query_productCategories,productCategory: Query_productCategory,productSubcategories: Query_productSubcategories,productSubcategoriesByBusiness: Query_productSubcategoriesByBusiness,products: Query_products,settlementSummary: Query_settlementSummary,settlements: Query_settlements,uncompletedOrders: Query_uncompletedOrders,userBehavior: Query_userBehavior,users: Query_users,validatePromotions: Query_validatePromotions },
-      Mutation: { addUserAddress: Mutation_addUserAddress,addWalletCredit: Mutation_addWalletCredit,adminSetDriverConnectionStatus: Mutation_adminSetDriverConnectionStatus,adminUpdateDriverLocation: Mutation_adminUpdateDriverLocation,adminUpdateDriverSettings: Mutation_adminUpdateDriverSettings,assignDriverToOrder: Mutation_assignDriverToOrder,assignPromotionToUsers: Mutation_assignPromotionToUsers,backfillSettlementsForDeliveredOrders: Mutation_backfillSettlementsForDeliveredOrders,cancelOrder: Mutation_cancelOrder,createBusiness: Mutation_createBusiness,createCampaign: Mutation_createCampaign,createOrder: Mutation_createOrder,createProduct: Mutation_createProduct,createProductCategory: Mutation_createProductCategory,createProductSubcategory: Mutation_createProductSubcategory,createPromotion: Mutation_createPromotion,createTestOrder: Mutation_createTestOrder,createUser: Mutation_createUser,deductWalletCredit: Mutation_deductWalletCredit,deleteBusiness: Mutation_deleteBusiness,deleteCampaign: Mutation_deleteCampaign,deleteProduct: Mutation_deleteProduct,deleteProductCategory: Mutation_deleteProductCategory,deleteProductSubcategory: Mutation_deleteProductSubcategory,deletePromotion: Mutation_deletePromotion,deleteUser: Mutation_deleteUser,deleteUserAddress: Mutation_deleteUserAddress,driverHeartbeat: Mutation_driverHeartbeat,generateReferralCode: Mutation_generateReferralCode,initiateSignup: Mutation_initiateSignup,login: Mutation_login,markFirstOrderUsed: Mutation_markFirstOrderUsed,markSettlementAsPaid: Mutation_markSettlementAsPaid,markSettlementAsPartiallyPaid: Mutation_markSettlementAsPartiallyPaid,markSettlementsAsPaid: Mutation_markSettlementsAsPaid,registerDeviceToken: Mutation_registerDeviceToken,removeUserFromPromotion: Mutation_removeUserFromPromotion,resendEmailVerification: Mutation_resendEmailVerification,sendCampaign: Mutation_sendCampaign,sendPushNotification: Mutation_sendPushNotification,setBusinessSchedule: Mutation_setBusinessSchedule,setDefaultAddress: Mutation_setDefaultAddress,setUserPermissions: Mutation_setUserPermissions,startPreparing: Mutation_startPreparing,submitPhoneNumber: Mutation_submitPhoneNumber,unregisterDeviceToken: Mutation_unregisterDeviceToken,unsettleSettlement: Mutation_unsettleSettlement,updateBusiness: Mutation_updateBusiness,updateCommissionPercentage: Mutation_updateCommissionPercentage,updateDriverLocation: Mutation_updateDriverLocation,updateDriverOnlineStatus: Mutation_updateDriverOnlineStatus,updateOrderStatus: Mutation_updateOrderStatus,updatePreparationTime: Mutation_updatePreparationTime,updateProduct: Mutation_updateProduct,updateProductCategory: Mutation_updateProductCategory,updateProductSubcategory: Mutation_updateProductSubcategory,updateProductsOrder: Mutation_updateProductsOrder,updatePromotion: Mutation_updatePromotion,updateStoreStatus: Mutation_updateStoreStatus,updateUser: Mutation_updateUser,updateUserAddress: Mutation_updateUserAddress,updateUserNote: Mutation_updateUserNote,verifyEmail: Mutation_verifyEmail,verifyPhone: Mutation_verifyPhone },
+      Query: { auditLog: Query_auditLog,auditLogs: Query_auditLogs,business: Query_business,businessBalance: Query_businessBalance,businesses: Query_businesses,calculateDeliveryPrice: Query_calculateDeliveryPrice,deliveryPricingTiers: Query_deliveryPricingTiers,deliveryZones: Query_deliveryZones,driverBalance: Query_driverBalance,drivers: Query_drivers,getAllPromotions: Query_getAllPromotions,getApplicablePromotions: Query_getApplicablePromotions,getPromotion: Query_getPromotion,getPromotionAnalytics: Query_getPromotionAnalytics,getPromotionThresholds: Query_getPromotionThresholds,getPromotionUsage: Query_getPromotionUsage,getStoreStatus: Query_getStoreStatus,getUserPromoMetadata: Query_getUserPromoMetadata,getUserPromotions: Query_getUserPromotions,getUserWallet: Query_getUserWallet,getWalletTransactions: Query_getWalletTransactions,me: Query_me,myAddresses: Query_myAddresses,myBehavior: Query_myBehavior,myDriverMetrics: Query_myDriverMetrics,myReferralStats: Query_myReferralStats,notificationCampaign: Query_notificationCampaign,notificationCampaigns: Query_notificationCampaigns,order: Query_order,orders: Query_orders,ordersByStatus: Query_ordersByStatus,previewCampaignAudience: Query_previewCampaignAudience,product: Query_product,productCategories: Query_productCategories,productCategory: Query_productCategory,productSubcategories: Query_productSubcategories,productSubcategoriesByBusiness: Query_productSubcategoriesByBusiness,products: Query_products,settlementSummary: Query_settlementSummary,settlements: Query_settlements,uncompletedOrders: Query_uncompletedOrders,userBehavior: Query_userBehavior,users: Query_users,validatePromotions: Query_validatePromotions },
+      Mutation: { addUserAddress: Mutation_addUserAddress,addWalletCredit: Mutation_addWalletCredit,adminSetDriverConnectionStatus: Mutation_adminSetDriverConnectionStatus,adminUpdateDriverLocation: Mutation_adminUpdateDriverLocation,adminUpdateDriverSettings: Mutation_adminUpdateDriverSettings,assignDriverToOrder: Mutation_assignDriverToOrder,assignPromotionToUsers: Mutation_assignPromotionToUsers,backfillSettlementsForDeliveredOrders: Mutation_backfillSettlementsForDeliveredOrders,cancelOrder: Mutation_cancelOrder,createBusiness: Mutation_createBusiness,createCampaign: Mutation_createCampaign,createDeliveryPricingTier: Mutation_createDeliveryPricingTier,createDeliveryZone: Mutation_createDeliveryZone,createOrder: Mutation_createOrder,createProduct: Mutation_createProduct,createProductCategory: Mutation_createProductCategory,createProductSubcategory: Mutation_createProductSubcategory,createPromotion: Mutation_createPromotion,createTestOrder: Mutation_createTestOrder,createUser: Mutation_createUser,deductWalletCredit: Mutation_deductWalletCredit,deleteBusiness: Mutation_deleteBusiness,deleteCampaign: Mutation_deleteCampaign,deleteDeliveryPricingTier: Mutation_deleteDeliveryPricingTier,deleteDeliveryZone: Mutation_deleteDeliveryZone,deleteProduct: Mutation_deleteProduct,deleteProductCategory: Mutation_deleteProductCategory,deleteProductSubcategory: Mutation_deleteProductSubcategory,deletePromotion: Mutation_deletePromotion,deleteUser: Mutation_deleteUser,deleteUserAddress: Mutation_deleteUserAddress,driverHeartbeat: Mutation_driverHeartbeat,generateReferralCode: Mutation_generateReferralCode,initiateSignup: Mutation_initiateSignup,login: Mutation_login,markFirstOrderUsed: Mutation_markFirstOrderUsed,markSettlementAsPaid: Mutation_markSettlementAsPaid,markSettlementAsPartiallyPaid: Mutation_markSettlementAsPartiallyPaid,markSettlementsAsPaid: Mutation_markSettlementsAsPaid,registerDeviceToken: Mutation_registerDeviceToken,removeUserFromPromotion: Mutation_removeUserFromPromotion,resendEmailVerification: Mutation_resendEmailVerification,sendCampaign: Mutation_sendCampaign,sendPushNotification: Mutation_sendPushNotification,setBusinessSchedule: Mutation_setBusinessSchedule,setDefaultAddress: Mutation_setDefaultAddress,setDeliveryPricingTiers: Mutation_setDeliveryPricingTiers,setUserPermissions: Mutation_setUserPermissions,startPreparing: Mutation_startPreparing,submitPhoneNumber: Mutation_submitPhoneNumber,unregisterDeviceToken: Mutation_unregisterDeviceToken,unsettleSettlement: Mutation_unsettleSettlement,updateBusiness: Mutation_updateBusiness,updateCommissionPercentage: Mutation_updateCommissionPercentage,updateDeliveryPricingTier: Mutation_updateDeliveryPricingTier,updateDeliveryZone: Mutation_updateDeliveryZone,updateDriverLocation: Mutation_updateDriverLocation,updateDriverOnlineStatus: Mutation_updateDriverOnlineStatus,updateOrderStatus: Mutation_updateOrderStatus,updatePreparationTime: Mutation_updatePreparationTime,updateProduct: Mutation_updateProduct,updateProductCategory: Mutation_updateProductCategory,updateProductSubcategory: Mutation_updateProductSubcategory,updateProductsOrder: Mutation_updateProductsOrder,updatePromotion: Mutation_updatePromotion,updateStoreStatus: Mutation_updateStoreStatus,updateUser: Mutation_updateUser,updateUserAddress: Mutation_updateUserAddress,updateUserNote: Mutation_updateUserNote,verifyEmail: Mutation_verifyEmail,verifyPhone: Mutation_verifyPhone },
       Subscription: { allOrdersUpdated: Subscription_allOrdersUpdated,auditLogCreated: Subscription_auditLogCreated,driverConnectionStatusChanged: Subscription_driverConnectionStatusChanged,driversUpdated: Subscription_driversUpdated,orderStatusUpdated: Subscription_orderStatusUpdated,settlementCreated: Subscription_settlementCreated,settlementStatusChanged: Subscription_settlementStatusChanged,userOrdersUpdated: Subscription_userOrdersUpdated },
       ApplicablePromotion: ApplicablePromotion,
 AudiencePreview: AudiencePreview,
@@ -167,6 +182,10 @@ AuditLogConnection: AuditLogConnection,
 AuthResponse: AuthResponse,
 Business: Business,
 BusinessDayHours: BusinessDayHours,
+DeliveryPriceResult: DeliveryPriceResult,
+DeliveryPricingTier: DeliveryPricingTier,
+DeliveryZone: DeliveryZone,
+DeliveryZoneMatch: DeliveryZoneMatch,
 DeviceToken: DeviceToken,
 DriverConnection: DriverConnection,
 DriverDailyMetrics: DriverDailyMetrics,
@@ -178,6 +197,7 @@ Order: Order,
 OrderBusiness: OrderBusiness,
 OrderItem: OrderItem,
 OrderPromotion: OrderPromotion,
+PolygonPoint: PolygonPoint,
 Product: Product,
 ProductCategory: ProductCategory,
 ProductSubcategory: ProductSubcategory,

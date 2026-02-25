@@ -13,6 +13,7 @@ import { useCreateOrder } from '../hooks/useCreateOrder';
 import { useLazyQuery, useQuery, useMutation } from '@apollo/client/react';
 import { VALIDATE_PROMOTIONS, GET_PROMOTION_THRESHOLDS } from '@/graphql/operations/promotions';
 import { GET_MY_ADDRESSES, ADD_USER_ADDRESS, SET_DEFAULT_ADDRESS } from '@/graphql/operations/addresses';
+import { CALCULATE_DELIVERY_PRICE } from '@/graphql/operations/deliveryPricing';
 import type { UserAddress } from '@/gql/graphql';
 
 type CheckoutLocation = {
@@ -125,7 +126,9 @@ export const CartScreen = () => {
     const { createOrder, loading: orderLoading } = useCreateOrder();
 
     const [isProcessing, setIsProcessing] = useState(false);
-    const [deliveryPrice] = useState(2.0); // Base delivery fee
+    const [deliveryPrice, setDeliveryPrice] = useState(2.0); // Default; updated from API
+    const [deliveryPriceLoading, setDeliveryPriceLoading] = useState(false);
+    const [deliveryZoneName, setDeliveryZoneName] = useState<string | null>(null);
     const [isMapModalOpen, setIsMapModalOpen] = useState(false);
     const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
     const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
@@ -170,6 +173,10 @@ export const CartScreen = () => {
     const addressSlideX = useRef(new Animated.Value(screenWidth)).current;
 
     const [validatePromotionsManual, { loading: manualPromoLoading }] = useLazyQuery(VALIDATE_PROMOTIONS, {
+        fetchPolicy: 'no-cache',
+    });
+
+    const [calculateDeliveryPriceFn] = useLazyQuery(CALCULATE_DELIVERY_PRICE, {
         fetchPolicy: 'no-cache',
     });
 
@@ -313,8 +320,32 @@ export const CartScreen = () => {
         }
     }, [savedAddresses, selectedLocation]);
 
-    const requestFeeForLocation = (next: CheckoutLocation) => {
-        // Delivery price is fixed for now
+    const requestFeeForLocation = async (next: CheckoutLocation) => {
+        // Calculate delivery fee based on distance from business
+        const businessIds = Array.from(new Set(items.map((item) => item.businessId)));
+        if (businessIds.length === 0) return;
+
+        setDeliveryPriceLoading(true);
+        try {
+            // Use the first business to calculate distance
+            const response = await calculateDeliveryPriceFn({
+                variables: {
+                    dropoffLat: next.latitude,
+                    dropoffLng: next.longitude,
+                    businessId: businessIds[0],
+                },
+            });
+            const result = response?.data?.calculateDeliveryPrice;
+            if (result?.price != null) {
+                setDeliveryPrice(Number(result.price));
+            }
+            setDeliveryZoneName(result?.zoneApplied?.name ?? null);
+        } catch {
+            // Keep default price on error
+            setDeliveryZoneName(null);
+        } finally {
+            setDeliveryPriceLoading(false);
+        }
     };
 
     useEffect(() => {
@@ -1121,7 +1152,11 @@ export const CartScreen = () => {
                                         <Text className="text-base" style={{ color: theme.colors.subtext }}>
                                             Delivery
                                         </Text>
-                                        {/* Delivery zone and feeLoading removed */}
+                                        {deliveryZoneName && !freeDeliveryApplied && (
+                                            <Text className="text-xs" style={{ color: theme.colors.primary }}>
+                                                ({deliveryZoneName})
+                                            </Text>
+                                        )}
                                     </View>
                                     <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
                                         {freeDeliveryApplied ? 'Free' : `€${appliedDeliveryPrice.toFixed(2)}`}

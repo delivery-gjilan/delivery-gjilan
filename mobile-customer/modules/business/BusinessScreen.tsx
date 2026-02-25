@@ -99,7 +99,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                     <Text className="text-2xl font-bold mb-4" style={{ color: theme.colors.text }}>
                         Menu
                     </Text>
-                    <ProductsList products={products || []} />
+                    <ProductsList products={products || []} businessType={business.businessType} />
                 </View>
             </Animated.ScrollView>
         </SafeAreaView>

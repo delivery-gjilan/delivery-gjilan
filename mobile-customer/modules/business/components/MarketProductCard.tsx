@@ -1,19 +1,20 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Product } from '@/gql/graphql';
+import { Product, BusinessType } from '@/gql/graphql';
 import { useTheme } from '@/hooks/useTheme';
 import { useProductInCart } from '../hooks/useProductInCart';
 
 interface MarketProductCardProps {
     product: Partial<Product>;
+    businessType?: BusinessType;
     onPress?: (productId: string) => void;
     descriptionOverride?: string | null;
 }
 
-export function MarketProductCard({ product, onPress, descriptionOverride }: MarketProductCardProps) {
+export function MarketProductCard({ product, businessType, onPress, descriptionOverride }: MarketProductCardProps) {
     const theme = useTheme();
-    const { quantity, addToCart, incrementQuantity, decrementQuantity } = useProductInCart(product);
+    const { quantity, addToCart, incrementQuantity, decrementQuantity } = useProductInCart(product, businessType);
 
     const handlePress = () => {
         if (onPress) {

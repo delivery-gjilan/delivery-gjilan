@@ -29,7 +29,7 @@ export const useLocaleStore = create<LocaleStore>()(
     persist(
         (set) => ({
             languageChoice: 'en',
-            translations: null,
+            translations: en as Translation, // Initialize with default language
             setLanguageChoice: (choice) => {
                 if (!SUPPORTED_LANGUAGES.includes(choice)) return;
                 const newTranslation = getTranslationFromLanguage(choice);
@@ -45,6 +45,13 @@ export const useLocaleStore = create<LocaleStore>()(
             name: 'locale-storage',
             storage: createJSONStorage(() => AsyncStorage),
             partialize: (state) => ({ languageChoice: state.languageChoice }),
+            onRehydrateStorage: () => (state) => {
+                // Load correct translations after store rehydrates
+                if (state) {
+                    const translations = getTranslationFromLanguage(state.languageChoice);
+                    useLocaleStore.setState({ translations });
+                }
+            },
         },
     ),
 );

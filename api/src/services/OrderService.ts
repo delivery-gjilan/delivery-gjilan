@@ -85,11 +85,23 @@ export class OrderService {
 
         log.debug({ itemsTotal: calculatedItemsTotal, deliveryPrice: input.deliveryPrice }, 'order:totals');
 
+        // 2a. Validate multi-restaurant restriction
+        // Customers can order from at most 1 restaurant (+ market/pharmacy is fine)
+        const db = await getDB();
+        const orderBusinesses = await db
+            .select({ id: businessesTable.id, businessType: businessesTable.businessType })
+            .from(businessesTable)
+            .where(inArray(businessesTable.id, [...businessIds]));
+
+        const restaurantCount = orderBusinesses.filter((b) => b.businessType === 'RESTAURANT').length;
+        if (restaurantCount > 1) {
+            throw new GraphQLError('You can only order from one restaurant at a time. Please remove items from one restaurant before adding from another.');
+        }
+
         // 2b. Check that all businesses are currently open
         const now = new Date();
         const currentDay = now.getDay(); // 0 = Sunday
         const currentMinutes = now.getHours() * 60 + now.getMinutes();
-        const db = await getDB();
 
         for (const bizId of businessIds) {
             const hoursRows = await db

@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, GestureResponderEvent, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Product } from '@/gql/graphql';
+import { Product, BusinessType } from '@/gql/graphql';
 import { useTheme } from '@/hooks/useTheme';
 import { useProductInCart } from '../hooks/useProductInCart';
 
@@ -9,11 +9,12 @@ const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 interface CartControlsProps {
     product: Partial<Product>;
+    businessType?: BusinessType;
 }
 
-export function CartControls({ product }: CartControlsProps) {
+export function CartControls({ product, businessType }: CartControlsProps) {
     const theme = useTheme();
-    const { quantity, addToCart, incrementQuantity, decrementQuantity } = useProductInCart(product as any);
+    const { quantity, addToCart, incrementQuantity, decrementQuantity } = useProductInCart(product as any, businessType);
     const scaleAnim = useRef(new Animated.Value(1)).current;
     const [showFloatingNumber, setShowFloatingNumber] = useState(false);
     const floatingOpacity = useRef(new Animated.Value(0)).current;

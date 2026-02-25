@@ -35,6 +35,8 @@ const menu: any[] = [
   { name: "Drivers", href: "/dashboard/drivers", icon: Truck, superAdminOnly: true },
   { name: "Map", href: "/dashboard/map", icon: Map, superAdminOnly: true },
   { name: "Promotions", href: "/dashboard/promotions", icon: Tag, superAdminOnly: true },
+  { name: "Delivery Pricing", href: "/dashboard/delivery-pricing", icon: Truck, superAdminOnly: true },
+  { name: "Delivery Zones", href: "/dashboard/delivery-zones", icon: Map, superAdminOnly: true },
   { name: "Admins", href: "/dashboard/admins", icon: UserCog, superAdminOnly: true },
   { name: "Users", href: "/dashboard/users", icon: Users, superAdminOnly: true },
   { name: "Notifications", href: "/dashboard/notifications", icon: Bell, superAdminOnly: true },
