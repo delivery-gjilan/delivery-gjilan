@@ -15,6 +15,7 @@ import {
     UNSETTLE_SETTLEMENT,
 } from '@/graphql/operations/settlements/queries';
 import { format, startOfDay, startOfMonth } from 'date-fns';
+import { toast } from 'sonner';
 
 interface Settlement {
     id: string;
@@ -216,7 +217,7 @@ export default function FinancesDashboard() {
         const rawAmount = partialAmounts[settlementId] ?? '';
         const amount = Number(rawAmount);
         if (!amount || amount <= 0) {
-            alert('Enter an amount greater than 0.');
+            toast.warning('Enter an amount greater than 0.');
             return;
         }
 

@@ -1,4 +1,7 @@
 import type { BusinessResolvers } from './../../../generated/types.generated';
+import { getDB } from '@/database';
+import { promotions, promotionBusinessEligibility } from '@/database/schema/promotions';
+import { eq, and, isNull, lte, gte, or, sql } from 'drizzle-orm';
 
 /**
  * Parse a working hours time string like "08:00" into total minutes from midnight.
@@ -40,5 +43,55 @@ export const Business: BusinessResolvers = {
             return currentMinutes >= opensAt || currentMinutes < closesAt;
         }
         return currentMinutes >= opensAt && currentMinutes < closesAt;
+    },
+
+    activePromotion: async (parent) => {
+        const db = await getDB();
+        const now = new Date().toISOString();
+
+        // Find active promotions for this business
+        const activePromotions = await db
+            .select({
+                id: promotions.id,
+                name: promotions.name,
+                description: promotions.description,
+                type: promotions.type,
+                discountValue: promotions.discountValue,
+                priority: promotions.priority,
+            })
+            .from(promotions)
+            .innerJoin(
+                promotionBusinessEligibility,
+                eq(promotionBusinessEligibility.promotionId, promotions.id)
+            )
+            .where(
+                and(
+                    eq(promotionBusinessEligibility.businessId, parent.id),
+                    eq(promotions.isActive, true),
+                    or(
+                        isNull(promotions.startsAt),
+                        lte(promotions.startsAt, now)
+                    ),
+                    or(
+                        isNull(promotions.endsAt),
+                        gte(promotions.endsAt, now)
+                    )
+                )
+            )
+            .orderBy(sql`${promotions.priority} DESC`)
+            .limit(1);
+
+        if (activePromotions.length === 0) {
+            return null;
+        }
+
+        const promo = activePromotions[0];
+        return {
+            id: promo.id,
+            name: promo.name,
+            description: promo.description ?? null,
+            type: promo.type,
+            discountValue: promo.discountValue ?? null,
+        };
     },
 };

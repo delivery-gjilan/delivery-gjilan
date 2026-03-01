@@ -4,6 +4,7 @@ import logger from '@/lib/logger';
 import { drivers as driversTable } from '@/database/schema';
 import { eq } from 'drizzle-orm';
 import { notifyDriverOrderAssigned } from '@/services/orderNotifications';
+import { AppError } from '@/lib/errors';
 
 export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToOrder']> = async (
     _parent,
@@ -15,14 +16,14 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
 
     const role = userData?.role;
     if (!role) {
-        throw new Error('Unauthorized');
+        throw AppError.unauthorized();
     }
 
     const isSuperAdmin = role === 'SUPER_ADMIN';
     const isDriver = role === 'DRIVER';
 
     if (!isSuperAdmin && !isDriver) {
-        throw new Error('Not authorized to assign driver');
+        throw AppError.forbidden('Not authorized to assign driver');
     }
 
     let effectiveDriverId = driverId;
@@ -30,26 +31,26 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
     // Race condition check: Fetch order early
     const dbOrderBefore = await orderService.orderRepository.findById(id);
     if (!dbOrderBefore) {
-        throw new Error('Order not found');
+        throw AppError.notFound('Order');
     }
 
     if (isDriver) {
         if (!userData?.userId) {
-            throw new Error('Driver not authenticated');
+            throw AppError.unauthorized('Driver not authenticated');
         }
 
         // Drivers can only self-assign
         if (driverId && driverId !== userData.userId) {
-            throw new Error('Drivers can only assign themselves');
+            throw AppError.forbidden('Drivers can only assign themselves');
         }
 
         // Race condition check: Verify order isn't already assigned to someone else
         if (dbOrderBefore.driverId && dbOrderBefore.driverId !== userData.userId) {
-            throw new Error('This order has already been taken by another driver');
+            throw AppError.conflict('This order has already been taken by another driver');
         }
 
         if (dbOrderBefore.status !== 'READY' && dbOrderBefore.status !== 'PREPARING') {
-            throw new Error('Order is not available for driver assignment');
+            throw AppError.businessRule('Order is not available for driver assignment');
         }
 
         effectiveDriverId = userData.userId;
@@ -62,10 +63,10 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
     if (effectiveDriverId) {
         const driver = await authService.authRepository.findById(effectiveDriverId);
         if (!driver) {
-            throw new Error('Driver not found');
+            throw AppError.notFound('Driver');
         }
         if (driver.role !== 'DRIVER') {
-            throw new Error('Specified user is not a driver');
+            throw AppError.badInput('Specified user is not a driver');
         }
         driverName = `${driver.firstName} ${driver.lastName}`;
 
@@ -86,11 +87,16 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
         const alreadyAssignedToSameDriver = dbOrderBefore.driverId === effectiveDriverId;
         
         if (!alreadyAssignedToSameDriver && existingOrders.length >= maxActiveOrders) {
-            throw new Error(`Driver already has maximum number of active orders (${maxActiveOrders}/${maxActiveOrders})`);
+            throw AppError.businessRule(`Driver already has maximum number of active orders (${maxActiveOrders}/${maxActiveOrders})`);
         }
     }
 
-    const order = await orderService.assignDriverToOrder(id, effectiveDriverId ?? null);
+    const atomicAssign = isDriver; // Drivers get atomic assignment to prevent race conditions
+    const order = await orderService.assignDriverToOrder(id, effectiveDriverId ?? null, atomicAssign);
+
+    if (!order) {
+        throw AppError.conflict('This order has already been taken by another driver');
+    }
 
     // Get the order to find the user ID for publishing
     const dbOrder = await orderService.orderRepository.findById(id);

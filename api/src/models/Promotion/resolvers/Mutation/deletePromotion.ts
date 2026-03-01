@@ -2,10 +2,11 @@ import type { MutationResolvers } from './../../../../generated/types.generated'
 import { getDB } from '@/database';
 import { promotions, userPromotions, promotionBusinessEligibility } from '@/database/schema';
 import { eq } from 'drizzle-orm';
+import { AppError } from '@/lib/errors';
 
 export const deletePromotion: NonNullable<MutationResolvers['deletePromotion']> = async (_parent, { id }, { userData }) => {
   if (!userData.userId || userData.role !== 'SUPER_ADMIN') {
-    throw new Error('Forbidden');
+    throw AppError.forbidden();
   }
 
   const db = await getDB();

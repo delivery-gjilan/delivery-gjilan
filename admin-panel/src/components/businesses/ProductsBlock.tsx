@@ -15,6 +15,7 @@ import {
 } from "@/lib/hooks/useProducts";
 import { useProductSubcategories } from "@/lib/hooks/useProductSubcategories";
 import type { CreateProductInput, UpdateProductInput } from "@/gql/graphql";
+import { toast } from 'sonner';
 
 /* ===============================================
    TYPES
@@ -150,7 +151,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             throw new Error(data.error || 'Upload failed');
         } catch (error) {
             console.error('Image upload error:', error);
-            alert('Failed to upload image');
+            toast.error('Failed to upload image');
             return null;
         }
     }
@@ -181,7 +182,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
 
     const handleCreate = async () => {
         if (!createForm.categoryId || !createForm.name || !createForm.price) {
-            alert("Please fill in all required fields");
+            toast.warning("Please fill in all required fields");
             return;
         }
 
@@ -229,7 +230,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             setCreateImageFile(null);
             setCreateImagePreview(null);
         } else {
-            alert(`Error creating product: ${error}`);
+            toast.error(`Error creating product: ${error}`);
         }
     };
 
@@ -253,7 +254,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
 
     const handleEdit = async () => {
         if (!editForm.categoryId || !editForm.name || !editForm.price) {
-            alert("Please fill in all required fields");
+            toast.warning("Please fill in all required fields");
             return;
         }
 
@@ -289,7 +290,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             await refetch();
             setEditOpen(false);
         } else {
-            alert(`Error updating product: ${error}`);
+            toast.error(`Error updating product: ${error}`);
         }
     };
 
@@ -302,7 +303,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             await refetch();
             setDeleteId(null);
         } else {
-            alert(`Error deleting product: ${error}`);
+            toast.error(`Error deleting product: ${error}`);
         }
     };
 

@@ -6,6 +6,7 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { useAuth } from "@/lib/auth-context";
 import { useBusiness, useUpdateBusiness } from "@/lib/hooks/useBusinesses";
+import { toast } from 'sonner';
 
 export default function SettingsPage() {
   const { admin } = useAuth();
@@ -41,7 +42,7 @@ export default function SettingsPage() {
     const override = parseInt(overridePrepTime, 10);
 
     if (Number.isNaN(avg) || avg <= 0) {
-      alert("Please enter a valid average prep time.");
+      toast.warning("Please enter a valid average prep time.");
       return;
     }
 
@@ -54,13 +55,13 @@ export default function SettingsPage() {
     } else if (!Number.isNaN(override) && override > 0) {
       input.prepTimeOverrideMinutes = override;
     } else {
-      alert("Please enter a valid override prep time or clear it.");
+      toast.warning("Please enter a valid override prep time or clear it.");
       return;
     }
 
     const result = await update(businessId, input);
     if (!result.success) {
-      alert(result.error || "Failed to update preparation time.");
+      toast.error(result.error || "Failed to update preparation time.");
     }
   };
 

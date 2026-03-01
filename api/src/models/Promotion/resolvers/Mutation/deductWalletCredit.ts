@@ -2,6 +2,7 @@ import type { MutationResolvers } from './../../../../generated/types.generated'
 import { getDB } from '@/database';
 import { userWallet, walletTransactions } from '@/database/schema';
 import { eq } from 'drizzle-orm';
+import { AppError } from '@/lib/errors';
 
 export const deductWalletCredit: NonNullable<MutationResolvers['deductWalletCredit']> = async (
     _parent,
@@ -9,7 +10,7 @@ export const deductWalletCredit: NonNullable<MutationResolvers['deductWalletCred
     { userData }
 ) => {
     if (!userData.userId || userData.userId !== userId) {
-        throw new Error('Unauthorized');
+        throw AppError.unauthorized();
     }
 
     const db = await getDB();
@@ -22,12 +23,12 @@ export const deductWalletCredit: NonNullable<MutationResolvers['deductWalletCred
         .where(eq(userWallet.userId, userId));
 
     if (!wallet) {
-        throw new Error('Wallet not found');
+        throw AppError.notFound('Wallet');
     }
 
     const balanceBefore = parseFloat(wallet.balance as any);
     if (balanceBefore < deductAmount) {
-        throw new Error('Insufficient wallet balance');
+        throw AppError.businessRule('Insufficient wallet balance');
     }
 
     const balanceAfter = balanceBefore - deductAmount;

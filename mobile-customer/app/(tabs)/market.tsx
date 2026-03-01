@@ -8,6 +8,7 @@ import { useBusinesses } from '@/modules/business/hooks/useBusinesses';
 import { useProducts } from '@/modules/product/hooks/useProducts';
 import { useProductCategories, useProductSubcategoriesByBusiness } from '@/modules/product/hooks/useProductCategories';
 import { MarketProductCard } from '@/modules/business/components/MarketProductCard';
+import { useTranslations } from '@/hooks/useTranslations';
 
 type CategoryTab = {
     id: string;
@@ -29,6 +30,7 @@ type CategoryCardProps = {
 
 function CategoryCard({ name, imageUrl, productCount, subcategoryCount, onPress }: CategoryCardProps) {
     const theme = useTheme();
+    const { t } = useTranslations();
 
     return (
         <TouchableOpacity
@@ -68,10 +70,10 @@ function CategoryCard({ name, imageUrl, productCount, subcategoryCount, onPress 
                     {name}
                 </Text>
                 <Text className="text-xs mt-2" style={{ color: theme.colors.subtext }}>
-                    {productCount} {productCount === 1 ? 'product' : 'products'}
+                    {productCount} {productCount === 1 ? t.market.product : t.market.products}
                 </Text>
                 <Text className="text-xs mt-0.5" style={{ color: theme.colors.subtext }}>
-                    {subcategoryCount} {subcategoryCount === 1 ? 'subcategory' : 'subcategories'}
+                    {subcategoryCount} {subcategoryCount === 1 ? t.market.subcategory : t.market.subcategories}
                 </Text>
             </View>
         </TouchableOpacity>
@@ -82,6 +84,7 @@ export default function Market() {
     const theme = useTheme();
     const router = useRouter();
     const { businesses, loading: businessesLoading, error: businessesError } = useBusinesses();
+    const { t } = useTranslations();
     const marketBusiness = useMemo(
         () => (businesses || []).find((business) => business.businessType === 'MARKET'),
         [businesses],
@@ -112,7 +115,7 @@ export default function Market() {
         }
 
         const ids = Array.from(new Set((products || []).map((product) => product.categoryId)));
-        return ids.map((id, index) => ({ id, name: `Category ${index + 1}` }));
+        return ids.map((id, index) => ({ id, name: `${t.market.category} ${index + 1}` }));
     }, [categories, products]);
 
     const subcategoryMap = useMemo(() => {
@@ -146,7 +149,7 @@ export default function Market() {
             const subcategory = product.subcategoryId ? subcategoryMap.byId.get(product.subcategoryId) : null;
             return {
                 ...product,
-                _subcategoryLabel: subcategory?.name ?? 'All',
+                _subcategoryLabel: subcategory?.name ?? t.common.all,
             };
         });
     }, [filteredProducts, subcategoryMap.byId]);
@@ -212,13 +215,13 @@ export default function Market() {
                     </View>
                 ) : businessesError || productsError || categoriesError || subcategoriesError ? (
                     <View className="flex-1 justify-center items-center px-4 py-20">
-                        <Text style={{ color: theme.colors.text }}>Error loading market</Text>
+                        <Text style={{ color: theme.colors.text }}>{t.market.error_loading}</Text>
                         <Text className="text-sm mt-2" style={{ color: theme.colors.subtext }}>
                             {businessesError?.message ||
                                 productsError?.message ||
                                 categoriesError?.message ||
                                 subcategoriesError?.message ||
-                                'Something went wrong'}
+                                t.common.something_went_wrong}
                         </Text>
                     </View>
                 ) : (
@@ -227,10 +230,10 @@ export default function Market() {
                             <>
                                 <View className="px-4 pb-3">
                                     <Text className="text-xs tracking-widest" style={{ color: theme.colors.subtext }}>
-                                        MARKET
+                                        {t.market.title}
                                     </Text>
                                     <Text className="text-lg font-semibold" style={{ color: theme.colors.text }}>
-                                        Categories
+                                        {t.market.categories}
                                     </Text>
                                 </View>
 
@@ -244,7 +247,7 @@ export default function Market() {
                                     ListEmptyComponent={
                                         <View className="px-4 py-12 items-center">
                                             <Text className="text-base text-center" style={{ color: theme.colors.subtext }}>
-                                                {marketBusiness ? 'No categories available yet.' : 'No market available yet.'}
+                                                {marketBusiness ? t.market.no_categories : t.market.no_market}
                                             </Text>
                                         </View>
                                     }
@@ -289,10 +292,10 @@ export default function Market() {
                                         </TouchableOpacity>
                                         <View className="flex-1">
                                             <Text className="text-xs tracking-widest" style={{ color: theme.colors.subtext }}>
-                                                MARKET
+                                                {t.market.title}
                                             </Text>
                                             <Text className="text-lg font-semibold" style={{ color: theme.colors.text }}>
-                                                {selectedCategory?.name ?? 'Category'}
+                                                {selectedCategory?.name ?? t.market.category}
                                             </Text>
                                         </View>
                                     </View>
@@ -305,7 +308,7 @@ export default function Market() {
                                         <TextInput
                                             value={searchValue}
                                             onChangeText={setSearchValue}
-                                            placeholder="Search products"
+                                            placeholder={t.market.search_products}
                                             placeholderTextColor={theme.colors.subtext}
                                             className="flex-1 py-2.5 px-3 text-base"
                                             style={{ color: theme.colors.text }}
@@ -334,7 +337,7 @@ export default function Market() {
                                                             selectedSubcategoryId === 'all' ? theme.colors.primary : theme.colors.subtext,
                                                     }}
                                                 >
-                                                    All
+                                                    {t.market.all}
                                                 </Text>
                                             </TouchableOpacity>
                                             {selectedSubcategories.map((subcategory) => {
@@ -375,7 +378,7 @@ export default function Market() {
                                     ListEmptyComponent={
                                         <View className="px-4 py-12 items-center">
                                             <Text className="text-base text-center" style={{ color: theme.colors.subtext }}>
-                                                No products available yet.
+                                                {t.market.no_products}
                                             </Text>
                                         </View>
                                     }

@@ -2,10 +2,11 @@ import type { MutationResolvers } from './../../../../generated/types.generated'
 import { getDB } from '@/database';
 import { userAddress } from '@/database/schema';
 import { eq, and } from 'drizzle-orm';
+import { AppError } from '@/lib/errors';
 
 export const updateUserAddress: NonNullable<MutationResolvers['updateUserAddress']> = async (_parent, { input }, { userData }) => {
     if (!userData.userId) {
-        throw new Error('Unauthorized');
+        throw AppError.unauthorized();
     }
 
     const db = await getDB();
@@ -29,7 +30,7 @@ export const updateUserAddress: NonNullable<MutationResolvers['updateUserAddress
         .returning();
 
     if (!updated) {
-        throw new Error('Address not found');
+        throw AppError.notFound('Address');
     }
 
     return {

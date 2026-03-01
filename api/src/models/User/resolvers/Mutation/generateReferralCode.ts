@@ -3,10 +3,11 @@ import { getDB } from '@/database';
 import { users } from '@/database/schema/users';
 import { eq } from 'drizzle-orm';
 import crypto from 'crypto';
+import { AppError } from '@/lib/errors';
 
 export const generateReferralCode: NonNullable<MutationResolvers['generateReferralCode']> = async (_parent, _arg, { userData }) => {
     if (!userData.userId) {
-        throw new Error('Unauthorized');
+        throw AppError.unauthorized();
     }
 
     const db = await getDB();
@@ -19,7 +20,7 @@ export const generateReferralCode: NonNullable<MutationResolvers['generateReferr
         .limit(1);
 
     if (!user) {
-        throw new Error('User not found');
+        throw AppError.notFound('User');
     }
 
     if (user.referralCode) {

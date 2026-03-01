@@ -1,6 +1,7 @@
 import type { SettlementResolvers } from './../../../generated/types.generated';
 import { eq } from 'drizzle-orm';
 import { businesses, drivers, users } from '@/database/schema';
+import { AppError } from '@/lib/errors';
 
 const normalizeDateValue = (value: string | Date | null | undefined): Date | null => {
     if (!value) return null;
@@ -41,7 +42,7 @@ export const Settlement: SettlementResolvers = {
     order: async (settlement, _, { orderService }) => {
         const order = await orderService.getOrderById(String(settlement.orderId));
         if (!order) {
-            throw new Error('Order not found for settlement');
+            throw AppError.notFound('Order');
         }
         return order;
     },

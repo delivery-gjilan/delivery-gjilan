@@ -2,11 +2,11 @@ import type { MutationResolvers } from './../../../../generated/types.generated'
 import { getDB } from '@/database';
 import { deliveryZones } from '@/database/schema/deliveryZones';
 import { eq } from 'drizzle-orm';
-import { GraphQLError } from 'graphql';
+import { AppError } from '@/lib/errors';
 
 export const updateDeliveryZone: NonNullable<MutationResolvers['updateDeliveryZone']> = async (_parent, { id, input }, _ctx) => {
     if (input.polygon && input.polygon.length < 3) {
-        throw new GraphQLError('A polygon must have at least 3 points');
+        throw AppError.badInput('A polygon must have at least 3 points');
     }
 
     const db = await getDB();
@@ -25,7 +25,7 @@ export const updateDeliveryZone: NonNullable<MutationResolvers['updateDeliveryZo
         .returning();
 
     if (!row) {
-        throw new GraphQLError(`Delivery zone with ID ${id} not found`);
+        throw AppError.notFound(`Delivery zone with ID ${id}`);
     }
 
     return {

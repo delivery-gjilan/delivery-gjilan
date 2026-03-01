@@ -35,8 +35,14 @@ input SetDeliveryPricingTiersInput {
     tiers: [CreateDeliveryPricingTierInput!]!
 }
 
+type DeliveryPricingConfig {
+    zones: [DeliveryZone!]!
+    tiers: [DeliveryPricingTier!]!
+}
+
 extend type Query {
     deliveryPricingTiers: [DeliveryPricingTier!]!
+    deliveryPricingConfig: DeliveryPricingConfig! @skipAuth
     calculateDeliveryPrice(
         dropoffLat: Float!
         dropoffLng: Float!

@@ -2,6 +2,7 @@ import type { MutationResolvers } from './../../../../generated/types.generated'
 import { getDB } from '@/database';
 import { userPromotions } from '@/database/schema';
 import { and, eq } from 'drizzle-orm';
+import { AppError } from '@/lib/errors';
 
 export const removeUserFromPromotion: NonNullable<MutationResolvers['removeUserFromPromotion']> = async (
     _parent,
@@ -9,7 +10,7 @@ export const removeUserFromPromotion: NonNullable<MutationResolvers['removeUserF
     { userData }
 ) => {
     if (!userData.userId || userData.role !== 'SUPER_ADMIN') {
-        throw new Error('Forbidden');
+        throw AppError.forbidden();
     }
 
     const db = await getDB();

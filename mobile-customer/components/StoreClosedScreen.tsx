@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
+import { useTranslations } from '@/hooks/useTranslations';
 import { Ionicons } from '@expo/vector-icons';
 
 interface StoreClosedScreenProps {
@@ -10,6 +11,7 @@ interface StoreClosedScreenProps {
 
 export default function StoreClosedScreen({ message }: StoreClosedScreenProps) {
     const { colors } = useTheme();
+    const { t } = useTranslations();
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
@@ -19,17 +21,17 @@ export default function StoreClosedScreen({ message }: StoreClosedScreenProps) {
                         <Ionicons name="time-outline" size={64} color="#f97316" />
                     </View>
                     <Text className="text-white text-2xl font-bold text-center mb-3">
-                        Store Temporarily Closed
+                        {t.store_closed.title}
                     </Text>
                     <Text className="text-neutral-400 text-base text-center leading-6">
-                        {message || "We are too busy at the moment. Please come back later!"}
+                        {message || t.store_closed.default_message}
                     </Text>
                 </View>
 
                 <View className="w-full max-w-md">
                     <View className="bg-gray-800/50 border border-gray-700 rounded-xl p-4">
                         <Text className="text-neutral-300 text-sm text-center">
-                            We&apos;ll be back soon! Check back in a few minutes.
+                            {t.store_closed.info}
                         </Text>
                     </View>
                 </View>

@@ -2,6 +2,7 @@ import { ProductCategoryRepository } from '@/repositories/ProductCategoryReposit
 import { ProductCategory, CreateProductCategoryInput, UpdateProductCategoryInput } from '@/generated/types.generated';
 import { productCategoryValidator } from '@/validators/ProductCategoryValidator';
 import { DbProductCategory } from '@/database/schema/productCategories';
+import { AppError } from '@/lib/errors';
 
 export class ProductCategoryService {
     constructor(private productCategoryRepository: ProductCategoryRepository) {}
@@ -41,7 +42,7 @@ export class ProductCategoryService {
         const validatedInput = productCategoryValidator.validateUpdateProductCategory(input);
 
         const updatedCategory = await this.productCategoryRepository.update(id, validatedInput);
-        if (!updatedCategory) throw new Error('Product Category not found');
+        if (!updatedCategory) throw AppError.notFound('Product Category');
 
         return this.mapToProductCategory(updatedCategory);
     }

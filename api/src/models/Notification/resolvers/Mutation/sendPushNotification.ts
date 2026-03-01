@@ -1,4 +1,5 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
+import { AppError } from '@/lib/errors';
 
 export const sendPushNotification: NonNullable<MutationResolvers['sendPushNotification']> = async (
     _parent,
@@ -6,7 +7,7 @@ export const sendPushNotification: NonNullable<MutationResolvers['sendPushNotifi
     { userData, notificationService },
 ) => {
     if (!userData.role || !['SUPER_ADMIN', 'ADMIN'].includes(userData.role)) {
-        throw new Error('Only admins can send push notifications');
+        throw AppError.forbidden('Only admins can send push notifications');
     }
 
     const payload = {

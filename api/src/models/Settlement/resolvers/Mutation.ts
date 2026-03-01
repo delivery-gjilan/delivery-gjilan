@@ -5,6 +5,7 @@ import { SettlementRepository } from '@/repositories/SettlementRepository';
 import { FinancialService } from '@/services/FinancialService';
 import { eq } from 'drizzle-orm';
 import { drivers, businesses, orderItems as orderItemsTable } from '@/database/schema';
+import { AppError } from '@/lib/errors';
 
 export const Mutation: MutationResolvers<AppContext> = {
     markSettlementAsPaid: async (_, { settlementId }, { db }) => {
@@ -19,11 +20,11 @@ export const Mutation: MutationResolvers<AppContext> = {
 
     updateCommissionPercentage: async (_, { driverId, businessId, percentage }, { db }) => {
         if (!driverId && !businessId) {
-            throw new Error('Must provide either driverId or businessId');
+            throw AppError.badInput('Must provide either driverId or businessId');
         }
 
         if (percentage < 0 || percentage > 100) {
-            throw new Error('Percentage must be between 0 and 100');
+            throw AppError.badInput('Percentage must be between 0 and 100');
         }
 
         try {
@@ -45,7 +46,7 @@ export const Mutation: MutationResolvers<AppContext> = {
 
             return true;
         } catch (error) {
-            throw new Error(`Failed to update commission percentage: ${error}`);
+            throw new AppError(`Failed to update commission percentage: ${error}`, 'INTERNAL_ERROR');
         }
     },
     backfillSettlementsForDeliveredOrders: async (_, __, { db, orderService }) => {

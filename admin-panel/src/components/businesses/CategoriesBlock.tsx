@@ -12,6 +12,7 @@ import {
     useUpdateCategory,
     useDeleteCategory,
 } from "@/lib/hooks/useProductCategories";
+import { toast } from 'sonner';
 
 /* --------------------------
    Types
@@ -58,7 +59,7 @@ export default function CategoriesBlock({
 
     const handleCreate = async () => {
         if (!createForm.name.trim()) {
-            alert("Please enter a category name");
+            toast.warning("Please enter a category name");
             return;
         }
 
@@ -72,7 +73,7 @@ export default function CategoriesBlock({
             setCreateOpen(false);
             setCreateForm({ name: "" });
         } else {
-            alert(`Error creating category: ${error}`);
+            toast.error(`Error creating category: ${error}`);
         }
     };
 
@@ -87,7 +88,7 @@ export default function CategoriesBlock({
 
     const handleEdit = async () => {
         if (!editForm.name.trim()) {
-            alert("Please enter a category name");
+            toast.warning("Please enter a category name");
             return;
         }
 
@@ -100,7 +101,7 @@ export default function CategoriesBlock({
             await refetch();
             setEditOpen(false);
         } else {
-            alert(`Error updating category: ${error}`);
+            toast.error(`Error updating category: ${error}`);
         }
     };
 
@@ -113,7 +114,7 @@ export default function CategoriesBlock({
             await refetch();
             setDeleteId(null);
         } else {
-            alert(`Error deleting category: ${error}`);
+            toast.error(`Error deleting category: ${error}`);
         }
     };
 

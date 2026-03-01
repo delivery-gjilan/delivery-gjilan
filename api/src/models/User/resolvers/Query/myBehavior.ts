@@ -1,6 +1,7 @@
 import type { QueryResolvers } from '@/generated/types.generated';
 import { userBehaviors } from '@/database/schema';
 import { eq } from 'drizzle-orm';
+import { AppError } from '@/lib/errors';
 
 export const myBehavior: NonNullable<QueryResolvers['myBehavior']> = async (
     _parent,
@@ -8,7 +9,7 @@ export const myBehavior: NonNullable<QueryResolvers['myBehavior']> = async (
     { db, userData },
 ) => {
     if (!userData.userId) {
-        throw new Error('Unauthorized');
+        throw AppError.unauthorized();
     }
 
     const [behavior] = await db

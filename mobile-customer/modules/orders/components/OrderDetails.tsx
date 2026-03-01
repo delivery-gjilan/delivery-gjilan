@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
+import { useTranslations } from '@/hooks/useTranslations';
 import { Order } from '@/gql/graphql';
 import { Image } from 'expo-image';
 import { useQuery } from '@apollo/client/react';
@@ -18,6 +19,7 @@ interface OrderDetailsProps {
 export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const router = useRouter();
     const theme = useTheme();
+    const { t } = useTranslations();
     const prevStatusRef = useRef<string | null>(null);
     const { clearCart } = useCartActions();
     const [isEditingAddress, setIsEditingAddress] = useState(false);
@@ -46,9 +48,9 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
             // Show success alert after a brief delay to ensure navigation completes
             setTimeout(() => {
                 Alert.alert(
-                    '🎉 Order Delivered!',
-                    'Your order has been successfully delivered. Thank you for your order!',
-                    [{ text: 'OK' }]
+                    t.orders.details.order_delivered,
+                    t.orders.details.order_delivered_message,
+                    [{ text: t.common.ok }]
                 );
             }, 300);
         }
@@ -89,12 +91,12 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                         <TouchableOpacity onPress={() => router.back()} className="mr-3">
                             <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                         </TouchableOpacity>
-                        <Text className="text-2xl font-bold text-foreground">Order Details</Text>
+                        <Text className="text-2xl font-bold text-foreground">{t.orders.details.title}</Text>
                     </View>
 
                     <View className="flex-1 justify-center items-center">
                         <Ionicons name="alert-circle-outline" size={80} color={theme.colors.subtext} />
-                        <Text className="text-lg text-foreground mt-4">Order not found</Text>
+                        <Text className="text-lg text-foreground mt-4">{t.orders.details.not_found}</Text>
                     </View>
                 </View>
             </SafeAreaView>
@@ -155,7 +157,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         try {
             await Linking.openURL(`tel:${driverPhone}`);
         } catch {
-            Alert.alert('Call Failed', 'Unable to open the phone dialer.');
+            Alert.alert(t.orders.details.call_failed, t.orders.details.unable_open_dialer);
         }
     };
 
@@ -164,7 +166,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         if (!next) return;
         setAddressOverride(next);
         setIsEditingAddress(false);
-        Alert.alert('Address Updated', 'Address updated for this view.');
+        Alert.alert(t.orders.details.address_updated, t.orders.details.address_updated_message);
     };
 
     return (
@@ -176,29 +178,29 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                         <TouchableOpacity onPress={() => router.back()} className="flex-row items-center">
                             <Ionicons name="chevron-back" size={28} color={theme.colors.text} />
                         </TouchableOpacity>
-                        <Text className="text-sm text-subtext font-medium flex-1 ml-2">ACTIVE ORDER</Text>
+                        <Text className="text-sm text-subtext font-medium flex-1 ml-2">{t.orders.details.active_label}</Text>
                         <Ionicons name="checkmark-circle" size={20} style={{ color: statusColor.dot }} />
                     </View>
                     <Text className="text-3xl font-bold text-foreground">#{order.id?.slice(0, 8)}</Text>
-                    <Text className="text-sm text-subtext mt-1">Real-time tracking updates</Text>
+                    <Text className="text-sm text-subtext mt-1">{t.orders.details.realtime_tracking}</Text>
                 </View>
 
                 {/* Status Card */}
                 <View className="bg-white dark:bg-gray-800 rounded-3xl p-4 mb-4 border border-border/20" style={{ backgroundColor: statusColor.bg }}>
                     <View className="flex-row items-center justify-between">
                         <View className="flex-1">
-                            <Text className="text-xs text-subtext font-semibold mb-1">Current Status</Text>
+                            <Text className="text-xs text-subtext font-semibold mb-1">{t.orders.details.current_status}</Text>
                             <Text className="text-xl font-bold text-foreground">{statusLabel}</Text>
                             {orderDuration && (
                                 <Text className="text-xs text-subtext mt-2">
-                                    {order.status === 'DELIVERED' ? 'Delivery time' : 'Elapsed'}: {orderDuration}
+                                    {order.status === 'DELIVERED' ? t.orders.details.delivery_time : t.orders.details.elapsed}: {orderDuration}
                                 </Text>
                             )}
                         </View>
                         <View className="items-center">
                             <View className="w-3 h-3 rounded-full mb-2" style={{ backgroundColor: statusColor.dot }} />
                             <Text className="text-xs font-semibold" style={{ color: statusColor.dot }}>
-                                Live
+                                {t.common.live}
                             </Text>
                         </View>
                     </View>
@@ -209,10 +211,10 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                     <View className="bg-white dark:bg-gray-800 rounded-3xl p-4 mb-4 border border-blue-200 dark:border-blue-800">
                         <View className="flex-row items-center mb-2">
                             <Ionicons name="restaurant" size={20} color="#3B82F6" />
-                            <Text className="text-base font-bold text-foreground ml-2">Being Prepared</Text>
+                            <Text className="text-base font-bold text-foreground ml-2">{t.orders.details.being_prepared}</Text>
                         </View>
                         <Text className="text-sm text-subtext">
-                            Average prep time: ~{(order as any).preparationMinutes} minutes
+                            {t.orders.details.avg_prep_time.replace('{{minutes}}', String((order as any).preparationMinutes))}
                         </Text>
                     </View>
                 )}
@@ -222,15 +224,15 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                     <View className="bg-white dark:bg-gray-800 rounded-3xl p-4 mb-4">
                         <View className="flex-row items-center mb-3">
                             <Ionicons name="person-circle" size={24} style={{ color: theme.colors.income }} />
-                            <Text className="text-lg font-bold text-foreground ml-3">Driver</Text>
+                            <Text className="text-lg font-bold text-foreground ml-3">{t.orders.details.driver}</Text>
                         </View>
                         <View className="flex-row items-center justify-between pt-3 border-t border-border/20">
                             <View className="flex-1">
                                 <Text className="text-base font-semibold text-foreground">
-                                    {driverName || 'Assigning driver...'}
+                                    {driverName || t.orders.details.assigning_driver}
                                 </Text>
                                 <Text className="text-sm text-subtext mt-1">
-                                    {driverVehicle || (driverPhone ? driverPhone : 'Driver assignment in progress')}
+                                    {driverVehicle || (driverPhone ? driverPhone : t.orders.details.driver_assignment)}
                                 </Text>
                             </View>
                             <TouchableOpacity
@@ -252,7 +254,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                     <View className="flex-row items-center justify-between mb-3">
                         <View className="flex-row items-center">
                             <Ionicons name="location" size={20} style={{ color: theme.colors.income }} />
-                            <Text className="text-lg font-bold text-foreground ml-3">Delivery</Text>
+                            <Text className="text-lg font-bold text-foreground ml-3">{t.orders.details.delivery}</Text>
                         </View>
                         <TouchableOpacity
                             onPress={() => setIsEditingAddress((prev) => !prev)}
@@ -261,7 +263,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                         >
                             <Ionicons name="pencil" size={14} color={theme.colors.text} />
                             <Text className="text-xs ml-1 font-semibold" style={{ color: theme.colors.text }}>
-                                Edit
+                                {t.common.edit}
                             </Text>
                         </TouchableOpacity>
                     </View>
@@ -274,7 +276,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                             <TextInput
                                 value={addressDraft}
                                 onChangeText={setAddressDraft}
-                                placeholder="Enter delivery address"
+                                placeholder={t.orders.details.enter_delivery_address}
                                 placeholderTextColor={theme.colors.subtext}
                                 className="text-base px-3 py-3 rounded-xl mb-3"
                                 style={{
@@ -293,7 +295,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                     style={{ backgroundColor: theme.colors.border }}
                                 >
                                     <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
-                                        Cancel
+                                        {t.common.cancel}
                                     </Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
@@ -301,7 +303,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                     className="px-4 py-2 rounded-lg"
                                     style={{ backgroundColor: theme.colors.income }}
                                 >
-                                    <Text className="text-sm font-semibold text-white">Save</Text>
+                                    <Text className="text-sm font-semibold text-white">{t.common.save}</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -332,7 +334,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                             <View className="flex-1">
                                 <Text className="text-lg font-bold text-foreground">{businessOrder.business.name}</Text>
                                 <Text className="text-sm text-foreground">
-                                    {businessOrder.items.length} item
+                                    {businessOrder.items.length} {t.common.item}
                                     {businessOrder.items.length !== 1 ? 's' : ''}
                                 </Text>
                             </View>
@@ -356,7 +358,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                 </View>
                                 <View className="flex-1">
                                     <Text className="text-base text-foreground">{item.name}</Text>
-                                    <Text className="text-sm text-subtext">Qty: {item.quantity}</Text>
+                                    <Text className="text-sm text-subtext">{t.common.qty}: {item.quantity}</Text>
                                 </View>
                                 <Text className="text-base font-semibold text-foreground">
                                     €{(item.price * item.quantity).toFixed(2)}
@@ -370,23 +372,23 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                 <View className="bg-white dark:bg-gray-800 rounded-3xl p-4 mb-6">
                     <View className="flex-row items-center mb-4">
                         <Ionicons name="receipt" size={20} style={{ color: theme.colors.income }} />
-                        <Text className="text-lg font-bold text-foreground ml-3">Order Summary</Text>
+                        <Text className="text-lg font-bold text-foreground ml-3">{t.orders.details.order_summary}</Text>
                     </View>
 
                     <View className="space-y-2 pb-4">
                         <View className="flex-row justify-between">
-                            <Text className="text-base text-foreground">Subtotal</Text>
+                            <Text className="text-base text-foreground">{t.orders.details.subtotal}</Text>
                             <Text className="text-base text-foreground">€{order.orderPrice.toFixed(2)}</Text>
                         </View>
 
                         <View className="flex-row justify-between">
-                            <Text className="text-base text-foreground">Delivery Fee</Text>
+                            <Text className="text-base text-foreground">{t.orders.details.delivery_fee}</Text>
                             <Text className="text-base text-foreground">€{order.deliveryPrice.toFixed(2)}</Text>
                         </View>
                     </View>
 
                     <View className="border-t border-border pt-4 flex-row justify-between">
-                        <Text className="text-lg font-bold text-foreground">Total</Text>
+                        <Text className="text-lg font-bold text-foreground">{t.common.total}</Text>
                         <Text className="text-lg font-bold" style={{ color: theme.colors.income }}>€{order.totalPrice.toFixed(2)}</Text>
                     </View>
                 </View>

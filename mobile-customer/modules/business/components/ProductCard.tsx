@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { Product, BusinessType } from '@/gql/graphql';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
+import { useTranslations } from '@/hooks/useTranslations';
 import { CartControls } from './CartControls';
 
 interface ProductCardProps {
@@ -13,6 +14,7 @@ interface ProductCardProps {
 
 export function ProductCard({ product, businessType }: ProductCardProps) {
     const theme = useTheme();
+    const { t } = useTranslations();
 
     const handlePress = () => {
         if (!product.id) return;
@@ -78,7 +80,7 @@ export function ProductCard({ product, businessType }: ProductCardProps) {
                     {/* Unavailable Overlay */}
                     {!product.isAvailable && (
                         <View className="absolute inset-0 bg-black/60 items-center justify-center">
-                            <Text className="text-white text-xs font-semibold">Unavailable</Text>
+                            <Text className="text-white text-xs font-semibold">{t.common.unavailable}</Text>
                         </View>
                     )}
                 </View>

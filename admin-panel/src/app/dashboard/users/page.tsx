@@ -13,6 +13,7 @@ import { Table, Th, Td } from "@/components/ui/Table";
 import Modal from "@/components/ui/Modal";
 import { useAuth } from "@/lib/auth-context";
 import { Pencil, Trash2, Flag, AlertCircle } from "lucide-react";
+import { toast } from 'sonner';
 
 interface UserItem {
     id: string;
@@ -260,7 +261,7 @@ export default function UsersPage() {
             });
             handleCloseNoteModal();
         } catch (err) {
-            alert(err instanceof Error ? err.message : "Failed to update note");
+            toast.error(err instanceof Error ? err.message : "Failed to update note");
         }
     };
 

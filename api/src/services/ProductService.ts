@@ -6,6 +6,7 @@ import type { DbType } from '@/database';
 import { productStocks } from '@/database/schema/productStock';
 import { eq } from 'drizzle-orm';
 import logger from '@/lib/logger';
+import { AppError } from '@/lib/errors';
 
 const log = logger.child({ service: 'ProductService' });
 
@@ -79,7 +80,7 @@ export class ProductService {
         const { stock, ...updateData } = validatedInput as any;
 
         const updatedProduct = await this.productRepository.update(id, updateData);
-        if (!updatedProduct) throw new Error('Product not found');
+        if (!updatedProduct) throw AppError.notFound('Product');
 
         // Handle stock update separately if provided and db is available
         if (stock !== undefined && this.db) {

@@ -27,6 +27,20 @@ export class ProductRepository {
         };
     }
 
+    async findByIds(ids: string[]): Promise<(DbProduct & { stock?: number })[]> {
+        if (ids.length === 0) return [];
+        const results = await this.db.query.products.findMany({
+            where: inArray(products.id, ids),
+            with: {
+                productStock: true,
+            },
+        });
+        return results.map((p) => ({
+            ...p,
+            stock: p.productStock?.stock ?? 0,
+        }));
+    }
+
     async findByBusinessId(businessId: string): Promise<(DbProduct & { stock?: number })[]> {
         const results = await this.db.query.products.findMany({
             where: eq(products.businessId, businessId),

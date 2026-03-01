@@ -18,6 +18,7 @@ import { ASSIGN_DRIVER_TO_ORDER, UPDATE_ORDER_STATUS } from "@/graphql/operation
 import { ADMIN_UPDATE_DRIVER_LOCATION } from "@/graphql/operations/users/mutations";
 import { calculateRouteDistance } from "@/lib/utils/mapbox";
 import { getInitials, getAvatarColor } from "@/lib/avatarUtils";
+import { toast } from 'sonner';
 
 // ╔══════════════════════════════════════════════════════════╗
 // ║                      CONSTANTS                          ║
@@ -520,14 +521,14 @@ export default function MapPage() {
         setTimeout(() => { setShowPolylines((prev) => ({ ...prev, [orderId]: true })); }, 500);
       }
     } catch (error: any) {
-      alert(error.message || "Failed to assign driver");
+      toast.error(error.message || "Failed to assign driver");
     }
   };
 
   const handleAutoAssign = async (orderId: string) => {
     try {
       const order = activeOrders.find((o: any) => o.id === orderId);
-      if (!order) { alert("Order not found"); return; }
+      if (!order) { toast.error("Order not found"); return; }
       const firstBusiness = order.businesses?.[0]?.business;
       let pickup = null;
       if (firstBusiness?.location?.latitude && firstBusiness?.location?.longitude) {
@@ -538,7 +539,7 @@ export default function MapPage() {
           pickup = { latitude: fullBusiness.location.latitude, longitude: fullBusiness.location.longitude };
         }
       }
-      if (!pickup) { alert("Business location not available"); return; }
+      if (!pickup) { toast.error("Business location not available"); return; }
 
       const availableDrivers = drivers.filter((d: any) => {
         const hasLocation = d.driverLocation?.latitude && d.driverLocation?.longitude;
@@ -546,7 +547,7 @@ export default function MapPage() {
         const canAssign = isDriverAssignable(d);
         return hasLocation && !isBusy && canAssign;
       });
-      if (availableDrivers.length === 0) { alert("No available drivers found"); return; }
+      if (availableDrivers.length === 0) { toast.warning("No available drivers found"); return; }
 
       let nearestDriver = availableDrivers[0];
       let minDistance = Infinity;
@@ -556,7 +557,7 @@ export default function MapPage() {
       });
       await handleAssignDriver(orderId, nearestDriver.id);
     } catch (error: any) {
-      alert(error.message || "Failed to auto-assign driver");
+      toast.error(error.message || "Failed to auto-assign driver");
     }
   };
 
@@ -564,7 +565,7 @@ export default function MapPage() {
     try {
       await updateOrderStatus({ variables: { id: orderId, status }, refetchQueries: ["GetOrders"] });
     } catch (error: any) {
-      alert(error.message || "Failed to update status");
+      toast.error(error.message || "Failed to update status");
     }
   };
 

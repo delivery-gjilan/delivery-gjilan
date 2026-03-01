@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/auth-context";
 import { ASSIGN_DRIVER_TO_ORDER, CREATE_TEST_ORDER, START_PREPARING, UPDATE_PREPARATION_TIME } from "@/graphql/operations/orders";
 import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
 import { Package, Store, Search, ArrowRight, Clock, CheckCircle2, Eye, EyeOff, MapPin, User, Plus, ChefHat, Timer } from "lucide-react";
+import { toast } from 'sonner';
 
 /* ---------------------------------------------------------
    TYPES
@@ -182,7 +183,7 @@ export default function OrdersPage() {
                 const result = await updateStatus(order.id, "READY");
                 setUpdatingOrderId(null);
                 if (!result.success) {
-                    alert(result.error || "Failed to update order status.");
+                    toast.error(result.error || "Failed to update order status.");
                 }
                 return;
             }
@@ -204,7 +205,7 @@ export default function OrdersPage() {
         setUpdatingOrderId(null);
 
         if (!result.success) {
-            alert(result.error || "Failed to update order status.");
+            toast.error(result.error || "Failed to update order status.");
         }
     };
 
@@ -212,7 +213,7 @@ export default function OrdersPage() {
         if (!prepTimeModalOrder) return;
         const minutes = parseInt(prepTimeMinutes, 10);
         if (!minutes || minutes < 1) {
-            alert("Please enter a valid preparation time.");
+            toast.warning("Please enter a valid preparation time.");
             return;
         }
         try {
@@ -221,7 +222,7 @@ export default function OrdersPage() {
             });
             setPrepTimeModalOrder(null);
         } catch (err: any) {
-            alert(err.message || "Failed to start preparing.");
+            toast.error(err.message || "Failed to start preparing.");
         }
     };
 
@@ -229,7 +230,7 @@ export default function OrdersPage() {
         if (!editPrepTimeOrder) return;
         const minutes = parseInt(editPrepTimeMinutes, 10);
         if (!minutes || minutes < 1) {
-            alert("Please enter a valid preparation time.");
+            toast.warning("Please enter a valid preparation time.");
             return;
         }
         try {
@@ -238,7 +239,7 @@ export default function OrdersPage() {
             });
             setEditPrepTimeOrder(null);
         } catch (err: any) {
-            alert(err.message || "Failed to update preparation time.");
+            toast.error(err.message || "Failed to update preparation time.");
         }
     };
 
@@ -255,7 +256,7 @@ export default function OrdersPage() {
         setUpdatingOrderId(null);
 
         if (!result.success) {
-            alert(result.error || "Failed to update order status.");
+            toast.error(result.error || "Failed to update order status.");
         }
     };
 
@@ -275,7 +276,7 @@ export default function OrdersPage() {
                 refetchQueries: ['GetOrders'],
             });
         } catch (error: any) {
-            alert(error.message || "Failed to assign driver");
+            toast.error(error.message || "Failed to assign driver");
         } finally {
             setAssigningDriverOrderId(null);
         }
@@ -332,7 +333,7 @@ export default function OrdersPage() {
                                     try {
                                         await createTestOrder({ refetchQueries: ['GetOrders'] });
                                     } catch (err: any) {
-                                        alert(err.message || 'Failed to create test order');
+                                        toast.error(err.message || 'Failed to create test order');
                                     }
                                 }}
                                 disabled={creatingTestOrder}

@@ -1,5 +1,6 @@
 import type { QueryResolvers } from './../../../../generated/types.generated';
 import { UserQueryService } from '@/services/UserQueryService';
+import { AppError } from '@/lib/errors';
 
 export const previewCampaignAudience: NonNullable<QueryResolvers['previewCampaignAudience']> = async (
     _parent,
@@ -7,7 +8,7 @@ export const previewCampaignAudience: NonNullable<QueryResolvers['previewCampaig
     { userData, db, authService },
 ) => {
     if (!userData.role || !['SUPER_ADMIN', 'ADMIN'].includes(userData.role)) {
-        throw new Error('Only admins can preview audiences');
+        throw AppError.forbidden('Only admins can preview audiences');
     }
 
     const queryService = new UserQueryService(db);

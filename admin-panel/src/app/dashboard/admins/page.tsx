@@ -171,16 +171,6 @@ export default function AdminsPage() {
                 }, 1000);
             } else {
                 // Create new admin
-                console.log('[DEBUG] Creating admin with data:', {
-                    email: formData.email,
-                    password: formData.password, // TEMPORARY: Log actual password for debugging
-                    passwordLength: formData.password.length,
-                    firstName: formData.firstName,
-                    lastName: formData.lastName,
-                    role: formData.role,
-                    businessId: (formData.role === 'BUSINESS_OWNER' || formData.role === 'BUSINESS_EMPLOYEE') ? formData.businessId : null,
-                });
-                
                 const { data: created } = await createUser({
                     variables: {
                         email: formData.email,

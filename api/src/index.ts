@@ -1,6 +1,9 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { createYoga } from 'graphql-yoga';
+import { EnvelopArmorPlugin } from '@escape.tech/graphql-armor';
 import { schema } from './graphql/schema';
 import { createContext } from './graphql/createContext';
 import uploadRoutes from './routes/uploadRoutes';
@@ -18,8 +21,62 @@ initSentry();
 const app = express();
 const port = Number(process.env.PORT) || 4000;
 
-app.use(cors());
-app.use(express.json());
+// ── Security headers ──
+app.use(helmet({ contentSecurityPolicy: false })); // CSP disabled for GraphiQL
+
+// ── CORS ──
+const allowedOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
+    : ['http://localhost:3000', 'http://localhost:8082', 'http://localhost:8083', 'http://localhost:8084'];
+
+app.use(cors({
+    origin: allowedOrigins,
+    credentials: true,
+}));
+
+// ── Body parsing with size limit ──
+app.use(express.json({ limit: '16kb' }));
+
+// ── Rate limiting ──
+// General API limiter
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 500,                  // 500 requests per window
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests, please try again later.' },
+});
+
+// Stricter limiter for auth-related operations (GraphQL login/signup)
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 20,                   // 20 attempts per window
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many authentication attempts, please try again later.' },
+});
+
+// Upload limiter
+const uploadLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 50,                   // 50 uploads per window
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many upload requests, please try again later.' },
+});
+
+app.use('/graphql', apiLimiter);
+app.use('/api/upload', uploadLimiter);
+
+// Apply stricter auth rate limiting to auth-related GraphQL operations
+const AUTH_OPERATIONS = new Set(['Login', 'InitiateSignup', 'RefreshToken', 'VerifyEmail', 'VerifyPhone', 'ResendEmailVerification']);
+app.use('/graphql', (req, res, next) => {
+    const operationName = req.body?.operationName;
+    if (operationName && AUTH_OPERATIONS.has(operationName)) {
+        return authLimiter(req, res, next);
+    }
+    next();
+});
 
 // Structured request logging (replaces the old console.log middleware)
 app.use(requestLogger);
@@ -30,14 +87,23 @@ Sentry.setupExpressErrorHandler(app);
 // Upload routes (REST API)
 app.use('/api/upload', uploadRoutes);
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 const yoga = createYoga({
     schema,
     graphqlEndpoint: '/graphql',
-    maskedErrors: false,
+    maskedErrors: isProduction,
     context: createContext,
-    graphiql: {
-        subscriptionsProtocol: 'WS',
-    },
+    graphiql: isProduction ? false : { subscriptionsProtocol: 'WS' },
+    plugins: [
+        EnvelopArmorPlugin({
+            maxDepth: { n: 10 },
+            costLimit: { maxCost: 5000 },
+            maxAliases: { n: 5 },
+            maxDirectives: { n: 10 },
+            maxTokens: { n: 1000 },
+        }),
+    ],
 });
 
 app.use(yoga.graphqlEndpoint, yoga);

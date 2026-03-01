@@ -38,6 +38,15 @@
       "isBackground": true
     },
     {
+      "label": "mobile-business:start",
+      "type": "shell",
+      "command": "npm start -- --port 8084",
+      "options": {
+        "cwd": "${workspaceFolder}/mobile-business"
+      },
+      "isBackground": true
+    },
+    {
       "label": "ngrok:tunnels",
       "type": "shell",
       "command": "ngrok start --all",
@@ -53,6 +62,7 @@
         "admin:dev",
         "mobile-customer:start",
         "mobile-driver:start",
+        "mobile-business:start",
         "ngrok:tunnels"
       ],
       "dependsOrder": "parallel",

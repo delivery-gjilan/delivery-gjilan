@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useActiveOrdersStore } from '../store/activeOrdersStore';
 import { useTheme } from '@/hooks/useTheme';
+import { useTranslations } from '@/hooks/useTranslations';
 import { Order } from '@/gql/graphql';
 
 const OrderStatusBadge = ({ status }: { status: string }) => {
@@ -74,6 +75,7 @@ const OrderListItem = ({ order }: { order: Order }) => {
 export const ActiveOrdersList = () => {
     const router = useRouter();
     const theme = useTheme();
+    const { t } = useTranslations();
     const { activeOrders, hasActiveOrders } = useActiveOrdersStore();
 
     if (!hasActiveOrders) {
@@ -84,14 +86,14 @@ export const ActiveOrdersList = () => {
                         <TouchableOpacity onPress={() => router.back()} className="mr-3">
                             <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                         </TouchableOpacity>
-                        <Text className="text-2xl font-bold text-text">Active Orders</Text>
+                        <Text className="text-2xl font-bold text-text">{t.orders.active_orders}</Text>
                     </View>
 
                     <View className="flex-1 justify-center items-center">
                         <Ionicons name="checkmark-circle-outline" size={80} color={theme.colors.subtext} />
-                        <Text className="text-lg text-subtext mt-4 text-center">No active orders</Text>
+                        <Text className="text-lg text-subtext mt-4 text-center">{t.orders.no_active_orders}</Text>
                         <Text className="text-sm text-subtext mt-2 text-center px-8">
-                            All your orders have been completed or cancelled
+                            {t.orders.no_active_orders_subtitle}
                         </Text>
                     </View>
                 </View>
@@ -106,7 +108,7 @@ export const ActiveOrdersList = () => {
                     <TouchableOpacity onPress={() => router.back()} className="mr-3">
                         <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                     </TouchableOpacity>
-                    <Text className="text-2xl font-bold text-text">Active Orders</Text>
+                    <Text className="text-2xl font-bold text-text">{t.orders.active_orders}</Text>
                 </View>
 
                 <FlatList

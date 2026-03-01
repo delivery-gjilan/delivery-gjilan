@@ -7,11 +7,13 @@ import * as Clipboard from 'expo-clipboard';
 import { useQuery, useMutation } from '@apollo/client/react';
 
 import { useTheme } from '@/hooks/useTheme';
+import { useTranslations } from '@/hooks/useTranslations';
 import { GET_MY_REFERRAL_STATS, GENERATE_REFERRAL_CODE } from '@/graphql/operations/referrals';
 
 export default function InviteFriendsScreen() {
     const router = useRouter();
     const theme = useTheme();
+    const { t } = useTranslations();
     const [copiedCode, setCopiedCode] = useState(false);
 
     const { data, loading, refetch } = useQuery(GET_MY_REFERRAL_STATS, {
@@ -23,7 +25,7 @@ export default function InviteFriendsScreen() {
             refetch();
         },
         onError: (error) => {
-            Alert.alert('Error', error.message);
+            Alert.alert(t.common.error, error.message);
         },
     });
 
@@ -40,14 +42,14 @@ export default function InviteFriendsScreen() {
 
     const handleCopyLink = async () => {
         await Clipboard.setStringAsync(referralLink);
-        Alert.alert('Copied!', 'Referral link copied to clipboard');
+        Alert.alert(t.invite.copied, t.invite.link_copied);
     };
 
     const handleShare = async () => {
         try {
             await Share.share({
-                message: `Join Delivery Gjilan using my referral code ${referralCode} and get rewarded! ${referralLink}`,
-                title: 'Invite to Delivery Gjilan',
+                message: t.invite.share_message.replace('{{code}}', referralCode).replace('{{link}}', referralLink),
+                title: t.invite.share_title,
             });
         } catch (error) {
             console.error('Share error:', error);
@@ -72,7 +74,7 @@ export default function InviteFriendsScreen() {
                     <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
                 <Text className="text-xl font-bold" style={{ color: theme.colors.text }}>
-                    Invite Friends
+                    {t.invite.title}
                 </Text>
                 <View style={{ width: 40 }} />
             </View>
@@ -89,17 +91,17 @@ export default function InviteFriendsScreen() {
                 >
                     <Ionicons name="gift" size={48} color={theme.colors.primary} style={{ alignSelf: 'center', marginBottom: 12 }} />
                     <Text className="text-lg font-bold text-center mb-2" style={{ color: theme.colors.text }}>
-                        Earn €5 for Each Friend!
+                        {t.invite.earn_title}
                     </Text>
                     <Text className="text-sm text-center" style={{ color: theme.colors.subtext }}>
-                        Share your referral code and get €5 credited to your wallet when they complete their first order.
+                        {t.invite.earn_description}
                     </Text>
                 </View>
 
                 {/* Referral Code Card */}
                 <View className="p-6 rounded-3xl mb-6" style={{ backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border }}>
                     <Text className="text-sm font-semibold mb-3" style={{ color: theme.colors.subtext }}>
-                        YOUR REFERRAL CODE
+                        {t.invite.your_code}
                     </Text>
                     <View className="flex-row items-center justify-between p-4 rounded-2xl mb-4" style={{ backgroundColor: theme.colors.background }}>
                         <Text className="text-2xl font-bold tracking-wider" style={{ color: theme.colors.text }}>
@@ -118,7 +120,7 @@ export default function InviteFriendsScreen() {
                             style={{ backgroundColor: theme.colors.primary }}
                         >
                             <Ionicons name="share-social" size={20} color="#fff" style={{ marginRight: 8 }} />
-                            <Text className="text-base font-semibold text-white">Share Referral Link</Text>
+                            <Text className="text-base font-semibold text-white">{t.invite.share_link}</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -128,7 +130,7 @@ export default function InviteFriendsScreen() {
                         >
                             <Ionicons name="link" size={20} color={theme.colors.text} style={{ marginRight: 8 }} />
                             <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
-                                Copy Link
+                                {t.invite.copy_link}
                             </Text>
                         </TouchableOpacity>
                     </View>
@@ -142,7 +144,7 @@ export default function InviteFriendsScreen() {
                             {stats?.totalReferrals || 0}
                         </Text>
                         <Text className="text-xs" style={{ color: theme.colors.subtext }}>
-                            Total Invites
+                            {t.invite.total_invites}
                         </Text>
                     </View>
 
@@ -152,7 +154,7 @@ export default function InviteFriendsScreen() {
                             {stats?.completedReferrals || 0}
                         </Text>
                         <Text className="text-xs" style={{ color: theme.colors.subtext }}>
-                            Completed
+                            {t.invite.completed}
                         </Text>
                     </View>
 
@@ -162,7 +164,7 @@ export default function InviteFriendsScreen() {
                             €{stats?.totalRewardsEarned?.toFixed(2) || '0.00'}
                         </Text>
                         <Text className="text-xs" style={{ color: theme.colors.subtext }}>
-                            Earned
+                            {t.invite.earned}
                         </Text>
                     </View>
                 </View>
@@ -171,7 +173,7 @@ export default function InviteFriendsScreen() {
                 {stats?.referrals && stats.referrals.length > 0 && (
                     <View>
                         <Text className="text-lg font-bold mb-3" style={{ color: theme.colors.text }}>
-                            Your Referrals
+                            {t.invite.your_referrals}
                         </Text>
                         {stats.referrals.map((referral: any) => (
                             <View
@@ -181,7 +183,7 @@ export default function InviteFriendsScreen() {
                             >
                                 <View className="flex-1">
                                     <Text className="text-base font-semibold mb-1" style={{ color: theme.colors.text }}>
-                                        {referral.referredUser ? `${referral.referredUser.firstName} ${referral.referredUser.lastName}` : 'Pending signup'}
+                                        {referral.referredUser ? `${referral.referredUser.firstName} ${referral.referredUser.lastName}` : t.invite.pending_signup}
                                     </Text>
                                     <Text className="text-sm" style={{ color: theme.colors.subtext }}>
                                         {new Date(referral.createdAt).toLocaleDateString()}
@@ -227,7 +229,7 @@ export default function InviteFriendsScreen() {
                 {/* How It Works */}
                 <View className="mt-6 p-6 rounded-3xl" style={{ backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border }}>
                     <Text className="text-lg font-bold mb-4" style={{ color: theme.colors.text }}>
-                        How it works
+                        {t.invite.how_it_works}
                     </Text>
                     <View className="gap-4">
                         <View className="flex-row">
@@ -241,7 +243,7 @@ export default function InviteFriendsScreen() {
                             </View>
                             <View className="flex-1">
                                 <Text className="text-base" style={{ color: theme.colors.text }}>
-                                    Share your unique referral code with friends
+                                    {t.invite.step_1}
                                 </Text>
                             </View>
                         </View>
@@ -256,7 +258,7 @@ export default function InviteFriendsScreen() {
                             </View>
                             <View className="flex-1">
                                 <Text className="text-base" style={{ color: theme.colors.text }}>
-                                    They sign up using your code
+                                    {t.invite.step_2}
                                 </Text>
                             </View>
                         </View>
@@ -271,7 +273,7 @@ export default function InviteFriendsScreen() {
                             </View>
                             <View className="flex-1">
                                 <Text className="text-base" style={{ color: theme.colors.text }}>
-                                    When they complete their first order, you both get €5!
+                                    {t.invite.step_3}
                                 </Text>
                             </View>
                         </View>

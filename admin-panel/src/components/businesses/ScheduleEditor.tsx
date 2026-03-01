@@ -5,6 +5,7 @@ import { useMutation } from "@apollo/client/react";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import { SET_BUSINESS_SCHEDULE } from "@/graphql/operations/businesses/mutations";
+import { toast } from 'sonner';
 
 const DAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -95,7 +96,7 @@ export default function ScheduleEditor({ businessId, schedule, onSaved }: Props)
             onSaved?.();
         } catch (err) {
             console.error("Failed to save schedule", err);
-            alert("Failed to save schedule");
+            toast.error("Failed to save schedule");
         } finally {
             setSaving(false);
         }

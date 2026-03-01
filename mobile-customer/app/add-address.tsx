@@ -8,6 +8,7 @@ import { useMutation, useQuery } from '@apollo/client/react';
 import * as Location from 'expo-location';
 
 import { useTheme } from '@/hooks/useTheme';
+import { useTranslations } from '@/hooks/useTranslations';
 import { ADD_USER_ADDRESS, UPDATE_USER_ADDRESS, GET_MY_ADDRESSES } from '@/graphql/operations/addresses';
 
 const MAPTILER_API_KEY = process.env.EXPO_PUBLIC_MAPTILER_API_KEY;
@@ -15,6 +16,7 @@ const MAPTILER_API_KEY = process.env.EXPO_PUBLIC_MAPTILER_API_KEY;
 export default function AddEditAddressScreen() {
     const router = useRouter();
     const theme = useTheme();
+    const { t } = useTranslations();
     const { id } = useLocalSearchParams();
     const isEdit = !!id;
     const mapRef = useRef<MapView>(null);
@@ -56,22 +58,22 @@ export default function AddEditAddressScreen() {
     const [addAddress] = useMutation(ADD_USER_ADDRESS, {
         refetchQueries: [{ query: GET_MY_ADDRESSES }],
         onCompleted: () => {
-            Alert.alert('Success', 'Address added successfully');
+            Alert.alert(t.common.success, t.addresses.added_success);
             router.back();
         },
         onError: (error) => {
-            Alert.alert('Error', error.message);
+            Alert.alert(t.common.error, error.message);
         },
     });
 
     const [updateAddress] = useMutation(UPDATE_USER_ADDRESS, {
         refetchQueries: [{ query: GET_MY_ADDRESSES }],
         onCompleted: () => {
-            Alert.alert('Success', 'Address updated successfully');
+            Alert.alert(t.common.success, t.addresses.updated_success);
             router.back();
         },
         onError: (error) => {
-            Alert.alert('Error', error.message);
+            Alert.alert(t.common.error, error.message);
         },
     });
 
@@ -86,7 +88,7 @@ export default function AddEditAddressScreen() {
         try {
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
-                Alert.alert('Permission denied', 'Location permission is required');
+                Alert.alert(t.addresses.permission_denied, t.addresses.location_required);
                 setFetchingLocation(false);
                 return;
             }
@@ -108,7 +110,7 @@ export default function AddEditAddressScreen() {
             await reverseGeocode(coords.latitude, coords.longitude);
         } catch (error) {
             console.error('Location error:', error);
-            Alert.alert('Error', 'Could not get your location');
+            Alert.alert(t.common.error, t.addresses.location_failed);
         }
         setFetchingLocation(false);
     };
@@ -137,12 +139,12 @@ export default function AddEditAddressScreen() {
 
     const handleSave = async () => {
         if (!addressName.trim()) {
-            Alert.alert('Required', 'Please enter an address name');
+            Alert.alert(t.common.required, t.addresses.enter_name);
             return;
         }
 
         if (!markerCoordinate) {
-            Alert.alert('Required', 'Please select a location on the map');
+            Alert.alert(t.common.required, t.addresses.select_location);
             return;
         }
 
@@ -183,7 +185,7 @@ export default function AddEditAddressScreen() {
                     <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
                 <Text className="text-xl font-bold" style={{ color: theme.colors.text }}>
-                    {isEdit ? 'Edit Address' : 'Add Address'}
+                    {isEdit ? t.addresses.edit_title : t.addresses.add_title}
                 </Text>
                 <View style={{ width: 40 }} />
             </View>
@@ -225,7 +227,7 @@ export default function AddEditAddressScreen() {
                         style={{ backgroundColor: theme.colors.card + 'F0', ...styles.shadow }}
                     >
                         <Text className="text-sm" style={{ color: theme.colors.text }}>
-                            📍 Tap on the map to set your address location
+                            {t.addresses.tap_map}
                         </Text>
                     </View>
                 </View>
@@ -234,12 +236,12 @@ export default function AddEditAddressScreen() {
                 <View className="flex-1 p-4">
                     <View className="mb-4">
                         <Text className="text-sm font-semibold mb-2" style={{ color: theme.colors.text }}>
-                            Address Label *
+                            {t.addresses.label}
                         </Text>
                         <TextInput
                             value={addressName}
                             onChangeText={setAddressName}
-                            placeholder="e.g., Home, Work, Gym"
+                            placeholder={t.addresses.label_placeholder}
                             placeholderTextColor={theme.colors.subtext}
                             className="px-4 py-3 rounded-xl text-base"
                             style={{
@@ -253,12 +255,12 @@ export default function AddEditAddressScreen() {
 
                     <View className="mb-4">
                         <Text className="text-sm font-semibold mb-2" style={{ color: theme.colors.text }}>
-                            Full Address
+                            {t.addresses.full_address}
                         </Text>
                         <TextInput
                             value={displayName}
                             onChangeText={setDisplayName}
-                            placeholder="Auto-filled from map or enter manually"
+                            placeholder={t.addresses.full_address_placeholder}
                             placeholderTextColor={theme.colors.subtext}
                             multiline
                             numberOfLines={2}
@@ -275,7 +277,7 @@ export default function AddEditAddressScreen() {
                     {markerCoordinate && (
                         <View className="mb-4 p-3 rounded-xl" style={{ backgroundColor: theme.colors.card }}>
                             <Text className="text-xs" style={{ color: theme.colors.subtext }}>
-                                Coordinates: {markerCoordinate.latitude.toFixed(6)}, {markerCoordinate.longitude.toFixed(6)}
+                                {t.addresses.coordinates}: {markerCoordinate.latitude.toFixed(6)}, {markerCoordinate.longitude.toFixed(6)}
                             </Text>
                         </View>
                     )}
@@ -290,7 +292,7 @@ export default function AddEditAddressScreen() {
                             <ActivityIndicator size="small" color="#fff" />
                         ) : (
                             <Text className="text-base font-semibold text-white">
-                                {isEdit ? 'Update Address' : 'Save Address'}
+                                {isEdit ? t.addresses.update : t.addresses.save}
                             </Text>
                         )}
                     </TouchableOpacity>

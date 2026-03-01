@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CreateProductSubcategoryInput, UpdateProductSubcategoryInput } from '@/generated/types.generated';
+import { AppError } from '@/lib/errors';
 
 const createProductSubcategorySchema = z.object({
     categoryId: z.string().uuid('Invalid Category ID'),
@@ -12,11 +13,19 @@ const updateProductSubcategorySchema = z.object({
 
 export class ProductSubcategoryValidator {
     validateCreateProductSubcategory(input: CreateProductSubcategoryInput) {
-        return createProductSubcategorySchema.parse(input);
+        const result = createProductSubcategorySchema.safeParse(input);
+        if (!result.success) {
+            throw AppError.fromZodError(result.error);
+        }
+        return result.data;
     }
 
     validateUpdateProductSubcategory(input: UpdateProductSubcategoryInput) {
-        return updateProductSubcategorySchema.parse(input);
+        const result = updateProductSubcategorySchema.safeParse(input);
+        if (!result.success) {
+            throw AppError.fromZodError(result.error);
+        }
+        return result.data;
     }
 }
 

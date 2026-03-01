@@ -1,10 +1,11 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { getDB } from '@/database';
 import { promotions, userPromotions, promotionBusinessEligibility } from '@/database/schema';
+import { AppError } from '@/lib/errors';
 
 export const createPromotion: NonNullable<MutationResolvers['createPromotion']> = async (_parent, { input }, { userData }) => {
   if (!userData.userId || userData.role !== 'SUPER_ADMIN') {
-    throw new Error('Forbidden');
+    throw AppError.forbidden();
   }
 
   const db = await getDB();

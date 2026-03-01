@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CreateProductCategoryInput, UpdateProductCategoryInput } from '@/generated/types.generated';
+import { AppError } from '@/lib/errors';
 
 const createProductCategorySchema = z.object({
     businessId: z.string().uuid('Invalid Business ID'),
@@ -13,11 +14,19 @@ const updateProductCategorySchema = z.object({
 
 export class ProductCategoryValidator {
     validateCreateProductCategory(input: CreateProductCategoryInput) {
-        return createProductCategorySchema.parse(input);
+        const result = createProductCategorySchema.safeParse(input);
+        if (!result.success) {
+            throw AppError.fromZodError(result.error);
+        }
+        return result.data;
     }
 
     validateUpdateProductCategory(input: UpdateProductCategoryInput) {
-        return updateProductCategorySchema.parse(input);
+        const result = updateProductCategorySchema.safeParse(input);
+        if (!result.success) {
+            throw AppError.fromZodError(result.error);
+        }
+        return result.data;
     }
 }
 

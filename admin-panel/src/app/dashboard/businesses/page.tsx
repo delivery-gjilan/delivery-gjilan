@@ -17,6 +17,7 @@ import {
     UPDATE_BUSINESS,
 } from "@/graphql/operations/businesses";
 import ScheduleEditor from "@/components/businesses/ScheduleEditor";
+import { toast } from 'sonner';
 
 /* ---------------------------------------------------------
    GRAPHQL TYPES
@@ -147,7 +148,7 @@ export default function BusinessesPage() {
             throw new Error(data.error || 'Upload failed');
         } catch (error) {
             console.error('Image upload error:', error);
-            alert('Failed to upload image');
+            toast.error('Failed to upload image');
             return null;
         }
     }
@@ -178,7 +179,7 @@ export default function BusinessesPage() {
 
     async function handleCreate() {
         if (!createForm.name.trim() || !createForm.location.address.trim()) {
-            alert("Please fill in all required fields");
+            toast.warning("Please fill in all required fields");
             return;
         }
 
@@ -263,7 +264,7 @@ export default function BusinessesPage() {
         if (!selected) return;
         
         if (!editForm.name.trim() || !editForm.location.address.trim()) {
-            alert("Please fill in all required fields");
+            toast.warning("Please fill in all required fields");
             return;
         }
 

@@ -1,4 +1,6 @@
 import { ApolloClient, InMemoryCache, HttpLink, ApolloLink } from '@apollo/client';
+import { onError } from '@apollo/client/link/error';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { SetContextLink } from '@apollo/client/link/context';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
@@ -6,6 +8,7 @@ import { createClient } from 'graphql-ws';
 import { persistCache, AsyncStorageWrapper } from 'apollo3-cache-persist';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../../store/authStore';
+import { toast } from '../../store/toastStore';
 
 const logLink = new ApolloLink((operation, forward) => {
     console.log('Request', {
@@ -13,6 +16,33 @@ const logLink = new ApolloLink((operation, forward) => {
         vars: operation.variables,
     });
     return forward(operation);
+});
+
+const errorLink = onError(({ error, operation }) => {
+    if (CombinedGraphQLErrors.is(error)) {
+        for (const err of error.errors) {
+            if (err.extensions?.code === 'UNAUTHENTICATED' || err.message === 'Unauthorized') {
+                console.warn('[Apollo] Auth error — clearing session');
+                useAuthStore.getState().logout();
+                return; // Don't show toast for auth redirect
+            }
+        }
+        // Show first non-auth GraphQL error as toast
+        const firstError = error.errors[0];
+        if (firstError) {
+            console.error(`[Apollo] GraphQL error in ${operation.operationName}:`, firstError.message);
+            toast.error(firstError.message);
+        }
+    } else {
+        // Network or other error
+        if ('statusCode' in error && (error as any).statusCode === 401) {
+            console.warn('[Apollo] 401 — clearing session');
+            useAuthStore.getState().logout();
+            return;
+        }
+        console.error('[Apollo] Network error:', error.message);
+        toast.error('Network Error', 'Please check your connection and try again.');
+    }
 });
 
 const authLink = new SetContextLink(async ({ headers }) => {
@@ -50,7 +80,10 @@ const wsLink = wsUrl
               shouldRetry: () => true,
               on: {
                   connected: () => console.log('[WS] Connected'),
-                  error: (err) => console.error('[WS] Error', err),
+                  error: (err) => {
+                      console.error('[WS] Error', err);
+                      toast.error('Connection Error', 'Real-time updates may be unavailable.');
+                  },
               },
           }),
       )
@@ -103,7 +136,7 @@ export const cacheReady: Promise<void> = persistCache({
 });
 
 const client = new ApolloClient({
-    link: ApolloLink.from([logLink, splitLink]),
+    link: ApolloLink.from([logLink, errorLink, splitLink]),
     cache,
     defaultOptions: {
         watchQuery: {

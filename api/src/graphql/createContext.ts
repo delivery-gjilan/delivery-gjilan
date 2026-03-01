@@ -69,6 +69,42 @@ async function extractUserData(context: YogaInitialContext & { connectionParams?
     }
 }
 
+// Cached singleton services (stateless, safe to reuse across requests)
+let cachedServices: {
+    businessService: BusinessService;
+    productCategoryService: ProductCategoryService;
+    productSubcategoryService: ProductSubcategoryService;
+    productService: ProductService;
+    authService: AuthService;
+    driverAuthService: DriverAuthService;
+    orderService: OrderService;
+    notificationService: NotificationService;
+} | null = null;
+
+async function getOrCreateServices(db: any) {
+    if (cachedServices) return cachedServices;
+
+    const businessRepository = new BusinessRepository(db);
+    const businessHoursRepository = new BusinessHoursRepository(db);
+    const productCategoryRepository = new ProductCategoryRepository(db);
+    const productSubcategoryRepository = new ProductSubcategoryRepository(db);
+    const productRepository = new ProductRepository(db);
+    const authRepository = new AuthRepository(db);
+    const orderRepository = new OrderRepository();
+
+    cachedServices = {
+        businessService: new BusinessService(businessRepository, businessHoursRepository),
+        productCategoryService: new ProductCategoryService(productCategoryRepository),
+        productSubcategoryService: new ProductSubcategoryService(productSubcategoryRepository, productCategoryRepository),
+        productService: new ProductService(productRepository, db),
+        authService: new AuthService(authRepository),
+        driverAuthService: new DriverAuthService(authRepository, new DriverRepository(db)),
+        orderService: new OrderService(orderRepository, authRepository, productRepository, pubsub),
+        notificationService: new NotificationService(new NotificationRepository(db)),
+    };
+    return cachedServices;
+}
+
 /**
  * Creates the GraphQL context with all services and user data
  */
@@ -89,26 +125,8 @@ export async function createContext(initialContext: YogaInitialContext): Promise
     // Initialize database connection
     const db = await getDB();
 
-    // Initialize repositories
-    const businessRepository = new BusinessRepository(db);
-    const businessHoursRepository = new BusinessHoursRepository(db);
-    const productCategoryRepository = new ProductCategoryRepository(db);
-    const productSubcategoryRepository = new ProductSubcategoryRepository(db);
-    const productRepository = new ProductRepository(db);
-    const authRepository = new AuthRepository(db);
-    const orderRepository = new OrderRepository();
-
-    // Initialize services
-    const businessService = new BusinessService(businessRepository, businessHoursRepository);
-    const productCategoryService = new ProductCategoryService(productCategoryRepository);
-    const productSubcategoryService = new ProductSubcategoryService(productSubcategoryRepository, productCategoryRepository);
-    const productService = new ProductService(productRepository, db);
-    const authService = new AuthService(authRepository);
-    const driverAuthService = new DriverAuthService(authRepository, new DriverRepository(db));
-    const orderService = new OrderService(orderRepository, authRepository, productRepository, pubsub);
-
-    const notificationRepository = new NotificationRepository(db);
-    const notificationService = new NotificationService(notificationRepository);
+    // Get or create singleton services
+    const services = await getOrCreateServices(db);
 
     // Get driver services (initialized on server startup)
     let driverService;
@@ -132,15 +150,8 @@ export async function createContext(initialContext: YogaInitialContext): Promise
         userData,
         requestId,
         log: reqLog,
-        businessService,
-        productCategoryService,
-        productSubcategoryService,
-        productService,
-        authService,
-        driverAuthService,
-        orderService,
+        ...services,
         driverService,
-        notificationService,
         pubsub,
     };
 }

@@ -1,4 +1,5 @@
 import type { QueryResolvers } from './../../../../generated/types.generated';
+import { AppError } from '@/lib/errors';
 
 export const notificationCampaigns: NonNullable<QueryResolvers['notificationCampaigns']> = async (
     _parent,
@@ -6,7 +7,7 @@ export const notificationCampaigns: NonNullable<QueryResolvers['notificationCamp
     { userData, notificationService },
 ) => {
     if (!userData.role || !['SUPER_ADMIN', 'ADMIN'].includes(userData.role)) {
-        throw new Error('Only admins can view campaigns');
+        throw AppError.forbidden('Only admins can view campaigns');
     }
 
     const campaigns = await notificationService.repo.getAllCampaigns();

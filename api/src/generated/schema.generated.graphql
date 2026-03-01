@@ -117,6 +117,7 @@ type AuthResponse {
 }
 
 type Business {
+  activePromotion: BusinessPromotion
   avgPrepTimeMinutes: Int!
   businessType: BusinessType!
   commissionPercentage: Float!
@@ -145,6 +146,14 @@ input BusinessDayHoursInput {
   closesAt: String!
   dayOfWeek: Int!
   opensAt: String!
+}
+
+type BusinessPromotion {
+  description: String
+  discountValue: Float
+  id: ID!
+  name: String!
+  type: PromotionType!
 }
 
 enum BusinessType {
@@ -284,6 +293,11 @@ type DeliveryPriceResult {
   price: Float!
   tierApplied: DeliveryPricingTier
   zoneApplied: DeliveryZoneMatch
+}
+
+type DeliveryPricingConfig {
+  tiers: [DeliveryPricingTier!]!
+  zones: [DeliveryZone!]!
 }
 
 type DeliveryPricingTier {
@@ -777,6 +791,7 @@ type Query {
   businessBalance(businessId: ID!): SettlementSummary!
   businesses: [Business!]!
   calculateDeliveryPrice(businessId: ID!, dropoffLat: Float!, dropoffLng: Float!): DeliveryPriceResult!
+  deliveryPricingConfig: DeliveryPricingConfig!
   deliveryPricingTiers: [DeliveryPricingTier!]!
   deliveryZones: [DeliveryZone!]!
   driverBalance(driverId: ID!): SettlementSummary!

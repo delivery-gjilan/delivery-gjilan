@@ -24,8 +24,9 @@ export const uncompletedOrders: NonNullable<QueryResolvers['uncompletedOrders']>
             // Customers can only see their own uncompleted orders
             return orderService.getUserUncompletedOrders(userData.userId);
 
-        case 'BUSINESS_ADMIN':
-            // Business admins can only see uncompleted orders that contain items from their business
+        case 'BUSINESS_OWNER':
+        case 'BUSINESS_EMPLOYEE':
+            // Business users can only see uncompleted orders that contain items from their business
             if (!userData.businessId) {
                 throw new GraphQLError('Business admin must be associated with a business', {
                     extensions: { code: 'FORBIDDEN' },

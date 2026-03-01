@@ -4,6 +4,7 @@ import { ProductRepository } from '@/repositories/ProductRepository';
 import { getDB } from '@/database';
 import {
     orderItems as orderItemsTable,
+    orders as ordersTable,
     products as productsTable,
     businesses as businessesTable,
     businessHours as businessHoursTable,
@@ -12,11 +13,12 @@ import {
     orderPromotions as orderPromotionsTable,
 } from '@/database/schema';
 import { userPromoMetadata } from '@/database/schema';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 import type { Order, OrderBusiness, OrderItem, OrderStatus, CreateOrderInput } from '@/generated/types.generated';
 import type { DbOrder } from '@/database/schema/orders';
 import { PubSub, publish, subscribe, topics } from '@/lib/pubsub';
 import { GraphQLError } from 'graphql';
+import { AppError } from '@/lib/errors';
 import { PromotionEngine } from '@/services/PromotionEngine';
 import { FinancialService } from '@/services/FinancialService';
 import logger from '@/lib/logger';
@@ -39,26 +41,30 @@ export class OrderService {
         // 1. Validate User
         const user = await this.authRepository.findById(userId);
         if (!user) {
-            throw new Error('User not found');
+            throw AppError.notFound('User');
         }
 
         if (user.signupStep !== 'COMPLETED') {
-            throw new Error('User has not completed signup process');
+            throw AppError.businessRule('User has not completed signup process');
         }
 
-        // 2. Validate Products and Calculate Totals
+        // 2. Validate Products and Calculate Totals (batch fetch to avoid N+1)
+        const productIds = input.items.map((item) => item.productId);
+        const allProducts = await this.productRepository.findByIds(productIds);
+        const productMap = new Map(allProducts.map((p) => [p.id, p]));
+
         let calculatedItemsTotal = 0;
         const itemsToCreate = [];
         const cartItems = [] as Array<{ productId: string; businessId: string; quantity: number; price: number }>;
         const businessIds = new Set<string>();
 
         for (const itemInput of input.items) {
-            const product = await this.productRepository.findById(itemInput.productId);
+            const product = productMap.get(itemInput.productId);
             if (!product) {
-                throw new Error(`Product with ID ${itemInput.productId} not found`);
+                throw AppError.notFound(`Product with ID ${itemInput.productId}`);
             }
             if (!product.isAvailable) {
-                throw new Error(`Product ${product.name} is currently unavailable`);
+                throw AppError.badInput(`Product ${product.name} is currently unavailable`);
             }
 
             // Use DB price for security, or validate input price
@@ -95,7 +101,7 @@ export class OrderService {
 
         const restaurantCount = orderBusinesses.filter((b) => b.businessType === 'RESTAURANT').length;
         if (restaurantCount > 1) {
-            throw new GraphQLError('You can only order from one restaurant at a time. Please remove items from one restaurant before adding from another.');
+            throw AppError.businessRule('You can only order from one restaurant at a time. Please remove items from one restaurant before adding from another.');
         }
 
         // 2b. Check that all businesses are currently open
@@ -120,7 +126,7 @@ export class OrderService {
                             ? currentMinutes >= biz.opensAt || currentMinutes < biz.closesAt
                             : currentMinutes >= biz.opensAt && currentMinutes < biz.closesAt;
                     if (!isOpenLegacy) {
-                        throw new GraphQLError(`Business "${biz.name}" is currently closed.`);
+                        throw AppError.businessRule(`Business "${biz.name}" is currently closed.`);
                     }
                 }
             } else {
@@ -132,7 +138,7 @@ export class OrderService {
                 });
                 if (!isOpenNow) {
                     const [biz] = await db.select().from(businessesTable).where(eq(businessesTable.id, bizId));
-                    throw new GraphQLError(`Business "${biz?.name ?? bizId}" is currently closed.`);
+                    throw AppError.businessRule(`Business "${biz?.name ?? bizId}" is currently closed.`);
                 }
             }
         }
@@ -153,7 +159,7 @@ export class OrderService {
         );
 
         if (input.promoCode && promoResult.promotions.length === 0) {
-            throw new Error('Invalid promo code');
+            throw AppError.badInput('Invalid promo code');
         }
 
         const effectiveOrderPrice = promoResult.finalSubtotal;
@@ -162,7 +168,7 @@ export class OrderService {
 
         // Verify total price matches client input (allow small float error)
         if (Math.abs(totalOrderPrice - input.totalPrice) > 0.01) {
-            throw new Error(`Price mismatch: Calculated ${totalOrderPrice}, provided ${input.totalPrice}`);
+            throw AppError.badInput(`Price mismatch: Calculated ${totalOrderPrice}, provided ${input.totalPrice}`);
         }
 
         const orderData = {
@@ -180,7 +186,7 @@ export class OrderService {
         const createdOrder = await this.orderRepository.create(orderData, itemsToCreate);
 
         if (!createdOrder) {
-            throw new GraphQLError('Failed to create order: no items were associated or the database insert failed');
+            throw AppError.businessRule('Failed to create order: no items were associated or the database insert failed');
         }
 
         await this.updateUserBehaviorOnOrderCreated(userId, createdOrder.orderDate || null);
@@ -226,24 +232,29 @@ export class OrderService {
             }
         }
 
-        // Decrement stock for ordered products (ensure it doesn't go below 0)
+        // Decrement stock for ordered products atomically (prevent overselling)
         for (const item of itemsToCreate) {
-            // Check if productStock entry exists
-            const existingStock = await db.select().from(productStocksTable)
-                .where(eq(productStocksTable.productId, item.productId))
-                .then(rows => rows[0]);
+            // Atomic: UPDATE stock = stock - quantity WHERE stock >= quantity
+            const updated = await db.update(productStocksTable)
+                .set({ stock: sql`${productStocksTable.stock} - ${item.quantity}` })
+                .where(and(
+                    eq(productStocksTable.productId, item.productId),
+                    gte(productStocksTable.stock, item.quantity),
+                ))
+                .returning();
 
-            if (existingStock) {
-                // Update existing stock
-                await db.update(productStocksTable)
-                    .set({ stock: sql`GREATEST(0, ${productStocksTable.stock} - ${item.quantity})` })
-                    .where(eq(productStocksTable.productId, item.productId));
-            } else {
-                // Create stock entry (assume starting at 0 and going negative if oversold)
-                await db.insert(productStocksTable).values({
-                    productId: item.productId,
-                    stock: Math.max(0, 0 - item.quantity),
-                }).onConflictDoNothing();
+            // If no rows updated, either no stock entry exists (untracked) or insufficient stock
+            if (updated.length === 0) {
+                // Check if a stock entry exists at all
+                const existingStock = await db.select().from(productStocksTable)
+                    .where(eq(productStocksTable.productId, item.productId))
+                    .then(rows => rows[0]);
+
+                if (existingStock) {
+                    // Stock entry exists but insufficient — oversold
+                    throw AppError.badInput(`Insufficient stock for product. Only ${existingStock.stock} available.`);
+                }
+                // No stock entry = product doesn't track stock, proceed normally
             }
         }
 
@@ -418,7 +429,34 @@ export class OrderService {
         return Promise.all(dbOrders.map((order) => this.mapToOrder(order)));
     }
 
-    async updateOrderStatus(id: string, status: OrderStatus): Promise<Order> {
+    // Valid order status transitions (state machine)
+    private static readonly VALID_TRANSITIONS: Record<string, OrderStatus[]> = {
+        PENDING: ['PREPARING', 'CANCELLED'],
+        PREPARING: ['READY', 'CANCELLED'],
+        READY: ['OUT_FOR_DELIVERY', 'CANCELLED'],
+        OUT_FOR_DELIVERY: ['DELIVERED', 'CANCELLED'],
+        DELIVERED: [],
+        CANCELLED: [],
+    };
+
+    private async validateStatusTransition(orderId: string, newStatus: OrderStatus): Promise<void> {
+        const order = await this.orderRepository.findById(orderId);
+        if (!order) {
+            throw AppError.notFound('Order');
+        }
+        const currentStatus = order.status as OrderStatus;
+        const allowed = OrderService.VALID_TRANSITIONS[currentStatus];
+        if (!allowed || !allowed.includes(newStatus)) {
+            throw AppError.businessRule(
+                `Invalid status transition: ${currentStatus} → ${newStatus}`,
+            );
+        }
+    }
+
+    async updateOrderStatus(id: string, status: OrderStatus, skipValidation = false): Promise<Order> {
+        if (!skipValidation) {
+            await this.validateStatusTransition(id, status);
+        }
         // Set timestamp based on status transition
         const timestampMap: Record<string, 'readyAt' | 'outForDeliveryAt' | 'deliveredAt'> = {
             READY: 'readyAt',
@@ -433,7 +471,7 @@ export class OrderService {
             updated = await this.orderRepository.updateStatus(id, status);
         }
         if (!updated) {
-            throw new Error('Order not found');
+            throw AppError.notFound('Order');
         }
         return this.mapToOrder(updated);
     }
@@ -441,7 +479,7 @@ export class OrderService {
     async startPreparing(id: string, preparationMinutes: number): Promise<Order> {
         const updated = await this.orderRepository.startPreparing(id, preparationMinutes);
         if (!updated) {
-            throw new Error('Order not found or not in PENDING status');
+            throw AppError.notFound('Order not found or not in PENDING status');
         }
         return this.mapToOrder(updated);
     }
@@ -449,7 +487,7 @@ export class OrderService {
     async updatePreparationTime(id: string, preparationMinutes: number): Promise<Order> {
         const updated = await this.orderRepository.updatePreparationTime(id, preparationMinutes);
         if (!updated) {
-            throw new Error('Order not found or not in PREPARING status');
+            throw AppError.notFound('Order not found or not in PREPARING status');
         }
         return this.mapToOrder(updated);
     }
@@ -460,15 +498,15 @@ export class OrderService {
             updated = await this.orderRepository.updateStatusAndDriver(id, status, driverId, 'PREPARING');
         }
         if (!updated) {
-            throw new Error('Order already assigned or not ready');
+            throw AppError.conflict('Order already assigned or not ready');
         }
         return this.mapToOrder(updated);
     }
 
-    async assignDriverToOrder(id: string, driverId: string | null): Promise<Order> {
-        const updated = await this.orderRepository.assignDriver(id, driverId);
+    async assignDriverToOrder(id: string, driverId: string | null, onlyIfUnassigned = false): Promise<Order | null> {
+        const updated = await this.orderRepository.assignDriver(id, driverId, onlyIfUnassigned);
         if (!updated) {
-            throw new Error('Order not found');
+            return null;
         }
         return this.mapToOrder(updated);
     }
@@ -477,7 +515,7 @@ export class OrderService {
         // Get the order to retrieve its items
         const dbOrder = await this.orderRepository.findById(id);
         if (!dbOrder) {
-            throw new Error('Order not found');
+            throw AppError.notFound('Order');
         }
 
         // Get order items
@@ -505,6 +543,10 @@ export class OrderService {
         }
 
         const order = await this.updateOrderStatus(id, 'CANCELLED');
+
+        // Reverse promotion usage for this cancelled order
+        const promotionEngine = new PromotionEngine(db);
+        await promotionEngine.reverseUsage(id, dbOrder.userId);
 
         // Void any pending financial settlements for this order
         const financialService = new FinancialService(db);
@@ -640,10 +682,10 @@ export class OrderService {
     }
 
     async publishAllOrders() {
-        // Fetch ALL orders (not just uncompleted) to show both active and completed
-        const allOrders = await this.orderRepository.findAll();
+        // Only publish uncompleted orders for real-time updates (DELIVERED/CANCELLED are static)
+        const uncompletedOrders = await this.orderRepository.findUncompleted();
         const orders: Order[] = [];
-        for (const dbOrder of allOrders) {
+        for (const dbOrder of uncompletedOrders) {
             const order = await this.mapToOrder(dbOrder);
             orders.push(order);
         }
@@ -664,24 +706,24 @@ export class OrderService {
 
     async getOrdersByBusinessId(businessId: string): Promise<Order[]> {
         try {
-            // Get all orders
-            const allOrders = await this.getAllOrders();
-            
-            // Filter orders that contain at least one item from this business
-            const filteredOrders: Order[] = [];
-            
-            for (const order of allOrders) {
-                // Check if any business in the order matches the businessId
-                const hasBusinessItems = order.businesses.some(
-                    orderBusiness => orderBusiness.business.id === businessId
-                );
-                
-                if (hasBusinessItems) {
-                    filteredOrders.push(order);
-                }
-            }
-            
-            return filteredOrders;
+            // Single query: find order IDs that contain items from this business
+            const db = await getDB();
+            const orderIds = await db
+                .selectDistinct({ orderId: orderItemsTable.orderId })
+                .from(orderItemsTable)
+                .innerJoin(productsTable, eq(orderItemsTable.productId, productsTable.id))
+                .where(eq(productsTable.businessId, businessId))
+                .then(rows => rows.map(r => r.orderId));
+
+            if (orderIds.length === 0) return [];
+
+            // Fetch only the matched orders
+            const dbOrders = await db.query.orders.findMany({
+                where: inArray(ordersTable.id, orderIds),
+                orderBy: (tbl, { desc }) => [desc(tbl.createdAt)],
+            });
+
+            return Promise.all(dbOrders.map(o => this.mapToOrder(o)));
         } catch (error) {
             log.error({ err: error, businessId }, 'order:filterByBusiness:error');
             throw error;

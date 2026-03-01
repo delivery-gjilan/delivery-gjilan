@@ -3,6 +3,7 @@ import { users } from '@/database/schema/users';
 import { userBehaviors } from '@/database/schema/userBehaviors';
 import { eq, gt, gte, lt, lte, ne, inArray, and, or, SQL } from 'drizzle-orm';
 import logger from '@/lib/logger';
+import { AppError } from '@/lib/errors';
 
 /**
  * Query structure for the notification query builder.
@@ -79,7 +80,7 @@ export class UserQueryService {
     async resolveUserIds(query: Record<string, unknown>): Promise<string[]> {
         const group = query as unknown as Group;
         if (!group.rules || !group.operator) {
-            throw new Error('Invalid query structure: must have operator and rules');
+            throw AppError.badInput('Invalid query structure: must have operator and rules');
         }
 
         const needsBehaviorJoin = this.checkNeedsBehaviorJoin(group);
@@ -120,7 +121,7 @@ export class UserQueryService {
     private buildWhere(item: Rule | Group): SQL {
         if (isGroup(item)) {
             const conditions = item.rules.map((r) => this.buildWhere(r));
-            if (conditions.length === 0) throw new Error('Empty rule group');
+            if (conditions.length === 0) throw AppError.badInput('Empty rule group');
             if (item.operator === 'AND') return and(...conditions)!;
             return or(...conditions)!;
         }
@@ -131,7 +132,7 @@ export class UserQueryService {
     private buildCondition(rule: Rule): SQL {
         const column = fieldMap[rule.field as FieldName];
         if (!column) {
-            throw new Error(`Unknown query field: ${rule.field}`);
+            throw AppError.badInput(`Unknown query field: ${rule.field}`);
         }
 
         switch (rule.op) {
@@ -148,10 +149,10 @@ export class UserQueryService {
             case 'lte':
                 return lte(column, rule.value as string);
             case 'in':
-                if (!Array.isArray(rule.value)) throw new Error(`'in' operator requires an array value`);
+                if (!Array.isArray(rule.value)) throw AppError.badInput(`'in' operator requires an array value`);
                 return inArray(column, rule.value as string[]);
             default:
-                throw new Error(`Unknown operator: ${rule.op}`);
+                throw AppError.badInput(`Unknown operator: ${rule.op}`);
         }
     }
 }

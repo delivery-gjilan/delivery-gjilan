@@ -5,6 +5,7 @@ import { DriverRepository } from '@/repositories/DriverRepository';
 import { DbOrder, DbOrderItem, products as productsTable } from '@/database/schema';
 import { inArray } from 'drizzle-orm';
 import logger from '@/lib/logger';
+import { AppError } from '@/lib/errors';
 
 const log = logger.child({ service: 'FinancialService' });
 
@@ -148,7 +149,7 @@ export class FinancialService {
      */
     async updateDriverCommission(driverId: string, percentage: number): Promise<void> {
         if (percentage < 0 || percentage > 100) {
-            throw new Error('Commission percentage must be between 0 and 100');
+            throw AppError.badInput('Commission percentage must be between 0 and 100');
         }
 
         // Implementation would update driver's commission percentage
@@ -159,7 +160,7 @@ export class FinancialService {
      */
     async updateBusinessCommission(businessId: string, percentage: number): Promise<void> {
         if (percentage < 0 || percentage > 100) {
-            throw new Error('Commission percentage must be between 0 and 100');
+            throw AppError.badInput('Commission percentage must be between 0 and 100');
         }
 
         // Implementation would update business's commission percentage

@@ -6,10 +6,12 @@ import { useCart } from '@/modules/cart/hooks/useCart';
 import { useCartActions } from '@/modules/cart/hooks/useCartActions';
 import { Product } from '@/gql/graphql';
 import { GET_BUSINESS } from '@/graphql/operations/businesses';
+import { useTranslations } from '@/hooks/useTranslations';
 
 export function useProductActions(product: Partial<Product>) {
     const { items } = useCart();
     const { addItem, updateQuantity, removeItem } = useCartActions();
+    const { t } = useTranslations();
 
     // Fetch business type (should be cached from business screen)
     const { data: businessData } = useQuery(GET_BUSINESS, {
@@ -53,7 +55,7 @@ export function useProductActions(product: Partial<Product>) {
         });
 
         if (error) {
-            Alert.alert('Cannot Add Item', error);
+            Alert.alert(t.product.cannot_add_item, error);
             return;
         }
 

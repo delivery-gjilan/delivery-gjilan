@@ -4,6 +4,7 @@ import { hashPassword, comparePassword, generateVerificationCode } from '@/lib/u
 import jwt from 'jsonwebtoken';
 import { AuthResponse, SignupStepResponse } from '@/generated/types.generated';
 import logger from '@/lib/logger';
+import { AppError } from '@/lib/errors';
 
 const log = logger.child({ service: 'AuthService' });
 
@@ -18,14 +19,42 @@ export class AuthService {
         return secret;
     }
 
+    private getRefreshSecret(): string {
+        const secret = process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET;
+        if (!secret) {
+            throw new Error('REFRESH_TOKEN_SECRET is not defined in environment variables');
+        }
+        return secret;
+    }
+
     /**
      * Step 1: Initiate signup - Create user, generate email verification code, and return JWT token
      */
     async initiateSignup(firstName: string, lastName: string, email: string, password: string, referralCode?: string): Promise<AuthResponse> {
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            throw AppError.badInput('Invalid email format');
+        }
+
+        // Normalize email
+        email = email.trim().toLowerCase();
+
+        // Validate password strength
+        if (password.length < 8) {
+            throw AppError.badInput('Password must be at least 8 characters long');
+        }
+        if (!/[A-Z]/.test(password)) {
+            throw AppError.badInput('Password must contain at least one uppercase letter');
+        }
+        if (!/[0-9]/.test(password)) {
+            throw AppError.badInput('Password must contain at least one number');
+        }
+
         // Check if user already exists
         const existingUser = await this.authRepository.findByEmail(email);
         if (existingUser) {
-            throw new Error('User with this email already exists');
+            throw AppError.conflict('User with this email already exists');
         }
 
         // If referral code provided, validate it
@@ -33,7 +62,7 @@ export class AuthService {
         if (referralCode) {
             referrerUserId = await this.authRepository.findUserByReferralCode(referralCode);
             if (!referrerUserId) {
-                throw new Error('Invalid referral code');
+                throw AppError.badInput('Invalid referral code');
             }
         }
 
@@ -72,7 +101,7 @@ export class AuthService {
         const user = await this.authRepository.verifyEmailCode(userId, code);
 
         if (!user) {
-            throw new Error('Invalid verification code');
+            throw AppError.badInput('Invalid verification code');
         }
 
         return {
@@ -89,11 +118,11 @@ export class AuthService {
         const user = await this.authRepository.findById(userId);
 
         if (!user) {
-            throw new Error('User not found');
+            throw AppError.notFound('User');
         }
 
         if (user.emailVerified) {
-            throw new Error('Email is already verified');
+            throw AppError.conflict('Email is already verified');
         }
 
         // Generate and set new email verification code
@@ -117,16 +146,16 @@ export class AuthService {
         const user = await this.authRepository.findById(userId);
 
         if (!user) {
-            throw new Error('User not found');
+            throw AppError.notFound('User');
         }
 
         if (!user.emailVerified) {
-            throw new Error('Please verify your email first');
+            throw AppError.businessRule('Please verify your email first');
         }
 
         // Allow resubmission if phone not verified yet
         if (user.phoneVerified) {
-            throw new Error('Phone number is already verified');
+            throw AppError.conflict('Phone number is already verified');
         }
 
         // Set phone number
@@ -153,7 +182,7 @@ export class AuthService {
         const user = await this.authRepository.verifyPhoneCode(userId, code);
 
         if (!user) {
-            throw new Error('Invalid verification code');
+            throw AppError.badInput('Invalid verification code');
         }
 
         return {
@@ -167,24 +196,25 @@ export class AuthService {
      * Login with email and password
      */
     async login(email: string, password: string): Promise<AuthResponse> {
+        // Normalize email to lowercase for consistent lookup
+        email = email.trim().toLowerCase();
         const user = await this.authRepository.findByEmail(email);
 
         if (!user) {
             log.warn({ email }, 'auth:login:userNotFound');
-            throw new Error('Invalid email or password');
+            throw AppError.badInput('Invalid email or password');
         }
 
-        log.info({ userId: user.id, email: user.email, role: user.role, storedPasswordHash: user.password, loginPassword: password }, 'auth:login:userFound'); // TEMP: log passwords
+        log.info({ userId: user.id, email: user.email, role: user.role }, 'auth:login:userFound');
 
         // Allow login at any signup stage - user will be redirected based on signupStep
 
         // Verify password
         const isPasswordValid = await comparePassword(password, user.password);
-        log.info({ userId: user.id, isPasswordValid, hashedPasswordLength: user.password.length, providedPassword: password }, 'auth:login:passwordVerification'); // TEMP
         
         if (!isPasswordValid) {
             log.warn({ userId: user.id, email }, 'auth:login:invalidPassword');
-            throw new Error('Invalid email or password');
+            throw AppError.badInput('Invalid email or password');
         }
 
         // Generate JWT token (eternal - no expiration)
@@ -198,13 +228,42 @@ export class AuthService {
     }
 
     /**
-     * Generate JWT token without expiration
+     * Generate JWT access token with short expiration (15 minutes)
      */
     async generateJWT(userId: string): Promise<string> {
         const secret = this.getJwtSecret();
         const user = await this.authRepository.findById(userId);
-        if (!user) throw new Error('User not found');
-        return jwt.sign({ userId, role: user.role, businessId: user.businessId }, secret);
+        if (!user) throw AppError.notFound('User');
+        return jwt.sign({ userId, role: user.role, businessId: user.businessId }, secret, { algorithm: 'HS256', expiresIn: '15m' });
+    }
+
+    /**
+     * Generate a longer-lived refresh token (30 days) with a separate secret
+     */
+    async generateRefreshToken(userId: string): Promise<string> {
+        const secret = this.getRefreshSecret();
+        return jwt.sign({ userId, type: 'refresh' }, secret, { algorithm: 'HS256', expiresIn: '30d' });
+    }
+
+    /**
+     * Refresh an access token using a valid refresh token
+     */
+    async refreshAccessToken(refreshToken: string): Promise<{ token: string; refreshToken: string }> {
+        try {
+            const secret = this.getRefreshSecret();
+            const decoded = jwt.verify(refreshToken, secret, { algorithms: ['HS256'] }) as { userId: string; type?: string };
+            if (decoded.type !== 'refresh') {
+                throw AppError.unauthorized('Invalid refresh token');
+            }
+            const user = await this.authRepository.findById(decoded.userId);
+            if (!user) throw AppError.notFound('User');
+            const newToken = await this.generateJWT(decoded.userId);
+            const newRefreshToken = await this.generateRefreshToken(decoded.userId);
+            return { token: newToken, refreshToken: newRefreshToken };
+        } catch (err) {
+            if (err instanceof AppError) throw err;
+            throw AppError.unauthorized('Invalid or expired refresh token');
+        }
     }
 
     /**
@@ -213,7 +272,7 @@ export class AuthService {
     async verifyJWT(token: string): Promise<DbUser | null> {
         try {
             const secret = this.getJwtSecret();
-            const decoded = jwt.verify(token, secret) as { userId: string };
+            const decoded = jwt.verify(token, secret, { algorithms: ['HS256'] }) as { userId: string };
             const user = await this.authRepository.findById(decoded.userId);
             return user || null;
         } catch (error) {
@@ -240,22 +299,35 @@ export class AuthService {
         role: 'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN' | 'ADMIN' | 'BUSINESS_OWNER' | 'BUSINESS_EMPLOYEE',
         businessId?: string,
     ): Promise<AuthResponse> {
+        // Normalize email to lowercase to ensure consistent lookup
+        email = email.trim().toLowerCase();
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            throw AppError.badInput('Invalid email format');
+        }
+
+        // Validate password strength
+        if (password.length < 8) {
+            throw AppError.badInput('Password must be at least 8 characters long');
+        }
+
         // Check if user already exists
         const existingUser = await this.authRepository.findByEmail(email);
         if (existingUser) {
-            throw new Error('User with this email already exists');
+            throw AppError.conflict('User with this email already exists');
         }
 
         // Validate businessId for business roles
         if ((role === 'BUSINESS_OWNER' || role === 'BUSINESS_EMPLOYEE') && !businessId) {
-            throw new Error(`Business ID is required for ${role} role`);
+            throw AppError.badInput(`Business ID is required for ${role} role`);
         }
 
-        log.info({ email, role, password, passwordLength: password.length }, 'auth:createUser:starting'); // TEMP: log password for debugging
+        log.info({ email, role }, 'auth:createUser:starting');
 
         // Hash password
         const hashedPassword = await hashPassword(password);
-        log.info({ email, hashedPassword, hashedPasswordLength: hashedPassword.length }, 'auth:createUser:passwordHashed'); // TEMP: log hash
 
         // Create user with role and completed status
         const user = await this.authRepository.createUserWithRole(
@@ -267,7 +339,7 @@ export class AuthService {
             businessId,
         );
 
-        log.info({ userId: user.id, email: user.email, role: user.role, savedPasswordHash: user.password }, 'auth:createUser:userCreated'); // TEMP: log saved hash
+        log.info({ userId: user.id, email: user.email, role: user.role }, 'auth:createUser:userCreated');
 
         // Generate JWT token
         const token = await this.generateJWT(user.id);

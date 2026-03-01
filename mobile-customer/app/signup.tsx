@@ -3,14 +3,16 @@ import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { SignupStep } from '@/gql/graphql';
+import { useTranslations } from '@/hooks/useTranslations';
+import type { Translation } from '@/localization/schema';
 
-const STEP_CONFIG: Record<SignupStep, { number: number; title: string; description: string }> = {
-    INITIAL: { number: 1, title: 'Create Account', description: 'Enter your basic information' },
-    EMAIL_SENT: { number: 2, title: 'Verify Email', description: 'Check your email for the verification code' },
-    EMAIL_VERIFIED: { number: 3, title: 'Add Phone', description: 'Provide your phone number' },
-    PHONE_SENT: { number: 4, title: 'Verify Phone', description: 'Check your SMS for the verification code' },
-    COMPLETED: { number: 5, title: 'Complete', description: 'Account setup complete!' },
-};
+const getStepConfig = (t: Translation): Record<SignupStep, { number: number; title: string; description: string }> => ({
+    INITIAL: { number: 1, title: t.auth.signup.step_titles.create_account, description: t.auth.signup.step_titles.create_account_desc },
+    EMAIL_SENT: { number: 2, title: t.auth.signup.step_titles.verify_email, description: t.auth.signup.step_titles.verify_email_desc },
+    EMAIL_VERIFIED: { number: 3, title: t.auth.signup.step_titles.add_phone, description: t.auth.signup.step_titles.add_phone_desc },
+    PHONE_SENT: { number: 4, title: t.auth.signup.step_titles.verify_phone, description: t.auth.signup.step_titles.verify_phone_desc },
+    COMPLETED: { number: 5, title: t.auth.signup.step_titles.complete, description: t.auth.signup.step_titles.complete_desc },
+});
 
 export default function SignupScreen() {
     const {
@@ -24,6 +26,9 @@ export default function SignupScreen() {
         loading: authLoading,
     } = useAuth();
     const router = useRouter();
+    const { t } = useTranslations();
+
+    const STEP_CONFIG = getStepConfig(t);
 
     // Step 1: Account details
     const [firstName, setFirstName] = useState('');
@@ -49,11 +54,11 @@ export default function SignupScreen() {
 
     const handleInitiateSignup = async () => {
         if (!firstName.trim() || !lastName.trim() || !email.trim() || !password.trim()) {
-            setError('Please fill in all fields');
+            setError(t.auth.signup.fill_all_fields);
             return;
         }
         if (password.length < 6) {
-            setError('Password must be at least 6 characters');
+            setError(t.auth.signup.password_min_length);
             return;
         }
 
@@ -68,7 +73,7 @@ export default function SignupScreen() {
             setPassword('');
             setReferralCode('');
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Signup failed');
+            setError(err instanceof Error ? err.message : t.auth.signup.signup_failed);
         } finally {
             setLoading(false);
         }
@@ -76,7 +81,7 @@ export default function SignupScreen() {
 
     const handleVerifyEmail = async () => {
         if (!emailCode.trim()) {
-            setError('Please enter the verification code');
+            setError(t.auth.signup.enter_verification_code);
             return;
         }
 
@@ -86,7 +91,7 @@ export default function SignupScreen() {
             await verifyEmail(emailCode);
             setEmailCode('');
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Email verification failed');
+            setError(err instanceof Error ? err.message : t.auth.signup.email_verification_failed);
         } finally {
             setLoading(false);
         }
@@ -94,7 +99,7 @@ export default function SignupScreen() {
 
     const handleSubmitPhoneNumber = async () => {
         if (!phoneNumber.trim()) {
-            setError('Please enter your phone number');
+            setError(t.auth.signup.enter_phone);
             return;
         }
 
@@ -104,7 +109,7 @@ export default function SignupScreen() {
             await submitPhoneNumber(phoneNumber);
             // Don't clear phone number - keep it for potential resubmission
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to submit phone number');
+            setError(err instanceof Error ? err.message : t.auth.signup.phone_submit_failed);
         } finally {
             setLoading(false);
         }
@@ -112,7 +117,7 @@ export default function SignupScreen() {
 
     const handleVerifyPhone = async () => {
         if (!phoneCode.trim()) {
-            setError('Please enter the verification code');
+            setError(t.auth.signup.enter_verification_code);
             return;
         }
 
@@ -126,7 +131,7 @@ export default function SignupScreen() {
                 router.replace('/(tabs)/home');
             }, 500);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Phone verification failed');
+            setError(err instanceof Error ? err.message : t.auth.signup.phone_verification_failed);
         } finally {
             setLoading(false);
         }
@@ -135,10 +140,10 @@ export default function SignupScreen() {
     // Step Progress Indicator
     const StepIndicator = () => {
         const steps = [
-            { num: 1, label: 'Account', key: 'INITIAL' },
-            { num: 2, label: 'Email', key: 'EMAIL_SENT' },
-            { num: 3, label: 'Phone', key: 'EMAIL_VERIFIED' },
-            { num: 4, label: 'Verify', key: 'PHONE_SENT' },
+            { num: 1, label: t.auth.signup.steps.account, key: 'INITIAL' },
+            { num: 2, label: t.auth.signup.steps.email, key: 'EMAIL_SENT' },
+            { num: 3, label: t.auth.signup.steps.phone, key: 'EMAIL_VERIFIED' },
+            { num: 4, label: t.auth.signup.steps.verify, key: 'PHONE_SENT' },
         ];
 
         const currentStepNumber = stepConfig.number;
@@ -202,10 +207,10 @@ export default function SignupScreen() {
                 {currentStep === 'INITIAL' && (
                     <View>
                         <View className="mb-4">
-                            <Text className="text-gray-700 font-semibold mb-2">First Name</Text>
+                            <Text className="text-gray-700 font-semibold mb-2">{t.auth.signup.first_name}</Text>
                             <TextInput
                                 className="border border-gray-300 rounded-lg px-4 py-3 text-gray-900"
-                                placeholder="Enter your first name"
+                                placeholder={t.auth.signup.first_name_placeholder}
                                 value={firstName}
                                 onChangeText={setFirstName}
                                 editable={!loading}
@@ -213,10 +218,10 @@ export default function SignupScreen() {
                         </View>
 
                         <View className="mb-4">
-                            <Text className="text-gray-700 font-semibold mb-2">Last Name</Text>
+                            <Text className="text-gray-700 font-semibold mb-2">{t.auth.signup.last_name}</Text>
                             <TextInput
                                 className="border border-gray-300 rounded-lg px-4 py-3 text-gray-900"
-                                placeholder="Enter your last name"
+                                placeholder={t.auth.signup.last_name_placeholder}
                                 value={lastName}
                                 onChangeText={setLastName}
                                 editable={!loading}
@@ -224,10 +229,10 @@ export default function SignupScreen() {
                         </View>
 
                         <View className="mb-4">
-                            <Text className="text-gray-700 font-semibold mb-2">Email</Text>
+                            <Text className="text-gray-700 font-semibold mb-2">{t.auth.signup.email_label}</Text>
                             <TextInput
                                 className="border border-gray-300 rounded-lg px-4 py-3 text-gray-900"
-                                placeholder="Enter your email"
+                                placeholder={t.auth.signup.email_placeholder}
                                 value={email}
                                 onChangeText={setEmail}
                                 editable={!loading}
@@ -237,10 +242,10 @@ export default function SignupScreen() {
                         </View>
 
                         <View className="mb-6">
-                            <Text className="text-gray-700 font-semibold mb-2">Password</Text>
+                            <Text className="text-gray-700 font-semibold mb-2">{t.auth.signup.password_label}</Text>
                             <TextInput
                                 className="border border-gray-300 rounded-lg px-4 py-3 text-gray-900"
-                                placeholder="Enter your password (min 6 characters)"
+                                placeholder={t.auth.signup.password_placeholder}
                                 value={password}
                                 onChangeText={setPassword}
                                 editable={!loading}
@@ -249,17 +254,17 @@ export default function SignupScreen() {
                         </View>
 
                         <View className="mb-6">
-                            <Text className="text-gray-700 font-semibold mb-2">Referral Code (Optional)</Text>
+                            <Text className="text-gray-700 font-semibold mb-2">{t.auth.signup.referral_code_label}</Text>
                             <TextInput
                                 className="border border-gray-300 rounded-lg px-4 py-3 text-gray-900"
-                                placeholder="Enter referral code if you have one"
+                                placeholder={t.auth.signup.referral_code_placeholder}
                                 value={referralCode}
                                 onChangeText={(text) => setReferralCode(text.toUpperCase())}
                                 editable={!loading}
                                 autoCapitalize="characters"
                             />
                             <Text className="text-xs text-gray-500 mt-1">
-                                Get rewarded when you use a friend's referral code
+                                {t.auth.signup.referral_code_hint}
                             </Text>
                         </View>
 
@@ -273,7 +278,7 @@ export default function SignupScreen() {
                             {loading ? (
                                 <ActivityIndicator color="white" />
                             ) : (
-                                <Text className="text-white font-semibold text-base">Continue</Text>
+                                <Text className="text-white font-semibold text-base">{t.common.continue}</Text>
                             )}
                         </TouchableOpacity>
                     </View>
@@ -283,16 +288,15 @@ export default function SignupScreen() {
                 {currentStep === 'EMAIL_SENT' && (
                     <View>
                         <Text className="text-gray-600 mb-4">
-                            We&apos;ve sent a verification code to {user?.email}. Please check your email and enter the
-                            code below.
+                            {t.auth.signup.email_sent} {user?.email}. {t.auth.signup.phone_verification_instruction}
                         </Text>
 
                         <View className="mb-6">
-                            <Text className="text-gray-700 font-semibold mb-2">Verification Code</Text>
+                            <Text className="text-gray-700 font-semibold mb-2">{t.auth.signup.verification_code}</Text>
                             <TextInput
                                 className="border border-gray-300 rounded-lg px-4 py-3 text-gray-900 
                                 text-center text-xl tracking-widest"
-                                placeholder="000000"
+                                placeholder={t.auth.signup.verification_code_placeholder}
                                 value={emailCode}
                                 onChangeText={setEmailCode}
                                 editable={!loading}
@@ -311,7 +315,7 @@ export default function SignupScreen() {
                             {loading ? (
                                 <ActivityIndicator color="white" />
                             ) : (
-                                <Text className="text-white font-semibold text-base">Verify Email</Text>
+                                <Text className="text-white font-semibold text-base">{t.auth.signup.verify_email_button}</Text>
                             )}
                         </TouchableOpacity>
 
@@ -323,14 +327,14 @@ export default function SignupScreen() {
                                     await resendEmailVerification();
                                     setError(null);
                                 } catch (err) {
-                                    setError(err instanceof Error ? err.message : 'Failed to resend code');
+                                    setError(err instanceof Error ? err.message : t.auth.signup.resend_failed);
                                 } finally {
                                     setLoading(false);
                                 }
                             }}
                             disabled={loading}
                         >
-                            <Text className="text-blue-600 text-center font-semibold">Resend Code</Text>
+                            <Text className="text-blue-600 text-center font-semibold">{t.auth.signup.resend_code}</Text>
                         </TouchableOpacity>
                     </View>
                 )}
@@ -339,14 +343,14 @@ export default function SignupScreen() {
                 {currentStep === 'EMAIL_VERIFIED' && (
                     <View>
                         <Text className="text-gray-600 mb-4">
-                            We need your phone number to send you verification codes and important updates.
+                            {t.auth.signup.phone_instruction}
                         </Text>
 
                         <View className="mb-6">
-                            <Text className="text-gray-700 font-semibold mb-2">Phone Number</Text>
+                            <Text className="text-gray-700 font-semibold mb-2">{t.auth.signup.phone_label}</Text>
                             <TextInput
                                 className="border border-gray-300 rounded-lg px-4 py-3 text-gray-900"
-                                placeholder="+1 (555) 123-4567"
+                                placeholder={t.auth.signup.phone_placeholder}
                                 value={phoneNumber}
                                 onChangeText={setPhoneNumber}
                                 editable={!loading}
@@ -364,7 +368,7 @@ export default function SignupScreen() {
                             {loading ? (
                                 <ActivityIndicator color="white" />
                             ) : (
-                                <Text className="text-white font-semibold text-base">Continue</Text>
+                                <Text className="text-white font-semibold text-base">{t.common.continue}</Text>
                             )}
                         </TouchableOpacity>
                     </View>
@@ -374,16 +378,15 @@ export default function SignupScreen() {
                 {currentStep === 'PHONE_SENT' && (
                     <View>
                         <Text className="text-gray-600 mb-4">
-                            We&apos;ve sent a verification code to {user?.phoneNumber}. Please check your messages and
-                            enter the code below.
+                            {t.auth.signup.phone_verification_sent} {user?.phoneNumber}. {t.auth.signup.phone_verification_instruction}
                         </Text>
 
                         <View className="mb-6">
-                            <Text className="text-gray-700 font-semibold mb-2">Verification Code</Text>
+                            <Text className="text-gray-700 font-semibold mb-2">{t.auth.signup.verification_code}</Text>
                             <TextInput
                                 className="border border-gray-300 rounded-lg px-4 py-3 text-gray-900 text-center 
                                 text-xl tracking-widest"
-                                placeholder="000000"
+                                placeholder={t.auth.signup.verification_code_placeholder}
                                 value={phoneCode}
                                 onChangeText={setPhoneCode}
                                 editable={!loading}
@@ -402,7 +405,7 @@ export default function SignupScreen() {
                             {loading ? (
                                 <ActivityIndicator color="white" />
                             ) : (
-                                <Text className="text-white font-semibold text-base">Complete Signup</Text>
+                                <Text className="text-white font-semibold text-base">{t.auth.signup.complete_signup}</Text>
                             )}
                         </TouchableOpacity>
 
@@ -414,7 +417,7 @@ export default function SignupScreen() {
                             }}
                             disabled={loading}
                         >
-                            <Text className="text-blue-600 text-center font-semibold">Change Phone Number</Text>
+                            <Text className="text-blue-600 text-center font-semibold">{t.auth.signup.change_phone}</Text>
                         </TouchableOpacity>
                     </View>
                 )}

@@ -1,4 +1,5 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
+import { AppError } from '@/lib/errors';
 
 export const createCampaign: NonNullable<MutationResolvers['createCampaign']> = async (
     _parent,
@@ -6,7 +7,7 @@ export const createCampaign: NonNullable<MutationResolvers['createCampaign']> = 
     { userData, notificationService },
 ) => {
     if (!userData.role || !['SUPER_ADMIN', 'ADMIN'].includes(userData.role)) {
-        throw new Error('Only admins can create campaigns');
+        throw AppError.forbidden('Only admins can create campaigns');
     }
 
     const campaign = await notificationService.repo.createCampaign({

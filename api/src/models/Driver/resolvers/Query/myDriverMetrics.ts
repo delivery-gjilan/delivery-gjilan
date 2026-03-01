@@ -1,10 +1,11 @@
 import type { QueryResolvers } from './../../../../generated/types.generated';
 import { drivers as driversTable, orders as ordersTable, settlements as settlementsTable } from '@/database/schema';
 import { eq, and, gte, notInArray } from 'drizzle-orm';
+import { AppError } from '@/lib/errors';
 
 export const myDriverMetrics: NonNullable<QueryResolvers['myDriverMetrics']> = async (_parent, _arg, { userData, db }) => {
     if (!userData.userId || userData.role !== 'DRIVER') {
-        throw new Error('Unauthorized');
+        throw AppError.unauthorized();
     }
 
     const driverId = userData.userId;

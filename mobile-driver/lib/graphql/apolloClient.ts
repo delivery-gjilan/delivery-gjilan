@@ -1,4 +1,5 @@
 import { ApolloClient, InMemoryCache, HttpLink, ApolloLink } from '@apollo/client';
+import { onError } from '@apollo/client/link/error';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { SetContextLink } from '@apollo/client/link/context';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
@@ -25,6 +26,21 @@ const logLink = new ApolloLink((operation, forward) => {
         query: operation.query?.loc?.source?.body,
     });
     return forward(operation);
+});
+
+const errorLink = onError(({ graphQLErrors, networkError }) => {
+    if (graphQLErrors) {
+        for (const err of graphQLErrors) {
+            if (err.extensions?.code === 'UNAUTHENTICATED' || err.message === 'Unauthorized') {
+                console.warn('[Apollo] Auth error — clearing session');
+                useAuthStore.getState().logout();
+            }
+        }
+    }
+    if (networkError && 'statusCode' in networkError && (networkError as any).statusCode === 401) {
+        console.warn('[Apollo] 401 — clearing session');
+        useAuthStore.getState().logout();
+    }
 });
 
 const authLink = new SetContextLink(async ({ headers }) => {
@@ -150,7 +166,7 @@ export const cacheReady: Promise<void> = persistCache({
 });
 
 const client = new ApolloClient({
-    link: ApolloLink.from([logLink, splitLink]),
+    link: ApolloLink.from([logLink, errorLink, splitLink]),
     cache,
     defaultOptions: {
         watchQuery: {

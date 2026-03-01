@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CreateProductInput, UpdateProductInput } from '@/generated/types.generated';
+import { AppError } from '@/lib/errors';
 
 const createProductSchema = z.object({
     businessId: z.uuid('Invalid Business ID'),
@@ -30,11 +31,19 @@ const updateProductSchema = z.object({
 
 export class ProductValidator {
     validateCreateProduct(input: CreateProductInput) {
-        return createProductSchema.parse(input);
+        const result = createProductSchema.safeParse(input);
+        if (!result.success) {
+            throw AppError.fromZodError(result.error);
+        }
+        return result.data;
     }
 
     validateUpdateProduct(input: UpdateProductInput) {
-        return updateProductSchema.parse(input);
+        const result = updateProductSchema.safeParse(input);
+        if (!result.success) {
+            throw AppError.fromZodError(result.error);
+        }
+        return result.data;
     }
 }
 

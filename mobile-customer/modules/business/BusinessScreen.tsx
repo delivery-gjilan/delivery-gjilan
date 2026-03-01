@@ -2,6 +2,7 @@ import { View, Text } from 'react-native';
 import Animated, { useSharedValue, useAnimatedScrollHandler } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
+import { useTranslations } from '@/hooks/useTranslations';
 import { useBusiness } from './hooks/useBusiness';
 import { useProducts } from './hooks/useProducts';
 import { BusinessHeader } from './components/BusinessHeader';
@@ -15,6 +16,7 @@ interface BusinessScreenProps {
 
 export function BusinessScreen({ businessId }: BusinessScreenProps) {
     const theme = useTheme();
+    const { t } = useTranslations();
     const { business, loading: businessLoading, error: businessError } = useBusiness(businessId);
     const { products, loading: productsLoading, error: productsError } = useProducts(businessId);
     
@@ -41,7 +43,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
 
                     <View className="px-4 py-6">
                         <Text className="text-2xl font-bold mb-4" style={{ color: theme.colors.text }}>
-                            Menu
+                            {t.business.menu}
                         </Text>
                         {[1, 2, 3, 4, 5, 6].map((i) => (
                             <ProductCardSkeleton key={i} />
@@ -63,7 +65,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
     if (!business) {
         return (
             <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }}>
-                <ErrorMessage message="Business not found" />
+                <ErrorMessage message={t.business.not_found} />
             </SafeAreaView>
         );
     }
@@ -89,15 +91,15 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                     {isBusyOverride && (
                         <View className="bg-yellow-100 border border-yellow-200 rounded-xl p-4 mb-4">
                             <Text className="text-yellow-900 font-semibold mb-1">
-                                Restaurant is busy right now
+                                {t.business.busy_title}
                             </Text>
                             <Text className="text-yellow-900">
-                                Food is going to take about {overridePrepTimeMinutes} min.
+                                {t.business.busy_message.replace('{{minutes}}', String(overridePrepTimeMinutes))}
                             </Text>
                         </View>
                     )}
                     <Text className="text-2xl font-bold mb-4" style={{ color: theme.colors.text }}>
-                        Menu
+                        {t.business.menu}
                     </Text>
                     <ProductsList products={products || []} businessType={business.businessType} />
                 </View>

@@ -143,6 +143,7 @@ export type AuthResponse = {
 
 export type Business = {
   __typename?: 'Business';
+  activePromotion?: Maybe<BusinessPromotion>;
   avgPrepTimeMinutes: Scalars['Int']['output'];
   businessType: BusinessType;
   commissionPercentage: Scalars['Float']['output'];
@@ -172,6 +173,15 @@ export type BusinessDayHoursInput = {
   closesAt: Scalars['String']['input'];
   dayOfWeek: Scalars['Int']['input'];
   opensAt: Scalars['String']['input'];
+};
+
+export type BusinessPromotion = {
+  __typename?: 'BusinessPromotion';
+  description?: Maybe<Scalars['String']['output']>;
+  discountValue?: Maybe<Scalars['Float']['output']>;
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+  type: PromotionType;
 };
 
 export type BusinessType =
@@ -306,6 +316,12 @@ export type DeliveryPriceResult = {
   price: Scalars['Float']['output'];
   tierApplied?: Maybe<DeliveryPricingTier>;
   zoneApplied?: Maybe<DeliveryZoneMatch>;
+};
+
+export type DeliveryPricingConfig = {
+  __typename?: 'DeliveryPricingConfig';
+  tiers: Array<DeliveryPricingTier>;
+  zones: Array<DeliveryZone>;
 };
 
 export type DeliveryPricingTier = {
@@ -1153,6 +1169,7 @@ export type Query = {
   businessBalance: SettlementSummary;
   businesses: Array<Business>;
   calculateDeliveryPrice: DeliveryPriceResult;
+  deliveryPricingConfig: DeliveryPricingConfig;
   deliveryPricingTiers: Array<DeliveryPricingTier>;
   deliveryZones: Array<DeliveryZone>;
   driverBalance: SettlementSummary;
@@ -1843,9 +1860,10 @@ export type ResolversTypes = {
   AuditLog: ResolverTypeWrapper<Omit<AuditLog, 'action' | 'actor' | 'actorType' | 'entityType'> & { action: ResolversTypes['ActionType'], actor?: Maybe<ResolversTypes['User']>, actorType: ResolversTypes['ActorType'], entityType: ResolversTypes['EntityType'] }>;
   AuditLogConnection: ResolverTypeWrapper<Omit<AuditLogConnection, 'logs'> & { logs: Array<ResolversTypes['AuditLog']> }>;
   AuthResponse: ResolverTypeWrapper<Omit<AuthResponse, 'user'> & { user: ResolversTypes['User'] }>;
-  Business: ResolverTypeWrapper<Omit<Business, 'businessType'> & { businessType: ResolversTypes['BusinessType'] }>;
+  Business: ResolverTypeWrapper<Omit<Business, 'activePromotion' | 'businessType'> & { activePromotion?: Maybe<ResolversTypes['BusinessPromotion']>, businessType: ResolversTypes['BusinessType'] }>;
   BusinessDayHours: ResolverTypeWrapper<BusinessDayHours>;
   BusinessDayHoursInput: BusinessDayHoursInput;
+  BusinessPromotion: ResolverTypeWrapper<Omit<BusinessPromotion, 'type'> & { type: ResolversTypes['PromotionType'] }>;
   BusinessType: ResolverTypeWrapper<'MARKET' | 'PHARMACY' | 'RESTAURANT'>;
   CampaignStatus: ResolverTypeWrapper<'DRAFT' | 'SENDING' | 'SENT' | 'FAILED'>;
   CartContextInput: CartContextInput;
@@ -1864,6 +1882,7 @@ export type ResolversTypes = {
   Date: ResolverTypeWrapper<Scalars['Date']['output']>;
   DateTime: ResolverTypeWrapper<Scalars['DateTime']['output']>;
   DeliveryPriceResult: ResolverTypeWrapper<DeliveryPriceResult>;
+  DeliveryPricingConfig: ResolverTypeWrapper<DeliveryPricingConfig>;
   DeliveryPricingTier: ResolverTypeWrapper<DeliveryPricingTier>;
   DeliveryZone: ResolverTypeWrapper<DeliveryZone>;
   DeliveryZoneMatch: ResolverTypeWrapper<DeliveryZoneMatch>;
@@ -1961,9 +1980,10 @@ export type ResolversParentTypes = {
   AuditLog: Omit<AuditLog, 'actor'> & { actor?: Maybe<ResolversParentTypes['User']> };
   AuditLogConnection: Omit<AuditLogConnection, 'logs'> & { logs: Array<ResolversParentTypes['AuditLog']> };
   AuthResponse: Omit<AuthResponse, 'user'> & { user: ResolversParentTypes['User'] };
-  Business: Business;
+  Business: Omit<Business, 'activePromotion'> & { activePromotion?: Maybe<ResolversParentTypes['BusinessPromotion']> };
   BusinessDayHours: BusinessDayHours;
   BusinessDayHoursInput: BusinessDayHoursInput;
+  BusinessPromotion: BusinessPromotion;
   CartContextInput: CartContextInput;
   CartItemInput: CartItemInput;
   CreateBusinessInput: CreateBusinessInput;
@@ -1980,6 +2000,7 @@ export type ResolversParentTypes = {
   Date: Scalars['Date']['output'];
   DateTime: Scalars['DateTime']['output'];
   DeliveryPriceResult: DeliveryPriceResult;
+  DeliveryPricingConfig: DeliveryPricingConfig;
   DeliveryPricingTier: DeliveryPricingTier;
   DeliveryZone: DeliveryZone;
   DeliveryZoneMatch: DeliveryZoneMatch;
@@ -2104,6 +2125,7 @@ export type AuthResponseResolvers<ContextType = GraphQLContext, ParentType exten
 };
 
 export type BusinessResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Business'] = ResolversParentTypes['Business']> = {
+  activePromotion?: Resolver<Maybe<ResolversTypes['BusinessPromotion']>, ParentType, ContextType>;
   avgPrepTimeMinutes?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   businessType?: Resolver<ResolversTypes['BusinessType'], ParentType, ContextType>;
   commissionPercentage?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
@@ -2130,6 +2152,15 @@ export type BusinessDayHoursResolvers<ContextType = GraphQLContext, ParentType e
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
+export type BusinessPromotionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['BusinessPromotion'] = ResolversParentTypes['BusinessPromotion']> = {
+  description?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  discountValue?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  type?: Resolver<ResolversTypes['PromotionType'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
 export type BusinessTypeResolvers = EnumResolverSignature<{ MARKET?: any, PHARMACY?: any, RESTAURANT?: any }, ResolversTypes['BusinessType']>;
 
 export type CampaignStatusResolvers = EnumResolverSignature<{ DRAFT?: any, FAILED?: any, SENDING?: any, SENT?: any }, ResolversTypes['CampaignStatus']>;
@@ -2147,6 +2178,12 @@ export type DeliveryPriceResultResolvers<ContextType = GraphQLContext, ParentTyp
   price?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   tierApplied?: Resolver<Maybe<ResolversTypes['DeliveryPricingTier']>, ParentType, ContextType>;
   zoneApplied?: Resolver<Maybe<ResolversTypes['DeliveryZoneMatch']>, ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type DeliveryPricingConfigResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['DeliveryPricingConfig'] = ResolversParentTypes['DeliveryPricingConfig']> = {
+  tiers?: Resolver<Array<ResolversTypes['DeliveryPricingTier']>, ParentType, ContextType>;
+  zones?: Resolver<Array<ResolversTypes['DeliveryZone']>, ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -2532,6 +2569,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   businessBalance?: Resolver<ResolversTypes['SettlementSummary'], ParentType, ContextType, RequireFields<QuerybusinessBalanceArgs, 'businessId'>>;
   businesses?: Resolver<Array<ResolversTypes['Business']>, ParentType, ContextType>;
   calculateDeliveryPrice?: Resolver<ResolversTypes['DeliveryPriceResult'], ParentType, ContextType, RequireFields<QuerycalculateDeliveryPriceArgs, 'businessId' | 'dropoffLat' | 'dropoffLng'>>;
+  deliveryPricingConfig?: Resolver<ResolversTypes['DeliveryPricingConfig'], ParentType, ContextType>;
   deliveryPricingTiers?: Resolver<Array<ResolversTypes['DeliveryPricingTier']>, ParentType, ContextType>;
   deliveryZones?: Resolver<Array<ResolversTypes['DeliveryZone']>, ParentType, ContextType>;
   driverBalance?: Resolver<ResolversTypes['SettlementSummary'], ParentType, ContextType, RequireFields<QuerydriverBalanceArgs, 'driverId'>>;
@@ -2779,11 +2817,13 @@ export type Resolvers<ContextType = GraphQLContext> = {
   AuthResponse?: AuthResponseResolvers<ContextType>;
   Business?: BusinessResolvers<ContextType>;
   BusinessDayHours?: BusinessDayHoursResolvers<ContextType>;
+  BusinessPromotion?: BusinessPromotionResolvers<ContextType>;
   BusinessType?: BusinessTypeResolvers;
   CampaignStatus?: CampaignStatusResolvers;
   Date?: GraphQLScalarType;
   DateTime?: GraphQLScalarType;
   DeliveryPriceResult?: DeliveryPriceResultResolvers<ContextType>;
+  DeliveryPricingConfig?: DeliveryPricingConfigResolvers<ContextType>;
   DeliveryPricingTier?: DeliveryPricingTierResolvers<ContextType>;
   DeliveryZone?: DeliveryZoneResolvers<ContextType>;
   DeliveryZoneMatch?: DeliveryZoneMatchResolvers<ContextType>;

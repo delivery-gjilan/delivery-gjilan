@@ -1,5 +1,10 @@
 node_modules
 
+# Environment files (never commit secrets)
+.env
+.env.*
+!.env.example
+
 # Observability — Docker volume data (never commit)
 observability/loki-data/
 observability/grafana-data/

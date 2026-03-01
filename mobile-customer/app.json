@@ -11,8 +11,10 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "We use your location to set the delivery address."
-      }
+        "NSLocationWhenInUseUsageDescription": "We use your location to set the delivery address.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.anonymous.mobilecustomer"
     },
     "android": {
       "permissions": [

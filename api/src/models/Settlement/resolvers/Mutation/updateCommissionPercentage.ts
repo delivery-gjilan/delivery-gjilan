@@ -2,6 +2,7 @@ import type { MutationResolvers } from './../../../../generated/types.generated'
 import { AppContext } from '@/index';
 import { eq } from 'drizzle-orm';
 import { drivers, businesses } from '@/database/schema';
+import { AppError } from '@/lib/errors';
 
 export const updateCommissionPercentage: NonNullable<MutationResolvers['updateCommissionPercentage']> = async (
     _parent,
@@ -9,11 +10,11 @@ export const updateCommissionPercentage: NonNullable<MutationResolvers['updateCo
     { db }
 ) => {
     if (!driverId && !businessId) {
-        throw new Error('Must provide either driverId or businessId');
+        throw AppError.badInput('Must provide either driverId or businessId');
     }
 
     if (percentage < 0 || percentage > 100) {
-        throw new Error('Percentage must be between 0 and 100');
+        throw AppError.badInput('Percentage must be between 0 and 100');
     }
 
     try {
@@ -35,6 +36,6 @@ export const updateCommissionPercentage: NonNullable<MutationResolvers['updateCo
 
         return true;
     } catch (error) {
-        throw new Error(`Failed to update commission percentage: ${error}`);
+        throw new AppError(`Failed to update commission percentage: ${error}`, 'INTERNAL_ERROR');
     }
 };

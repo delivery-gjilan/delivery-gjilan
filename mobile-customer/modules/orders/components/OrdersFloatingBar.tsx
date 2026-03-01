@@ -2,11 +2,13 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
+import { useTranslations } from '@/hooks/useTranslations';
 import { useActiveOrdersStore } from '../store/activeOrdersStore';
 
 export const OrdersFloatingBar = () => {
     const router = useRouter();
     const theme = useTheme();
+    const { t } = useTranslations();
 
     const { hasActiveOrders, activeOrders } = useActiveOrdersStore();
 
@@ -49,7 +51,7 @@ export const OrdersFloatingBar = () => {
                     <Ionicons name="receipt-outline" size={20} color="white" />
                 </View>
                 <View className="flex-1">
-                    <Text className="text-white font-semibold text-base">Active Order</Text>
+                    <Text className="text-white font-semibold text-base">{t.orders.active_bar}</Text>
                     <Text className="text-white/80 text-xs" numberOfLines={1}>{displayBusinessName}</Text>
                 </View>
             </View>

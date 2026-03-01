@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CreateBusinessInput, UpdateBusinessInput } from '@/generated/types.generated';
+import { AppError } from '@/lib/errors';
 
 const workingHoursSchema = z.object({
     opensAt: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Invalid time format (HH:MM)'),
@@ -40,11 +41,19 @@ const updateBusinessSchema = z.object({
 
 export class BusinessValidator {
     validateCreateBusiness(input: CreateBusinessInput) {
-        return createBusinessSchema.parse(input);
+        const result = createBusinessSchema.safeParse(input);
+        if (!result.success) {
+            throw AppError.fromZodError(result.error);
+        }
+        return result.data;
     }
 
     validateUpdateBusiness(input: UpdateBusinessInput) {
-        return updateBusinessSchema.parse(input);
+        const result = updateBusinessSchema.safeParse(input);
+        if (!result.success) {
+            throw AppError.fromZodError(result.error);
+        }
+        return result.data;
     }
 }
 

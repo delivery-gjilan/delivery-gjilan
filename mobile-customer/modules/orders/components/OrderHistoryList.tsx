@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
+import { useTranslations } from '@/hooks/useTranslations';
 import { useOrders } from '../hooks/useOrders';
 import { Order } from '@/gql/graphql';
 
@@ -88,6 +89,7 @@ const OrderHistoryItem = ({ order }: { order: Order }) => {
 export const OrderHistoryList = () => {
     const router = useRouter();
     const theme = useTheme();
+    const { t } = useTranslations();
     const { orders, loading } = useOrders();
 
     const sortedOrders = useMemo(() => {
@@ -106,7 +108,7 @@ export const OrderHistoryList = () => {
                         <TouchableOpacity onPress={() => router.back()} className="mr-3">
                             <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                         </TouchableOpacity>
-                        <Text className="text-2xl font-bold text-text">Order history</Text>
+                        <Text className="text-2xl font-bold text-text">{t.orders.order_history}</Text>
                     </View>
                     <View className="flex-1 items-center justify-center">
                         <ActivityIndicator size="large" color={theme.colors.income} />
@@ -124,13 +126,13 @@ export const OrderHistoryList = () => {
                         <TouchableOpacity onPress={() => router.back()} className="mr-3">
                             <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                         </TouchableOpacity>
-                        <Text className="text-2xl font-bold text-text">Order history</Text>
+                        <Text className="text-2xl font-bold text-text">{t.orders.order_history}</Text>
                     </View>
                     <View className="flex-1 justify-center items-center">
                         <Ionicons name="receipt-outline" size={80} color={theme.colors.subtext} />
-                        <Text className="text-lg text-subtext mt-4 text-center">No past orders yet</Text>
+                        <Text className="text-lg text-subtext mt-4 text-center">{t.orders.no_past_orders}</Text>
                         <Text className="text-sm text-subtext mt-2 text-center px-8">
-                            Your completed and cancelled orders will show up here.
+                            {t.orders.no_past_orders_subtitle}
                         </Text>
                     </View>
                 </View>
@@ -145,7 +147,7 @@ export const OrderHistoryList = () => {
                     <TouchableOpacity onPress={() => router.back()} className="mr-3">
                         <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                     </TouchableOpacity>
-                    <Text className="text-2xl font-bold text-text">Order history</Text>
+                    <Text className="text-2xl font-bold text-text">{t.orders.order_history}</Text>
                 </View>
 
                 <FlatList

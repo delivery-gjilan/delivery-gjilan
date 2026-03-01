@@ -1,6 +1,7 @@
 import type { QueryResolvers } from './../../../../generated/types.generated';
 import { getDB } from '@/database';
 import { PromotionEngine } from '@/services/PromotionEngine';
+import { AppError } from '@/lib/errors';
 
 export const getApplicablePromotions: NonNullable<QueryResolvers['getApplicablePromotions']> = async (
         _parent,
@@ -8,7 +9,7 @@ export const getApplicablePromotions: NonNullable<QueryResolvers['getApplicableP
         { userData }
 ) => {
         if (!userData.userId) {
-                throw new Error('Unauthorized');
+                throw AppError.unauthorized();
         }
 
         const db = await getDB();

@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCart } from '../hooks/useCart';
 import { useCartAnimationStore } from '../store/cartAnimationStore';
 import { useTheme } from '@/hooks/useTheme';
+import { useTranslations } from '@/hooks/useTranslations';
 import { useEffect, useRef } from 'react';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
@@ -11,6 +12,7 @@ const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 export const CartFloatingBar = () => {
     const router = useRouter();
     const theme = useTheme();
+    const { t } = useTranslations();
     const { total, count, isEmpty } = useCart();
     const { triggerCount } = useCartAnimationStore();
     const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -87,7 +89,7 @@ export const CartFloatingBar = () => {
                     <View className="bg-white/20 px-3 py-1 rounded-full">
                         <Text className="text-white font-bold">{count}</Text>
                     </View>
-                    <Text className="text-white font-medium text-lg">View Cart</Text>
+                    <Text className="text-white font-medium text-lg">{t.cart.view_cart}</Text>
                 </View>
                 <View className="flex-row items-center space-x-1">
                     <Text className="text-white font-bold text-lg">€{total.toFixed(2)}</Text>

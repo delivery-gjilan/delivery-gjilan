@@ -3,10 +3,11 @@ import type { QueryResolvers } from './../../../../generated/types.generated';
 import { getDB } from '@/database';
 import { promotions } from '@/database/schema';
 import { eq } from 'drizzle-orm';
+import { AppError } from '@/lib/errors';
 
 export const getAllPromotions: NonNullable<QueryResolvers['getAllPromotions']> = async (_parent, args, { userData }) => {
   if (!userData.userId || userData.role !== 'SUPER_ADMIN') {
-    throw new Error('Forbidden');
+    throw AppError.forbidden();
   }
 
   const db = await getDB();

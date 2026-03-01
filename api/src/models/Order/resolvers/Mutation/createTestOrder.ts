@@ -4,14 +4,20 @@ import { orders, orderItems, deliveryPricingTiers } from '@/database/schema';
 import { businesses as businessesTable, products as productsTable } from '@/database/schema';
 import { users as usersTable } from '@/database/schema';
 import { eq, asc } from 'drizzle-orm';
-import { GraphQLError } from 'graphql';
+import { AppError } from '@/lib/errors';
 
 export const createTestOrder: NonNullable<MutationResolvers['createTestOrder']> = async (
     _parent,
     _args,
     context,
 ) => {
-    const { orderService } = context;
+    const { orderService, userData } = context;
+
+    // Only super admins can create test orders
+    if (!userData?.userId || userData.role !== 'SUPER_ADMIN') {
+        throw AppError.forbidden('Only super admins can create test orders');
+    }
+
     const db = await getDB();
 
     // 1. Find Casbas Pizza
@@ -21,7 +27,7 @@ export const createTestOrder: NonNullable<MutationResolvers['createTestOrder']> 
         .where(eq(businessesTable.name, 'Casbas Pizza'));
 
     if (!casbasPizza) {
-        throw new GraphQLError('Casbas Pizza not found in database. Please run seed first.');
+        throw new AppError('Casbas Pizza not found in database. Please run seed first.', 'NOT_FOUND');
     }
 
     // 2. Get products from Casbas Pizza
@@ -31,7 +37,7 @@ export const createTestOrder: NonNullable<MutationResolvers['createTestOrder']> 
         .where(eq(productsTable.businessId, casbasPizza.id));
 
     if (casbasProducts.length === 0) {
-        throw new GraphQLError('No products found for Casbas Pizza.');
+        throw new AppError('No products found for Casbas Pizza.', 'NOT_FOUND');
     }
 
     // 3. Find a random CUSTOMER user
@@ -41,7 +47,7 @@ export const createTestOrder: NonNullable<MutationResolvers['createTestOrder']> 
         .where(eq(usersTable.role, 'CUSTOMER'));
 
     if (customerUsers.length === 0) {
-        throw new GraphQLError('No customer users found in database.');
+        throw new AppError('No customer users found in database.', 'NOT_FOUND');
     }
 
     const randomCustomer = customerUsers[Math.floor(Math.random() * customerUsers.length)];
@@ -121,7 +127,7 @@ export const createTestOrder: NonNullable<MutationResolvers['createTestOrder']> 
     // 9. Return the order through the normal mapping
     const dbOrder = await orderService.orderRepository.findById(createdOrder.id);
     if (!dbOrder) {
-        throw new GraphQLError('Failed to retrieve created test order.');
+        throw new AppError('Failed to retrieve created test order.', 'INTERNAL_ERROR');
     }
 
     return orderService.mapToOrderPublic(dbOrder);

@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Pressable, Platform, Image, Dimensions, A
 import { useTheme } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
+import { useEstimatedDeliveryPrice } from '@/hooks/useEstimatedDeliveryPrice';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IMAGE_HEIGHT = 192; // h-48 equivalent
@@ -34,6 +35,8 @@ interface RestaurantCardProps {
     businessType: string;
     isOpen: boolean;
     onPress: (id: string) => void;
+    locationLat: number;
+    locationLng: number;
     description?: string;
     deliveryFee?: number;
     avgPrepTimeMinutes?: number | null;
@@ -43,6 +46,13 @@ interface RestaurantCardProps {
     discount?: number;
     isNew?: boolean;
     isSponsored?: boolean;
+    activePromotion?: {
+        id: string;
+        name: string;
+        description?: string | null;
+        type: string;
+        discountValue?: number | null;
+    } | null;
 }
 
 export function RestaurantCard({
@@ -52,8 +62,10 @@ export function RestaurantCard({
     businessType,
     isOpen,
     onPress,
+    locationLat,
+    locationLng,
     description,
-    deliveryFee = 1.1,
+    deliveryFee,
     avgPrepTimeMinutes,
     prepTimeOverrideMinutes,
     rating = 8.6,
@@ -61,10 +73,16 @@ export function RestaurantCard({
     discount,
     isNew,
     isSponsored,
+    activePromotion,
 }: RestaurantCardProps) {
     const theme = useTheme();
     const isFavorite = useFavoritesStore((state) => state.isFavorite(id));
     const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
+    const { estimateDeliveryPrice } = useEstimatedDeliveryPrice();
+
+    // Calculate estimated delivery price based on user's location
+    const calculatedDeliveryFee = estimateDeliveryPrice(locationLat, locationLng);
+    const displayDeliveryFee = deliveryFee ?? calculatedDeliveryFee;
 
     // Entrance animations
     const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -156,6 +174,20 @@ export function RestaurantCard({
 
                 {/* Top Left Badges */}
                 <View className="absolute top-3 left-3 flex-col gap-2">
+                    {activePromotion && (
+                        <View className="bg-cyan-500 px-3 py-1.5 rounded-lg flex-row items-center gap-1.5">
+                            <Ionicons name="pricetag" size={14} color="black" />
+                            <Text className="text-black font-semibold text-xs">
+                                {activePromotion.type === 'PERCENTAGE' && activePromotion.discountValue
+                                    ? `${Math.round(activePromotion.discountValue)}% Zbritje`
+                                    : activePromotion.type === 'FIXED_AMOUNT' && activePromotion.discountValue
+                                      ? `€${activePromotion.discountValue.toFixed(2)} Zbritje`
+                                      : activePromotion.type === 'FREE_DELIVERY'
+                                        ? 'Transporti Falas'
+                                        : activePromotion.name}
+                            </Text>
+                        </View>
+                    )}
                     {discount && (
                         <View className="bg-cyan-500 px-3 py-1.5 rounded-lg flex-row items-center gap-1.5">
                             <Ionicons name="pricetag" size={14} color="black" />
@@ -222,7 +254,7 @@ export function RestaurantCard({
                     <View className="flex-row items-center gap-1">
                         <Ionicons name="bicycle-outline" size={16} color={theme.colors.subtext} />
                         <Text className="text-sm" style={{ color: theme.colors.subtext }}>
-                            €{deliveryFee.toFixed(2)}
+                            €{displayDeliveryFee.toFixed(2)}
                         </Text>
                     </View>
 

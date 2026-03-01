@@ -1,6 +1,7 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { getDB } from '@/database';
 import { PromotionService } from '@/services/PromotionService';
+import { AppError } from '@/lib/errors';
 
 export const markFirstOrderUsed: NonNullable<MutationResolvers['markFirstOrderUsed']> =  async (
     _parent,
@@ -8,7 +9,7 @@ export const markFirstOrderUsed: NonNullable<MutationResolvers['markFirstOrderUs
     { userData }
 ) => {
     if (!userData.userId || userData.userId !== userId) {
-        throw new Error('Unauthorized');
+        throw AppError.unauthorized();
     }
 
     const db = await getDB();

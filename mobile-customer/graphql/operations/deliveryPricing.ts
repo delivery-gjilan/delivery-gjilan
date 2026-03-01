@@ -13,3 +13,27 @@ export const CALCULATE_DELIVERY_PRICE = graphql(`
         }
     }
 `);
+
+export const DELIVERY_PRICING_CONFIG_QUERY = graphql(`
+    query DeliveryPricingConfig {
+        deliveryPricingConfig {
+            zones {
+                id
+                name
+                polygon {
+                    lat
+                    lng
+                }
+                deliveryFee
+                sortOrder
+            }
+            tiers {
+                id
+                minDistanceKm
+                maxDistanceKm
+                price
+                sortOrder
+            }
+        }
+    }
+`);

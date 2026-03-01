@@ -2,9 +2,32 @@ import { Router, Request, Response } from 'express';
 import { uploadMiddleware } from '../lib/middleware/uploadMiddleware';
 import S3Service from '../services/S3Service';
 import logger from '@/lib/logger';
+import { decodeJwtToken } from '@/lib/utils/authUtils';
 
 const log = logger.child({ service: 'UploadRoutes' });
 const router = Router();
+
+/**
+ * Middleware to verify JWT token on upload routes
+ */
+function requireAuth(req: Request, res: Response, next: () => void) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        res.status(401).json({ success: false, error: 'Authentication required' });
+        return;
+    }
+
+    try {
+        const token = authHeader.substring(7);
+        const decoded = decodeJwtToken(token);
+        (req as any).userId = decoded.userId;
+        (req as any).userRole = decoded.role;
+        next();
+    } catch {
+        res.status(401).json({ success: false, error: 'Invalid or expired token' });
+        return;
+    }
+}
 
 /**
  * POST /api/upload/image
@@ -14,7 +37,7 @@ const router = Router();
  * - image: File (required)
  * - folder: 'businesses' | 'products' | 'categories' (required)
  */
-router.post('/image', uploadMiddleware.single('image'), async (req: Request, res: Response) => {
+router.post('/image', requireAuth, uploadMiddleware.single('image'), async (req: Request, res: Response) => {
     try {
         // Validate file
         if (!req.file) {
@@ -65,7 +88,7 @@ router.post('/image', uploadMiddleware.single('image'), async (req: Request, res
  * Body (JSON):
  * - imageUrl: string (required)
  */
-router.delete('/image', async (req: Request, res: Response) => {
+router.delete('/image', requireAuth, async (req: Request, res: Response) => {
     try {
         const { imageUrl } = req.body;
 

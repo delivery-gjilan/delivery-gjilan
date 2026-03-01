@@ -4,7 +4,7 @@ import { deliveryPricingTiers } from '@/database/schema/deliveryPricingTiers';
 import { deliveryZones } from '@/database/schema/deliveryZones';
 import { businesses } from '@/database/schema/businesses';
 import { asc, eq } from 'drizzle-orm';
-import { GraphQLError } from 'graphql';
+import { AppError } from '@/lib/errors';
 import { calculateDrivingDistanceKm } from '@/lib/haversine';
 import { isPointInPolygon } from '@/lib/pointInPolygon';
 
@@ -24,7 +24,7 @@ export const calculateDeliveryPrice: NonNullable<QueryResolvers['calculateDelive
         .where(eq(businesses.id, businessId));
 
     if (!business) {
-        throw new GraphQLError(`Business with ID ${businessId} not found`);
+        throw AppError.notFound(`Business with ID ${businessId}`);
     }
 
     // 2. Calculate driving distance via Mapbox Directions API

@@ -2,6 +2,7 @@ import { View, Image, TouchableOpacity, Text } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
+import { useTranslations } from '@/hooks/useTranslations';
 import { Product } from '@/gql/graphql';
 
 interface ProductHeaderProps {
@@ -10,6 +11,7 @@ interface ProductHeaderProps {
 
 export function ProductHeader({ product }: ProductHeaderProps) {
     const theme = useTheme();
+    const { t } = useTranslations();
 
     return (
         <View className="relative">
@@ -37,13 +39,13 @@ export function ProductHeader({ product }: ProductHeaderProps) {
             {/* Status Badge */}
             {!product.isAvailable && (
                 <View className="absolute top-4 right-4 bg-expense px-3 py-2 rounded-full">
-                    <Text className="text-white text-sm font-semibold">Unavailable</Text>
+                    <Text className="text-white text-sm font-semibold">{t.common.unavailable}</Text>
                 </View>
             )}
 
             {product.isOnSale && product.salePrice && (
                 <View className="absolute bottom-4 right-4 bg-expense px-3 py-2 rounded-full">
-                    <Text className="text-white text-sm font-bold">SALE</Text>
+                    <Text className="text-white text-sm font-bold">{t.common.sale}</Text>
                 </View>
             )}
         </View>

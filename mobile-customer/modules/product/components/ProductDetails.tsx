@@ -1,11 +1,14 @@
 import { View, Text } from 'react-native';
 import { Product } from '@/gql/graphql';
+import { useTranslations } from '@/hooks/useTranslations';
 
 interface ProductDetailsProps {
     product: Partial<Product>;
 }
 
 export function ProductDetails({ product }: ProductDetailsProps) {
+    const { t } = useTranslations();
+
     return (
         <View className="px-6 py-6">
             {/* Product Name */}
@@ -29,7 +32,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
             {/* Description */}
             {product.description && (
                 <View className="mb-6">
-                    <Text className="text-foreground text-lg font-semibold mb-3">Description</Text>
+                    <Text className="text-foreground text-lg font-semibold mb-3">{t.product.description}</Text>
                     <Text className="text-subtext text-base leading-6">{product.description}</Text>
                 </View>
             )}

@@ -12,6 +12,8 @@ import { useActiveOrdersTracking } from '@/hooks/useActiveOrdersTracking';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { useNotifications } from '@/hooks/useNotifications';
 import StoreClosedScreen from '@/components/StoreClosedScreen';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ToastContainer } from '@/components/Toast';
 import { initSentry } from '@/lib/sentry';
 
 // ── Initialise Sentry before anything else renders ──
@@ -80,6 +82,7 @@ function AppContent() {
                     />
                 </Stack>
                 <FloatingBars />
+                <ToastContainer />
             </SafeAreaProvider>
         </ThemeProvider>
     );
@@ -94,8 +97,10 @@ export default function RootLayout() {
     }
 
     return (
-        <ApolloProvider client={client}>
-            <AppContent />
-        </ApolloProvider>
+        <ErrorBoundary>
+            <ApolloProvider client={client}>
+                <AppContent />
+            </ApolloProvider>
+        </ErrorBoundary>
     );
 }

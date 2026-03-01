@@ -10,6 +10,7 @@ import { ProfileRow } from '@/components/ProfileRow';
 import { useAuthStore } from '@/store/authStore';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { useBusinesses } from '@/modules/business/hooks/useBusinesses';
+import { useTranslations } from '@/hooks/useTranslations';
 
 export default function Profile() {
     const theme = useTheme();
@@ -31,7 +32,7 @@ export default function Profile() {
         if (user?.email) {
             return user.email.split('@')[0];
         }
-        return 'User';
+        return t.profile.user_fallback;
     };
 
     const handleLogout = () => {
@@ -41,6 +42,7 @@ export default function Profile() {
     const favoriteIds = useFavoritesStore((state) => state.favoriteIds);
     const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
     const { businesses } = useBusinesses();
+    const { t } = useTranslations();
 
     const handleOrderHistoryPress = () => {
         router.push('/orders/history');
@@ -48,8 +50,8 @@ export default function Profile() {
 
     const ordersSubtitle =
         orders.length > 0
-            ? `${orders.length} order${orders.length !== 1 ? 's' : ''}`
-            : 'No orders';
+            ? `${orders.length} ${orders.length !== 1 ? t.profile.order_count_plural : t.profile.order_count}`
+            : t.profile.no_orders;
 
     return (
         <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }} edges={['top']}>
@@ -57,7 +59,7 @@ export default function Profile() {
                 {/* Header Section */}
                 <View className="px-4 pt-4 pb-6 flex-row justify-between items-center">
                     <View>
-                        <Text className="text-4xl font-bold text-white">Hi {getUserName()}!</Text>
+                        <Text className="text-4xl font-bold text-white">{t.profile.greeting} {getUserName()}!</Text>
                     </View>
                     <View className="flex-row items-center gap-3">
                         <TouchableOpacity
@@ -89,21 +91,21 @@ export default function Profile() {
                         }}
                     >
                         <View className="px-4">
-                            <ProfileRow title="Order history" subtitle={ordersSubtitle} onPress={handleOrderHistoryPress} />
-                            <ProfileRow title="Credits" onPress={() => {}} />
-                            <ProfileRow title="Buy gift card" onPress={() => {}} showDivider={false} />
+                            <ProfileRow title={t.profile.order_history} subtitle={ordersSubtitle} onPress={handleOrderHistoryPress} />
+                            <ProfileRow title={t.profile.credits} onPress={() => {}} />
+                            <ProfileRow title={t.profile.buy_gift_card} onPress={() => {}} showDivider={false} />
                         </View>
                     </View>
                 </View>
 
                 {/* Favorites Section */}
                 <View className="px-4 mb-8">
-                    <Text className="text-2xl font-bold text-white mb-4">Your favorites</Text>
+                    <Text className="text-2xl font-bold text-white mb-4">{t.profile.your_favorites}</Text>
                     {favoriteIds.size === 0 ? (
                         <View className="flex-row items-center justify-between">
                             <View className="flex-1 pr-4">
                                 <Text className="text-sm leading-5" style={{ color: theme.colors.subtext }}>
-                                    Add a restaurant to your favorites by tapping the heart icon. Your favorites will appear here!
+                                    {t.profile.favorites_empty}
                                 </Text>
                             </View>
                             <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: theme.colors.card, alignItems: 'center', justifyContent: 'center' }}>
@@ -143,21 +145,21 @@ export default function Profile() {
 
                 {/* Quick Links Section */}
                 <View className="px-4 mb-6">
-                    <Text className="text-2xl font-bold text-white mb-4">Quick links</Text>
+                    <Text className="text-2xl font-bold text-white mb-4">{t.profile.quick_links}</Text>
                     <View>
-                        <ProfileRow title="Invite Friends" icon="gift" onPress={() => router.push('/invite-friends')} />
-                        <ProfileRow title="Redeem code" onPress={() => {}} />
-                        <ProfileRow title="Contact Support" onPress={() => {}} />
-                        <ProfileRow title="Order history" onPress={handleOrderHistoryPress} showDivider={false} />
+                        <ProfileRow title={t.profile.invite_friends} icon="gift" onPress={() => router.push('/invite-friends')} />
+                        <ProfileRow title={t.profile.redeem_code} onPress={() => {}} />
+                        <ProfileRow title={t.profile.contact_support} onPress={() => {}} />
+                        <ProfileRow title={t.profile.order_history} onPress={handleOrderHistoryPress} showDivider={false} />
                     </View>
                 </View>
 
                 {/* Settings Section */}
                 <View className="px-4 mb-8">
-                    <Text className="text-2xl font-bold text-white mb-4">Settings</Text>
+                    <Text className="text-2xl font-bold text-white mb-4">{t.profile.settings}</Text>
                     <View>
-                        <ProfileRow title="My Addresses" icon="location" onPress={() => router.push('/addresses')} />
-                        <ProfileRow title="Account" onPress={() => {}} showDivider={false} />
+                        <ProfileRow title={t.profile.my_addresses} icon="location" onPress={() => router.push('/addresses')} />
+                        <ProfileRow title={t.profile.account} onPress={() => {}} showDivider={false} />
                     </View>
                 </View>
 
@@ -169,7 +171,7 @@ export default function Profile() {
                         style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)' }}
                     >
                         <Text className="text-base font-semibold" style={{ color: '#EF4444' }}>
-                            Logout
+                            {t.profile.logout}
                         </Text>
                     </TouchableOpacity>
                 </View>

@@ -2,10 +2,11 @@ import type { QueryResolvers } from './../../../../generated/types.generated';
 import { getDB } from '@/database';
 import { users, userReferrals } from '@/database/schema';
 import { eq, sql } from 'drizzle-orm';
+import { AppError } from '@/lib/errors';
 
 export const myReferralStats: NonNullable<QueryResolvers['myReferralStats']> = async (_parent, _arg, { userData }) => {
     if (!userData.userId) {
-        throw new Error('Unauthorized');
+        throw AppError.unauthorized();
     }
 
     const db = await getDB();
@@ -18,7 +19,7 @@ export const myReferralStats: NonNullable<QueryResolvers['myReferralStats']> = a
         .limit(1);
 
     if (!user) {
-        throw new Error('User not found');
+        throw AppError.notFound('User');
     }
 
     let referralCode = user.referralCode;

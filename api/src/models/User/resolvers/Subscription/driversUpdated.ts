@@ -13,7 +13,7 @@ export const driversUpdated: NonNullable<SubscriptionResolvers['driversUpdated']
       throw new GraphQLError('Authentication required', { extensions: { code: 'UNAUTHENTICATED' } });
     }
 
-    if (userData.role !== 'SUPER_ADMIN' && userData.role !== 'BUSINESS_ADMIN') {
+    if (userData.role !== 'SUPER_ADMIN' && userData.role !== 'BUSINESS_OWNER' && userData.role !== 'BUSINESS_EMPLOYEE') {
       throw new GraphQLError('Forbidden', { extensions: { code: 'FORBIDDEN' } });
     }
 

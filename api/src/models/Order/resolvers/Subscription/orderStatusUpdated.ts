@@ -18,7 +18,7 @@ export const orderStatusUpdated: NonNullable<SubscriptionResolvers['orderStatusU
         const isCustomer = userData.role === 'CUSTOMER' && order.userId === userData.userId;
 
         let isBusinessAdmin = false;
-        if (userData.role === 'BUSINESS_ADMIN' && userData.businessId) {
+        if ((userData.role === 'BUSINESS_OWNER' || userData.role === 'BUSINESS_EMPLOYEE') && userData.businessId) {
             isBusinessAdmin = await orderService.orderContainsBusiness(orderId, userData.businessId);
         }
 

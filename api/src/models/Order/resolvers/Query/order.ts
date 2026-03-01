@@ -33,8 +33,9 @@ export const order: NonNullable<QueryResolvers['order']> = async (_parent, { id 
             }
             break;
 
-        case 'BUSINESS_ADMIN':
-            // Business admins can only see orders that contain items from their business
+        case 'BUSINESS_OWNER':
+        case 'BUSINESS_EMPLOYEE':
+            // Business users can only see orders that contain items from their business
             if (!userData.businessId) {
                 throw new GraphQLError('Business admin must be associated with a business', {
                     extensions: { code: 'FORBIDDEN' },

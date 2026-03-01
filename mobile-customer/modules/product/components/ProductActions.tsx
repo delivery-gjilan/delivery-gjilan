@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Product } from '@/gql/graphql';
 import { useTheme } from '@/hooks/useTheme';
+import { useTranslations } from '@/hooks/useTranslations';
 import { useProductActions } from '../hooks/useProductActions';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
@@ -14,6 +15,7 @@ interface ProductActionsProps {
 
 export function ProductActions({ product }: ProductActionsProps) {
     const theme = useTheme();
+    const { t } = useTranslations();
     const insets = useSafeAreaInsets();
     const buttonScaleAnim = useRef(new Animated.Value(1)).current;
     const [showFloatingNumber, setShowFloatingNumber] = useState(false);
@@ -67,16 +69,16 @@ export function ProductActions({ product }: ProductActionsProps) {
                 }}
             >
                 <View className="bg-expense/20 py-4 rounded-xl items-center">
-                    <Text className="text-expense text-base font-semibold">This product is currently unavailable</Text>
+                    <Text className="text-expense text-base font-semibold">{t.product.unavailable_message}</Text>
                 </View>
             </View>
         );
     }
 
     const getButtonText = () => {
-        if (!isInCart) return 'Add to Order';
-        if (hasQuantityChanged) return 'Update Order';
-        return 'In Cart';
+        if (!isInCart) return t.product.add_to_order;
+        if (hasQuantityChanged) return t.product.update_order;
+        return t.product.in_cart;
     };
 
     const handleMainAction = () => {
@@ -112,7 +114,7 @@ export function ProductActions({ product }: ProductActionsProps) {
         >
             {/* Quantity Controls */}
             <View className="flex-row items-center justify-between mb-4">
-                <Text className="text-foreground text-lg font-semibold">Quantity</Text>
+                <Text className="text-foreground text-lg font-semibold">{t.product.quantity}</Text>
 
                 <View style={{ position: 'relative' }}>
                     <View className="flex-row items-center bg-background border border-border rounded-full">
@@ -187,7 +189,7 @@ export function ProductActions({ product }: ProductActionsProps) {
                         <View className="flex-row items-center gap-2">
                             <Ionicons name="trash-outline" size={20} color={theme.colors.expense} />
                             <Text className="text-base font-semibold" style={{ color: theme.colors.expense }}>
-                                Remove from Cart
+                                {t.product.remove_from_cart}
                             </Text>
                         </View>
                     </TouchableOpacity>

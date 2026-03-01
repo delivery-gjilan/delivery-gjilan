@@ -2,10 +2,11 @@ import type { MutationResolvers } from './../../../../generated/types.generated'
 import { getDB } from '@/database';
 import { promotions, promotionBusinessEligibility } from '@/database/schema';
 import { eq } from 'drizzle-orm';
+import { AppError } from '@/lib/errors';
 
 export const updatePromotion: NonNullable<MutationResolvers['updatePromotion']> = async (_parent, { input }, { userData }) => {
   if (!userData.userId || userData.role !== 'SUPER_ADMIN') {
-    throw new Error('Forbidden');
+    throw AppError.forbidden();
   }
 
   const db = await getDB();
@@ -36,7 +37,7 @@ export const updatePromotion: NonNullable<MutationResolvers['updatePromotion']> 
     .returning();
 
   if (!promo) {
-    throw new Error('Promotion not found');
+    throw AppError.notFound('Promotion');
   }
 
   // Update eligible businesses if provided

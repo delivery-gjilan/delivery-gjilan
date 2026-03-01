@@ -1,17 +1,19 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { View, FlatList, Image, TouchableOpacity, Dimensions, Platform } from 'react-native';
-import Animated, { useAnimatedStyle, interpolate, Extrapolate } from 'react-native-reanimated';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { View, Text, FlatList, Image, TouchableOpacity, Dimensions, Platform } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/useTheme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SLIDE_WIDTH = SCREEN_WIDTH - 32; // 16px padding on each side
-const SLIDE_HEIGHT = 180;
-const AUTO_SCROLL_INTERVAL = 4000; // 4 seconds
+const SLIDE_HEIGHT = Math.round(SLIDE_WIDTH * 0.56); // Taller aspect ratio
+const AUTO_SCROLL_INTERVAL = 4000;
 
 export interface PromoBanner {
     id: string;
     imageUrl: string;
     type: 'image' | 'gif';
+    title?: string;
+    subtitle?: string;
     onPress?: () => void;
 }
 
@@ -23,50 +25,36 @@ export function PromoSlider({ banners }: PromoSliderProps) {
     const theme = useTheme();
     const flatListRef = useRef<FlatList>(null);
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [isUserScrolling, setIsUserScrolling] = useState(false);
-    const scrollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const scrollPausedRef = useRef(false);
 
-    // Auto-scroll logic
+    // Auto-scroll
     useEffect(() => {
-        if (banners.length <= 1 || isUserScrolling) return;
+        if (banners.length <= 1) return;
 
-        scrollTimerRef.current = setInterval(() => {
-            setCurrentIndex((prevIndex) => {
-                const nextIndex = (prevIndex + 1) % banners.length;
-                flatListRef.current?.scrollToIndex({
-                    index: nextIndex,
-                    animated: true,
-                });
-                return nextIndex;
+        const interval = setInterval(() => {
+            if (scrollPausedRef.current) return;
+            setCurrentIndex((prev) => {
+                const next = (prev + 1) % banners.length;
+                flatListRef.current?.scrollToIndex({ index: next, animated: true });
+                return next;
             });
         }, AUTO_SCROLL_INTERVAL);
 
-        return () => {
-            if (scrollTimerRef.current) {
-                clearInterval(scrollTimerRef.current);
-            }
-        };
-    }, [banners.length, isUserScrolling]);
+        return () => clearInterval(interval);
+    }, [banners.length]);
 
-    // Handle manual scroll
-    const onScroll = (event: any) => {
-        const scrollPosition = event.nativeEvent.contentOffset.x;
-        const index = Math.round(scrollPosition / (SLIDE_WIDTH + 16));
+    const onScroll = useCallback((event: any) => {
+        const index = Math.round(event.nativeEvent.contentOffset.x / (SLIDE_WIDTH + 16));
         setCurrentIndex(index);
-    };
+    }, []);
 
-    // Pause auto-scroll when user starts dragging
-    const onScrollBeginDrag = () => {
-        setIsUserScrolling(true);
-        if (scrollTimerRef.current) {
-            clearInterval(scrollTimerRef.current);
-        }
-    };
+    const onScrollBeginDrag = useCallback(() => {
+        scrollPausedRef.current = true;
+    }, []);
 
-    // Resume auto-scroll after user stops dragging
-    const onScrollEndDrag = () => {
-        setIsUserScrolling(false);
-    };
+    const onScrollEndDrag = useCallback(() => {
+        scrollPausedRef.current = false;
+    }, []);
 
     const renderItem = ({ item }: { item: PromoBanner }) => (
         <TouchableOpacity
@@ -82,7 +70,7 @@ export function PromoSlider({ banners }: PromoSliderProps) {
                 style={{
                     width: '100%',
                     height: '100%',
-                    borderRadius: 16,
+                    borderRadius: 8,
                     overflow: 'hidden',
                     backgroundColor: theme.colors.card,
                     ...(Platform.OS === 'ios' && {
@@ -104,6 +92,34 @@ export function PromoSlider({ banners }: PromoSliderProps) {
                     }}
                     resizeMode="cover"
                 />
+                {/* Text overlay */}
+                {(item.title || item.subtitle) && (
+                    <LinearGradient
+                        colors={['transparent', 'rgba(0,0,0,0.75)']}
+                        style={{
+                            position: 'absolute',
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            paddingHorizontal: 16,
+                            paddingBottom: 16,
+                            paddingTop: 40,
+                            borderBottomLeftRadius: 8,
+                            borderBottomRightRadius: 8,
+                        }}
+                    >
+                        {item.title && (
+                            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 20, marginBottom: 2 }}>
+                                {item.title}
+                            </Text>
+                        )}
+                        {item.subtitle && (
+                            <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, fontWeight: '500' }}>
+                                {item.subtitle}
+                            </Text>
+                        )}
+                    </LinearGradient>
+                )}
             </View>
         </TouchableOpacity>
     );
@@ -135,7 +151,7 @@ export function PromoSlider({ banners }: PromoSliderProps) {
                 })}
             />
 
-            {/* Pagination Dots */}
+            {/* Pagination Dots + Play button */}
             {banners.length > 1 && (
                 <View
                     style={{
@@ -143,24 +159,45 @@ export function PromoSlider({ banners }: PromoSliderProps) {
                         justifyContent: 'center',
                         alignItems: 'center',
                         marginTop: 12,
-                        gap: 6,
+                        paddingHorizontal: 16,
                     }}
                 >
-                    {banners.map((_, index) => {
-                        const isActive = index === currentIndex;
-                        return (
-                            <View
-                                key={index}
-                                style={{
-                                    width: isActive ? 20 : 6,
-                                    height: 6,
-                                    borderRadius: 3,
-                                    backgroundColor: isActive ? theme.colors.primary : theme.colors.subtext,
-                                    opacity: isActive ? 1 : 0.3,
-                                }}
-                            />
-                        );
-                    })}
+                    <View style={{ flex: 1 }} />
+                    <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                        {banners.map((_, index) => {
+                            const isActive = index === currentIndex;
+                            return (
+                                <View
+                                    key={index}
+                                    style={{
+                                        width: 6,
+                                        height: 6,
+                                        borderRadius: 3,
+                                        backgroundColor: isActive ? theme.colors.primary : 'rgba(255,255,255,0.4)',
+                                    }}
+                                />
+                            );
+                        })}
+                    </View>
+                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                        <TouchableOpacity
+                            onPress={() => {
+                                const next = (currentIndex + 1) % banners.length;
+                                flatListRef.current?.scrollToIndex({ index: next, animated: true });
+                                setCurrentIndex(next);
+                            }}
+                            style={{
+                                width: 32,
+                                height: 32,
+                                borderRadius: 16,
+                                backgroundColor: 'rgba(255,255,255,0.2)',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                            }}
+                        >
+                            <Text style={{ color: '#fff', fontSize: 16, marginLeft: 2 }}>▶</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             )}
         </View>

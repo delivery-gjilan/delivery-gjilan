@@ -1,5 +1,6 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { createAuditLogger } from '@/services/AuditLogger';
+import { AppError } from '@/lib/errors';
 
 export const createOrder: NonNullable<MutationResolvers['createOrder']> = async (
     _parent,
@@ -8,7 +9,7 @@ export const createOrder: NonNullable<MutationResolvers['createOrder']> = async 
 ) => {
     const { userData, orderService, db } = context;
     if (!userData.userId) {
-        throw new Error('Unauthorized');
+        throw AppError.unauthorized();
     }
     const order = await orderService.createOrder(userData.userId, input);
     await orderService.publishUserOrders(userData.userId!);

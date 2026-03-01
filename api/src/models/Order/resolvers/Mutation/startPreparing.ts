@@ -2,6 +2,7 @@ import type { MutationResolvers } from './../../../../generated/types.generated'
 import { createAuditLogger } from '@/services/AuditLogger';
 import logger from '@/lib/logger';
 import { notifyCustomerOrderStatus } from '@/services/orderNotifications';
+import { AppError } from '@/lib/errors';
 
 export const startPreparing: NonNullable<MutationResolvers['startPreparing']> = async (
     _parent,
@@ -13,33 +14,33 @@ export const startPreparing: NonNullable<MutationResolvers['startPreparing']> = 
 
     const role = userData?.role;
     if (!role) {
-        throw new Error('Unauthorized');
+        throw AppError.unauthorized();
     }
 
-    const isBusinessAdmin = role === 'BUSINESS_ADMIN';
+    const isBusinessAdmin = role === 'BUSINESS_OWNER' || role === 'BUSINESS_EMPLOYEE';
     const isSuperAdmin = role === 'SUPER_ADMIN';
 
     if (!isBusinessAdmin && !isSuperAdmin) {
-        throw new Error('Not authorized to start preparing');
+        throw AppError.forbidden('Not authorized to start preparing');
     }
 
     if (isBusinessAdmin) {
         if (!userData.businessId) {
-            throw new Error('Business admin has no business assigned');
+            throw AppError.forbidden('Business admin has no business assigned');
         }
         const canAccess = await orderService.orderContainsBusiness(id, userData.businessId);
         if (!canAccess) {
-            throw new Error('Not authorized to update this order');
+            throw AppError.forbidden('Not authorized to update this order');
         }
     }
 
     if (preparationMinutes < 1 || preparationMinutes > 180) {
-        throw new Error('Preparation time must be between 1 and 180 minutes');
+        throw AppError.badInput('Preparation time must be between 1 and 180 minutes');
     }
 
     const currentOrder = await orderService.getOrderById(id);
     if (!currentOrder) {
-        throw new Error('Order not found');
+        throw AppError.notFound('Order');
     }
 
     const order = await orderService.startPreparing(id, preparationMinutes);

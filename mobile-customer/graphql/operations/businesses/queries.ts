@@ -26,6 +26,13 @@ export const GET_BUSINESSES = graphql(`
                 closesAt
             }
             isOpen
+            activePromotion {
+                id
+                name
+                description
+                type
+                discountValue
+            }
             createdAt
             updatedAt
         }

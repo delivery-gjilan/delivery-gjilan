@@ -11,6 +11,7 @@ import {
 import { orders } from '@/database/schema';
 import { eq, and, or, sql, gte, lte, isNull, inArray } from 'drizzle-orm';
 import logger from '@/lib/logger';
+import { AppError } from '@/lib/errors';
 
 const log = logger.child({ service: 'PromotionEngine' });
 
@@ -252,50 +253,81 @@ export class PromotionEngine {
         orderSubtotal: number,
         businessId: string | null
     ): Promise<void> {
-        for (const promoId of promotionIds) {
-            await this.db.insert(promotionUsage).values({
-                promotionId: promoId,
-                userId,
-                orderId,
-                discountAmount: String(discountAmount),
-                freeDeliveryApplied,
-                orderSubtotal: String(orderSubtotal),
-                businessId,
-            });
+        await this.db.transaction(async (tx) => {
+            for (const promoId of promotionIds) {
+                // Lock the promotion row to prevent concurrent usage beyond limits
+                const [promo] = await tx
+                    .select()
+                    .from(promotions)
+                    .where(eq(promotions.id, promoId))
+                    .for('update');
 
-            // Increment usage counters
-            await this.db
-                .update(promotions)
+                if (!promo) continue;
+
+                // Re-check usage limits inside the transaction
+                if (promo.maxGlobalUsage && promo.currentGlobalUsage >= promo.maxGlobalUsage) {
+                    throw AppError.businessRule(`Promotion "${promo.name}" has reached its global usage limit`);
+                }
+
+                if (promo.maxUsagePerUser) {
+                    const [usage] = await tx
+                        .select({ count: sql<number>`count(*)` })
+                        .from(promotionUsage)
+                        .where(
+                            and(
+                                eq(promotionUsage.promotionId, promoId),
+                                eq(promotionUsage.userId, userId)
+                            )
+                        );
+                    if (Number(usage?.count || 0) >= promo.maxUsagePerUser) {
+                        throw AppError.businessRule(`You have already used promotion "${promo.name}" the maximum number of times`);
+                    }
+                }
+
+                await tx.insert(promotionUsage).values({
+                    promotionId: promoId,
+                    userId,
+                    orderId,
+                    discountAmount: String(discountAmount),
+                    freeDeliveryApplied,
+                    orderSubtotal: String(orderSubtotal),
+                    businessId,
+                });
+
+                // Increment usage counters
+                await tx
+                    .update(promotions)
+                    .set({
+                        currentGlobalUsage: sql`${promotions.currentGlobalUsage} + 1`,
+                        totalUsageCount: sql`${promotions.totalUsageCount} + 1`,
+                        totalRevenue: sql`${promotions.totalRevenue} + ${orderSubtotal}`,
+                    })
+                    .where(eq(promotions.id, promoId));
+
+                // Update user-specific assignment if exists
+                await tx
+                    .update(userPromotions)
+                    .set({
+                        usageCount: sql`${userPromotions.usageCount} + 1`,
+                        lastUsedAt: new Date().toISOString(),
+                    })
+                    .where(
+                        and(
+                            eq(userPromotions.userId, userId),
+                            eq(userPromotions.promotionId, promoId)
+                        )
+                    );
+            }
+
+            // Update user metadata
+            await tx
+                .update(userPromoMetadata)
                 .set({
-                    currentGlobalUsage: sql`${promotions.currentGlobalUsage} + 1`,
-                    totalUsageCount: sql`${promotions.totalUsageCount} + 1`,
-                    totalRevenue: sql`${promotions.totalRevenue} + ${orderSubtotal}`,
+                    totalPromotionsUsed: sql`${userPromoMetadata.totalPromotionsUsed} + 1`,
+                    totalSavings: sql`${userPromoMetadata.totalSavings} + ${discountAmount}`,
                 })
-                .where(eq(promotions.id, promoId));
-
-            // Update user-specific assignment if exists
-            await this.db
-                .update(userPromotions)
-                .set({
-                    usageCount: sql`${userPromotions.usageCount} + 1`,
-                    lastUsedAt: new Date().toISOString(),
-                })
-                .where(
-                    and(
-                        eq(userPromotions.userId, userId),
-                        eq(userPromotions.promotionId, promoId)
-                    )
-                );
-        }
-
-        // Update user metadata
-        await this.db
-            .update(userPromoMetadata)
-            .set({
-                totalPromotionsUsed: sql`${userPromoMetadata.totalPromotionsUsed} + 1`,
-                totalSavings: sql`${userPromoMetadata.totalSavings} + ${discountAmount}`,
-            })
-            .where(eq(userPromoMetadata.userId, userId));
+                .where(eq(userPromoMetadata.userId, userId));
+        });
     }
 
     /**
@@ -427,5 +459,64 @@ export class PromotionEngine {
 
         // Per-user limit already checked in checkCodeEligibility
         return true;
+    }
+
+    /**
+     * Reverse promotion usage when an order is cancelled.
+     * Decrements global/user counters and deletes usage records for the order.
+     */
+    async reverseUsage(orderId: string, userId: string): Promise<void> {
+        // Find all promotion usage records for this order
+        const usageRecords = await this.db
+            .select()
+            .from(promotionUsage)
+            .where(eq(promotionUsage.orderId, orderId));
+
+        if (usageRecords.length === 0) return;
+
+        let totalDiscount = 0;
+        for (const record of usageRecords) {
+            totalDiscount += Number(record.discountAmount || 0);
+
+            // Decrement promotion global counters
+            await this.db
+                .update(promotions)
+                .set({
+                    currentGlobalUsage: sql`GREATEST(0, ${promotions.currentGlobalUsage} - 1)`,
+                    totalUsageCount: sql`GREATEST(0, ${promotions.totalUsageCount} - 1)`,
+                })
+                .where(eq(promotions.id, record.promotionId));
+
+            // Decrement user-specific assignment counters
+            await this.db
+                .update(userPromotions)
+                .set({
+                    usageCount: sql`GREATEST(0, ${userPromotions.usageCount} - 1)`,
+                })
+                .where(
+                    and(
+                        eq(userPromotions.userId, userId),
+                        eq(userPromotions.promotionId, record.promotionId)
+                    )
+                );
+        }
+
+        // Delete usage records for this order
+        await this.db
+            .delete(promotionUsage)
+            .where(eq(promotionUsage.orderId, orderId));
+
+        // Reverse user metadata
+        if (totalDiscount > 0) {
+            await this.db
+                .update(userPromoMetadata)
+                .set({
+                    totalPromotionsUsed: sql`GREATEST(0, ${userPromoMetadata.totalPromotionsUsed} - ${usageRecords.length})`,
+                    totalSavings: sql`GREATEST(0, ${userPromoMetadata.totalSavings} - ${totalDiscount})`,
+                })
+                .where(eq(userPromoMetadata.userId, userId));
+        }
+
+        log.info({ orderId, userId, reversedCount: usageRecords.length }, 'promo:usage:reversed');
     }
 }

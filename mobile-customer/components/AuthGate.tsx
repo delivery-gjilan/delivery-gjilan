@@ -1,6 +1,7 @@
 import { View, Text, Modal, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/store/authStore';
+import { useTranslations } from '@/hooks/useTranslations';
 
 interface AuthGateProps {
     visible: boolean;
@@ -10,6 +11,7 @@ interface AuthGateProps {
 export default function AuthGate({ visible, onDismiss }: AuthGateProps) {
     const router = useRouter();
     const { user, needsSignupCompletion } = useAuthStore();
+    const { t } = useTranslations();
 
     const handlePrimaryAction = () => {
         onDismiss();
@@ -23,18 +25,17 @@ export default function AuthGate({ visible, onDismiss }: AuthGateProps) {
     const getMessage = () => {
         if (needsSignupCompletion) {
             return {
-                title: 'Complete Your Signup',
-                description:
-                    "You haven't finished setting up your account. Complete the signup process to start ordering!",
-                primaryButton: 'Continue Signup',
-                secondaryButton: 'Do It Later',
+                title: t.auth_gate.incomplete_signup.title,
+                description: t.auth_gate.incomplete_signup.description,
+                primaryButton: t.auth_gate.incomplete_signup.primary_button,
+                secondaryButton: t.auth_gate.incomplete_signup.secondary_button,
             };
         }
         return {
-            title: 'Get a Better Experience',
-            description: 'Sign in to save your preferences, track orders, and enjoy a personalized experience!',
-            primaryButton: 'Sign In / Sign Up',
-            secondaryButton: 'Continue as Guest',
+            title: t.auth_gate.guest.title,
+            description: t.auth_gate.guest.description,
+            primaryButton: t.auth_gate.guest.primary_button,
+            secondaryButton: t.auth_gate.guest.secondary_button,
         };
     };
 

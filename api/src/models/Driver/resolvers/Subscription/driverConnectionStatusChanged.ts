@@ -28,7 +28,7 @@ export const driverConnectionStatusChanged: NonNullable<
       throw new GraphQLError('Authentication required', { extensions: { code: 'UNAUTHENTICATED' } });
     }
 
-    const isAdmin = userData.role === 'SUPER_ADMIN' || userData.role === 'BUSINESS_ADMIN';
+    const isAdmin = userData.role === 'SUPER_ADMIN' || userData.role === 'BUSINESS_OWNER' || userData.role === 'BUSINESS_EMPLOYEE';
     const isSelf = userData.userId === driverId;
 
     if (!isAdmin && !isSelf) {

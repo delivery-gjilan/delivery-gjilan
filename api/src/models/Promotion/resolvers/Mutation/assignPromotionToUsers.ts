@@ -3,6 +3,7 @@ import { getDB } from '@/database';
 import { PromotionService } from '@/services/PromotionService';
 import { userPromotions } from '@/database/schema';
 import { eq } from 'drizzle-orm';
+import { AppError } from '@/lib/errors';
 
 export const assignPromotionToUsers: NonNullable<MutationResolvers['assignPromotionToUsers']> = async (
     _parent,
@@ -10,7 +11,7 @@ export const assignPromotionToUsers: NonNullable<MutationResolvers['assignPromot
     { userData }
 ) => {
     if (!userData.userId || userData.role !== 'SUPER_ADMIN') {
-        throw new Error('Forbidden');
+        throw AppError.forbidden();
     }
 
     const db = await getDB();

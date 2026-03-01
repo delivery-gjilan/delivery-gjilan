@@ -6,6 +6,7 @@ import { FinancialService } from '@/services/FinancialService';
 import { createAuditLogger } from '@/services/AuditLogger';
 import logger from '@/lib/logger';
 import { notifyCustomerOrderStatus } from '@/services/orderNotifications';
+import { AppError } from '@/lib/errors';
 
 export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus']> = async (
     _parent,
@@ -17,35 +18,35 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
 
     const role = userData?.role;
     if (!role) {
-        throw new Error('Unauthorized');
+        throw AppError.unauthorized();
     }
 
     const currentOrder = await orderService.getOrderById(id);
     if (!currentOrder) {
-        throw new Error('Order not found');
+        throw AppError.notFound('Order');
     }
 
     const dbOrder = await orderService.orderRepository.findById(id);
     if (!dbOrder) {
-        throw new Error('Order not found');
+        throw AppError.notFound('Order');
     }
 
     const currentStatus = currentOrder.status;
 
     const isSuperAdmin = role === 'SUPER_ADMIN';
     const isDriver = role === 'DRIVER';
-    const isBusinessAdmin = role === 'BUSINESS_ADMIN';
+    const isBusinessAdmin = role === 'BUSINESS_OWNER' || role === 'BUSINESS_EMPLOYEE';
 
     let order;
 
     if (isBusinessAdmin) {
         if (!userData.businessId) {
-            throw new Error('Business admin has no business assigned');
+            throw AppError.forbidden('Business admin has no business assigned');
         }
 
         const canAccess = await orderService.orderContainsBusiness(id, userData.businessId);
         if (!canAccess) {
-            throw new Error('Not authorized to update this order');
+            throw AppError.forbidden('Not authorized to update this order');
         }
 
         const allowed: Record<string, string[]> = {
@@ -53,7 +54,7 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
         };
 
         if (!allowed[currentStatus]?.includes(status)) {
-            throw new Error('Invalid status transition for business admin. Use startPreparing mutation for PENDING → PREPARING');
+            throw AppError.businessRule('Invalid status transition for business admin. Use startPreparing mutation for PENDING → PREPARING');
         }
         order = await orderService.updateOrderStatus(id, status);
     } else if (isDriver) {
@@ -64,15 +65,15 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
         };
 
         if (!allowed[currentStatus]?.includes(status)) {
-            throw new Error('Invalid status transition for driver');
+            throw AppError.businessRule('Invalid status transition for driver');
         }
 
         if (!userData.userId) {
-            throw new Error('Driver not authenticated');
+            throw AppError.unauthorized('Driver not authenticated');
         }
 
         if (dbOrder.driverId && dbOrder.driverId !== userData.userId) {
-            throw new Error('Order already assigned to another driver');
+            throw AppError.conflict('Order already assigned to another driver');
         }
 
         if (status === 'OUT_FOR_DELIVERY') {
@@ -81,9 +82,10 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
             order = await orderService.updateOrderStatus(id, status);
         }
     } else if (!isSuperAdmin) {
-        throw new Error('Not authorized to update order status');
+        throw AppError.forbidden('Not authorized to update order status');
     } else {
-        order = await orderService.updateOrderStatus(id, status);
+        // SUPER_ADMIN bypasses status transition validation
+        order = await orderService.updateOrderStatus(id, status, true);
     }
 
     if (status === 'DELIVERED' && currentStatus !== 'DELIVERED') {

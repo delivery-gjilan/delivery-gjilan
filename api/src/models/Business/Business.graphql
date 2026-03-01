@@ -18,8 +18,17 @@ type Business {
     prepTimeOverrideMinutes: Int
     commissionPercentage: Float!
     isOpen: Boolean!
+    activePromotion: BusinessPromotion
     createdAt: Date!
     updatedAt: Date!
+}
+
+type BusinessPromotion {
+    id: ID!
+    name: String!
+    description: String
+    type: PromotionType!
+    discountValue: Float
 }
 
 type Query {

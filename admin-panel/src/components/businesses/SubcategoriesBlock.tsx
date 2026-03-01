@@ -13,6 +13,7 @@ import {
     useUpdateProductSubcategory,
     useDeleteProductSubcategory,
 } from "@/lib/hooks/useProductSubcategories";
+import { toast } from 'sonner';
 
 interface ProductSubcategory {
     id: string;
@@ -55,7 +56,7 @@ export default function SubcategoriesBlock({ businessId }: { businessId: string 
 
     const handleCreate = async () => {
         if (!createForm.categoryId || !createForm.name.trim()) {
-            alert("Please select a category and enter a name");
+            toast.warning("Please select a category and enter a name");
             return;
         }
 
@@ -69,7 +70,7 @@ export default function SubcategoriesBlock({ businessId }: { businessId: string 
             setCreateOpen(false);
             setCreateForm({ categoryId: "", name: "" });
         } else {
-            alert(`Error creating subcategory: ${createErr}`);
+            toast.error(`Error creating subcategory: ${createErr}`);
         }
     };
 
@@ -84,7 +85,7 @@ export default function SubcategoriesBlock({ businessId }: { businessId: string 
 
     const handleEdit = async () => {
         if (!editForm.name.trim()) {
-            alert("Please enter a name");
+            toast.warning("Please enter a name");
             return;
         }
 
@@ -96,7 +97,7 @@ export default function SubcategoriesBlock({ businessId }: { businessId: string 
             await refetch();
             setEditOpen(false);
         } else {
-            alert(`Error updating subcategory: ${updateErr}`);
+            toast.error(`Error updating subcategory: ${updateErr}`);
         }
     };
 
@@ -109,7 +110,7 @@ export default function SubcategoriesBlock({ businessId }: { businessId: string 
             await refetch();
             setDeleteId(null);
         } else {
-            alert(`Error deleting subcategory: ${deleteErr}`);
+            toast.error(`Error deleting subcategory: ${deleteErr}`);
         }
     };
 

@@ -1,10 +1,11 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { getDB } from '@/database';
 import { userAddress } from '@/database/schema';
+import { AppError } from '@/lib/errors';
 
 export const addUserAddress: NonNullable<MutationResolvers['addUserAddress']> = async (_parent, { input }, { userData }) => {
     if (!userData.userId) {
-        throw new Error('Unauthorized');
+        throw AppError.unauthorized();
     }
 
     const db = await getDB();

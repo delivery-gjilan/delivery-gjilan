@@ -7,6 +7,7 @@ import * as Location from 'expo-location';
 import MapView, { Marker, Region } from 'react-native-maps';
 
 import { useTheme } from '@/hooks/useTheme';
+import { useTranslations } from '@/hooks/useTranslations';
 import { useCart } from '../hooks/useCart';
 import { useCartActions } from '../hooks/useCartActions';
 import { useCreateOrder } from '../hooks/useCreateOrder';
@@ -121,6 +122,7 @@ const minimalistMapStyle = [
 export const CartScreen = () => {
     const router = useRouter();
     const theme = useTheme();
+    const { t } = useTranslations();
     const { items, total, isEmpty } = useCart();
     const { updateQuantity, removeItem } = useCartActions();
     const { createOrder, loading: orderLoading } = useCreateOrder();
@@ -512,7 +514,7 @@ export const CartScreen = () => {
 
     const handleSaveAsDefault = async () => {
         if (!pendingLocationToSave || !addressName.trim()) {
-            Alert.alert('Address Name Required', 'Please enter a name for this address.');
+            Alert.alert(t.cart.address_name_required, t.cart.enter_address_name);
             return;
         }
         
@@ -542,7 +544,7 @@ export const CartScreen = () => {
             setAddressName('');
             setTimeout(() => setIsSummaryModalOpen(true), 260);
         } catch (error) {
-            Alert.alert('Error', 'Failed to save address. Please try again.');
+            Alert.alert(t.common.error, t.cart.failed_save_address);
             console.error('Error saving address:', error);
         }
     };
@@ -566,7 +568,7 @@ export const CartScreen = () => {
     const handleUseCurrentLocation = async () => {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
-            Alert.alert('Location Required', 'Please enable location services to use your current address.');
+            Alert.alert(t.cart.location_required, t.cart.enable_location);
             return;
         }
 
@@ -580,7 +582,7 @@ export const CartScreen = () => {
         }
 
         if (!current) {
-            Alert.alert('Location Required', 'Unable to fetch your current location.');
+            Alert.alert(t.cart.location_required, t.cart.unable_fetch_location);
             return;
         }
 
@@ -630,7 +632,7 @@ export const CartScreen = () => {
     // Manual promo application handler (previous auto-validation removed)
     const handleApplyCoupon = async () => {
         if (!couponCode.trim()) {
-            Alert.alert('Enter Code', 'Please enter a promo code.');
+            Alert.alert(t.cart.enter_promo_code, t.cart.enter_promo_code);
             return;
         }
 
@@ -645,7 +647,7 @@ export const CartScreen = () => {
             const result = (response?.data as any)?.validatePromotions;
             if (!result || (Array.isArray(result.promotions) && result.promotions.length === 0)) {
                 setPromoResult(null);
-                Alert.alert('Invalid Code', 'Promotion not valid.');
+                Alert.alert(t.cart.invalid_code, t.cart.promo_not_valid);
                 return;
             }
 
@@ -656,9 +658,9 @@ export const CartScreen = () => {
                 effectiveDeliveryPrice: Number(result.finalDeliveryPrice ?? deliveryPrice),
                 totalPrice: Number(result.finalTotal ?? total + deliveryPrice),
             });
-            Alert.alert('Promo Applied', `Discount €${Number(result.totalDiscount ?? 0).toFixed(2)} added.`);
+            Alert.alert(t.cart.promo_applied_title, t.cart.discount_added.replace('{{amount}}', Number(result.totalDiscount ?? 0).toFixed(2)));
         } catch (err) {
-            Alert.alert('Promo Error', 'Unable to validate promo code.');
+            Alert.alert(t.cart.promo_error, t.cart.unable_validate_promo);
         }
     };
 
@@ -698,7 +700,7 @@ export const CartScreen = () => {
 
     const handleCheckout = async () => {
         if (!selectedLocation) {
-            Alert.alert('Select Address', 'Please choose a delivery address to continue.');
+            Alert.alert(t.cart.select_address, t.cart.select_address_alert);
             return;
         }
 
@@ -707,7 +709,7 @@ export const CartScreen = () => {
             await createOrder(selectedLocation, appliedDeliveryPrice, finalTotal, promoResult?.code);
             // Navigation happens in the hook
         } catch (err) {
-            Alert.alert('Order Failed', 'Unable to create order. Please try again.', [{ text: 'OK' }]);
+            Alert.alert(t.cart.order_failed, t.cart.unable_create_order, [{ text: t.common.ok }]);
         } finally {
             setIsProcessing(false);
         }
@@ -730,7 +732,7 @@ export const CartScreen = () => {
                         <Ionicons name="close" size={28} color={theme.colors.text} />
                     </TouchableOpacity>
                     <Text className="text-xl font-bold" style={{ color: theme.colors.text }}>
-                        Cart
+                        {t.cart.title}
                     </Text>
                     <View style={{ width: 28 }} />
                 </View>
@@ -739,10 +741,10 @@ export const CartScreen = () => {
                 <View className="flex-1 items-center justify-center px-6">
                     <Ionicons name="cart-outline" size={80} color={theme.colors.subtext} />
                     <Text className="text-xl font-semibold mt-4" style={{ color: theme.colors.text }}>
-                        Your cart is empty
+                        {t.cart.empty}
                     </Text>
                     <Text className="mt-2 text-center" style={{ color: theme.colors.subtext }}>
-                        Add items to get started
+                        {t.cart.empty_subtitle}
                     </Text>
                 </View>
             </SafeAreaView>
@@ -767,7 +769,7 @@ export const CartScreen = () => {
                     <Ionicons name="close" size={28} color={theme.colors.text} />
                 </TouchableOpacity>
                 <Text className="text-xl font-bold" style={{ color: theme.colors.text }}>
-                    Cart ({items.length})
+                    {t.cart.title} ({items.length})
                 </Text>
                 <View style={{ width: 28 }} />
             </View>
@@ -873,7 +875,7 @@ export const CartScreen = () => {
                 <View className="gap-2 mb-3">
                     <View className="flex-row justify-between items-center">
                         <Text className="text-base" style={{ color: theme.colors.subtext }}>
-                            Subtotal
+                            {t.common.subtotal}
                         </Text>
                         <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
                             €{total.toFixed(2)}
@@ -887,7 +889,7 @@ export const CartScreen = () => {
                 {/* Total */}
                 <View className="flex-row justify-between items-center mb-4">
                     <Text className="text-lg font-semibold" style={{ color: theme.colors.text }}>
-                        Total
+                        {t.common.total}
                     </Text>
                     <Text className="text-2xl font-bold" style={{ color: theme.colors.primary }}>
                         €{total.toFixed(2)}
@@ -907,10 +909,10 @@ export const CartScreen = () => {
                     {isProcessing ? (
                         <View className="flex-row items-center gap-2">
                             <ActivityIndicator size="small" color="white" />
-                            <Text className="text-white font-bold text-lg">Processing...</Text>
+                            <Text className="text-white font-bold text-lg">{t.cart.processing}</Text>
                         </View>
                     ) : (
-                        <Text className="text-white font-bold text-lg">Choose address</Text>
+                        <Text className="text-white font-bold text-lg">{t.cart.choose_address}</Text>
                     )}
                 </AnimatedTouchable>
             </View>
@@ -924,7 +926,7 @@ export const CartScreen = () => {
                                 <Ionicons name="close" size={26} color={theme.colors.text} />
                             </TouchableOpacity>
                             <Text className="text-lg font-bold" style={{ color: theme.colors.text }}>
-                                Select address
+                                {t.cart.select_address}
                             </Text>
                             <View style={{ width: 26 }} />
                         </View>
@@ -987,7 +989,7 @@ export const CartScreen = () => {
                                                                             className="text-xs font-semibold"
                                                                             style={{ color: theme.colors.primary }}
                                                                         >
-                                                                            Default
+                                                                            {t.common.default}
                                                                         </Text>
                                                                     </View>
                                                                 )}
@@ -1021,10 +1023,10 @@ export const CartScreen = () => {
                                         <Ionicons name="location-outline" size={40} color={theme.colors.subtext} />
                                     </View>
                                     <Text className="text-lg font-semibold mb-2" style={{ color: theme.colors.text }}>
-                                        No saved addresses
+                                        {t.cart.no_saved_addresses}
                                     </Text>
                                     <Text className="text-center" style={{ color: theme.colors.subtext }}>
-                                        Add addresses from your profile for quick checkout
+                                        {t.cart.no_saved_addresses_subtitle}
                                     </Text>
                                 </View>
                             )}
@@ -1037,7 +1039,7 @@ export const CartScreen = () => {
                                 onPress={handleChooseOnMap}
                             >
                                 <Ionicons name="map-outline" size={20} color="white" />
-                                <Text className="text-white font-semibold">Choose on map</Text>
+                                <Text className="text-white font-semibold">{t.cart.choose_on_map}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 className="py-3 rounded-xl items-center"
@@ -1045,7 +1047,7 @@ export const CartScreen = () => {
                                 onPress={closeAddressModal}
                             >
                                 <Text className="font-semibold" style={{ color: theme.colors.text }}>
-                                    Cancel
+                                    {t.common.cancel}
                                 </Text>
                             </TouchableOpacity>
                         </View>
@@ -1062,7 +1064,7 @@ export const CartScreen = () => {
                                 <Ionicons name="close" size={26} color={theme.colors.text} />
                             </TouchableOpacity>
                             <Text className="text-lg font-bold" style={{ color: theme.colors.text }}>
-                                Select on map
+                                {t.cart.select_on_map}
                             </Text>
                             <View style={{ width: 26 }} />
                         </View>
@@ -1090,7 +1092,7 @@ export const CartScreen = () => {
                                 }}
                                 onPress={handleUseCurrentLocation}
                             >
-                                <Text className="text-white font-semibold">Use my current address</Text>
+                                <Text className="text-white font-semibold">{t.cart.use_current_address}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 className="py-3 rounded-xl items-center"
@@ -1101,7 +1103,7 @@ export const CartScreen = () => {
                                 onPress={closeMapModal}
                             >
                                 <Text className="font-semibold" style={{ color: theme.colors.text }}>
-                                    Back
+                                    {t.common.back}
                                 </Text>
                             </TouchableOpacity>
                         </View>
@@ -1126,7 +1128,7 @@ export const CartScreen = () => {
                                 <Ionicons name="close" size={22} color={theme.colors.text} />
                             </TouchableOpacity>
                             <Text className="text-lg font-bold" style={{ color: theme.colors.text }}>
-                                Order summary
+                                {t.cart.order_summary}
                             </Text>
                             <View style={{ width: 22 }} />
                         </View>
@@ -1135,10 +1137,10 @@ export const CartScreen = () => {
                             {selectedLocation && (
                                 <View className="mb-5">
                                     <Text className="text-xs uppercase" style={{ color: theme.colors.subtext }}>
-                                        Deliver to
+                                        {t.cart.deliver_to}
                                     </Text>
                                     <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
-                                        {selectedLocation.label ?? 'Selected address'}
+                                        {selectedLocation.label ?? t.cart.selected_address}
                                     </Text>
                                     <Text className="text-sm" style={{ color: theme.colors.subtext }}>
                                         {selectedLocation.address}
@@ -1150,7 +1152,7 @@ export const CartScreen = () => {
                                 <View className="flex-row justify-between items-center">
                                     <View className="flex-row items-center gap-1">
                                         <Text className="text-base" style={{ color: theme.colors.subtext }}>
-                                            Delivery
+                                            {t.common.delivery}
                                         </Text>
                                         {deliveryZoneName && !freeDeliveryApplied && (
                                             <Text className="text-xs" style={{ color: theme.colors.primary }}>
@@ -1159,17 +1161,17 @@ export const CartScreen = () => {
                                         )}
                                     </View>
                                     <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
-                                        {freeDeliveryApplied ? 'Free' : `€${appliedDeliveryPrice.toFixed(2)}`}
+                                        {freeDeliveryApplied ? t.common.free : `€${appliedDeliveryPrice.toFixed(2)}`}
                                     </Text>
                                 </View>
                                 {(appliedDiscount > 0 || freeDeliveryApplied) && (
                                     <View className="flex-row justify-between items-center">
                                         <Text className="text-base" style={{ color: theme.colors.subtext }}>
-                                            Promo
+                                            {t.cart.promo}
                                         </Text>
                                         <Text className="text-base font-semibold" style={{ color: theme.colors.income }}>
                                             {freeDeliveryApplied && appliedDiscount === 0
-                                                ? 'Free delivery'
+                                                ? t.cart.free_delivery
                                                 : `-€${appliedDiscount.toFixed(2)}`}
                                         </Text>
                                     </View>
@@ -1178,13 +1180,13 @@ export const CartScreen = () => {
 
                             <View className="p-4 rounded-2xl border mb-4" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.background }}>
                                 <Text className="text-xs uppercase mb-2" style={{ color: theme.colors.subtext }}>
-                                    Promo code
+                                    {t.cart.promo_code}
                                 </Text>
                                 <View className="flex-row items-center gap-2">
                                     <TextInput
                                         value={couponCode}
                                         onChangeText={setCouponCode}
-                                        placeholder="Enter code"
+                                        placeholder={t.cart.enter_code}
                                         placeholderTextColor={theme.colors.subtext}
                                         className="flex-1 px-3 py-2 rounded-xl"
                                         style={{
@@ -1206,13 +1208,13 @@ export const CartScreen = () => {
                                         {manualPromoLoading ? (
                                             <ActivityIndicator size="small" color={theme.colors.text} />
                                         ) : (
-                                            <Text className="text-white font-semibold">Apply</Text>
+                                            <Text className="text-white font-semibold">{t.common.apply}</Text>
                                         )}
                                     </TouchableOpacity>
                                 </View>
                                 {promoResult && (
                                     <Text className="text-xs mt-2" style={{ color: theme.colors.subtext }}>
-                                        Promo {promoResult.code} applied to this order.
+                                        {t.cart.promo_applied.replace('{{code}}', promoResult.code)}
                                     </Text>
                                 )}
                             </View>
@@ -1221,7 +1223,7 @@ export const CartScreen = () => {
 
                             <View className="flex-row justify-between items-center mb-4">
                                 <Text className="text-lg font-semibold" style={{ color: theme.colors.text }}>
-                                    Total
+                                    {t.common.total}
                                 </Text>
                                 <Text className="text-2xl font-bold" style={{ color: theme.colors.primary }}>
                                     €{finalTotal.toFixed(2)}
@@ -1244,10 +1246,10 @@ export const CartScreen = () => {
                                 {isProcessing || orderLoading ? (
                                     <View className="flex-row items-center gap-2">
                                         <ActivityIndicator size="small" color="white" />
-                                        <Text className="text-white font-semibold">Placing order...</Text>
+                                        <Text className="text-white font-semibold">{t.cart.placing_order}</Text>
                                     </View>
                                 ) : (
-                                    <Text className="text-white font-semibold">Confirm & Place Order</Text>
+                                    <Text className="text-white font-semibold">{t.cart.confirm_order}</Text>
                                 )}
                             </TouchableOpacity>
                             <TouchableOpacity
@@ -1259,7 +1261,7 @@ export const CartScreen = () => {
                                 }}
                             >
                                 <Text className="font-semibold" style={{ color: theme.colors.text }}>
-                                    Change address
+                                    {t.cart.change_address}
                                 </Text>
                             </TouchableOpacity>
                         </View>
@@ -1279,10 +1281,10 @@ export const CartScreen = () => {
                                 <Ionicons name="bookmark-outline" size={32} color={theme.colors.primary} />
                             </View>
                             <Text className="text-xl font-bold text-center mb-2" style={{ color: theme.colors.text }}>
-                                Save this address?
+                                {t.cart.save_address_title}
                             </Text>
                             <Text className="text-center" style={{ color: theme.colors.subtext }}>
-                                Choose a name for quick access
+                                {t.cart.save_address_subtitle}
                             </Text>
                         </View>
 
@@ -1310,7 +1312,7 @@ export const CartScreen = () => {
                         {/* Quick Select Buttons */}
                         <View className="mb-4">
                             <Text className="text-sm font-semibold mb-2" style={{ color: theme.colors.text }}>
-                                Quick select
+                                {t.cart.quick_select}
                             </Text>
                             <View className="flex-row gap-3">
                                 <TouchableOpacity
@@ -1331,7 +1333,7 @@ export const CartScreen = () => {
                                             className="font-semibold"
                                             style={{ color: addressName === 'Home' ? theme.colors.primary : theme.colors.text }}
                                         >
-                                            Home
+                                            {t.cart.home}
                                         </Text>
                                     </View>
                                 </TouchableOpacity>
@@ -1353,7 +1355,7 @@ export const CartScreen = () => {
                                             className="font-semibold"
                                             style={{ color: addressName === 'Work' ? theme.colors.primary : theme.colors.text }}
                                         >
-                                            Work
+                                            {t.cart.work}
                                         </Text>
                                     </View>
                                 </TouchableOpacity>
@@ -1363,7 +1365,7 @@ export const CartScreen = () => {
                         {/* Custom Name Input */}
                         <View className="mb-4">
                             <Text className="text-sm font-semibold mb-2" style={{ color: theme.colors.text }}>
-                                Or enter custom name
+                                {t.cart.custom_name}
                             </Text>
                             <TextInput
                                 className="rounded-xl px-4 py-3 border-2"
@@ -1372,7 +1374,7 @@ export const CartScreen = () => {
                                     borderColor: addressName && addressName !== 'Home' && addressName !== 'Work' ? theme.colors.primary : theme.colors.border,
                                     color: theme.colors.text,
                                 }}
-                                placeholder="e.g., Mom's house, Office, Gym..."
+                                placeholder={t.cart.custom_name_placeholder}
                                 placeholderTextColor={theme.colors.subtext}
                                 value={addressName !== 'Home' && addressName !== 'Work' ? addressName : ''}
                                 onChangeText={setAddressName}
@@ -1397,7 +1399,7 @@ export const CartScreen = () => {
                                 {addingAddress ? (
                                     <ActivityIndicator size="small" color="white" />
                                 ) : (
-                                    <Text className="text-white font-semibold">Save as default</Text>
+                                    <Text className="text-white font-semibold">{t.cart.save_as_default}</Text>
                                 )}
                             </TouchableOpacity>
                             <TouchableOpacity
@@ -1407,7 +1409,7 @@ export const CartScreen = () => {
                                 disabled={addingAddress}
                             >
                                 <Text className="font-semibold" style={{ color: theme.colors.text }}>
-                                    Skip, just use once
+                                    {t.cart.skip_save}
                                 </Text>
                             </TouchableOpacity>
                         </View>

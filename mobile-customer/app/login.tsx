@@ -3,10 +3,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { useState } from 'react';
 import { useRouter, type Href } from 'expo-router';
+import { useTranslations } from '@/hooks/useTranslations';
 
 export default function LoginScreen() {
     const { login, loading } = useAuth();
     const router = useRouter();
+    const { t } = useTranslations();
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -14,7 +16,7 @@ export default function LoginScreen() {
 
     const handleLogin = async () => {
         if (!email.trim() || !password.trim()) {
-            setError('Please fill in all fields');
+            setError(t.auth.login.fill_all_fields);
             return;
         }
 
@@ -33,7 +35,7 @@ export default function LoginScreen() {
                 }
             }
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Login failed');
+            setError(err instanceof Error ? err.message : t.auth.login.login_failed);
         }
     };
 
@@ -41,8 +43,8 @@ export default function LoginScreen() {
         <SafeAreaView className="flex-1 bg-white">
             <ScrollView className="flex-1">
                 <View className="px-6 py-12">
-                    <Text className="text-4xl font-bold text-gray-900 mb-2">Welcome</Text>
-                    <Text className="text-base text-gray-600">Sign in to your account</Text>
+                    <Text className="text-4xl font-bold text-gray-900 mb-2">{t.auth.login.title}</Text>
+                    <Text className="text-base text-gray-600">{t.auth.login.subtitle}</Text>
                 </View>
 
                 <View className="px-6 py-6">
@@ -55,10 +57,10 @@ export default function LoginScreen() {
 
                     {/* Email Input */}
                     <View className="mb-4">
-                        <Text className="text-gray-700 font-semibold mb-2">Email</Text>
+                        <Text className="text-gray-700 font-semibold mb-2">{t.auth.login.email_label}</Text>
                         <TextInput
                             className="border border-gray-300 rounded-lg px-4 py-3 text-gray-900"
-                            placeholder="Enter your email"
+                            placeholder={t.auth.login.email_placeholder}
                             value={email}
                             onChangeText={setEmail}
                             editable={!loading}
@@ -69,10 +71,10 @@ export default function LoginScreen() {
 
                     {/* Password Input */}
                     <View className="mb-6">
-                        <Text className="text-gray-700 font-semibold mb-2">Password</Text>
+                        <Text className="text-gray-700 font-semibold mb-2">{t.auth.login.password_label}</Text>
                         <TextInput
                             className="border border-gray-300 rounded-lg px-4 py-3 text-gray-900"
-                            placeholder="Enter your password"
+                            placeholder={t.auth.login.password_placeholder}
                             value={password}
                             onChangeText={setPassword}
                             editable={!loading}
@@ -91,7 +93,7 @@ export default function LoginScreen() {
                         {loading ? (
                             <ActivityIndicator color="white" />
                         ) : (
-                            <Text className="text-white font-semibold text-base">Sign In</Text>
+                            <Text className="text-white font-semibold text-base">{t.auth.sign_in}</Text>
                         )}
                     </TouchableOpacity>
 
@@ -103,7 +105,7 @@ export default function LoginScreen() {
                         }}
                     >
                         <Text className="text-center text-gray-600">
-                            Don&apos;t have an account? <Text className="text-blue-600 font-semibold">Sign up</Text>
+                            {t.auth.login.no_account}<Text className="text-blue-600 font-semibold">{t.auth.login.sign_up_link}</Text>
                         </Text>
                     </TouchableOpacity>
                 </View>

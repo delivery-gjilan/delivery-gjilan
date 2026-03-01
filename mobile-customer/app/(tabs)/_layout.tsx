@@ -26,21 +26,28 @@ export default function TabLayout() {
                 <Tabs.Screen
                     name="home"
                     options={{
-                        title: 'Restaurants',
+                        title: t.tabs.discover,
+                        tabBarIcon: ({ color, size }) => <Ionicons name="compass" size={size} color={color} />,
+                    }}
+                />
+                <Tabs.Screen
+                    name="restaurants"
+                    options={{
+                        title: t.tabs.restaurants,
                         tabBarIcon: ({ color, size }) => <Ionicons name="restaurant" size={size} color={color} />,
                     }}
                 />
                 <Tabs.Screen
                     name="market"
                     options={{
-                        title: 'Market',
+                        title: t.tabs.shops,
                         tabBarIcon: ({ color, size }) => <Ionicons name="cart" size={size} color={color} />,
                     }}
                 />
                 <Tabs.Screen
                     name="profile"
                     options={{
-                        title: 'Profile',
+                        title: t.tabs.profile,
                         tabBarIcon: ({ color, size }) => <Ionicons name="person" size={size} color={color} />,
                     }}
                 />

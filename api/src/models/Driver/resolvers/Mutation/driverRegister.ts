@@ -1,5 +1,5 @@
 import type { MutationResolvers } from '@/generated/types.generated';
-import { GraphQLError } from 'graphql';
+import { AppError } from '@/lib/errors';
 
 export const driverRegister: NonNullable<MutationResolvers['driverRegister']> = async (
     _parent,
@@ -7,7 +7,7 @@ export const driverRegister: NonNullable<MutationResolvers['driverRegister']> = 
     { driverAuthService }
 ) => {
     if (!driverAuthService) {
-        throw new GraphQLError('Driver authentication service not available');
+        throw new AppError('Driver authentication service not available', 'SERVICE_UNAVAILABLE');
     }
 
     try {
@@ -37,6 +37,6 @@ export const driverRegister: NonNullable<MutationResolvers['driverRegister']> = 
             message: result.message,
         };
     } catch (error) {
-        throw new GraphQLError(error instanceof Error ? error.message : 'Registration failed');
+        throw AppError.badInput(error instanceof Error ? error.message : 'Registration failed');
     }
 };

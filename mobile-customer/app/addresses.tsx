@@ -6,11 +6,13 @@ import { useRouter } from 'expo-router';
 import { useQuery, useMutation } from '@apollo/client/react';
 
 import { useTheme } from '@/hooks/useTheme';
+import { useTranslations } from '@/hooks/useTranslations';
 import { GET_MY_ADDRESSES, DELETE_USER_ADDRESS, SET_DEFAULT_ADDRESS } from '@/graphql/operations/addresses';
 
 export default function AddressesScreen() {
     const router = useRouter();
     const theme = useTheme();
+    const { t } = useTranslations();
 
     const { data, loading, refetch } = useQuery(GET_MY_ADDRESSES, {
         // Show cached addresses immediately; refresh in background.
@@ -22,7 +24,7 @@ export default function AddressesScreen() {
             refetch();
         },
         onError: (error) => {
-            Alert.alert('Error', error.message);
+            Alert.alert(t.common.error, error.message);
         },
     });
 
@@ -31,7 +33,7 @@ export default function AddressesScreen() {
             refetch();
         },
         onError: (error) => {
-            Alert.alert('Error', error.message);
+            Alert.alert(t.common.error, error.message);
         },
     });
 
@@ -39,12 +41,12 @@ export default function AddressesScreen() {
 
     const handleDelete = (id: string, name: string) => {
         Alert.alert(
-            'Delete Address',
-            `Are you sure you want to delete "${name || 'this address'}"?`,
+            t.addresses.delete_title,
+            `${t.addresses.delete_confirm} "${name || t.addresses.this_address}"?`,
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: t.common.cancel, style: 'cancel' },
                 {
-                    text: 'Delete',
+                    text: t.common.delete,
                     style: 'destructive',
                     onPress: () => deleteAddress({ variables: { id } }),
                 },
@@ -74,7 +76,7 @@ export default function AddressesScreen() {
                     <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
                 <Text className="text-xl font-bold" style={{ color: theme.colors.text }}>
-                    My Addresses
+                    {t.addresses.title}
                 </Text>
                 <View style={{ width: 40 }} />
             </View>
@@ -87,7 +89,7 @@ export default function AddressesScreen() {
                     style={{ backgroundColor: theme.colors.primary }}
                 >
                     <Ionicons name="add-circle-outline" size={24} color="#fff" style={{ marginRight: 8 }} />
-                    <Text className="text-base font-semibold text-white">Add New Address</Text>
+                    <Text className="text-base font-semibold text-white">{t.addresses.add_new}</Text>
                 </TouchableOpacity>
 
                 {/* Address List */}
@@ -95,10 +97,10 @@ export default function AddressesScreen() {
                     <View className="items-center py-12">
                         <Ionicons name="location-outline" size={64} color={theme.colors.subtext} style={{ marginBottom: 16 }} />
                         <Text className="text-lg font-semibold mb-2" style={{ color: theme.colors.text }}>
-                            No addresses yet
+                            {t.addresses.no_addresses}
                         </Text>
                         <Text className="text-sm text-center" style={{ color: theme.colors.subtext }}>
-                            Add your first address to make ordering easier
+                            {t.addresses.no_addresses_subtitle}
                         </Text>
                     </View>
                 ) : (
@@ -129,7 +131,7 @@ export default function AddressesScreen() {
                                             style={{ marginRight: 8 }}
                                         />
                                         <Text className="text-lg font-bold" style={{ color: theme.colors.text }}>
-                                            {address.addressName || 'Address'}
+                                            {address.addressName || t.addresses.address_fallback}
                                         </Text>
                                         {address.priority === 1 && (
                                             <View
@@ -137,7 +139,7 @@ export default function AddressesScreen() {
                                                 style={{ backgroundColor: theme.colors.primary + '20' }}
                                             >
                                                 <Text className="text-xs font-semibold" style={{ color: theme.colors.primary }}>
-                                                    Default
+                                                    {t.common.default}
                                                 </Text>
                                             </View>
                                         )}
@@ -158,7 +160,7 @@ export default function AddressesScreen() {
                                     >
                                         <Ionicons name="star-outline" size={18} color={theme.colors.text} style={{ marginRight: 6 }} />
                                         <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
-                                            Set Default
+                                            {t.addresses.set_default}
                                         </Text>
                                     </TouchableOpacity>
                                 )}
@@ -169,7 +171,7 @@ export default function AddressesScreen() {
                                 >
                                     <Ionicons name="create-outline" size={18} color={theme.colors.text} style={{ marginRight: 6 }} />
                                     <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
-                                        Edit
+                                        {t.common.edit}
                                     </Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity

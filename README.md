@@ -118,7 +118,12 @@ If you've set up everything correctly (workspace TypeScript version + GraphQLSP)
 
 ## Mobile Applications
 
-We have two mobile applications: `mobile-customer` and `mobile-driver`. The setup process is similar for both.
+We have three mobile applications:
+- **`mobile-customer`** - Customer app for browsing, ordering, and tracking deliveries
+- **`mobile-driver`** - Driver app for accepting and managing delivery orders
+- **`mobile-business`** - Business app for managing orders, products, and operations
+
+The setup process is similar for all three apps.
 
 ### Setup & Run
 
@@ -128,6 +133,8 @@ We have two mobile applications: `mobile-customer` and `mobile-driver`. The setu
     cd mobile-customer
     # OR
     cd mobile-driver
+    # OR
+    cd mobile-business
     ```
 
 2. Install dependencies:
@@ -140,6 +147,11 @@ We have two mobile applications: `mobile-customer` and `mobile-driver`. The setu
     ```bash
     npm start
     ```
+
+> **Note**: Each mobile app runs on a different port to avoid conflicts:
+> - mobile-customer: port 8082
+> - mobile-driver: port 8083
+> - mobile-business: port 8084
 
 ### Running on Device/Emulator
 

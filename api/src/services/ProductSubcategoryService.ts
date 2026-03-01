@@ -3,6 +3,7 @@ import { ProductCategoryRepository } from '@/repositories/ProductCategoryReposit
 import { CreateProductSubcategoryInput, ProductSubcategory, UpdateProductSubcategoryInput } from '@/generated/types.generated';
 import { DbProductSubcategory } from '@/database/schema/productSubcategories';
 import { productSubcategoryValidator } from '@/validators/ProductSubcategoryValidator';
+import { AppError } from '@/lib/errors';
 
 export class ProductSubcategoryService {
     constructor(
@@ -42,7 +43,7 @@ export class ProductSubcategoryService {
     async updateProductSubcategory(id: string, input: UpdateProductSubcategoryInput): Promise<ProductSubcategory> {
         const validatedInput = productSubcategoryValidator.validateUpdateProductSubcategory(input);
         const updated = await this.productSubcategoryRepository.update(id, validatedInput);
-        if (!updated) throw new Error('Product Subcategory not found');
+        if (!updated) throw AppError.notFound('Product Subcategory');
         return this.mapToProductSubcategory(updated);
     }
 

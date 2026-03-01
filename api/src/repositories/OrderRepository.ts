@@ -62,12 +62,15 @@ export class OrderRepository {
         return result[0] || null;
     }
 
-    async assignDriver(id: string, driverId: string | null): Promise<DbOrder | null> {
+    async assignDriver(id: string, driverId: string | null, onlyIfUnassigned = false): Promise<DbOrder | null> {
         const db = await getDB();
+        const whereClause = onlyIfUnassigned
+            ? and(eq(ordersTable.id, id), isNull(ordersTable.driverId))
+            : eq(ordersTable.id, id);
         const result = await db
             .update(ordersTable)
             .set({ driverId })
-            .where(eq(ordersTable.id, id))
+            .where(whereClause)
             .returning();
         return result[0] || null;
     }

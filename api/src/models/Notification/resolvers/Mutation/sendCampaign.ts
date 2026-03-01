@@ -1,5 +1,6 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { UserQueryService } from '@/services/UserQueryService';
+import { AppError } from '@/lib/errors';
 
 export const sendCampaign: NonNullable<MutationResolvers['sendCampaign']> = async (
     _parent,
@@ -7,12 +8,12 @@ export const sendCampaign: NonNullable<MutationResolvers['sendCampaign']> = asyn
     { userData, notificationService, db },
 ) => {
     if (!userData.role || !['SUPER_ADMIN', 'ADMIN'].includes(userData.role)) {
-        throw new Error('Only admins can send campaigns');
+        throw AppError.forbidden('Only admins can send campaigns');
     }
 
     const campaign = await notificationService.repo.getCampaignById(id);
-    if (!campaign) throw new Error('Campaign not found');
-    if (campaign.status !== 'DRAFT') throw new Error('Campaign has already been sent or is sending');
+    if (!campaign) throw AppError.notFound('Campaign');
+    if (campaign.status !== 'DRAFT') throw AppError.conflict('Campaign has already been sent or is sending');
 
     // Mark as sending
     await notificationService.repo.updateCampaign(id, { status: 'SENDING' });

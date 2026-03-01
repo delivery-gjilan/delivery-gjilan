@@ -3,6 +3,7 @@ import { BusinessHoursRepository, DbBusinessHours } from '@/repositories/Busines
 import { Business, BusinessDayHours, BusinessDayHoursInput, CreateBusinessInput, UpdateBusinessInput } from '@/generated/types.generated';
 import { businessValidator } from '@/validators/BusinessValidator';
 import { DbBusiness } from '@/database/schema/businesses';
+import { AppError } from '@/lib/errors';
 
 export class BusinessService {
     constructor(
@@ -122,7 +123,7 @@ export class BusinessService {
         }
 
         const updatedBusiness = await this.businessRepository.update(id, updateData);
-        if (!updatedBusiness) throw new Error('Business not found');
+        if (!updatedBusiness) throw AppError.notFound('Business');
 
         const schedule = await this.businessHoursRepository.findByBusinessId(id);
         return this.mapToBusiness(updatedBusiness, schedule);
@@ -137,11 +138,11 @@ export class BusinessService {
     async setBusinessSchedule(businessId: string, slots: BusinessDayHoursInput[]): Promise<BusinessDayHours[]> {
         // Validate
         for (const s of slots) {
-            if (s.dayOfWeek < 0 || s.dayOfWeek > 6) throw new Error(`Invalid dayOfWeek: ${s.dayOfWeek}`);
+            if (s.dayOfWeek < 0 || s.dayOfWeek > 6) throw AppError.badInput(`Invalid dayOfWeek: ${s.dayOfWeek}`);
             const openMin = this.timeStringToMinutes(s.opensAt);
             const closeMin = this.timeStringToMinutes(s.closesAt);
-            if (openMin < 0 || openMin > 1439) throw new Error(`Invalid opensAt: ${s.opensAt}`);
-            if (closeMin < 0 || closeMin > 1439) throw new Error(`Invalid closesAt: ${s.closesAt}`);
+            if (openMin < 0 || openMin > 1439) throw AppError.badInput(`Invalid opensAt: ${s.opensAt}`);
+            if (closeMin < 0 || closeMin > 1439) throw AppError.badInput(`Invalid closesAt: ${s.closesAt}`);
         }
 
         const rows = await this.businessHoursRepository.replaceSchedule(

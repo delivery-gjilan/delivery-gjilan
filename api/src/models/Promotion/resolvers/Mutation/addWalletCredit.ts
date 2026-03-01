@@ -2,6 +2,7 @@ import type { MutationResolvers } from './../../../../generated/types.generated'
 import { getDB } from '@/database';
 import { userWallet, walletTransactions } from '@/database/schema';
 import { eq } from 'drizzle-orm';
+import { AppError } from '@/lib/errors';
 
 export const addWalletCredit: NonNullable<MutationResolvers['addWalletCredit']> = async (
     _parent,
@@ -9,7 +10,7 @@ export const addWalletCredit: NonNullable<MutationResolvers['addWalletCredit']> 
     { userData }
 ) => {
     if (!userData.userId || userData.role !== 'SUPER_ADMIN') {
-        throw new Error('Forbidden');
+        throw AppError.forbidden();
     }
 
     const db = await getDB();

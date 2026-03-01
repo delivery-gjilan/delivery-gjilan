@@ -2,6 +2,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { AuthRepository } from '@/repositories/AuthRepository';
 import { DriverRepository } from '@/repositories/DriverRepository';
+import { AppError } from '@/lib/errors';
 
 export interface DriverAuthResult {
     token: string;
@@ -60,7 +61,7 @@ export class DriverAuthService {
     ): Promise<DriverAuthResult> {
         const existingUser = await this.authRepository.findByEmail(email.toLowerCase());
         if (existingUser) {
-            throw new Error('Driver with this email already exists');
+            throw AppError.conflict('Driver with this email already exists');
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -84,7 +85,8 @@ export class DriverAuthService {
 
         const token = jwt.sign(
             { userId: user.id, role: user.role, businessId: user.businessId },
-            this.getJwtSecret()
+            this.getJwtSecret(),
+            { expiresIn: '7d' }
         );
 
         return {
@@ -97,19 +99,20 @@ export class DriverAuthService {
     async login(email: string, password: string): Promise<DriverAuthResult> {
         const user = await this.authRepository.findByEmail(email.toLowerCase());
         if (!user || user.role !== 'DRIVER') {
-            throw new Error('Driver not found');
+            throw AppError.badInput('Driver not found');
         }
 
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
-            throw new Error('Invalid password');
+            throw AppError.badInput('Invalid password');
         }
 
         const driverProfile = await this.driverRepository.createDriver(user.id);
 
         const token = jwt.sign(
             { userId: user.id, role: user.role, businessId: user.businessId },
-            this.getJwtSecret()
+            this.getJwtSecret(),
+            { expiresIn: '7d' }
         );
 
         return {
