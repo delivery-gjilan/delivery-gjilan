@@ -4,6 +4,7 @@ export const CREATE_ORDER = graphql(`
     mutation CreateOrder($input: CreateOrderInput!) {
         createOrder(input: $input) {
             id
+            displayId
             orderPrice
             deliveryPrice
             totalPrice
@@ -42,6 +43,7 @@ export const UPDATE_ORDER_STATUS = graphql(`
     mutation UpdateOrderStatus($id: ID!, $status: OrderStatus!) {
         updateOrderStatus(id: $id, status: $status) {
             id
+            displayId
             orderPrice
             deliveryPrice
             totalPrice
@@ -85,6 +87,7 @@ export const CANCEL_ORDER = graphql(`
     mutation CancelOrder($id: ID!) {
         cancelOrder(id: $id) {
             id
+            displayId
             orderPrice
             deliveryPrice
             totalPrice

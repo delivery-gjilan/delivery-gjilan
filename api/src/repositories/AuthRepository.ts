@@ -2,7 +2,7 @@ import { DbType } from '@/database';
 import { DbUser, users } from '@/database/schema/users';
 import { userReferrals } from '@/database/schema/referrals';
 import { SignupStep } from '@/generated/types.generated';
-import { eq } from 'drizzle-orm';
+import { eq, and, isNull, sql } from 'drizzle-orm';
 
 export class AuthRepository {
     constructor(private db: DbType) {}
@@ -26,12 +26,12 @@ export class AuthRepository {
     }
 
     async findByEmail(email: string): Promise<DbUser | undefined> {
-        const [user] = await this.db.select().from(users).where(eq(users.email, email));
+        const [user] = await this.db.select().from(users).where(and(eq(users.email, email), isNull(users.deletedAt)));
         return user;
     }
 
     async findById(id: string): Promise<DbUser | undefined> {
-        const [user] = await this.db.select().from(users).where(eq(users.id, id));
+        const [user] = await this.db.select().from(users).where(and(eq(users.id, id), isNull(users.deletedAt)));
         return user;
     }
 
@@ -133,11 +133,11 @@ export class AuthRepository {
     }
 
     async findAllUsers(): Promise<DbUser[]> {
-        return this.db.select().from(users);
+        return this.db.select().from(users).where(isNull(users.deletedAt));
     }
 
     async findDrivers(): Promise<DbUser[]> {
-        return this.db.select().from(users).where(eq(users.role, 'DRIVER'));
+        return this.db.select().from(users).where(and(eq(users.role, 'DRIVER'), isNull(users.deletedAt)));
     }
 
     async updateUser(
@@ -160,7 +160,11 @@ export class AuthRepository {
     }
 
     async deleteUser(userId: string): Promise<boolean> {
-        const result = await this.db.delete(users).where(eq(users.id, userId)).returning();
+        const result = await this.db
+            .update(users)
+            .set({ deletedAt: sql`CURRENT_TIMESTAMP` })
+            .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+            .returning();
         return result.length > 0;
     }
 
@@ -168,7 +172,7 @@ export class AuthRepository {
         const [user] = await this.db
             .select()
             .from(users)
-            .where(eq(users.referralCode, referralCode))
+            .where(and(eq(users.referralCode, referralCode), isNull(users.deletedAt)))
             .limit(1);
         return user ? user.id : null;
     }

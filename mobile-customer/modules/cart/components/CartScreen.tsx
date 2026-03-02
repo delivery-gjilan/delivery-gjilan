@@ -11,6 +11,8 @@ import { useTranslations } from '@/hooks/useTranslations';
 import { useCart } from '../hooks/useCart';
 import { useCartActions } from '../hooks/useCartActions';
 import { useCreateOrder } from '../hooks/useCreateOrder';
+import OrderConfirmDialog from '@/components/OrderConfirmDialog';
+import OrderSuccessScreen from '@/components/OrderSuccessScreen';
 import { useLazyQuery, useQuery, useMutation } from '@apollo/client/react';
 import { VALIDATE_PROMOTIONS, GET_PROMOTION_THRESHOLDS } from '@/graphql/operations/promotions';
 import { GET_MY_ADDRESSES, ADD_USER_ADDRESS, SET_DEFAULT_ADDRESS } from '@/graphql/operations/addresses';
@@ -124,7 +126,7 @@ export const CartScreen = () => {
     const theme = useTheme();
     const { t } = useTranslations();
     const { items, total, isEmpty } = useCart();
-    const { updateQuantity, removeItem } = useCartActions();
+    const { updateQuantity, removeItem, clearCart, updateItemNotes } = useCartActions();
     const { createOrder, loading: orderLoading } = useCreateOrder();
 
     const [isProcessing, setIsProcessing] = useState(false);
@@ -139,6 +141,9 @@ export const CartScreen = () => {
     const [showSaveAddressPrompt, setShowSaveAddressPrompt] = useState(false);
     const [pendingLocationToSave, setPendingLocationToSave] = useState<CheckoutLocation | null>(null);
     const [addressName, setAddressName] = useState('');
+    const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+    const [showSuccessScreen, setShowSuccessScreen] = useState(false);
+    const [driverNotes, setDriverNotes] = useState('');
     
     // Query saved addresses
     const { data: addressesData, loading: addressesLoading } = useQuery(GET_MY_ADDRESSES, {
@@ -706,14 +711,47 @@ export const CartScreen = () => {
 
         setIsProcessing(true);
         try {
-            await createOrder(selectedLocation, appliedDeliveryPrice, finalTotal, promoResult?.code);
-            // Navigation happens in the hook
+            await createOrder(selectedLocation, appliedDeliveryPrice, finalTotal, promoResult?.code, driverNotes);
+            // Close ALL modals & show success screen
+            setIsSummaryModalOpen(false);
+            setIsMapModalOpen(false);
+            setIsAddressModalOpen(false);
+            setShowSaveAddressPrompt(false);
+            setShowConfirmDialog(false);
+            setShowSuccessScreen(true);
+            // Clear cart AFTER setting success screen so isEmpty doesn't flash first
+            clearCart();
         } catch (err) {
+            setShowConfirmDialog(false);
             Alert.alert(t.cart.order_failed, t.cart.unable_create_order, [{ text: t.common.ok }]);
         } finally {
             setIsProcessing(false);
         }
     };
+
+    if (showSuccessScreen) {
+        return (
+            <Modal
+                visible
+                animationType="fade"
+                onRequestClose={() => {
+                    setShowSuccessScreen(false);
+                    router.replace('/(tabs)/home');
+                }}
+            >
+                <OrderSuccessScreen
+                    onTrackOrder={() => {
+                        setShowSuccessScreen(false);
+                        router.replace('/orders/active');
+                    }}
+                    onGoHome={() => {
+                        setShowSuccessScreen(false);
+                        router.replace('/(tabs)/home');
+                    }}
+                />
+            </Modal>
+        );
+    }
 
     if (isEmpty) {
         return (
@@ -852,11 +890,30 @@ export const CartScreen = () => {
                                         <Ionicons name="add" size={16} color="white" />
                                     </TouchableOpacity>
                                 </View>
+
+                                {/* Item Notes Input */}
+                                <View className="mt-2">
+                                    <TextInput
+                                        value={item.notes || ''}
+                                        onChangeText={(text) => updateItemNotes(item.productId, text)}
+                                        placeholder={t.cart.item_notes_placeholder || "Add special instructions..."}
+                                        placeholderTextColor={theme.colors.subtext}
+                                        className="text-xs px-2 py-1.5 rounded-lg border"
+                                        style={{
+                                            backgroundColor: theme.colors.background,
+                                            borderColor: theme.colors.border,
+                                            color: theme.colors.text,
+                                        }}
+                                        multiline
+                                        numberOfLines={2}
+                                        maxLength={200}
+                                    />
+                                </View>
                             </View>
 
                             {/* Remove Button */}
                             <TouchableOpacity onPress={() => removeItem(item.productId)} className="ml-2 p-2">
-                                <Ionicons name="trash-outline" size={24} color="#ef4444" />
+                                <Ionicons name="trash-outline" size={24} color={theme.colors.expense} />
                             </TouchableOpacity>
                         </View>
                     ))}
@@ -1219,6 +1276,32 @@ export const CartScreen = () => {
                                 )}
                             </View>
 
+                            {/* Driver Notes Section */}
+                            <View className="p-4 rounded-2xl border mb-4" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.background }}>
+                                <View className="flex-row items-center gap-2 mb-2">
+                                    <Ionicons name="chatbubble-outline" size={16} color={theme.colors.subtext} />
+                                    <Text className="text-xs uppercase font-medium" style={{ color: theme.colors.subtext }}>
+                                        {t.cart.driver_notes || "Notes for Driver"}
+                                    </Text>
+                                </View>
+                                <TextInput
+                                    value={driverNotes}
+                                    onChangeText={setDriverNotes}
+                                    placeholder={t.cart.driver_notes_placeholder || "e.g., Ring the doorbell twice"}
+                                    placeholderTextColor={theme.colors.subtext}
+                                    className="px-3 py-2 rounded-xl text-sm"
+                                    style={{
+                                        backgroundColor: theme.colors.card,
+                                        borderWidth: 1,
+                                        borderColor: theme.colors.border,
+                                        color: theme.colors.text,
+                                    }}
+                                    multiline
+                                    numberOfLines={3}
+                                    maxLength={300}
+                                />
+                            </View>
+
                             <View className="h-px mb-3" style={{ backgroundColor: theme.colors.border }} />
 
                             <View className="flex-row justify-between items-center mb-4">
@@ -1240,7 +1323,7 @@ export const CartScreen = () => {
                                     backgroundColor: isProcessing ? theme.colors.border : theme.colors.primary,
                                     opacity: isProcessing ? 0.6 : 1,
                                 }}
-                                onPress={handleCheckout}
+                                onPress={() => setShowConfirmDialog(true)}
                                 disabled={isProcessing}
                             >
                                 {isProcessing || orderLoading ? (
@@ -1433,11 +1516,20 @@ export const CartScreen = () => {
                         alignItems: 'center',
                     }}
                 >
-                    <View style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: 12, backgroundColor: notifier.type === 'success' ? '#16a34a' : theme.colors.primary, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 6 }}>
+                    <View style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: 12, backgroundColor: notifier.type === 'success' ? theme.colors.income : theme.colors.primary, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 6 }}>
                         <Text style={{ color: '#fff', fontWeight: '600' }}>{notifier.message}</Text>
                     </View>
                 </Animated.View>
             )}
+
+            {/* Order Confirmation Dialog */}
+            <OrderConfirmDialog
+                visible={showConfirmDialog}
+                total={finalTotal.toFixed(2)}
+                loading={isProcessing || orderLoading}
+                onConfirm={handleCheckout}
+                onCancel={() => setShowConfirmDialog(false)}
+            />
 
         </SafeAreaView>
     );

@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, numeric, timestamp, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, numeric, timestamp, pgEnum, index } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import { drivers } from './drivers';
 import { businesses } from './businesses';
@@ -48,7 +48,12 @@ export const settlements = pgTable('settlements', {
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull()
         .$onUpdate(() => sql`CURRENT_TIMESTAMP`),
-});
+}, (t) => ([
+    index('idx_settlements_order_id').on(t.orderId),
+    index('idx_settlements_driver_id').on(t.driverId),
+    index('idx_settlements_business_id').on(t.businessId),
+    index('idx_settlements_status').on(t.status),
+]));
 
 export const settlementsRelations = relations(settlements, ({ one }) => ({
     driver: one(drivers, {

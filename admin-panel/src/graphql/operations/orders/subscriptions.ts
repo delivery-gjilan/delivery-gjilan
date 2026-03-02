@@ -4,6 +4,7 @@ export const ORDERS_SUBSCRIPTION = gql(`
     subscription OrdersUpdated($token: String!) {
         userOrdersUpdated(input: { token: $token }) {
             id
+            displayId
             orderPrice
             deliveryPrice
             totalPrice
@@ -59,6 +60,7 @@ export const ALL_ORDERS_SUBSCRIPTION = gql(`
     subscription AllOrdersUpdated {
         allOrdersUpdated {
             id
+            displayId
             orderPrice
             deliveryPrice
             totalPrice

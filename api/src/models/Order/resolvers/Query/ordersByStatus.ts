@@ -6,45 +6,31 @@ export const ordersByStatus: NonNullable<QueryResolvers['ordersByStatus']> = asy
     { status },
     { orderService, userData },
 ) => {
-    // Check authentication
     if (!userData.userId) {
         throw new GraphQLError('Unauthorized: You must be logged in to view orders', {
             extensions: { code: 'UNAUTHORIZED' },
         });
     }
 
-    // Get orders by status
-    const statusOrders = await orderService.getOrdersByStatus(status);
-
-    // Filter based on role
     switch (userData.role) {
         case 'SUPER_ADMIN':
-            return statusOrders;
+        case 'ADMIN':
+            return orderService.getOrdersByStatus(status);
 
         case 'DRIVER':
-            // Drivers see their own assigned orders + all active (pickable) orders for this status
-            return statusOrders.filter(order =>
-                order.driver?.id === userData.userId ||
-                !['DELIVERED', 'CANCELLED'].includes(order.status)
-            );
+            return orderService.getOrdersForDriverByStatus(userData.userId, status);
 
         case 'CUSTOMER':
-            // Customers can only see their own orders
-            return statusOrders.filter(order => order.userId === userData.userId);
-
-        case 'ADMIN':
-            return statusOrders;
+            return orderService.getOrdersByUserIdAndStatus(userData.userId, status);
 
         case 'BUSINESS_OWNER':
         case 'BUSINESS_EMPLOYEE':
-            // Business users can only see orders that contain items from their business
             if (!userData.businessId) {
                 throw new GraphQLError('Business user must be associated with a business', {
                     extensions: { code: 'FORBIDDEN' },
                 });
             }
-            const businessOrders = await orderService.getOrdersByBusinessId(userData.businessId);
-            return businessOrders.filter(order => order.status === status);
+            return orderService.getOrdersByBusinessIdAndStatus(userData.businessId, status);
 
         default:
             throw new GraphQLError('Invalid user role', {

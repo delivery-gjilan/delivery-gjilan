@@ -4,6 +4,7 @@ import { Business, BusinessDayHours, BusinessDayHoursInput, CreateBusinessInput,
 import { businessValidator } from '@/validators/BusinessValidator';
 import { DbBusiness } from '@/database/schema/businesses';
 import { AppError } from '@/lib/errors';
+import { cache } from '@/lib/cache';
 
 export class BusinessService {
     constructor(
@@ -34,6 +35,7 @@ export class BusinessService {
     private mapToBusiness(business: DbBusiness, schedule: DbBusinessHours[] = []): Business {
         return {
             ...business,
+            description: business.description ?? null,
             phoneNumber: business.phoneNumber ?? null,
             location: {
                 latitude: business.locationLat,
@@ -62,6 +64,7 @@ export class BusinessService {
 
         const createdBusiness = await this.businessRepository.create({
             name: validatedInput.name,
+            description: validatedInput.description ?? null,
             phoneNumber: validatedInput.phoneNumber ?? null,
             imageUrl: validatedInput.imageUrl,
             businessType: validatedInput.businessType,
@@ -78,13 +81,24 @@ export class BusinessService {
     }
 
     async getBusiness(id: string): Promise<Business | null> {
+        // Try cache first
+        const cached = await cache.get<Business>(cache.keys.business(id));
+        if (cached) return cached;
+
         const business = await this.businessRepository.findById(id);
         if (!business) return null;
         const schedule = await this.businessHoursRepository.findByBusinessId(id);
-        return this.mapToBusiness(business, schedule);
+        const result = this.mapToBusiness(business, schedule);
+
+        await cache.set(cache.keys.business(id), result, cache.TTL.BUSINESS);
+        return result;
     }
 
     async getBusinesses(): Promise<Business[]> {
+        // Try cache first
+        const cached = await cache.get<Business[]>(cache.keys.businesses());
+        if (cached) return cached;
+
         const allBusinesses = await this.businessRepository.findAll();
         if (allBusinesses.length === 0) return [];
 
@@ -99,7 +113,10 @@ export class BusinessService {
             hoursByBiz.set(h.businessId, arr);
         }
 
-        return allBusinesses.map((b) => this.mapToBusiness(b, hoursByBiz.get(b.id) ?? []));
+        const businesses = allBusinesses.map((b) => this.mapToBusiness(b, hoursByBiz.get(b.id) ?? []));
+
+        await cache.set(cache.keys.businesses(), businesses, cache.TTL.BUSINESSES);
+        return businesses;
     }
 
     async updateBusiness(id: string, input: UpdateBusinessInput): Promise<Business> {

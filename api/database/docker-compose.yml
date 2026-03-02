@@ -13,6 +13,17 @@ services:
         ports:
             - 8090:5432
 
+    redis:
+        image: redis:7-alpine
+        restart: always
+        container_name: delivery-gjilan-redis
+        ports:
+            - 6379:6379
+        volumes:
+            - redisdata:/data
+
 volumes:
     dbdata:
+        driver: local
+    redisdata:
         driver: local

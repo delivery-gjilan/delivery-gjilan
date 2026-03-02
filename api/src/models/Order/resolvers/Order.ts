@@ -1,8 +1,5 @@
 import type { OrderResolvers } from './../../../generated/types.generated';
 import logger from '@/lib/logger';
-import { getDB } from '@/database';
-import { orderPromotions } from '@/database/schema/orderPromotions';
-import { eq } from 'drizzle-orm';
 
 export const Order: OrderResolvers = {
     userId: (parent) => {
@@ -14,28 +11,22 @@ export const Order: OrderResolvers = {
         return (parent.businesses ?? []).map(b => b.business.location);
     },
 
-    user: async (parent, _args, { authService }) => {
+    user: async (parent, _args, { loaders }) => {
         if (!parent.userId) {
             return null;
         }
         
         try {
-            const user = await authService.authRepository.findById(parent.userId);
-            return user || null;
+            return await loaders.userLoader.load(String(parent.userId));
         } catch (error) {
             logger.error({ err: error, orderId: parent.id }, 'order:resolveUser failed');
             return null;
         }
     },
     
-    orderPromotions: async (parent) => {
+    orderPromotions: async (parent, _args, { loaders }) => {
         try {
-            const db = await getDB();
-            const promotions = await db
-                .select()
-                .from(orderPromotions)
-                .where(eq(orderPromotions.orderId, parent.id));
-            return promotions;
+            return await loaders.orderPromotionsLoader.load(String(parent.id));
         } catch (error) {
             logger.error({ err: error, orderId: parent.id }, 'order:resolvePromotions failed');
             return [];

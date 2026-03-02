@@ -190,11 +190,20 @@ export default function OrdersScreen() {
                 {/* Items */}
                 <View className="border-t border-gray-700 pt-3 mb-3">
                     {businessOrder.items.map((item, index) => (
-                        <View key={index} className="flex-row justify-between mb-2">
-                            <Text className="text-text flex-1">
-                                {item.quantity}x {item.name}
-                            </Text>
-                            <Text className="text-subtext">${(item.price * item.quantity).toFixed(2)}</Text>
+                        <View key={index} className="mb-2">
+                            <View className="flex-row justify-between">
+                                <Text className="text-text flex-1">
+                                    {item.quantity}x {item.name}
+                                </Text>
+                                <Text className="text-subtext">${(item.price * item.quantity).toFixed(2)}</Text>
+                            </View>
+                            {item.notes && (
+                                <View className="mt-1 ml-4 px-2 py-1 bg-background/50 rounded">
+                                    <Text className="text-xs italic text-subtext">
+                                        Note: {item.notes}
+                                    </Text>
+                                </View>
+                            )}
                         </View>
                     ))}
                 </View>

@@ -4,6 +4,7 @@ export const GET_ORDERS = gql`
     query GetOrders {
         orders {
             id
+            displayId
             orderDate
             status
             orderPrice
@@ -14,6 +15,7 @@ export const GET_ORDERS = gql`
                 longitude
                 address
             }
+            driverNotes
             businesses {
                 business {
                     id
@@ -27,6 +29,7 @@ export const GET_ORDERS = gql`
                 items {
                     name
                     quantity
+                    notes
                 }
             }
             user {
@@ -48,6 +51,7 @@ export const GET_ORDER = gql`
     query GetOrder($id: ID!) {
         order(id: $id) {
             id
+            displayId
             orderDate
             status
             orderPrice
@@ -58,6 +62,7 @@ export const GET_ORDER = gql`
                 longitude
                 address
             }
+            driverNotes
             businesses {
                 business {
                     id
@@ -71,6 +76,7 @@ export const GET_ORDER = gql`
                 items {
                     name
                     quantity
+                    notes
                 }
             }
             user {
@@ -115,6 +121,7 @@ export const ALL_ORDERS_UPDATED = gql`
     subscription AllOrdersUpdated {
         allOrdersUpdated {
             id
+            displayId
             orderDate
             status
             orderPrice
@@ -125,6 +132,7 @@ export const ALL_ORDERS_UPDATED = gql`
                 longitude
                 address
             }
+            driverNotes
             businesses {
                 business {
                     id
@@ -138,6 +146,7 @@ export const ALL_ORDERS_UPDATED = gql`
                 items {
                     name
                     quantity
+                    notes
                 }
             }
             user {

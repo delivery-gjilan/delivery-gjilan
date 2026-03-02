@@ -4,6 +4,7 @@ import { CreateProductSubcategoryInput, ProductSubcategory, UpdateProductSubcate
 import { DbProductSubcategory } from '@/database/schema/productSubcategories';
 import { productSubcategoryValidator } from '@/validators/ProductSubcategoryValidator';
 import { AppError } from '@/lib/errors';
+import { cache } from '@/lib/cache';
 
 export class ProductSubcategoryService {
     constructor(
@@ -20,15 +21,27 @@ export class ProductSubcategoryService {
     }
 
     async getProductSubcategories(categoryId: string): Promise<ProductSubcategory[]> {
+        const cached = await cache.get<ProductSubcategory[]>(cache.keys.subcategoriesByCat(categoryId));
+        if (cached) return cached;
+
         const subcategories = await this.productSubcategoryRepository.findByCategoryId(categoryId);
-        return subcategories.map((s) => this.mapToProductSubcategory(s));
+        const result = subcategories.map((s) => this.mapToProductSubcategory(s));
+
+        await cache.set(cache.keys.subcategoriesByCat(categoryId), result, cache.TTL.SUBCATEGORIES);
+        return result;
     }
 
     async getProductSubcategoriesByBusiness(businessId: string): Promise<ProductSubcategory[]> {
+        const cached = await cache.get<ProductSubcategory[]>(cache.keys.subcategories(businessId));
+        if (cached) return cached;
+
         const categories = await this.productCategoryRepository.findByBusinessId(businessId);
         const categoryIds = categories.map((category) => category.id);
         const subcategories = await this.productSubcategoryRepository.findByCategoryIds(categoryIds);
-        return subcategories.map((s) => this.mapToProductSubcategory(s));
+        const result = subcategories.map((s) => this.mapToProductSubcategory(s));
+
+        await cache.set(cache.keys.subcategories(businessId), result, cache.TTL.SUBCATEGORIES);
+        return result;
     }
 
     async createProductSubcategory(input: CreateProductSubcategoryInput): Promise<ProductSubcategory> {

@@ -9,13 +9,13 @@ export const FloatingBars = () => {
     const insets = useSafeAreaInsets();
 
     // Routes where floating bars should not appear
-    const hiddenRoutes = ['/product/', '/cart', '/orders', '/login', '/signup', '/auth-selection', '/invite-friends'];
+    const hiddenRoutes = ['/product/', '/cart', '/orders', '/login', '/signup', '/auth-selection', '/invite-friends', '/profile'];
     const shouldHide = hiddenRoutes.some((route) => pathname.startsWith(route)) || pathname === '/';
 
     if (shouldHide) return null;
 
     // Check if we're on a tab route
-    const tabRoutes = ['/market', '/home', '/profile'];
+    const tabRoutes = ['/market', '/home', '/profile', '/restaurants', '/analytics'];
     const isOnTabRoute = tabRoutes.some((route) => pathname === route || pathname.startsWith(route));
 
     // Calculate bottom position based on whether tab bar is visible

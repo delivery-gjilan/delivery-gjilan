@@ -1,5 +1,5 @@
 import { relations, sql } from 'drizzle-orm';
-import { pgTable, varchar, numeric, timestamp, uuid, pgEnum, doublePrecision, integer } from 'drizzle-orm/pg-core';
+import { pgTable, varchar, numeric, timestamp, uuid, pgEnum, doublePrecision, integer, index, uniqueIndex } from 'drizzle-orm/pg-core';
 import { orderItems } from './orderItems';
 import { OrderStatus } from '@/generated/types.generated';
 import { users } from './users';
@@ -11,6 +11,7 @@ export const orderStatus = pgEnum('order_status', orderStatusValues);
 
 export const orders = pgTable('orders', {
     id: uuid('id').primaryKey().defaultRandom().notNull(),
+    displayId: varchar('display_id', { length: 10 }).notNull(),
     userId: uuid('user_id')
         .notNull()
         .references(() => users.id, { onDelete: 'cascade' }),
@@ -23,6 +24,7 @@ export const orders = pgTable('orders', {
     dropoffLat: doublePrecision('dropoff_lat').notNull(),
     dropoffLng: doublePrecision('dropoff_lng').notNull(),
     dropoffAddress: varchar('dropoff_address', { length: 500 }).notNull(),
+    driverNotes: varchar('driver_notes', { length: 500 }),
     preparationMinutes: integer('preparation_minutes'),
     estimatedReadyAt: timestamp('estimated_ready_at', { withTimezone: true, mode: 'string' }),
     preparingAt: timestamp('preparing_at', { withTimezone: true, mode: 'string' }),
@@ -37,7 +39,13 @@ export const orders = pgTable('orders', {
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull()
         .$onUpdate(() => sql`CURRENT_TIMESTAMP`),
-});
+}, (t) => ([
+    index('idx_orders_user_id').on(t.userId),
+    index('idx_orders_driver_id').on(t.driverId),
+    index('idx_orders_status').on(t.status),
+    index('idx_orders_status_created').on(t.status, t.createdAt),
+    uniqueIndex('idx_orders_display_id').on(t.displayId),
+]));
 
 export const ordersRelations = relations(orders, ({ one, many }) => ({
     orderItems: many(orderItems),

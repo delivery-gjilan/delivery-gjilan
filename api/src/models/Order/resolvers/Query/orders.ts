@@ -8,25 +8,16 @@ export const orders: NonNullable<QueryResolvers['orders']> = async (_parent, _ar
         });
     }
 
-    const allOrders = await orderService.getAllOrders();
-
     switch (userData.role) {
         case 'SUPER_ADMIN':
-            return allOrders;
+        case 'ADMIN':
+            return orderService.getAllOrders();
 
         case 'DRIVER':
-            // Drivers see their own assigned orders + all active (pickable) orders
-            return allOrders.filter(order =>
-                order.driver?.id === userData.userId ||
-                !['DELIVERED', 'CANCELLED'].includes(order.status)
-            );
+            return orderService.getOrdersForDriver(userData.userId);
 
         case 'CUSTOMER':
-            return allOrders.filter(order => order.userId === userData.userId);
-
-        case 'ADMIN':
-            // Platform admins can see all orders
-            return allOrders;
+            return orderService.getOrdersByUserId(userData.userId);
 
         case 'BUSINESS_OWNER':
         case 'BUSINESS_EMPLOYEE':

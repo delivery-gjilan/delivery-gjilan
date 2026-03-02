@@ -139,12 +139,20 @@ export type AuthResponse = {
   user: User;
 };
 
+export enum BannerType {
+  Info = 'INFO',
+  Success = 'SUCCESS',
+  Warning = 'WARNING'
+}
+
 export type Business = {
   __typename?: 'Business';
+  activePromotion?: Maybe<BusinessPromotion>;
   avgPrepTimeMinutes: Scalars['Int']['output'];
   businessType: BusinessType;
   commissionPercentage: Scalars['Float']['output'];
   createdAt: Scalars['Date']['output'];
+  description?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
   isActive: Scalars['Boolean']['output'];
@@ -170,6 +178,15 @@ export type BusinessDayHoursInput = {
   closesAt: Scalars['String']['input'];
   dayOfWeek: Scalars['Int']['input'];
   opensAt: Scalars['String']['input'];
+};
+
+export type BusinessPromotion = {
+  __typename?: 'BusinessPromotion';
+  description?: Maybe<Scalars['String']['output']>;
+  discountValue?: Maybe<Scalars['Float']['output']>;
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+  type: PromotionType;
 };
 
 export enum BusinessType {
@@ -202,6 +219,7 @@ export type CartItemInput = {
 export type CreateBusinessInput = {
   avgPrepTimeMinutes?: InputMaybe<Scalars['Int']['input']>;
   businessType: BusinessType;
+  description?: InputMaybe<Scalars['String']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   location: LocationInput;
   name: Scalars['String']['input'];
@@ -216,8 +234,24 @@ export type CreateCampaignInput = {
   title: Scalars['String']['input'];
 };
 
+export type CreateDeliveryPricingTierInput = {
+  maxDistanceKm?: InputMaybe<Scalars['Float']['input']>;
+  minDistanceKm: Scalars['Float']['input'];
+  price: Scalars['Float']['input'];
+  sortOrder?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type CreateDeliveryZoneInput = {
+  deliveryFee: Scalars['Float']['input'];
+  isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  name: Scalars['String']['input'];
+  polygon: Array<PolygonPointInput>;
+  sortOrder?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type CreateOrderInput = {
   deliveryPrice: Scalars['Float']['input'];
+  driverNotes?: InputMaybe<Scalars['String']['input']>;
   dropOffLocation: LocationInput;
   items: Array<CreateOrderItemInput>;
   promoCode?: InputMaybe<Scalars['String']['input']>;
@@ -225,6 +259,7 @@ export type CreateOrderInput = {
 };
 
 export type CreateOrderItemInput = {
+  notes?: InputMaybe<Scalars['String']['input']>;
   price: Scalars['Float']['input'];
   productId: Scalars['ID']['input'];
   quantity: Scalars['Int']['input'];
@@ -283,6 +318,55 @@ export type CreateUserInput = {
   lastName: Scalars['String']['input'];
   password: Scalars['String']['input'];
   role: UserRole;
+};
+
+export type DeliveryPriceResult = {
+  __typename?: 'DeliveryPriceResult';
+  distanceKm: Scalars['Float']['output'];
+  price: Scalars['Float']['output'];
+  tierApplied?: Maybe<DeliveryPricingTier>;
+  zoneApplied?: Maybe<DeliveryZoneMatch>;
+};
+
+export type DeliveryPricingConfig = {
+  __typename?: 'DeliveryPricingConfig';
+  tiers: Array<DeliveryPricingTier>;
+  zones: Array<DeliveryZone>;
+};
+
+export type DeliveryPricingTier = {
+  __typename?: 'DeliveryPricingTier';
+  createdAt: Scalars['DateTime']['output'];
+  id: Scalars['ID']['output'];
+  isActive: Scalars['Boolean']['output'];
+  maxDistanceKm?: Maybe<Scalars['Float']['output']>;
+  minDistanceKm: Scalars['Float']['output'];
+  price: Scalars['Float']['output'];
+  sortOrder: Scalars['Int']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+};
+
+export type DeliveryZone = {
+  __typename?: 'DeliveryZone';
+  createdAt: Scalars['DateTime']['output'];
+  deliveryFee: Scalars['Float']['output'];
+  id: Scalars['ID']['output'];
+  isActive: Scalars['Boolean']['output'];
+  name: Scalars['String']['output'];
+  polygon: Array<PolygonPoint>;
+  sortOrder: Scalars['Int']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+};
+
+/**
+ * Returned from calculateDeliveryPrice when a zone matches;
+ * tells the client which zone (if any) is being applied.
+ */
+export type DeliveryZoneMatch = {
+  __typename?: 'DeliveryZoneMatch';
+  deliveryFee: Scalars['Float']['output'];
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
 };
 
 export enum DeviceAppType {
@@ -421,6 +505,8 @@ export type Mutation = {
   cancelOrder: Order;
   createBusiness: Business;
   createCampaign: NotificationCampaign;
+  createDeliveryPricingTier: DeliveryPricingTier;
+  createDeliveryZone: DeliveryZone;
   createOrder: Order;
   createProduct: Product;
   createProductCategory: ProductCategory;
@@ -431,6 +517,9 @@ export type Mutation = {
   deductWalletCredit: WalletTransaction;
   deleteBusiness: Scalars['Boolean']['output'];
   deleteCampaign: Scalars['Boolean']['output'];
+  deleteDeliveryPricingTier: Scalars['Boolean']['output'];
+  deleteDeliveryZone: Scalars['Boolean']['output'];
+  deleteMyAccount: Scalars['Boolean']['output'];
   deleteProduct: Scalars['Boolean']['output'];
   deleteProductCategory: Scalars['Boolean']['output'];
   deleteProductSubcategory: Scalars['Boolean']['output'];
@@ -457,6 +546,7 @@ export type Mutation = {
   sendPushNotification: SendNotificationResult;
   setBusinessSchedule: Array<BusinessDayHours>;
   setDefaultAddress: Scalars['Boolean']['output'];
+  setDeliveryPricingTiers: Array<DeliveryPricingTier>;
   setUserPermissions: User;
   startPreparing: Order;
   submitPhoneNumber: SignupStepResponse;
@@ -464,6 +554,8 @@ export type Mutation = {
   unsettleSettlement: Settlement;
   updateBusiness: Business;
   updateCommissionPercentage: Scalars['Boolean']['output'];
+  updateDeliveryPricingTier: DeliveryPricingTier;
+  updateDeliveryZone: DeliveryZone;
   updateDriverLocation: User;
   updateDriverOnlineStatus: User;
   updateOrderStatus: Order;
@@ -538,6 +630,16 @@ export type MutationCreateCampaignArgs = {
 };
 
 
+export type MutationCreateDeliveryPricingTierArgs = {
+  input: CreateDeliveryPricingTierInput;
+};
+
+
+export type MutationCreateDeliveryZoneArgs = {
+  input: CreateDeliveryZoneInput;
+};
+
+
 export type MutationCreateOrderArgs = {
   input: CreateOrderInput;
 };
@@ -581,6 +683,16 @@ export type MutationDeleteBusinessArgs = {
 
 
 export type MutationDeleteCampaignArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type MutationDeleteDeliveryPricingTierArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type MutationDeleteDeliveryZoneArgs = {
   id: Scalars['ID']['input'];
 };
 
@@ -684,6 +796,11 @@ export type MutationSetDefaultAddressArgs = {
 };
 
 
+export type MutationSetDeliveryPricingTiersArgs = {
+  input: SetDeliveryPricingTiersInput;
+};
+
+
 export type MutationSetUserPermissionsArgs = {
   permissions: Array<UserPermission>;
   userId: Scalars['ID']['input'];
@@ -721,6 +838,18 @@ export type MutationUpdateCommissionPercentageArgs = {
   businessId?: InputMaybe<Scalars['ID']['input']>;
   driverId?: InputMaybe<Scalars['ID']['input']>;
   percentage: Scalars['Float']['input'];
+};
+
+
+export type MutationUpdateDeliveryPricingTierArgs = {
+  id: Scalars['ID']['input'];
+  input: UpdateDeliveryPricingTierInput;
+};
+
+
+export type MutationUpdateDeliveryZoneArgs = {
+  id: Scalars['ID']['input'];
+  input: UpdateDeliveryZoneInput;
 };
 
 
@@ -848,7 +977,9 @@ export type Order = {
   businesses: Array<OrderBusiness>;
   deliveredAt?: Maybe<Scalars['Date']['output']>;
   deliveryPrice: Scalars['Float']['output'];
+  displayId: Scalars['String']['output'];
   driver?: Maybe<User>;
+  driverNotes?: Maybe<Scalars['String']['output']>;
   dropOffLocation: Location;
   estimatedReadyAt?: Maybe<Scalars['Date']['output']>;
   id: Scalars['ID']['output'];
@@ -879,6 +1010,7 @@ export type OrderItem = {
   __typename?: 'OrderItem';
   imageUrl?: Maybe<Scalars['String']['output']>;
   name: Scalars['String']['output'];
+  notes?: Maybe<Scalars['String']['output']>;
   price: Scalars['Float']['output'];
   productId: Scalars['ID']['output'];
   quantity: Scalars['Int']['output'];
@@ -902,6 +1034,17 @@ export enum OrderStatus {
   Preparing = 'PREPARING',
   Ready = 'READY'
 }
+
+export type PolygonPoint = {
+  __typename?: 'PolygonPoint';
+  lat: Scalars['Float']['output'];
+  lng: Scalars['Float']['output'];
+};
+
+export type PolygonPointInput = {
+  lat: Scalars['Float']['input'];
+  lng: Scalars['Float']['input'];
+};
 
 export type Product = {
   __typename?: 'Product';
@@ -1048,6 +1191,10 @@ export type Query = {
   business?: Maybe<Business>;
   businessBalance: SettlementSummary;
   businesses: Array<Business>;
+  calculateDeliveryPrice: DeliveryPriceResult;
+  deliveryPricingConfig: DeliveryPricingConfig;
+  deliveryPricingTiers: Array<DeliveryPricingTier>;
+  deliveryZones: Array<DeliveryZone>;
   driverBalance: SettlementSummary;
   drivers: Array<User>;
   getAllPromotions: Array<Promotion>;
@@ -1113,6 +1260,13 @@ export type QueryBusinessArgs = {
 
 export type QueryBusinessBalanceArgs = {
   businessId: Scalars['ID']['input'];
+};
+
+
+export type QueryCalculateDeliveryPriceArgs = {
+  businessId: Scalars['ID']['input'];
+  dropoffLat: Scalars['Float']['input'];
+  dropoffLng: Scalars['Float']['input'];
 };
 
 
@@ -1304,6 +1458,10 @@ export type SendPushNotificationInput = {
   userIds: Array<Scalars['ID']['input']>;
 };
 
+export type SetDeliveryPricingTiersInput = {
+  tiers: Array<CreateDeliveryPricingTierInput>;
+};
+
 export type Settlement = {
   __typename?: 'Settlement';
   amount: Scalars['Float']['output'];
@@ -1354,6 +1512,9 @@ export type SignupStepResponse = {
 
 export type StoreStatus = {
   __typename?: 'StoreStatus';
+  bannerEnabled: Scalars['Boolean']['output'];
+  bannerMessage?: Maybe<Scalars['String']['output']>;
+  bannerType: BannerType;
   closedMessage?: Maybe<Scalars['String']['output']>;
   isStoreClosed: Scalars['Boolean']['output'];
 };
@@ -1414,6 +1575,7 @@ export type UpdateBusinessInput = {
   avgPrepTimeMinutes?: InputMaybe<Scalars['Int']['input']>;
   businessType?: InputMaybe<BusinessType>;
   commissionPercentage?: InputMaybe<Scalars['Float']['input']>;
+  description?: InputMaybe<Scalars['String']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
   location?: InputMaybe<LocationInput>;
@@ -1421,6 +1583,22 @@ export type UpdateBusinessInput = {
   phoneNumber?: InputMaybe<Scalars['String']['input']>;
   prepTimeOverrideMinutes?: InputMaybe<Scalars['Int']['input']>;
   workingHours?: InputMaybe<WorkingHoursInput>;
+};
+
+export type UpdateDeliveryPricingTierInput = {
+  isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  maxDistanceKm?: InputMaybe<Scalars['Float']['input']>;
+  minDistanceKm?: InputMaybe<Scalars['Float']['input']>;
+  price?: InputMaybe<Scalars['Float']['input']>;
+  sortOrder?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type UpdateDeliveryZoneInput = {
+  deliveryFee?: InputMaybe<Scalars['Float']['input']>;
+  isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+  polygon?: InputMaybe<Array<PolygonPointInput>>;
+  sortOrder?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type UpdateProductCategoryInput = {
@@ -1469,6 +1647,9 @@ export type UpdatePromotionInput = {
 };
 
 export type UpdateStoreStatusInput = {
+  bannerEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  bannerMessage?: InputMaybe<Scalars['String']['input']>;
+  bannerType?: InputMaybe<BannerType>;
   closedMessage?: InputMaybe<Scalars['String']['input']>;
   isStoreClosed: Scalars['Boolean']['input'];
 };

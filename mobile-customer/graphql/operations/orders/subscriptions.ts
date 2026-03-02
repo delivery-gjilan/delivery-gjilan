@@ -13,6 +13,7 @@ export const USER_ORDERS_UPDATED = graphql(`
     subscription UserOrdersUpdated($input: SubscriptionInput!) {
         userOrdersUpdated(input: $input) {
             id
+            displayId
             orderPrice
             deliveryPrice
             totalPrice

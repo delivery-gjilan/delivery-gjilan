@@ -72,7 +72,7 @@ export function ProductCard({ product, businessType }: ProductCardProps) {
 
                     {/* Discount Badge */}
                     {hasDiscount && (
-                        <View className="absolute top-2 left-2 bg-red-500 px-2 py-1 rounded-md">
+                        <View className="absolute top-2 left-2 bg-expense px-2 py-1 rounded-md">
                             <Text className="text-white text-xs font-bold">-{discountPercent}%</Text>
                         </View>
                     )}

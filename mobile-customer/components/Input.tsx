@@ -18,13 +18,13 @@ export function Input({ label, error, containerClassName, className, ...props }:
             <TextInput
                 className={cn(
                     'bg-card text-foreground p-4 rounded-2xl text-lg border border-transparent focus:border-primary',
-                    error && 'border-red-500',
+                    error && 'border-expense',
                     className,
                 )}
                 placeholderTextColor={theme.colors.subtext}
                 {...props}
             />
-            {error && <Text className="text-red-500 text-sm mt-1">{error}</Text>}
+            {error && <Text className="text-expense text-sm mt-1">{error}</Text>}
         </View>
     );
 }

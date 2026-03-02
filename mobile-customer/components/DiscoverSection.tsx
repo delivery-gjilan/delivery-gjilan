@@ -41,7 +41,7 @@ export function DiscoverSection({
                         onPress={onSeeAll} 
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         style={{
-                            backgroundColor: 'rgba(11, 137, 169, 0.15)',
+                            backgroundColor: theme.colors.primary + '26',
                             paddingHorizontal: 12,
                             paddingVertical: 6,
                             borderRadius: 16,

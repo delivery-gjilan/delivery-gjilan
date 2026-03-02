@@ -2,6 +2,7 @@ import type { MutationResolvers } from './../../../../generated/types.generated'
 import { createAuditLogger } from '@/services/AuditLogger';
 import { hasPermission } from '@/lib/utils/permissions';
 import { GraphQLError } from 'graphql';
+import { cache } from '@/lib/cache';
 
 export const updateBusiness: NonNullable<MutationResolvers['updateBusiness']> = async (
     _parent,
@@ -30,6 +31,9 @@ export const updateBusiness: NonNullable<MutationResolvers['updateBusiness']> = 
     
     const oldBusiness = await businessService.getBusiness(id);
     const result = await businessService.updateBusiness(id, input);
+    
+    // Invalidate cache for this business + list
+    await cache.invalidateBusiness(id);
     
     // Create metadata with changed fields
     const changedFields = Object.keys(input);

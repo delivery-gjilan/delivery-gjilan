@@ -55,18 +55,10 @@ export function useOrders(): UseOrdersResult {
         fetchPolicy: 'network-only', // Changed from 'cache-and-network' to always fetch fresh data
     });
 
-    // Real-time subscription for updates - automatically updates cache
+    // Real-time subscription for updates — refetch on signal
     useSubscription(ALL_ORDERS_SUBSCRIPTION, {
-        onData: ({ client, data: subData }) => {
-            if (subData?.data?.allOrdersUpdated) {
-                // Update the cache with new orders data
-                client.writeQuery({
-                    query: GET_ORDERS,
-                    data: {
-                        orders: subData.data.allOrdersUpdated,
-                    },
-                });
-            }
+        onData: () => {
+            refetch();
         },
     });
 

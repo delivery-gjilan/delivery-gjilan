@@ -63,16 +63,16 @@ const SharedFonts = Platform.select({
 export const LightTheme = {
     dark: false,
     colors: {
-        primary: '#5f0202',
-        background: '#ffffff',
+        primary: '#2DD4BF',
+        background: '#F8FAFC',
         foreground: '#000000',
-        expense: '#ef4444', // Red-500
-        income: '#22c55e', // Green-500
-        card: '#f3f4f6', // Gray-100
-        text: '#1f2937', // Gray-800
-        subtext: '#6b7280', // Gray-500
-        border: '#e5e7eb', // Gray-200
-        notification: '#f59e0b', // Amber-500
+        expense: '#EF4444',
+        income: '#22C55E',
+        card: '#FFFFFF',
+        text: '#1f2937',
+        subtext: '#64748B',
+        border: '#E2E8F0',
+        notification: '#f59e0b',
     },
     fonts: SharedFonts,
 };
@@ -80,16 +80,16 @@ export const LightTheme = {
 export const DarkTheme = {
     dark: false,
     colors: {
-        primary: '#0b89a9',
-        background: '#000000',
+        primary: '#2DD4BF',
+        background: '#0F172A',
         foreground: '#ffffff',
-        expense: '#f87171', // Red-400
-        income: '#4ade80', // Green-400
-        card: '#1f2937', // Gray-800
-        text: '#f9fafb', // Gray-50
-        subtext: '#9ca3af', // Gray-400
-        border: '#374151', // Gray-700
-        notification: '#fbbf24', // Amber-400
+        expense: '#EF4444',
+        income: '#22C55E',
+        card: '#1E293B',
+        text: '#F8FAFC',
+        subtext: '#94A3B8',
+        border: '#334155',
+        notification: '#99F6E4',
     },
     fonts: SharedFonts,
 };

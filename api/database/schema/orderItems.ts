@@ -1,4 +1,4 @@
-import { pgTable, uuid, integer, numeric, timestamp, primaryKey } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, integer, numeric, timestamp, primaryKey, index, varchar } from 'drizzle-orm/pg-core';
 
 import { orders } from './orders';
 import { products } from './products';
@@ -15,6 +15,7 @@ export const orderItems = pgTable(
             .references(() => products.id, { onDelete: 'cascade' }),
         price: numeric('price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
         quantity: integer('quantity').notNull(),
+        notes: varchar('notes', { length: 500 }),
         createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
             .default(sql`CURRENT_TIMESTAMP`)
             .notNull(),
@@ -25,6 +26,7 @@ export const orderItems = pgTable(
     },
     (t) => ({
         pk: primaryKey({ columns: [t.orderId, t.productId] }),
+        productIdx: index('idx_order_items_product_id').on(t.productId),
     }),
 );
 

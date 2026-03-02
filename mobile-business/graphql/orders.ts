@@ -5,6 +5,7 @@ export const GET_BUSINESS_ORDERS = graphql(`
     query GetBusinessOrders {
         orders {
             id
+            displayId
             userId
             orderPrice
             deliveryPrice
@@ -43,6 +44,7 @@ export const GET_BUSINESS_ORDERS = graphql(`
                     imageUrl
                     quantity
                     price
+                    notes
                 }
             }
         }
@@ -87,6 +89,7 @@ export const ORDERS_SUBSCRIPTION = graphql(`
     subscription AllOrdersUpdated {
         allOrdersUpdated {
             id
+            displayId
             userId
             orderPrice
             deliveryPrice
@@ -112,6 +115,7 @@ export const ORDERS_SUBSCRIPTION = graphql(`
                     name
                     quantity
                     price
+                    notes
                 }
             }
         }

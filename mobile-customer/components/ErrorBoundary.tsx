@@ -41,21 +41,21 @@ export class ErrorBoundary extends Component<Props, State> {
             }
 
             return (
-                <View className="flex-1 bg-white dark:bg-neutral-950 items-center justify-center px-8">
+                <View className="flex-1 bg-background items-center justify-center px-8">
                     <Text className="text-4xl mb-4">😵</Text>
-                    <Text className="text-xl font-bold text-neutral-900 dark:text-white text-center mb-2">
+                    <Text className="text-xl font-bold text-foreground text-center mb-2">
                         Oops! Something went wrong
                     </Text>
-                    <Text className="text-sm text-neutral-500 dark:text-neutral-400 text-center mb-6">
+                    <Text className="text-sm text-subtext text-center mb-6">
                         An unexpected error occurred. Please try again.
                     </Text>
 
                     {__DEV__ && this.state.error && (
                         <ScrollView
-                            className="max-h-40 w-full bg-red-50 dark:bg-red-950/30 rounded-xl p-3 mb-6"
+                            className="max-h-40 w-full bg-expense/10 rounded-xl p-3 mb-6"
                             showsVerticalScrollIndicator={false}
                         >
-                            <Text className="text-xs text-red-600 dark:text-red-400 font-mono">
+                            <Text className="text-xs text-expense font-mono">
                                 {this.state.error.toString()}
                             </Text>
                         </ScrollView>
@@ -63,7 +63,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
                     <TouchableOpacity
                         onPress={this.handleRetry}
-                        className="bg-sky-500 rounded-xl py-3 px-8"
+                        className="bg-primary rounded-xl py-3 px-8"
                         activeOpacity={0.8}
                     >
                         <Text className="text-white font-semibold text-base">Try Again</Text>

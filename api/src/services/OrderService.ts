@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import { OrderRepository } from '@/repositories/OrderRepository';
 import { AuthRepository } from '@/repositories/AuthRepository';
 import { ProductRepository } from '@/repositories/ProductRepository';
@@ -35,6 +36,20 @@ export class OrderService {
         private pubsub: PubSub,
     ) {
         this.orderRepository = orderRepository;
+    }
+
+    /**
+     * Generate a short, human-readable display ID like "GJ-A3F8"
+     * Format: GJ-XXXX (4 alphanumeric chars, uppercase, no ambiguous chars)
+     */
+    private generateDisplayId(): string {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I/O/0/1
+        const bytes = randomBytes(4);
+        let id = '';
+        for (let i = 0; i < 4; i++) {
+            id += chars[bytes[i] % chars.length];
+        }
+        return `GJ-${id}`;
     }
 
     async createOrder(userId: string, input: CreateOrderInput): Promise<Order> {
@@ -77,6 +92,7 @@ export class OrderService {
                 productId: itemInput.productId,
                 quantity: itemInput.quantity,
                 price: price, // Store the price at time of purchase
+                notes: itemInput.notes || null,
             });
 
             cartItems.push({
@@ -172,6 +188,7 @@ export class OrderService {
         }
 
         const orderData = {
+            displayId: this.generateDisplayId(),
             price: effectiveOrderPrice,
             userId,
             deliveryPrice: effectiveDeliveryPrice,
@@ -181,6 +198,7 @@ export class OrderService {
             dropoffLat: input.dropOffLocation.latitude,
             dropoffLng: input.dropOffLocation.longitude,
             dropoffAddress: input.dropOffLocation.address,
+            driverNotes: input.driverNotes || null,
         };
 
         const createdOrder = await this.orderRepository.create(orderData, itemsToCreate);
@@ -310,6 +328,7 @@ export class OrderService {
                 price: item.price,
                 quantityInStock: Math.min(item.quantity, originalStock),
                 quantityNeeded: Math.max(0, item.quantity - originalStock),
+                notes: item.notes || undefined,
             });
         }
 
@@ -357,6 +376,7 @@ export class OrderService {
 
         return {
             id: dbOrder.id,
+            displayId: dbOrder.displayId,
             userId: dbOrder.userId,
             orderPrice: dbOrder.price,
             deliveryPrice: dbOrder.deliveryPrice,
@@ -393,6 +413,7 @@ export class OrderService {
                 longitude: dbOrder.dropoffLng,
                 address: dbOrder.dropoffAddress,
             },
+            driverNotes: dbOrder.driverNotes || undefined,
             businesses: businessOrderList,
         };
     }
@@ -426,6 +447,26 @@ export class OrderService {
 
     async getOrdersByStatus(status: OrderStatus): Promise<Order[]> {
         const dbOrders = await this.orderRepository.findByStatus(status);
+        return Promise.all(dbOrders.map((order) => this.mapToOrder(order)));
+    }
+
+    async getOrdersByUserId(userId: string): Promise<Order[]> {
+        const dbOrders = await this.orderRepository.findByUserId(userId);
+        return Promise.all(dbOrders.map((order) => this.mapToOrder(order)));
+    }
+
+    async getOrdersByUserIdAndStatus(userId: string, status: OrderStatus): Promise<Order[]> {
+        const dbOrders = await this.orderRepository.findByUserIdAndStatus(userId, status);
+        return Promise.all(dbOrders.map((order) => this.mapToOrder(order)));
+    }
+
+    async getOrdersForDriver(driverId: string): Promise<Order[]> {
+        const dbOrders = await this.orderRepository.findForDriver(driverId);
+        return Promise.all(dbOrders.map((order) => this.mapToOrder(order)));
+    }
+
+    async getOrdersForDriverByStatus(driverId: string, status: OrderStatus): Promise<Order[]> {
+        const dbOrders = await this.orderRepository.findForDriverByStatus(driverId, status);
         return Promise.all(dbOrders.map((order) => this.mapToOrder(order)));
     }
 
@@ -669,29 +710,16 @@ export class OrderService {
     }
 
     async publishUserOrders(userId: string) {
-        const userOrders = await this.orderRepository.findByUserId(userId);
-        const orders: Order[] = [];
-        for (const dbOrder of userOrders) {
-            const order = await this.mapToOrder(dbOrder);
-            orders.push(order);
-        }
+        // Lightweight signal — client refetches on its own
         publish(this.pubsub, topics.ordersByUserChanged(userId), {
             userId,
-            orders,
+            orders: [],
         });
     }
 
     async publishAllOrders() {
-        // Only publish uncompleted orders for real-time updates (DELIVERED/CANCELLED are static)
-        const uncompletedOrders = await this.orderRepository.findUncompleted();
-        const orders: Order[] = [];
-        for (const dbOrder of uncompletedOrders) {
-            const order = await this.mapToOrder(dbOrder);
-            orders.push(order);
-        }
-        publish(this.pubsub, topics.allOrdersChanged(), {
-            orders,
-        });
+        // Lightweight signal — clients refetch on their own
+        publish(this.pubsub, topics.allOrdersChanged(), { orders: [] });
     }
 
     async getUserUncompletedOrders(userId: string) {
@@ -730,15 +758,45 @@ export class OrderService {
         }
     }
 
+    async getOrdersByBusinessIdAndStatus(businessId: string, status: OrderStatus): Promise<Order[]> {
+        try {
+            const db = await getDB();
+            const orderIds = await db
+                .selectDistinct({ orderId: orderItemsTable.orderId })
+                .from(orderItemsTable)
+                .innerJoin(productsTable, eq(orderItemsTable.productId, productsTable.id))
+                .where(eq(productsTable.businessId, businessId))
+                .then(rows => rows.map(r => r.orderId));
+
+            if (orderIds.length === 0) return [];
+
+            const dbOrders = await db.query.orders.findMany({
+                where: (tbl, { and: andOp, eq: eqOp }) =>
+                    andOp(inArray(tbl.id, orderIds), eqOp(tbl.status, status)),
+                orderBy: (tbl, { desc }) => [desc(tbl.createdAt)],
+            });
+
+            return Promise.all(dbOrders.map(o => this.mapToOrder(o)));
+        } catch (error) {
+            log.error({ err: error, businessId, status }, 'order:filterByBusinessAndStatus:error');
+            throw error;
+        }
+    }
+
     async orderContainsBusiness(orderId: string, businessId: string): Promise<boolean> {
         try {
-            const order = await this.getOrderById(orderId);
-            if (!order) return false;
-            
-            // Check if any business in the order matches the businessId
-            return order.businesses.some(
-                orderBusiness => orderBusiness.business.id === businessId
-            );
+            // Lightweight check — single DB query, no mapToOrder
+            const db = await getDB();
+            const match = await db
+                .select({ orderId: orderItemsTable.orderId })
+                .from(orderItemsTable)
+                .innerJoin(productsTable, eq(orderItemsTable.productId, productsTable.id))
+                .where(and(
+                    eq(orderItemsTable.orderId, orderId),
+                    eq(productsTable.businessId, businessId),
+                ))
+                .limit(1);
+            return match.length > 0;
         } catch (error) {
             log.error({ err: error, orderId, businessId }, 'order:containsBusiness:error');
             return false;

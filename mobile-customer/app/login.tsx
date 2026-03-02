@@ -4,11 +4,13 @@ import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { useState } from 'react';
 import { useRouter, type Href } from 'expo-router';
 import { useTranslations } from '@/hooks/useTranslations';
+import { useTheme } from '@/hooks/useTheme';
 
 export default function LoginScreen() {
     const { login, loading } = useAuth();
     const router = useRouter();
     const { t } = useTranslations();
+    const theme = useTheme();
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -40,27 +42,28 @@ export default function LoginScreen() {
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-white">
+        <SafeAreaView className="flex-1 bg-background">
             <ScrollView className="flex-1">
                 <View className="px-6 py-12">
-                    <Text className="text-4xl font-bold text-gray-900 mb-2">{t.auth.login.title}</Text>
-                    <Text className="text-base text-gray-600">{t.auth.login.subtitle}</Text>
+                    <Text className="text-4xl font-bold text-foreground mb-2">{t.auth.login.title}</Text>
+                    <Text className="text-base text-subtext">{t.auth.login.subtitle}</Text>
                 </View>
 
                 <View className="px-6 py-6">
                     {/* Error Message */}
                     {error && (
-                        <View className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                            <Text className="text-red-600 font-medium">{error}</Text>
+                        <View className="bg-expense/10 border border-expense/20 rounded-lg p-4 mb-6">
+                            <Text className="text-expense font-medium">{error}</Text>
                         </View>
                     )}
 
                     {/* Email Input */}
                     <View className="mb-4">
-                        <Text className="text-gray-700 font-semibold mb-2">{t.auth.login.email_label}</Text>
+                        <Text className="text-foreground font-semibold mb-2">{t.auth.login.email_label}</Text>
                         <TextInput
-                            className="border border-gray-300 rounded-lg px-4 py-3 text-gray-900"
+                            className="border border-border rounded-lg px-4 py-3 text-foreground"
                             placeholder={t.auth.login.email_placeholder}
+                            placeholderTextColor={theme.colors.subtext}
                             value={email}
                             onChangeText={setEmail}
                             editable={!loading}
@@ -71,10 +74,11 @@ export default function LoginScreen() {
 
                     {/* Password Input */}
                     <View className="mb-6">
-                        <Text className="text-gray-700 font-semibold mb-2">{t.auth.login.password_label}</Text>
+                        <Text className="text-foreground font-semibold mb-2">{t.auth.login.password_label}</Text>
                         <TextInput
-                            className="border border-gray-300 rounded-lg px-4 py-3 text-gray-900"
+                            className="border border-border rounded-lg px-4 py-3 text-foreground"
                             placeholder={t.auth.login.password_placeholder}
+                            placeholderTextColor={theme.colors.subtext}
                             value={password}
                             onChangeText={setPassword}
                             editable={!loading}
@@ -85,7 +89,7 @@ export default function LoginScreen() {
                     {/* Login Button */}
                     <TouchableOpacity
                         className={`py-3 rounded-lg flex-row items-center justify-center ${
-                            loading ? 'bg-gray-400' : 'bg-blue-600'
+                            loading ? 'bg-border' : 'bg-primary'
                         }`}
                         onPress={handleLogin}
                         disabled={loading}
@@ -104,8 +108,8 @@ export default function LoginScreen() {
                             router.push('/signup' as Href);
                         }}
                     >
-                        <Text className="text-center text-gray-600">
-                            {t.auth.login.no_account}<Text className="text-blue-600 font-semibold">{t.auth.login.sign_up_link}</Text>
+                        <Text className="text-center text-subtext">
+                            {t.auth.login.no_account}<Text className="text-primary font-semibold">{t.auth.login.sign_up_link}</Text>
                         </Text>
                     </TouchableOpacity>
                 </View>

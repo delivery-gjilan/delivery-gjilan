@@ -164,7 +164,7 @@ export function RestaurantCard({
             {/* Image Container with Badges */}
             <View className="relative rounded-2xl overflow-hidden">
                 {/* Restaurant Image */}
-                <View className="h-48 bg-gray-800">
+                <View className="h-48 bg-card">
                     <Image
                         source={{ uri: imageUrl || getPlaceholderImage(id) }}
                         style={{ width: '100%', height: IMAGE_HEIGHT }}
@@ -175,7 +175,7 @@ export function RestaurantCard({
                 {/* Top Left Badges */}
                 <View className="absolute top-3 left-3 flex-col gap-2">
                     {activePromotion && (
-                        <View className="bg-cyan-500 px-3 py-1.5 rounded-lg flex-row items-center gap-1.5">
+                        <View className="bg-primary px-3 py-1.5 rounded-lg flex-row items-center gap-1.5">
                             <Ionicons name="pricetag" size={14} color="black" />
                             <Text className="text-black font-semibold text-xs">
                                 {activePromotion.type === 'PERCENTAGE' && activePromotion.discountValue
@@ -189,13 +189,13 @@ export function RestaurantCard({
                         </View>
                     )}
                     {discount && (
-                        <View className="bg-cyan-500 px-3 py-1.5 rounded-lg flex-row items-center gap-1.5">
+                        <View className="bg-primary px-3 py-1.5 rounded-lg flex-row items-center gap-1.5">
                             <Ionicons name="pricetag" size={14} color="black" />
                             <Text className="text-black font-semibold text-xs">-{discount}% Item Discount</Text>
                         </View>
                     )}
                     {isNew && (
-                        <View className="bg-cyan-500 px-3 py-1.5 rounded-lg">
+                        <View className="bg-primary px-3 py-1.5 rounded-lg">
                             <Text className="text-black font-semibold text-xs">New</Text>
                         </View>
                     )}
@@ -205,7 +205,7 @@ export function RestaurantCard({
                 <Pressable
                     onPress={handleFavoritePress}
                     className="absolute top-3 right-3 w-9 h-9 rounded-full items-center justify-center"
-                    style={{ backgroundColor: 'rgba(255, 255, 255, 0.95)' }}
+                    style={{ backgroundColor: theme.colors.card }}
                 >
                     <Ionicons
                         name={isFavorite ? 'heart' : 'heart-outline'}
@@ -279,8 +279,8 @@ export function RestaurantCard({
                 {/* Open/Closed Status (if closed, show it prominently) */}
                 {!isOpen && (
                     <View className="mt-2 flex-row items-center">
-                        <View className="w-2 h-2 rounded-full bg-red-500 mr-2" />
-                        <Text className="text-xs font-medium text-red-500">Currently Closed</Text>
+                        <View className="w-2 h-2 rounded-full bg-expense mr-2" />
+                        <Text className="text-xs font-medium text-expense">Currently Closed</Text>
                     </View>
                 )}
             </View>

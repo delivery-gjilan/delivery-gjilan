@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, pgEnum, index } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import { users } from './users';
 
@@ -45,7 +45,9 @@ export const userPermissions = pgTable('user_permissions', {
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull(),
-});
+}, (t) => ([
+    index('idx_user_permissions_user_id').on(t.userId),
+]));
 
 export const userPermissionsRelations = relations(userPermissions, ({ one }) => ({
     user: one(users, {

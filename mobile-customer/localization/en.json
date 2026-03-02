@@ -208,7 +208,12 @@
         "settings": "Settings",
         "my_addresses": "My Addresses",
         "account": "Account",
-        "user_fallback": "User"
+        "user_fallback": "User",
+        "delete_account": "Delete Account",
+        "delete_account_title": "Delete Account",
+        "delete_account_message": "Are you sure you want to delete your account? This action cannot be undone. All your data will be permanently removed.",
+        "delete_account_confirm": "Delete",
+        "delete_account_error": "Failed to delete account. Please try again later."
     },
     "addresses": {
         "title": "My Addresses",
@@ -313,8 +318,19 @@
         "unable_create_order": "Unable to create order. Please try again.",
         "active_order_exists_title": "Active Order Exists",
         "active_order_exists_message": "You already have an active order. Please wait for it to be delivered before placing a new order.",
+        "item_notes_placeholder": "Add special instructions...",
+        "driver_notes": "Notes for Driver",
+        "driver_notes_placeholder": "e.g., Ring the doorbell twice",
         "order_placed_title": "Order Placed!",
-        "order_placed_message": "Your order has been placed successfully. You can track it from the active order banner."
+        "order_placed_message": "Your order has been placed successfully. You can track it from the active order banner.",
+        "confirm_order_title": "Place this order?",
+        "confirm_order_message": "You're about to place an order for €{total}.",
+        "confirm_order_note": "Our team may contact you by phone to confirm details or coordinate delivery.",
+        "confirm_order_yes": "Yes, place order",
+        "confirm_order_cancel": "Go back",
+        "order_success_title": "Order placed!",
+        "order_success_subtitle": "Sit back and relax — we're on it.",
+        "order_success_track": "Track order"
     },
     "orders": {
         "title": "My Orders",
@@ -359,7 +375,36 @@
             "call_failed": "Call Failed",
             "unable_open_dialer": "Unable to open the phone dialer.",
             "address_updated": "Address Updated",
-            "address_updated_message": "Address updated for this view."
+            "address_updated_message": "Address updated for this view.",
+            "order_placed": "Order Placed",
+            "est_ready": "Est. Ready",
+            "est_delivery": "Est. Delivery",
+            "prep_time": "Prep Time",
+            "eta": "ETA",
+            "min_short": "min",
+            "order_timeline": "Order Timeline",
+            "placed_at": "Placed",
+            "preparing_at": "Preparing",
+            "ready_at": "Ready",
+            "picked_up_at": "Picked Up",
+            "delivered_at": "Delivered",
+            "your_items": "Your Items",
+            "live_tracking": "Live Tracking",
+            "call_driver": "Call",
+            "message_driver": "Message",
+            "arriving_in": "Arriving in",
+            "your_order": "Your Order",
+            "pickup": "Pickup",
+            "dropoff": "Drop-off",
+            "order_details": "Order Details",
+            "items_count": "{{count}} items",
+            "waiting_restaurant": "Waiting for restaurant",
+            "preparing_your_order": "Preparing your order",
+            "ready_for_pickup": "Ready for pickup",
+            "on_the_way": "On the way",
+            "order_complete": "Order Complete",
+            "order_cancelled": "Order Cancelled",
+            "finding_driver": "Finding you a driver..."
         },
         "active_bar": "Active Order",
         "status": {
@@ -367,7 +412,17 @@
             "preparing": "PREPARING",
             "ready": "READY",
             "out_for_delivery": "OUT FOR DELIVERY",
-            "in_progress": "IN PROGRESS"
+            "in_progress": "IN PROGRESS",
+            "cancelled": "CANCELLED",
+            "delivered": "DELIVERED"
+        },
+        "status_messages": {
+            "pending": "Waiting for the restaurant to accept your order",
+            "preparing": "Your order is being prepared",
+            "ready": "Your order is ready for pickup",
+            "out_for_delivery": "Your order is on its way",
+            "cancelled": "This order has been cancelled",
+            "delivered": "Your order has been delivered"
         }
     },
     "business": {

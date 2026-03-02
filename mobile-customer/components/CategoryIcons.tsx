@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, Platform } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface Category {
     id: string;
@@ -13,6 +14,15 @@ interface CategoryIconsProps {
     categories: Category[];
 }
 
+// Category-specific gradient colors for a modern look
+const categoryGradients: Record<string, string[]> = {
+    restaurants: ['#ff6b6b', '#ee5a52'],
+    groceries: ['#51cf66', '#37b24d'],
+    health: ['#4dabf7', '#339af0'],
+    beauty: ['#cc5de8', '#be4bdb'],
+    drinks: ['#ff922b', '#fd7e14'],
+};
+
 export function CategoryIcons({ categories }: CategoryIconsProps) {
     const theme = useTheme();
 
@@ -20,46 +30,68 @@ export function CategoryIcons({ categories }: CategoryIconsProps) {
         <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16, gap: 16 }}
+            contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
         >
-            {categories.map((cat) => (
-                <TouchableOpacity
-                    key={cat.id}
-                    onPress={cat.onPress}
-                    activeOpacity={0.7}
-                    style={{ alignItems: 'center', width: 72 }}
-                >
-                    <View
-                        style={{
-                            width: 64,
-                            height: 64,
-                            borderRadius: 32,
-                            backgroundColor: theme.colors.card,
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            overflow: 'hidden',
-                            marginBottom: 6,
-                        }}
+            {categories.map((cat) => {
+                const gradientColors = categoryGradients[cat.id] || ['#868e96', '#495057'];
+                
+                return (
+                    <TouchableOpacity
+                        key={cat.id}
+                        onPress={cat.onPress}
+                        activeOpacity={0.8}
+                        style={{ alignItems: 'center', width: 76 }}
                     >
-                        <Image
-                            source={{ uri: cat.imageUrl }}
-                            style={{ width: 40, height: 40 }}
-                            resizeMode="contain"
-                        />
-                    </View>
-                    <Text
-                        style={{
-                            color: theme.colors.text,
-                            fontSize: 11,
-                            fontWeight: '500',
-                            textAlign: 'center',
-                        }}
-                        numberOfLines={2}
-                    >
-                        {cat.label}
-                    </Text>
-                </TouchableOpacity>
-            ))}
+                        <View
+                            style={{
+                                width: 68,
+                                height: 68,
+                                borderRadius: 20,
+                                marginBottom: 8,
+                                overflow: 'hidden',
+                                ...(Platform.OS === 'ios' && {
+                                    shadowColor: gradientColors[0],
+                                    shadowOffset: { width: 0, height: 4 },
+                                    shadowOpacity: 0.3,
+                                    shadowRadius: 8,
+                                }),
+                                ...(Platform.OS === 'android' && {
+                                    elevation: 4,
+                                }),
+                            }}
+                        >
+                            <LinearGradient
+                                colors={gradientColors}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <Image
+                                    source={{ uri: cat.imageUrl }}
+                                    style={{ width: 36, height: 36, tintColor: 'white' }}
+                                    resizeMode="contain"
+                                />
+                            </LinearGradient>
+                        </View>
+                        <Text
+                            style={{
+                                color: theme.colors.text,
+                                fontSize: 12,
+                                fontWeight: '600',
+                                textAlign: 'center',
+                            }}
+                            numberOfLines={2}
+                        >
+                            {cat.label}
+                        </Text>
+                    </TouchableOpacity>
+                );
+            })}
         </ScrollView>
     );
 }

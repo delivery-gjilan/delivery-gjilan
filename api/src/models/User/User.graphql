@@ -163,6 +163,7 @@ type Mutation {
     createUser(input: CreateUserInput!): AuthResponse!
     updateUser(input: UpdateUserInput!): User!
     deleteUser(id: ID!): Boolean!
+    deleteMyAccount: Boolean!
     updateUserNote(userId: ID!, note: String, flagColor: String): User!
     setUserPermissions(userId: ID!, permissions: [UserPermission!]!): User!
     updateDriverLocation(latitude: Float!, longitude: Float!): User!

@@ -7,6 +7,7 @@ enum BusinessType {
 type Business {
     id: ID!
     name: String!
+    description: String
     phoneNumber: String
     imageUrl: String
     businessType: BusinessType!
@@ -38,6 +39,7 @@ type Query {
 
 input CreateBusinessInput {
     name: String!
+    description: String
     phoneNumber: String
     imageUrl: String
     businessType: BusinessType!
@@ -48,6 +50,7 @@ input CreateBusinessInput {
 
 input UpdateBusinessInput {
     name: String
+    description: String
     phoneNumber: String
     imageUrl: String
     businessType: BusinessType

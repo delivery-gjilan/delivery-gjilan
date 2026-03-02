@@ -25,6 +25,7 @@ type OrderItem {
     price: Float!
     quantityInStock: Int!
     quantityNeeded: Int!
+    notes: String
 }
 
 type OrderPromotion {
@@ -36,6 +37,7 @@ type OrderPromotion {
 
 type Order {
     id: ID!
+    displayId: String!
     userId: ID!
     orderPrice: Float!
     deliveryPrice: Float!
@@ -55,6 +57,7 @@ type Order {
     driver: User
     dropOffLocation: Location!
     pickupLocations: [Location!]!
+    driverNotes: String
     businesses: [OrderBusiness!]!
     orderPromotions: [OrderPromotion!]
 }
@@ -88,10 +91,12 @@ input CreateOrderInput {
     deliveryPrice: Float!
     totalPrice: Float! # For validation/check
     promoCode: String
+    driverNotes: String
 }
 
 input CreateOrderItemInput {
     productId: ID!
     quantity: Int!
     price: Float! # For validation/check
+    notes: String
 }

@@ -282,7 +282,7 @@ export function BusinessHeader({ business, scrollY }: { business: Partial<Busine
                     <View className="flex-row items-center gap-2">
                         <View
                             className="px-2.5 py-1 rounded-md"
-                            style={{ backgroundColor: business.isOpen ? '#10b981' : '#ef4444' }}
+                            style={{ backgroundColor: business.isOpen ? theme.colors.income : theme.colors.expense }}
                         >
                             <Text className="text-white text-xs font-semibold">
                                 {business.isOpen ? 'Open' : 'Closed'}
@@ -318,7 +318,7 @@ export function BusinessHeader({ business, scrollY }: { business: Partial<Busine
                     onPress={() => router.back()}
                     className="w-11 h-11 rounded-full items-center justify-center"
                     style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        backgroundColor: theme.colors.card,
                         ...(Platform.OS === 'ios' && {
                             shadowColor: '#000',
                             shadowOffset: { width: 0, height: 2 },
@@ -327,7 +327,7 @@ export function BusinessHeader({ business, scrollY }: { business: Partial<Busine
                         }),
                     }}
                 >
-                    <Ionicons name="arrow-back" size={24} color="#1f2937" />
+                    <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
             </View>
         </Animated.View>

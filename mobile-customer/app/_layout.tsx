@@ -14,7 +14,10 @@ import { useNotifications } from '@/hooks/useNotifications';
 import StoreClosedScreen from '@/components/StoreClosedScreen';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ToastContainer } from '@/components/Toast';
+import InfoBanner from '@/components/InfoBanner';
+import type { InfoBannerType } from '@/components/InfoBanner';
 import { initSentry } from '@/lib/sentry';
+import { useState } from 'react';
 
 // ── Initialise Sentry before anything else renders ──
 initSentry();
@@ -22,7 +25,8 @@ initSentry();
 // Inner component that uses Apollo Client (must be inside ApolloProvider)
 function AppContent() {
     const theme = useTheme();
-    const { isStoreClosed, closedMessage, loading: storeStatusLoading } = useStoreStatus();
+    const { isStoreClosed, closedMessage, loading: storeStatusLoading, bannerEnabled, bannerMessage, bannerType } = useStoreStatus();
+    const [bannerDismissed, setBannerDismissed] = useState(false);
 
     // Initialize push notifications
     useNotifications();
@@ -39,9 +43,18 @@ function AppContent() {
         return <StoreClosedScreen message={closedMessage} />;
     }
 
+    const showBanner = bannerEnabled && !!bannerMessage && !bannerDismissed;
+
     return (
         <ThemeProvider value={theme}>
             <SafeAreaProvider>
+                {showBanner && (
+                    <InfoBanner
+                        message={bannerMessage}
+                        type={(bannerType as InfoBannerType) ?? 'INFO'}
+                        onDismiss={() => setBannerDismissed(true)}
+                    />
+                )}
                 <Stack screenOptions={{ headerShown: false }}>
                     <Stack.Screen name="index" options={{ headerShown: false }} />
                     <Stack.Screen name="auth-selection" options={{ headerShown: false }} />

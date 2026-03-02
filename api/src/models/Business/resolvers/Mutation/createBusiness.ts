@@ -1,5 +1,6 @@
 import type { MutationResolvers } from '@/generated/types.generated';
 import { createAuditLogger } from '@/services/AuditLogger';
+import { cache } from '@/lib/cache';
 
 export const createBusiness: NonNullable<MutationResolvers['createBusiness']> = async (
     _parent,
@@ -8,6 +9,9 @@ export const createBusiness: NonNullable<MutationResolvers['createBusiness']> = 
 ) => {
     const { businessService, db } = context;
     const result = await businessService.createBusiness(input);
+    
+    // Invalidate businesses list cache
+    await cache.invalidateAllBusinesses();
     
     // Log the action
     const logger = createAuditLogger(db, context);

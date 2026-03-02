@@ -94,7 +94,7 @@ export function CompactRestaurantCard({
                             position: 'absolute',
                             top: 8,
                             left: 8,
-                            backgroundColor: '#06b6d4',
+                            backgroundColor: theme.colors.primary,
                             paddingHorizontal: 7,
                             paddingVertical: 3,
                             borderRadius: 5,

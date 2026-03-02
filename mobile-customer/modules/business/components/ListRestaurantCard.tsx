@@ -143,7 +143,7 @@ export function ListRestaurantCard({
                             flexDirection: 'row',
                             alignItems: 'center',
                             alignSelf: 'flex-start',
-                            backgroundColor: '#0ea5e9',
+                            backgroundColor: theme.colors.primary,
                             paddingHorizontal: 8,
                             paddingVertical: 3,
                             borderRadius: 12,

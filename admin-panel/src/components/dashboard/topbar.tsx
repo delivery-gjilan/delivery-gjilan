@@ -4,29 +4,35 @@
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import Button from "@/components/ui/Button";
-import { LogOut, Shield, Briefcase, StoreIcon, Clock } from "lucide-react";
+import { LogOut, Shield, Briefcase, StoreIcon, Clock, Megaphone } from "lucide-react";
 import { useQuery, useMutation } from "@apollo/client/react";
 import { GET_STORE_STATUS, UPDATE_STORE_STATUS } from "@/graphql/operations/store";
 import { useState } from "react";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
+import { BannerType } from "@/gql/graphql";
 
 export default function Topbar() {
   const router = useRouter();
   const { admin, logout } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [customMessage, setCustomMessage] = useState("");
+  const [showBannerModal, setShowBannerModal] = useState(false);
+  const [bannerMessage, setBannerMessage] = useState("");
+  const [bannerType, setBannerType] = useState<BannerType>(BannerType.Info);
 
   const { data: storeStatusData, refetch } = useQuery(GET_STORE_STATUS);
   const [updateStoreStatus, { loading: updating }] = useMutation(UPDATE_STORE_STATUS, {
     onCompleted: () => {
       refetch();
       setShowModal(false);
+      setShowBannerModal(false);
     },
   });
 
   const storeStatus = storeStatusData?.getStoreStatus;
   const isStoreClosed = storeStatus?.isStoreClosed ?? false;
+  const bannerEnabled = storeStatus?.bannerEnabled ?? false;
 
   const handleToggleStore = async (close: boolean) => {
     if (close) {
@@ -52,6 +58,37 @@ export default function Topbar() {
         input: {
           isStoreClosed: true,
           closedMessage: customMessage,
+        },
+      },
+    });
+  };
+
+  const handleOpenBannerModal = () => {
+    setBannerMessage(storeStatus?.bannerMessage || "");
+    setBannerType((storeStatus?.bannerType as BannerType) || BannerType.Info);
+    setShowBannerModal(true);
+  };
+
+  const handleSaveBanner = async () => {
+    await updateStoreStatus({
+      variables: {
+        input: {
+          isStoreClosed,
+          bannerEnabled: true,
+          bannerMessage,
+          bannerType,
+        },
+      },
+    });
+  };
+
+  const handleDisableBanner = async () => {
+    await updateStoreStatus({
+      variables: {
+        input: {
+          isStoreClosed,
+          bannerEnabled: false,
+          bannerMessage: null,
         },
       },
     });
@@ -84,6 +121,29 @@ export default function Topbar() {
           >
             {isStoreClosed ? 'Open store' : 'Close'}
           </button>
+
+          <div className="w-px h-4 bg-zinc-800" />
+
+          <button
+            onClick={bannerEnabled ? handleDisableBanner : handleOpenBannerModal}
+            disabled={updating}
+            className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+              bannerEnabled 
+                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20' 
+                : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            <Megaphone size={12} />
+            {bannerEnabled ? 'Banner active' : 'Set banner'}
+          </button>
+          {bannerEnabled && (
+            <button
+              onClick={handleOpenBannerModal}
+              className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+            >
+              Edit
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -92,9 +152,15 @@ export default function Topbar() {
           </span>
           <button
             onClick={handleLogout}
-            className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60 transition-all"
+            className="relative group p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60 transition-all"
           >
             <LogOut size={15} />
+            {/* Tooltip */}
+            <div className="absolute top-full mt-2 right-0 px-2.5 py-1.5 bg-zinc-800 text-zinc-100 text-xs font-medium rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 -translate-y-1 transition-all duration-200 whitespace-nowrap z-50 shadow-xl border border-zinc-700/50 pointer-events-none">
+              Logout
+              {/* Arrow */}
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-zinc-800" />
+            </div>
           </button>
         </div>
       </header>
@@ -132,6 +198,80 @@ export default function Topbar() {
               disabled={updating || !customMessage.trim()}
             >
               {updating ? "Closing..." : "Close Store"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Banner Modal */}
+      <Modal
+        isOpen={showBannerModal}
+        onClose={() => setShowBannerModal(false)}
+        title="Information Banner"
+      >
+        <div className="space-y-4">
+          <div className="bg-blue-500/5 border border-blue-500/10 rounded-lg p-3">
+            <p className="text-blue-200/80 text-xs">
+              This banner will be shown to all users across all apps. Use it for announcements, 
+              high-demand warnings, or system status updates.
+            </p>
+          </div>
+
+          <Input
+            label="Banner Message"
+            value={bannerMessage}
+            onChange={(e) => setBannerMessage(e.target.value)}
+            placeholder="e.g. High demand right now — orders may take longer than usual"
+          />
+
+          <div>
+            <label className="block text-xs text-zinc-400 mb-2">Banner Type</label>
+            <div className="flex gap-2">
+              {([
+                { value: BannerType.Info, label: "Info", color: "blue" },
+                { value: BannerType.Warning, label: "Warning", color: "amber" },
+                { value: BannerType.Success, label: "Success", color: "emerald" },
+              ] as const).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setBannerType(opt.value)}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${
+                    bannerType === opt.value
+                      ? `bg-${opt.color}-500/15 text-${opt.color}-400 border-${opt.color}-500/30`
+                      : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:border-zinc-700'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {bannerMessage && (
+            <div>
+              <label className="block text-xs text-zinc-400 mb-2">Preview</label>
+              <div className={`rounded-lg px-4 py-3 text-sm ${
+                bannerType === BannerType.Warning
+                  ? 'bg-amber-500/10 text-amber-200 border border-amber-500/20'
+                  : bannerType === BannerType.Success
+                  ? 'bg-emerald-500/10 text-emerald-200 border border-emerald-500/20'
+                  : 'bg-blue-500/10 text-blue-200 border border-blue-500/20'
+              }`}>
+                {bannerMessage}
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800/50">
+            <Button variant="outline" onClick={() => setShowBannerModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveBanner}
+              disabled={updating || !bannerMessage.trim()}
+            >
+              {updating ? "Saving..." : "Activate Banner"}
             </Button>
           </div>
         </div>

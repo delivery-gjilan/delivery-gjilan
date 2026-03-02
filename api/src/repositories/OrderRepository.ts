@@ -33,6 +33,46 @@ export class OrderRepository {
         return await db.select().from(ordersTable).where(eq(ordersTable.userId, userId));
     }
 
+    async findByUserIdAndStatus(userId: string, status: OrderStatus): Promise<DbOrder[]> {
+        const db = await getDB();
+        return await db
+            .select()
+            .from(ordersTable)
+            .where(and(eq(ordersTable.userId, userId), eq(ordersTable.status, status)));
+    }
+
+    /**
+     * Orders visible to a driver: assigned to them OR still active (pickable).
+     */
+    async findForDriver(driverId: string): Promise<DbOrder[]> {
+        const db = await getDB();
+        return await db
+            .select()
+            .from(ordersTable)
+            .where(
+                or(
+                    eq(ordersTable.driverId, driverId),
+                    inArray(ordersTable.status, ['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'] as OrderStatus[]),
+                ),
+            );
+    }
+
+    async findForDriverByStatus(driverId: string, status: OrderStatus): Promise<DbOrder[]> {
+        const db = await getDB();
+        return await db
+            .select()
+            .from(ordersTable)
+            .where(
+                and(
+                    eq(ordersTable.status, status),
+                    or(
+                        eq(ordersTable.driverId, driverId),
+                        inArray(ordersTable.status, ['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'] as OrderStatus[]),
+                    ),
+                ),
+            );
+    }
+
     async updateStatus(id: string, status: OrderStatus): Promise<DbOrder | null> {
         const db = await getDB();
         const result = await db.update(ordersTable).set({ status }).where(eq(ordersTable.id, id)).returning();

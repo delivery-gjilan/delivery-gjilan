@@ -60,12 +60,11 @@ export const CartFloatingBar = () => {
 
     // Get lighter version of primary color for flash effect
     const getLightColor = (hexColor: string) => {
-        // For light theme (dark red), flash to lighter red
-        // For dark theme (teal), flash to lighter teal
-        if (theme.dark === false && hexColor === '#5f0202') {
-            return '#ef4444'; // Lighter red
+        // Flash to lighter purple
+        if (theme.dark === false && hexColor === '#8B5CF6') {
+            return '#A78BFA'; // violet-400
         }
-        return '#67e8f9'; // Lighter cyan for dark theme
+        return '#DDD6FE'; // accent for any theme
     };
 
     const backgroundColor = colorAnim.interpolate({

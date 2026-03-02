@@ -40,14 +40,26 @@ input SubscriptionInput {
     token: String!
 }
 
+enum BannerType {
+    INFO
+    WARNING
+    SUCCESS
+}
+
 type StoreStatus {
     isStoreClosed: Boolean!
     closedMessage: String
+    bannerEnabled: Boolean!
+    bannerMessage: String
+    bannerType: BannerType!
 }
 
 input UpdateStoreStatusInput {
     isStoreClosed: Boolean!
     closedMessage: String
+    bannerEnabled: Boolean
+    bannerMessage: String
+    bannerType: BannerType
 }
 
 type Query {

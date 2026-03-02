@@ -1,15 +1,12 @@
 import { useMutation } from '@apollo/client/react';
-import { router } from 'expo-router';
 import { CREATE_ORDER } from '@/graphql/operations/orders';
 import { useCart } from './useCart';
-import { useCartActions } from './useCartActions';
 import { useActiveOrdersStore } from '@/modules/orders/store/activeOrdersStore';
 import { useTranslations } from '@/hooks/useTranslations';
 import { toast } from '@/store/toastStore';
 
 export function useCreateOrder() {
     const { items } = useCart();
-    const { clearCart } = useCartActions();
     const { hasActiveOrders } = useActiveOrdersStore();
     const { t } = useTranslations();
 
@@ -20,6 +17,7 @@ export function useCreateOrder() {
         deliveryPrice: number,
         totalPrice: number,
         promoCode?: string | null,
+        driverNotes?: string | null,
     ) => {
         // Check if user already has an active order
         if (hasActiveOrders) {
@@ -42,6 +40,7 @@ export function useCreateOrder() {
             productId: item.productId,
             quantity: item.quantity,
             price: item.price,
+            notes: item.notes || null,
         }));
 
         try {
@@ -57,23 +56,10 @@ export function useCreateOrder() {
                         deliveryPrice,
                         totalPrice,
                         promoCode: promoCode || null,
+                        driverNotes: driverNotes || null,
                     },
                 },
             });
-
-            // Clear cart after successful order
-            clearCart();
-
-            // Immediately navigate to home to close cart screen
-            router.replace('/(tabs)/home');
-
-            // Show success toast after a brief delay to ensure navigation completes
-            setTimeout(() => {
-                toast.success(
-                    t.cart.order_placed_title,
-                    t.cart.order_placed_message,
-                );
-            }, 300);
 
             return result.data?.createOrder;
         } catch (err) {

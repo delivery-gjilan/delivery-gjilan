@@ -59,12 +59,12 @@ export default function Profile() {
                                 width: 48,
                                 height: 48,
                                 borderRadius: 24,
-                                backgroundColor: '#E8DCC4',
+                                backgroundColor: theme.colors.primary + '30',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                             }}
                         >
-                            <Text className="text-lg font-bold text-black">{getInitials()}</Text>
+                            <Text className="text-lg font-bold" style={{ color: theme.colors.primary }}>{getInitials()}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity>
                             <Ionicons name="chevron-down" size={24} color={theme.colors.subtext} />
@@ -79,7 +79,7 @@ export default function Profile() {
                         style={{
                             backgroundColor: theme.colors.card,
                             borderWidth: 1,
-                            borderColor: 'rgba(255,255,255,0.1)',
+                            borderColor: theme.colors.border,
                         }}
                     >
                         <View className="px-4">
@@ -105,7 +105,7 @@ export default function Profile() {
                                 style={{
                                     width: 120,
                                     height: 120,
-                                    backgroundColor: '#2C3E50',
+                                    backgroundColor: theme.colors.card,
                                     borderRadius: 12,
                                     alignItems: 'center',
                                     justifyContent: 'center',
@@ -128,7 +128,7 @@ export default function Profile() {
                                         top: 20,
                                         width: 80,
                                         height: 20,
-                                        backgroundColor: '#00D4FF',
+                                        backgroundColor: theme.colors.primary,
                                         borderTopLeftRadius: 8,
                                         borderTopRightRadius: 8,
                                     }}
@@ -143,7 +143,7 @@ export default function Profile() {
                                     width: 36,
                                     height: 36,
                                     borderRadius: 18,
-                                    backgroundColor: '#EF4444',
+                                    backgroundColor: theme.colors.expense,
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                 }}
@@ -179,9 +179,9 @@ export default function Profile() {
                     <TouchableOpacity
                         onPress={handleLogout}
                         className="py-4 rounded-xl items-center"
-                        style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)' }}
+                        style={{ backgroundColor: theme.colors.expense + '1A' }}
                     >
-                        <Text className="text-base font-semibold" style={{ color: '#EF4444' }}>
+                        <Text className="text-base font-semibold" style={{ color: theme.colors.expense }}>
                             Logout
                         </Text>
                     </TouchableOpacity>

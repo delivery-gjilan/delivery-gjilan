@@ -141,6 +141,11 @@ export type AuthResponse = {
   user: User;
 };
 
+export type BannerType =
+  | 'INFO'
+  | 'SUCCESS'
+  | 'WARNING';
+
 export type Business = {
   __typename?: 'Business';
   activePromotion?: Maybe<BusinessPromotion>;
@@ -148,6 +153,7 @@ export type Business = {
   businessType: BusinessType;
   commissionPercentage: Scalars['Float']['output'];
   createdAt: Scalars['Date']['output'];
+  description?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
   isActive: Scalars['Boolean']['output'];
@@ -212,6 +218,7 @@ export type CartItemInput = {
 export type CreateBusinessInput = {
   avgPrepTimeMinutes?: InputMaybe<Scalars['Int']['input']>;
   businessType: BusinessType;
+  description?: InputMaybe<Scalars['String']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   location: LocationInput;
   name: Scalars['String']['input'];
@@ -243,6 +250,7 @@ export type CreateDeliveryZoneInput = {
 
 export type CreateOrderInput = {
   deliveryPrice: Scalars['Float']['input'];
+  driverNotes?: InputMaybe<Scalars['String']['input']>;
   dropOffLocation: LocationInput;
   items: Array<CreateOrderItemInput>;
   promoCode?: InputMaybe<Scalars['String']['input']>;
@@ -250,6 +258,7 @@ export type CreateOrderInput = {
 };
 
 export type CreateOrderItemInput = {
+  notes?: InputMaybe<Scalars['String']['input']>;
   price: Scalars['Float']['input'];
   productId: Scalars['ID']['input'];
   quantity: Scalars['Int']['input'];
@@ -505,6 +514,7 @@ export type Mutation = {
   deleteCampaign: Scalars['Boolean']['output'];
   deleteDeliveryPricingTier: Scalars['Boolean']['output'];
   deleteDeliveryZone: Scalars['Boolean']['output'];
+  deleteMyAccount: Scalars['Boolean']['output'];
   deleteProduct: Scalars['Boolean']['output'];
   deleteProductCategory: Scalars['Boolean']['output'];
   deleteProductSubcategory: Scalars['Boolean']['output'];
@@ -961,7 +971,9 @@ export type Order = {
   businesses: Array<OrderBusiness>;
   deliveredAt?: Maybe<Scalars['Date']['output']>;
   deliveryPrice: Scalars['Float']['output'];
+  displayId: Scalars['String']['output'];
   driver?: Maybe<User>;
+  driverNotes?: Maybe<Scalars['String']['output']>;
   dropOffLocation: Location;
   estimatedReadyAt?: Maybe<Scalars['Date']['output']>;
   id: Scalars['ID']['output'];
@@ -992,6 +1004,7 @@ export type OrderItem = {
   __typename?: 'OrderItem';
   imageUrl?: Maybe<Scalars['String']['output']>;
   name: Scalars['String']['output'];
+  notes?: Maybe<Scalars['String']['output']>;
   price: Scalars['Float']['output'];
   productId: Scalars['ID']['output'];
   quantity: Scalars['Int']['output'];
@@ -1485,6 +1498,9 @@ export type SignupStepResponse = {
 
 export type StoreStatus = {
   __typename?: 'StoreStatus';
+  bannerEnabled: Scalars['Boolean']['output'];
+  bannerMessage?: Maybe<Scalars['String']['output']>;
+  bannerType: BannerType;
   closedMessage?: Maybe<Scalars['String']['output']>;
   isStoreClosed: Scalars['Boolean']['output'];
 };
@@ -1545,6 +1561,7 @@ export type UpdateBusinessInput = {
   avgPrepTimeMinutes?: InputMaybe<Scalars['Int']['input']>;
   businessType?: InputMaybe<BusinessType>;
   commissionPercentage?: InputMaybe<Scalars['Float']['input']>;
+  description?: InputMaybe<Scalars['String']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
   location?: InputMaybe<LocationInput>;
@@ -1616,6 +1633,9 @@ export type UpdatePromotionInput = {
 };
 
 export type UpdateStoreStatusInput = {
+  bannerEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  bannerMessage?: InputMaybe<Scalars['String']['input']>;
+  bannerType?: InputMaybe<BannerType>;
   closedMessage?: InputMaybe<Scalars['String']['input']>;
   isStoreClosed: Scalars['Boolean']['input'];
 };
@@ -1860,6 +1880,7 @@ export type ResolversTypes = {
   AuditLog: ResolverTypeWrapper<Omit<AuditLog, 'action' | 'actor' | 'actorType' | 'entityType'> & { action: ResolversTypes['ActionType'], actor?: Maybe<ResolversTypes['User']>, actorType: ResolversTypes['ActorType'], entityType: ResolversTypes['EntityType'] }>;
   AuditLogConnection: ResolverTypeWrapper<Omit<AuditLogConnection, 'logs'> & { logs: Array<ResolversTypes['AuditLog']> }>;
   AuthResponse: ResolverTypeWrapper<Omit<AuthResponse, 'user'> & { user: ResolversTypes['User'] }>;
+  BannerType: ResolverTypeWrapper<'INFO' | 'WARNING' | 'SUCCESS'>;
   Business: ResolverTypeWrapper<Omit<Business, 'activePromotion' | 'businessType'> & { activePromotion?: Maybe<ResolversTypes['BusinessPromotion']>, businessType: ResolversTypes['BusinessType'] }>;
   BusinessDayHours: ResolverTypeWrapper<BusinessDayHours>;
   BusinessDayHoursInput: BusinessDayHoursInput;
@@ -1936,7 +1957,7 @@ export type ResolversTypes = {
   SettlementType: ResolverTypeWrapper<'DRIVER_PAYMENT' | 'BUSINESS_PAYMENT'>;
   SignupStep: ResolverTypeWrapper<'INITIAL' | 'EMAIL_SENT' | 'EMAIL_VERIFIED' | 'PHONE_SENT' | 'COMPLETED'>;
   SignupStepResponse: ResolverTypeWrapper<Omit<SignupStepResponse, 'currentStep'> & { currentStep: ResolversTypes['SignupStep'] }>;
-  StoreStatus: ResolverTypeWrapper<StoreStatus>;
+  StoreStatus: ResolverTypeWrapper<Omit<StoreStatus, 'bannerType'> & { bannerType: ResolversTypes['BannerType'] }>;
   SubmitPhoneNumberInput: SubmitPhoneNumberInput;
   Subscription: ResolverTypeWrapper<{}>;
   SubscriptionInput: SubscriptionInput;
@@ -2124,12 +2145,15 @@ export type AuthResponseResolvers<ContextType = GraphQLContext, ParentType exten
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
+export type BannerTypeResolvers = EnumResolverSignature<{ INFO?: any, SUCCESS?: any, WARNING?: any }, ResolversTypes['BannerType']>;
+
 export type BusinessResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Business'] = ResolversParentTypes['Business']> = {
   activePromotion?: Resolver<Maybe<ResolversTypes['BusinessPromotion']>, ParentType, ContextType>;
   avgPrepTimeMinutes?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   businessType?: Resolver<ResolversTypes['BusinessType'], ParentType, ContextType>;
   commissionPercentage?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
+  description?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   isActive?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
@@ -2304,6 +2328,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   deleteCampaign?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteCampaignArgs, 'id'>>;
   deleteDeliveryPricingTier?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteDeliveryPricingTierArgs, 'id'>>;
   deleteDeliveryZone?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteDeliveryZoneArgs, 'id'>>;
+  deleteMyAccount?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   deleteProduct?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteProductArgs, 'id'>>;
   deleteProductCategory?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteProductCategoryArgs, 'id'>>;
   deleteProductSubcategory?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteProductSubcategoryArgs, 'id'>>;
@@ -2387,7 +2412,9 @@ export type OrderResolvers<ContextType = GraphQLContext, ParentType extends Reso
   businesses?: Resolver<Array<ResolversTypes['OrderBusiness']>, ParentType, ContextType>;
   deliveredAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   deliveryPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  displayId?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   driver?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
+  driverNotes?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   dropOffLocation?: Resolver<ResolversTypes['Location'], ParentType, ContextType>;
   estimatedReadyAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
@@ -2418,6 +2445,7 @@ export type OrderBusinessResolvers<ContextType = GraphQLContext, ParentType exte
 export type OrderItemResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['OrderItem'] = ResolversParentTypes['OrderItem']> = {
   imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  notes?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   price?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   productId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   quantity?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
@@ -2680,6 +2708,9 @@ export type SignupStepResponseResolvers<ContextType = GraphQLContext, ParentType
 };
 
 export type StoreStatusResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['StoreStatus'] = ResolversParentTypes['StoreStatus']> = {
+  bannerEnabled?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  bannerMessage?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  bannerType?: Resolver<ResolversTypes['BannerType'], ParentType, ContextType>;
   closedMessage?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   isStoreClosed?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
@@ -2815,6 +2846,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   AuditLog?: AuditLogResolvers<ContextType>;
   AuditLogConnection?: AuditLogConnectionResolvers<ContextType>;
   AuthResponse?: AuthResponseResolvers<ContextType>;
+  BannerType?: BannerTypeResolvers;
   Business?: BusinessResolvers<ContextType>;
   BusinessDayHours?: BusinessDayHoursResolvers<ContextType>;
   BusinessPromotion?: BusinessPromotionResolvers<ContextType>;

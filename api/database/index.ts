@@ -20,6 +20,10 @@ export async function getDB() {
 
     pool = new Pool({
         connectionString,
+        max: 20,
+        min: 2,
+        idleTimeoutMillis: 30_000,
+        connectionTimeoutMillis: 5_000,
     });
 
     db = drizzle(pool, { schema: dbSchema });
@@ -28,5 +32,5 @@ export async function getDB() {
 }
 
 // Export db instance for permission checking
-export { db };
+export { db, pool };
 export type DbType = typeof db;

@@ -19,29 +19,21 @@ export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'busines
         }
         return businessService.getBusiness(String(parent.businessId));
     },
-    isOnline: async (parent, _args, { driverService }) => {
-        if (parent.role !== 'DRIVER' || !driverService) {
-            return false;
-        }
-
+    isOnline: async (parent, _args, { loaders }) => {
+        if (parent.role !== 'DRIVER') return false;
         try {
-            const driver = await driverService.getDriverWithConnection(String(parent.id));
+            const driver = await loaders.driverByUserIdLoader.load(String(parent.id));
             return driver?.onlinePreference ?? false;
         } catch (error) {
             logger.error({ err: error }, 'user:isOnline resolve failed');
             return false;
         }
     },
-    driverLocation: async (parent, _args, { driverService }) => {
-        if (parent.role !== 'DRIVER' || !driverService) {
-            return null;
-        }
-
+    driverLocation: async (parent, _args, { loaders }) => {
+        if (parent.role !== 'DRIVER') return null;
         try {
-            const driver = await driverService.getDriverWithConnection(String(parent.id));
-            if (!driver?.driverLat || !driver?.driverLng) {
-                return null;
-            }
+            const driver = await loaders.driverByUserIdLoader.load(String(parent.id));
+            if (!driver?.driverLat || !driver?.driverLng) return null;
             return {
                 latitude: driver.driverLat,
                 longitude: driver.driverLng,
@@ -52,54 +44,43 @@ export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'busines
             return null;
         }
     },
-    driverLocationUpdatedAt: async (parent, _args, { driverService }) => {
-        let value: string | Date | null | undefined;
-        if (parent.role === 'DRIVER' && driverService) {
-            try {
-                const driver = await driverService.getDriverWithConnection(String(parent.id));
-                value = driver?.lastLocationUpdate ?? null;
-            } catch (error) {
-                logger.error({ err: error }, 'user:driverLocationUpdatedAt resolve failed');
+    driverLocationUpdatedAt: async (parent, _args, { loaders }) => {
+        if (parent.role !== 'DRIVER') return null;
+        try {
+            const driver = await loaders.driverByUserIdLoader.load(String(parent.id));
+            const value = driver?.lastLocationUpdate ?? null;
+            if (!value) return null;
+            if (value instanceof Date) return value;
+            if (typeof value === 'string') {
+                const normalized = value
+                    .replace(' ', 'T')
+                    .replace(/\+00\.?$/, 'Z')
+                    .replace(/Z\.$/, 'Z');
+                const parsed = new Date(normalized);
+                return isNaN(parsed.getTime()) ? null : parsed;
             }
-        }
-        if (!value) return null;
-        if (value instanceof Date) return value;
-        if (typeof value === 'string') {
-            const normalized = value
-                .replace(' ', 'T')
-                .replace(/\+00\.?$/, 'Z')
-                .replace(/Z\.$/, 'Z');
-            const parsed = new Date(normalized);
-            return isNaN(parsed.getTime()) ? null : parsed;
-        }
-        return null;
-    },
-    commissionPercentage: async (parent, _args, { driverService }) => {
-        if (parent.role !== 'DRIVER' || !driverService) {
+            return null;
+        } catch (error) {
+            logger.error({ err: error }, 'user:driverLocationUpdatedAt resolve failed');
             return null;
         }
-
+    },
+    commissionPercentage: async (parent, _args, { loaders }) => {
+        if (parent.role !== 'DRIVER') return null;
         try {
-            const driver = await driverService.getDriverWithConnection(String(parent.id));
-            if (!driver?.commissionPercentage) {
-                return null;
-            }
+            const driver = await loaders.driverByUserIdLoader.load(String(parent.id));
+            if (!driver?.commissionPercentage) return null;
             return parseFloat(driver.commissionPercentage);
         } catch (error) {
             logger.error({ err: error }, 'user:commissionPercentage resolve failed');
             return null;
         }
     },
-    driverConnection: async (parent, _args, { driverService }) => {
-        if (parent.role !== 'DRIVER' || !driverService) {
-            return null;
-        }
-
+    driverConnection: async (parent, _args, { loaders }) => {
+        if (parent.role !== 'DRIVER') return null;
         try {
-            const driver = await driverService.getDriverWithConnection(String(parent.id));
-            if (!driver) {
-                return null;
-            }
+            const driver = await loaders.driverByUserIdLoader.load(String(parent.id));
+            if (!driver) return null;
             return {
                 onlinePreference: driver.onlinePreference ?? false,
                 connectionStatus: driver.connectionStatus ?? 'DISCONNECTED',

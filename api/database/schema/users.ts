@@ -41,6 +41,7 @@ export const users = pgTable('users', {
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull()
         .$onUpdate(() => sql`CURRENT_TIMESTAMP`),
+    deletedAt: timestamp('deleted_at', { withTimezone: true, mode: 'string' }),
 });
 
 export const usersRelations = relations(users, ({ many, one }) => ({

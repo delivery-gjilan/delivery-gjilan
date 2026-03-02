@@ -89,11 +89,11 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                 {/* Content starts immediately after header */}
                 <View className="px-4 py-6">
                     {isBusyOverride && (
-                        <View className="bg-yellow-100 border border-yellow-200 rounded-xl p-4 mb-4">
-                            <Text className="text-yellow-900 font-semibold mb-1">
+                        <View className="bg-primary/10 border border-primary/20 rounded-xl p-4 mb-4">
+                            <Text className="text-foreground font-semibold mb-1">
                                 {t.business.busy_title}
                             </Text>
-                            <Text className="text-yellow-900">
+                            <Text className="text-foreground">
                                 {t.business.busy_message.replace('{{minutes}}', String(overridePrepTimeMinutes))}
                             </Text>
                         </View>

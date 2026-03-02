@@ -67,13 +67,19 @@ export default function Sidebar() {
   });
 
   return (
-    <aside className="w-[60px] bg-[#09090b] border-r border-[#1e1e22] flex flex-col items-center py-4 h-screen">
+    <aside className="w-[60px] bg-[#09090b] border-r border-[#1e1e22] flex flex-col items-center py-4 h-screen overflow-visible">
       {/* Logo */}
       <Link
         href="/dashboard"
-        className="w-9 h-9 rounded-lg bg-violet-600 flex items-center justify-center mb-5 hover:bg-violet-500 transition-colors"
+        title="Dashboard Home"
+        className="relative group w-9 h-9 rounded-lg bg-violet-600 flex items-center justify-center mb-5 hover:bg-violet-500 transition-colors"
       >
         <LayoutDashboard size={18} className="text-white" />
+        {/* Tooltip */}
+        <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-zinc-800 text-zinc-100 text-xs font-medium rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-0 whitespace-nowrap shadow-2xl border border-zinc-700 pointer-events-none z-[9999]">
+          Dashboard Home
+          <div className="absolute right-full top-1/2 -translate-y-1/2 -mr-[1px] border-[5px] border-transparent border-r-zinc-800" />
+        </span>
       </Link>
 
       {/* Navigation */}
@@ -87,24 +93,27 @@ export default function Sidebar() {
           const active = pathname.startsWith(item.href);
 
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`relative group w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-150 ${
-                active
-                  ? "bg-violet-500/15 text-violet-400"
-                  : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60"
-              }`}
-            >
-              <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
-              {active && (
-                <div className="absolute left-[-11px] top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-sm bg-violet-500" />
-              )}
+            <div key={item.href} className="relative group w-9 h-9">
+              <Link
+                href={item.href}
+                title={item.name}
+                className={`w-full h-full rounded-lg flex items-center justify-center transition-all duration-150 ${
+                  active
+                    ? "bg-violet-500/15 text-violet-400"
+                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60"
+                }`}
+              >
+                <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
+                {active && (
+                  <div className="absolute left-[-14px] top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-sm bg-violet-500" />
+                )}
+              </Link>
               {/* Tooltip */}
-              <div className="absolute left-full ml-2.5 px-2.5 py-1 bg-zinc-800 text-zinc-100 text-xs font-medium rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 whitespace-nowrap z-50 shadow-lg border border-zinc-700/50 pointer-events-none">
+              <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-zinc-800 text-zinc-100 text-xs font-medium rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-0 whitespace-nowrap shadow-2xl border border-zinc-700 pointer-events-none z-[9999]">
                 {item.name}
-              </div>
-            </Link>
+                <div className="absolute right-full top-1/2 -translate-y-1/2 -mr-[1px] border-[5px] border-transparent border-r-zinc-800" />
+              </span>
+            </div>
           );
         })}
       </nav>

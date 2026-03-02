@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useOrders } from '../modules/orders/hooks/useOrders';
+import { useOrdersSubscription } from '../modules/orders/hooks/useOrdersSubscription';
 
 /**
  * Hook to manage active orders tracking using real-time subscriptions
@@ -16,6 +17,9 @@ export function useActiveOrdersTracking() {
 
     // Fetch orders and subscribe to updates (this updates the store automatically)
     const { loading, error, refetch } = useOrders();
+
+    // Subscribe to real-time order updates
+    useOrdersSubscription();
 
     // Refetch orders when user becomes authenticated
     useEffect(() => {

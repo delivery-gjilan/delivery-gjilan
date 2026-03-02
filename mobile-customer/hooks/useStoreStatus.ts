@@ -6,9 +6,14 @@ export const useStoreStatus = () => {
         fetchPolicy: 'network-only', // Always fetch fresh on app open, no cache
     });
 
+    const status = data?.getStoreStatus;
+
     return {
-        isStoreClosed: data?.getStoreStatus?.isStoreClosed ?? false,
-        closedMessage: data?.getStoreStatus?.closedMessage,
+        isStoreClosed: status?.isStoreClosed ?? false,
+        closedMessage: status?.closedMessage,
+        bannerEnabled: status?.bannerEnabled ?? false,
+        bannerMessage: status?.bannerMessage ?? null,
+        bannerType: (status?.bannerType ?? 'INFO') as 'INFO' | 'WARNING' | 'SUCCESS',
         loading,
         error,
     };

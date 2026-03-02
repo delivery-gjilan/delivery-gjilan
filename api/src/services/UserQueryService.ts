@@ -1,7 +1,7 @@
 import { DbType } from '@/database';
 import { users } from '@/database/schema/users';
 import { userBehaviors } from '@/database/schema/userBehaviors';
-import { eq, gt, gte, lt, lte, ne, inArray, and, or, SQL } from 'drizzle-orm';
+import { eq, gt, gte, lt, lte, ne, inArray, and, or, isNull, SQL } from 'drizzle-orm';
 import logger from '@/lib/logger';
 import { AppError } from '@/lib/errors';
 
@@ -93,12 +93,12 @@ export class UserQueryService {
                 .select({ id: users.id })
                 .from(users)
                 .leftJoin(userBehaviors, eq(users.id, userBehaviors.userId))
-                .where(whereClause);
+                .where(and(whereClause, isNull(users.deletedAt)));
         } else {
             results = await this.db
                 .select({ id: users.id })
                 .from(users)
-                .where(whereClause);
+                .where(and(whereClause, isNull(users.deletedAt)));
         }
 
         logger.info({ matchedUsers: results.length, query }, 'User query resolved');

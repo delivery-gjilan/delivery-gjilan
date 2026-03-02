@@ -1,0 +1,163 @@
+import { createClient, RedisClientType } from 'redis';
+import logger from '@/lib/logger';
+
+let client: RedisClientType | null = null;
+let connected = false;
+/** Set to true after the first failed connection attempt — stops retrying. */
+let disabled = false;
+
+/**
+ * Lightweight Redis cache layer.
+ *
+ * – Connects lazily on first cache access
+ * – Attempts to connect **once**; if Redis is unavailable, caching is disabled
+ *   for the lifetime of the process (no retry spam)
+ * – Falls through to the database transparently (all methods are no-throw)
+ * – TTLs are set per-key so stale data self-evicts
+ */
+
+async function getClient(): Promise<RedisClientType | null> {
+    if (disabled) return null;
+    if (client && connected) return client;
+
+    const url = process.env.REDIS_URL || 'redis://localhost:6379';
+
+    try {
+        client = createClient({
+            url,
+            socket: {
+                // Only try once — do not auto-reconnect and spam logs
+                reconnectStrategy: false,
+                connectTimeout: 3_000,
+            },
+        }) as RedisClientType;
+
+        // Swallow ongoing errors so the process doesn't crash
+        client.on('error', () => {});
+
+        await client.connect();
+        connected = true;
+        logger.info('[Redis] connected — caching enabled');
+        return client;
+    } catch {
+        logger.info('[Redis] not available — running without cache (this is fine)');
+        client = null;
+        connected = false;
+        disabled = true;
+        return null;
+    }
+}
+
+// ── Default TTLs (seconds) ──
+const TTL = {
+    BUSINESSES: 5 * 60,         // 5 min — list rarely changes
+    BUSINESS: 5 * 60,           // 5 min — individual detail
+    CATEGORIES: 10 * 60,        // 10 min — very stable
+    SUBCATEGORIES: 10 * 60,     // 10 min — very stable
+} as const;
+
+// ── Key helpers ──
+const keys = {
+    businesses: () => 'cache:businesses',
+    business: (id: string) => `cache:business:${id}`,
+    categories: (businessId: string) => `cache:categories:${businessId}`,
+    subcategories: (businessId: string) => `cache:subcategories:${businessId}`,
+    subcategoriesByCat: (categoryId: string) => `cache:subcategories-cat:${categoryId}`,
+};
+
+// ── Generic get / set ──
+
+async function get<T>(key: string): Promise<T | null> {
+    try {
+        const redis = await getClient();
+        if (!redis) return null;
+        const raw = await redis.get(key);
+        return raw ? (JSON.parse(raw) as T) : null;
+    } catch {
+        return null;
+    }
+}
+
+async function set(key: string, value: unknown, ttl: number): Promise<void> {
+    try {
+        const redis = await getClient();
+        if (!redis) return;
+        await redis.set(key, JSON.stringify(value), { EX: ttl });
+    } catch {
+        // swallow — DB is still the source of truth
+    }
+}
+
+async function del(...keysToDel: string[]): Promise<void> {
+    try {
+        const redis = await getClient();
+        if (!redis) return;
+        if (keysToDel.length > 0) {
+            await redis.del(keysToDel);
+        }
+    } catch {
+        // swallow
+    }
+}
+
+async function delPattern(pattern: string): Promise<void> {
+    try {
+        const redis = await getClient();
+        if (!redis) return;
+        let cursor = 0;
+        do {
+            const result = await redis.scan(cursor, { MATCH: pattern, COUNT: 100 });
+            cursor = result.cursor;
+            if (result.keys.length > 0) {
+                await redis.del(result.keys);
+            }
+        } while (cursor !== 0);
+    } catch {
+        // swallow
+    }
+}
+
+// ── Public API ──
+
+export const cache = {
+    keys,
+    TTL,
+    get,
+    set,
+    del,
+    delPattern,
+
+    // ── Business helpers ──
+    async invalidateBusiness(businessId: string) {
+        await del(keys.businesses(), keys.business(businessId));
+    },
+    async invalidateAllBusinesses() {
+        await del(keys.businesses());
+        await delPattern('cache:business:*');
+    },
+
+    // ── Category helpers ──
+    async invalidateCategories(businessId: string) {
+        await del(keys.categories(businessId));
+    },
+
+    // ── Subcategory helpers ──
+    async invalidateSubcategories(businessId: string, categoryId?: string) {
+        const toDelete = [keys.subcategories(businessId)];
+        if (categoryId) toDelete.push(keys.subcategoriesByCat(categoryId));
+        await del(...toDelete);
+    },
+
+    // ── Shutdown ──
+    async disconnect() {
+        try {
+            if (client) {
+                await client.quit();
+                client = null;
+                connected = false;
+            }
+        } catch {
+            // swallow
+        }
+    },
+};

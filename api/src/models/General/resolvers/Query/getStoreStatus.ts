@@ -22,11 +22,17 @@ export const getStoreStatus: NonNullable<QueryResolvers['getStoreStatus']> = asy
     return {
       isStoreClosed: false,
       closedMessage: 'We are too busy at the moment. Please come back later!',
+      bannerEnabled: false,
+      bannerMessage: null,
+      bannerType: 'INFO',
     };
   }
 
   return {
     isStoreClosed: settings[0].isStoreClosed,
     closedMessage: settings[0].closedMessage,
+    bannerEnabled: settings[0].bannerEnabled,
+    bannerMessage: settings[0].bannerMessage,
+    bannerType: (settings[0].bannerType || 'info').toUpperCase(),
   };
 };

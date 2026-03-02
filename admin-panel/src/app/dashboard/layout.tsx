@@ -31,7 +31,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-[#09090b]">
+    <div className="flex h-screen w-full bg-[#09090b]">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
         <Topbar />

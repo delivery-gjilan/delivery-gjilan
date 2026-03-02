@@ -35,6 +35,7 @@ interface CartActionsStore {
     addItem: (item: CartItem) => string | null; // returns error message or null
     removeItem: (productId: string) => void;
     updateQuantity: (productId: string, quantity: number) => void;
+    updateItemNotes: (productId: string, notes: string) => void;
     clearCart: () => void;
 }
 
@@ -81,6 +82,11 @@ export const useCartActionsStore = create<CartActionsStore>((set) => ({
                 items: state.items.map((i) => (i.productId === productId ? { ...i, quantity } : i)),
             };
         });
+    },
+    updateItemNotes: (productId, notes) => {
+        useCartDataStore.setState((state) => ({
+            items: state.items.map((i) => (i.productId === productId ? { ...i, notes } : i)),
+        }));
     },
     clearCart: () => {
         useCartDataStore.setState({ items: [] });

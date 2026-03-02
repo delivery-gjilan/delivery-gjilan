@@ -14,6 +14,7 @@ import { initSentry, Sentry } from '@/lib/sentry';
 import { requestLogger } from '@/lib/middleware/requestLogger';
 import logger from '@/lib/logger';
 import { initializeFirebase } from '@/lib/firebase';
+import { cache } from '@/lib/cache';
 
 // ── Sentry must be initialised before any other middleware ──
 initSentry();
@@ -170,10 +171,14 @@ useServer(
 );
 
 // Shutdown handler
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
     logger.info('SIGTERM received, shutting down gracefully');
     shutdownDriverServices();
-    Sentry.close(2000).then(() => process.exit(0));
+    const { pool } = await import('../database');
+    await pool?.end();
+    await cache.disconnect();
+    await Sentry.close(2000);
+    process.exit(0);
 });
 
 process.on('unhandledRejection', (error) => {

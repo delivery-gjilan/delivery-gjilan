@@ -1,16 +1,17 @@
-import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { GET_ORDERS } from '@/graphql/operations/orders';
-import { useQuery } from '@apollo/client/react';
+import { useQuery, useMutation } from '@apollo/client/react';
 import { ProfileRow } from '@/components/ProfileRow';
 import { useAuthStore } from '@/store/authStore';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { useBusinesses } from '@/modules/business/hooks/useBusinesses';
 import { useTranslations } from '@/hooks/useTranslations';
+import { DELETE_MY_ACCOUNT_MUTATION } from '@/graphql/operations/auth';
 
 export default function Profile() {
     const theme = useTheme();
@@ -37,6 +38,33 @@ export default function Profile() {
 
     const handleLogout = () => {
         logout();
+    };
+
+    const [deleteMyAccount, { loading: deletingAccount }] = useMutation(DELETE_MY_ACCOUNT_MUTATION);
+
+    const handleDeleteAccount = () => {
+        Alert.alert(
+            t.profile.delete_account_title,
+            t.profile.delete_account_message,
+            [
+                { text: t.common?.cancel || 'Cancel', style: 'cancel' },
+                {
+                    text: t.profile.delete_account_confirm,
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await deleteMyAccount();
+                            logout();
+                        } catch (error) {
+                            Alert.alert(
+                                t.common?.error || 'Error',
+                                t.profile.delete_account_error
+                            );
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     const favoriteIds = useFavoritesStore((state) => state.favoriteIds);
@@ -67,12 +95,12 @@ export default function Profile() {
                                 width: 48,
                                 height: 48,
                                 borderRadius: 24,
-                                backgroundColor: '#E8DCC4',
+                                backgroundColor: theme.colors.primary + '30',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                             }}
                         >
-                            <Text className="text-lg font-bold text-black">{getInitials()}</Text>
+                            <Text className="text-lg font-bold" style={{ color: theme.colors.primary }}>{getInitials()}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity>
                             <Ionicons name="chevron-down" size={24} color={theme.colors.subtext} />
@@ -87,7 +115,7 @@ export default function Profile() {
                         style={{
                             backgroundColor: theme.colors.card,
                             borderWidth: 1,
-                            borderColor: 'rgba(255,255,255,0.1)',
+                            borderColor: theme.colors.border,
                         }}
                     >
                         <View className="px-4">
@@ -159,7 +187,12 @@ export default function Profile() {
                     <Text className="text-2xl font-bold text-white mb-4">{t.profile.settings}</Text>
                     <View>
                         <ProfileRow title={t.profile.my_addresses} icon="location" onPress={() => router.push('/addresses')} />
-                        <ProfileRow title={t.profile.account} onPress={() => {}} showDivider={false} />
+                        <ProfileRow
+                            title={t.profile.delete_account}
+                            icon="trash"
+                            onPress={handleDeleteAccount}
+                            showDivider={false}
+                        />
                     </View>
                 </View>
 
@@ -168,9 +201,9 @@ export default function Profile() {
                     <TouchableOpacity
                         onPress={handleLogout}
                         className="py-4 rounded-xl items-center"
-                        style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)' }}
+                        style={{ backgroundColor: theme.colors.expense + '1A' }}
                     >
-                        <Text className="text-base font-semibold" style={{ color: '#EF4444' }}>
+                        <Text className="text-base font-semibold" style={{ color: theme.colors.expense }}>
                             {t.profile.logout}
                         </Text>
                     </TouchableOpacity>

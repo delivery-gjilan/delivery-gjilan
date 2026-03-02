@@ -5,7 +5,7 @@ import type { Permission } from '@/lib/utils/permissions';
 import { GraphQLError } from 'graphql';
 import { db } from '../../../../../database';
 import { users } from '../../../../../database/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 
 export const setUserPermissions: NonNullable<MutationResolvers['setUserPermissions']> = async (
     _parent,
@@ -24,7 +24,7 @@ export const setUserPermissions: NonNullable<MutationResolvers['setUserPermissio
     }
     
     // Get the target user
-    const [targetUser] = await db.select().from(users).where(eq(users.id, userId));
+    const [targetUser] = await db.select().from(users).where(and(eq(users.id, userId), isNull(users.deletedAt)));
     
     if (!targetUser) {
         throw new GraphQLError('User not found', {

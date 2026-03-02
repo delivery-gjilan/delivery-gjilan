@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, pgEnum, jsonb, text } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, timestamp, pgEnum, jsonb, text, index } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import { users } from './users';
 
@@ -109,7 +109,11 @@ export const auditLogs = pgTable('audit_logs', {
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull(),
-});
+}, (t) => ([
+    index('idx_audit_logs_actor_id').on(t.actorId),
+    index('idx_audit_logs_entity').on(t.entityType, t.entityId),
+    index('idx_audit_logs_created_at').on(t.createdAt),
+]));
 
 export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
     actor: one(users, {

@@ -116,12 +116,19 @@ type AuthResponse {
   user: User!
 }
 
+enum BannerType {
+  INFO
+  SUCCESS
+  WARNING
+}
+
 type Business {
   activePromotion: BusinessPromotion
   avgPrepTimeMinutes: Int!
   businessType: BusinessType!
   commissionPercentage: Float!
   createdAt: Date!
+  description: String
   id: ID!
   imageUrl: String
   isActive: Boolean!
@@ -186,6 +193,7 @@ input CartItemInput {
 input CreateBusinessInput {
   avgPrepTimeMinutes: Int
   businessType: BusinessType!
+  description: String
   imageUrl: String
   location: LocationInput!
   name: String!
@@ -217,6 +225,7 @@ input CreateDeliveryZoneInput {
 
 input CreateOrderInput {
   deliveryPrice: Float!
+  driverNotes: String
   dropOffLocation: LocationInput!
   items: [CreateOrderItemInput!]!
   promoCode: String
@@ -224,6 +233,7 @@ input CreateOrderInput {
 }
 
 input CreateOrderItemInput {
+  notes: String
   price: Float!
   productId: ID!
   quantity: Int!
@@ -500,6 +510,7 @@ type Mutation {
   deleteCampaign(id: ID!): Boolean!
   deleteDeliveryPricingTier(id: ID!): Boolean!
   deleteDeliveryZone(id: ID!): Boolean!
+  deleteMyAccount: Boolean!
   deleteProduct(id: ID!): Boolean!
   deleteProductCategory(id: ID!): Boolean!
   deleteProductSubcategory(id: ID!): Boolean!
@@ -592,7 +603,9 @@ type Order {
   businesses: [OrderBusiness!]!
   deliveredAt: Date
   deliveryPrice: Float!
+  displayId: String!
   driver: User
+  driverNotes: String
   dropOffLocation: Location!
   estimatedReadyAt: Date
   id: ID!
@@ -621,6 +634,7 @@ type OrderBusiness {
 type OrderItem {
   imageUrl: String
   name: String!
+  notes: String
   price: Float!
   productId: ID!
   quantity: Int!
@@ -932,6 +946,9 @@ type SignupStepResponse {
 }
 
 type StoreStatus {
+  bannerEnabled: Boolean!
+  bannerMessage: String
+  bannerType: BannerType!
   closedMessage: String
   isStoreClosed: Boolean!
 }
@@ -959,6 +976,7 @@ input UpdateBusinessInput {
   avgPrepTimeMinutes: Int
   businessType: BusinessType
   commissionPercentage: Float
+  description: String
   imageUrl: String
   isActive: Boolean
   location: LocationInput
@@ -1030,6 +1048,9 @@ input UpdatePromotionInput {
 }
 
 input UpdateStoreStatusInput {
+  bannerEnabled: Boolean
+  bannerMessage: String
+  bannerType: BannerType
   closedMessage: String
   isStoreClosed: Boolean!
 }

@@ -5,6 +5,7 @@ export const GET_BUSINESSES = graphql(`
         businesses {
             id
             name
+            description
             imageUrl
             businessType
             isActive
@@ -44,6 +45,7 @@ export const GET_BUSINESS = graphql(`
         business(id: $id) {
             id
             name
+            description
             imageUrl
             businessType
             isActive

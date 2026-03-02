@@ -63,9 +63,9 @@ export function MarketProductCard({ product, businessType, onPress, descriptionO
                 {hasDiscount && (
                     <View
                         className="absolute top-2 left-2 px-2 py-1 rounded-full"
-                        style={{ backgroundColor: 'rgba(239, 68, 68, 0.12)', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.5)' }}
+                        style={{ backgroundColor: theme.colors.expense + '1F', borderWidth: 1, borderColor: theme.colors.expense + '80' }}
                     >
-                        <Text className="text-xs font-semibold" style={{ color: '#ef4444' }}>
+                        <Text className="text-xs font-semibold" style={{ color: theme.colors.expense }}>
                             -{discountPercent}%
                         </Text>
                     </View>

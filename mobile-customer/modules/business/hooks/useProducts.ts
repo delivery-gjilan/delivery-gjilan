@@ -5,6 +5,7 @@ export function useProducts(businessId: string) {
     const { data, loading, error } = useQuery(GET_PRODUCTS, {
         variables: { businessId },
         skip: !businessId,
+        fetchPolicy: 'cache-first',
     });
 
     return {

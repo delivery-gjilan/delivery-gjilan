@@ -17,11 +17,22 @@ export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus
     .where(eq(storeSettings.id, 'default'))
     .limit(1);
 
-  const updateData = {
+  const updateData: Record<string, any> = {
     isStoreClosed: input.isStoreClosed,
     closedMessage: input.closedMessage || 'We are too busy at the moment. Please come back later!',
     updatedAt: new Date().toISOString(),
   };
+
+  // Only update banner fields if they were explicitly provided
+  if (input.bannerEnabled !== undefined && input.bannerEnabled !== null) {
+    updateData.bannerEnabled = input.bannerEnabled;
+  }
+  if (input.bannerMessage !== undefined) {
+    updateData.bannerMessage = input.bannerMessage;
+  }
+  if (input.bannerType) {
+    updateData.bannerType = input.bannerType.toLowerCase();
+  }
 
   if (existing.length === 0) {
     // Insert new settings row
@@ -37,8 +48,19 @@ export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus
       .where(eq(storeSettings.id, 'default'));
   }
 
+  // Re-read the current state to return complete data
+  const current = await db
+    .select()
+    .from(storeSettings)
+    .where(eq(storeSettings.id, 'default'))
+    .limit(1);
+
+  const row = current[0]!;
   return {
-    isStoreClosed: updateData.isStoreClosed,
-    closedMessage: updateData.closedMessage,
+    isStoreClosed: row.isStoreClosed,
+    closedMessage: row.closedMessage,
+    bannerEnabled: row.bannerEnabled,
+    bannerMessage: row.bannerMessage,
+    bannerType: (row.bannerType || 'info').toUpperCase(),
   };
 };

@@ -11,6 +11,7 @@ import { DriverAuthService } from '@/services/DriverAuthService';
 import { PubSub } from '@/lib/pubsub';
 import type { Logger } from '@/lib/logger';
 import { NotificationService } from '@/services/NotificationService';
+import { DataLoaders } from './dataloaders';
 
 export interface ApiContextInterface {
     db: DbType;
@@ -33,6 +34,7 @@ export interface ApiContextInterface {
     driverService?: DriverService;
     notificationService: NotificationService;
     pubsub: PubSub;
+    loaders: DataLoaders;
 }
 
 export interface GraphQLContext extends YogaInitialContext, ApiContextInterface {}

@@ -5,6 +5,9 @@ export const GET_STORE_STATUS = graphql(`
         getStoreStatus {
             isStoreClosed
             closedMessage
+            bannerEnabled
+            bannerMessage
+            bannerType
         }
     }
 `);
@@ -14,6 +17,9 @@ export const UPDATE_STORE_STATUS = graphql(`
         updateStoreStatus(input: $input) {
             isStoreClosed
             closedMessage
+            bannerEnabled
+            bannerMessage
+            bannerType
         }
     }
 `);

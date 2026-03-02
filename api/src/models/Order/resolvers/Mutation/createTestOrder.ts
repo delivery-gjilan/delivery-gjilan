@@ -1,4 +1,5 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
+import { randomBytes } from 'crypto';
 import { getDB } from '@/database';
 import { orders, orderItems, deliveryPricingTiers } from '@/database/schema';
 import { businesses as businessesTable, products as productsTable } from '@/database/schema';
@@ -96,10 +97,17 @@ export const createTestOrder: NonNullable<MutationResolvers['createTestOrder']> 
         else deliveryPrice = tiers[tiers.length - 1].price;
     }
 
+    // Generate short display ID
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const bytes = randomBytes(4);
+    let displayId = 'GJ-';
+    for (let i = 0; i < 4; i++) displayId += chars[bytes[i] % chars.length];
+
     // 6. Create order directly in DB (bypass business hours / promo validation)
     const [createdOrder] = await db
         .insert(orders)
         .values({
+            displayId,
             userId: randomCustomer.id,
             price: orderPrice,
             deliveryPrice,

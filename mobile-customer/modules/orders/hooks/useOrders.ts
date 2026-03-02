@@ -40,6 +40,7 @@ export function useOrder(id: string) {
     const { data, loading, error, refetch } = useQuery(GET_ORDER, {
         variables: { id },
         skip: !id,
+        fetchPolicy: 'cache-and-network',
     });
 
     return {

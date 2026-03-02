@@ -3,6 +3,7 @@ import { ProductCategory, CreateProductCategoryInput, UpdateProductCategoryInput
 import { productCategoryValidator } from '@/validators/ProductCategoryValidator';
 import { DbProductCategory } from '@/database/schema/productCategories';
 import { AppError } from '@/lib/errors';
+import { cache } from '@/lib/cache';
 
 export class ProductCategoryService {
     constructor(private productCategoryRepository: ProductCategoryRepository) {}
@@ -34,8 +35,14 @@ export class ProductCategoryService {
     }
 
     async getProductCategories(businessId: string): Promise<ProductCategory[]> {
+        const cached = await cache.get<ProductCategory[]>(cache.keys.categories(businessId));
+        if (cached) return cached;
+
         const categories = await this.productCategoryRepository.findByBusinessId(businessId);
-        return categories.map((c) => this.mapToProductCategory(c));
+        const result = categories.map((c) => this.mapToProductCategory(c));
+
+        await cache.set(cache.keys.categories(businessId), result, cache.TTL.CATEGORIES);
+        return result;
     }
 
     async updateProductCategory(id: string, input: UpdateProductCategoryInput): Promise<ProductCategory> {

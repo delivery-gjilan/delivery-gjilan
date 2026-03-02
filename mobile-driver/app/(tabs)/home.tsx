@@ -48,29 +48,22 @@ export default function Home() {
     const metrics = (metricsData as any)?.myDriverMetrics;
 
     useSubscription(ALL_ORDERS_UPDATED, {
-        onData: ({ client, data: subData }) => {
-            const payload = (subData as any)?.data?.allOrdersUpdated as any[] | undefined;
-            if (payload) {
-                const incomingOrders = payload;
-                const readyOrders = incomingOrders.filter((order: any) => {
-                    if (order.status !== 'READY') return false;
-                    // Show order only if unassigned or assigned to this driver
-                    return !order.driver?.id || order.driver.id === currentDriverId;
-                });
-
-                const unseenOrder = readyOrders.find((order: any) => !seenOrderIds.current.has(order.id));
-                if (unseenOrder) {
-                    seenOrderIds.current.add(unseenOrder.id);
-                    setNewOrder(unseenOrder);
-                }
-
-                client.writeQuery({
-                    query: GET_ORDERS,
-                    data: { orders: incomingOrders },
-                });
-            }
-        },
+        onData: () => { refetch(); },
     });
+
+    // Detect new READY orders for notification popup
+    useEffect(() => {
+        const orders = (data as any)?.orders ?? [];
+        const readyOrders = orders.filter((order: any) => {
+            if (order.status !== 'READY') return false;
+            return !order.driver?.id || order.driver.id === currentDriverId;
+        });
+        const unseenOrder = readyOrders.find((order: any) => !seenOrderIds.current.has(order.id));
+        if (unseenOrder) {
+            seenOrderIds.current.add(unseenOrder.id);
+            setNewOrder(unseenOrder);
+        }
+    }, [data, currentDriverId]);
 
     const [updateStatus, { loading: updating }] = useMutation(UPDATE_ORDER_STATUS);
     const [assignDriverToOrder, { loading: assigningOrder }] = useMutation(ASSIGN_DRIVER_TO_ORDER);
@@ -429,6 +422,20 @@ export default function Home() {
                             </Text>
                         )}
 
+                        {selectedOrder?.driverNotes && (
+                            <View className="mt-3 p-3 rounded-xl" style={{ backgroundColor: theme.colors.background }}>
+                                <View className="flex-row items-center gap-1 mb-1">
+                                    <Ionicons name="chatbubble-ellipses" size={14} color={theme.colors.primary} />
+                                    <Text className="text-xs font-semibold uppercase" style={{ color: theme.colors.primary }}>
+                                        Delivery Instructions
+                                    </Text>
+                                </View>
+                                <Text className="text-sm" style={{ color: theme.colors.text }}>
+                                    {selectedOrder.driverNotes}
+                                </Text>
+                            </View>
+                        )}
+
                         <View className="mt-4 rounded-2xl p-4" style={{ backgroundColor: theme.colors.border }}>
                             <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
                                 ETA
@@ -452,9 +459,16 @@ export default function Home() {
                             <View className="mt-2 space-y-1">
                                 {selectedOrder && itemsForOrder(selectedOrder).length > 0 ? (
                                     itemsForOrder(selectedOrder).map((item: any, index: number) => (
-                                        <Text key={`${item.name}-${index}`} className="text-sm" style={{ color: theme.colors.subtext }}>
-                                            {item.quantity}x {item.name}
-                                        </Text>
+                                        <View key={`${item.name}-${index}`} className="mb-2">
+                                            <Text className="text-sm font-medium" style={{ color: theme.colors.text }}>
+                                                {item.quantity}x {item.name}
+                                            </Text>
+                                            {item.notes && (
+                                                <Text className="text-xs italic ml-4 mt-0.5" style={{ color: theme.colors.subtext }}>
+                                                    Note: {item.notes}
+                                                </Text>
+                                            )}
+                                        </View>
                                     ))
                                 ) : (
                                     <Text className="text-sm" style={{ color: theme.colors.subtext }}>

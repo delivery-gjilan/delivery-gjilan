@@ -11,6 +11,7 @@ export const businessType = pgEnum('business_type', businessTypeValues);
 export const businesses = pgTable('businesses', {
     id: uuid('id').primaryKey().defaultRandom().notNull(),
     name: varchar('name', { length: 255 }).notNull(),
+    description: varchar('description', { length: 500 }),
     phoneNumber: varchar('phone_number', { length: 32 }),
     imageUrl: varchar('image_url', { length: 500 }),
     businessType: businessType('business_type').notNull(),
@@ -31,6 +32,7 @@ export const businesses = pgTable('businesses', {
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull()
         .$onUpdate(() => sql`CURRENT_TIMESTAMP`),
+    deletedAt: timestamp('deleted_at', { withTimezone: true, mode: 'string' }),
 });
 
 export const businessesRelations = relations(businesses, ({ many }) => ({

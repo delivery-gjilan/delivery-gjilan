@@ -1,5 +1,5 @@
 import { relations, sql } from 'drizzle-orm';
-import { pgTable, timestamp, integer, uuid, doublePrecision, text } from 'drizzle-orm/pg-core';
+import { pgTable, timestamp, integer, uuid, doublePrecision, text, index } from 'drizzle-orm/pg-core';
 import { users } from './users';
 
 export const userAddress = pgTable('user_address', {
@@ -17,7 +17,9 @@ export const userAddress = pgTable('user_address', {
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull()
         .$onUpdate(() => sql`CURRENT_TIMESTAMP`),
-});
+}, (t) => ([
+    index('idx_user_address_user_id').on(t.userId),
+]));
 
 export const userAddressRelations = relations(userAddress, ({ one }) => ({
     product: one(users, {

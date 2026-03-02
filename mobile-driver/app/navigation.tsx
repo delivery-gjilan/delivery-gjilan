@@ -49,21 +49,13 @@ export default function NavigationScreen() {
     } = useNavigationStore();
 
     /* ── Orders query + real-time subscription ── */
-    const { data } = useQuery(GET_ORDERS, {
+    const { data, refetch } = useQuery(GET_ORDERS, {
         fetchPolicy: 'cache-and-network',
         nextFetchPolicy: 'cache-first',
     });
 
     useSubscription(ALL_ORDERS_UPDATED, {
-        onData: ({ client, data: subData }) => {
-            const payload = (subData as any)?.data?.allOrdersUpdated as any[] | undefined;
-            if (payload) {
-                client.writeQuery({
-                    query: GET_ORDERS,
-                    data: { orders: payload },
-                });
-            }
-        },
+        onData: () => { refetch(); },
     });
 
     /* ── Filter assigned orders ── */

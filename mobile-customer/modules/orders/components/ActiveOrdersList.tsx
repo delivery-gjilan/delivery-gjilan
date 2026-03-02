@@ -47,7 +47,7 @@ const OrderListItem = ({ order }: { order: Order }) => {
         <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => router.push(`/orders/${order.id}` as `/orders/${string}`)}
-            className="bg-white dark:bg-gray-800 p-4 rounded-xl mb-3"
+            className="bg-card p-4 rounded-xl mb-3"
             style={{
                 borderWidth: 1,
                 borderColor: theme.colors.border,

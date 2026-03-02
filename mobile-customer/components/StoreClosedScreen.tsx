@@ -20,17 +20,17 @@ export default function StoreClosedScreen({ message }: StoreClosedScreenProps) {
                     <View className="bg-orange-500/20 p-6 rounded-full mb-4">
                         <Ionicons name="time-outline" size={64} color="#f97316" />
                     </View>
-                    <Text className="text-white text-2xl font-bold text-center mb-3">
+                    <Text className="text-foreground text-2xl font-bold text-center mb-3">
                         {t.store_closed.title}
                     </Text>
-                    <Text className="text-neutral-400 text-base text-center leading-6">
+                    <Text className="text-subtext text-base text-center leading-6">
                         {message || t.store_closed.default_message}
                     </Text>
                 </View>
 
                 <View className="w-full max-w-md">
-                    <View className="bg-gray-800/50 border border-gray-700 rounded-xl p-4">
-                        <Text className="text-neutral-300 text-sm text-center">
+                    <View className="bg-card/50 border border-border rounded-xl p-4">
+                        <Text className="text-subtext text-sm text-center">
                             {t.store_closed.info}
                         </Text>
                     </View>

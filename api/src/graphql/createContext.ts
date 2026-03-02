@@ -13,6 +13,7 @@ import { ProductService } from '@/services/ProductService';
 import { AuthRepository } from '@/repositories/AuthRepository';
 import { AuthService } from '@/services/AuthService';
 import { GraphQLContext } from './context';
+import { createDataLoaders } from './dataloaders';
 import { DriverAuthService } from '@/services/DriverAuthService';
 import { DriverRepository } from '@/repositories/DriverRepository';
 
@@ -153,5 +154,6 @@ export async function createContext(initialContext: YogaInitialContext): Promise
         ...services,
         driverService,
         pubsub,
+        loaders: createDataLoaders(db),
     };
 }

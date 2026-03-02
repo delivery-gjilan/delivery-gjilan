@@ -1,5 +1,5 @@
 import { relations, sql } from 'drizzle-orm';
-import { pgTable, timestamp, integer, uuid } from 'drizzle-orm/pg-core';
+import { pgTable, timestamp, integer, uuid, index } from 'drizzle-orm/pg-core';
 import { products } from './products';
 
 export const productStocks = pgTable('product_stocks', {
@@ -13,7 +13,9 @@ export const productStocks = pgTable('product_stocks', {
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull()
         .$onUpdate(() => sql`CURRENT_TIMESTAMP`),
-});
+}, (t) => ([
+    index('idx_product_stocks_product_id').on(t.productId),
+]));
 
 export const productStocksRelations = relations(productStocks, ({ one }) => ({
     product: one(products, {

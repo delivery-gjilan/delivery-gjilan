@@ -1,9 +1,10 @@
 import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { SignupStep } from '@/gql/graphql';
 import { useTranslations } from '@/hooks/useTranslations';
+import { useTheme } from '@/hooks/useTheme';
 import type { Translation } from '@/localization/schema';
 
 const getStepConfig = (t: Translation): Record<SignupStep, { number: number; title: string; description: string }> => ({
@@ -27,6 +28,7 @@ export default function SignupScreen() {
     } = useAuth();
     const router = useRouter();
     const { t } = useTranslations();
+    const theme = useTheme();
 
     const STEP_CONFIG = getStepConfig(t);
 
@@ -158,21 +160,21 @@ export default function SignupScreen() {
                         <View key={step.key} className="flex-1 items-center">
                             <View
                                 className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                                    isActive ? 'bg-blue-600' : 'bg-gray-300'
+                                    isActive ? 'bg-primary' : 'bg-border'
                                 }`}
                             >
-                                <Text className={`font-bold ${isActive ? 'text-white' : 'text-gray-500'}`}>
+                                <Text className={`font-bold ${isActive ? 'text-white' : 'text-subtext'}`}>
                                     {step.num}
                                 </Text>
                             </View>
                             <Text
-                                className={`text-xs mt-2 text-center ${isActive ? 'text-gray-700' : 'text-gray-400'}`}
+                                className={`text-xs mt-2 text-center ${isActive ? 'text-foreground' : 'text-subtext'}`}
                             >
                                 {step.label}
                             </Text>
                             {index < steps.length - 1 && (
                                 <View
-                                    className={`absolute top-5 w-12 h-1 ${isActive ? 'bg-blue-600' : 'bg-gray-300'}`}
+                                    className={`absolute top-5 w-12 h-1 ${isActive ? 'bg-primary' : 'bg-border'}`}
                                     style={{ left: '50%', marginLeft: 20 }}
                                 />
                             )}
@@ -184,11 +186,11 @@ export default function SignupScreen() {
     };
 
     return (
-        <ScrollView className="flex-1 bg-white">
+        <ScrollView className="flex-1 bg-background">
             {/* Header */}
             <View className="px-6 py-8">
-                <Text className="text-3xl font-bold text-gray-900">{stepConfig.title}</Text>
-                <Text className="text-base text-gray-600 mt-2">{stepConfig.description}</Text>
+                <Text className="text-3xl font-bold text-foreground">{stepConfig.title}</Text>
+                <Text className="text-base text-subtext mt-2">{stepConfig.description}</Text>
             </View>
 
             {/* Step Indicator */}
@@ -198,8 +200,8 @@ export default function SignupScreen() {
             <View className="px-6 py-6">
                 {/* Error Message */}
                 {error && (
-                    <View className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                        <Text className="text-red-600 font-medium">{error}</Text>
+                    <View className="bg-expense/10 border border-expense/20 rounded-lg p-4 mb-6">
+                        <Text className="text-expense font-medium">{error}</Text>
                     </View>
                 )}
 
@@ -207,10 +209,11 @@ export default function SignupScreen() {
                 {currentStep === 'INITIAL' && (
                     <View>
                         <View className="mb-4">
-                            <Text className="text-gray-700 font-semibold mb-2">{t.auth.signup.first_name}</Text>
+                            <Text className="text-foreground font-semibold mb-2">{t.auth.signup.first_name}</Text>
                             <TextInput
-                                className="border border-gray-300 rounded-lg px-4 py-3 text-gray-900"
+                                className="border border-border rounded-lg px-4 py-3 text-foreground"
                                 placeholder={t.auth.signup.first_name_placeholder}
+                                placeholderTextColor={theme.colors.subtext}
                                 value={firstName}
                                 onChangeText={setFirstName}
                                 editable={!loading}
@@ -218,10 +221,11 @@ export default function SignupScreen() {
                         </View>
 
                         <View className="mb-4">
-                            <Text className="text-gray-700 font-semibold mb-2">{t.auth.signup.last_name}</Text>
+                            <Text className="text-foreground font-semibold mb-2">{t.auth.signup.last_name}</Text>
                             <TextInput
-                                className="border border-gray-300 rounded-lg px-4 py-3 text-gray-900"
+                                className="border border-border rounded-lg px-4 py-3 text-foreground"
                                 placeholder={t.auth.signup.last_name_placeholder}
+                                placeholderTextColor={theme.colors.subtext}
                                 value={lastName}
                                 onChangeText={setLastName}
                                 editable={!loading}
@@ -229,10 +233,11 @@ export default function SignupScreen() {
                         </View>
 
                         <View className="mb-4">
-                            <Text className="text-gray-700 font-semibold mb-2">{t.auth.signup.email_label}</Text>
+                            <Text className="text-foreground font-semibold mb-2">{t.auth.signup.email_label}</Text>
                             <TextInput
-                                className="border border-gray-300 rounded-lg px-4 py-3 text-gray-900"
+                                className="border border-border rounded-lg px-4 py-3 text-foreground"
                                 placeholder={t.auth.signup.email_placeholder}
+                                placeholderTextColor={theme.colors.subtext}
                                 value={email}
                                 onChangeText={setEmail}
                                 editable={!loading}
@@ -242,10 +247,11 @@ export default function SignupScreen() {
                         </View>
 
                         <View className="mb-6">
-                            <Text className="text-gray-700 font-semibold mb-2">{t.auth.signup.password_label}</Text>
+                            <Text className="text-foreground font-semibold mb-2">{t.auth.signup.password_label}</Text>
                             <TextInput
-                                className="border border-gray-300 rounded-lg px-4 py-3 text-gray-900"
+                                className="border border-border rounded-lg px-4 py-3 text-foreground"
                                 placeholder={t.auth.signup.password_placeholder}
+                                placeholderTextColor={theme.colors.subtext}
                                 value={password}
                                 onChangeText={setPassword}
                                 editable={!loading}
@@ -254,23 +260,24 @@ export default function SignupScreen() {
                         </View>
 
                         <View className="mb-6">
-                            <Text className="text-gray-700 font-semibold mb-2">{t.auth.signup.referral_code_label}</Text>
+                            <Text className="text-foreground font-semibold mb-2">{t.auth.signup.referral_code_label}</Text>
                             <TextInput
-                                className="border border-gray-300 rounded-lg px-4 py-3 text-gray-900"
+                                className="border border-border rounded-lg px-4 py-3 text-foreground"
                                 placeholder={t.auth.signup.referral_code_placeholder}
+                                placeholderTextColor={theme.colors.subtext}
                                 value={referralCode}
                                 onChangeText={(text) => setReferralCode(text.toUpperCase())}
                                 editable={!loading}
                                 autoCapitalize="characters"
                             />
-                            <Text className="text-xs text-gray-500 mt-1">
+                            <Text className="text-xs text-subtext mt-1">
                                 {t.auth.signup.referral_code_hint}
                             </Text>
                         </View>
 
                         <TouchableOpacity
                             className={`py-3 rounded-lg flex-row items-center justify-center ${
-                                loading ? 'bg-gray-400' : 'bg-blue-600'
+                                loading ? 'bg-border' : 'bg-primary'
                             }`}
                             onPress={handleInitiateSignup}
                             disabled={loading}
@@ -281,22 +288,34 @@ export default function SignupScreen() {
                                 <Text className="text-white font-semibold text-base">{t.common.continue}</Text>
                             )}
                         </TouchableOpacity>
-                    </View>
+                        {/* Back to Login Link */}
+                        <TouchableOpacity
+                            className="py-4 mt-6"
+                            onPress={() => {
+                                router.push('/login' as Href);
+                            }}
+                        >
+                            <Text className="text-center text-subtext">
+                                {t.auth.signup.already_have_account || 'Already have an account? '}
+                                <Text className="text-primary font-semibold">{t.auth.sign_in}</Text>
+                            </Text>
+                        </TouchableOpacity>                    </View>
                 )}
 
                 {/* Step 2: Email Verification */}
                 {currentStep === 'EMAIL_SENT' && (
                     <View>
-                        <Text className="text-gray-600 mb-4">
+                        <Text className="text-subtext mb-4">
                             {t.auth.signup.email_sent} {user?.email}. {t.auth.signup.phone_verification_instruction}
                         </Text>
 
                         <View className="mb-6">
-                            <Text className="text-gray-700 font-semibold mb-2">{t.auth.signup.verification_code}</Text>
+                            <Text className="text-foreground font-semibold mb-2">{t.auth.signup.verification_code}</Text>
                             <TextInput
-                                className="border border-gray-300 rounded-lg px-4 py-3 text-gray-900 
+                                className="border border-border rounded-lg px-4 py-3 text-foreground 
                                 text-center text-xl tracking-widest"
                                 placeholder={t.auth.signup.verification_code_placeholder}
+                                placeholderTextColor={theme.colors.subtext}
                                 value={emailCode}
                                 onChangeText={setEmailCode}
                                 editable={!loading}
@@ -307,7 +326,7 @@ export default function SignupScreen() {
 
                         <TouchableOpacity
                             className={`py-3 rounded-lg flex-row items-center justify-center ${
-                                loading ? 'bg-gray-400' : 'bg-blue-600'
+                                loading ? 'bg-border' : 'bg-primary'
                             }`}
                             onPress={handleVerifyEmail}
                             disabled={loading}
@@ -334,7 +353,20 @@ export default function SignupScreen() {
                             }}
                             disabled={loading}
                         >
-                            <Text className="text-blue-600 text-center font-semibold">{t.auth.signup.resend_code}</Text>
+                            <Text className="text-primary text-center font-semibold">{t.auth.signup.resend_code}</Text>
+                        </TouchableOpacity>
+
+                        {/* Back to Login Link */}
+                        <TouchableOpacity
+                            className="py-4 mt-6"
+                            onPress={() => {
+                                router.push('/login' as Href);
+                            }}
+                        >
+                            <Text className="text-center text-subtext">
+                                {t.auth.signup.already_have_account || 'Already have an account? '}
+                                <Text className="text-primary font-semibold">{t.auth.sign_in}</Text>
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 )}
@@ -342,15 +374,16 @@ export default function SignupScreen() {
                 {/* Step 3: Phone Number */}
                 {currentStep === 'EMAIL_VERIFIED' && (
                     <View>
-                        <Text className="text-gray-600 mb-4">
+                        <Text className="text-subtext mb-4">
                             {t.auth.signup.phone_instruction}
                         </Text>
 
                         <View className="mb-6">
-                            <Text className="text-gray-700 font-semibold mb-2">{t.auth.signup.phone_label}</Text>
+                            <Text className="text-foreground font-semibold mb-2">{t.auth.signup.phone_label}</Text>
                             <TextInput
-                                className="border border-gray-300 rounded-lg px-4 py-3 text-gray-900"
+                                className="border border-border rounded-lg px-4 py-3 text-foreground"
                                 placeholder={t.auth.signup.phone_placeholder}
+                                placeholderTextColor={theme.colors.subtext}
                                 value={phoneNumber}
                                 onChangeText={setPhoneNumber}
                                 editable={!loading}
@@ -360,7 +393,7 @@ export default function SignupScreen() {
 
                         <TouchableOpacity
                             className={`py-3 rounded-lg flex-row items-center justify-center ${
-                                loading ? 'bg-gray-400' : 'bg-blue-600'
+                                loading ? 'bg-border' : 'bg-primary'
                             }`}
                             onPress={handleSubmitPhoneNumber}
                             disabled={loading}
@@ -371,22 +404,36 @@ export default function SignupScreen() {
                                 <Text className="text-white font-semibold text-base">{t.common.continue}</Text>
                             )}
                         </TouchableOpacity>
+
+                        {/* Back to Login Link */}
+                        <TouchableOpacity
+                            className="py-4 mt-6"
+                            onPress={() => {
+                                router.push('/login' as Href);
+                            }}
+                        >
+                            <Text className="text-center text-subtext">
+                                {t.auth.signup.already_have_account || 'Already have an account? '}
+                                <Text className="text-primary font-semibold">{t.auth.sign_in}</Text>
+                            </Text>
+                        </TouchableOpacity>
                     </View>
                 )}
 
                 {/* Step 4: Phone Verification */}
                 {currentStep === 'PHONE_SENT' && (
                     <View>
-                        <Text className="text-gray-600 mb-4">
+                        <Text className="text-subtext mb-4">
                             {t.auth.signup.phone_verification_sent} {user?.phoneNumber}. {t.auth.signup.phone_verification_instruction}
                         </Text>
 
                         <View className="mb-6">
-                            <Text className="text-gray-700 font-semibold mb-2">{t.auth.signup.verification_code}</Text>
+                            <Text className="text-foreground font-semibold mb-2">{t.auth.signup.verification_code}</Text>
                             <TextInput
-                                className="border border-gray-300 rounded-lg px-4 py-3 text-gray-900 text-center 
+                                className="border border-border rounded-lg px-4 py-3 text-foreground text-center 
                                 text-xl tracking-widest"
                                 placeholder={t.auth.signup.verification_code_placeholder}
+                                placeholderTextColor={theme.colors.subtext}
                                 value={phoneCode}
                                 onChangeText={setPhoneCode}
                                 editable={!loading}
@@ -397,7 +444,7 @@ export default function SignupScreen() {
 
                         <TouchableOpacity
                             className={`py-3 rounded-lg flex-row items-center justify-center ${
-                                loading ? 'bg-gray-400' : 'bg-blue-600'
+                                loading ? 'bg-border' : 'bg-primary'
                             }`}
                             onPress={handleVerifyPhone}
                             disabled={loading}
@@ -417,7 +464,20 @@ export default function SignupScreen() {
                             }}
                             disabled={loading}
                         >
-                            <Text className="text-blue-600 text-center font-semibold">{t.auth.signup.change_phone}</Text>
+                            <Text className="text-primary text-center font-semibold">{t.auth.signup.change_phone}</Text>
+                        </TouchableOpacity>
+
+                        {/* Back to Login Link */}
+                        <TouchableOpacity
+                            className="py-4 mt-6"
+                            onPress={() => {
+                                router.push('/login' as Href);
+                            }}
+                        >
+                            <Text className="text-center text-subtext">
+                                {t.auth.signup.already_have_account || 'Already have an account? '}
+                                <Text className="text-primary font-semibold">{t.auth.sign_in}</Text>
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 )}

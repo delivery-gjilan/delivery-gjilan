@@ -2,6 +2,7 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { hasPermission } from '@/lib/utils/permissions';
 import { GraphQLError } from 'graphql';
+import { cache } from '@/lib/cache';
 
 export const setBusinessSchedule: NonNullable<MutationResolvers['setBusinessSchedule']> = async (
     _parent,
@@ -27,5 +28,8 @@ export const setBusinessSchedule: NonNullable<MutationResolvers['setBusinessSche
         }
     }
     
-    return ctx.businessService.setBusinessSchedule(businessId, schedule);
+    return ctx.businessService.setBusinessSchedule(businessId, schedule).then(async (result) => {
+        await cache.invalidateBusiness(businessId);
+        return result;
+    });
 };

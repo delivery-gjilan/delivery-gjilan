@@ -4,6 +4,7 @@ export const GET_ORDERS = graphql(`
     query GetOrders {
         orders {
             id
+            displayId
             orderPrice
             deliveryPrice
             totalPrice
@@ -62,6 +63,7 @@ export const GET_ORDER = graphql(`
     query GetOrder($id: ID!) {
         order(id: $id) {
             id
+            displayId
             orderPrice
             deliveryPrice
             totalPrice
@@ -111,6 +113,7 @@ export const GET_ORDERS_BY_STATUS = graphql(`
     query GetOrdersByStatus($status: OrderStatus!) {
         ordersByStatus(status: $status) {
             id
+            displayId
             orderPrice
             deliveryPrice
             totalPrice

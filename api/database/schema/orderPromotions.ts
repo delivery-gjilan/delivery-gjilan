@@ -1,5 +1,5 @@
 import { relations, sql } from 'drizzle-orm';
-import { pgTable, numeric, timestamp, uuid, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, numeric, timestamp, uuid, pgEnum, index } from 'drizzle-orm/pg-core';
 import { orders } from './orders';
 import { promotions } from './promotions';
 
@@ -21,7 +21,9 @@ export const orderPromotions = pgTable('order_promotions', {
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull()
         .$onUpdate(() => sql`CURRENT_TIMESTAMP`),
-});
+}, (t) => ([
+    index('idx_order_promotions_order_id').on(t.orderId),
+]));
 
 export const orderPromotionsRelations = relations(orderPromotions, ({ one }) => ({
     order: one(orders, {

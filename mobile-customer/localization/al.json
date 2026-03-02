@@ -208,7 +208,12 @@
         "settings": "Cilësimet",
         "my_addresses": "Adresat e Mia",
         "account": "Llogaria",
-        "user_fallback": "Përdoruesi"
+        "user_fallback": "Përdoruesi",
+        "delete_account": "Fshij Llogarinë",
+        "delete_account_title": "Fshij Llogarinë",
+        "delete_account_message": "A jeni i sigurt se dëshironi të fshini llogarinë tuaj? Ky veprim nuk mund të kthehet. Të gjitha të dhënat tuaja do të fshihen përgjithmonë.",
+        "delete_account_confirm": "Fshij",
+        "delete_account_error": "Dështoi fshirja e llogarisë. Ju lutem provoni përsëri më vonë."
     },
     "addresses": {
         "title": "Adresat e Mia",
@@ -313,8 +318,19 @@
         "unable_create_order": "Nuk mundëm të krijojmë porosinë. Ju lutem provoni përsëri.",
         "active_order_exists_title": "Porosi Aktive Ekziston",
         "active_order_exists_message": "Ju keni tashmë një porosi aktive. Ju lutem prisni derisa të dorëzohet para se të bëni porosi të re.",
+        "item_notes_placeholder": "Shto udhëzime speciale...",
+        "driver_notes": "Shënime për Shofer",
+        "driver_notes_placeholder": "p.sh., Bini zilen dy herë",
         "order_placed_title": "Porosia u Vendos!",
-        "order_placed_message": "Porosia juaj u vendos me sukses. Mund ta ndiqni nga banderola e porosisë aktive."
+        "order_placed_message": "Porosia juaj u vendos me sukses. Mund ta ndiqni nga banderola e porosisë aktive.",
+        "confirm_order_title": "Ta vendosni këtë porosi?",
+        "confirm_order_message": "Ju jeni duke vendosur një porosi për €{total}.",
+        "confirm_order_note": "Ekipi ynë mund t'ju kontaktojë me telefon për të konfirmuar detajet ose koordinuar dorëzimin.",
+        "confirm_order_yes": "Po, vendos porosinë",
+        "confirm_order_cancel": "Kthehu",
+        "order_success_title": "Porosia u vendos!",
+        "order_success_subtitle": "Uluni dhe relaksohuni — ne jemi duke u marrë me të.",
+        "order_success_track": "Ndiq porosinë"
     },
     "orders": {
         "title": "Porosinë e Mia",
@@ -359,7 +375,36 @@
             "call_failed": "Thirrja Dështoi",
             "unable_open_dialer": "Nuk mundëm të hapim thirrësin.",
             "address_updated": "Adresa u Përditësua",
-            "address_updated_message": "Adresa u përditësua për këtë pamje."
+            "address_updated_message": "Adresa u përditësua për këtë pamje.",
+            "order_placed": "Porosia u Vendos",
+            "est_ready": "Gatishmëria",
+            "est_delivery": "Dërgesa",
+            "prep_time": "Koha Përgatitjes",
+            "eta": "Koha e Mbërritjes",
+            "min_short": "min",
+            "order_timeline": "Ecuria e Porosisë",
+            "placed_at": "Vendosur",
+            "preparing_at": "Pregatitur",
+            "ready_at": "Gati",
+            "picked_up_at": "Marrë",
+            "delivered_at": "Dorëzuar",
+            "your_items": "Artikujt Tuaj",
+            "live_tracking": "Gjurmim i Drejtpërdrejtë",
+            "call_driver": "Thirr",
+            "message_driver": "Mesazh",
+            "arriving_in": "Mbërrin për",
+            "your_order": "Porosia Juaj",
+            "pickup": "Marrja",
+            "dropoff": "Dorëzimi",
+            "order_details": "Detajet e Porosisë",
+            "items_count": "{{count}} artikuj",
+            "waiting_restaurant": "Duke pritur restoratin",
+            "preparing_your_order": "Duke përgatitur porosinë tuaj",
+            "ready_for_pickup": "Gati për marrje",
+            "on_the_way": "Në rrugë",
+            "order_complete": "Porosia e Kompletuar",
+            "order_cancelled": "Porosia e Anuluar",
+            "finding_driver": "Duke gjetur një shofer..."
         },
         "active_bar": "Porosi Aktive",
         "status": {
@@ -367,7 +412,17 @@
             "preparing": "DUKE PREGATITUR",
             "ready": "GATI",
             "out_for_delivery": "NË DËRGIM",
-            "in_progress": "NË PROGRES"
+            "in_progress": "NË PROGRES",
+            "cancelled": "ANULUAR",
+            "delivered": "DORËZUAR"
+        },
+        "status_messages": {
+            "pending": "Duke pritur që restoranti të pranojë porosinë tuaj",
+            "preparing": "Porosia juaj po përgatitet",
+            "ready": "Porosia juaj është gati për marrje",
+            "out_for_delivery": "Porosia juaj është në rrugë",
+            "cancelled": "Kjo porosi është anuluar",
+            "delivered": "Porosia juaj është dorëzuar"
         }
     },
     "business": {

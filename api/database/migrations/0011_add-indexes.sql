@@ -1,0 +1,21 @@
+CREATE INDEX "idx_audit_logs_actor_id" ON "audit_logs" USING btree ("actor_id");--> statement-breakpoint
+CREATE INDEX "idx_audit_logs_entity" ON "audit_logs" USING btree ("entity_type","entity_id");--> statement-breakpoint
+CREATE INDEX "idx_audit_logs_created_at" ON "audit_logs" USING btree ("created_at");--> statement-breakpoint
+CREATE INDEX "idx_orders_user_id" ON "orders" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "idx_orders_driver_id" ON "orders" USING btree ("driver_id");--> statement-breakpoint
+CREATE INDEX "idx_orders_status" ON "orders" USING btree ("status");--> statement-breakpoint
+CREATE INDEX "idx_orders_status_created" ON "orders" USING btree ("status","created_at");--> statement-breakpoint
+CREATE INDEX "idx_order_items_product_id" ON "order_items" USING btree ("product_id");--> statement-breakpoint
+CREATE INDEX "idx_products_business_id" ON "products" USING btree ("business_id");--> statement-breakpoint
+CREATE INDEX "idx_products_category_id" ON "products" USING btree ("category_id");--> statement-breakpoint
+CREATE INDEX "idx_product_categories_business_id" ON "product_categories" USING btree ("business_id");--> statement-breakpoint
+CREATE INDEX "idx_product_subcategories_category_id" ON "product_subcategories" USING btree ("category_id");--> statement-breakpoint
+CREATE INDEX "idx_user_permissions_user_id" ON "user_permissions" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "idx_settlements_order_id" ON "settlements" USING btree ("order_id");--> statement-breakpoint
+CREATE INDEX "idx_settlements_driver_id" ON "settlements" USING btree ("driver_id");--> statement-breakpoint
+CREATE INDEX "idx_settlements_business_id" ON "settlements" USING btree ("business_id");--> statement-breakpoint
+CREATE INDEX "idx_settlements_status" ON "settlements" USING btree ("status");--> statement-breakpoint
+CREATE INDEX "idx_product_stocks_product_id" ON "product_stocks" USING btree ("product_id");--> statement-breakpoint
+CREATE INDEX "idx_order_promotions_order_id" ON "order_promotions" USING btree ("order_id");--> statement-breakpoint
+CREATE INDEX "idx_user_address_user_id" ON "user_address" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "idx_notifications_user_id" ON "notifications" USING btree ("user_id");

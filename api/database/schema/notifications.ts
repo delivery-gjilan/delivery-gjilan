@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, pgEnum, jsonb, integer } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, pgEnum, jsonb, integer, index } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import { users } from './users';
 
@@ -49,7 +49,9 @@ export const notifications = pgTable('notifications', {
     sentAt: timestamp('sent_at', { withTimezone: true, mode: 'string' })
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull(),
-});
+}, (t) => ([
+    index('idx_notifications_user_id').on(t.userId),
+]));
 
 export const notificationsRelations = relations(notifications, ({ one }) => ({
     user: one(users, {
