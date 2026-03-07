@@ -3,9 +3,10 @@ import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, Styl
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import MapView, { Marker, Region } from 'react-native-maps';
 import { useMutation, useQuery } from '@apollo/client/react';
 import * as Location from 'expo-location';
+import { MapView, Marker } from '@/components/MapWrapper';
+import type { Region } from '@/components/MapWrapper';
 
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
@@ -19,7 +20,7 @@ export default function AddEditAddressScreen() {
     const { t } = useTranslations();
     const { id } = useLocalSearchParams();
     const isEdit = !!id;
-    const mapRef = useRef<MapView>(null);
+    const mapRef = useRef<any>(null);
 
     const [addressName, setAddressName] = useState('');
     const [displayName, setDisplayName] = useState('');

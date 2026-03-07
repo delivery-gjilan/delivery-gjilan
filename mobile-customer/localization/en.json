@@ -330,7 +330,20 @@
         "confirm_order_cancel": "Go back",
         "order_success_title": "Order placed!",
         "order_success_subtitle": "Sit back and relax — we're on it.",
-        "order_success_track": "Track order"
+        "order_success_track": "Track order",
+        "search_address": "Search street, place...",
+        "use_gps": "Use GPS location",
+        "saved_addresses": "Saved Addresses",
+        "finding_address": "Finding address...",
+        "deliver_here": "Deliver here",
+        "confirm_address": "Confirm Address",
+        "tap_to_select": "Tap on the map or search",
+        "tap_to_select_subtitle": "Choose where you want your order delivered",
+        "step_address": "Address",
+        "step_review": "Review",
+        "item_notes_placeholder": "Add special instructions...",
+        "driver_notes": "Notes for Driver",
+        "driver_notes_placeholder": "e.g., Ring the doorbell twice"
     },
     "orders": {
         "title": "My Orders",

@@ -28,30 +28,51 @@ import { calculateHaversineDistance } from '@/utils/haversine';
 import { fetchRoute } from '@/utils/route';
 import MapView, { Marker, Polyline, Region, PROVIDER_GOOGLE } from 'react-native-maps';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// ─── Map Style ──────────────────────────────────────────────
-const minimalistMapStyle = [
-    { elementType: 'geometry', stylers: [{ color: '#f5f5f5' }] },
+// ─── Map Styles ─────────────────────────────────────────────
+const darkMapStyle = [
+    { elementType: 'geometry', stylers: [{ color: '#1A1A22' }] },
     { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-    { elementType: 'labels.text.fill', stylers: [{ color: '#616161' }] },
-    { elementType: 'labels.text.stroke', stylers: [{ color: '#f5f5f5' }] },
-    { featureType: 'administrative.land_parcel', stylers: [{ visibility: 'off' }] },
-    { featureType: 'administrative.neighborhood', stylers: [{ visibility: 'off' }] },
-    { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#eeeeee' }] },
-    { featureType: 'poi', elementType: 'labels.text', stylers: [{ visibility: 'off' }] },
-    { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#e5e5e5' }] },
-    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
-    { featureType: 'road.arterial', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#dadada' }] },
-    { featureType: 'road.highway', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-    { featureType: 'road.local', stylers: [{ visibility: 'off' }] },
+    { elementType: 'labels.text.fill', stylers: [{ color: '#A1A1AA' }] },
+    { elementType: 'labels.text.stroke', stylers: [{ color: '#0F0F14' }] },
+    { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#27272A' }] },
+    { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#27272A' }] },
+    { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#1A1A22' }] },
+    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#3f3f46' }] },
     { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#c9c9c9' }] },
-    { featureType: 'water', elementType: 'labels.text', stylers: [{ visibility: 'off' }] },
+    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0F0F14' }] },
 ];
+
+const lightMapStyle = [
+    { elementType: 'geometry', stylers: [{ color: '#f8fafc' }] },
+    { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+    { elementType: 'labels.text.fill', stylers: [{ color: '#64748B' }] },
+    { elementType: 'labels.text.stroke', stylers: [{ color: '#ffffff' }] },
+    { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
+    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#e2e8f0' }] },
+    { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#dbeafe' }] },
+    { featureType: 'administrative.neighborhood', stylers: [{ visibility: 'off' }] },
+];
+
+// ─── Helper Functions ───────────────────────────────────────
+const formatOrderDate = (value?: string | null) => {
+    if (!value) return 'Unknown date';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return 'Unknown date';
+    return parsed.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+};
 
 // ─── Status Config ──────────────────────────────────────────
 const STATUS_CONFIG: Record<string, {
@@ -63,7 +84,7 @@ const STATUS_CONFIG: Record<string, {
     PENDING: { color: '#F59E0B', bgColor: '#FEF3C7', textColor: '#92400E', icon: 'time' },
     PREPARING: { color: '#3B82F6', bgColor: '#DBEAFE', textColor: '#1E40AF', icon: 'restaurant' },
     READY: { color: '#10B981', bgColor: '#D1FAE5', textColor: '#065F46', icon: 'checkmark-circle' },
-    OUT_FOR_DELIVERY: { color: '#8B5CF6', bgColor: '#EDE9FE', textColor: '#5B21B6', icon: 'bicycle' },
+    OUT_FOR_DELIVERY: { color: '#22C55E', bgColor: '#DCFCE7', textColor: '#166534', icon: 'bicycle' },
     DELIVERED: { color: '#22C55E', bgColor: '#DCFCE7', textColor: '#166534', icon: 'checkmark-done-circle' },
     CANCELLED: { color: '#EF4444', bgColor: '#FEE2E2', textColor: '#991B1B', icon: 'close-circle' },
 };
@@ -151,7 +172,7 @@ const DriverMarker = ({ imageUrl }: { imageUrl?: string | null }) => {
     return (
         <Animated.View style={bobStyle}>
             <View style={{
-                width: 48, height: 48, borderRadius: 24, backgroundColor: '#8B5CF6',
+                width: 48, height: 48, borderRadius: 24, backgroundColor: '#7C3AED',
                 alignItems: 'center', justifyContent: 'center',
                 borderWidth: 3, borderColor: 'white',
                 shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
@@ -186,10 +207,11 @@ const DropoffMarker = () => (
     </View>
 );
 
-// ─── Horizontal Status Stepper ──────────────────────────────
-const StatusStepper = ({ status, color, t }: {
+// ─── Icon Stepper ───────────────────────────────────────
+const IconStepper = ({ status, color, theme: th, t }: {
     status: string;
     color: string;
+    theme: any;
     t: any;
 }) => {
     const currentIndex = STATUS_ORDER.indexOf(status as typeof STATUS_ORDER[number]);
@@ -204,70 +226,53 @@ const StatusStepper = ({ status, color, t }: {
     };
 
     return (
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
             {STATUS_ORDER.map((step, index) => {
-                const isCompleted = !isCancelled && index < currentIndex;
-                const isActive = !isCancelled && index === currentIndex;
-                const stepColor = isCompleted ? '#22C55E' : isActive ? color : '#D1D5DB';
+                const done = !isCancelled && index < currentIndex;
+                const active = !isCancelled && index === currentIndex;
+                const upcoming = !done && !active;
                 const iconName = STATUS_STEP_ICONS[step];
                 const isLast = index === STATUS_ORDER.length - 1;
 
+                const iconColor = done ? '#22C55E' : active ? color : (th.dark ? '#3f3f46' : '#D1D5DB');
+                const lineColor = done ? '#22C55E' : (th.dark ? '#27272A' : '#E5E7EB');
+
                 return (
                     <View key={step} style={{ flex: 1, alignItems: 'center' }}>
-                        {/* Connector + Circle row */}
                         <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%' }}>
-                            {/* Left connector line */}
                             {index > 0 && (
-                                <View style={{
-                                    flex: 1, height: 2,
-                                    backgroundColor: isCompleted || isActive ? stepColor : '#E5E7EB',
-                                }} />
+                                <View style={{ flex: 1, height: 2, backgroundColor: lineColor }} />
                             )}
                             {index === 0 && <View style={{ flex: 1 }} />}
 
-                            {/* Circle */}
                             <View style={{
-                                width: isActive ? 32 : 26,
-                                height: isActive ? 32 : 26,
-                                borderRadius: isActive ? 16 : 13,
-                                backgroundColor: isCompleted ? '#22C55E' : isActive ? color : '#F3F4F6',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                borderWidth: isActive ? 3 : isCompleted ? 0 : 2,
-                                borderColor: isActive ? color + '30' : '#E5E7EB',
+                                width: 28,
+                                height: 28,
+                                borderRadius: 14,
+                                backgroundColor: done ? '#22C55E15' : active ? color + '15' : (th.dark ? '#1A1A22' : '#F3F4F6'),
+                                alignItems: 'center', justifyContent: 'center',
+                                borderWidth: active ? 2 : 0,
+                                borderColor: active ? color + '40' : 'transparent',
                             }}>
-                                {isCompleted ? (
-                                    <Ionicons name="checkmark" size={14} color="white" />
+                                {done ? (
+                                    <Ionicons name="checkmark" size={14} color="#22C55E" />
                                 ) : (
-                                    <Ionicons
-                                        name={iconName}
-                                        size={isActive ? 16 : 12}
-                                        color={isActive ? 'white' : '#9CA3AF'}
-                                    />
+                                    <Ionicons name={iconName} size={14} color={iconColor} />
                                 )}
                             </View>
 
-                            {/* Right connector line */}
                             {!isLast && (
-                                <View style={{
-                                    flex: 1, height: 2,
-                                    backgroundColor: isCompleted ? '#22C55E' : '#E5E7EB',
-                                }} />
+                                <View style={{ flex: 1, height: 2, backgroundColor: done ? '#22C55E' : lineColor }} />
                             )}
                             {isLast && <View style={{ flex: 1 }} />}
                         </View>
 
-                        {/* Label */}
-                        <Text
-                            style={{
-                                fontSize: 9,
-                                fontWeight: isActive ? '700' : '500',
-                                color: isActive ? color : isCompleted ? '#22C55E' : '#9CA3AF',
-                                marginTop: 4,
-                                textAlign: 'center',
-                            }}
-                            numberOfLines={1}
-                        >
+                        <Text style={{
+                            fontSize: 9,
+                            fontWeight: active ? '700' : '400',
+                            color: active ? color : done ? '#22C55E' : th.colors.subtext,
+                            marginTop: 4, textAlign: 'center',
+                        }} numberOfLines={1}>
                             {stepLabels[step]}
                         </Text>
                     </View>
@@ -520,289 +525,606 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     };
 
     // ═════════════════════════════════════════════════════════
-    // ─── Render ─────────────────────────────────────────────
+    // ─── COMPLETED ORDER VIEW (No Map) ─────────────────────────
+    // ═══════════════════════════════════════════════════════════
+
+    if (isCompleted || isCancelled) {
+        return (
+            <ScrollView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+                <SafeAreaView edges={['top']}>
+                    {/* Header */}
+                    <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingHorizontal: 16,
+                        paddingVertical: 16,
+                        borderBottomWidth: 1,
+                        borderBottomColor: theme.colors.border,
+                    }}>
+                        <TouchableOpacity
+                            onPress={() => router.back()}
+                            style={{
+                                width: 36,
+                                height: 36,
+                                borderRadius: 18,
+                                backgroundColor: theme.dark ? '#ffffff10' : '#00000008',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginRight: 12,
+                            }}
+                        >
+                            <Ionicons name="arrow-back" size={20} color={theme.colors.text} />
+                        </TouchableOpacity>
+                        <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text, letterSpacing: -0.3 }}>
+                            {t.orders.details.order_details}
+                        </Text>
+                    </View>
+
+                    {/* Status Banner */}
+                    <View style={{
+                        marginHorizontal: 16,
+                        marginTop: 16,
+                        marginBottom: 12,
+                        backgroundColor: config.bgColor,
+                        borderRadius: 20,
+                        padding: 24,
+                        alignItems: 'center',
+                        shadowColor: config.color,
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.15,
+                        shadowRadius: 12,
+                        elevation: 4,
+                    }}>
+                        <View style={{
+                            width: 72,
+                            height: 72,
+                            borderRadius: 36,
+                            backgroundColor: config.color + '30',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginBottom: 16,
+                            borderWidth: 3,
+                            borderColor: config.color + '50',
+                        }}>
+                            <Ionicons name={config.icon} size={36} color={config.color} />
+                        </View>
+                        <Text style={{ fontSize: 24, fontWeight: '800', color: config.textColor, marginBottom: 6, letterSpacing: -0.5 }}>
+                            {isCompleted ? t.orders.details.order_delivered : 'Order Cancelled'}
+                        </Text>
+                        <Text style={{ fontSize: 13, color: config.textColor, opacity: 0.7, textAlign: 'center', fontWeight: '500' }}>
+                            {formatOrderDate(order.orderDate)}
+                        </Text>
+                    </View>
+
+                    {/* Order Number Card */}
+                    <View style={{
+                        marginHorizontal: 16,
+                        marginBottom: 12,
+                        backgroundColor: theme.colors.card,
+                        borderRadius: 16,
+                        padding: 18,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.05,
+                        shadowRadius: 8,
+                        elevation: 2,
+                    }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                            <Ionicons name="receipt-outline" size={14} color={theme.colors.primary} style={{ marginRight: 6 }} />
+                            <Text style={{ fontSize: 11, color: theme.colors.subtext, fontWeight: '600', letterSpacing: 0.5 }}>
+                                ORDER NUMBER
+                            </Text>
+                        </View>
+                        <Text style={{ fontSize: 22, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.5 }}>
+                            #{order.displayId || order.id?.slice(-8).toUpperCase() || 'N/A'}
+                        </Text>
+                    </View>
+
+                    {/* Order Items */}
+                    <View style={{
+                        marginHorizontal: 16,
+                        marginBottom: 12,
+                        backgroundColor: theme.colors.card,
+                        borderRadius: 16,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        overflow: 'hidden',
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.05,
+                        shadowRadius: 8,
+                        elevation: 2,
+                    }}>
+                        <View style={{
+                            paddingHorizontal: 18,
+                            paddingVertical: 14,
+                            borderBottomWidth: 1,
+                            borderBottomColor: theme.colors.border,
+                        }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Ionicons name="cart-outline" size={16} color={theme.colors.primary} style={{ marginRight: 8 }} />
+                                <Text style={{ fontSize: 15, fontWeight: '700', color: theme.colors.text, letterSpacing: -0.3 }}>
+                                    {t.orders.details.order_items}
+                                </Text>
+                            </View>
+                        </View>
+
+                        {order.businesses?.map((biz, bizIdx) => (
+                            <View key={bizIdx}>
+                                <View style={{
+                                    paddingHorizontal: 18,
+                                    paddingVertical: 12,
+                                    borderBottomWidth: 1,
+                                    borderBottomColor: theme.colors.border + '20',
+                                }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <View style={{
+                                            width: 24,
+                                            height: 24,
+                                            borderRadius: 12,
+                                            backgroundColor: theme.colors.primary + '20',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            marginRight: 8,
+                                        }}>
+                                            <Ionicons name="storefront" size={13} color={theme.colors.primary} />
+                                        </View>
+                                        <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text, letterSpacing: -0.3 }}>
+                                            {biz.business.name}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {biz.items.map((item, itemIdx) => (
+                                    <View
+                                        key={`${item.productId}-${itemIdx}`}
+                                        style={{
+                                            paddingHorizontal: 18,
+                                            paddingVertical: 14,
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            borderTopWidth: itemIdx === 0 ? 0 : 1,
+                                            borderTopColor: theme.colors.border + '20',
+                                        }}
+                                    >
+                                        {item.imageUrl ? (
+                                            <Image
+                                                source={{ uri: item.imageUrl }}
+                                                style={{
+                                                    width: 56,
+                                                    height: 56,
+                                                    borderRadius: 12,
+                                                    marginRight: 14,
+                                                }}
+                                                contentFit="cover"
+                                            />
+                                        ) : (
+                                            <View style={{
+                                                width: 56,
+                                                height: 56,
+                                                borderRadius: 12,
+                                                backgroundColor: theme.colors.primary + '15',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                marginRight: 14,
+                                                borderWidth: 1,
+                                                borderColor: theme.colors.primary + '30',
+                                            }}>
+                                                <Ionicons name="fast-food" size={24} color={theme.colors.primary} />
+                                            </View>
+                                        )}
+
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={{ fontSize: 15, fontWeight: '700', color: theme.colors.text, letterSpacing: -0.3 }} numberOfLines={1}>
+                                                {item.name}
+                                            </Text>
+                                            <Text style={{ fontSize: 13, color: theme.colors.subtext, fontWeight: '600', marginTop: 4 }}>
+                                                {item.quantity} × €{item.price.toFixed(2)}
+                                            </Text>
+                                            {item.notes && (
+                                                <View style={{
+                                                    marginTop: 6,
+                                                    paddingHorizontal: 8,
+                                                    paddingVertical: 4,
+                                                    backgroundColor: theme.colors.primary + '10',
+                                                    borderRadius: 6,
+                                                    borderLeftWidth: 2,
+                                                    borderLeftColor: theme.colors.primary,
+                                                }}>
+                                                    <Text style={{ fontSize: 11, color: theme.colors.primary, fontStyle: 'italic', fontWeight: '500' }}>
+                                                        {item.notes}
+                                                    </Text>
+                                                </View>
+                                            )}
+                                        </View>
+
+                                        <Text style={{ fontSize: 16, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.3 }}>
+                                            €{(item.price * item.quantity).toFixed(2)}
+                                        </Text>
+                                    </View>
+                                ))}
+                            </View>
+                        ))}
+                    </View>
+
+                    {/* Price Breakdown */}
+                    <View style={{
+                        marginHorizontal: 16,
+                        marginBottom: 12,
+                        backgroundColor: theme.colors.card,
+                        borderRadius: 16,
+                        padding: 18,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.05,
+                        shadowRadius: 8,
+                        elevation: 2,
+                    }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                            <Ionicons name="cash-outline" size={16} color={theme.colors.primary} style={{ marginRight: 8 }} />
+                            <Text style={{ fontSize: 15, fontWeight: '700', color: theme.colors.text, letterSpacing: -0.3 }}>
+                                Price Summary
+                            </Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10, paddingLeft: 24 }}>
+                            <Text style={{ fontSize: 14, color: theme.colors.subtext, fontWeight: '500' }}>{t.common.subtotal}</Text>
+                            <Text style={{ fontSize: 14, color: theme.colors.text, fontWeight: '600' }}>
+                                €{order.orderPrice?.toFixed(2)}
+                            </Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14, paddingLeft: 24 }}>
+                            <Text style={{ fontSize: 14, color: theme.colors.subtext, fontWeight: '500' }}>{t.common.delivery}</Text>
+                            <Text style={{ fontSize: 14, color: theme.colors.text, fontWeight: '600' }}>
+                                €{order.deliveryPrice?.toFixed(2)}
+                            </Text>
+                        </View>
+                        <View style={{
+                            paddingTop: 14,
+                            borderTopWidth: 2,
+                            borderTopColor: theme.colors.border,
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                        }}>
+                            <Text style={{ fontSize: 17, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.3 }}>
+                                {t.common.total}
+                            </Text>
+                            <Text style={{ fontSize: 22, fontWeight: '800', color: theme.colors.primary, letterSpacing: -0.5 }}>
+                                €{order.totalPrice?.toFixed(2)}
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Delivery Address */}
+                    {dropoffLocation && (
+                        <View style={{
+                            marginHorizontal: 16,
+                            marginBottom: 12,
+                            backgroundColor: theme.colors.card,
+                            borderRadius: 16,
+                            padding: 18,
+                            borderWidth: 1,
+                            borderColor: theme.colors.border,
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.05,
+                            shadowRadius: 8,
+                            elevation: 2,
+                        }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                                <View style={{
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: 16,
+                                    backgroundColor: theme.colors.primary + '20',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    marginRight: 10,
+                                }}>
+                                    <Ionicons name="location" size={16} color={theme.colors.primary} />
+                                </View>
+                                <Text style={{ fontSize: 15, fontWeight: '700', color: theme.colors.text, letterSpacing: -0.3 }}>
+                                    {t.orders.details.delivery_address}
+                                </Text>
+                            </View>
+                            <Text style={{ fontSize: 14, color: theme.colors.subtext, lineHeight: 22, fontWeight: '500', paddingLeft: 42 }}>
+                                {dropoffLocation.address}
+                            </Text>
+                        </View>
+                    )}
+
+                    {/* Driver Info (if completed) */}
+                    {driver && isCompleted && (
+                        <View style={{
+                            marginHorizontal: 16,
+                            marginBottom: 12,
+                            backgroundColor: theme.colors.card,
+                            borderRadius: 16,
+                            padding: 18,
+                            borderWidth: 1,
+                            borderColor: theme.colors.border,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.05,
+                            shadowRadius: 8,
+                            elevation: 2,
+                        }}>
+                            <View style={{
+                                width: 56,
+                                height: 56,
+                                borderRadius: 28,
+                                backgroundColor: theme.colors.primary + '15',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginRight: 14,
+                                overflow: 'hidden',
+                                borderWidth: 2,
+                                borderColor: theme.colors.primary + '30',
+                            }}>
+                                {driverImageUrl ? (
+                                    <Image source={{ uri: driverImageUrl }} style={{ width: 56, height: 56 }} />
+                                ) : (
+                                    <Ionicons name="person" size={26} color={theme.colors.primary} />
+                                )}
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 11, color: theme.colors.subtext, marginBottom: 4, fontWeight: '600', letterSpacing: 0.5 }}>
+                                    {t.orders.details.driver?.toUpperCase() || 'DRIVER'}
+                                </Text>
+                                <Text style={{ fontSize: 16, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.3 }}>
+                                    {driverName || 'Driver'}
+                                </Text>
+                            </View>
+                            <View style={{
+                                width: 36,
+                                height: 36,
+                                borderRadius: 18,
+                                backgroundColor: theme.colors.primary + '15',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            }}>
+                                <Ionicons name="checkmark-circle" size={20} color={theme.colors.primary} />
+                            </View>
+                        </View>
+                    )}
+
+                    <View style={{ height: 40 }} />
+                </SafeAreaView>
+            </ScrollView>
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ─── ACTIVE ORDER VIEW (With Map) ─────────────────────────
     // ═════════════════════════════════════════════════════════
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
 
-                {/* ═══ Map (fills remaining space above bottom panel) ═══ */}
+                {/* ═══ Map (ambient background) ═══ */}
                 <View style={{ flex: 1 }}>
                     <MapView
                         ref={mapRef}
                         style={{ flex: 1 }}
                         provider={PROVIDER_GOOGLE}
                         initialRegion={defaultRegion}
-                        customMapStyle={minimalistMapStyle}
+                        customMapStyle={(theme.dark ? darkMapStyle : lightMapStyle) as any}
                         showsUserLocation={false}
                         showsMyLocationButton={false}
                         showsCompass={false}
                         toolbarEnabled={false}
                         pitchEnabled={false}
                         rotateEnabled={false}
-                    >
-                        {/* Restaurant marker — prominent when not delivering */}
-                        {pickupLocation && !isDeliveryPhase && (
-                            <Marker
-                                coordinate={{ latitude: pickupLocation.latitude, longitude: pickupLocation.longitude }}
-                                anchor={{ x: 0.5, y: 0.85 }}
-                            >
-                                <PulsingMarker color={config.color} icon={config.icon} label={getMarkerLabel()} />
-                            </Marker>
-                        )}
-
-                        {/* Restaurant marker — small during delivery */}
-                        {pickupLocation && isDeliveryPhase && (
-                            <Marker
-                                coordinate={{ latitude: pickupLocation.latitude, longitude: pickupLocation.longitude }}
-                                anchor={{ x: 0.5, y: 0.5 }}
-                            >
-                                <View style={{
-                                    width: 28, height: 28, borderRadius: 14, backgroundColor: '#3B82F6',
-                                    alignItems: 'center', justifyContent: 'center',
-                                    borderWidth: 2, borderColor: 'white',
-                                }}>
-                                    <Ionicons name="restaurant" size={14} color="white" />
-                                </View>
-                            </Marker>
-                        )}
-
-                        {/* Dropoff marker */}
-                        {dropoffLocation && (
-                            <Marker
-                                coordinate={{ latitude: dropoffLocation.latitude, longitude: dropoffLocation.longitude }}
-                                anchor={{ x: 0.5, y: 0.5 }}
-                            >
-                                <DropoffMarker />
-                            </Marker>
-                        )}
-
-                        {/* Driver marker — live position */}
-                        {isDeliveryPhase && driverLocation && (
-                            <Marker
-                                coordinate={{ latitude: driverLocation.latitude, longitude: driverLocation.longitude }}
-                                anchor={{ x: 0.5, y: 0.9 }}
-                            >
-                                <DriverMarker imageUrl={driverImageUrl} />
-                            </Marker>
-                        )}
-
-                        {/* Route polyline (road-following from Mapbox) */}
-                        {routeCoords.length >= 2 && (
-                            <>
-                                {/* Casing (white outline) */}
-                                <Polyline
-                                    coordinates={routeCoords}
-                                    strokeColor="white"
-                                    strokeWidth={7}
-                                    geodesic
-                                />
-                                {/* Fill */}
-                                <Polyline
-                                    coordinates={routeCoords}
-                                    strokeColor={isDeliveryPhase ? '#8B5CF6' : config.color}
-                                    strokeWidth={4}
-                                    geodesic
-                                />
-                            </>
-                        )}
-                    </MapView>
+                    />
 
                     {/* ═══ Top Bar Overlay ═══════════════════ */}
                     <View style={{
-                        position: 'absolute', top: insets.top + 8, left: 16, right: 16,
-                        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+                        position: 'absolute', top: insets.top + 8, left: 16,
                     }}>
                         <TouchableOpacity onPress={() => router.back()} style={topBtnStyle}>
-                            <Ionicons name="chevron-back" size={22} color="white" />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={fitMapToMarkers} style={topBtnStyle}>
-                            <Ionicons name="locate" size={20} color="white" />
+                            <Ionicons name="chevron-back" size={20} color={theme.colors.text} />
                         </TouchableOpacity>
                     </View>
                 </View>
 
-                {/* ═══ Fixed Bottom Panel ══════════════════ */}
+                {/* ═══ Bottom Panel ════════════════════════ */}
                 <View style={{
                     backgroundColor: theme.colors.card,
-                    borderTopLeftRadius: 24,
-                    borderTopRightRadius: 24,
+                    borderTopLeftRadius: 28,
+                    borderTopRightRadius: 28,
                     shadowColor: '#000',
-                    shadowOffset: { width: 0, height: -4 },
-                    shadowOpacity: 0.08,
-                    shadowRadius: 12,
-                    elevation: 12,
-                    paddingTop: 16,
+                    shadowOffset: { width: 0, height: -6 },
+                    shadowOpacity: 0.12,
+                    shadowRadius: 16,
+                    elevation: 16,
                     paddingBottom: insets.bottom + 12,
-                    paddingHorizontal: 20,
+                    overflow: 'hidden',
                 }}>
-                    {/* Handle indicator (visual only) */}
+                    {/* Status-colored accent strip at top */}
+                    <View style={{ height: 3, backgroundColor: config.color }} />
+
+                    {/* Handle */}
                     <View style={{
-                        width: 40, height: 4, borderRadius: 2,
+                        width: 36, height: 4, borderRadius: 2,
                         backgroundColor: theme.colors.border,
-                        alignSelf: 'center', marginBottom: 14,
+                        alignSelf: 'center', marginTop: 10, marginBottom: 16,
                     }} />
 
-                    {/* ── Horizontal Status Stepper ────── */}
-                    <StatusStepper status={status} color={config.color} t={t} />
+                    <View style={{ paddingHorizontal: 20 }}>
 
-                    {/* ── Status Info Row ──────────────── */}
-                    <Animated.View entering={FadeIn.duration(300)} style={{ marginTop: 16 }}>
-                        {/* Order ID + Status message */}
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                            <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '700', flex: 1 }} numberOfLines={1}>
-                                {statusMessage}
-                            </Text>
-                            <Text style={{ color: theme.colors.subtext, fontSize: 12, fontWeight: '600', marginLeft: 8 }}>
-                                #{order.displayId || order.id?.slice(0, 8)}
-                            </Text>
-                        </View>
-
-                        {/* ETA + Elapsed */}
-                        <View style={{ flexDirection: 'row', gap: 16, marginBottom: 14 }}>
-                            {deliveryEta !== null && !isCompleted && !isCancelled && (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                    <Ionicons name="time-outline" size={15} color={config.color} />
-                                    <Text style={{ color: theme.colors.subtext, fontSize: 13 }}>
-                                        {t.orders.details.arriving_in}{' '}
-                                        <Text style={{ fontWeight: '700', color: config.color }}>
-                                            ~{deliveryEta} {t.orders.details.min_short}
-                                        </Text>
-                                    </Text>
-                                </View>
-                            )}
-                            {elapsedMin !== null && (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                    <Ionicons name="hourglass-outline" size={13} color={theme.colors.subtext} />
-                                    <Text style={{ color: theme.colors.subtext, fontSize: 12 }}>
-                                        {t.orders.details.elapsed}: {elapsedMin} {t.orders.details.min_short}
-                                    </Text>
-                                </View>
-                            )}
-                        </View>
-                    </Animated.View>
-
-                    {/* ── Driver Card ──────────────────── */}
-                    {(isDeliveryPhase || (driver && (status === 'READY' || isCompleted))) && (
-                        <Animated.View entering={FadeInDown.duration(300).delay(50)} style={{
-                            backgroundColor: theme.colors.background,
-                            borderRadius: 14, padding: 14, marginBottom: 14,
-                            flexDirection: 'row', alignItems: 'center',
+                        {/* ── Status row: avatar + message + ETA ── */}
+                        <Animated.View entering={FadeIn.duration(400)} style={{
+                            flexDirection: 'row', alignItems: 'center', marginBottom: 16,
                         }}>
-                            {/* Avatar */}
+                            {/* Avatar (driver or default) */}
                             <View style={{
-                                width: 46, height: 46, borderRadius: 23,
-                                backgroundColor: config.color + '15',
+                                width: 48, height: 48, borderRadius: 24,
+                                backgroundColor: theme.dark ? '#1A1A22' : '#F3F4F6',
                                 alignItems: 'center', justifyContent: 'center',
                                 overflow: 'hidden', marginRight: 12,
+                                borderWidth: 2, borderColor: theme.dark ? '#27272A' : '#E5E7EB',
                             }}>
                                 {driverImageUrl ? (
-                                    <Image source={{ uri: driverImageUrl }} style={{ width: 46, height: 46, borderRadius: 23 }} />
+                                    <Image source={{ uri: driverImageUrl }} style={{ width: 48, height: 48, borderRadius: 24 }} />
                                 ) : (
-                                    <Ionicons name="person" size={22} color={config.color} />
+                                    <Ionicons name="person-outline" size={24} color={theme.colors.subtext} />
                                 )}
                             </View>
 
-                            {/* Info */}
+                            {/* Status text + order id */}
                             <View style={{ flex: 1 }}>
-                                <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '700' }}>
-                                    {driverName || t.orders.details.finding_driver}
+                                <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '800', letterSpacing: -0.3 }} numberOfLines={1}>
+                                    {statusMessage}
                                 </Text>
-                                <Text style={{ color: theme.colors.subtext, fontSize: 12, marginTop: 2 }}>{driverPhone}</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 8 }}>
+                                    <Text style={{ color: theme.colors.subtext, fontSize: 12 }}>
+                                        #{order.displayId || order.id?.slice(0, 8)}
+                                    </Text>
+                                    {elapsedMin !== null && (
+                                        <Text style={{ color: theme.colors.subtext, fontSize: 12 }}>
+                                            · {elapsedMin} {t.orders.details.min_short}
+                                        </Text>
+                                    )}
+                                </View>
                             </View>
 
-                            {/* Call */}
-                            <TouchableOpacity onPress={handleCallDriver} style={{
-                                width: 40, height: 40, borderRadius: 20,
-                                backgroundColor: '#22C55E',
-                                alignItems: 'center', justifyContent: 'center',
-                            }}>
-                                <Ionicons name="call" size={18} color="white" />
-                            </TouchableOpacity>
+                            {/* ETA badge */}
+                            {deliveryEta !== null && !isCompleted && !isCancelled && (
+                                <View style={{
+                                    backgroundColor: config.color + '15',
+                                    borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8,
+                                    alignItems: 'center',
+                                }}>
+                                    <Text style={{ color: config.color, fontSize: 18, fontWeight: '800', lineHeight: 20 }}>
+                                        ~{deliveryEta}
+                                    </Text>
+                                    <Text style={{ color: config.color, fontSize: 10, fontWeight: '600', marginTop: 1 }}>
+                                        {t.orders.details.min_short}
+                                    </Text>
+                                </View>
+                            )}
                         </Animated.View>
-                    )}
 
-                    {/* ── Order Summary Toggle ────────── */}
-                    <TouchableOpacity
-                        onPress={handleToggleSummary}
-                        activeOpacity={0.7}
-                        style={{
-                            backgroundColor: theme.colors.background,
-                            borderRadius: 14, paddingVertical: 14, paddingHorizontal: 16,
-                            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                            borderBottomLeftRadius: showSummary ? 0 : 14,
-                            borderBottomRightRadius: showSummary ? 0 : 14,
-                        }}
-                    >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                            <Ionicons name="receipt-outline" size={18} color={theme.colors.text} />
-                            <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>
-                                {t.orders.details.order_summary}
-                            </Text>
-                            <View style={{
-                                backgroundColor: config.color + '15',
-                                borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2,
+                        {/* ── Icon stepper ───────────────── */}
+                        <View style={{ marginBottom: 16 }}>
+                            <IconStepper status={status} color={config.color} theme={theme} t={t} />
+                        </View>
+
+                        {/* ── Driver Card ──────────────────── */}
+                        {(isDeliveryPhase || (driver && (status === 'READY' || isCompleted))) && (
+                            <Animated.View entering={FadeInDown.duration(300).delay(50)} style={{
+                                backgroundColor: theme.dark ? '#ffffff08' : '#00000005',
+                                borderRadius: 16, padding: 14, marginBottom: 12,
+                                flexDirection: 'row', alignItems: 'center',
+                                borderWidth: 1, borderColor: theme.dark ? '#ffffff0A' : '#0000000A',
                             }}>
-                                <Text style={{ color: config.color, fontSize: 12, fontWeight: '700' }}>
-                                    €{order.totalPrice?.toFixed(2)}
-                                </Text>
-                            </View>
-                        </View>
-                        <Ionicons
-                            name={showSummary ? 'chevron-up' : 'chevron-down'}
-                            size={18}
-                            color={theme.colors.subtext}
-                        />
-                    </TouchableOpacity>
+                                {/* Avatar */}
+                                <View style={{
+                                    width: 44, height: 44, borderRadius: 14,
+                                    backgroundColor: config.color + '15',
+                                    alignItems: 'center', justifyContent: 'center',
+                                    overflow: 'hidden', marginRight: 12,
+                                }}>
+                                    {driverImageUrl ? (
+                                        <Image source={{ uri: driverImageUrl }} style={{ width: 44, height: 44, borderRadius: 14 }} />
+                                    ) : (
+                                        <Ionicons name="person" size={20} color={config.color} />
+                                    )}
+                                </View>
 
-                    {/* ── Expanded Order Items ────────── */}
-                    {showSummary && (
-                        <View style={{
-                            backgroundColor: theme.colors.background,
-                            borderBottomLeftRadius: 14,
-                            borderBottomRightRadius: 14,
-                            paddingHorizontal: 16,
-                            paddingBottom: 14,
-                        }}>
-                            <View style={{ height: 1, backgroundColor: theme.colors.border + '40', marginBottom: 8 }} />
-                            <ScrollView style={{ maxHeight: 160 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-                                {order.businesses?.map((biz) =>
-                                    biz.items.map((item, idx) => (
-                                        <View key={`${item.productId}-${idx}`} style={{
-                                            flexDirection: 'row', alignItems: 'center', paddingVertical: 6,
-                                            borderTopWidth: idx === 0 ? 0 : 1, borderTopColor: theme.colors.border + '25',
-                                        }}>
-                                            <View style={{
-                                                width: 24, height: 24, borderRadius: 6,
-                                                backgroundColor: theme.colors.primary + '10',
-                                                alignItems: 'center', justifyContent: 'center',
-                                                marginRight: 8, overflow: 'hidden',
+                                {/* Info */}
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '700' }}>
+                                        {driverName || t.orders.details.finding_driver}
+                                    </Text>
+                                    <Text style={{ color: theme.colors.subtext, fontSize: 12, marginTop: 2 }}>{driverPhone}</Text>
+                                </View>
+
+                                {/* Call */}
+                                <TouchableOpacity onPress={handleCallDriver} style={{
+                                    width: 40, height: 40, borderRadius: 13,
+                                    backgroundColor: '#22C55E',
+                                    alignItems: 'center', justifyContent: 'center',
+                                }}>
+                                    <Ionicons name="call" size={18} color="white" />
+                                </TouchableOpacity>
+                            </Animated.View>
+                        )}
+
+                        {/* ── Show Order Summary Button ────── */}
+                        <TouchableOpacity
+                            onPress={handleToggleSummary}
+                            activeOpacity={0.7}
+                            style={{
+                                alignSelf: 'center',
+                                marginBottom: 12,
+                            }}
+                        >
+                            <Text style={{ color: theme.colors.subtext, fontSize: 13, fontWeight: '600' }}>
+                                {showSummary ? '▲ Hide order summary' : '▼ Show order summary'}
+                            </Text>
+                        </TouchableOpacity>
+
+                        {/* ── Expanded Order Items ────────── */}
+                        {showSummary && (
+                            <View style={{
+                                borderRadius: 16,
+                                paddingHorizontal: 16,
+                                paddingVertical: 12,
+                                marginBottom: 12,
+                                borderWidth: 1,
+                                borderColor: theme.colors.border,
+                            }}>
+                                <ScrollView style={{ maxHeight: 160 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                                    {order.businesses?.map((biz) =>
+                                        biz.items.map((item, idx) => (
+                                            <View key={`${item.productId}-${idx}`} style={{
+                                                flexDirection: 'row', alignItems: 'center', paddingVertical: 6,
+                                                borderTopWidth: idx === 0 ? 0 : 1, borderTopColor: theme.colors.border + '15',
                                             }}>
-                                                {item.imageUrl ? (
-                                                    <Image source={{ uri: item.imageUrl }} style={{ width: 24, height: 24, borderRadius: 6 }} />
-                                                ) : (
-                                                    <Ionicons name="fast-food-outline" size={12} color={theme.colors.primary} />
-                                                )}
+                                                <View style={{
+                                                    width: 28, height: 28, borderRadius: 8,
+                                                    backgroundColor: config.color + '10',
+                                                    alignItems: 'center', justifyContent: 'center',
+                                                    marginRight: 10, overflow: 'hidden',
+                                                }}>
+                                                    {item.imageUrl ? (
+                                                        <Image source={{ uri: item.imageUrl }} style={{ width: 28, height: 28, borderRadius: 8 }} />
+                                                    ) : (
+                                                        <Ionicons name="fast-food-outline" size={13} color={config.color} />
+                                                    )}
+                                                </View>
+                                                <Text style={{ flex: 1, color: theme.colors.text, fontSize: 13 }} numberOfLines={1}>
+                                                    {item.quantity}× {item.name}
+                                                </Text>
+                                                <Text style={{ color: theme.colors.text, fontSize: 13, fontWeight: '600' }}>
+                                                    €{(item.price * item.quantity).toFixed(2)}
+                                                </Text>
                                             </View>
-                                            <Text style={{ flex: 1, color: theme.colors.text, fontSize: 12 }} numberOfLines={1}>
-                                                {item.quantity}x {item.name}
-                                            </Text>
-                                            <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '600' }}>
-                                                €{(item.price * item.quantity).toFixed(2)}
-                                            </Text>
-                                        </View>
-                                    ))
-                                )}
-                            </ScrollView>
-                            <View style={{ borderTopWidth: 1, borderTopColor: theme.colors.border, marginTop: 6, paddingTop: 10, flexDirection: 'row', justifyContent: 'space-between' }}>
-                                <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '700' }}>{t.common.total}</Text>
-                                <Text style={{ color: config.color, fontSize: 14, fontWeight: '700' }}>
-                                    €{order.totalPrice?.toFixed(2)}
-                                </Text>
+                                        ))
+                                    )}
+                                </ScrollView>
+                                <View style={{
+                                    borderTopWidth: 1, borderTopColor: theme.colors.border + '30',
+                                    marginTop: 8, paddingTop: 10,
+                                    flexDirection: 'row', justifyContent: 'space-between',
+                                }}>
+                                    <Text style={{ color: theme.colors.text, fontSize: 15, fontWeight: '700' }}>{t.common.total}</Text>
+                                    <Text style={{ color: config.color, fontSize: 15, fontWeight: '800' }}>
+                                        €{order.totalPrice?.toFixed(2)}
+                                    </Text>
+                                </View>
                             </View>
-                        </View>
-                    )}
+                        )}
+
+                    </View>
                 </View>
             </View>
         </GestureHandlerRootView>
@@ -811,9 +1133,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
 
 // ─── Shared Styles ──────────────────────────────────────────
 const topBtnStyle = {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: '#8B5CF6',
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.25)',
     alignItems: 'center' as const, justifyContent: 'center' as const,
-    shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35, shadowRadius: 8, elevation: 6,
 };

@@ -12,6 +12,8 @@ import { Skeleton } from '@/components/Skeleton';
 import { WoltHeader } from '@/components/WoltHeader';
 import { useEstimatedDeliveryPrice } from '@/hooks/useEstimatedDeliveryPrice';
 import { useTranslations } from '@/hooks/useTranslations';
+import { useQuery } from '@apollo/client/react';
+import { GET_BANNERS } from '@/graphql/operations/banners';
 
 function HorizontalCardSkeleton() {
     const theme = useTheme();
@@ -44,6 +46,12 @@ export default function Discover() {
     const { businesses, loading, error } = useBusinesses();
     const { estimateDeliveryPrice } = useEstimatedDeliveryPrice();
     const { t } = useTranslations();
+    
+    // Fetch banners from API
+    const { data: bannersData, loading: bannersLoading } = useQuery(GET_BANNERS, {
+        variables: { activeOnly: true },
+        fetchPolicy: 'cache-and-network',
+    });
 
     const restaurants = useMemo(
         () => (businesses || []).filter((b) => b.businessType === 'RESTAURANT'),
@@ -65,13 +73,28 @@ export default function Discover() {
         [restaurants],
     );
 
-    // Promo banners — replace with real data from your admin panel / CMS
-    const promoBanners = useMemo(() => [
-        { id: '1', imageUrl: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&q=80', type: 'image' as const, title: t.home.promo_banners.pizza_discount, subtitle: t.home.promo_banners.pizza_discount_sub },
-        { id: '2', imageUrl: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80', type: 'image' as const, title: t.home.promo_banners.free_delivery, subtitle: t.home.promo_banners.free_delivery_sub },
-        { id: '3', imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&q=80', type: 'image' as const, title: t.home.promo_banners.healthy_food, subtitle: t.home.promo_banners.healthy_food_sub },
-        { id: '4', imageUrl: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80', type: 'image' as const, title: t.home.promo_banners.weekly_menu, subtitle: t.home.promo_banners.weekly_menu_sub },
-    ], [t]);
+    // Map API banners to PromoSlider format
+    const promoBanners = useMemo(() => {
+        const apiBanners = bannersData?.getBanners || [];
+        
+        if (apiBanners.length > 0) {
+            return apiBanners.map((banner: any) => ({
+                id: banner.id,
+                imageUrl: banner.imageUrl,
+                type: 'image' as const,
+                title: banner.title || '',
+                subtitle: banner.subtitle || '',
+            }));
+        }
+        
+        // Fallback to default banners if no API banners
+        return [
+            { id: '1', imageUrl: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&q=80', type: 'image' as const, title: t.home.promo_banners.pizza_discount, subtitle: t.home.promo_banners.pizza_discount_sub },
+            { id: '2', imageUrl: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80', type: 'image' as const, title: t.home.promo_banners.free_delivery, subtitle: t.home.promo_banners.free_delivery_sub },
+            { id: '3', imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&q=80', type: 'image' as const, title: t.home.promo_banners.healthy_food, subtitle: t.home.promo_banners.healthy_food_sub },
+            { id: '4', imageUrl: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80', type: 'image' as const, title: t.home.promo_banners.weekly_menu, subtitle: t.home.promo_banners.weekly_menu_sub },
+        ];
+    }, [bannersData, t]);
 
     // Category icons for top row
     const categories = useMemo(() => [

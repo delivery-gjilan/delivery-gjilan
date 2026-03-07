@@ -30,7 +30,7 @@ export function CategoryIcons({ categories }: CategoryIconsProps) {
         <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
+            contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
         >
             {categories.map((cat) => {
                 const gradientColors = categoryGradients[cat.id] || ['#868e96', '#495057'];
@@ -40,14 +40,14 @@ export function CategoryIcons({ categories }: CategoryIconsProps) {
                         key={cat.id}
                         onPress={cat.onPress}
                         activeOpacity={0.8}
-                        style={{ alignItems: 'center', width: 76 }}
+                        style={{ alignItems: 'center', width: 62 }}
                     >
                         <View
                             style={{
-                                width: 68,
-                                height: 68,
-                                borderRadius: 20,
-                                marginBottom: 8,
+                                width: 54,
+                                height: 54,
+                                borderRadius: 16,
+                                marginBottom: 6,
                                 overflow: 'hidden',
                                 ...(Platform.OS === 'ios' && {
                                     shadowColor: gradientColors[0],
@@ -73,7 +73,7 @@ export function CategoryIcons({ categories }: CategoryIconsProps) {
                             >
                                 <Image
                                     source={{ uri: cat.imageUrl }}
-                                    style={{ width: 36, height: 36, tintColor: 'white' }}
+                                    style={{ width: 28, height: 28, tintColor: 'white' }}
                                     resizeMode="contain"
                                 />
                             </LinearGradient>
@@ -81,7 +81,7 @@ export function CategoryIcons({ categories }: CategoryIconsProps) {
                         <Text
                             style={{
                                 color: theme.colors.text,
-                                fontSize: 12,
+                                fontSize: 11,
                                 fontWeight: '600',
                                 textAlign: 'center',
                             }}

@@ -461,7 +461,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             =============================================== */}
 
             <Modal
-                open={createOpen}
+                isOpen={createOpen}
                 onClose={() => setCreateOpen(false)}
                 title="Create Product"
             >
@@ -639,7 +639,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             =============================================== */}
 
             <Modal
-                open={editOpen}
+                isOpen={editOpen}
                 onClose={() => setEditOpen(false)}
                 title="Edit Product"
             >
@@ -830,7 +830,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             =============================================== */}
 
             <Modal
-                open={deleteId !== null}
+                isOpen={deleteId !== null}
                 onClose={() => setDeleteId(null)}
                 title="Delete Product"
             >

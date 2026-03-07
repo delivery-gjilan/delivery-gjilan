@@ -20,6 +20,7 @@ import {
   Activity,
   Bell,
   LayoutDashboard,
+  Image,
 } from "lucide-react";
 
 const menu: any[] = [
@@ -34,6 +35,7 @@ const menu: any[] = [
   { name: "Businesses", href: "/dashboard/businesses", icon: Store, superAdminOnly: true },
   { name: "Drivers", href: "/dashboard/drivers", icon: Truck, superAdminOnly: true },
   { name: "Map", href: "/dashboard/map", icon: Map, superAdminOnly: true },
+  { name: "Banners", href: "/admin/banners", icon: Image, superAdminOnly: true },
   { name: "Promotions", href: "/dashboard/promotions", icon: Tag, superAdminOnly: true },
   { name: "Delivery Pricing", href: "/dashboard/delivery-pricing", icon: Truck, superAdminOnly: true },
   { name: "Delivery Zones", href: "/dashboard/delivery-zones", icon: Map, superAdminOnly: true },
@@ -67,53 +69,46 @@ export default function Sidebar() {
   });
 
   return (
-    <aside className="w-[60px] bg-[#09090b] border-r border-[#1e1e22] flex flex-col items-center py-4 h-screen overflow-visible">
+    <aside className="w-[200px] bg-[#09090b] border-r border-[#1e1e22] flex flex-col py-4 h-screen overflow-visible">
       {/* Logo */}
       <Link
         href="/dashboard"
         title="Dashboard Home"
-        className="relative group w-9 h-9 rounded-lg bg-violet-600 flex items-center justify-center mb-5 hover:bg-violet-500 transition-colors"
+        className="mx-3 mb-5 px-3 py-2.5 rounded-lg bg-violet-600 flex items-center gap-3 hover:bg-violet-500 transition-colors"
       >
-        <LayoutDashboard size={18} className="text-white" />
-        {/* Tooltip */}
-        <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-zinc-800 text-zinc-100 text-xs font-medium rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-0 whitespace-nowrap shadow-2xl border border-zinc-700 pointer-events-none z-[9999]">
-          Dashboard Home
-          <div className="absolute right-full top-1/2 -translate-y-1/2 -mr-[1px] border-[5px] border-transparent border-r-zinc-800" />
-        </span>
+        <LayoutDashboard size={18} className="text-white flex-shrink-0" />
+        <span className="text-white font-semibold text-sm">Dashboard</span>
       </Link>
 
       {/* Navigation */}
-      <nav className="flex-1 flex flex-col items-center gap-0.5 overflow-y-auto w-full px-2.5">
+      <nav className="flex-1 flex flex-col gap-0.5 overflow-y-auto w-full px-3">
         {filteredMenu.map((item: any, index: number) => {
           if (item.divider) {
-            return <div key={`divider-${index}`} className="w-5 h-px bg-zinc-800 my-2" />;
+            return <div key={`divider-${index}`} className="h-px bg-zinc-800 my-2" />;
           }
 
           const Icon = item.icon;
           const active = pathname.startsWith(item.href);
 
           return (
-            <div key={item.href} className="relative group w-9 h-9">
-              <Link
-                href={item.href}
-                title={item.name}
-                className={`w-full h-full rounded-lg flex items-center justify-center transition-all duration-150 ${
-                  active
-                    ? "bg-violet-500/15 text-violet-400"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60"
-                }`}
-              >
-                <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
-                {active && (
-                  <div className="absolute left-[-14px] top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-sm bg-violet-500" />
-                )}
-              </Link>
-              {/* Tooltip */}
-              <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-zinc-800 text-zinc-100 text-xs font-medium rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-0 whitespace-nowrap shadow-2xl border border-zinc-700 pointer-events-none z-[9999]">
+            <Link
+              key={item.href}
+              href={item.href}
+              title={item.name}
+              className={`relative px-3 py-2.5 rounded-lg flex items-center gap-3 transition-all duration-150 ${
+                active
+                  ? "bg-violet-500/15 text-violet-400"
+                  : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60"
+              }`}
+            >
+              {active && (
+                <div className="absolute left-[-12px] top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-sm bg-violet-500" />
+              )}
+              <Icon size={18} strokeWidth={active ? 2.2 : 1.8} className="flex-shrink-0" />
+              <span className={`text-sm ${active ? 'font-semibold' : 'font-medium'}`}>
                 {item.name}
-                <div className="absolute right-full top-1/2 -translate-y-1/2 -mr-[1px] border-[5px] border-transparent border-r-zinc-800" />
               </span>
-            </div>
+            </Link>
           );
         })}
       </nav>

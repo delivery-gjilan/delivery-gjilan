@@ -22,28 +22,28 @@ export function ProfileRow({ title, subtitle, icon, onPress, showChevron = true,
                 activeOpacity={0.7}
                 style={{
                     paddingVertical: 16,
-                    paddingHorizontal: 0,
+                    paddingHorizontal: 20,
                     flexDirection: 'row',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                 }}
             >
                 {icon && (
-                    <View style={{ marginRight: 12 }}>
-                        <Ionicons name={icon} size={22} color={theme.colors.primary} />
+                    <View style={{ marginRight: 12, width: 24, alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name={icon} size={22} color={theme.colors.text} style={{ opacity: 0.5 }} />
                     </View>
                 )}
                 <View style={{ flex: 1 }}>
-                    <Text className="text-base" style={{ color: theme.colors.text }}>
+                    <Text style={{ color: theme.colors.text, fontSize: 15, fontWeight: '500' }}>
                         {title}
                     </Text>
                     {subtitle && (
-                        <Text className="text-sm mt-1" style={{ color: theme.colors.subtext }}>
+                        <Text style={{ color: theme.colors.subtext, fontSize: 13, marginTop: 2 }}>
                             {subtitle}
                         </Text>
                     )}
                 </View>
-                {showChevron && <Ionicons name="chevron-forward" size={20} color={theme.colors.subtext} />}
+                {showChevron && <Ionicons name="chevron-forward" size={20} color={theme.colors.subtext} style={{ opacity: 0.5 }} />}
             </TouchableOpacity>
             {showDivider && (
                 <View
@@ -51,6 +51,7 @@ export function ProfileRow({ title, subtitle, icon, onPress, showChevron = true,
                         height: 1,
                         backgroundColor: theme.colors.subtext,
                         opacity: 0.1,
+                        marginLeft: 20,
                     }}
                 />
             )}

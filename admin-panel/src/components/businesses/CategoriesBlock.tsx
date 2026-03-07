@@ -199,7 +199,7 @@ export default function CategoriesBlock({
 
             {/* CREATE */}
             <Modal
-                open={createOpen}
+                isOpen={createOpen}
                 onClose={() => setCreateOpen(false)}
                 title="Create Category"
             >
@@ -234,7 +234,7 @@ export default function CategoriesBlock({
 
             {/* EDIT */}
             <Modal
-                open={editOpen}
+                isOpen={editOpen}
                 onClose={() => setEditOpen(false)}
                 title="Edit Category"
             >
@@ -272,7 +272,7 @@ export default function CategoriesBlock({
 
             {/* DELETE */}
             <Modal
-                open={deleteId !== null}
+                isOpen={deleteId !== null}
                 onClose={() => setDeleteId(null)}
                 title="Delete Category"
             >

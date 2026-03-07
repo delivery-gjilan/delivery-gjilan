@@ -330,7 +330,20 @@
         "confirm_order_cancel": "Kthehu",
         "order_success_title": "Porosia u vendos!",
         "order_success_subtitle": "Uluni dhe relaksohuni — ne jemi duke u marrë me të.",
-        "order_success_track": "Ndiq porosinë"
+        "order_success_track": "Ndiq porosinë",
+        "search_address": "Kërko rrugën, vendin...",
+        "use_gps": "Përdor vendndodhjen GPS",
+        "saved_addresses": "Adresat e Ruajtura",
+        "finding_address": "Duke gjetur adresën...",
+        "deliver_here": "Dërgo këtu",
+        "confirm_address": "Konfirmo Adresën",
+        "tap_to_select": "Klikoni hartën ose kërkoni",
+        "tap_to_select_subtitle": "Zgjidhni ku dëshironi të dorëzohet porosia juaj",
+        "step_address": "Adresa",
+        "step_review": "Shqyrtimi",
+        "item_notes_placeholder": "Shto udhëzime të veçanta...",
+        "driver_notes": "Shënime për shoferin",
+        "driver_notes_placeholder": "p.sh., Bini zillin dy herë"
     },
     "orders": {
         "title": "Porosinë e Mia",

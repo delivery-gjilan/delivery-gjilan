@@ -116,6 +116,19 @@ type AuthResponse {
   user: User!
 }
 
+type Banner {
+  createdAt: DateTime!
+  id: ID!
+  imageUrl: String!
+  isActive: Boolean!
+  linkTarget: String
+  linkType: String
+  sortOrder: Int!
+  subtitle: String
+  title: String
+  updatedAt: DateTime!
+}
+
 enum BannerType {
   INFO
   SUCCESS
@@ -188,6 +201,16 @@ input CartItemInput {
   price: Float!
   productId: ID!
   quantity: Int!
+}
+
+input CreateBannerInput {
+  imageUrl: String!
+  isActive: Boolean
+  linkTarget: String
+  linkType: String
+  sortOrder: Int
+  subtitle: String
+  title: String
 }
 
 input CreateBusinessInput {
@@ -494,6 +517,7 @@ type Mutation {
   assignPromotionToUsers(input: AssignPromotionToUserInput!): [UserPromotion!]!
   backfillSettlementsForDeliveredOrders: Int!
   cancelOrder(id: ID!): Order!
+  createBanner(input: CreateBannerInput!): Banner!
   createBusiness(input: CreateBusinessInput!): Business!
   createCampaign(input: CreateCampaignInput!): NotificationCampaign!
   createDeliveryPricingTier(input: CreateDeliveryPricingTierInput!): DeliveryPricingTier!
@@ -506,6 +530,7 @@ type Mutation {
   createTestOrder: Order!
   createUser(input: CreateUserInput!): AuthResponse!
   deductWalletCredit(amount: Float!, orderId: ID!, userId: ID!): WalletTransaction!
+  deleteBanner(id: ID!): Boolean!
   deleteBusiness(id: ID!): Boolean!
   deleteCampaign(id: ID!): Boolean!
   deleteDeliveryPricingTier(id: ID!): Boolean!
@@ -544,6 +569,8 @@ type Mutation {
   submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
   unregisterDeviceToken(token: String!): Boolean!
   unsettleSettlement(settlementId: ID!): Settlement!
+  updateBanner(id: ID!, input: UpdateBannerInput!): Banner!
+  updateBannerOrder(bannerId: ID!, newSortOrder: Int!): Banner!
   updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
   updateCommissionPercentage(businessId: ID, driverId: ID, percentage: Float!): Boolean!
   updateDeliveryPricingTier(id: ID!, input: UpdateDeliveryPricingTierInput!): DeliveryPricingTier!
@@ -812,6 +839,8 @@ type Query {
   drivers: [User!]!
   getAllPromotions(isActive: Boolean): [Promotion!]!
   getApplicablePromotions(cart: CartContextInput!, manualCode: String): [ApplicablePromotion!]!
+  getBanner(id: ID!): Banner
+  getBanners(activeOnly: Boolean): [Banner!]!
   getPromotion(id: ID!): Promotion
   getPromotionAnalytics(promotionId: ID!): PromotionAnalyticsResult!
   getPromotionThresholds(cart: CartContextInput!): [PromotionThreshold!]!
@@ -970,6 +999,16 @@ type Subscription {
 
 input SubscriptionInput {
   token: String!
+}
+
+input UpdateBannerInput {
+  imageUrl: String
+  isActive: Boolean
+  linkTarget: String
+  linkType: String
+  sortOrder: Int
+  subtitle: String
+  title: String
 }
 
 input UpdateBusinessInput {

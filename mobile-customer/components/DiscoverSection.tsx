@@ -44,7 +44,7 @@ export function DiscoverSection({
                             backgroundColor: theme.colors.primary + '26',
                             paddingHorizontal: 12,
                             paddingVertical: 6,
-                            borderRadius: 16,
+                            borderRadius: 8,
                         }}
                     >
                         <Text style={{ color: theme.colors.primary, fontWeight: '600', fontSize: 13 }}>

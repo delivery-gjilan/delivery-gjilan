@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert, Modal, TextInput, Animated, ImageBackground, StyleSheet, Dimensions, Platform } from 'react-native';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert, Modal, TextInput, Animated, Dimensions, Platform, BackHandler, LayoutAnimation, UIManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as Location from 'expo-location';
-import MapView, { Marker, Region } from 'react-native-maps';
+import AddressPicker, { type SelectedAddress } from './AddressPicker';
 
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
@@ -19,107 +19,13 @@ import { GET_MY_ADDRESSES, ADD_USER_ADDRESS, SET_DEFAULT_ADDRESS } from '@/graph
 import { CALCULATE_DELIVERY_PRICE } from '@/graphql/operations/deliveryPricing';
 import type { UserAddress } from '@/gql/graphql';
 
-type CheckoutLocation = {
-    latitude: number;
-    longitude: number;
-    address: string;
-    label?: string;
-    addressId?: number; // Track if this is a saved address
-};
-
-const formatAddress = (item: Location.LocationGeocodedAddress | null) => {
-    if (!item) return '';
-    const parts = [item.street, item.name, item.city, item.region, item.postalCode, item.country].filter(Boolean);
-    return parts.join(', ');
-};
+type CheckoutLocation = SelectedAddress;
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-// Minimalistic map style
-const minimalistMapStyle = [
-    {
-        "elementType": "geometry",
-        "stylers": [{ "color": "#f5f5f5" }]
-    },
-    {
-        "elementType": "labels.icon",
-        "stylers": [{ "visibility": "off" }]
-    },
-    {
-        "elementType": "labels.text.fill",
-        "stylers": [{ "color": "#616161" }]
-    },
-    {
-        "elementType": "labels.text.stroke",
-        "stylers": [{ "color": "#f5f5f5" }]
-    },
-    {
-        "featureType": "administrative.land_parcel",
-        "stylers": [{ "visibility": "off" }]
-    },
-    {
-        "featureType": "administrative.neighborhood",
-        "stylers": [{ "visibility": "off" }]
-    },
-    {
-        "featureType": "poi",
-        "elementType": "geometry",
-        "stylers": [{ "color": "#eeeeee" }]
-    },
-    {
-        "featureType": "poi",
-        "elementType": "labels.text",
-        "stylers": [{ "visibility": "off" }]
-    },
-    {
-        "featureType": "poi.park",
-        "elementType": "geometry",
-        "stylers": [{ "color": "#e5e5e5" }]
-    },
-    {
-        "featureType": "poi.park",
-        "elementType": "labels.text.fill",
-        "stylers": [{ "color": "#9e9e9e" }]
-    },
-    {
-        "featureType": "road",
-        "elementType": "geometry",
-        "stylers": [{ "color": "#ffffff" }]
-    },
-    {
-        "featureType": "road.arterial",
-        "elementType": "labels",
-        "stylers": [{ "visibility": "off" }]
-    },
-    {
-        "featureType": "road.highway",
-        "elementType": "geometry",
-        "stylers": [{ "color": "#dadada" }]
-    },
-    {
-        "featureType": "road.highway",
-        "elementType": "labels",
-        "stylers": [{ "visibility": "off" }]
-    },
-    {
-        "featureType": "road.local",
-        "stylers": [{ "visibility": "off" }]
-    },
-    {
-        "featureType": "transit",
-        "stylers": [{ "visibility": "off" }]
-    },
-    {
-        "featureType": "water",
-        "elementType": "geometry",
-        "stylers": [{ "color": "#c9c9c9" }]
-    },
-    {
-        "featureType": "water",
-        "elementType": "labels.text",
-        "stylers": [{ "visibility": "off" }]
-    }
-];
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 export const CartScreen = () => {
     const router = useRouter();
@@ -133,9 +39,7 @@ export const CartScreen = () => {
     const [deliveryPrice, setDeliveryPrice] = useState(2.0); // Default; updated from API
     const [deliveryPriceLoading, setDeliveryPriceLoading] = useState(false);
     const [deliveryZoneName, setDeliveryZoneName] = useState<string | null>(null);
-    const [isMapModalOpen, setIsMapModalOpen] = useState(false);
-    const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
-    const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+    const [step, setStep] = useState<1 | 2 | 3>(1);
     const [selectedLocation, setSelectedLocation] = useState<CheckoutLocation | null>(null);
     const [couponCode, setCouponCode] = useState('');
     const [showSaveAddressPrompt, setShowSaveAddressPrompt] = useState(false);
@@ -165,19 +69,9 @@ export const CartScreen = () => {
         effectiveDeliveryPrice: number;
         totalPrice: number;
     } | null>(null);
-    const [mapRegion, setMapRegion] = useState<Region>({
-        latitude: 42.4629,
-        longitude: 21.4694,
-        latitudeDelta: 0.005,
-        longitudeDelta: 0.005,
-    });
-    const [mapMarker, setMapMarker] = useState<{ latitude: number; longitude: number } | null>(null);
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const proceedButtonAnim = useRef(new Animated.Value(1)).current;
     const screenWidth = Dimensions.get('window').width;
-    const summarySlideX = useRef(new Animated.Value(screenWidth)).current;
-    const mapSlideX = useRef(new Animated.Value(screenWidth)).current;
-    const addressSlideX = useRef(new Animated.Value(screenWidth)).current;
 
     const [validatePromotionsManual, { loading: manualPromoLoading }] = useLazyQuery(VALIDATE_PROMOTIONS, {
         fetchPolicy: 'no-cache',
@@ -398,123 +292,36 @@ export const CartScreen = () => {
         return () => breathingAnimation.stop();
     }, [selectedLocation, proceedButtonAnim]);
 
+    // ─── Step navigation with layout animation ──────────────
+    const goToStep = useCallback((s: 1 | 2 | 3) => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setStep(s);
+    }, []);
+
+    // Android back button: navigate between wizard steps
     useEffect(() => {
-        if (!isSummaryModalOpen) return;
-        summarySlideX.setValue(screenWidth);
-        Animated.timing(summarySlideX, {
-            toValue: 0,
-            duration: 260,
-            useNativeDriver: true,
-        }).start();
-    }, [isSummaryModalOpen, screenWidth, summarySlideX]);
+        const onBack = () => {
+            if (step === 3) { goToStep(2); return true; }
+            if (step === 2) { goToStep(1); return true; }
+            return false; // default behavior (close screen)
+        };
+        const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
+        return () => sub.remove();
+    }, [step, goToStep]);
 
-    useEffect(() => {
-        if (!isMapModalOpen) return;
-        mapSlideX.setValue(screenWidth);
-        Animated.timing(mapSlideX, {
-            toValue: 0,
-            duration: 240,
-            useNativeDriver: true,
-        }).start();
-    }, [isMapModalOpen, screenWidth, mapSlideX]);
-
-    useEffect(() => {
-        if (!isAddressModalOpen) return;
-        addressSlideX.setValue(screenWidth);
-        Animated.timing(addressSlideX, {
-            toValue: 0,
-            duration: 240,
-            useNativeDriver: true,
-        }).start();
-    }, [isAddressModalOpen, screenWidth, addressSlideX]);
-
-    const closeSummaryModal = () => {
-        Animated.timing(summarySlideX, {
-            toValue: screenWidth,
-            duration: 220,
-            useNativeDriver: true,
-        }).start(() => setIsSummaryModalOpen(false));
-    };
-
-    const closeMapModal = () => {
-        Animated.timing(mapSlideX, {
-            toValue: screenWidth,
-            duration: 200,
-            useNativeDriver: true,
-        }).start(() => setIsMapModalOpen(false));
-    };
-
-    const closeAddressModal = () => {
-        Animated.timing(addressSlideX, {
-            toValue: screenWidth,
-            duration: 200,
-            useNativeDriver: true,
-        }).start(() => setIsAddressModalOpen(false));
-    };
-
-    const handleMapPress = async (event: any) => {
-        const { latitude, longitude } = event.nativeEvent.coordinate;
-        // Reverse geocode to get address and reuse the central select handler
-        try {
-            const [result] = await Location.reverseGeocodeAsync({ latitude, longitude });
-            const address = formatAddress(result ?? null);
-            const location = {
-                latitude,
-                longitude,
-                address: address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
-                label: 'Map location',
-            };
-            handleSelectLocation(location);
-        } catch (error) {
-            const location = {
-                latitude,
-                longitude,
-                address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
-                label: 'Map location',
-            };
-            handleSelectLocation(location);
-        }
-    };
-
-    const handleSelectLocation = (next: CheckoutLocation) => {
+    // ─── Address Picker Handler ─────────────────────────────
+    const handleAddressSelected = (next: CheckoutLocation) => {
         setSelectedLocation(next);
         requestFeeForLocation(next);
-        // Update map marker and center map on selected location
-        setMapMarker({ latitude: next.latitude, longitude: next.longitude });
-        setMapRegion({
-            latitude: next.latitude,
-            longitude: next.longitude,
-            latitudeDelta: 0.005,
-            longitudeDelta: 0.005,
-        });
-        // Close any open modals and open summary so user can confirm the address
-        if (isAddressModalOpen) closeAddressModal();
-        if (isMapModalOpen) closeMapModal();
-        
-        // If this is a map-selected location (not a saved address), ask if they want to save it
+
+        // If this is a new location (not a saved address), ask if they want to save it
         if (!next.addressId) {
             setPendingLocationToSave(next);
-            setAddressName(''); // Reset address name
-            setTimeout(() => setShowSaveAddressPrompt(true), 300);
+            setAddressName('');
+            setTimeout(() => setShowSaveAddressPrompt(true), 200);
         } else {
-            setTimeout(() => setIsSummaryModalOpen(true), 260);
+            goToStep(3);
         }
-    };
-
-    const handleSelectSavedAddress = (address: UserAddress) => {
-        const location: CheckoutLocation = {
-            latitude: address.latitude,
-            longitude: address.longitude,
-            address: address.displayName,
-            label: address.addressName,
-            addressId: address.id,
-        };
-        handleSelectLocation(location);
-    };
-
-    const handleChooseOnMap = () => {
-        closeAddressModal();
-        setTimeout(() => setIsMapModalOpen(true), 260);
     };
 
     const handleSaveAsDefault = async () => {
@@ -524,7 +331,6 @@ export const CartScreen = () => {
         }
         
         try {
-            // First add the address
             const result = await addAddress({
                 variables: {
                     input: {
@@ -536,7 +342,6 @@ export const CartScreen = () => {
                 },
             });
             
-            // Then set it as default
             const newAddressId = result.data?.addUserAddress?.id;
             if (newAddressId) {
                 await setDefaultAddress({
@@ -547,7 +352,7 @@ export const CartScreen = () => {
             setShowSaveAddressPrompt(false);
             setPendingLocationToSave(null);
             setAddressName('');
-            setTimeout(() => setIsSummaryModalOpen(true), 260);
+            goToStep(3);
         } catch (error) {
             Alert.alert(t.common.error, t.cart.failed_save_address);
             console.error('Error saving address:', error);
@@ -558,66 +363,7 @@ export const CartScreen = () => {
         setShowSaveAddressPrompt(false);
         setPendingLocationToSave(null);
         setAddressName('');
-        setTimeout(() => setIsSummaryModalOpen(true), 260);
-    };
-
-    const handleChooseAddress = () => {
-        // If no saved addresses, go directly to map
-        if (savedAddresses.length === 0) {
-            setIsMapModalOpen(true);
-        } else {
-            setIsAddressModalOpen(true);
-        }
-    };
-
-    const handleUseCurrentLocation = async () => {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-            Alert.alert(t.cart.location_required, t.cart.enable_location);
-            return;
-        }
-
-        let current: Location.LocationObject | null = null;
-        try {
-            current = await Location.getCurrentPositionAsync({
-                accuracy: Location.Accuracy.Balanced,
-            });
-        } catch {
-            current = await Location.getLastKnownPositionAsync();
-        }
-
-        if (!current) {
-            Alert.alert(t.cart.location_required, t.cart.unable_fetch_location);
-            return;
-        }
-
-        let address = `${current.coords.latitude.toFixed(6)}, ${current.coords.longitude.toFixed(6)}`;
-        try {
-            const [reverse] = await Location.reverseGeocodeAsync({
-                latitude: current.coords.latitude,
-                longitude: current.coords.longitude,
-            });
-            const formatted = formatAddress(reverse ?? null);
-            address = formatted || address;
-        } catch {
-            // Keep coordinate fallback.
-        }
-
-        // Update map marker and center map on current location
-        setMapMarker({ latitude: current.coords.latitude, longitude: current.coords.longitude });
-        setMapRegion({
-            latitude: current.coords.latitude,
-            longitude: current.coords.longitude,
-            latitudeDelta: 0.005,
-            longitudeDelta: 0.005,
-        });
-
-        handleSelectLocation({
-            latitude: current.coords.latitude,
-            longitude: current.coords.longitude,
-            address,
-            label: 'Current location',
-        });
+        goToStep(3);
     };
 
     // Clear promo if cart total drops below threshold for auto-applied promos
@@ -712,13 +458,11 @@ export const CartScreen = () => {
         setIsProcessing(true);
         try {
             await createOrder(selectedLocation, appliedDeliveryPrice, finalTotal, promoResult?.code, driverNotes);
-            // Close ALL modals & show success screen
-            setIsSummaryModalOpen(false);
-            setIsMapModalOpen(false);
-            setIsAddressModalOpen(false);
+            // Reset wizard & show success screen
             setShowSaveAddressPrompt(false);
             setShowConfirmDialog(false);
             setShowSuccessScreen(true);
+            setStep(1);
             // Clear cart AFTER setting success screen so isEmpty doesn't flash first
             clearCart();
         } catch (err) {
@@ -791,674 +535,512 @@ export const CartScreen = () => {
 
     return (
         <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }}>
-            {/* Swipe Handle */}
-            <View className="items-center py-2">
-                <View className="w-12 h-1 rounded-full" style={{ backgroundColor: theme.colors.border }} />
-            </View>
 
-            {/* (notifier rendered at end to ensure it's above other content) */}
-
-            {/* Header */}
-            <View
-                className="flex-row items-center justify-between px-4 py-3 border-b"
-                style={{ borderBottomColor: theme.colors.border }}
-            >
-                <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
-                    <Ionicons name="close" size={28} color={theme.colors.text} />
-                </TouchableOpacity>
-                <Text className="text-xl font-bold" style={{ color: theme.colors.text }}>
-                    {t.cart.title} ({items.length})
-                </Text>
-                <View style={{ width: 28 }} />
-            </View>
-
-            {/* Threshold progress indicator for conditional promotions */}
-            {applicableConditional && spendThreshold && progress > 0 && progress < 1 && !promoResult && (
-                <View className="px-4 py-3">
-                    <View className="flex-row items-center justify-between mb-2">
-                        <Text className="text-sm" style={{ color: theme.colors.subtext }}>
-                            Spend €{spendThreshold.toFixed(2)} to unlock: {applicableConditional.name || 'promotion'}
-                        </Text>
-                        <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
-                            €{amountRemaining.toFixed(2)}
-                        </Text>
-                    </View>
-                    <View style={{ height: 8, backgroundColor: theme.colors.border, borderRadius: 8, overflow: 'hidden' }}>
-                        <Animated.View style={{ height: 8, width: `${Math.round(progress * 100)}%`, backgroundColor: theme.colors.primary }} />
-                    </View>
-                </View>
-            )}
-
-            {/* Cart Items */}
-            <ScrollView className="flex-1">
-                <View className="p-4 gap-3">
-                    {items.map((item) => (
-                        <View
-                            key={item.productId}
-                            className="rounded-xl p-4 flex-row items-center border"
-                            style={{
-                                backgroundColor: theme.colors.card,
-                                borderColor: theme.colors.border,
-                            }}
-                        >
-                            {item.imageUrl ? (
-                                <Image
-                                    source={{ uri: item.imageUrl }}
-                                    className="w-20 h-20 rounded-lg"
-                                    resizeMode="cover"
-                                />
-                            ) : (
-                                <View
-                                    className="w-20 h-20 rounded-lg items-center justify-center"
-                                    style={{ backgroundColor: theme.colors.border }}
-                                >
-                                    <Ionicons name="image-outline" size={32} color={theme.colors.subtext} />
-                                </View>
-                            )}
-
-                            <View className="flex-1 ml-4">
-                                <Text
-                                    className="text-base font-semibold"
-                                    style={{ color: theme.colors.text }}
-                                    numberOfLines={2}
-                                >
-                                    {item.name}
-                                </Text>
-                                <Text className="font-bold mt-1" style={{ color: theme.colors.primary }}>
-                                    €{item.price.toFixed(2)}
-                                </Text>
-
-                                {/* Quantity Controls */}
-                                <View className="flex-row items-center mt-2 gap-2">
-                                    <TouchableOpacity
-                                        onPress={() => updateQuantity(item.productId, item.quantity - 1)}
-                                        className="w-8 h-8 rounded-full items-center justify-center"
-                                        style={{ backgroundColor: theme.colors.border }}
-                                    >
-                                        <Ionicons name="remove" size={16} color={theme.colors.text} />
-                                    </TouchableOpacity>
-
-                                    <Text className="text-base font-semibold px-3" style={{ color: theme.colors.text }}>
-                                        {item.quantity}
-                                    </Text>
-
-                                    <TouchableOpacity
-                                        onPress={() => updateQuantity(item.productId, item.quantity + 1)}
-                                        className="w-8 h-8 rounded-full items-center justify-center"
-                                        style={{ backgroundColor: theme.colors.primary }}
-                                    >
-                                        <Ionicons name="add" size={16} color="white" />
-                                    </TouchableOpacity>
-                                </View>
-
-                                {/* Item Notes Input */}
-                                <View className="mt-2">
-                                    <TextInput
-                                        value={item.notes || ''}
-                                        onChangeText={(text) => updateItemNotes(item.productId, text)}
-                                        placeholder={t.cart.item_notes_placeholder || "Add special instructions..."}
-                                        placeholderTextColor={theme.colors.subtext}
-                                        className="text-xs px-2 py-1.5 rounded-lg border"
-                                        style={{
-                                            backgroundColor: theme.colors.background,
-                                            borderColor: theme.colors.border,
-                                            color: theme.colors.text,
-                                        }}
-                                        multiline
-                                        numberOfLines={2}
-                                        maxLength={200}
-                                    />
-                                </View>
-                            </View>
-
-                            {/* Remove Button */}
-                            <TouchableOpacity onPress={() => removeItem(item.productId)} className="ml-2 p-2">
-                                <Ionicons name="trash-outline" size={24} color={theme.colors.expense} />
-                            </TouchableOpacity>
-                        </View>
-                    ))}
-                </View>
-            </ScrollView>
-
-            {/* Footer with Total and Checkout */}
-            <View
-                className="border-t p-4"
-                style={{
-                    borderTopColor: theme.colors.border,
-                    backgroundColor: theme.colors.card,
-                }}
-            >
-                {/* Price Breakdown */}
-                <View className="gap-2 mb-3">
-                    <View className="flex-row justify-between items-center">
-                        <Text className="text-base" style={{ color: theme.colors.subtext }}>
-                            {t.common.subtotal}
-                        </Text>
-                        <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
-                            €{total.toFixed(2)}
-                        </Text>
-                    </View>
-                </View>
-
-                {/* Divider */}
-                <View className="h-px mb-3" style={{ backgroundColor: theme.colors.border }} />
-
-                {/* Total */}
-                <View className="flex-row justify-between items-center mb-4">
-                    <Text className="text-lg font-semibold" style={{ color: theme.colors.text }}>
-                        {t.common.total}
-                    </Text>
-                    <Text className="text-2xl font-bold" style={{ color: theme.colors.primary }}>
-                        €{total.toFixed(2)}
-                    </Text>
-                </View>
-                {/* Checkout Button */}
-                <AnimatedTouchable
-                    className="py-4 rounded-xl items-center"
-                    style={{
-                        backgroundColor: isProcessing ? theme.colors.border : theme.colors.primary,
-                        opacity: isProcessing ? 0.6 : pulseAnim,
-                    }}
-                    activeOpacity={0.8}
-                    onPress={handleChooseAddress}
-                    disabled={isProcessing}
+            {/* ─── Top bar: back + stepper ──── */}
+            <View className="flex-row items-center px-4 py-6">
+                <TouchableOpacity
+                    onPress={() => step === 1 ? router.back() : goToStep((step - 1) as 1 | 2)}
+                    className="p-1 mr-2"
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                    {isProcessing ? (
-                        <View className="flex-row items-center gap-2">
-                            <ActivityIndicator size="small" color="white" />
-                            <Text className="text-white font-bold text-lg">{t.cart.processing}</Text>
-                        </View>
-                    ) : (
-                        <Text className="text-white font-bold text-lg">{t.cart.choose_address}</Text>
-                    )}
-                </AnimatedTouchable>
+                    <Ionicons name={step === 1 ? 'close' : 'arrow-back'} size={22} color={theme.colors.text} />
+                </TouchableOpacity>
+
+                <View className="flex-1 flex-row items-center justify-center">
+                {([
+                    { s: 1 as const, icon: 'cart-outline' as const, iconDone: 'cart' as const, label: t.cart.title },
+                    { s: 2 as const, icon: 'location-outline' as const, iconDone: 'location' as const, label: t.cart.step_address ?? 'Address' },
+                    { s: 3 as const, icon: 'document-text-outline' as const, iconDone: 'document-text' as const, label: t.cart.step_review ?? 'Review' },
+                ] as const).map(({ s, icon, iconDone, label }, idx) => {
+                    const done = step > s;
+                    const active = step === s;
+                    const lineColor = done ? '#22C55E' : theme.colors.border;
+                    const iconColor = done || active ? '#22C55E' : theme.colors.subtext;
+                    return (
+                        <React.Fragment key={s}>
+                            {idx > 0 && (
+                                <View className="flex-1 mx-0.5" style={{ height: 2, borderRadius: 1, backgroundColor: lineColor }} />
+                            )}
+                            <View className="items-center" style={{ width: 52 }}>
+                                {done ? (
+                                    <Ionicons name={iconDone} size={20} color="#22C55E" />
+                                ) : (
+                                    <Ionicons name={icon} size={20} color={iconColor} />
+                                )}
+                                <Text style={{
+                                    fontSize: 10,
+                                    marginTop: 3,
+                                    color: done || active ? '#22C55E' : theme.colors.subtext,
+                                    fontWeight: active ? '700' : done ? '600' : '400',
+                                }}>
+                                    {label}
+                                </Text>
+                            </View>
+                        </React.Fragment>
+                    );
+                })}
+                </View>
             </View>
 
-            {/* Address Selection Modal */}
-            <Modal visible={isAddressModalOpen} animationType="none" onRequestClose={closeAddressModal}>
-                <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }}>
-                    <Animated.View style={{ flex: 1, transform: [{ translateX: addressSlideX }] }}>
-                        <View className="flex-row items-center justify-between px-4 py-3 border-b" style={{ borderBottomColor: theme.colors.border }}>
-                            <TouchableOpacity onPress={closeAddressModal} className="p-2 -ml-2">
-                                <Ionicons name="close" size={26} color={theme.colors.text} />
-                            </TouchableOpacity>
-                            <Text className="text-lg font-bold" style={{ color: theme.colors.text }}>
-                                {t.cart.select_address}
-                            </Text>
-                            <View style={{ width: 26 }} />
-                        </View>
-
-                        <ScrollView className="flex-1" contentContainerStyle={{ padding: 16 }}>
-                            {addressesLoading ? (
-                                <View className="py-8">
-                                    <ActivityIndicator size="large" color={theme.colors.primary} />
-                                </View>
-                            ) : savedAddresses.length > 0 ? (
-                                <View className="gap-3">
-                                    {savedAddresses.map((address) => {
-                                        const isSelected = selectedLocation?.addressId === address.id;
-                                        const isDefault = address.priority === 1;
-                                        
-                                        // Select icon based on address name
-                                        let iconName: any = 'location';
-                                        if (address.addressName.toLowerCase().includes('home')) {
-                                            iconName = 'home';
-                                        } else if (address.addressName.toLowerCase().includes('work') || address.addressName.toLowerCase().includes('office')) {
-                                            iconName = 'briefcase';
-                                        }
-
-                                        return (
-                                            <TouchableOpacity
-                                                key={address.id}
-                                                onPress={() => handleSelectSavedAddress(address)}
-                                                className="rounded-xl p-4 border-2"
-                                                style={{
-                                                    backgroundColor: isSelected ? theme.colors.primary + '15' : theme.colors.card,
-                                                    borderColor: isSelected ? theme.colors.primary : theme.colors.border,
-                                                }}
-                                            >
-                                                <View className="flex-row items-start justify-between">
-                                                    <View className="flex-row items-start flex-1">
-                                                        <View
-                                                            className="w-10 h-10 rounded-full items-center justify-center mr-3"
-                                                            style={{ backgroundColor: theme.colors.primary + '20' }}
-                                                        >
-                                                            <Ionicons
-                                                                name={iconName}
-                                                                size={20}
-                                                                color={theme.colors.primary}
-                                                            />
-                                                        </View>
-                                                        <View className="flex-1">
-                                                            <View className="flex-row items-center gap-2">
-                                                                <Text
-                                                                    className="text-base font-semibold"
-                                                                    style={{ color: theme.colors.text }}
-                                                                >
-                                                                    {address.addressName}
-                                                                </Text>
-                                                                {isDefault && (
-                                                                    <View
-                                                                        className="px-2 py-0.5 rounded"
-                                                                        style={{ backgroundColor: theme.colors.primary + '20' }}
-                                                                    >
-                                                                        <Text
-                                                                            className="text-xs font-semibold"
-                                                                            style={{ color: theme.colors.primary }}
-                                                                        >
-                                                                            {t.common.default}
-                                                                        </Text>
-                                                                    </View>
-                                                                )}
-                                                            </View>
-                                                            <Text
-                                                                className="text-sm mt-1"
-                                                                style={{ color: theme.colors.subtext }}
-                                                            >
-                                                                {address.displayName}
-                                                            </Text>
-                                                        </View>
-                                                    </View>
-                                                    {isSelected && (
-                                                        <Ionicons
-                                                            name="checkmark-circle"
-                                                            size={24}
-                                                            color={theme.colors.primary}
-                                                        />
-                                                    )}
-                                                </View>
-                                            </TouchableOpacity>
-                                        );
-                                    })}
-                                </View>
-                            ) : (
-                                <View className="py-12 items-center">
-                                    <View
-                                        className="w-20 h-20 rounded-full items-center justify-center mb-4"
-                                        style={{ backgroundColor: theme.colors.border }}
-                                    >
-                                        <Ionicons name="location-outline" size={40} color={theme.colors.subtext} />
-                                    </View>
-                                    <Text className="text-lg font-semibold mb-2" style={{ color: theme.colors.text }}>
-                                        {t.cart.no_saved_addresses}
-                                    </Text>
-                                    <Text className="text-center" style={{ color: theme.colors.subtext }}>
-                                        {t.cart.no_saved_addresses_subtitle}
-                                    </Text>
-                                </View>
-                            )}
-                        </ScrollView>
-
-                        <View className="p-4 border-t gap-2" style={{ borderTopColor: theme.colors.border, backgroundColor: theme.colors.card }}>
-                            <TouchableOpacity
-                                className="py-3 rounded-xl items-center flex-row justify-center gap-2"
-                                style={{ backgroundColor: theme.colors.primary }}
-                                onPress={handleChooseOnMap}
-                            >
-                                <Ionicons name="map-outline" size={20} color="white" />
-                                <Text className="text-white font-semibold">{t.cart.choose_on_map}</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                className="py-3 rounded-xl items-center"
-                                style={{ backgroundColor: theme.colors.border }}
-                                onPress={closeAddressModal}
-                            >
-                                <Text className="font-semibold" style={{ color: theme.colors.text }}>
-                                    {t.common.cancel}
+            {/* ─── STEP 1: Cart ───────────────────────── */}
+            {step === 1 && (
+                <>
+                    {/* Threshold progress indicator for conditional promotions */}
+                    {applicableConditional && spendThreshold && progress > 0 && progress < 1 && !promoResult && (
+                        <View className="px-4 py-3">
+                            <View className="flex-row items-center justify-between mb-2">
+                                <Text className="text-sm" style={{ color: theme.colors.subtext }}>
+                                    Spend €{spendThreshold.toFixed(2)} to unlock: {applicableConditional.name || 'promotion'}
                                 </Text>
-                            </TouchableOpacity>
-                        </View>
-                    </Animated.View>
-                </SafeAreaView>
-            </Modal>
-
-            {/* Map Picker Modal */}
-            <Modal visible={isMapModalOpen} animationType="none" onRequestClose={closeMapModal}>
-                <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }}>
-                    <Animated.View style={{ flex: 1, transform: [{ translateX: mapSlideX }] }}>
-                        <View className="flex-row items-center justify-between px-4 py-3 border-b" style={{ borderBottomColor: theme.colors.border }}>
-                            <TouchableOpacity onPress={closeMapModal} className="p-2 -ml-2">
-                                <Ionicons name="close" size={26} color={theme.colors.text} />
-                            </TouchableOpacity>
-                            <Text className="text-lg font-bold" style={{ color: theme.colors.text }}>
-                                {t.cart.select_on_map}
-                            </Text>
-                            <View style={{ width: 26 }} />
-                        </View>
-
-                        <View style={{ flex: 1 }}>
-                            <MapView
-                                style={{ flex: 1 }}
-                                initialRegion={mapRegion}
-                                region={mapRegion}
-                                onPress={handleMapPress}
-                                customMapStyle={minimalistMapStyle as any}
-                            >
-                                {mapMarker && (
-                                    <Marker coordinate={{ latitude: mapMarker.latitude, longitude: mapMarker.longitude }} />
-                                )}
-                            </MapView>
-                        </View>
-
-                        <View className="p-4 border-t" style={{ borderTopColor: theme.colors.border, backgroundColor: theme.colors.card }}>
-                            <TouchableOpacity
-                                className="py-3 rounded-xl items-center mb-2"
-                                style={{
-                                    backgroundColor: theme.colors.primary,
-                                    opacity: 1,
-                                }}
-                                onPress={handleUseCurrentLocation}
-                            >
-                                <Text className="text-white font-semibold">{t.cart.use_current_address}</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                className="py-3 rounded-xl items-center"
-                                style={{
-                                    backgroundColor: theme.colors.border,
-                                    opacity: 1,
-                                }}
-                                onPress={closeMapModal}
-                            >
-                                <Text className="font-semibold" style={{ color: theme.colors.text }}>
-                                    {t.common.back}
+                                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
+                                    €{amountRemaining.toFixed(2)}
                                 </Text>
-                            </TouchableOpacity>
-                        </View>
-                    </Animated.View>
-                </SafeAreaView>
-            </Modal>
-
-            {/* Summary Modal */}
-            <Modal visible={isSummaryModalOpen} transparent animationType="none" onRequestClose={closeSummaryModal}>
-                <View className="flex-1 justify-end" style={{ backgroundColor: 'rgba(0, 0, 0, 0.35)' }}>
-                    <Animated.View
-                        style={{
-                            transform: [{ translateX: summarySlideX }],
-                            backgroundColor: theme.colors.card,
-                            borderTopLeftRadius: 24,
-                            borderTopRightRadius: 24,
-                            maxHeight: '85%',
-                        }}
-                    >
-                        <View className="flex-row items-center justify-between px-4 py-3 border-b" style={{ borderBottomColor: theme.colors.border }}>
-                            <TouchableOpacity onPress={closeSummaryModal} className="p-2 -ml-2">
-                                <Ionicons name="close" size={22} color={theme.colors.text} />
-                            </TouchableOpacity>
-                            <Text className="text-lg font-bold" style={{ color: theme.colors.text }}>
-                                {t.cart.order_summary}
-                            </Text>
-                            <View style={{ width: 22 }} />
-                        </View>
-
-                        <ScrollView contentContainerStyle={{ padding: 16 }}>
-                            {selectedLocation && (
-                                <View className="mb-5">
-                                    <Text className="text-xs uppercase" style={{ color: theme.colors.subtext }}>
-                                        {t.cart.deliver_to}
-                                    </Text>
-                                    <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
-                                        {selectedLocation.label ?? t.cart.selected_address}
-                                    </Text>
-                                    <Text className="text-sm" style={{ color: theme.colors.subtext }}>
-                                        {selectedLocation.address}
-                                    </Text>
-                                </View>
-                            )}
-
-                            <View className="gap-2 mb-4">
-                                <View className="flex-row justify-between items-center">
-                                    <View className="flex-row items-center gap-1">
-                                        <Text className="text-base" style={{ color: theme.colors.subtext }}>
-                                            {t.common.delivery}
-                                        </Text>
-                                        {deliveryZoneName && !freeDeliveryApplied && (
-                                            <Text className="text-xs" style={{ color: theme.colors.primary }}>
-                                                ({deliveryZoneName})
-                                            </Text>
-                                        )}
-                                    </View>
-                                    <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
-                                        {freeDeliveryApplied ? t.common.free : `€${appliedDeliveryPrice.toFixed(2)}`}
-                                    </Text>
-                                </View>
-                                {(appliedDiscount > 0 || freeDeliveryApplied) && (
-                                    <View className="flex-row justify-between items-center">
-                                        <Text className="text-base" style={{ color: theme.colors.subtext }}>
-                                            {t.cart.promo}
-                                        </Text>
-                                        <Text className="text-base font-semibold" style={{ color: theme.colors.income }}>
-                                            {freeDeliveryApplied && appliedDiscount === 0
-                                                ? t.cart.free_delivery
-                                                : `-€${appliedDiscount.toFixed(2)}`}
-                                        </Text>
-                                    </View>
-                                )}
                             </View>
-
-                            <View className="p-4 rounded-2xl border mb-4" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.background }}>
-                                <Text className="text-xs uppercase mb-2" style={{ color: theme.colors.subtext }}>
-                                    {t.cart.promo_code}
-                                </Text>
-                                <View className="flex-row items-center gap-2">
-                                    <TextInput
-                                        value={couponCode}
-                                        onChangeText={setCouponCode}
-                                        placeholder={t.cart.enter_code}
-                                        placeholderTextColor={theme.colors.subtext}
-                                        className="flex-1 px-3 py-2 rounded-xl"
-                                        style={{
-                                            color: theme.colors.text,
-                                            backgroundColor: theme.colors.card,
-                                            borderWidth: 1,
-                                            borderColor: theme.colors.border,
-                                        }}
-                                    />
-                                    <TouchableOpacity
-                                        className="px-4 py-2 rounded-xl"
-                                        style={{
-                                            backgroundColor: manualPromoLoading ? theme.colors.border : theme.colors.primary,
-                                            opacity: manualPromoLoading ? 0.7 : 1,
-                                        }}
-                                        onPress={handleApplyCoupon}
-                                        disabled={manualPromoLoading}
-                                    >
-                                        {manualPromoLoading ? (
-                                            <ActivityIndicator size="small" color={theme.colors.text} />
-                                        ) : (
-                                            <Text className="text-white font-semibold">{t.common.apply}</Text>
-                                        )}
-                                    </TouchableOpacity>
-                                </View>
-                                {promoResult && (
-                                    <Text className="text-xs mt-2" style={{ color: theme.colors.subtext }}>
-                                        {t.cart.promo_applied.replace('{{code}}', promoResult.code)}
-                                    </Text>
-                                )}
+                            <View style={{ height: 8, backgroundColor: theme.colors.border, borderRadius: 8, overflow: 'hidden' }}>
+                                <Animated.View style={{ height: 8, width: `${Math.round(progress * 100)}%`, backgroundColor: theme.colors.primary }} />
                             </View>
+                        </View>
+                    )}
 
-                            {/* Driver Notes Section */}
-                            <View className="p-4 rounded-2xl border mb-4" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.background }}>
-                                <View className="flex-row items-center gap-2 mb-2">
-                                    <Ionicons name="chatbubble-outline" size={16} color={theme.colors.subtext} />
-                                    <Text className="text-xs uppercase font-medium" style={{ color: theme.colors.subtext }}>
-                                        {t.cart.driver_notes || "Notes for Driver"}
-                                    </Text>
-                                </View>
-                                <TextInput
-                                    value={driverNotes}
-                                    onChangeText={setDriverNotes}
-                                    placeholder={t.cart.driver_notes_placeholder || "e.g., Ring the doorbell twice"}
-                                    placeholderTextColor={theme.colors.subtext}
-                                    className="px-3 py-2 rounded-xl text-sm"
+                    {/* Cart Items */}
+                    <ScrollView className="flex-1">
+                        <View className="p-4 gap-3">
+                            {items.map((item) => (
+                                <View
+                                    key={item.productId}
+                                    className="rounded-xl p-4 flex-row items-center border"
                                     style={{
                                         backgroundColor: theme.colors.card,
+                                        borderColor: theme.colors.border,
+                                    }}
+                                >
+                                    {item.imageUrl ? (
+                                        <Image
+                                            source={{ uri: item.imageUrl }}
+                                            className="w-20 h-20 rounded-lg"
+                                            resizeMode="cover"
+                                        />
+                                    ) : (
+                                        <View
+                                            className="w-20 h-20 rounded-lg items-center justify-center"
+                                            style={{ backgroundColor: theme.colors.border }}
+                                        >
+                                            <Ionicons name="image-outline" size={32} color={theme.colors.subtext} />
+                                        </View>
+                                    )}
+
+                                    <View className="flex-1 ml-4">
+                                        <Text
+                                            className="text-base font-semibold"
+                                            style={{ color: theme.colors.text }}
+                                            numberOfLines={2}
+                                        >
+                                            {item.name}
+                                        </Text>
+                                        <Text className="font-bold mt-1" style={{ color: theme.colors.primary }}>
+                                            €{item.price.toFixed(2)}
+                                        </Text>
+
+                                        {/* Quantity Controls */}
+                                        <View className="flex-row items-center mt-2 gap-2">
+                                            <TouchableOpacity
+                                                onPress={() => updateQuantity(item.productId, item.quantity - 1)}
+                                                className="w-8 h-8 rounded-full items-center justify-center"
+                                                style={{ backgroundColor: theme.colors.border }}
+                                            >
+                                                <Ionicons name="remove" size={16} color={theme.colors.text} />
+                                            </TouchableOpacity>
+
+                                            <Text className="text-base font-semibold px-3" style={{ color: theme.colors.text }}>
+                                                {item.quantity}
+                                            </Text>
+
+                                            <TouchableOpacity
+                                                onPress={() => updateQuantity(item.productId, item.quantity + 1)}
+                                                className="w-8 h-8 rounded-full items-center justify-center"
+                                                style={{ backgroundColor: theme.colors.primary }}
+                                            >
+                                                <Ionicons name="add" size={16} color="white" />
+                                            </TouchableOpacity>
+                                        </View>
+
+                                        {/* Item Notes Input */}
+                                        <View className="mt-2">
+                                            <TextInput
+                                                value={item.notes || ''}
+                                                onChangeText={(text) => updateItemNotes(item.productId, text)}
+                                                placeholder={t.cart.item_notes_placeholder || "Add special instructions..."}
+                                                placeholderTextColor={theme.colors.subtext}
+                                                className="text-xs px-2 py-1.5 rounded-lg border"
+                                                style={{
+                                                    backgroundColor: theme.colors.background,
+                                                    borderColor: theme.colors.border,
+                                                    color: theme.colors.text,
+                                                }}
+                                                multiline
+                                                numberOfLines={2}
+                                                maxLength={200}
+                                            />
+                                        </View>
+                                    </View>
+
+                                    {/* Remove Button */}
+                                    <TouchableOpacity onPress={() => removeItem(item.productId)} className="ml-2 p-2">
+                                        <Ionicons name="trash-outline" size={24} color={theme.colors.expense} />
+                                    </TouchableOpacity>
+                                </View>
+                            ))}
+                        </View>
+                    </ScrollView>
+
+                    {/* Footer with Total and Continue */}
+                    <View
+                        className="border-t p-4"
+                        style={{
+                            borderTopColor: theme.colors.border,
+                            backgroundColor: theme.colors.card,
+                        }}
+                    >
+                        <View className="flex-row justify-between items-center mb-4">
+                            <Text className="text-lg font-semibold" style={{ color: theme.colors.text }}>
+                                {t.common.subtotal}
+                            </Text>
+                            <Text className="text-2xl font-bold" style={{ color: theme.colors.primary }}>
+                                €{total.toFixed(2)}
+                            </Text>
+                        </View>
+                        <AnimatedTouchable
+                            className="py-4 rounded-xl items-center flex-row justify-center gap-2"
+                            style={{
+                                backgroundColor: theme.colors.primary,
+                                opacity: pulseAnim,
+                            }}
+                            activeOpacity={0.8}
+                            onPress={() => goToStep(2)}
+                        >
+                            <Text className="text-white font-bold text-lg">{t.cart.choose_address}</Text>
+                            <Ionicons name="arrow-forward" size={20} color="white" />
+                        </AnimatedTouchable>
+                    </View>
+                </>
+            )}
+
+            {/* ─── STEP 2: Address ────────────────────── */}
+            {step === 2 && (
+                <AddressPicker
+                    embedded
+                    visible={step === 2}
+                    savedAddresses={savedAddresses}
+                    initialLocation={selectedLocation}
+                    onSelect={handleAddressSelected}
+                    onClose={() => goToStep(1)}
+                />
+            )}
+
+            {/* ─── STEP 3: Order Summary ─────────────── */}
+            {step === 3 && (
+                <>
+                    <ScrollView className="flex-1" contentContainerStyle={{ padding: 16 }}>
+                        {/* Delivery Address */}
+                        {selectedLocation && (
+                            <TouchableOpacity
+                                activeOpacity={0.7}
+                                onPress={() => goToStep(2)}
+                                className="rounded-2xl p-4 mb-4 border"
+                                style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.card }}
+                            >
+                                <View className="flex-row items-center justify-between mb-2">
+                                    <Text className="text-xs uppercase font-semibold" style={{ color: theme.colors.subtext }}>
+                                        {t.cart.deliver_to}
+                                    </Text>
+                                    <View className="flex-row items-center gap-1">
+                                        <Ionicons name="pencil" size={12} color={theme.colors.primary} />
+                                        <Text className="text-xs font-semibold" style={{ color: theme.colors.primary }}>
+                                            {t.cart.change_address}
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View className="flex-row items-center gap-3">
+                                    <View
+                                        className="w-10 h-10 rounded-xl items-center justify-center"
+                                        style={{ backgroundColor: theme.colors.primary + '15' }}
+                                    >
+                                        <Ionicons name="location" size={20} color={theme.colors.primary} />
+                                    </View>
+                                    <View className="flex-1">
+                                        <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
+                                            {selectedLocation.label ?? t.cart.selected_address}
+                                        </Text>
+                                        <Text className="text-sm mt-0.5" numberOfLines={2} style={{ color: theme.colors.subtext }}>
+                                            {selectedLocation.address}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </TouchableOpacity>
+                        )}
+
+                        {/* Order Items (compact) */}
+                        <View className="rounded-2xl border mb-4 overflow-hidden" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
+                            <Text className="text-xs uppercase font-semibold px-4 pt-3 pb-2" style={{ color: theme.colors.subtext }}>
+                                {t.cart.title} ({items.length})
+                            </Text>
+                            {items.map((item, idx) => (
+                                <View
+                                    key={item.productId}
+                                    className="flex-row items-center px-4 py-2.5"
+                                    style={idx < items.length - 1 ? { borderBottomWidth: 1, borderBottomColor: theme.colors.border } : undefined}
+                                >
+                                    <Text className="text-sm flex-1" numberOfLines={1} style={{ color: theme.colors.text }}>
+                                        {item.name}
+                                    </Text>
+                                    <Text className="text-xs mx-2" style={{ color: theme.colors.subtext }}>
+                                        ×{item.quantity}
+                                    </Text>
+                                    <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
+                                        €{(item.price * item.quantity).toFixed(2)}
+                                    </Text>
+                                </View>
+                            ))}
+                        </View>
+
+                        {/* Price Breakdown */}
+                        <View className="rounded-2xl border p-4 mb-4" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
+                            <View className="flex-row justify-between items-center mb-2">
+                                <Text className="text-sm" style={{ color: theme.colors.subtext }}>{t.common.subtotal}</Text>
+                                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>€{total.toFixed(2)}</Text>
+                            </View>
+                            <View className="flex-row justify-between items-center mb-2">
+                                <View className="flex-row items-center gap-1">
+                                    <Text className="text-sm" style={{ color: theme.colors.subtext }}>{t.common.delivery}</Text>
+                                    {deliveryZoneName && !freeDeliveryApplied && (
+                                        <Text className="text-xs" style={{ color: theme.colors.primary }}>({deliveryZoneName})</Text>
+                                    )}
+                                </View>
+                                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
+                                    {deliveryPriceLoading ? '...' : freeDeliveryApplied ? t.common.free : `€${appliedDeliveryPrice.toFixed(2)}`}
+                                </Text>
+                            </View>
+                            {(appliedDiscount > 0 || freeDeliveryApplied) && (
+                                <View className="flex-row justify-between items-center mb-2">
+                                    <Text className="text-sm" style={{ color: theme.colors.subtext }}>{t.cart.promo}</Text>
+                                    <Text className="text-sm font-semibold" style={{ color: theme.colors.income }}>
+                                        {freeDeliveryApplied && appliedDiscount === 0 ? t.cart.free_delivery : `-€${appliedDiscount.toFixed(2)}`}
+                                    </Text>
+                                </View>
+                            )}
+                            <View className="h-px my-2" style={{ backgroundColor: theme.colors.border }} />
+                            <View className="flex-row justify-between items-center">
+                                <Text className="text-base font-bold" style={{ color: theme.colors.text }}>{t.common.total}</Text>
+                                <Text className="text-xl font-bold" style={{ color: theme.colors.primary }}>€{finalTotal.toFixed(2)}</Text>
+                            </View>
+                        </View>
+
+                        {/* Promo Code */}
+                        <View className="rounded-2xl border p-4 mb-4" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
+                            <Text className="text-xs uppercase font-semibold mb-2" style={{ color: theme.colors.subtext }}>
+                                {t.cart.promo_code}
+                            </Text>
+                            <View className="flex-row items-center gap-2">
+                                <TextInput
+                                    value={couponCode}
+                                    onChangeText={setCouponCode}
+                                    placeholder={t.cart.enter_code}
+                                    placeholderTextColor={theme.colors.subtext}
+                                    className="flex-1 px-3 py-2 rounded-xl text-sm"
+                                    style={{
+                                        color: theme.colors.text,
+                                        backgroundColor: theme.colors.background,
                                         borderWidth: 1,
                                         borderColor: theme.colors.border,
-                                        color: theme.colors.text,
                                     }}
-                                    multiline
-                                    numberOfLines={3}
-                                    maxLength={300}
                                 />
+                                <TouchableOpacity
+                                    className="px-4 py-2 rounded-xl"
+                                    style={{
+                                        backgroundColor: manualPromoLoading ? theme.colors.border : theme.colors.primary,
+                                        opacity: manualPromoLoading ? 0.7 : 1,
+                                    }}
+                                    onPress={handleApplyCoupon}
+                                    disabled={manualPromoLoading}
+                                >
+                                    {manualPromoLoading ? (
+                                        <ActivityIndicator size="small" color={theme.colors.text} />
+                                    ) : (
+                                        <Text className="text-white font-semibold">{t.common.apply}</Text>
+                                    )}
+                                </TouchableOpacity>
                             </View>
-
-                            <View className="h-px mb-3" style={{ backgroundColor: theme.colors.border }} />
-
-                            <View className="flex-row justify-between items-center mb-4">
-                                <Text className="text-lg font-semibold" style={{ color: theme.colors.text }}>
-                                    {t.common.total}
+                            {promoResult && (
+                                <Text className="text-xs mt-2" style={{ color: theme.colors.income }}>
+                                    {t.cart.promo_applied.replace('{{code}}', promoResult.code)}
                                 </Text>
-                                <Text className="text-2xl font-bold" style={{ color: theme.colors.primary }}>
-                                    €{finalTotal.toFixed(2)}
-                                </Text>
-                            </View>
-
-                            <View style={{ height: 16 }} />
-                        </ScrollView>
-
-                        <View className="p-4 border-t" style={{ borderTopColor: theme.colors.border, backgroundColor: theme.colors.card }}>
-                            <TouchableOpacity
-                                className="py-3 rounded-xl items-center mb-2"
-                                style={{
-                                    backgroundColor: isProcessing ? theme.colors.border : theme.colors.primary,
-                                    opacity: isProcessing ? 0.6 : 1,
-                                }}
-                                onPress={() => setShowConfirmDialog(true)}
-                                disabled={isProcessing}
-                            >
-                                {isProcessing || orderLoading ? (
-                                    <View className="flex-row items-center gap-2">
-                                        <ActivityIndicator size="small" color="white" />
-                                        <Text className="text-white font-semibold">{t.cart.placing_order}</Text>
-                                    </View>
-                                ) : (
-                                    <Text className="text-white font-semibold">{t.cart.confirm_order}</Text>
-                                )}
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                className="py-3 rounded-xl items-center"
-                                style={{ backgroundColor: theme.colors.border }}
-                                onPress={() => {
-                                    closeSummaryModal();
-                                    setTimeout(() => setIsAddressModalOpen(true), 260);
-                                }}
-                            >
-                                <Text className="font-semibold" style={{ color: theme.colors.text }}>
-                                    {t.cart.change_address}
-                                </Text>
-                            </TouchableOpacity>
+                            )}
                         </View>
-                        </Animated.View>
+
+                        {/* Driver Notes */}
+                        <View className="rounded-2xl border p-4 mb-4" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
+                            <View className="flex-row items-center gap-2 mb-2">
+                                <Ionicons name="chatbubble-outline" size={16} color={theme.colors.subtext} />
+                                <Text className="text-xs uppercase font-semibold" style={{ color: theme.colors.subtext }}>
+                                    {t.cart.driver_notes || "Notes for Driver"}
+                                </Text>
+                            </View>
+                            <TextInput
+                                value={driverNotes}
+                                onChangeText={setDriverNotes}
+                                placeholder={t.cart.driver_notes_placeholder || "e.g., Ring the doorbell twice"}
+                                placeholderTextColor={theme.colors.subtext}
+                                className="px-3 py-2 rounded-xl text-sm"
+                                style={{
+                                    backgroundColor: theme.colors.background,
+                                    borderWidth: 1,
+                                    borderColor: theme.colors.border,
+                                    color: theme.colors.text,
+                                }}
+                                multiline
+                                numberOfLines={3}
+                                maxLength={300}
+                            />
+                        </View>
+
+                        <View style={{ height: 16 }} />
+                    </ScrollView>
+
+                    {/* Footer */}
+                    <View className="p-4 border-t" style={{ borderTopColor: theme.colors.border, backgroundColor: theme.colors.card }}>
+                        <TouchableOpacity
+                            className="py-3.5 rounded-xl items-center"
+                            style={{
+                                backgroundColor: isProcessing ? theme.colors.border : theme.colors.primary,
+                                opacity: isProcessing ? 0.6 : 1,
+                            }}
+                            activeOpacity={0.8}
+                            onPress={() => setShowConfirmDialog(true)}
+                            disabled={isProcessing}
+                        >
+                            {isProcessing || orderLoading ? (
+                                <View className="flex-row items-center gap-2">
+                                    <ActivityIndicator size="small" color="white" />
+                                    <Text className="text-white font-bold text-base">{t.cart.placing_order}</Text>
+                                </View>
+                            ) : (
+                                <View className="flex-row items-center gap-2">
+                                    <Text className="text-white font-bold text-base">{t.cart.confirm_order}</Text>
+                                    <Ionicons name="checkmark-circle" size={20} color="white" />
+                                </View>
+                            )}
+                        </TouchableOpacity>
                     </View>
-            </Modal>
+                </>
+            )}
 
             {/* Save Address Prompt Modal */}
             <Modal visible={showSaveAddressPrompt} transparent animationType="fade" onRequestClose={handleSkipSaving}>
-                <View className="flex-1 justify-center items-center px-6" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
-                    <View className="w-full rounded-2xl p-6" style={{ backgroundColor: theme.colors.card }}>
-                        <View className="items-center mb-4">
-                            <View
-                                className="w-16 h-16 rounded-full items-center justify-center mb-3"
-                                style={{ backgroundColor: theme.colors.primary + '20' }}
-                            >
-                                <Ionicons name="bookmark-outline" size={32} color={theme.colors.primary} />
-                            </View>
-                            <Text className="text-xl font-bold text-center mb-2" style={{ color: theme.colors.text }}>
-                                {t.cart.save_address_title}
-                            </Text>
-                            <Text className="text-center" style={{ color: theme.colors.subtext }}>
-                                {t.cart.save_address_subtitle}
-                            </Text>
-                        </View>
+                <BlurView
+                    intensity={Platform.OS === 'ios' ? 60 : 100}
+                    tint={theme.dark ? 'dark' : 'light'}
+                    experimentalBlurMethod="dimezisBlurView"
+                    className="flex-1 justify-center items-center px-5"
+                >
+                    <View
+                        className="w-full rounded-3xl overflow-hidden"
+                        style={{
+                            backgroundColor: theme.colors.card,
+                            shadowColor: theme.colors.primary,
+                            shadowOffset: { width: 0, height: 8 },
+                            shadowOpacity: 0.15,
+                            shadowRadius: 24,
+                            elevation: 12,
+                        }}
+                    >
+                        {/* Header accent bar */}
+                        <View style={{ height: 3, backgroundColor: theme.colors.primary }} />
 
-                        {pendingLocationToSave && (
-                            <View
-                                className="rounded-xl p-3 mb-4"
-                                style={{ backgroundColor: theme.colors.background }}
-                            >
-                                <View className="flex-row items-start">
-                                    <Ionicons
-                                        name="location"
-                                        size={18}
-                                        color={theme.colors.primary}
-                                        style={{ marginRight: 8, marginTop: 2 }}
-                                    />
-                                    <View className="flex-1">
-                                        <Text className="text-sm" style={{ color: theme.colors.subtext }}>
-                                            {pendingLocationToSave.address}
-                                        </Text>
+                        <View className="p-6">
+                            {/* Top row: title + dismiss */}
+                            <View className="flex-row items-center justify-between mb-4">
+                                <Text className="text-lg font-bold" style={{ color: theme.colors.text }}>
+                                    {t.cart.save_address_title}
+                                </Text>
+                                <TouchableOpacity
+                                    activeOpacity={0.6}
+                                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                    onPress={handleSkipSaving}
+                                    disabled={addingAddress}
+                                >
+                                    <Ionicons name="close" size={22} color={theme.colors.subtext} />
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Address preview — what you're saving */}
+                            {pendingLocationToSave && (
+                                <View
+                                    className="rounded-2xl p-3 mb-5 flex-row items-center"
+                                    style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border }}
+                                >
+                                    <View
+                                        className="w-9 h-9 rounded-xl items-center justify-center mr-3"
+                                        style={{ backgroundColor: theme.colors.primary + '15' }}
+                                    >
+                                        <Ionicons name="location" size={18} color={theme.colors.primary} />
                                     </View>
+                                    <Text className="flex-1 text-sm leading-5" numberOfLines={2} style={{ color: theme.colors.subtext }}>
+                                        {pendingLocationToSave.address}
+                                    </Text>
                                 </View>
-                            </View>
-                        )}
+                            )}
 
-                        {/* Quick Select Buttons */}
-                        <View className="mb-4">
-                            <Text className="text-sm font-semibold mb-2" style={{ color: theme.colors.text }}>
+                            {/* Label section header */}
+                            <Text className="text-xs font-semibold uppercase tracking-wider mb-2.5" style={{ color: theme.colors.subtext }}>
                                 {t.cart.quick_select}
                             </Text>
-                            <View className="flex-row gap-3">
-                                <TouchableOpacity
-                                    className="flex-1 py-3 rounded-xl items-center border-2"
-                                    style={{
-                                        backgroundColor: addressName === 'Home' ? theme.colors.primary + '15' : theme.colors.background,
-                                        borderColor: addressName === 'Home' ? theme.colors.primary : theme.colors.border,
-                                    }}
-                                    onPress={() => setAddressName('Home')}
-                                >
-                                    <View className="flex-row items-center gap-2">
-                                        <Ionicons
-                                            name="home"
-                                            size={20}
-                                            color={addressName === 'Home' ? theme.colors.primary : theme.colors.text}
-                                        />
-                                        <Text
-                                            className="font-semibold"
-                                            style={{ color: addressName === 'Home' ? theme.colors.primary : theme.colors.text }}
-                                        >
-                                            {t.cart.home}
-                                        </Text>
-                                    </View>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    className="flex-1 py-3 rounded-xl items-center border-2"
-                                    style={{
-                                        backgroundColor: addressName === 'Work' ? theme.colors.primary + '15' : theme.colors.background,
-                                        borderColor: addressName === 'Work' ? theme.colors.primary : theme.colors.border,
-                                    }}
-                                    onPress={() => setAddressName('Work')}
-                                >
-                                    <View className="flex-row items-center gap-2">
-                                        <Ionicons
-                                            name="briefcase"
-                                            size={20}
-                                            color={addressName === 'Work' ? theme.colors.primary : theme.colors.text}
-                                        />
-                                        <Text
-                                            className="font-semibold"
-                                            style={{ color: addressName === 'Work' ? theme.colors.primary : theme.colors.text }}
-                                        >
-                                            {t.cart.work}
-                                        </Text>
-                                    </View>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
 
-                        {/* Custom Name Input */}
-                        <View className="mb-4">
-                            <Text className="text-sm font-semibold mb-2" style={{ color: theme.colors.text }}>
-                                {t.cart.custom_name}
-                            </Text>
+                            {/* Home / Work / Custom — single row of chips */}
+                            <View className="flex-row gap-2 mb-4">
+                                {([
+                                    { key: 'Home', icon: 'home', label: t.cart.home },
+                                    { key: 'Work', icon: 'briefcase', label: t.cart.work },
+                                ] as const).map(({ key, icon, label }) => {
+                                    const active = addressName === key;
+                                    return (
+                                        <TouchableOpacity
+                                            key={key}
+                                            activeOpacity={0.7}
+                                            className="flex-row items-center gap-1.5 px-4 py-2.5 rounded-xl"
+                                            style={{
+                                                backgroundColor: active ? theme.colors.primary : theme.colors.background,
+                                                borderWidth: 1.5,
+                                                borderColor: active ? theme.colors.primary : theme.colors.border,
+                                            }}
+                                            onPress={() => setAddressName(key)}
+                                        >
+                                            <Ionicons
+                                                name={active ? icon : `${icon}-outline` as any}
+                                                size={16}
+                                                color={active ? '#fff' : theme.colors.subtext}
+                                            />
+                                            <Text
+                                                className="text-sm font-semibold"
+                                                style={{ color: active ? '#fff' : theme.colors.subtext }}
+                                            >
+                                                {label}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+
+                            {/* Custom name input */}
                             <TextInput
-                                className="rounded-xl px-4 py-3 border-2"
+                                className="rounded-xl px-4 py-3 mb-5 text-sm"
                                 style={{
                                     backgroundColor: theme.colors.background,
+                                    borderWidth: 1.5,
                                     borderColor: addressName && addressName !== 'Home' && addressName !== 'Work' ? theme.colors.primary : theme.colors.border,
                                     color: theme.colors.text,
                                 }}
                                 placeholder={t.cart.custom_name_placeholder}
-                                placeholderTextColor={theme.colors.subtext}
+                                placeholderTextColor={theme.colors.subtext + '80'}
                                 value={addressName !== 'Home' && addressName !== 'Work' ? addressName : ''}
                                 onChangeText={setAddressName}
                                 onFocus={() => {
@@ -1467,37 +1049,40 @@ export const CartScreen = () => {
                                     }
                                 }}
                             />
-                        </View>
 
-                        <View className="gap-3">
-                            <TouchableOpacity
-                                className="py-3 rounded-xl items-center"
-                                style={{
-                                    backgroundColor: addressName.trim() ? theme.colors.primary : theme.colors.border,
-                                    opacity: addressName.trim() ? 1 : 0.5,
-                                }}
-                                onPress={handleSaveAsDefault}
-                                disabled={addingAddress || !addressName.trim()}
-                            >
-                                {addingAddress ? (
-                                    <ActivityIndicator size="small" color="white" />
-                                ) : (
-                                    <Text className="text-white font-semibold">{t.cart.save_as_default}</Text>
-                                )}
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                className="py-3 rounded-xl items-center"
-                                style={{ backgroundColor: theme.colors.border }}
-                                onPress={handleSkipSaving}
-                                disabled={addingAddress}
-                            >
-                                <Text className="font-semibold" style={{ color: theme.colors.text }}>
-                                    {t.cart.skip_save}
-                                </Text>
-                            </TouchableOpacity>
+                            {/* Action buttons */}
+                            <View className="flex-row gap-3">
+                                <TouchableOpacity
+                                    activeOpacity={0.7}
+                                    className="flex-1 py-3.5 rounded-xl items-center"
+                                    style={{ backgroundColor: theme.colors.background, borderWidth: 1.5, borderColor: theme.colors.border }}
+                                    onPress={handleSkipSaving}
+                                    disabled={addingAddress}
+                                >
+                                    <Text className="font-semibold text-sm" style={{ color: theme.colors.subtext }}>
+                                        {t.cart.skip_save}
+                                    </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    activeOpacity={0.8}
+                                    className="flex-1 py-3.5 rounded-xl items-center"
+                                    style={{
+                                        backgroundColor: addressName.trim() ? theme.colors.primary : theme.colors.border,
+                                        opacity: addressName.trim() ? 1 : 0.4,
+                                    }}
+                                    onPress={handleSaveAsDefault}
+                                    disabled={addingAddress || !addressName.trim()}
+                                >
+                                    {addingAddress ? (
+                                        <ActivityIndicator size="small" color="white" />
+                                    ) : (
+                                        <Text className="text-white font-bold text-sm">{t.cart.save_as_default}</Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
                         </View>
                     </View>
-                </View>
+                </BlurView>
             </Modal>
 
             {/* Top-floating notifier (auto-apply success) - rendered last so it overlays everything */}

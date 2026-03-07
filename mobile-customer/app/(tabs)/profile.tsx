@@ -8,8 +8,6 @@ import { GET_ORDERS } from '@/graphql/operations/orders';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { ProfileRow } from '@/components/ProfileRow';
 import { useAuthStore } from '@/store/authStore';
-import { useFavoritesStore } from '@/store/useFavoritesStore';
-import { useBusinesses } from '@/modules/business/hooks/useBusinesses';
 import { useTranslations } from '@/hooks/useTranslations';
 import { DELETE_MY_ACCOUNT_MUTATION } from '@/graphql/operations/auth';
 
@@ -67,10 +65,7 @@ export default function Profile() {
         );
     };
 
-    const favoriteIds = useFavoritesStore((state) => state.favoriteIds);
-    const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
-    const { businesses } = useBusinesses();
-    const { t } = useTranslations();
+    const { t, languageChoice, setLanguageChoice } = useTranslations();
 
     const handleOrderHistoryPress = () => {
         router.push('/orders/history');
@@ -85,125 +80,115 @@ export default function Profile() {
         <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }} edges={['top']}>
             <ScrollView showsVerticalScrollIndicator={false}>
                 {/* Header Section */}
-                <View className="px-4 pt-4 pb-6 flex-row justify-between items-center">
-                    <View>
-                        <Text className="text-4xl font-bold text-white">{t.profile.greeting} {getUserName()}!</Text>
-                    </View>
-                    <View className="flex-row items-center gap-3">
+                <View className="px-5 pt-6 pb-6">
+                    <Text style={{ color: theme.colors.text, fontSize: 32, fontWeight: '700' }}>
+                        Hi {getUserName()}!
+                    </Text>
+                </View>
+
+                {/* Main Actions List */}
+                <View className="mb-6">
+                    <ProfileRow 
+                        title={t.profile.order_history} 
+                        subtitle={ordersSubtitle} 
+                        icon="receipt-outline" 
+                        onPress={handleOrderHistoryPress} 
+                    />
+                    <ProfileRow 
+                        title={t.profile.credits} 
+                        icon="wallet-outline" 
+                        onPress={() => {}} 
+                        showDivider={false}
+                    />
+                </View>
+
+                {/* Language Selection */}
+                <View className="px-5 mb-6">
+                    <Text style={{ color: theme.colors.text, fontSize: 15, fontWeight: '600', marginBottom: 12 }}>
+                        Language / Gjuha
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
                         <TouchableOpacity
+                            onPress={() => setLanguageChoice('en')}
                             style={{
-                                width: 48,
-                                height: 48,
-                                borderRadius: 24,
-                                backgroundColor: theme.colors.primary + '30',
+                                flex: 1,
+                                paddingVertical: 12,
+                                borderRadius: 8,
+                                backgroundColor: 'transparent',
+                                borderWidth: 1.5,
+                                borderColor: languageChoice === 'en' ? '#22C55E' : '#2A2A2A',
                                 alignItems: 'center',
+                                flexDirection: 'row',
                                 justifyContent: 'center',
+                                gap: 6,
                             }}
                         >
-                            <Text className="text-lg font-bold" style={{ color: theme.colors.primary }}>{getInitials()}</Text>
+                            <Text style={{ fontSize: 18 }}>🇬🇧</Text>
+                            <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>
+                                English
+                            </Text>
+                            {languageChoice === 'en' && (
+                                <Ionicons name="checkmark-circle" size={16} color="#22C55E" />
+                            )}
                         </TouchableOpacity>
-                        <TouchableOpacity>
-                            <Ionicons name="chevron-down" size={24} color={theme.colors.subtext} />
+                        <TouchableOpacity
+                            onPress={() => setLanguageChoice('al')}
+                            style={{
+                                flex: 1,
+                                paddingVertical: 12,
+                                borderRadius: 8,
+                                backgroundColor: 'transparent',
+                                borderWidth: 1.5,
+                                borderColor: languageChoice === 'al' ? '#22C55E' : '#2A2A2A',
+                                alignItems: 'center',
+                                flexDirection: 'row',
+                                justifyContent: 'center',
+                                gap: 6,
+                            }}
+                        >
+                            <Text style={{ fontSize: 18 }}>🇦🇱</Text>
+                            <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>
+                                Shqip
+                            </Text>
+                            {languageChoice === 'al' && (
+                                <Ionicons name="checkmark-circle" size={16} color="#22C55E" />
+                            )}
                         </TouchableOpacity>
                     </View>
                 </View>
 
-                {/* Primary Card - Important Actions */}
-                <View className="px-4 mb-6">
-                    <View
-                        className="rounded-2xl overflow-hidden"
-                        style={{
-                            backgroundColor: theme.colors.card,
-                            borderWidth: 1,
-                            borderColor: theme.colors.border,
-                        }}
-                    >
-                        <View className="px-4">
-                            <ProfileRow title={t.profile.order_history} subtitle={ordersSubtitle} onPress={handleOrderHistoryPress} />
-                            <ProfileRow title={t.profile.credits} onPress={() => {}} />
-                            <ProfileRow title={t.profile.buy_gift_card} onPress={() => {}} showDivider={false} />
-                        </View>
-                    </View>
+                {/* Quick Links */}
+                <View className="mb-6">
+                    <ProfileRow title={t.profile.my_addresses} icon="location-outline" onPress={() => router.push('/addresses')} />
+                    <ProfileRow title={t.profile.invite_friends} icon="gift-outline" onPress={() => router.push('/invite-friends')} />
+                    <ProfileRow title={t.profile.redeem_code} icon="ticket-outline" onPress={() => {}} />
+                    <ProfileRow title={t.profile.contact_support} icon="chatbubble-outline" onPress={() => {}} showDivider={false} />
                 </View>
 
-                {/* Favorites Section */}
-                <View className="px-4 mb-8">
-                    <Text className="text-2xl font-bold text-white mb-4">{t.profile.your_favorites}</Text>
-                    {favoriteIds.size === 0 ? (
-                        <View className="flex-row items-center justify-between">
-                            <View className="flex-1 pr-4">
-                                <Text className="text-sm leading-5" style={{ color: theme.colors.subtext }}>
-                                    {t.profile.favorites_empty}
-                                </Text>
-                            </View>
-                            <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: theme.colors.card, alignItems: 'center', justifyContent: 'center' }}>
-                                <Ionicons name="heart-outline" size={36} color={theme.colors.subtext} />
-                            </View>
-                        </View>
-                    ) : (
-                        <View style={{ gap: 8 }}>
-                            {businesses
-                                .filter((b) => favoriteIds.has(b.id))
-                                .map((b) => (
-                                    <View
-                                        key={b.id}
-                                        className="flex-row items-center justify-between px-4 py-3 rounded-xl"
-                                        style={{ backgroundColor: theme.colors.card }}
-                                    >
-                                        <View className="flex-1">
-                                            <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
-                                                {b.name}
-                                            </Text>
-                                            <Text className="text-xs mt-0.5" style={{ color: theme.colors.subtext }}>
-                                                {b.businessType.charAt(0) + b.businessType.slice(1).toLowerCase()}
-                                            </Text>
-                                        </View>
-                                        <TouchableOpacity
-                                            onPress={() => toggleFavorite(b.id)}
-                                            className="ml-3 p-2"
-                                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                                        >
-                                            <Ionicons name="heart" size={22} color="#ef4444" />
-                                        </TouchableOpacity>
-                                    </View>
-                                ))}
-                        </View>
-                    )}
-                </View>
-
-                {/* Quick Links Section */}
-                <View className="px-4 mb-6">
-                    <Text className="text-2xl font-bold text-white mb-4">{t.profile.quick_links}</Text>
-                    <View>
-                        <ProfileRow title={t.profile.invite_friends} icon="gift" onPress={() => router.push('/invite-friends')} />
-                        <ProfileRow title={t.profile.redeem_code} onPress={() => {}} />
-                        <ProfileRow title={t.profile.contact_support} onPress={() => {}} />
-                        <ProfileRow title={t.profile.order_history} onPress={handleOrderHistoryPress} showDivider={false} />
-                    </View>
-                </View>
-
-                {/* Settings Section */}
-                <View className="px-4 mb-8">
-                    <Text className="text-2xl font-bold text-white mb-4">{t.profile.settings}</Text>
-                    <View>
-                        <ProfileRow title={t.profile.my_addresses} icon="location" onPress={() => router.push('/addresses')} />
-                        <ProfileRow
-                            title={t.profile.delete_account}
-                            icon="trash"
-                            onPress={handleDeleteAccount}
-                            showDivider={false}
-                        />
-                    </View>
+                {/* Account Actions */}
+                <View className="mb-6">
+                    <ProfileRow
+                        title={t.profile.delete_account}
+                        icon="trash-outline"
+                        onPress={handleDeleteAccount}
+                        showDivider={false}
+                    />
                 </View>
 
                 {/* Logout Button */}
-                <View className="px-4 pb-8">
+                <View className="px-5 pb-8">
                     <TouchableOpacity
                         onPress={handleLogout}
-                        className="py-4 rounded-xl items-center"
-                        style={{ backgroundColor: theme.colors.expense + '1A' }}
+                        style={{
+                            paddingVertical: 14,
+                            borderRadius: 8,
+                            alignItems: 'center',
+                            backgroundColor: 'transparent',
+                            borderWidth: 1,
+                            borderColor: '#2A2A2A',
+                        }}
                     >
-                        <Text className="text-base font-semibold" style={{ color: theme.colors.expense }}>
+                        <Text style={{ color: theme.colors.text, fontSize: 15, fontWeight: '600' }}>
                             {t.profile.logout}
                         </Text>
                     </TouchableOpacity>

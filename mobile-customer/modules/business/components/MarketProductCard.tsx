@@ -27,6 +27,7 @@ export function MarketProductCard({ product, businessType, onPress, descriptionO
     const discountPercent = hasDiscount
         ? Math.round(((product.price - product.salePrice!) / product.price) * 100)
         : 0;
+    const isSoldOut = !product.isAvailable || product.stock === 0;
 
     return (
         <TouchableOpacity
@@ -70,6 +71,18 @@ export function MarketProductCard({ product, businessType, onPress, descriptionO
                         </Text>
                     </View>
                 )}
+
+                {/* Sold out overlay - like Wolt */}
+                {isSoldOut && (
+                    <View 
+                        className="absolute inset-0 items-center justify-center"
+                        style={{ backgroundColor: 'rgba(255, 255, 255, 0.85)' }}
+                    >
+                        <View className="px-3 py-1.5 rounded-full" style={{ backgroundColor: '#888' }}>
+                            <Text className="text-xs font-bold text-white">SOLD OUT</Text>
+                        </View>
+                    </View>
+                )}
             </View>
 
             <View className="p-3" style={{ minHeight: 116 }}>
@@ -99,12 +112,17 @@ export function MarketProductCard({ product, businessType, onPress, descriptionO
 
                     {quantity === 0 ? (
                         <TouchableOpacity
-                            onPress={addToCart}
+                            onPress={isSoldOut ? undefined : addToCart}
                             className="px-3 py-1.5 rounded-full"
-                            style={{ borderWidth: 1, borderColor: theme.colors.primary }}
-                            activeOpacity={0.8}
+                            style={{ 
+                                borderWidth: 1, 
+                                borderColor: isSoldOut ? theme.colors.subtext : theme.colors.primary,
+                                opacity: isSoldOut ? 0.5 : 1
+                            }}
+                            activeOpacity={isSoldOut ? 1 : 0.8}
+                            disabled={isSoldOut}
                         >
-                            <Text className="text-xs font-semibold" style={{ color: theme.colors.primary }}>
+                            <Text className="text-xs font-semibold" style={{ color: isSoldOut ? theme.colors.subtext : theme.colors.primary }}>
                                 Shto
                             </Text>
                         </TouchableOpacity>
@@ -124,6 +142,7 @@ export function MarketProductCard({ product, businessType, onPress, descriptionO
                                 onPress={incrementQuantity}
                                 className="w-7 h-7 items-center justify-center"
                                 activeOpacity={0.8}
+                                disabled={isSoldOut}
                             >
                                 <Ionicons name="add" size={16} color={theme.colors.primary} />
                             </TouchableOpacity>

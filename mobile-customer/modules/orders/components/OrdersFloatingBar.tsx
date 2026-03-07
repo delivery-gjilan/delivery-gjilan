@@ -49,7 +49,7 @@ export const OrdersFloatingBar = () => {
                 return {
                     label: t.orders.status.out_for_delivery,
                     message: t.orders.status_messages.out_for_delivery,
-                    bgColor: '#8B5CF6', // Purple
+                    bgColor: '#7C3AED', // Purple
                     icon: 'bicycle-outline' as const,
                 };
             case 'CANCELLED':
@@ -82,7 +82,7 @@ export const OrdersFloatingBar = () => {
         <TouchableOpacity
             activeOpacity={0.9}
             onPress={() => router.push(`/orders/${activeOrder.id}`)}
-            className="flex-row items-center justify-between p-4 rounded-2xl shadow-lg elevation-5"
+            className="flex-row items-center justify-between p-4 rounded-2xl"
             style={{ backgroundColor: statusInfo.bgColor }}
         >
             <View className="flex-row items-center space-x-3 gap-3 flex-1">

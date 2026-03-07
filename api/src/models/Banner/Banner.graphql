@@ -1,0 +1,44 @@
+type Banner {
+    id: ID!
+    title: String
+    subtitle: String
+    imageUrl: String!
+    linkType: String
+    linkTarget: String
+    sortOrder: Int!
+    isActive: Boolean!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+}
+
+input CreateBannerInput {
+    title: String
+    subtitle: String
+    imageUrl: String!
+    linkType: String
+    linkTarget: String
+    sortOrder: Int
+    isActive: Boolean
+}
+
+input UpdateBannerInput {
+    title: String
+    subtitle: String
+    imageUrl: String
+    linkType: String
+    linkTarget: String
+    sortOrder: Int
+    isActive: Boolean
+}
+
+extend type Query {
+    getBanners(activeOnly: Boolean): [Banner!]!
+    getBanner(id: ID!): Banner
+}
+
+extend type Mutation {
+    createBanner(input: CreateBannerInput!): Banner!
+    updateBanner(id: ID!, input: UpdateBannerInput!): Banner!
+    deleteBanner(id: ID!): Boolean!
+    updateBannerOrder(bannerId: ID!, newSortOrder: Int!): Banner!
+}

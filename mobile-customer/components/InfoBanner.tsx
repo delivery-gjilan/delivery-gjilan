@@ -16,7 +16,7 @@ const BANNER_STYLES = {
         border: 'border-primary/30',
         text: 'text-primary',
         icon: 'information-circle' as const,
-        iconColor: '#2DD4BF',
+        iconColor: '#7C3AED',
     },
     WARNING: {
         bg: 'bg-amber-500/10',

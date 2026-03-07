@@ -19,7 +19,7 @@ export default function TabLayout() {
                         borderTopColor: theme.colors.border,
                         height: 48 + insets.bottom,
                     },
-                    tabBarActiveTintColor: theme.colors.primary,
+                    tabBarActiveTintColor: theme.colors.text,
                     tabBarInactiveTintColor: theme.colors.subtext,
                 }}
             >
@@ -27,28 +27,28 @@ export default function TabLayout() {
                     name="home"
                     options={{
                         title: t.tabs.discover,
-                        tabBarIcon: ({ color, size }) => <Ionicons name="compass" size={size} color={color} />,
+                        tabBarIcon: ({ color, size }) => <Ionicons name="compass-outline" size={size} color={color} />,
                     }}
                 />
                 <Tabs.Screen
                     name="restaurants"
                     options={{
                         title: t.tabs.restaurants,
-                        tabBarIcon: ({ color, size }) => <Ionicons name="restaurant" size={size} color={color} />,
+                        tabBarIcon: ({ color, size }) => <Ionicons name="restaurant-outline" size={size} color={color} />,
                     }}
                 />
                 <Tabs.Screen
                     name="market"
                     options={{
                         title: t.tabs.shops,
-                        tabBarIcon: ({ color, size }) => <Ionicons name="cart" size={size} color={color} />,
+                        tabBarIcon: ({ color, size }) => <Ionicons name="cart-outline" size={size} color={color} />,
                     }}
                 />
                 <Tabs.Screen
                     name="profile"
                     options={{
                         title: t.tabs.profile,
-                        tabBarIcon: ({ color, size }) => <Ionicons name="person" size={size} color={color} />,
+                        tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" size={size} color={color} />,
                     }}
                 />
                 <Tabs.Screen

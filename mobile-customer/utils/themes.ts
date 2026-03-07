@@ -63,7 +63,7 @@ const SharedFonts = Platform.select({
 export const LightTheme = {
     dark: false,
     colors: {
-        primary: '#2DD4BF',
+        primary: '#7C3AED',
         background: '#F8FAFC',
         foreground: '#000000',
         expense: '#EF4444',
@@ -78,18 +78,20 @@ export const LightTheme = {
 };
 
 export const DarkTheme = {
-    dark: false,
+    dark: true,
     colors: {
-        primary: '#2DD4BF',
-        background: '#0F172A',
-        foreground: '#ffffff',
+        primary: '#7C3AED',
+        primaryDark: '#6D28D9',
+        accent: '#A78BFA',
+        background: '#000000',
+        foreground: '#FFFFFF',
         expense: '#EF4444',
         income: '#22C55E',
-        card: '#1E293B',
-        text: '#F8FAFC',
-        subtext: '#94A3B8',
-        border: '#334155',
-        notification: '#99F6E4',
+        card: '#1A1A1A',
+        text: '#FFFFFF',
+        subtext: '#A1A1AA',
+        border: '#27272A',
+        notification: '#A78BFA',
     },
     fonts: SharedFonts,
 };

@@ -4,6 +4,7 @@ import { Stack } from 'expo-router';
 import '../global.css';
 import { useAppSetup } from '@/hooks/useAppSetup';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ApolloProvider } from '@apollo/client/react';
 import client from '@/lib/graphql/apolloClient';
 import LoadingScreen from '@/components/LoadingScreen';
@@ -47,56 +48,58 @@ function AppContent() {
 
     return (
         <ThemeProvider value={theme}>
-            <SafeAreaProvider>
-                {showBanner && (
-                    <InfoBanner
-                        message={bannerMessage}
-                        type={(bannerType as InfoBannerType) ?? 'INFO'}
-                        onDismiss={() => setBannerDismissed(true)}
-                    />
-                )}
-                <Stack screenOptions={{ headerShown: false }}>
-                    <Stack.Screen name="index" options={{ headerShown: false }} />
-                    <Stack.Screen name="auth-selection" options={{ headerShown: false }} />
-                    <Stack.Screen name="signup" options={{ headerShown: false }} />
-                    <Stack.Screen name="login" options={{ headerShown: false }} />
-                    <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                    <Stack.Screen name="business/[businessId]" options={{ headerShown: false }} />
-                    <Stack.Screen name="product/[productId]" options={{ headerShown: false }} />
-                    <Stack.Screen
-                        name="cart"
-                        options={{
-                            presentation: 'modal',
-                            animation: 'slide_from_bottom',
-                            gestureDirection: 'vertical',
-                            gestureEnabled: true,
-                            headerShown: false,
-                        }}
-                    />
-                    <Stack.Screen
-                        name="orders/active"
-                        options={{
-                            presentation: 'modal',
-                            animation: 'slide_from_bottom',
-                            gestureDirection: 'vertical',
-                            gestureEnabled: true,
-                            headerShown: false,
-                        }}
-                    />
-                    <Stack.Screen
-                        name="orders/[orderId]"
-                        options={{
-                            presentation: 'modal',
-                            animation: 'slide_from_bottom',
-                            gestureDirection: 'vertical',
-                            gestureEnabled: true,
-                            headerShown: false,
-                        }}
-                    />
-                </Stack>
-                <FloatingBars />
-                <ToastContainer />
-            </SafeAreaProvider>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+                <SafeAreaProvider>
+                    {showBanner && (
+                        <InfoBanner
+                            message={bannerMessage}
+                            type={(bannerType as InfoBannerType) ?? 'INFO'}
+                            onDismiss={() => setBannerDismissed(true)}
+                        />
+                    )}
+                    <Stack screenOptions={{ headerShown: false }}>
+                        <Stack.Screen name="index" options={{ headerShown: false }} />
+                        <Stack.Screen name="auth-selection" options={{ headerShown: false }} />
+                        <Stack.Screen name="signup" options={{ headerShown: false }} />
+                        <Stack.Screen name="login" options={{ headerShown: false }} />
+                        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                        <Stack.Screen name="business/[businessId]" options={{ headerShown: false }} />
+                        <Stack.Screen name="product/[productId]" options={{ headerShown: false }} />
+                        <Stack.Screen
+                            name="cart"
+                            options={{
+                                presentation: 'modal',
+                                animation: 'slide_from_bottom',
+                                gestureDirection: 'vertical',
+                                gestureEnabled: true,
+                                headerShown: false,
+                            }}
+                        />
+                        <Stack.Screen
+                            name="orders/active"
+                            options={{
+                                presentation: 'modal',
+                                animation: 'slide_from_bottom',
+                                gestureDirection: 'vertical',
+                                gestureEnabled: true,
+                                headerShown: false,
+                            }}
+                        />
+                        <Stack.Screen
+                            name="orders/[orderId]"
+                            options={{
+                                presentation: 'modal',
+                                animation: 'slide_from_bottom',
+                                gestureDirection: 'vertical',
+                                gestureEnabled: true,
+                                headerShown: false,
+                            }}
+                        />
+                    </Stack>
+                    <FloatingBars />
+                    <ToastContainer />
+                </SafeAreaProvider>
+            </GestureHandlerRootView>
         </ThemeProvider>
     );
 }

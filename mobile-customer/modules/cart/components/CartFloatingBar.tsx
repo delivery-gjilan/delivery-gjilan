@@ -61,8 +61,8 @@ export const CartFloatingBar = () => {
     // Get lighter version of primary color for flash effect
     const getLightColor = (hexColor: string) => {
         // Flash to lighter purple
-        if (theme.dark === false && hexColor === '#8B5CF6') {
-            return '#A78BFA'; // violet-400
+        if (theme.dark === false && hexColor === '#7C3AED') {
+            return '#A78BFA'; // violet-400 (accent color)
         }
         return '#DDD6FE'; // accent for any theme
     };
@@ -81,7 +81,7 @@ export const CartFloatingBar = () => {
             }}
         >
             <Animated.View 
-                className="flex-row items-center justify-between p-4 rounded-2xl shadow-lg elevation-5"
+                className="flex-row items-center justify-between p-4 rounded-2xl"
                 style={{ backgroundColor: backgroundColor }}
             >
                 <View className="flex-row items-center space-x-3 gap-3">
