@@ -1,7 +1,13 @@
 // @ts-nocheck
 import { BusinessRepository } from '@/repositories/BusinessRepository';
 import { BusinessHoursRepository, DbBusinessHours } from '@/repositories/BusinessHoursRepository';
-import { Business, BusinessDayHours, BusinessDayHoursInput, CreateBusinessInput, UpdateBusinessInput } from '@/generated/types.generated';
+import {
+    Business,
+    BusinessDayHours,
+    BusinessDayHoursInput,
+    CreateBusinessInput,
+    UpdateBusinessInput,
+} from '@/generated/types.generated';
 import { businessValidator } from '@/validators/BusinessValidator';
 import { DbBusiness } from '@/database/schema/businesses';
 import { AppError } from '@/lib/errors';
@@ -100,6 +106,12 @@ export class BusinessService {
         const cached = await cache.get<Business[]>(cache.keys.businesses());
         if (cached) return cached;
 
+        try {
+            await this.businessRepository.findAll();
+        } catch (error) {
+            console.error('Error fetching businesses:', error);
+            return [];
+        }
         const allBusinesses = await this.businessRepository.findAll();
         if (allBusinesses.length === 0) return [];
 
