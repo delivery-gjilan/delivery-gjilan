@@ -34,6 +34,7 @@ export async function getDB(): Promise<AnyDb> {
     if (db) return db;
 
     const connectionString = process.env.DB_URL as string;
+    console.log('DATABASE FOUP:', connectionString);
 
     if (isSupabaseUrl(connectionString)) {
         // ── Supabase: postgres.js with prepare:false ─────────────────────────
