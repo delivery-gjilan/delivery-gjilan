@@ -27,13 +27,15 @@ app.use(helmet({ contentSecurityPolicy: false })); // CSP disabled for GraphiQL
 
 // ── CORS ──
 const allowedOrigins = process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
+    ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
     : ['http://localhost:3000', 'http://localhost:8082', 'http://localhost:8083', 'http://localhost:8084'];
 
-app.use(cors({
-    origin: allowedOrigins,
-    credentials: true,
-}));
+app.use(
+    cors({
+        origin: allowedOrigins,
+        credentials: true,
+    }),
+);
 
 // ── Body parsing with size limit ──
 app.use(express.json({ limit: '16kb' }));
@@ -42,7 +44,7 @@ app.use(express.json({ limit: '16kb' }));
 // General API limiter
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 500,                  // 500 requests per window
+    max: 500, // 500 requests per window
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests, please try again later.' },
@@ -51,7 +53,7 @@ const apiLimiter = rateLimit({
 // Stricter limiter for auth-related operations (GraphQL login/signup)
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 20,                   // 20 attempts per window
+    max: 20, // 20 attempts per window
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many authentication attempts, please try again later.' },
@@ -60,7 +62,7 @@ const authLimiter = rateLimit({
 // Upload limiter
 const uploadLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 50,                   // 50 uploads per window
+    max: 50, // 50 uploads per window
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many upload requests, please try again later.' },
@@ -70,7 +72,14 @@ app.use('/graphql', apiLimiter);
 app.use('/api/upload', uploadLimiter);
 
 // Apply stricter auth rate limiting to auth-related GraphQL operations
-const AUTH_OPERATIONS = new Set(['Login', 'InitiateSignup', 'RefreshToken', 'VerifyEmail', 'VerifyPhone', 'ResendEmailVerification']);
+const AUTH_OPERATIONS = new Set([
+    'Login',
+    'InitiateSignup',
+    'RefreshToken',
+    'VerifyEmail',
+    'VerifyPhone',
+    'ResendEmailVerification',
+]);
 app.use('/graphql', (req, res, next) => {
     const operationName = req.body?.operationName;
     if (operationName && AUTH_OPERATIONS.has(operationName)) {
@@ -111,12 +120,15 @@ app.use(yoga.graphqlEndpoint, yoga);
 
 const httpServer = app.listen(port, async () => {
     logger.info({ port }, 'Server started on http://localhost:%d/graphql', port);
-    
+
     // Initialize Firebase Admin SDK for push notifications
     try {
         initializeFirebase();
     } catch (error) {
-        logger.warn({ err: error }, 'Firebase not initialized — push notifications disabled. Set FIREBASE_SERVICE_ACCOUNT_KEY env var.');
+        logger.warn(
+            { err: error },
+            'Firebase not initialized — push notifications disabled. Set FIREBASE_SERVICE_ACCOUNT_KEY env var.',
+        );
     }
 
     // Initialize driver services (heartbeat checker)

@@ -1,0 +1,27 @@
+# ── Dependencies ────────────────────────────────────────────────────────────
+# Railway runs `npm ci` itself
+node_modules/
+
+# ── Secrets ─────────────────────────────────────────────────────────────────
+# All secrets go in Railway env vars, never in files
+.env
+
+# ── Local dev infrastructure ─────────────────────────────────────────────────
+# Railway provides managed Postgres + Redis; docker-compose is local-only
+database/docker-compose.yml
+
+# ── Runtime-generated files ───────────────────────────────────────────────────
+logs/
+
+# ── Build output ─────────────────────────────────────────────────────────────
+# Rebuilt from source during Railway's build step (`npm run build`)
+dist/
+
+# ── Dev tooling ──────────────────────────────────────────────────────────────
+# Not needed at runtime
+.prettierrc
+.prettierignore
+eslint.config.mjs
+codegen.ts
+create-banners-table.js
+scripts/
