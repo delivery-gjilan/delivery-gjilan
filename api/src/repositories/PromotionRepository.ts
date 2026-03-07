@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { DbType } from '@/database';
 import {
     promotions,

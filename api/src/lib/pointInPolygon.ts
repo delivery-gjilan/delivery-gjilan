@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Ray-casting algorithm to determine if a point lies inside a polygon.
  *

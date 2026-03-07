@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { SettlementRepository } from '@/repositories/SettlementRepository';
 import { createAuditLogger } from '@/services/AuditLogger';

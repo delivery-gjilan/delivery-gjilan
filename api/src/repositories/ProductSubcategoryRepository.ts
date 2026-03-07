@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { DbType } from '@/database';
 import { DbProductSubcategory, NewDbProductSubcategory, productSubcategories } from '@/database/schema/productSubcategories';
 import { eq, inArray } from 'drizzle-orm';

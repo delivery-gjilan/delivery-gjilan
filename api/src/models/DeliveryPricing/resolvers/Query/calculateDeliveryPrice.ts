@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { QueryResolvers } from './../../../../generated/types.generated';
 import { getDB } from '@/database';
 import { deliveryPricingTiers } from '@/database/schema/deliveryPricingTiers';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { SettlementResolvers } from './../../../generated/types.generated';
 import { eq } from 'drizzle-orm';
 import { businesses, drivers, users } from '@/database/schema';

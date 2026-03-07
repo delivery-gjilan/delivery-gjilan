@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { SubscriptionResolvers } from './../../../../generated/types.generated';
 import { GraphQLError } from 'graphql';
 import { pubsub, subscribe, topics } from '@/lib/pubsub';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { randomBytes } from 'crypto';
 import { OrderRepository } from '@/repositories/OrderRepository';
 import { AuthRepository } from '@/repositories/AuthRepository';

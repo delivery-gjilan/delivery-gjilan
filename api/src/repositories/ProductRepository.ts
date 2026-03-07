@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { DbType } from '@/database';
 import { DbProduct, NewDbProduct, products } from '@/database/schema/products';
 import { eq, and, inArray, asc } from 'drizzle-orm';

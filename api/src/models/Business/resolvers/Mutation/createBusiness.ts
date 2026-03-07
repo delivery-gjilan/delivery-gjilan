@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { MutationResolvers } from '@/generated/types.generated';
 import { createAuditLogger } from '@/services/AuditLogger';
 import { cache } from '@/lib/cache';

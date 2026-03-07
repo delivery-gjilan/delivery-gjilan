@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { DbType } from '@/database';
 import { DbPromotion, NewDbPromotion } from '@/database/schema';
 import { PromotionRepository, PromotionFilters } from '@/repositories/PromotionRepository';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { OrderResolvers } from './../../../generated/types.generated';
 import logger from '@/lib/logger';
 

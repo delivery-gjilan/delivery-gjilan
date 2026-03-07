@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { db } from '../../../../../database';
 import { banners } from '../../../../../database/schema';

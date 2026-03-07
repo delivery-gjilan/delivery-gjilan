@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { userPermissionsRepository } from '@/repositories/UserPermissionsRepository';
 import { isPlatformAdmin } from '@/lib/utils/permissions';

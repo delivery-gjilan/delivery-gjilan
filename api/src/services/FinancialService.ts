@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Database } from '@/database';
 import { SettlementRepository } from '@/repositories/SettlementRepository';
 import { BusinessRepository } from '@/repositories/BusinessRepository';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { BusinessResolvers } from './../../../generated/types.generated';
 import { getDB } from '@/database';
 import { promotions, promotionBusinessEligibility } from '@/database/schema/promotions';

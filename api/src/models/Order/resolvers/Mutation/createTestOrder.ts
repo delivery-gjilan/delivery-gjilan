@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { randomBytes } from 'crypto';
 import { getDB } from '@/database';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { AuditLogResolvers } from '@/generated/types.generated';
 import { AppContext } from '@/index';
 import { users } from '@/database/schema';

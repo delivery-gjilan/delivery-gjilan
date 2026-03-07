@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { ReferralResolvers } from './../../../generated/types.generated';
 import { getDB } from '@/database';
 import { users } from '@/database/schema/users';

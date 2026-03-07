@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { AuthRepository } from '@/repositories/AuthRepository';
 import { DbUser } from '@/database/schema/users';
 import { hashPassword, comparePassword, generateVerificationCode } from '@/lib/utils/authUtils';

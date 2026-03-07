@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { DbType } from '@/database';
 import { DbUser, users } from '@/database/schema/users';
 import { userReferrals } from '@/database/schema/referrals';

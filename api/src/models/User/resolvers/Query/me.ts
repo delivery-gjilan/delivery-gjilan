@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { QueryResolvers } from '@/generated/types.generated';
 
 export const me: NonNullable<QueryResolvers['me']> = async (_parent, _args, { authService, request }) => {

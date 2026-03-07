@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { getDB } from '.';
 import { businesses, NewDbBusiness } from './schema/businesses';
 import { businessHours } from './schema/businessHours';

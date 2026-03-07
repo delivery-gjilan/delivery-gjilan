@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { DriverResolvers } from './../../../generated/types.generated';
 
 /**

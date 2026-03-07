@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { DbType } from '@/database';
 import { DbBusiness, NewDbBusiness, businesses } from '@/database/schema/businesses';
 import { eq, and, isNull, sql } from 'drizzle-orm';

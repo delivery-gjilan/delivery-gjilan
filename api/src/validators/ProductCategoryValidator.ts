@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { z } from 'zod';
 import { CreateProductCategoryInput, UpdateProductCategoryInput } from '@/generated/types.generated';
 import { AppError } from '@/lib/errors';

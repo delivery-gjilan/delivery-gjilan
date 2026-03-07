@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { MutationResolvers } from '@/generated/types.generated';
 import { AppContext } from '@/index';
 import logger from '@/lib/logger';

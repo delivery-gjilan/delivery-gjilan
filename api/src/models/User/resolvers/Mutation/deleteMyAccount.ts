@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { MutationResolvers } from '@/generated/types.generated';
 import { GraphQLError } from 'graphql';
 

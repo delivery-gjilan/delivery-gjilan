@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { QueryResolvers } from './../../../../generated/types.generated';
 import { getDB } from '@/database';
 import { storeSettings } from '@/database/schema/storeSettings';

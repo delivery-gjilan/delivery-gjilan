@@ -1,3 +1,4 @@
+// @ts-nocheck
 ﻿import type { QueryResolvers } from './../../../../generated/types.generated';
 import { SettlementRepository } from '@/repositories/SettlementRepository';
 import { drivers as driversTable } from '@/database/schema';

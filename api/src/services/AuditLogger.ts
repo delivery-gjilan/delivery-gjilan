@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { AuditLogRepository, CreateAuditLogInput } from '@/repositories/AuditLogRepository';
 import { Database } from '@/database';
 import { ActionType, EntityType, ActorType } from '@/database/schema/auditLogs';

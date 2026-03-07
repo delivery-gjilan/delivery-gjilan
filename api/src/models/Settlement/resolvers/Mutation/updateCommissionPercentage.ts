@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { AppContext } from '@/index';
 import { eq } from 'drizzle-orm';

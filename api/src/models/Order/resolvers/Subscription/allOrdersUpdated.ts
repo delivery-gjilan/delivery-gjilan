@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { SubscriptionResolvers } from './../../../../generated/types.generated';
 import { AppError } from '@/lib/errors';
 

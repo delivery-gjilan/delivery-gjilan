@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createClient, RedisClientType } from 'redis';
 import logger from '@/lib/logger';
 

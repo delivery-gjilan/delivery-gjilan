@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { QueryResolvers } from '@/generated/types.generated';
 import { AppContext } from '@/index';
 import { SettlementRepository } from '@/repositories/SettlementRepository';

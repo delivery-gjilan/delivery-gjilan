@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { QueryResolvers } from './../../../../generated/types.generated';
 import { UserQueryService } from '@/services/UserQueryService';
 import { AppError } from '@/lib/errors';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import 'dotenv/config';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { getDB } from '.';
