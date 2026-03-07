@@ -2,16 +2,22 @@ CREATE TYPE "public"."action_type" AS ENUM('USER_CREATED', 'USER_UPDATED', 'USER
 CREATE TYPE "public"."actor_type" AS ENUM('ADMIN', 'BUSINESS', 'DRIVER', 'CUSTOMER', 'SYSTEM');--> statement-breakpoint
 CREATE TYPE "public"."entity_type" AS ENUM('USER', 'BUSINESS', 'PRODUCT', 'ORDER', 'SETTLEMENT', 'DRIVER', 'CATEGORY', 'SUBCATEGORY', 'DELIVERY_ZONE');--> statement-breakpoint
 CREATE TYPE "public"."business_type" AS ENUM('MARKET', 'PHARMACY', 'RESTAURANT');--> statement-breakpoint
+CREATE TYPE "public"."device_app_type" AS ENUM('CUSTOMER', 'DRIVER');--> statement-breakpoint
+CREATE TYPE "public"."device_platform" AS ENUM('IOS', 'ANDROID');--> statement-breakpoint
 CREATE TYPE "public"."driver_connection_status" AS ENUM('CONNECTED', 'STALE', 'LOST', 'DISCONNECTED');--> statement-breakpoint
-CREATE TYPE "public"."order_status" AS ENUM('PENDING', 'ACCEPTED', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED');--> statement-breakpoint
+CREATE TYPE "public"."order_status" AS ENUM('PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED');--> statement-breakpoint
 CREATE TYPE "public"."signup_step" AS ENUM('INITIAL', 'EMAIL_SENT', 'EMAIL_VERIFIED', 'PHONE_SENT', 'COMPLETED');--> statement-breakpoint
-CREATE TYPE "public"."user_role" AS ENUM('CUSTOMER', 'DRIVER', 'SUPER_ADMIN', 'BUSINESS_ADMIN');--> statement-breakpoint
+CREATE TYPE "public"."user_role" AS ENUM('CUSTOMER', 'DRIVER', 'SUPER_ADMIN', 'ADMIN', 'BUSINESS_OWNER', 'BUSINESS_EMPLOYEE');--> statement-breakpoint
+CREATE TYPE "public"."user_permission" AS ENUM('view_orders', 'manage_orders', 'view_products', 'manage_products', 'view_finances', 'manage_settings', 'view_analytics');--> statement-breakpoint
 CREATE TYPE "public"."settlement_status" AS ENUM('PENDING', 'PAID', 'OVERDUE');--> statement-breakpoint
 CREATE TYPE "public"."settlement_type" AS ENUM('DRIVER_PAYMENT', 'BUSINESS_PAYMENT');--> statement-breakpoint
 CREATE TYPE "public"."promotion_target" AS ENUM('ALL_USERS', 'SPECIFIC_USERS', 'FIRST_ORDER', 'CONDITIONAL');--> statement-breakpoint
 CREATE TYPE "public"."promotion_type" AS ENUM('FIXED_AMOUNT', 'PERCENTAGE', 'FREE_DELIVERY', 'WALLET_CREDIT');--> statement-breakpoint
 CREATE TYPE "public"."wallet_transaction_type" AS ENUM('CREDIT', 'DEBIT', 'REFUND', 'REFERRAL_REWARD', 'ADMIN_ADJUSTMENT', 'PROMOTION', 'EXPIRATION');--> statement-breakpoint
 CREATE TYPE "public"."promotion_applies_to" AS ENUM('PRICE', 'DELIVERY');--> statement-breakpoint
+CREATE TYPE "public"."referral_status" AS ENUM('PENDING', 'COMPLETED', 'EXPIRED');--> statement-breakpoint
+CREATE TYPE "public"."campaign_status" AS ENUM('DRAFT', 'SENDING', 'SENT', 'FAILED');--> statement-breakpoint
+CREATE TYPE "public"."notification_type" AS ENUM('ORDER_STATUS', 'ORDER_ASSIGNED', 'PROMOTIONAL', 'ADMIN_ALERT');--> statement-breakpoint
 CREATE TABLE "audit_logs" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"actor_id" uuid,
@@ -25,9 +31,23 @@ CREATE TABLE "audit_logs" (
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "banners" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"title" text,
+	"subtitle" text,
+	"image_url" text NOT NULL,
+	"link_type" text,
+	"link_target" text,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"is_active" boolean DEFAULT true NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "businesses" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" varchar(255) NOT NULL,
+	"description" varchar(500),
 	"phone_number" varchar(32),
 	"image_url" varchar(500),
 	"business_type" "business_type" NOT NULL,
@@ -40,6 +60,50 @@ CREATE TABLE "businesses" (
 	"avg_prep_time_minutes" integer DEFAULT 20 NOT NULL,
 	"prep_time_override_minutes" integer,
 	"commission_percentage" numeric(5, 2) DEFAULT '0' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	"deleted_at" timestamp with time zone
+);
+--> statement-breakpoint
+CREATE TABLE "business_hours" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"business_id" uuid NOT NULL,
+	"day_of_week" integer NOT NULL,
+	"opens_at" integer NOT NULL,
+	"closes_at" integer NOT NULL,
+	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	CONSTRAINT "uq_business_day_open" UNIQUE("business_id","day_of_week","opens_at")
+);
+--> statement-breakpoint
+CREATE TABLE "delivery_pricing_tiers" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"min_distance_km" numeric(6, 2) NOT NULL,
+	"max_distance_km" numeric(6, 2),
+	"price" numeric(10, 2) NOT NULL,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"is_active" boolean DEFAULT true NOT NULL,
+	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "delivery_zones" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"name" text NOT NULL,
+	"polygon" jsonb NOT NULL,
+	"delivery_fee" numeric(10, 2) NOT NULL,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"is_active" boolean DEFAULT true NOT NULL,
+	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "device_tokens" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"user_id" uuid NOT NULL,
+	"token" text NOT NULL,
+	"platform" "device_platform" NOT NULL,
+	"device_id" text NOT NULL,
+	"app_type" "device_app_type" NOT NULL,
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -55,6 +119,7 @@ CREATE TABLE "drivers" (
 	"online_preference" boolean DEFAULT false NOT NULL,
 	"connection_status" "driver_connection_status" DEFAULT 'DISCONNECTED' NOT NULL,
 	"commission_percentage" numeric(5, 2) DEFAULT '0' NOT NULL,
+	"max_active_orders" numeric(3, 0) DEFAULT '2' NOT NULL,
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	CONSTRAINT "drivers_user_id_unique" UNIQUE("user_id")
@@ -62,6 +127,7 @@ CREATE TABLE "drivers" (
 --> statement-breakpoint
 CREATE TABLE "orders" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"display_id" varchar(10) NOT NULL,
 	"user_id" uuid NOT NULL,
 	"driver_id" uuid,
 	"price" numeric(10, 2) NOT NULL,
@@ -72,6 +138,13 @@ CREATE TABLE "orders" (
 	"dropoff_lat" double precision NOT NULL,
 	"dropoff_lng" double precision NOT NULL,
 	"dropoff_address" varchar(500) NOT NULL,
+	"driver_notes" varchar(500),
+	"preparation_minutes" integer,
+	"estimated_ready_at" timestamp with time zone,
+	"preparing_at" timestamp with time zone,
+	"ready_at" timestamp with time zone,
+	"out_for_delivery_at" timestamp with time zone,
+	"delivered_at" timestamp with time zone,
 	"order_date" timestamp DEFAULT now(),
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -82,6 +155,7 @@ CREATE TABLE "order_items" (
 	"product_id" uuid NOT NULL,
 	"price" numeric(10, 2) NOT NULL,
 	"quantity" integer NOT NULL,
+	"notes" varchar(500),
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	CONSTRAINT "order_items_order_id_product_id_pk" PRIMARY KEY("order_id","product_id")
@@ -139,9 +213,19 @@ CREATE TABLE "users" (
 	"admin_note" text,
 	"flag_color" text DEFAULT 'yellow',
 	"image_url" text,
+	"referral_code" text,
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-	CONSTRAINT "users_email_unique" UNIQUE("email")
+	"deleted_at" timestamp with time zone,
+	CONSTRAINT "users_email_unique" UNIQUE("email"),
+	CONSTRAINT "users_referral_code_unique" UNIQUE("referral_code")
+);
+--> statement-breakpoint
+CREATE TABLE "user_permissions" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"user_id" uuid NOT NULL,
+	"permission" "user_permission" NOT NULL,
+	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "settlements" (
@@ -296,6 +380,56 @@ CREATE TABLE "user_address" (
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "store_settings" (
+	"id" text PRIMARY KEY DEFAULT 'default' NOT NULL,
+	"is_store_closed" boolean DEFAULT false NOT NULL,
+	"closed_message" text DEFAULT 'We are too busy at the moment. Please come back later!',
+	"banner_enabled" boolean DEFAULT false NOT NULL,
+	"banner_message" text,
+	"banner_type" text DEFAULT 'info' NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "user_referrals" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"referrer_user_id" uuid NOT NULL,
+	"referred_user_id" uuid,
+	"referral_code" text NOT NULL,
+	"status" "referral_status" DEFAULT 'PENDING' NOT NULL,
+	"reward_given" boolean DEFAULT false NOT NULL,
+	"reward_amount" numeric(10, 2),
+	"completed_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	CONSTRAINT "user_referrals_referral_code_unique" UNIQUE("referral_code")
+);
+--> statement-breakpoint
+CREATE TABLE "notification_campaigns" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"title" text NOT NULL,
+	"body" text NOT NULL,
+	"data" jsonb,
+	"query" jsonb,
+	"target_count" integer DEFAULT 0 NOT NULL,
+	"sent_count" integer DEFAULT 0 NOT NULL,
+	"failed_count" integer DEFAULT 0 NOT NULL,
+	"status" "campaign_status" DEFAULT 'DRAFT' NOT NULL,
+	"sent_by" uuid,
+	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	"sent_at" timestamp with time zone
+);
+--> statement-breakpoint
+CREATE TABLE "notifications" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"user_id" uuid,
+	"title" text NOT NULL,
+	"body" text NOT NULL,
+	"data" jsonb,
+	"type" "notification_type" NOT NULL,
+	"campaign_id" uuid,
+	"sent_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "promotion_redemptions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"promotion_id" uuid NOT NULL,
@@ -308,6 +442,8 @@ CREATE TABLE "promotion_redemptions" (
 );
 --> statement-breakpoint
 ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_actor_id_users_id_fk" FOREIGN KEY ("actor_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "business_hours" ADD CONSTRAINT "business_hours_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "device_tokens" ADD CONSTRAINT "device_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "drivers" ADD CONSTRAINT "drivers_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "orders" ADD CONSTRAINT "orders_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "orders" ADD CONSTRAINT "orders_driver_id_users_id_fk" FOREIGN KEY ("driver_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -319,6 +455,7 @@ ALTER TABLE "products" ADD CONSTRAINT "products_subcategory_id_product_subcatego
 ALTER TABLE "product_categories" ADD CONSTRAINT "product_categories_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "product_subcategories" ADD CONSTRAINT "product_subcategories_category_id_product_categories_id_fk" FOREIGN KEY ("category_id") REFERENCES "public"."product_categories"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "users" ADD CONSTRAINT "users_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "user_permissions" ADD CONSTRAINT "user_permissions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "settlements" ADD CONSTRAINT "settlements_driver_id_drivers_id_fk" FOREIGN KEY ("driver_id") REFERENCES "public"."drivers"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "settlements" ADD CONSTRAINT "settlements_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "settlements" ADD CONSTRAINT "settlements_order_id_orders_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -343,10 +480,35 @@ ALTER TABLE "product_stocks" ADD CONSTRAINT "product_stocks_product_id_products_
 ALTER TABLE "order_promotions" ADD CONSTRAINT "order_promotions_order_id_orders_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order_promotions" ADD CONSTRAINT "order_promotions_promotion_id_promotions_id_fk" FOREIGN KEY ("promotion_id") REFERENCES "public"."promotions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_address" ADD CONSTRAINT "user_address_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "user_referrals" ADD CONSTRAINT "user_referrals_referrer_user_id_users_id_fk" FOREIGN KEY ("referrer_user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "user_referrals" ADD CONSTRAINT "user_referrals_referred_user_id_users_id_fk" FOREIGN KEY ("referred_user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "notification_campaigns" ADD CONSTRAINT "notification_campaigns_sent_by_users_id_fk" FOREIGN KEY ("sent_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "notifications" ADD CONSTRAINT "notifications_campaign_id_notification_campaigns_id_fk" FOREIGN KEY ("campaign_id") REFERENCES "public"."notification_campaigns"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "promotion_redemptions" ADD CONSTRAINT "promotion_redemptions_promotion_id_promotions_id_fk" FOREIGN KEY ("promotion_id") REFERENCES "public"."promotions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "promotion_redemptions" ADD CONSTRAINT "promotion_redemptions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "promotion_redemptions" ADD CONSTRAINT "promotion_redemptions_order_id_orders_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "promotion_redemptions" ADD CONSTRAINT "promotion_redemptions_referrer_user_id_users_id_fk" FOREIGN KEY ("referrer_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "idx_audit_logs_actor_id" ON "audit_logs" USING btree ("actor_id");--> statement-breakpoint
+CREATE INDEX "idx_audit_logs_entity" ON "audit_logs" USING btree ("entity_type","entity_id");--> statement-breakpoint
+CREATE INDEX "idx_audit_logs_created_at" ON "audit_logs" USING btree ("created_at");--> statement-breakpoint
+CREATE UNIQUE INDEX "device_tokens_user_device_idx" ON "device_tokens" USING btree ("user_id","device_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "device_tokens_token_idx" ON "device_tokens" USING btree ("token");--> statement-breakpoint
+CREATE INDEX "idx_orders_user_id" ON "orders" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "idx_orders_driver_id" ON "orders" USING btree ("driver_id");--> statement-breakpoint
+CREATE INDEX "idx_orders_status" ON "orders" USING btree ("status");--> statement-breakpoint
+CREATE INDEX "idx_orders_status_created" ON "orders" USING btree ("status","created_at");--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_orders_display_id" ON "orders" USING btree ("display_id");--> statement-breakpoint
+CREATE INDEX "idx_order_items_product_id" ON "order_items" USING btree ("product_id");--> statement-breakpoint
+CREATE INDEX "idx_products_business_id" ON "products" USING btree ("business_id");--> statement-breakpoint
+CREATE INDEX "idx_products_category_id" ON "products" USING btree ("category_id");--> statement-breakpoint
+CREATE INDEX "idx_product_categories_business_id" ON "product_categories" USING btree ("business_id");--> statement-breakpoint
+CREATE INDEX "idx_product_subcategories_category_id" ON "product_subcategories" USING btree ("category_id");--> statement-breakpoint
+CREATE INDEX "idx_user_permissions_user_id" ON "user_permissions" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "idx_settlements_order_id" ON "settlements" USING btree ("order_id");--> statement-breakpoint
+CREATE INDEX "idx_settlements_driver_id" ON "settlements" USING btree ("driver_id");--> statement-breakpoint
+CREATE INDEX "idx_settlements_business_id" ON "settlements" USING btree ("business_id");--> statement-breakpoint
+CREATE INDEX "idx_settlements_status" ON "settlements" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "idx_promo_business" ON "promotion_business_eligibility" USING btree ("promotion_id","business_id");--> statement-breakpoint
 CREATE INDEX "idx_promotion_usage_promo" ON "promotion_usage" USING btree ("promotion_id");--> statement-breakpoint
 CREATE INDEX "idx_promotion_usage_user" ON "promotion_usage" USING btree ("user_id");--> statement-breakpoint
@@ -361,4 +523,8 @@ CREATE INDEX "idx_user_promotions_active" ON "user_promotions" USING btree ("use
 CREATE INDEX "idx_user_wallet_user" ON "user_wallet" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "idx_wallet_transactions_wallet" ON "wallet_transactions" USING btree ("wallet_id");--> statement-breakpoint
 CREATE INDEX "idx_wallet_transactions_user" ON "wallet_transactions" USING btree ("user_id");--> statement-breakpoint
-CREATE INDEX "idx_wallet_transactions_type" ON "wallet_transactions" USING btree ("type");
+CREATE INDEX "idx_wallet_transactions_type" ON "wallet_transactions" USING btree ("type");--> statement-breakpoint
+CREATE INDEX "idx_product_stocks_product_id" ON "product_stocks" USING btree ("product_id");--> statement-breakpoint
+CREATE INDEX "idx_order_promotions_order_id" ON "order_promotions" USING btree ("order_id");--> statement-breakpoint
+CREATE INDEX "idx_user_address_user_id" ON "user_address" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "idx_notifications_user_id" ON "notifications" USING btree ("user_id");
