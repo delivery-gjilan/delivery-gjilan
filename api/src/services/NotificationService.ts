@@ -1,9 +1,19 @@
-import { getMessaging } from '@/lib/firebase';
+import { getMessaging, getFirebaseApp } from '@/lib/firebase';
 import { NotificationRepository } from '@/repositories/NotificationRepository';
 import { NotificationType } from '@/database/schema/notifications';
 import { DeviceAppType, DevicePlatform } from '@/database/schema/deviceTokens';
 import logger from '@/lib/logger';
 import type { Message, MulticastMessage } from 'firebase-admin/messaging';
+
+/** Returns true only if Firebase was successfully initialized at startup. */
+function isFirebaseReady(): boolean {
+    try {
+        getFirebaseApp();
+        return true;
+    } catch {
+        return false;
+    }
+}
 
 export interface NotificationPayload {
     title: string;
@@ -112,6 +122,10 @@ export class NotificationService {
     // ────────────────────────────────────────────────────────────────
 
     async sendToTopic(topic: string, payload: NotificationPayload): Promise<string> {
+        if (!isFirebaseReady()) {
+            logger.warn({ topic }, 'Firebase not initialized — skipping sendToTopic');
+            return '';
+        }
         const messaging = getMessaging();
         const message: Message = {
             topic,
@@ -150,6 +164,11 @@ export class NotificationService {
 
     private async sendMulticast(tokens: string[], payload: NotificationPayload): Promise<SendResult> {
         if (tokens.length === 0) return { successCount: 0, failureCount: 0, staleTokens: [] };
+
+        if (!isFirebaseReady()) {
+            logger.warn('Firebase not initialized — skipping push notification delivery');
+            return { successCount: 0, failureCount: 0, staleTokens: [] };
+        }
 
         const messaging = getMessaging();
 

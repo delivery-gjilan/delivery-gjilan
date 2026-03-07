@@ -16,18 +16,22 @@ interface UploadResult {
 }
 
 class S3Service {
-    private s3Client: S3Client;
+    private s3Client: S3Client | null = null;
     private bucketName: string;
     private region: string;
+    private configured: boolean;
 
     constructor() {
         this.region = process.env.AWS_REGION || 'eu-north-1';
         this.bucketName = process.env.AWS_BUCKET || '';
 
         if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
-            throw new Error('AWS credentials not configured');
+            log.warn('AWS credentials not configured — image upload/delete disabled');
+            this.configured = false;
+            return;
         }
 
+        this.configured = true;
         this.s3Client = new S3Client({
             region: this.region,
             credentials: {
@@ -41,6 +45,9 @@ class S3Service {
      * Upload a file to S3
      */
     async uploadFile(options: UploadOptions): Promise<UploadResult> {
+        if (!this.configured || !this.s3Client) {
+            return { success: false, error: 'Image upload is not configured (missing AWS credentials)' };
+        }
         try {
             const { folder, file } = options;
 
@@ -81,6 +88,10 @@ class S3Service {
      * Delete a file from S3
      */
     async deleteFile(imageUrl: string): Promise<boolean> {
+        if (!this.configured || !this.s3Client) {
+            log.warn('S3 not configured — skipping delete');
+            return false;
+        }
         try {
             // Extract key from URL
             // Format: https://bucket.s3.region.amazonaws.com/folder/filename.ext
