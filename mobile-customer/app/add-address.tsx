@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, StyleSheet, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -193,10 +193,11 @@ export default function AddEditAddressScreen() {
 
             <View className="flex-1">
                 {/* Map */}
-                <View style={{ height: '50%', position: 'relative' }}>
+                <View style={{ height: 350, position: 'relative' }}>
                     <MapView
                         ref={mapRef}
-                        style={{ flex: 1 }}
+                        style={StyleSheet.absoluteFillObject}
+                        initialRegion={mapRegion}
                         region={mapRegion}
                         onRegionChangeComplete={setMapRegion}
                         onPress={handleMapPress}

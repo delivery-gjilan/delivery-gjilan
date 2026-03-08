@@ -26,7 +26,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { calculateHaversineDistance } from '@/utils/haversine';
 import { fetchRoute } from '@/utils/route';
-import MapView, { Marker, Polyline, Region, PROVIDER_GOOGLE } from 'react-native-maps';
+import { MapView, Marker, Polyline } from '@/components/MapWrapper';
+import type { Region } from '@/components/MapWrapper';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -913,9 +914,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                     <MapView
                         ref={mapRef}
                         style={{ flex: 1 }}
-                        provider={PROVIDER_GOOGLE}
                         initialRegion={defaultRegion}
-                        customMapStyle={(theme.dark ? darkMapStyle : lightMapStyle) as any}
                         showsUserLocation={false}
                         showsMyLocationButton={false}
                         showsCompass={false}

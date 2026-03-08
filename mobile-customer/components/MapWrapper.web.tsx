@@ -24,6 +24,7 @@ export const MapView = React.forwardRef(({ style, children, ...props }: any, ref
 MapView.displayName = 'MapViewWebStub';
 
 export const Marker = (_props: any) => null;
+export const Polyline = (_props: any) => null;
 
 export type Region = {
     latitude: number;

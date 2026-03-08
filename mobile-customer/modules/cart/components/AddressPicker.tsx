@@ -6,7 +6,8 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, Region, PROVIDER_GOOGLE } from 'react-native-maps';
+import { MapView, Marker } from '@/components/MapWrapper';
+import type { Region } from '@/components/MapWrapper';
 import * as Location from 'expo-location';
 import Animated, {
     useSharedValue, useAnimatedStyle, withTiming,
@@ -407,10 +408,8 @@ export default function AddressPicker({
                     <MapView
                         ref={mapRef}
                         style={StyleSheet.absoluteFill}
-                        provider={PROVIDER_GOOGLE}
                         initialRegion={mapRegion}
                         onPress={handleMapPress}
-                        customMapStyle={(theme.dark ? darkMapStyle : lightMapStyle) as any}
                         showsUserLocation
                         showsMyLocationButton={false}
                         showsCompass={false}

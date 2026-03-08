@@ -19,6 +19,8 @@
     "android": {
       "permissions": [
         "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
       ],
       "adaptiveIcon": {
@@ -76,6 +78,12 @@
       "eas": {
         "projectId": "e5c04b16-6851-4fce-aa03-e4a183f0becf"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e5c04b16-6851-4fce-aa03-e4a183f0becf"
     }
   }
 }
