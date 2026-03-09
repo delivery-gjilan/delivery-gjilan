@@ -9,6 +9,7 @@ import { useQuery, useMutation } from '@apollo/client/react';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { GET_MY_REFERRAL_STATS, GENERATE_REFERRAL_CODE } from '@/graphql/operations/referrals';
+import { toast } from '@/store/toastStore';
 
 export default function InviteFriendsScreen() {
     const router = useRouter();
@@ -25,7 +26,7 @@ export default function InviteFriendsScreen() {
             refetch();
         },
         onError: (error) => {
-            Alert.alert(t.common.error, error.message);
+            toast.error(t.common.error, error.message);
         },
     });
 
@@ -42,7 +43,7 @@ export default function InviteFriendsScreen() {
 
     const handleCopyLink = async () => {
         await Clipboard.setStringAsync(referralLink);
-        Alert.alert(t.invite.copied, t.invite.link_copied);
+        toast.success(t.invite.copied, t.invite.link_copied);
     };
 
     const handleShare = async () => {

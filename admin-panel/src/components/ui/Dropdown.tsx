@@ -28,7 +28,9 @@ export default function Dropdown({
     placeholder = "Select...",
 }: DropdownProps) {
     const [isOpen, setIsOpen] = useState(false);
+    const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
     const ref = useRef<HTMLDivElement>(null);
+    const buttonRef = useRef<HTMLButtonElement>(null);
 
     const selectedOption = options.find((o) => o.value === value);
 
@@ -42,9 +44,21 @@ export default function Dropdown({
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
+    useEffect(() => {
+        if (isOpen && buttonRef.current) {
+            const rect = buttonRef.current.getBoundingClientRect();
+            setPosition({
+                top: rect.bottom + window.scrollY + 4,
+                left: rect.left + window.scrollX,
+                width: rect.width,
+            });
+        }
+    }, [isOpen]);
+
     return (
         <div ref={ref} className={`relative ${className}`}>
             <button
+                ref={buttonRef}
                 type="button"
                 onClick={() => !disabled && setIsOpen(!isOpen)}
                 disabled={disabled}
@@ -67,7 +81,15 @@ export default function Dropdown({
             </button>
 
             {isOpen && (
-                <div className="absolute z-50 mt-1 w-full min-w-[180px] bg-[#111113] border border-zinc-800 rounded-lg shadow-xl shadow-black/50 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-100">
+                <div 
+                    className="fixed z-[100] bg-[#111113] border border-zinc-800 rounded-lg shadow-xl shadow-black/50 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-100"
+                    style={{
+                        top: `${position.top}px`,
+                        left: `${position.left}px`,
+                        width: position.width ? `${position.width}px` : '180px',
+                        minWidth: '180px',
+                    }}
+                >
                     <div className="max-h-60 overflow-y-auto py-1">
                         {options.map((option) => (
                             <button

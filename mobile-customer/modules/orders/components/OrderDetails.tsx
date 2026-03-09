@@ -26,40 +26,41 @@ import Animated, {
 } from 'react-native-reanimated';
 import { calculateHaversineDistance } from '@/utils/haversine';
 import { fetchRoute } from '@/utils/route';
-import { MapView, Marker, Polyline } from '@/components/MapWrapper';
-import type { Region } from '@/components/MapWrapper';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Component, type ReactNode, type ErrorInfo } from 'react';
+
+// Lazy-load MapLibreGL to prevent crash if native module has issues
+let MapLibreGL: any = null;
+try {
+    MapLibreGL = require('@/components/MapWrapper').MapLibreGL;
+} catch (e) {
+    console.warn('[OrderDetails] Failed to load MapWrapper:', e);
+}
+
+// ─── Map Error Boundary ─────────────────────────────────────
+class MapErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
+    state = { hasError: false };
+    static getDerivedStateFromError() { return { hasError: true }; }
+    componentDidCatch(error: Error, info: ErrorInfo) {
+        console.error('[MapErrorBoundary] Map crashed:', error, info);
+    }
+    render() {
+        if (this.state.hasError || !MapLibreGL) return this.props.fallback;
+        return this.props.children;
+    }
+}
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// ─── Map Styles ─────────────────────────────────────────────
-const darkMapStyle = [
-    { elementType: 'geometry', stylers: [{ color: '#1A1A22' }] },
-    { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-    { elementType: 'labels.text.fill', stylers: [{ color: '#A1A1AA' }] },
-    { elementType: 'labels.text.stroke', stylers: [{ color: '#0F0F14' }] },
-    { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#27272A' }] },
-    { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#27272A' }] },
-    { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#1A1A22' }] },
-    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#3f3f46' }] },
-    { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0F0F14' }] },
-];
+// ─── Mapbox Style ──────────────────────────────────────────
+const MAPBOX_STYLE = 'mapbox://styles/mapbox/dark-v11';
 
-const lightMapStyle = [
-    { elementType: 'geometry', stylers: [{ color: '#f8fafc' }] },
-    { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-    { elementType: 'labels.text.fill', stylers: [{ color: '#64748B' }] },
-    { elementType: 'labels.text.stroke', stylers: [{ color: '#ffffff' }] },
-    { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
-    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#e2e8f0' }] },
-    { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#dbeafe' }] },
-    { featureType: 'administrative.neighborhood', stylers: [{ visibility: 'off' }] },
-];
+// ─── Gjilan City Bounds ─────────────────────────────────────
+const GJILAN_BOUNDS = {
+    ne: [21.54, 42.52] as [number, number], // northeast (wider for tile rendering)
+    sw: [21.40, 42.40] as [number, number], // southwest
+};
 
 // ─── Helper Functions ───────────────────────────────────────
 const formatOrderDate = (value?: string | null) => {
@@ -101,110 +102,39 @@ const STATUS_STEP_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
     DELIVERED: 'checkmark-done-circle',
 };
 
-// ─── Pulsing Marker ─────────────────────────────────────────
-const PulsingMarker = ({ color, icon, label }: {
-    color: string;
-    icon: keyof typeof Ionicons.glyphMap;
-    label?: string;
-}) => {
-    const pulse = useSharedValue(1);
-
-    useEffect(() => {
-        pulse.value = withRepeat(
-            withSequence(
-                withTiming(1.3, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
-                withTiming(1, { duration: 1000, easing: Easing.inOut(Easing.ease) })
-            ),
-            -1, true
-        );
-    }, []);
-
-    const pulseStyle = useAnimatedStyle(() => ({
-        transform: [{ scale: pulse.value }],
-        opacity: 2 - pulse.value,
-    }) as any);
-
-    return (
-        <View style={{ alignItems: 'center' }}>
-            {label && (
-                <View style={{
-                    backgroundColor: color, borderRadius: 12,
-                    paddingHorizontal: 8, paddingVertical: 3, marginBottom: 4,
-                }}>
-                    <Text style={{ color: 'white', fontSize: 10, fontWeight: '700' }} numberOfLines={1}>{label}</Text>
-                </View>
-            )}
-            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-                <Animated.View style={[pulseStyle, {
-                    position: 'absolute', width: 60, height: 60, borderRadius: 30,
-                    backgroundColor: color + '25',
-                }]} />
-                <View style={{
-                    width: 44, height: 44, borderRadius: 22, backgroundColor: color,
-                    alignItems: 'center', justifyContent: 'center',
-                    shadowColor: color, shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
-                }}>
-                    <Ionicons name={icon} size={22} color="white" />
-                </View>
-            </View>
+// ─── Pin Markers ────────────────────────────────────────────
+// Purple pin for business & driver (matches app theme)
+const PurplePin = ({ icon, size = 28 }: { icon: keyof typeof Ionicons.glyphMap; size?: number }) => (
+    <View style={{ alignItems: 'center' }}>
+        <View style={{
+            width: size, height: size, borderRadius: size / 2,
+            backgroundColor: '#7C3AED',
+            alignItems: 'center', justifyContent: 'center',
+            shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.4, shadowRadius: 6, elevation: 5,
+        }}>
+            <Ionicons name={icon} size={size * 0.45} color="white" />
         </View>
-    );
-};
+        <View style={{ width: 2, height: 8, backgroundColor: '#7C3AED', marginTop: -1 }} />
+        <View style={{ width: 8, height: 3, borderRadius: 4, backgroundColor: '#00000020', marginTop: 1 }} />
+    </View>
+);
 
-// ─── Driver Marker ──────────────────────────────────────────
-const DriverMarker = ({ imageUrl }: { imageUrl?: string | null }) => {
-    const bob = useSharedValue(0);
-
-    useEffect(() => {
-        bob.value = withRepeat(
-            withSequence(
-                withTiming(-4, { duration: 600, easing: Easing.inOut(Easing.ease) }),
-                withTiming(0, { duration: 600, easing: Easing.inOut(Easing.ease) })
-            ),
-            -1, true
-        );
-    }, []);
-
-    const bobStyle = useAnimatedStyle(() => ({
-        transform: [{ translateY: bob.value }],
-    }) as any);
-
-    return (
-        <Animated.View style={bobStyle}>
-            <View style={{
-                width: 48, height: 48, borderRadius: 24, backgroundColor: '#7C3AED',
-                alignItems: 'center', justifyContent: 'center',
-                borderWidth: 3, borderColor: 'white',
-                shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.3, shadowRadius: 6, elevation: 8, overflow: 'hidden',
-            }}>
-                {imageUrl ? (
-                    <Image source={{ uri: imageUrl }} style={{ width: 42, height: 42, borderRadius: 21 }} />
-                ) : (
-                    <Ionicons name="car" size={22} color="white" />
-                )}
-            </View>
-            <View style={{
-                width: 0, height: 0,
-                borderLeftWidth: 8, borderRightWidth: 8, borderTopWidth: 8,
-                borderLeftColor: 'transparent', borderRightColor: 'transparent',
-                borderTopColor: 'white', alignSelf: 'center', marginTop: -1,
-            }} />
-        </Animated.View>
-    );
-};
-
-// ─── Dropoff Marker ─────────────────────────────────────────
-const DropoffMarker = () => (
-    <View style={{
-        width: 36, height: 36, borderRadius: 18, backgroundColor: '#EF4444',
-        alignItems: 'center', justifyContent: 'center',
-        borderWidth: 3, borderColor: 'white',
-        shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25, shadowRadius: 4, elevation: 4,
-    }}>
-        <Ionicons name="location" size={18} color="white" />
+// Standard location pin for user's dropoff address
+const LocationPin = () => (
+    <View style={{ alignItems: 'center' }}>
+        <View style={{
+            width: 24, height: 24, borderRadius: 12,
+            backgroundColor: '#EF4444',
+            alignItems: 'center', justifyContent: 'center',
+            shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.3, shadowRadius: 4, elevation: 4,
+            borderWidth: 2, borderColor: 'white',
+        }}>
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: 'white' }} />
+        </View>
+        <View style={{ width: 2, height: 8, backgroundColor: '#EF4444', marginTop: -1 }} />
+        <View style={{ width: 8, height: 3, borderRadius: 4, backgroundColor: '#00000020', marginTop: 1 }} />
     </View>
 );
 
@@ -297,10 +227,12 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const theme = useTheme();
     const { t } = useTranslations();
     const insets = useSafeAreaInsets();
-    const mapRef = useRef<MapView>(null);
+    const mapRef = useRef<any>(null);
+    const cameraRef = useRef<any>(null);
     const prevStatusRef = useRef<string | null>(null);
     const { clearCart } = useCartActions();
     const [hasFittedMap, setHasFittedMap] = useState(false);
+    const [showSummary, setShowSummary] = useState(false);
 
     // Route polyline from Mapbox Directions API (cached)
     const [routeCoords, setRouteCoords] = useState<{ latitude: number; longitude: number }[]>([]);
@@ -345,7 +277,13 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     useEffect(() => {
         const from = isDeliveryPhase && driverLocation ? driverLocation : pickupLocation;
         const to = dropoffLocation;
-        if (!from || !to) return;
+        
+        // Validate that we have valid coordinates
+        if (!from || !to || 
+            typeof from.latitude !== 'number' || typeof from.longitude !== 'number' ||
+            typeof to.latitude !== 'number' || typeof to.longitude !== 'number') {
+            return;
+        }
 
         let cancelled = false;
         fetchRoute(
@@ -355,6 +293,8 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
             if (cancelled || !result) return;
             setRouteCoords(result.coordinates);
             setRouteDuration(result.durationMin);
+        }).catch((err) => {
+            console.error('[OrderDetails] Route fetch error:', err);
         });
 
         return () => { cancelled = true; };
@@ -428,29 +368,35 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         if (order) prevStatusRef.current = order.status ?? null;
     }, [order?.status]);
 
-    // ─── Map Fitting ────────────────────────────────────────
+    // ─── Map Fitting (status-aware) ────────────────────────
     const fitMapToMarkers = useCallback(() => {
-        if (!mapRef.current) return;
-        const coords: { latitude: number; longitude: number }[] = [];
+        if (!cameraRef.current) return;
 
-        if (isDeliveryPhase && driverLocation) {
-            coords.push({ latitude: driverLocation.latitude, longitude: driverLocation.longitude });
-        }
-        if (pickupLocation && !isDeliveryPhase) {
-            coords.push({ latitude: pickupLocation.latitude, longitude: pickupLocation.longitude });
-        }
-        if (dropoffLocation) {
-            coords.push({ latitude: dropoffLocation.latitude, longitude: dropoffLocation.longitude });
-        }
-        if (coords.length === 0) return;
-
-        if (coords.length === 1) {
-            mapRef.current.animateToRegion({ ...coords[0], latitudeDelta: 0.008, longitudeDelta: 0.008 }, 800);
+        if (isDeliveryPhase) {
+            // OUT_FOR_DELIVERY: fit driver + dropoff
+            const coords: { latitude: number; longitude: number }[] = [];
+            if (driverLocation) coords.push({ latitude: driverLocation.latitude, longitude: driverLocation.longitude });
+            if (dropoffLocation) coords.push({ latitude: dropoffLocation.latitude, longitude: dropoffLocation.longitude });
+            if (coords.length < 2) {
+                const c = coords[0] || (dropoffLocation ? { latitude: dropoffLocation.latitude, longitude: dropoffLocation.longitude } : null);
+                if (c) cameraRef.current.setCamera({ centerCoordinate: [c.longitude, c.latitude], zoomLevel: 15.5, animationDuration: 800 });
+                return;
+            }
+            const lngs = coords.map(c => c.longitude);
+            const lats = coords.map(c => c.latitude);
+            const ne: [number, number] = [Math.max(...lngs), Math.max(...lats)];
+            const sw: [number, number] = [Math.min(...lngs), Math.min(...lats)];
+            cameraRef.current.fitBounds(ne, sw, [120, 80, SCREEN_HEIGHT * 0.42, 80], 800);
         } else {
-            mapRef.current.fitToCoordinates(coords, {
-                edgePadding: { top: 100, right: 60, bottom: SCREEN_HEIGHT * 0.48, left: 60 },
-                animated: true,
-            });
+            // PENDING / PREPARING / READY: center on business
+            const loc = pickupLocation;
+            if (loc && typeof loc.latitude === 'number') {
+                cameraRef.current.setCamera({
+                    centerCoordinate: [loc.longitude, loc.latitude],
+                    zoomLevel: 15.5,
+                    animationDuration: 800,
+                });
+            }
         }
     }, [pickupLocation, dropoffLocation, driverLocation, isDeliveryPhase]);
 
@@ -458,14 +404,14 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     useEffect(() => {
         if (hasFittedMap) return;
         if (pickupLocation || dropoffLocation) {
-            setTimeout(() => { fitMapToMarkers(); setHasFittedMap(true); }, 600);
+            setTimeout(() => { fitMapToMarkers(); setHasFittedMap(true); }, 300);
         }
-    }, [pickupLocation, dropoffLocation, hasFittedMap]);
+    }, [pickupLocation, dropoffLocation, hasFittedMap, fitMapToMarkers]);
 
-    // Refit when delivery starts
+    // Refit when delivery starts or driver moves
     useEffect(() => {
         if (isDeliveryPhase && driverLocation) fitMapToMarkers();
-    }, [isDeliveryPhase]);
+    }, [isDeliveryPhase, driverLocation?.latitude, driverLocation?.longitude]);
 
     // ─── Handlers ───────────────────────────────────────────
     const handleCallDriver = async () => {
@@ -499,27 +445,16 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     }
 
     // ─── Default region ─────────────────────────────────────
-    const defaultRegion: Region = {
+    const defaultRegion = {
         latitude: pickupLocation?.latitude ?? dropoffLocation?.latitude ?? 42.4629,
         longitude: pickupLocation?.longitude ?? dropoffLocation?.longitude ?? 21.4694,
         latitudeDelta: 0.015,
         longitudeDelta: 0.015,
     };
 
-    // ─── Marker label ───────────────────────────────────────
-    const getMarkerLabel = (): string | undefined => {
-        switch (status) {
-            case 'PENDING': return t.orders.details.waiting_restaurant;
-            case 'PREPARING': return t.orders.details.preparing_your_order;
-            case 'READY': return t.orders.details.ready_for_pickup;
-            default: return undefined;
-        }
-    };
-
     const totalItems = order.businesses?.reduce((sum, b) => sum + b.items.length, 0) ?? 0;
 
     // ─── Toggle order summary ───────────────────────────────
-    const [showSummary, setShowSummary] = useState(false);
     const handleToggleSummary = () => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setShowSummary(prev => !prev);
@@ -905,44 +840,147 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     // ─── ACTIVE ORDER VIEW (With Map) ─────────────────────────
     // ═════════════════════════════════════════════════════════
 
+    const mapFallback = (
+        <View style={{ flex: 1, backgroundColor: '#1a1a2e', alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="map-outline" size={48} color="#555" />
+            <Text style={{ color: '#555', marginTop: 8, fontSize: 14 }}>Map unavailable</Text>
+        </View>
+    );
+
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
-            <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+            <View style={{ flex: 1, backgroundColor: '#000' }}>
 
-                {/* ═══ Map (ambient background) ═══ */}
-                <View style={{ flex: 1 }}>
-                    <MapView
+                {/* ═══ Full-screen Map ═══ */}
+                {MapLibreGL ? (
+                    <MapErrorBoundary fallback={mapFallback}>
+                    <MapLibreGL.MapView
                         ref={mapRef}
-                        style={{ flex: 1 }}
-                        initialRegion={defaultRegion}
-                        showsUserLocation={false}
-                        showsMyLocationButton={false}
-                        showsCompass={false}
-                        toolbarEnabled={false}
+                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                        styleURL={MAPBOX_STYLE}
+                        logoEnabled={false}
+                        attributionEnabled={false}
+                        scaleBarEnabled={false}
+                        compassEnabled={false}
+                        scrollEnabled={true}
+                        zoomEnabled={true}
                         pitchEnabled={false}
                         rotateEnabled={false}
-                    />
+                    >
+                        <MapLibreGL.Camera
+                            ref={cameraRef}
+                            minZoomLevel={13}
+                            maxZoomLevel={17}
+                            maxBounds={{
+                                ne: GJILAN_BOUNDS.ne,
+                                sw: GJILAN_BOUNDS.sw,
+                            }}
+                            defaultSettings={{
+                                centerCoordinate: [defaultRegion.longitude, defaultRegion.latitude],
+                                zoomLevel: 15.5,
+                            }}
+                        />
 
-                    {/* ═══ Top Bar Overlay ═══════════════════ */}
-                    <View style={{
-                        position: 'absolute', top: insets.top + 8, left: 16,
-                    }}>
-                        <TouchableOpacity onPress={() => router.back()} style={topBtnStyle}>
-                            <Ionicons name="chevron-back" size={20} color={theme.colors.text} />
-                        </TouchableOpacity>
-                    </View>
+                        {/* Route polyline (delivery phase only) */}
+                        {isDeliveryPhase && routeCoords.length > 1 && (
+                            <MapLibreGL.ShapeSource
+                                id="routeLine"
+                                shape={{
+                                    type: 'Feature',
+                                    properties: {},
+                                    geometry: {
+                                        type: 'LineString',
+                                        coordinates: routeCoords.map(c => [c.longitude, c.latitude]),
+                                    },
+                                }}
+                            >
+                                {/* Subtle glow */}
+                                <MapLibreGL.LineLayer
+                                    id="routeLineGlow"
+                                    style={{
+                                        lineColor: config.color,
+                                        lineWidth: 8,
+                                        lineOpacity: 0.12,
+                                        lineCap: 'round',
+                                        lineJoin: 'round',
+                                    }}
+                                />
+                                {/* Core line */}
+                                <MapLibreGL.LineLayer
+                                    id="routeLineFill"
+                                    style={{
+                                        lineColor: config.color,
+                                        lineWidth: 2.5,
+                                        lineOpacity: 0.9,
+                                        lineCap: 'round',
+                                        lineJoin: 'round',
+                                    }}
+                                />
+                            </MapLibreGL.ShapeSource>
+                        )}
+
+                        {/* Business marker (pending / preparing / ready) */}
+                        {!isDeliveryPhase && pickupLocation && typeof pickupLocation.latitude === 'number' && typeof pickupLocation.longitude === 'number' && (
+                            <MapLibreGL.PointAnnotation
+                                id="pickup-marker"
+                                coordinate={[pickupLocation.longitude, pickupLocation.latitude]}
+                            >
+                                <PurplePin icon="restaurant" size={28} />
+                            </MapLibreGL.PointAnnotation>
+                        )}
+
+                        {/* Driver marker (delivery phase) */}
+                        {isDeliveryPhase && driverLocation && typeof driverLocation.latitude === 'number' && typeof driverLocation.longitude === 'number' && (
+                            <MapLibreGL.PointAnnotation
+                                id="driver-marker"
+                                coordinate={[driverLocation.longitude, driverLocation.latitude]}
+                            >
+                                <PurplePin icon="car" size={32} />
+                            </MapLibreGL.PointAnnotation>
+                        )}
+
+                        {/* User dropoff location */}
+                        {isDeliveryPhase && dropoffLocation && typeof dropoffLocation.latitude === 'number' && typeof dropoffLocation.longitude === 'number' && (
+                            <MapLibreGL.PointAnnotation
+                                id="dropoff-marker"
+                                coordinate={[dropoffLocation.longitude, dropoffLocation.latitude]}
+                            >
+                                <LocationPin />
+                            </MapLibreGL.PointAnnotation>
+                        )}
+                    </MapLibreGL.MapView>
+                    </MapErrorBoundary>
+                ) : mapFallback}
+
+                {/* ═══ Back Button (floating) ═══ */}
+                <View style={{ position: 'absolute', top: insets.top + 12, left: 16, zIndex: 10 }}>
+                    <TouchableOpacity
+                        onPress={() => router.back()}
+                        style={{
+                            width: 40, height: 40, borderRadius: 20,
+                            backgroundColor: 'rgba(0,0,0,0.45)',
+                            alignItems: 'center', justifyContent: 'center',
+                            borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+                        }}
+                    >
+                        <Ionicons name="chevron-back" size={20} color="white" />
+                    </TouchableOpacity>
                 </View>
 
-                {/* ═══ Bottom Panel ════════════════════════ */}
+                {/* ═══ Bottom Panel (floating overlay) ═══ */}
                 <View style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
                     backgroundColor: theme.colors.card,
                     borderTopLeftRadius: 28,
                     borderTopRightRadius: 28,
                     shadowColor: '#000',
-                    shadowOffset: { width: 0, height: -6 },
-                    shadowOpacity: 0.12,
-                    shadowRadius: 16,
-                    elevation: 16,
+                    shadowOffset: { width: 0, height: -8 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 20,
+                    elevation: 20,
                     paddingBottom: insets.bottom + 12,
                     overflow: 'hidden',
                 }}>
@@ -1131,8 +1169,49 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
 };
 
 // ─── Shared Styles ──────────────────────────────────────────
-const topBtnStyle = {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.25)',
-    alignItems: 'center' as const, justifyContent: 'center' as const,
+
+// ─── Safe Wrapper (catches ALL render errors) ───────────────
+class OrderDetailsBoundary extends Component<
+    { children: ReactNode; onBack: () => void },
+    { hasError: boolean; error: string }
+> {
+    state = { hasError: false, error: '' };
+    static getDerivedStateFromError(err: Error) {
+        return { hasError: true, error: err?.message || 'Unknown error' };
+    }
+    componentDidCatch(error: Error, info: ErrorInfo) {
+        console.error('[OrderDetailsBoundary]', error, info);
+    }
+    render() {
+        if (this.state.hasError) {
+            return (
+                <View style={{ flex: 1, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+                    <Ionicons name="alert-circle-outline" size={56} color="#EF4444" />
+                    <Text style={{ color: '#fff', fontSize: 18, fontWeight: '600', marginTop: 16 }}>
+                        Something went wrong
+                    </Text>
+                    <Text style={{ color: '#888', fontSize: 13, marginTop: 8, textAlign: 'center' }}>
+                        {this.state.error}
+                    </Text>
+                    <TouchableOpacity
+                        onPress={this.props.onBack}
+                        style={{ marginTop: 24, backgroundColor: '#7C3AED', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}
+                    >
+                        <Text style={{ color: '#fff', fontWeight: '600' }}>Go Back</Text>
+                    </TouchableOpacity>
+                </View>
+            );
+        }
+        return this.props.children;
+    }
+}
+
+// ─── Exported Safe Component ────────────────────────────────
+export const SafeOrderDetails = ({ order, loading }: OrderDetailsProps) => {
+    const router = useRouter();
+    return (
+        <OrderDetailsBoundary onBack={() => router.back()}>
+            <OrderDetails order={order} loading={loading} />
+        </OrderDetailsBoundary>
+    );
 };

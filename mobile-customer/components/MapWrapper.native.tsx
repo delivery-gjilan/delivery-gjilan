@@ -1,2 +1,5 @@
-export { default as MapView, Marker, Polyline } from 'react-native-maps';
-export type { Region } from 'react-native-maps';
+import Mapbox from '@rnmapbox/maps';
+
+// Export as MapLibreGL for backward compatibility
+export { default as MapLibreGL } from '@rnmapbox/maps';
+export default Mapbox;

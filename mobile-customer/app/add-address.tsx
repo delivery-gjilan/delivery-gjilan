@@ -1,18 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@apollo/client/react';
 import * as Location from 'expo-location';
-import { MapView, Marker } from '@/components/MapWrapper';
-import type { Region } from '@/components/MapWrapper';
+import { MapLibreGL } from '@/components/MapWrapper';
 
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { ADD_USER_ADDRESS, UPDATE_USER_ADDRESS, GET_MY_ADDRESSES } from '@/graphql/operations/addresses';
+import { toast } from '@/store/toastStore';
 
-const MAPTILER_API_KEY = process.env.EXPO_PUBLIC_MAPTILER_API_KEY;
+const MAPBOX_STYLE = 'mapbox://styles/mapbox/dark-v11';
 
 export default function AddEditAddressScreen() {
     const router = useRouter();
@@ -21,18 +21,16 @@ export default function AddEditAddressScreen() {
     const { id } = useLocalSearchParams();
     const isEdit = !!id;
     const mapRef = useRef<any>(null);
+    const cameraRef = useRef<any>(null);
 
     const [addressName, setAddressName] = useState('');
     const [displayName, setDisplayName] = useState('');
     const [loading, setLoading] = useState(false);
     const [fetchingLocation, setFetchingLocation] = useState(false);
     const [markerCoordinate, setMarkerCoordinate] = useState<{ latitude: number; longitude: number } | null>(null);
-    const [mapRegion, setMapRegion] = useState<Region>({
-        latitude: 42.4629,
-        longitude: 21.4694,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-    });
+    const [center, setCenter] = useState<[number, number]>([21.4694, 42.4629]); // [lng, lat]
+    const [zoomLevel, setZoomLevel] = useState(14);
+    const [error, setError] = useState<string | null>(null);
 
     const { data: addressesData } = useQuery(GET_MY_ADDRESSES, {
         skip: !isEdit,
@@ -47,34 +45,29 @@ export default function AddEditAddressScreen() {
             setAddressName(address.addressName || '');
             setDisplayName(address.displayName || '');
             setMarkerCoordinate({ latitude: address.latitude, longitude: address.longitude });
-            setMapRegion({
-                latitude: address.latitude,
-                longitude: address.longitude,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
-            });
+            setCenter([address.longitude, address.latitude]);
         }
     }, [isEdit, id, addressesData]);
 
     const [addAddress] = useMutation(ADD_USER_ADDRESS, {
         refetchQueries: [{ query: GET_MY_ADDRESSES }],
         onCompleted: () => {
-            Alert.alert(t.common.success, t.addresses.added_success);
+            toast.success(t.addresses.added_success);
             router.back();
         },
         onError: (error) => {
-            Alert.alert(t.common.error, error.message);
+            setError(error.message);
         },
     });
 
     const [updateAddress] = useMutation(UPDATE_USER_ADDRESS, {
         refetchQueries: [{ query: GET_MY_ADDRESSES }],
         onCompleted: () => {
-            Alert.alert(t.common.success, t.addresses.updated_success);
+            toast.success(t.addresses.updated_success);
             router.back();
         },
         onError: (error) => {
-            Alert.alert(t.common.error, error.message);
+            setError(error.message);
         },
     });
 
@@ -86,10 +79,11 @@ export default function AddEditAddressScreen() {
 
     const getCurrentLocation = async () => {
         setFetchingLocation(true);
+        setError(null);
         try {
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
-                Alert.alert(t.addresses.permission_denied, t.addresses.location_required);
+                setError(t.addresses.location_required);
                 setFetchingLocation(false);
                 return;
             }
@@ -101,17 +95,18 @@ export default function AddEditAddressScreen() {
             };
             
             setMarkerCoordinate(coords);
-            setMapRegion({
-                ...coords,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
+            setCenter([coords.longitude, coords.latitude]);
+            cameraRef.current?.setCamera({
+                centerCoordinate: [coords.longitude, coords.latitude],
+                zoomLevel: 15,
+                animationDuration: 600,
             });
 
             // Reverse geocode
             await reverseGeocode(coords.latitude, coords.longitude);
         } catch (error) {
             console.error('Location error:', error);
-            Alert.alert(t.common.error, t.addresses.location_failed);
+            setError(t.addresses.location_failed);
         }
         setFetchingLocation(false);
     };
@@ -133,19 +128,23 @@ export default function AddEditAddressScreen() {
     };
 
     const handleMapPress = async (event: any) => {
-        const { latitude, longitude } = event.nativeEvent.coordinate;
+        const { geometry } = event;
+        if (!geometry?.coordinates) return;
+        const [longitude, latitude] = geometry.coordinates;
         setMarkerCoordinate({ latitude, longitude });
         await reverseGeocode(latitude, longitude);
     };
 
     const handleSave = async () => {
+        setError(null);
+        
         if (!addressName.trim()) {
-            Alert.alert(t.common.required, t.addresses.enter_name);
+            setError(t.addresses.enter_name);
             return;
         }
 
         if (!markerCoordinate) {
-            Alert.alert(t.common.required, t.addresses.select_location);
+            setError(t.addresses.select_location);
             return;
         }
 
@@ -194,20 +193,33 @@ export default function AddEditAddressScreen() {
             <View className="flex-1">
                 {/* Map */}
                 <View style={{ height: 350, position: 'relative' }}>
-                    <MapView
+                    <MapLibreGL.MapView
                         ref={mapRef}
                         style={StyleSheet.absoluteFillObject}
-                        initialRegion={mapRegion}
-                        region={mapRegion}
-                        onRegionChangeComplete={setMapRegion}
+                        styleURL={MAPBOX_STYLE}
                         onPress={handleMapPress}
-                        showsUserLocation
-                        showsMyLocationButton={false}
+                        logoEnabled={false}
+                        attributionEnabled={false}
+                        scaleBarEnabled={false}
+                        compassEnabled={false}
                     >
+                        <MapLibreGL.Camera
+                            ref={cameraRef}
+                            defaultSettings={{
+                                centerCoordinate: center,
+                                zoomLevel: zoomLevel,
+                            }}
+                        />
+                        <MapLibreGL.UserLocation visible={true} />
                         {markerCoordinate && (
-                            <Marker coordinate={markerCoordinate} pinColor={theme.colors.primary} />
+                            <MapLibreGL.PointAnnotation
+                                id="selected-marker"
+                                coordinate={[markerCoordinate.longitude, markerCoordinate.latitude]}
+                            >
+                                <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: theme.colors.primary, borderWidth: 3, borderColor: 'white' }} />
+                            </MapLibreGL.PointAnnotation>
                         )}
-                    </MapView>
+                    </MapLibreGL.MapView>
 
                     {/* Current Location Button */}
                     <TouchableOpacity
@@ -236,13 +248,26 @@ export default function AddEditAddressScreen() {
 
                 {/* Form */}
                 <View className="flex-1 p-4">
+                    {/* Error Message */}
+                    {error && (
+                        <View className="flex-row items-start gap-2 mb-4 px-3 py-2.5 rounded-xl" style={{ backgroundColor: theme.colors.expense + '10', borderWidth: 1, borderColor: theme.colors.expense + '30' }}>
+                            <Ionicons name="alert-circle" size={16} color={theme.colors.expense} style={{ marginTop: 1 }} />
+                            <Text className="text-xs flex-1" style={{ color: theme.colors.expense, lineHeight: 18 }}>
+                                {error}
+                            </Text>
+                        </View>
+                    )}
+
                     <View className="mb-4">
                         <Text className="text-sm font-semibold mb-2" style={{ color: theme.colors.text }}>
                             {t.addresses.label}
                         </Text>
                         <TextInput
                             value={addressName}
-                            onChangeText={setAddressName}
+                            onChangeText={(text) => {
+                                setAddressName(text);
+                                if (error) setError(null);
+                            }}
                             placeholder={t.addresses.label_placeholder}
                             placeholderTextColor={theme.colors.subtext}
                             className="px-4 py-3 rounded-xl text-base"

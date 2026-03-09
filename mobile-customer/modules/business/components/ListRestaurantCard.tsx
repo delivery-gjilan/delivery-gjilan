@@ -76,7 +76,8 @@ export function ListRestaurantCard({
 
     return (
         <TouchableOpacity
-            onPress={() => onPress(id)}
+            onPress={isOpen ? () => onPress(id) : undefined}
+            disabled={!isOpen}
             activeOpacity={0.7}
             style={{
                 flexDirection: 'row',
@@ -86,6 +87,7 @@ export function ListRestaurantCard({
                 backgroundColor: theme.colors.background,
                 borderBottomWidth: 1,
                 borderBottomColor: theme.colors.border,
+                opacity: isOpen ? 1 : 0.6,
             }}
         >
             {/* Restaurant Logo */}

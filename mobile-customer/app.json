@@ -48,6 +48,7 @@
           "project": "mobile-customer"
         }
       ],
+      "@rnmapbox/maps",
       [
         "expo-notifications",
         {

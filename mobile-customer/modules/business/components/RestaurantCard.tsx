@@ -146,10 +146,12 @@ export function RestaurantCard({
             }}
         >
             <TouchableOpacity
-                onPress={() => onPress(id)}
+                onPress={isOpen ? () => onPress(id) : undefined}
+                disabled={!isOpen}
                 className="mb-5"
                 activeOpacity={0.95}
                 style={{
+                    opacity: isOpen ? 1 : 0.6,
                     ...(Platform.OS === 'ios' && {
                         shadowColor: '#000',
                         shadowOffset: { width: 0, height: 2 },

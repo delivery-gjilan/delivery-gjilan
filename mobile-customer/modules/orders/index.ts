@@ -1,7 +1,7 @@
 // Components
 export { OrdersFloatingBar } from './components/OrdersFloatingBar';
 export { ActiveOrdersList } from './components/ActiveOrdersList';
-export { OrderDetails } from './components/OrderDetails';
+export { OrderDetails, SafeOrderDetails } from './components/OrderDetails';
 export { OrderHistoryList } from './components/OrderHistoryList';
 
 // Hooks

@@ -18,7 +18,8 @@ import { ToastContainer } from '@/components/Toast';
 import InfoBanner from '@/components/InfoBanner';
 import type { InfoBannerType } from '@/components/InfoBanner';
 import { initSentry } from '@/lib/sentry';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import Mapbox from '@rnmapbox/maps';
 
 // ── Initialise Sentry before anything else renders ──
 initSentry();
@@ -76,17 +77,7 @@ function AppContent() {
                             }}
                         />
                         <Stack.Screen
-                            name="orders/active"
-                            options={{
-                                presentation: 'modal',
-                                animation: 'slide_from_bottom',
-                                gestureDirection: 'vertical',
-                                gestureEnabled: true,
-                                headerShown: false,
-                            }}
-                        />
-                        <Stack.Screen
-                            name="orders/[orderId]"
+                            name="orders"
                             options={{
                                 presentation: 'modal',
                                 animation: 'slide_from_bottom',
@@ -106,6 +97,14 @@ function AppContent() {
 
 export default function RootLayout() {
     const { ready } = useAppSetup();
+
+    // Initialize Mapbox
+    useEffect(() => {
+        const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? '';
+        if (MAPBOX_TOKEN) {
+            Mapbox.setAccessToken(MAPBOX_TOKEN);
+        }
+    }, []);
 
     // Show loading screen during app setup
     if (!ready) {

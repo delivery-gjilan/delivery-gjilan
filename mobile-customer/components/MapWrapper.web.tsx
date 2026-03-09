@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 
-// Stub components for web – react-native-maps is native-only
-export const MapView = React.forwardRef(({ style, children, ...props }: any, ref: any) => (
+// Stub for web – MapLibre is native-only
+const MapView = React.forwardRef(({ style, children, ...props }: any, ref: any) => (
     <View
         ref={ref}
         style={[
@@ -23,12 +23,23 @@ export const MapView = React.forwardRef(({ style, children, ...props }: any, ref
 
 MapView.displayName = 'MapViewWebStub';
 
-export const Marker = (_props: any) => null;
-export const Polyline = (_props: any) => null;
+const Camera = (_props: any) => null;
+const PointAnnotation = (_props: any) => null;
+const MarkerView = (_props: any) => null;
+const ShapeSource = (_props: any) => null;
+const LineLayer = (_props: any) => null;
+const UserLocation = (_props: any) => null;
 
-export type Region = {
-    latitude: number;
-    longitude: number;
-    latitudeDelta: number;
-    longitudeDelta: number;
+const MapLibreGL = {
+    MapView,
+    Camera,
+    PointAnnotation,
+    MarkerView,
+    ShapeSource,
+    LineLayer,
+    UserLocation,
+    setAccessToken: (_token: string | null) => {},
 };
+
+export { MapLibreGL };
+export default MapLibreGL;

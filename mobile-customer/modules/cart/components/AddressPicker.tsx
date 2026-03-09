@@ -6,12 +6,11 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { MapView, Marker } from '@/components/MapWrapper';
-import type { Region } from '@/components/MapWrapper';
+import { MapLibreGL } from '@/components/MapWrapper';
 import * as Location from 'expo-location';
 import Animated, {
     useSharedValue, useAnimatedStyle, withTiming,
-    withRepeat, withSequence, Easing, FadeIn, FadeOut,
+    Easing, FadeIn, FadeOut,
     SlideInDown, SlideOutDown,
 } from 'react-native-reanimated';
 import { useTheme } from '@/hooks/useTheme';
@@ -89,33 +88,8 @@ async function reverseGeocode(lat: number, lng: number): Promise<string> {
     }
 }
 
-// ─── Map style ──────────────────────────────────────────────
-const darkMapStyle = [
-    { elementType: 'geometry', stylers: [{ color: '#1A1A22' }] },
-    { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-    { elementType: 'labels.text.fill', stylers: [{ color: '#A1A1AA' }] },
-    { elementType: 'labels.text.stroke', stylers: [{ color: '#0F0F14' }] },
-    { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#27272A' }] },
-    { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#27272A' }] },
-    { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#1A1A22' }] },
-    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#3f3f46' }] },
-    { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0F0F14' }] },
-];
-
-const lightMapStyle = [
-    { elementType: 'geometry', stylers: [{ color: '#f8fafc' }] },
-    { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-    { elementType: 'labels.text.fill', stylers: [{ color: '#64748B' }] },
-    { elementType: 'labels.text.stroke', stylers: [{ color: '#ffffff' }] },
-    { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
-    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#e2e8f0' }] },
-    { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#dbeafe' }] },
-    { featureType: 'administrative.neighborhood', stylers: [{ visibility: 'off' }] },
-];
+// ─── Mapbox Style ───────────────────────────────────────────
+const MAPBOX_STYLE = 'mapbox://styles/mapbox/dark-v11';
 
 // ─── Props ──────────────────────────────────────────────────
 export interface SelectedAddress {
@@ -136,53 +110,49 @@ interface AddressPickerProps {
     embedded?: boolean;
 }
 
-// ─── Pulsing Pin ────────────────────────────────────────────
-const PulsingPin = () => {
-    const pulse = useSharedValue(1);
+// ─── Centered Pin (Fixed Position) ─────────────────────────
+const CenteredPin = ({ elevated }: { elevated: boolean }) => {
+    const opacity = useSharedValue(1);
+
     useEffect(() => {
-        pulse.value = withRepeat(
-            withSequence(
-                withTiming(1.6, { duration: 1200, easing: Easing.inOut(Easing.ease) }),
-                withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.ease) })
-            ), -1, true
-        );
-    }, []);
-    const ringStyle = useAnimatedStyle(() => ({
-        transform: [{ scale: pulse.value }],
-        opacity: 2 - pulse.value,
+        opacity.value = withTiming(elevated ? 0.5 : 1, { 
+            duration: 150, 
+            easing: Easing.inOut(Easing.ease) 
+        });
+    }, [elevated]);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        opacity: opacity.value,
     }) as any);
 
     return (
-        <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-            <Animated.View style={[ringStyle, {
-                position: 'absolute',
-                width: 56, height: 56, borderRadius: 28,
-                backgroundColor: '#7C3AED20',
-            }]} />
+        <Animated.View style={[animatedStyle, { alignItems: 'center', justifyContent: 'center' }]}>
+            {/* Pin body */}
             <View style={{
-                width: 32, height: 32, borderRadius: 16,
+                width: 24, height: 24, borderRadius: 12,
                 backgroundColor: '#7C3AED',
                 alignItems: 'center', justifyContent: 'center',
-                shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.4, shadowRadius: 8, elevation: 8,
+                shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.3, shadowRadius: 4, elevation: 4,
             }}>
                 <View style={{
-                    width: 10, height: 10, borderRadius: 5,
+                    width: 8, height: 8, borderRadius: 4,
                     backgroundColor: 'white',
                 }} />
             </View>
             {/* Pin tail */}
             <View style={{
-                width: 2, height: 12,
+                width: 2, height: 10,
                 backgroundColor: '#7C3AED',
-                marginTop: -2,
+                marginTop: -1,
             }} />
+            {/* Shadow */}
             <View style={{
-                width: 8, height: 4, borderRadius: 4,
-                backgroundColor: '#00000020',
-                marginTop: 2,
+                width: 12, height: 3, borderRadius: 6,
+                backgroundColor: '#00000015',
+                marginTop: 1,
             }} />
-        </View>
+        </Animated.View>
     );
 };
 
@@ -198,7 +168,8 @@ export default function AddressPicker({
     const theme = useTheme();
     const { t } = useTranslations();
     const insets = useSafeAreaInsets();
-    const mapRef = useRef<MapView>(null);
+    const mapRef = useRef<any>(null);
+    const cameraRef = useRef<any>(null);
 
     // Search state
     const [searchQuery, setSearchQuery] = useState('');
@@ -209,12 +180,10 @@ export default function AddressPicker({
     const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Map state
-    const [mapRegion, setMapRegion] = useState<Region>({
-        latitude: initialLocation?.latitude ?? GJILAN_CENTER.latitude,
-        longitude: initialLocation?.longitude ?? GJILAN_CENTER.longitude,
-        latitudeDelta: 0.008,
-        longitudeDelta: 0.008,
-    });
+    const [mapCenter, setMapCenter] = useState<[number, number]>([
+        initialLocation?.longitude ?? GJILAN_CENTER.longitude,
+        initialLocation?.latitude ?? GJILAN_CENTER.latitude,
+    ]);
     const [pinLocation, setPinLocation] = useState<{ latitude: number; longitude: number } | null>(
         initialLocation ? { latitude: initialLocation.latitude, longitude: initialLocation.longitude } : null
     );
@@ -224,6 +193,15 @@ export default function AddressPicker({
 
     // Bottom card state
     const [showSavedAddresses, setShowSavedAddresses] = useState(false);
+
+    // Pin animation state
+    const [pinElevated, setPinElevated] = useState(false);
+    const geocodeAbortRef = useRef<AbortController | null>(null);
+    const lastGeocodedPos = useRef<{ lat: number; lng: number } | null>(null);
+    const geocodeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const buttonEnableTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const isTouchingMapRef = useRef(false);
+    const mapDidMoveRef = useRef(false);
 
     // Reset when opened
     useEffect(() => {
@@ -235,18 +213,41 @@ export default function AddressPicker({
             if (initialLocation) {
                 setPinLocation({ latitude: initialLocation.latitude, longitude: initialLocation.longitude });
                 setPinAddress(initialLocation.address);
-                setMapRegion({
-                    latitude: initialLocation.latitude,
-                    longitude: initialLocation.longitude,
-                    latitudeDelta: 0.008,
-                    longitudeDelta: 0.008,
-                });
+                setMapCenter([initialLocation.longitude, initialLocation.latitude]);
+                lastGeocodedPos.current = { lat: initialLocation.latitude, lng: initialLocation.longitude };
             } else {
                 setPinLocation(null);
                 setPinAddress('');
+                lastGeocodedPos.current = null;
             }
+        } else {
+            // Cleanup on close
+            if (geocodeAbortRef.current) {
+                geocodeAbortRef.current.abort();
+                geocodeAbortRef.current = null;
+            }
+            if (geocodeDebounceRef.current) {
+                clearTimeout(geocodeDebounceRef.current);
+                geocodeDebounceRef.current = null;
+            }
+            if (buttonEnableTimeoutRef.current) {
+                clearTimeout(buttonEnableTimeoutRef.current);
+                buttonEnableTimeoutRef.current = null;
+            }
+            isTouchingMapRef.current = false;
+            mapDidMoveRef.current = false;
         }
     }, [visible]);
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (geocodeAbortRef.current) geocodeAbortRef.current.abort();
+            if (geocodeDebounceRef.current) clearTimeout(geocodeDebounceRef.current);
+            if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+            if (buttonEnableTimeoutRef.current) clearTimeout(buttonEnableTimeoutRef.current);
+        };
+    }, []);
 
     // Debounced search
     const handleSearchChange = useCallback((text: string) => {
@@ -278,14 +279,13 @@ export default function AddressPicker({
         setPinAddress(feature.place_name);
         setSearchQuery(feature.text);
         setShowResults(false);
+        lastGeocodedPos.current = { lat, lng: lng }; // Mark as geocoded
 
-        const newRegion = {
-            ...newLocation,
-            latitudeDelta: 0.005,
-            longitudeDelta: 0.005,
-        };
-        mapRef.current?.animateToRegion(newRegion, 600);
-        setMapRegion(newRegion);
+        cameraRef.current?.setCamera({
+            centerCoordinate: [lng, lat],
+            zoomLevel: 16,
+            animationDuration: 600,
+        });
     }, []);
 
     // Map tap
@@ -293,15 +293,7 @@ export default function AddressPicker({
         Keyboard.dismiss();
         setShowResults(false);
         setShowSavedAddresses(false);
-
-        const { latitude, longitude } = event.nativeEvent.coordinate;
-        setPinLocation({ latitude, longitude });
-        setReverseLoading(true);
-
-        const address = await reverseGeocode(latitude, longitude);
-        setPinAddress(address);
-        setSearchQuery('');
-        setReverseLoading(false);
+        // Note: Pin stays centered, so we'll update location on region change instead
     }, []);
 
     // Use current location
@@ -333,14 +325,13 @@ export default function AddressPicker({
             const { latitude, longitude } = current.coords;
             const newLocation = { latitude, longitude };
             setPinLocation(newLocation);
+            lastGeocodedPos.current = { lat: latitude, lng: longitude }; // Mark as geocoded
 
-            const newRegion = {
-                ...newLocation,
-                latitudeDelta: 0.005,
-                longitudeDelta: 0.005,
-            };
-            mapRef.current?.animateToRegion(newRegion, 600);
-            setMapRegion(newRegion);
+            cameraRef.current?.setCamera({
+                centerCoordinate: [longitude, latitude],
+                zoomLevel: 16,
+                animationDuration: 600,
+            });
 
             const address = await reverseGeocode(latitude, longitude);
             setPinAddress(address);
@@ -357,14 +348,13 @@ export default function AddressPicker({
         setSearchQuery('');
         setShowSavedAddresses(false);
         setShowResults(false);
+        lastGeocodedPos.current = { lat: addr.latitude, lng: addr.longitude }; // Mark as geocoded
 
-        const newRegion = {
-            ...newLocation,
-            latitudeDelta: 0.005,
-            longitudeDelta: 0.005,
-        };
-        mapRef.current?.animateToRegion(newRegion, 600);
-        setMapRegion(newRegion);
+        cameraRef.current?.setCamera({
+            centerCoordinate: [addr.longitude, addr.latitude],
+            zoomLevel: 16,
+            animationDuration: 600,
+        });
     }, []);
 
     // Confirm selection
@@ -404,42 +394,196 @@ export default function AddressPicker({
         <View style={embedded ? { flex: 1 } : StyleSheet.absoluteFill}>
             <Wrapper style={wrapperStyle}>
                 {/* ─── Map ─────────────────────────────── */}
-                <View style={{ flex: 1 }}>
-                    <MapView
+                <View 
+                    style={{ flex: 1 }}
+                    onStartShouldSetResponder={() => {
+                        // User touches map - disable button and mark as touching
+                        isTouchingMapRef.current = true;
+                        mapDidMoveRef.current = false; // Reset movement flag
+                        setPinElevated(true);
+                        if (buttonEnableTimeoutRef.current) clearTimeout(buttonEnableTimeoutRef.current);
+                        return true; // Capture touch to get release event
+                    }}
+                    onResponderRelease={() => {
+                        // User released finger from map
+                        isTouchingMapRef.current = false;
+                        
+                        // If map didn't move, re-enable button immediately
+                        if (!mapDidMoveRef.current && !reverseLoading) {
+                            setPinElevated(false);
+                        } else if (mapDidMoveRef.current) {
+                            // Map did move - trigger a check after a brief delay 
+                            // in case onRegionDidChange already fired while finger was down
+                            setTimeout(() => {
+                                // If button is still disabled and not currently geocoding,
+                                // force a region check to trigger geocoding
+                                if (pinElevated && !reverseLoading && mapRef.current) {
+                                    mapRef.current.getCenter().then((coords: any) => {
+                                        if (coords) {
+                                            // Simulate region change to trigger geocoding
+                                            const event = {
+                                                geometry: {
+                                                    coordinates: [coords[0], coords[1]]
+                                                }
+                                            };
+                                            // Manually call the geocoding logic
+                                            const [longitude, latitude] = coords;
+                                            const last = lastGeocodedPos.current;
+                                            if (last) {
+                                                const latDiff = Math.abs(latitude - last.lat);
+                                                const lngDiff = Math.abs(longitude - last.lng);
+                                                if (latDiff < 0.0001 && lngDiff < 0.0001) {
+                                                    setPinElevated(false);
+                                                    return;
+                                                }
+                                            }
+                                            
+                                            setPinLocation({ latitude, longitude });
+                                            setReverseLoading(true);
+                                            
+                                            setTimeout(async () => {
+                                                if (geocodeAbortRef.current) geocodeAbortRef.current.abort();
+                                                const controller = new AbortController();
+                                                geocodeAbortRef.current = controller;
+                                                lastGeocodedPos.current = { lat: latitude, lng: longitude };
+                                                try {
+                                                    const address = await reverseGeocode(latitude, longitude);
+                                                    if (!controller.signal.aborted) {
+                                                        setPinAddress(address);
+                                                        setSearchQuery('');
+                                                    }
+                                                } catch {
+                                                    // ignore
+                                                } finally {
+                                                    if (!controller.signal.aborted) {
+                                                        setReverseLoading(false);
+                                                        buttonEnableTimeoutRef.current = setTimeout(() => {
+                                                            setPinElevated(false);
+                                                        }, 50);
+                                                    }
+                                                }
+                                            }, 50);
+                                        }
+                                    }).catch(() => {
+                                        // If getCenter fails, just re-enable button
+                                        setPinElevated(false);
+                                    });
+                                }
+                            }, 100);
+                        }
+                    }}
+                >
+                    <MapLibreGL.MapView
                         ref={mapRef}
                         style={StyleSheet.absoluteFill}
-                        initialRegion={mapRegion}
+                        styleURL={MAPBOX_STYLE}
                         onPress={handleMapPress}
-                        showsUserLocation
-                        showsMyLocationButton={false}
-                        showsCompass={false}
-                        mapPadding={{ top: 120, right: 0, bottom: 240, left: 0 }}
+                        onRegionWillChange={() => {
+                            // Map started moving — lift pin, cancel any in-flight geocode
+                            mapDidMoveRef.current = true; // Mark that map moved
+                            setPinElevated(true);
+                            if (geocodeAbortRef.current) geocodeAbortRef.current.abort();
+                            if (buttonEnableTimeoutRef.current) clearTimeout(buttonEnableTimeoutRef.current);
+                        }}
+                        onRegionDidChange={async (feature: any) => {
+                            // Map stopped moving
+                            const coords = feature?.geometry?.coordinates;
+                            if (!coords) return;
+                            const [longitude, latitude] = coords;
+                            
+                            // Clear any pending button enable timeout (from tap without drag)
+                            if (buttonEnableTimeoutRef.current) clearTimeout(buttonEnableTimeoutRef.current);
+                            
+                            // Don't geocode if user is still touching the map (momentum scrolling)
+                            if (isTouchingMapRef.current) {
+                                return;
+                            }
+                            
+                            // Check if position changed significantly (>10 meters ~= 0.0001 degrees)
+                            const last = lastGeocodedPos.current;
+                            if (last) {
+                                const latDiff = Math.abs(latitude - last.lat);
+                                const lngDiff = Math.abs(longitude - last.lng);
+                                if (latDiff < 0.0001 && lngDiff < 0.0001) {
+                                    // Position barely changed, don't geocode
+                                    // But keep button disabled briefly to prevent accidental taps
+                                    buttonEnableTimeoutRef.current = setTimeout(() => setPinElevated(false), 200);
+                                    return;
+                                }
+                            }
+
+                            // Clear any pending debounce
+                            if (geocodeDebounceRef.current) clearTimeout(geocodeDebounceRef.current);
+
+                            // Keep button disabled during entire geocoding process
+                            setPinLocation({ latitude, longitude });
+                            setReverseLoading(true);
+
+                            // Small debounce to batch rapid events while staying responsive
+                            geocodeDebounceRef.current = setTimeout(async () => {
+                                // Abort previous geocode if still running
+                                if (geocodeAbortRef.current) geocodeAbortRef.current.abort();
+                                const controller = new AbortController();
+                                geocodeAbortRef.current = controller;
+
+                                // Store this position as the last geocoded
+                                lastGeocodedPos.current = { lat: latitude, lng: longitude };
+                                try {
+                                    const address = await reverseGeocode(latitude, longitude);
+                                    if (!controller.signal.aborted) {
+                                        setPinAddress(address);
+                                        setSearchQuery('');
+                                    }
+                                } catch {
+                                    // ignore aborted / failed
+                                } finally {
+                                    if (!controller.signal.aborted) {
+                                        setReverseLoading(false);
+                                        // Keep button disabled for 50ms after geocoding completes
+                                        buttonEnableTimeoutRef.current = setTimeout(() => {
+                                            setPinElevated(false);
+                                        }, 50);
+                                    }
+                                }
+                            }, 50); // 50ms debounce - faster response while still batching events
+                        }}
+                        logoEnabled={false}
+                        attributionEnabled={false}
+                        scaleBarEnabled={false}
+                        compassEnabled={false}
+                        zoomEnabled={true}
+                        scrollEnabled={true}
+                        pitchEnabled={false}
+                        rotateEnabled={false}
                     >
-                        {pinLocation && (
-                            <Marker
-                                coordinate={pinLocation}
-                                anchor={{ x: 0.5, y: 1 }}
-                            >
-                                <PulsingPin />
-                            </Marker>
-                        )}
-                    </MapView>
+                        <MapLibreGL.Camera
+                            ref={cameraRef}
+                            defaultSettings={{
+                                centerCoordinate: mapCenter,
+                                zoomLevel: 15,
+                            }}
+                        />
+                    </MapLibreGL.MapView>
+
+                    {/* ─── Fixed Center Pin ──────────────── */}
+                    <View style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        marginLeft: -12,
+                        marginTop: -37,
+                        pointerEvents: 'none',
+                    }}>
+                        <CenteredPin elevated={pinElevated} />
+                    </View>
 
                     {/* ─── Search Bar Overlay ────────────── */}
                     <View style={[styles.searchContainer, { top: searchTop }]}>
-                        {/* Back Button */}
-                        <TouchableOpacity
-                            style={[styles.backBtn, { backgroundColor: theme.colors.card }]}
-                            onPress={onClose}
-                            activeOpacity={0.7}
-                        >
-                            <Ionicons name="arrow-back" size={22} color={theme.colors.text} />
-                        </TouchableOpacity>
-
                         {/* Search Input */}
                         <View style={[styles.searchBar, {
                             backgroundColor: theme.colors.card,
                             borderColor: showResults ? '#7C3AED' : 'transparent',
+                            flex: 1,
                         }]}>
                             <Ionicons name="search" size={18} color={theme.colors.subtext} />
                             <TextInput
@@ -544,24 +688,6 @@ export default function AddressPicker({
                             ) : null}
                         </View>
                     )}
-
-                    {/* ─── GPS Button (bottom-right of map) ── */}
-                    {!showResults && (
-                        <TouchableOpacity
-                            style={[styles.gpsButton, {
-                                backgroundColor: theme.colors.card,
-                                bottom: pinLocation ? 220 : 180,
-                            }]}
-                            onPress={handleUseCurrentLocation}
-                            activeOpacity={0.7}
-                        >
-                            {locatingCurrent ? (
-                                <ActivityIndicator size="small" color="#7C3AED" />
-                            ) : (
-                                <Ionicons name="navigate" size={20} color="#7C3AED" />
-                            )}
-                        </TouchableOpacity>
-                    )}
                 </View>
 
                 {/* ─── Bottom Card ─────────────────────── */}
@@ -654,33 +780,27 @@ export default function AddressPicker({
                             <View style={[styles.selectedContainer, { backgroundColor: theme.colors.background }]}>
                                 <View style={[styles.selectedDot, { backgroundColor: '#7C3AED' }]} />
                                 <View style={{ flex: 1 }}>
-                                    {reverseLoading ? (
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Text style={[styles.selectedLabel, { color: theme.colors.text }]}>
+                                            {t.cart.deliver_here ?? "Deliver here"}
+                                        </Text>
+                                        {reverseLoading && (
                                             <ActivityIndicator size="small" color="#7C3AED" />
-                                            <Text style={[styles.selectedLoading, { color: theme.colors.subtext }]}>
-                                                {t.cart.finding_address ?? "Finding address..."}
-                                            </Text>
-                                        </View>
-                                    ) : (
-                                        <>
-                                            <Text style={[styles.selectedLabel, { color: theme.colors.text }]}>
-                                                {t.cart.deliver_here ?? "Deliver here"}
-                                            </Text>
-                                            <Text style={[styles.selectedAddress, { color: theme.colors.subtext }]} numberOfLines={2}>
-                                                {pinAddress}
-                                            </Text>
-                                        </>
-                                    )}
+                                        )}
+                                    </View>
+                                    <Text style={[styles.selectedAddress, { color: theme.colors.subtext, minHeight: 36 }]} numberOfLines={2}>
+                                        {pinAddress || (t.cart.finding_address ?? "Finding address...")}
+                                    </Text>
                                 </View>
                             </View>
 
                             {/* Confirm Button */}
                             <TouchableOpacity
                                 style={[styles.confirmBtn, {
-                                    backgroundColor: reverseLoading ? theme.colors.border : '#7C3AED',
+                                    backgroundColor: (reverseLoading || pinElevated) ? theme.colors.border : '#7C3AED',
                                 }]}
                                 onPress={handleConfirm}
-                                disabled={reverseLoading}
+                                disabled={reverseLoading || pinElevated}
                                 activeOpacity={0.8}
                             >
                                 <Ionicons name="checkmark-circle" size={20} color="white" />
@@ -715,14 +835,7 @@ const styles = StyleSheet.create({
         right: 12,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
         zIndex: 10,
-    },
-    backBtn: {
-        width: 44, height: 44, borderRadius: 22,
-        alignItems: 'center', justifyContent: 'center',
-        shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.12, shadowRadius: 6, elevation: 4,
     },
     searchBar: {
         flex: 1, height: 44, borderRadius: 22,
@@ -771,13 +884,6 @@ const styles = StyleSheet.create({
     },
     noResultsText: {
         fontSize: 13,
-    },
-    gpsButton: {
-        position: 'absolute', right: 16,
-        width: 44, height: 44, borderRadius: 22,
-        alignItems: 'center', justifyContent: 'center',
-        shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.12, shadowRadius: 6, elevation: 4,
     },
     bottomCard: {
         borderTopLeftRadius: 24, borderTopRightRadius: 24,

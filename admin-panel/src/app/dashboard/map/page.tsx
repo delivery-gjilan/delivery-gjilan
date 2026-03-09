@@ -159,22 +159,23 @@ interface DriverMotionTarget {
 export default function MapPage() {
   // == DATA ==
   const { data: businessData } = useQuery(GET_BUSINESSES);
-  const { data: driverData } = useQuery(DRIVERS_QUERY, { pollInterval: 10000 });
-  const { data: orderData } = useQuery(GET_ORDERS);
-  const { data: orderSubData } = useSubscription(ALL_ORDERS_SUBSCRIPTION);
-  const { data: driverSubData } = useSubscription(DRIVERS_UPDATED_SUBSCRIPTION);
+  const { data: driverData, refetch: refetchDrivers } = useQuery(DRIVERS_QUERY, { pollInterval: 10000 });
+  const { data: orderData, refetch: refetchOrders } = useQuery(GET_ORDERS);
+  
+  // Refetch when subscriptions fire (backend sends lightweight signal)
+  useSubscription(ALL_ORDERS_SUBSCRIPTION, {
+    onData: () => { refetchOrders(); },
+  });
+  useSubscription(DRIVERS_UPDATED_SUBSCRIPTION, {
+    onData: () => { refetchDrivers(); },
+  });
+  
   const [assignDriver] = useMutation(ASSIGN_DRIVER_TO_ORDER);
   const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS);
 
   const businesses = useMemo(() => (businessData as any)?.businesses ?? [], [businessData]);
-  const orders = useMemo(() => {
-    const sub = (orderSubData as any)?.allOrdersUpdated;
-    return sub ?? (orderData as any)?.orders ?? [];
-  }, [orderSubData, orderData]);
-  const drivers = useMemo(() => {
-    const sub = (driverSubData as any)?.driversUpdated;
-    return sub ?? (driverData as any)?.drivers ?? [];
-  }, [driverSubData, driverData]);
+  const orders = useMemo(() => (orderData as any)?.orders ?? [], [orderData]);
+  const drivers = useMemo(() => (driverData as any)?.drivers ?? [], [driverData]);
 
   const activeOrders = useMemo(
     () => orders.filter((o: any) => o.status !== "DELIVERED" && o.status !== "CANCELLED"),

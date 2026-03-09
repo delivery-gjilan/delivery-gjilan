@@ -60,7 +60,8 @@ export function CompactRestaurantCard({
 
     return (
         <TouchableOpacity
-            onPress={() => onPress(id)}
+            onPress={isOpen ? () => onPress(id) : undefined}
+            disabled={!isOpen}
             activeOpacity={0.9}
             style={{
                 width: CARD_WIDTH,
@@ -68,6 +69,7 @@ export function CompactRestaurantCard({
                 borderRadius: 12,
                 overflow: 'hidden',
                 backgroundColor: theme.colors.card,
+                opacity: isOpen ? 1 : 0.6,
                 ...(Platform.OS === 'ios' && {
                     shadowColor: '#000',
                     shadowOffset: { width: 0, height: 1 },

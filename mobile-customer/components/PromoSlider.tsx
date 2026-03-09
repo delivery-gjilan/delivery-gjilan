@@ -26,17 +26,32 @@ export function PromoSlider({ banners }: PromoSliderProps) {
     const flatListRef = useRef<FlatList>(null);
     const [currentIndex, setCurrentIndex] = useState(0);
     const scrollPausedRef = useRef(false);
+    const isLoopingRef = useRef(false);
+
+    // Create infinite scroll data (duplicate first/last items for seamless loop)
+    const infiniteData = banners.length > 1 
+        ? [banners[banners.length - 1], ...banners, banners[0]]
+        : banners;
+
+    // Initialize to first real item (index 1 in infinite data)
+    useEffect(() => {
+        if (banners.length > 1) {
+            setTimeout(() => {
+                flatListRef.current?.scrollToIndex({ index: 1, animated: false });
+            }, 50);
+        }
+    }, [banners.length]);
 
     // Auto-scroll
     useEffect(() => {
         if (banners.length <= 1) return;
 
         const interval = setInterval(() => {
-            if (scrollPausedRef.current) return;
+            if (scrollPausedRef.current || isLoopingRef.current) return;
             setCurrentIndex((prev) => {
-                const next = (prev + 1) % banners.length;
-                flatListRef.current?.scrollToIndex({ index: next, animated: true });
-                return next;
+                const next = prev + 1;
+                flatListRef.current?.scrollToIndex({ index: next + 1, animated: true });
+                return next % banners.length;
             });
         }, AUTO_SCROLL_INTERVAL);
 
@@ -44,9 +59,32 @@ export function PromoSlider({ banners }: PromoSliderProps) {
     }, [banners.length]);
 
     const onScroll = useCallback((event: any) => {
-        const index = Math.round(event.nativeEvent.contentOffset.x / (SLIDE_WIDTH + 16));
-        setCurrentIndex(index);
-    }, []);
+        if (banners.length <= 1 || isLoopingRef.current) return;
+        
+        const offsetX = event.nativeEvent.contentOffset.x;
+        const index = Math.round(offsetX / (SLIDE_WIDTH + 16));
+        
+        // Handle infinite loop wrapping
+        if (index === 0) {
+            // At duplicate last item, jump to real last item
+            isLoopingRef.current = true;
+            setTimeout(() => {
+                flatListRef.current?.scrollToIndex({ index: banners.length, animated: false });
+                setCurrentIndex(banners.length - 1);
+                isLoopingRef.current = false;
+            }, 50);
+        } else if (index === infiniteData.length - 1) {
+            // At duplicate first item, jump to real first item
+            isLoopingRef.current = true;
+            setTimeout(() => {
+                flatListRef.current?.scrollToIndex({ index: 1, animated: false });
+                setCurrentIndex(0);
+                isLoopingRef.current = false;
+            }, 50);
+        } else {
+            setCurrentIndex(index - 1); // Adjust for offset
+        }
+    }, [banners.length, infiniteData.length]);
 
     const onScrollBeginDrag = useCallback(() => {
         scrollPausedRef.current = true;
@@ -131,9 +169,9 @@ export function PromoSlider({ banners }: PromoSliderProps) {
             {/* Slider */}
             <FlatList
                 ref={flatListRef}
-                data={banners}
+                data={infiniteData}
                 renderItem={renderItem}
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item, index) => `${item.id}-${index}`}
                 horizontal
                 pagingEnabled={false}
                 showsHorizontalScrollIndicator={false}
@@ -182,9 +220,11 @@ export function PromoSlider({ banners }: PromoSliderProps) {
                     <View style={{ flex: 1, alignItems: 'flex-end' }}>
                         <TouchableOpacity
                             onPress={() => {
-                                const next = (currentIndex + 1) % banners.length;
-                                flatListRef.current?.scrollToIndex({ index: next, animated: true });
-                                setCurrentIndex(next);
+                                if (isLoopingRef.current) return;
+                                const nextRealIndex = (currentIndex + 1) % banners.length;
+                                const nextScrollIndex = currentIndex + 2; // +1 for offset, +1 for next
+                                flatListRef.current?.scrollToIndex({ index: nextScrollIndex, animated: true });
+                                setCurrentIndex(nextRealIndex);
                             }}
                             style={{
                                 width: 32,

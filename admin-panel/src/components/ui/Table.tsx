@@ -1,7 +1,9 @@
 export function Table({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-[#111113] border border-[#1e1e22] rounded-xl overflow-x-auto">
-      <table className="w-full text-left border-collapse">{children}</table>
+    <div className="bg-[#111113] border border-[#1e1e22] rounded-xl">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">{children}</table>
+      </div>
     </div>
   );
 }
@@ -16,7 +18,7 @@ export function Th({ children, className = "" }: { children: React.ReactNode; cl
 
 export function Td({ children, colSpan, className = "" }: { children: React.ReactNode; colSpan?: number; className?: string }) {
   return (
-    <td className={`px-4 py-2.5 text-zinc-300 border-b border-[#1e1e22]/60 text-sm ${className}`} colSpan={colSpan}>
+    <td className={`px-4 py-2.5 text-zinc-300 border-b border-[#1e1e22]/60 text-sm relative ${className}`} colSpan={colSpan}>
       {children}
     </td>
   );

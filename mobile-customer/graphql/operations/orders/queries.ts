@@ -5,6 +5,7 @@ export const GET_ORDERS = graphql(`
         orders {
             id
             displayId
+            userId
             orderPrice
             deliveryPrice
             totalPrice
@@ -53,6 +54,7 @@ export const GET_ORDER = graphql(`
         order(id: $id) {
             id
             displayId
+            userId
             orderPrice
             deliveryPrice
             totalPrice

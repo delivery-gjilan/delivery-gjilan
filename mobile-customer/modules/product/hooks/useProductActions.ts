@@ -59,16 +59,16 @@ export function useProductActions(product: Partial<Product>) {
             return;
         }
 
-        // Navigate back to business page with animation
-        router.push(`/business/${product.businessId ?? ''}`);
+        // Navigate back to previous screen
+        router.back();
     };
 
     const updateCart = () => {
         if (!id) return;
         updateQuantity(id, localQuantity);
 
-        // Navigate back to business page with animation
-        router.push(`/business/${product.businessId ?? ''}`);
+        // Navigate back to previous screen
+        router.back();
     };
 
     const removeFromCart = () => {

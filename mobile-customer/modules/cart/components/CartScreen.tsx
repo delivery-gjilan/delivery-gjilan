@@ -47,7 +47,10 @@ export const CartScreen = () => {
     const [addressName, setAddressName] = useState('');
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
     const [showSuccessScreen, setShowSuccessScreen] = useState(false);
+    const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
     const [driverNotes, setDriverNotes] = useState('');
+    const [promoError, setPromoError] = useState<string | null>(null);
+    const [saveAddressError, setSaveAddressError] = useState<string | null>(null);
     
     // Query saved addresses
     const { data: addressesData, loading: addressesLoading } = useQuery(GET_MY_ADDRESSES, {
@@ -141,6 +144,15 @@ export const CartScreen = () => {
     // Auto-apply helpers
     const autoAppliedPromotionIdRef = useRef<string | null>(null);
     const [autoApplying, setAutoApplying] = useState(false);
+    const hadItemsOnMount = useRef(items.length > 0);
+
+    // Auto-close cart when all items are removed
+    useEffect(() => {
+        if (hadItemsOnMount.current && items.length === 0) {
+            // Cart had items initially but is now empty - close it
+            router.back();
+        }
+    }, [items.length, router]);
 
     // When the cart reaches or exceeds a spend threshold, call the server to validate/apply promotions.
     useEffect(() => {
@@ -325,8 +337,10 @@ export const CartScreen = () => {
     };
 
     const handleSaveAsDefault = async () => {
+        setSaveAddressError(null);
+        
         if (!pendingLocationToSave || !addressName.trim()) {
-            Alert.alert(t.cart.address_name_required, t.cart.enter_address_name);
+            setSaveAddressError(t.cart.enter_address_name);
             return;
         }
         
@@ -349,17 +363,19 @@ export const CartScreen = () => {
                 });
             }
             
+            setSaveAddressError(null);
             setShowSaveAddressPrompt(false);
             setPendingLocationToSave(null);
             setAddressName('');
             goToStep(3);
         } catch (error) {
-            Alert.alert(t.common.error, t.cart.failed_save_address);
+            setSaveAddressError(error instanceof Error ? error.message : t.cart.failed_save_address);
             console.error('Error saving address:', error);
         }
     };
 
     const handleSkipSaving = () => {
+        setSaveAddressError(null);
         setShowSaveAddressPrompt(false);
         setPendingLocationToSave(null);
         setAddressName('');
@@ -382,8 +398,10 @@ export const CartScreen = () => {
 
     // Manual promo application handler (previous auto-validation removed)
     const handleApplyCoupon = async () => {
+        setPromoError(null);
+        
         if (!couponCode.trim()) {
-            Alert.alert(t.cart.enter_promo_code, t.cart.enter_promo_code);
+            setPromoError(t.cart.enter_promo_code);
             return;
         }
 
@@ -398,7 +416,7 @@ export const CartScreen = () => {
             const result = (response?.data as any)?.validatePromotions;
             if (!result || (Array.isArray(result.promotions) && result.promotions.length === 0)) {
                 setPromoResult(null);
-                Alert.alert(t.cart.invalid_code, t.cart.promo_not_valid);
+                setPromoError(t.cart.promo_not_valid);
                 return;
             }
 
@@ -409,9 +427,12 @@ export const CartScreen = () => {
                 effectiveDeliveryPrice: Number(result.finalDeliveryPrice ?? deliveryPrice),
                 totalPrice: Number(result.finalTotal ?? total + deliveryPrice),
             });
-            Alert.alert(t.cart.promo_applied_title, t.cart.discount_added.replace('{{amount}}', Number(result.totalDiscount ?? 0).toFixed(2)));
+            showNotifier(
+                t.cart.discount_added.replace('{{amount}}', Number(result.totalDiscount ?? 0).toFixed(2)),
+                'success'
+            );
         } catch (err) {
-            Alert.alert(t.cart.promo_error, t.cart.unable_validate_promo);
+            setPromoError(t.cart.unable_validate_promo);
         }
     };
 
@@ -429,6 +450,10 @@ export const CartScreen = () => {
         if (promoResult && !couponCode.trim()) {
             setPromoResult(null);
             autoAppliedPromotionIdRef.current = null;
+        }
+        // Clear error when user starts typing
+        if (promoError && couponCode.trim()) {
+            setPromoError(null);
         }
     }, [couponCode]);
 
@@ -457,10 +482,11 @@ export const CartScreen = () => {
 
         setIsProcessing(true);
         try {
-            await createOrder(selectedLocation, appliedDeliveryPrice, finalTotal, promoResult?.code, driverNotes);
+            const order = await createOrder(selectedLocation, appliedDeliveryPrice, finalTotal, promoResult?.code, driverNotes);
             // Reset wizard & show success screen
             setShowSaveAddressPrompt(false);
             setShowConfirmDialog(false);
+            setCreatedOrderId(order?.id || null);
             setShowSuccessScreen(true);
             setStep(1);
             // Clear cart AFTER setting success screen so isEmpty doesn't flash first
@@ -484,9 +510,14 @@ export const CartScreen = () => {
                 }}
             >
                 <OrderSuccessScreen
+                    orderId={createdOrderId}
                     onTrackOrder={() => {
                         setShowSuccessScreen(false);
-                        router.replace('/orders/active');
+                        if (createdOrderId) {
+                            router.replace(`/orders/${createdOrderId}` as any);
+                        } else {
+                            router.replace('/orders/active');
+                        }
                     }}
                     onGoHome={() => {
                         setShowSuccessScreen(false);
@@ -536,16 +567,8 @@ export const CartScreen = () => {
     return (
         <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }}>
 
-            {/* ─── Top bar: back + stepper ──── */}
-            <View className="flex-row items-center px-4 py-6">
-                <TouchableOpacity
-                    onPress={() => step === 1 ? router.back() : goToStep((step - 1) as 1 | 2)}
-                    className="p-1 mr-2"
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                    <Ionicons name={step === 1 ? 'close' : 'arrow-back'} size={22} color={theme.colors.text} />
-                </TouchableOpacity>
-
+            {/* ─── Top stepper (no back button) ──── */}
+            <View className="flex-row items-center justify-center px-4 py-6">
                 <View className="flex-1 flex-row items-center justify-center">
                 {([
                     { s: 1 as const, icon: 'cart-outline' as const, iconDone: 'cart' as const, label: t.cart.title },
@@ -870,10 +893,21 @@ export const CartScreen = () => {
                                     )}
                                 </TouchableOpacity>
                             </View>
-                            {promoResult && (
-                                <Text className="text-xs mt-2" style={{ color: theme.colors.income }}>
-                                    {t.cart.promo_applied.replace('{{code}}', promoResult.code)}
-                                </Text>
+                            {promoError && (
+                                <View className="flex-row items-center gap-1 mt-2">
+                                    <Ionicons name="alert-circle" size={14} color={theme.colors.expense} />
+                                    <Text className="text-xs flex-1" style={{ color: theme.colors.expense }}>
+                                        {promoError}
+                                    </Text>
+                                </View>
+                            )}
+                            {promoResult && !promoError && (
+                                <View className="flex-row items-center gap-1 mt-2">
+                                    <Ionicons name="checkmark-circle" size={14} color={theme.colors.income} />
+                                    <Text className="text-xs flex-1" style={{ color: theme.colors.income }}>
+                                        {t.cart.promo_applied.replace('{{code}}', promoResult.code)}
+                                    </Text>
+                                </View>
                             )}
                         </View>
 
@@ -1049,6 +1083,16 @@ export const CartScreen = () => {
                                     }
                                 }}
                             />
+
+                            {/* Error message */}
+                            {saveAddressError && (
+                                <View className="flex-row items-start gap-2 mb-4 px-3 py-2.5 rounded-xl" style={{ backgroundColor: theme.colors.expense + '10', borderWidth: 1, borderColor: theme.colors.expense + '30' }}>
+                                    <Ionicons name="alert-circle" size={16} color={theme.colors.expense} style={{ marginTop: 1 }} />
+                                    <Text className="text-xs flex-1" style={{ color: theme.colors.expense, lineHeight: 18 }}>
+                                        {saveAddressError}
+                                    </Text>
+                                </View>
+                            )}
 
                             {/* Action buttons */}
                             <View className="flex-row gap-3">

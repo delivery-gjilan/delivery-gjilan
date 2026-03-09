@@ -82,10 +82,10 @@ export const OrdersFloatingBar = () => {
         <TouchableOpacity
             activeOpacity={0.9}
             onPress={() => router.push(`/orders/${activeOrder.id}`)}
-            className="flex-row items-center justify-between p-4 rounded-2xl"
+            className="flex-row items-center justify-between p-4 rounded-2xl w-full"
             style={{ backgroundColor: statusInfo.bgColor }}
         >
-            <View className="flex-row items-center space-x-3 gap-3 flex-1">
+            <View className="flex-row items-center gap-3 flex-1">
                 <View className="bg-white/20 p-2 rounded-full">
                     <Ionicons name={statusInfo.icon} size={20} color="white" />
                 </View>
@@ -99,7 +99,7 @@ export const OrdersFloatingBar = () => {
                     </Text>
                 </View>
             </View>
-            <View className="flex-row items-center space-x-1">
+            <View className="flex-row items-center gap-1 ml-2">
                 <View className="bg-white/20 px-2 py-1 rounded-full">
                     <Text className="text-white text-xs font-semibold">{statusInfo.label}</Text>
                 </View>

@@ -15,11 +15,20 @@
       "autoIncrement": true,
       "channel": "production",
       "env": {
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
+        "EXPO_PUBLIC_MAPTILER_API_KEY": "J5uv4tZ8MpmOrnqpBl4J",
+        "EXPO_PUBLIC_MAPBOX_TOKEN": "pk.eyJ1IjoiYXJ0c2hhYmFuaTIwMDIiLCJhIjoiY21sZjlkbTNxMDIwOTNkc2F0cTZkYmZoeiJ9.C81uu49ST5NrfHZ58N9EXg",
+        "EXPO_PUBLIC_API_URL": "https://colloquial-deadra-cursorily.ngrok-free.dev/graphql"
       }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "artshabani2002@icloud.com",
+        "ascAppId": "6760239090",
+        "appleTeamId": "87K8YXG5V8"
+      }
+    }
   }
 }

@@ -429,8 +429,8 @@ export class OrderService {
         return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
     }
 
-    async getAllOrders(): Promise<Order[]> {
-        const dbOrders = await this.orderRepository.findAll();
+    async getAllOrders(limit = 500): Promise<Order[]> {
+        const dbOrders = await this.orderRepository.findAll(limit);
         return Promise.all(dbOrders.map((order) => this.mapToOrder(order)));
     }
 
@@ -450,8 +450,13 @@ export class OrderService {
         return Promise.all(dbOrders.map((order) => this.mapToOrder(order)));
     }
 
-    async getOrdersByUserId(userId: string): Promise<Order[]> {
-        const dbOrders = await this.orderRepository.findByUserId(userId);
+    async getOrdersByUserId(userId: string, limit = 100): Promise<Order[]> {
+        const dbOrders = await this.orderRepository.findByUserId(userId, limit);
+        return Promise.all(dbOrders.map((order) => this.mapToOrder(order)));
+    }
+
+    async getActiveOrdersByUserId(userId: string): Promise<Order[]> {
+        const dbOrders = await this.orderRepository.findActiveByUserId(userId);
         return Promise.all(dbOrders.map((order) => this.mapToOrder(order)));
     }
 

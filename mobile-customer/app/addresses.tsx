@@ -8,6 +8,7 @@ import { useQuery, useMutation } from '@apollo/client/react';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { GET_MY_ADDRESSES, DELETE_USER_ADDRESS, SET_DEFAULT_ADDRESS } from '@/graphql/operations/addresses';
+import { toast } from '@/store/toastStore';
 
 export default function AddressesScreen() {
     const router = useRouter();
@@ -22,9 +23,10 @@ export default function AddressesScreen() {
     const [deleteAddress] = useMutation(DELETE_USER_ADDRESS, {
         onCompleted: () => {
             refetch();
+            toast.success(t.addresses.deleted_success || 'Address deleted');
         },
         onError: (error) => {
-            Alert.alert(t.common.error, error.message);
+            toast.error(t.common.error, error.message);
         },
     });
 
@@ -33,7 +35,7 @@ export default function AddressesScreen() {
             refetch();
         },
         onError: (error) => {
-            Alert.alert(t.common.error, error.message);
+            toast.error(t.common.error, error.message);
         },
     });
 

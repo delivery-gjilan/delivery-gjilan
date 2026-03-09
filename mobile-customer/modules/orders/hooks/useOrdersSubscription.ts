@@ -12,6 +12,7 @@ import { useAuthStore } from '@/store/authStore';
  */
 export function useOrdersSubscription() {
     const token = useAuthStore((state) => state.token);
+    const userId = useAuthStore((state) => state.user?.id);
     const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
     const hasActiveOrders = useActiveOrdersStore((state) => state.hasActiveOrders);
     const setActiveOrders = useActiveOrdersStore((state) => state.setActiveOrders);
@@ -22,11 +23,21 @@ export function useOrdersSubscription() {
         variables: { input: { token: token || '' } },
         skip: !shouldSubscribe,
         onData: ({ client }) => {
-            // Signal received — refetch orders from server
-            client.refetchQueries({ include: [GET_ORDERS, GET_ORDER] }).then((results) => {
+            // Signal received — refetch orders from server and update cache
+            client.refetchQueries({ 
+                include: [GET_ORDERS, GET_ORDER],
+                updateCache(cache) {
+                    // Clear the orders cache to force fresh data
+                    cache.evict({ fieldName: 'orders' });
+                    cache.gc();
+                },
+            }).then((results) => {
                 const orders = (results[0]?.data as any)?.orders ?? [];
                 const activeOrders = orders.filter(
-                    (order: any) => order.status !== 'DELIVERED' && order.status !== 'CANCELLED',
+                    (order: any) => 
+                        order.userId === userId && 
+                        order.status !== 'DELIVERED' && 
+                        order.status !== 'CANCELLED',
                 );
                 setActiveOrders(activeOrders as unknown as any);
             });

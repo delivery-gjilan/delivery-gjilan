@@ -30,7 +30,7 @@ export function CategoryIcons({ categories }: CategoryIconsProps) {
         <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+            contentContainerStyle={{ paddingHorizontal: 16, gap: 8, flexGrow: 1, justifyContent: 'center' }}
         >
             {categories.map((cat) => {
                 const gradientColors = categoryGradients[cat.id] || ['#868e96', '#495057'];

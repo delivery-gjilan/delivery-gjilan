@@ -1,14 +1,18 @@
 import { getDB } from '@/database';
 import { orders as ordersTable, orderItems as orderItemsTable } from '@/database/schema';
-import { and, eq, inArray, isNull, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, notInArray, or } from 'drizzle-orm';
 import type { DbOrder } from '@/database/schema/orders';
 import type { NewDbOrderItem } from '@/database/schema/orderItems';
 import { OrderStatus } from '@/generated/types.generated';
 
 export class OrderRepository {
-    async findAll(): Promise<DbOrder[]> {
+    async findAll(limit = 500): Promise<DbOrder[]> {
         const db = await getDB();
-        return await db.select().from(ordersTable);
+        return await db
+            .select()
+            .from(ordersTable)
+            .orderBy(desc(ordersTable.orderDate))
+            .limit(limit);
     }
 
     async findById(id: string): Promise<DbOrder | null> {
@@ -19,7 +23,11 @@ export class OrderRepository {
 
     async findByStatus(status: OrderStatus): Promise<DbOrder[]> {
         const db = await getDB();
-        return await db.select().from(ordersTable).where(eq(ordersTable.status, status));
+        return await db
+            .select()
+            .from(ordersTable)
+            .where(eq(ordersTable.status, status))
+            .orderBy(desc(ordersTable.createdAt));
     }
 
     async findByIds(ids: string[]): Promise<DbOrder[]> {
@@ -28,9 +36,28 @@ export class OrderRepository {
         return await db.select().from(ordersTable).where(inArray(ordersTable.id, ids));
     }
 
-    async findByUserId(userId: string): Promise<DbOrder[]> {
+    async findByUserId(userId: string, limit = 100): Promise<DbOrder[]> {
         const db = await getDB();
-        return await db.select().from(ordersTable).where(eq(ordersTable.userId, userId));
+        return await db
+            .select()
+            .from(ordersTable)
+            .where(eq(ordersTable.userId, userId))
+            .orderBy(desc(ordersTable.orderDate))
+            .limit(limit);
+    }
+
+    async findActiveByUserId(userId: string): Promise<DbOrder[]> {
+        const db = await getDB();
+        return await db
+            .select()
+            .from(ordersTable)
+            .where(
+                and(
+                    eq(ordersTable.userId, userId),
+                    notInArray(ordersTable.status, ['DELIVERED', 'CANCELLED'] as OrderStatus[])
+                )
+            )
+            .orderBy(desc(ordersTable.createdAt));
     }
 
     async findByUserIdAndStatus(userId: string, status: OrderStatus): Promise<DbOrder[]> {
@@ -38,7 +65,8 @@ export class OrderRepository {
         return await db
             .select()
             .from(ordersTable)
-            .where(and(eq(ordersTable.userId, userId), eq(ordersTable.status, status)));
+            .where(and(eq(ordersTable.userId, userId), eq(ordersTable.status, status)))
+            .orderBy(desc(ordersTable.createdAt));
     }
 
     /**
@@ -54,7 +82,8 @@ export class OrderRepository {
                     eq(ordersTable.driverId, driverId),
                     inArray(ordersTable.status, ['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'] as OrderStatus[]),
                 ),
-            );
+            )
+            .orderBy(desc(ordersTable.createdAt));
     }
 
     async findForDriverByStatus(driverId: string, status: OrderStatus): Promise<DbOrder[]> {
@@ -70,7 +99,8 @@ export class OrderRepository {
                         inArray(ordersTable.status, ['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'] as OrderStatus[]),
                     ),
                 ),
-            );
+            )
+            .orderBy(desc(ordersTable.createdAt));
     }
 
     async updateStatus(id: string, status: OrderStatus): Promise<DbOrder | null> {

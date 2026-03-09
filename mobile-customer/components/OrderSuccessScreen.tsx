@@ -16,11 +16,12 @@ import { useTranslations } from '@/hooks/useTranslations';
 const { width } = Dimensions.get('window');
 
 interface OrderSuccessScreenProps {
+    orderId?: string | null;
     onTrackOrder: () => void;
     onGoHome: () => void;
 }
 
-export default function OrderSuccessScreen({ onTrackOrder, onGoHome }: OrderSuccessScreenProps) {
+export default function OrderSuccessScreen({ orderId, onTrackOrder, onGoHome }: OrderSuccessScreenProps) {
     const theme = useTheme();
     const { t } = useTranslations();
 
@@ -31,6 +32,7 @@ export default function OrderSuccessScreen({ onTrackOrder, onGoHome }: OrderSucc
     const buttonsOpacity = useRef(new Animated.Value(0)).current;
     const buttonsTranslateY = useRef(new Animated.Value(30)).current;
     const confettiRef = useRef<any>(null);
+    const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         // Haptic feedback
@@ -78,7 +80,33 @@ export default function OrderSuccessScreen({ onTrackOrder, onGoHome }: OrderSucc
                 }),
             ]),
         ]).start();
-    }, []);
+
+        // Auto-close after 12 seconds
+        autoCloseTimerRef.current = setTimeout(() => {
+            onGoHome();
+        }, 12000);
+
+        // Cleanup timer on unmount
+        return () => {
+            if (autoCloseTimerRef.current) {
+                clearTimeout(autoCloseTimerRef.current);
+            }
+        };
+    }, [onGoHome]);
+
+    const handleTrackOrder = () => {
+        if (autoCloseTimerRef.current) {
+            clearTimeout(autoCloseTimerRef.current);
+        }
+        onTrackOrder();
+    };
+
+    const handleGoHome = () => {
+        if (autoCloseTimerRef.current) {
+            clearTimeout(autoCloseTimerRef.current);
+        }
+        onGoHome();
+    };
 
     return (
         <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -164,7 +192,7 @@ export default function OrderSuccessScreen({ onTrackOrder, onGoHome }: OrderSucc
             >
                 <TouchableOpacity
                     style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
-                    onPress={onTrackOrder}
+                    onPress={handleTrackOrder}
                     activeOpacity={0.8}
                 >
                     <Ionicons name="navigate-outline" size={20} color="#fff" />
@@ -175,7 +203,7 @@ export default function OrderSuccessScreen({ onTrackOrder, onGoHome }: OrderSucc
 
                 <TouchableOpacity
                     style={[styles.secondaryButton, { borderColor: theme.colors.border }]}
-                    onPress={onGoHome}
+                    onPress={handleGoHome}
                     activeOpacity={0.7}
                 >
                     <Text style={[styles.secondaryButtonText, { color: theme.colors.subtext }]}>
