@@ -14,6 +14,7 @@ import { useQuery } from '@apollo/client/react';
 import { GET_ORDER_DRIVER } from '@/graphql/operations/orders';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useCartActions } from '@/modules/cart';
+import { useSuccessModalStore } from '@/store/useSuccessModalStore';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -29,6 +30,7 @@ import { fetchRoute } from '@/utils/route';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Component, type ReactNode, type ErrorInfo } from 'react';
+import { useLiveActivity } from '@/hooks/useLiveActivity';
 
 // Lazy-load MapLibreGL to prevent crash if native module has issues
 let MapLibreGL: any = null;
@@ -231,6 +233,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const cameraRef = useRef<any>(null);
     const prevStatusRef = useRef<string | null>(null);
     const { clearCart } = useCartActions();
+    const { showSuccess } = useSuccessModalStore();
     const [hasFittedMap, setHasFittedMap] = useState(false);
     const [showSummary, setShowSummary] = useState(false);
 
@@ -352,21 +355,67 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [order?.orderDate, order?.status, (order as any)?.deliveredAt]);
 
-    // ─── Detect Delivered → Redirect ────────────────────────
+    // ─── Live Activity (Dynamic Island) ─────────────────────
+    const { startLiveActivity, updateLiveActivity, endLiveActivity } = useLiveActivity({
+        orderId: order?.id ?? '',
+        orderDisplayId: order?.displayId ?? '',
+        businessName: businessName,
+        enabled: !!(order?.id && (status === 'OUT_FOR_DELIVERY' || status === 'PREPARING' || status === 'READY')),
+    });
+
+    // Start Live Activity when order goes OUT_FOR_DELIVERY
+    useEffect(() => {
+        if (status === 'OUT_FOR_DELIVERY' && driverName && deliveryEta !== null) {
+            console.log('[OrderDetails] Starting Live Activity for OUT_FOR_DELIVERY');
+            startLiveActivity({
+                driverName: driverName,
+                estimatedMinutes: deliveryEta,
+                status: 'out_for_delivery',
+            });
+        }
+    }, [status, driverName, deliveryEta, startLiveActivity]);
+
+    // Update Live Activity when ETA or driver changes
+    useEffect(() => {
+        if ((status === 'OUT_FOR_DELIVERY' || status === 'PREPARING' || status === 'READY') && driverName && deliveryEta !== null) {
+            const liveStatus = status === 'OUT_FOR_DELIVERY' ? 'out_for_delivery' 
+                : status === 'READY' ? 'ready' 
+                : 'preparing';
+            
+            updateLiveActivity({
+                driverName: driverName,
+                estimatedMinutes: deliveryEta,
+                status: liveStatus,
+            });
+        }
+    }, [deliveryEta, driverName, status, updateLiveActivity]);
+
+    // End Live Activity when delivered or cancelled
+    useEffect(() => {
+        if (isCompleted || isCancelled) {
+            console.log('[OrderDetails] Ending Live Activity (order completed/cancelled)');
+            endLiveActivity();
+        }
+    }, [isCompleted, isCancelled, endLiveActivity]);
+
+    // ─── Detect Delivered → Show Success Modal ────────────────────────
     useEffect(() => {
         if (order && prevStatusRef.current !== null && prevStatusRef.current !== 'DELIVERED' && order.status === 'DELIVERED') {
+            const orderId = order.id;
+            console.log('[OrderDetails] Order delivered, showing success modal:', orderId);
+            
+            // Clear cart and show success modal
             clearCart();
-            router.replace('/(tabs)/home');
+            showSuccess(orderId, 'order_delivered');
+            
+            // Navigate home after a brief delay
             setTimeout(() => {
-                Alert.alert(
-                    t.orders.details.order_delivered,
-                    t.orders.details.order_delivered_message,
-                    [{ text: t.common.ok }]
-                );
-            }, 300);
+                console.log('[OrderDetails] Navigating to home');
+                router.replace('/(tabs)/home');
+            }, 100);
         }
         if (order) prevStatusRef.current = order.status ?? null;
-    }, [order?.status]);
+    }, [order?.status, clearCart, router, showSuccess]);
 
     // ─── Map Fitting (status-aware) ────────────────────────
     const fitMapToMarkers = useCallback(() => {

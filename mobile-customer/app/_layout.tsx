@@ -15,6 +15,7 @@ import { useNotifications } from '@/hooks/useNotifications';
 import StoreClosedScreen from '@/components/StoreClosedScreen';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ToastContainer } from '@/components/Toast';
+import SuccessModalContainer from '@/components/SuccessModalContainer';
 import InfoBanner from '@/components/InfoBanner';
 import type { InfoBannerType } from '@/components/InfoBanner';
 import { initSentry } from '@/lib/sentry';
@@ -89,6 +90,7 @@ function AppContent() {
                     </Stack>
                     <FloatingBars />
                     <ToastContainer />
+                    <SuccessModalContainer />
                 </SafeAreaProvider>
             </GestureHandlerRootView>
         </ThemeProvider>

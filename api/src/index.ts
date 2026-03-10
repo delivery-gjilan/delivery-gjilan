@@ -7,6 +7,7 @@ import { EnvelopArmorPlugin } from '@escape.tech/graphql-armor';
 import { schema } from './graphql/schema';
 import { createContext } from './graphql/createContext';
 import uploadRoutes from './routes/uploadRoutes';
+import debugRoutes from './routes/debugRoutes';
 import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/use/ws';
 import { initializeDriverServices, shutdownDriverServices } from '@/services/driverServices.init';
@@ -85,10 +86,15 @@ app.use(requestLogger);
 // Sentry error handler (must be after routes, before custom error handler)
 Sentry.setupExpressErrorHandler(app);
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 // Upload routes (REST API)
 app.use('/api/upload', uploadRoutes);
 
-const isProduction = process.env.NODE_ENV === 'production';
+// Debug routes (non-production only)
+if (!isProduction) {
+    app.use('/api/debug', debugRoutes);
+}
 
 const yoga = createYoga({
     schema,

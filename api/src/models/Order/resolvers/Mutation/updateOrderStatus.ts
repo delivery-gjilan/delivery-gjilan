@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { FinancialService } from '@/services/FinancialService';
 import { createAuditLogger } from '@/services/AuditLogger';
 import logger from '@/lib/logger';
-import { notifyCustomerOrderStatus } from '@/services/orderNotifications';
+import { notifyCustomerOrderStatus, updateLiveActivity, endLiveActivity } from '@/services/orderNotifications';
 import { AppError } from '@/lib/errors';
 
 export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus']> = async (
@@ -116,6 +116,40 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
     
     // Send push notification to customer
     notifyCustomerOrderStatus(context.notificationService, dbOrder.userId, id, status);
+    
+    // Update Live Activity (Dynamic Island) with new status
+    if (status === 'PREPARING' || status === 'READY' || status === 'OUT_FOR_DELIVERY') {
+        const liveActivityStatus = status === 'OUT_FOR_DELIVERY' ? 'out_for_delivery' 
+            : status === 'READY' ? 'ready' 
+            : 'preparing';
+        
+        // Get driver name if available
+        let driverName = 'Your driver';
+        if (order.driver?.firstName) {
+            driverName = `${order.driver.firstName} ${order.driver.lastName || ''}`.trim();
+        }
+        
+        // Calculate estimated minutes based on status
+        let estimatedMinutes = 0;
+        if (status === 'PREPARING' && dbOrder.preparationMinutes) {
+            estimatedMinutes = dbOrder.preparationMinutes;
+        } else if (status === 'READY') {
+            estimatedMinutes = 10; // Default 10 min for driver pickup
+        } else if (status === 'OUT_FOR_DELIVERY') {
+            estimatedMinutes = 15; // Default 15 min for delivery
+        }
+        
+        updateLiveActivity(
+            context.notificationService,
+            id,
+            liveActivityStatus,
+            driverName,
+            estimatedMinutes
+        );
+    } else if (status === 'DELIVERED' || status === 'CANCELLED') {
+        // End Live Activity when order is completed or cancelled
+        endLiveActivity(context.notificationService, id);
+    }
     
     // Log the status change
     const auditLog = createAuditLogger(db, context);

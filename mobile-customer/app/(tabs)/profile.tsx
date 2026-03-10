@@ -162,7 +162,8 @@ export default function Profile() {
                     <ProfileRow title={t.profile.my_addresses} icon="location-outline" onPress={() => router.push('/addresses')} />
                     <ProfileRow title={t.profile.invite_friends} icon="gift-outline" onPress={() => router.push('/invite-friends')} />
                     <ProfileRow title={t.profile.redeem_code} icon="ticket-outline" onPress={() => {}} />
-                    <ProfileRow title={t.profile.contact_support} icon="chatbubble-outline" onPress={() => {}} showDivider={false} />
+                    <ProfileRow title={t.profile.contact_support} icon="chatbubble-outline" onPress={() => {}} />
+                    <ProfileRow title="🐛 Debug Notifications" icon="bug-outline" onPress={() => router.push('/debug-notifications')} showDivider={false} />
                 </View>
 
                 {/* Account Actions */}

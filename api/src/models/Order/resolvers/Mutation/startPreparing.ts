@@ -1,7 +1,7 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { createAuditLogger } from '@/services/AuditLogger';
 import logger from '@/lib/logger';
-import { notifyCustomerOrderStatus } from '@/services/orderNotifications';
+import { notifyCustomerOrderStatus, updateLiveActivity } from '@/services/orderNotifications';
 import { AppError } from '@/lib/errors';
 
 export const startPreparing: NonNullable<MutationResolvers['startPreparing']> = async (
@@ -59,6 +59,15 @@ export const startPreparing: NonNullable<MutationResolvers['startPreparing']> = 
         await orderService.publishAllOrders();
 
         notifyCustomerOrderStatus(context.notificationService, dbOrder.userId, id, 'PREPARING');
+
+        // Update Live Activity with preparation time
+        updateLiveActivity(
+            context.notificationService,
+            id,
+            'preparing',
+            'Your driver', // Driver not assigned yet
+            preparationMinutes
+        );
 
         const auditLog = createAuditLogger(db, context);
         await auditLog.log({

@@ -9,7 +9,12 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://colloquial-deadra-cursorily.ngrok-free.dev/graphql",
+        "EXPO_PUBLIC_MAPBOX_TOKEN": "pk.eyJ1IjoiYXJ0c2hhYmFuaTIwMDIiLCJhIjoiY21sZjlkbTNxMDIwOTNkc2F0cTZkYmZoeiJ9.C81uu49ST5NrfHZ58N9EXg",
+        "EXPO_PUBLIC_MAPTILER_API_KEY": "J5uv4tZ8MpmOrnqpBl4J"
+      }
     },
     "production": {
       "autoIncrement": true,

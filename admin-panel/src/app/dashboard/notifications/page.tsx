@@ -9,6 +9,8 @@ import {
   SEND_PUSH_NOTIFICATION,
   PREVIEW_CAMPAIGN_AUDIENCE,
   DELETE_CAMPAIGN,
+  GET_ALL_PROMOTIONS,
+  ASSIGN_PROMOTION_TO_USERS,
 } from "@/graphql/operations/notifications";
 import { USERS_QUERY } from "@/graphql/operations/users/queries";
 import Button from "@/components/ui/Button";
@@ -34,6 +36,11 @@ import {
   AlertCircle,
   Clock,
   X,
+  Image,
+  Zap,
+  Filter,
+  Gift,
+  Tag,
 } from "lucide-react";
 
 // â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -61,8 +68,22 @@ interface UserItem {
   role: string;
 }
 
-type Tab = "campaigns" | "direct";
+interface Promotion {
+  id: string;
+  name: string;
+  description: string;
+  code: string;
+  type: string;
+  discountValue: number;
+  maxDiscountCap: number;
+  isActive: boolean;
+  startsAt: string;
+  endsAt: string;
+}
+
+type Tab = "campaigns" | "direct" | "promotions";
 type StatusFilter = "ALL" | "DRAFT" | "SENDING" | "SENT" | "FAILED";
+type RoleFilter = "ALL" | "CUSTOMER" | "DRIVER" | "BUSINESS_OWNER";
 
 // â”€â”€ Status badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -98,8 +119,8 @@ function StatCard({ label, value, color }: { label: string; value: number; color
 
 // â”€â”€ Notification Preview Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-function NotificationPreview({ title, body }: { title: string; body: string }) {
-  if (!title && !body) return null;
+function NotificationPreview({ title, body, imageUrl }: { title: string; body: string; imageUrl?: string }) {
+  if (!title && !body && !imageUrl) return null;
 
   return (
     <div className="bg-[#1a1a1a] border border-[#333] rounded-xl p-3">
@@ -118,6 +139,11 @@ function NotificationPreview({ title, body }: { title: string; body: string }) {
           <p className="text-xs text-zinc-500 mt-0.5 line-clamp-2">
             {body || "Notification body text..."}
           </p>
+          {imageUrl && (
+            <div className="mt-2 rounded-lg overflow-hidden w-full h-20 bg-zinc-800/40 flex items-center justify-center border border-zinc-800">
+              <Image size={16} className="text-zinc-600" />
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -148,6 +174,19 @@ export default function NotificationsPage() {
   const [directSearch, setDirectSearch] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<UserItem[]>([]);
   const [directSent, setDirectSent] = useState<{ success: boolean; successCount: number; failureCount: number } | null>(null);
+  const [directImageUrl, setDirectImageUrl] = useState("");
+  const [directTimeSensitive, setDirectTimeSensitive] = useState(false);
+  const [directCategory, setDirectCategory] = useState("");
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>("ALL");
+
+  const [selectedPromotion, setSelectedPromotion] = useState<string>("");
+  const [promoUsers, setPromoUsers] = useState<UserItem[]>([]);
+  const [promoSearch, setPromoSearch] = useState("");
+  const [promoRoleFilter, setPromoRoleFilter] = useState<RoleFilter>("ALL");
+  const [promoNotifTitle, setPromoNotifTitle] = useState("");
+  const [promoNotifBody, setPromoNotifBody] = useState("");
+  const [promoImageUrl, setPromoImageUrl] = useState("");
+  const [promoSent, setPromoSent] = useState<{ success: boolean; count: number } | null>(null);
 
   // â”€â”€ Queries & Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const { data, loading, refetch } = useQuery(GET_NOTIFICATION_CAMPAIGNS);
@@ -158,11 +197,16 @@ export default function NotificationsPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const allUsers: UserItem[] = (usersData as any)?.users || [];
 
+  const { data: promotionsData } = useQuery(GET_ALL_PROMOTIONS);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allPromotions: Promotion[] = (promotionsData as any)?.getAllPromotions || [];
+
   const [createCampaign, { loading: creating }] = useMutation(CREATE_CAMPAIGN);
   const [sendCampaignMut, { loading: sending }] = useMutation(SEND_CAMPAIGN);
   const [deleteCampaignMut] = useMutation(DELETE_CAMPAIGN);
   const [sendPushMut, { loading: sendingDirect }] = useMutation(SEND_PUSH_NOTIFICATION);
   const [previewAudience, { loading: previewing }] = useLazyQuery(PREVIEW_CAMPAIGN_AUDIENCE);
+  const [assignPromotionMut, { loading: assigningPromo }] = useMutation(ASSIGN_PROMOTION_TO_USERS);
 
   // â”€â”€ Computed â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const stats = useMemo(() => ({
@@ -195,12 +239,28 @@ export default function NotificationsPage() {
       .filter(
         (u) =>
           !selectedUsers.some((s) => s.id === u.id) &&
+          (roleFilter === "ALL" || u.role === roleFilter) &&
           (u.email.toLowerCase().includes(term) ||
             u.firstName.toLowerCase().includes(term) ||
             u.lastName.toLowerCase().includes(term)),
       )
       .slice(0, 8);
-  }, [allUsers, directSearch, selectedUsers]);
+  }, [allUsers, directSearch, selectedUsers, roleFilter]);
+
+  const filteredPromoUsers = useMemo(() => {
+    if (!promoSearch.trim()) return [];
+    const term = promoSearch.toLowerCase();
+    return allUsers
+      .filter(
+        (u) =>
+          !promoUsers.some((s) => s.id === u.id) &&
+          (promoRoleFilter === "ALL" || u.role === promoRoleFilter) &&
+          (u.email.toLowerCase().includes(term) ||
+            u.firstName.toLowerCase().includes(term) ||
+            u.lastName.toLowerCase().includes(term)),
+      )
+      .slice(0, 8);
+  }, [allUsers, promoSearch, promoUsers, promoRoleFilter]);
 
   // â”€â”€ Handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handlePreview = async () => {
@@ -282,6 +342,9 @@ export default function NotificationsPage() {
             userIds: selectedUsers.map((u) => u.id),
             title: directTitle.trim(),
             body: directBody.trim(),
+            imageUrl: directImageUrl.trim() || undefined,
+            timeSensitive: directTimeSensitive,
+            category: directCategory || undefined,
           },
         },
       });
@@ -293,9 +356,60 @@ export default function NotificationsPage() {
       }
       setDirectTitle("");
       setDirectBody("");
+      setDirectImageUrl("");
+      setDirectTimeSensitive(false);
+      setDirectCategory("");
       setSelectedUsers([]);
     } catch (err) {
       console.error("Direct send failed:", err);
+    }
+  };
+
+  const handleSelectAllCustomers = () => {
+    const customers = allUsers.filter((u) => u.role === "CUSTOMER");
+    setSelectedUsers(customers);
+  };
+
+  const handlePromoAssign = async () => {
+    if (!selectedPromotion || promoUsers.length === 0) return;
+    try {
+      const { data } = await assignPromotionMut({
+        variables: {
+          input: {
+            promotionId: selectedPromotion,
+            userIds: promoUsers.map((u) => u.id),
+          },
+        },
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const assignments = (data as any)?.assignPromotionToUsers || [];
+      const count = assignments.length;
+
+      if (promoNotifTitle.trim() && promoNotifBody.trim()) {
+        await sendPushMut({
+          variables: {
+            input: {
+              userIds: promoUsers.map((u) => u.id),
+              title: promoNotifTitle.trim(),
+              body: promoNotifBody.trim(),
+              imageUrl: promoImageUrl.trim() || undefined,
+              category: "promotion",
+            },
+          },
+        });
+      }
+
+      setPromoSent({ success: true, count });
+      setTimeout(() => setPromoSent(null), 5000);
+      setSelectedPromotion("");
+      setPromoUsers([]);
+      setPromoNotifTitle("");
+      setPromoNotifBody("");
+      setPromoImageUrl("");
+    } catch (err) {
+      console.error("Promo assign failed:", err);
+      setPromoSent({ success: false, count: 0 });
+      setTimeout(() => setPromoSent(null), 5000);
     }
   };
 
@@ -352,6 +466,17 @@ export default function NotificationsPage() {
         >
           <Send size={15} />
           Direct Send
+        </button>
+        <button
+          onClick={() => setActiveTab("promotions")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+            activeTab === "promotions"
+              ? "bg-[#1a1a1a] text-white border border-[#333]"
+              : "text-zinc-600 hover:text-zinc-400"
+          }`}
+        >
+          <Gift size={15} />
+          Promotions
         </button>
       </div>
 
@@ -537,7 +662,44 @@ export default function NotificationsPage() {
                 />
               </div>
 
-              <NotificationPreview title={directTitle} body={directBody} />
+              <Input
+                label="Image URL (optional)"
+                value={directImageUrl}
+                onChange={(e) => setDirectImageUrl(e.target.value)}
+                placeholder="https://example.com/image.png"
+              />
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-zinc-400">Category</label>
+                <select
+                  value={directCategory}
+                  onChange={(e) => setDirectCategory(e.target.value)}
+                  className="w-full bg-[#09090b] border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-violet-500"
+                >
+                  <option value="">None</option>
+                  <option value="order-on-the-way">Order On The Way</option>
+                  <option value="order-delivered">Order Delivered</option>
+                  <option value="order-cancelled">Order Cancelled</option>
+                  <option value="promotion">Promotion</option>
+                  <option value="general">General</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="direct-time-sensitive"
+                  checked={directTimeSensitive}
+                  onChange={(e) => setDirectTimeSensitive(e.target.checked)}
+                  className="w-4 h-4 rounded border-zinc-700 bg-[#09090b] text-violet-600 focus:ring-violet-500"
+                />
+                <label htmlFor="direct-time-sensitive" className="text-sm text-zinc-400 flex items-center gap-1.5">
+                  <Zap size={14} className="text-violet-500" />
+                  Time-sensitive (bypasses Focus/DND modes)
+                </label>
+              </div>
+
+              <NotificationPreview title={directTitle} body={directBody} imageUrl={directImageUrl} />
             </div>
 
             <Button
@@ -562,10 +724,36 @@ export default function NotificationsPage() {
 
           {/* Right: user picker */}
           <div className="bg-[#111] border border-zinc-800 rounded-xl p-5 space-y-4">
-            <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-              <Users size={14} className="text-violet-500" />
-              Select Recipients
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+                <Users size={14} className="text-violet-500" />
+                Select Recipients
+              </h3>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleSelectAllCustomers}
+                className="text-xs"
+              >
+                <Users size={12} className="mr-1" />
+                All Customers
+              </Button>
+            </div>
+
+            {/* Role Filter */}
+            <div className="flex items-center gap-2">
+              <Filter size={14} className="text-zinc-600" />
+              <select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value as RoleFilter)}
+                className="flex-1 bg-[#09090b] border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+              >
+                <option value="ALL">All Roles</option>
+                <option value="CUSTOMER">Customers</option>
+                <option value="DRIVER">Drivers</option>
+                <option value="BUSINESS_OWNER">Business Owners</option>
+              </select>
+            </div>
 
             {/* Search users */}
             <div className="relative">
@@ -635,6 +823,197 @@ export default function NotificationsPage() {
               <div className="text-center py-8">
                 <Users size={28} className="text-neutral-700 mx-auto mb-2" />
                 <p className="text-zinc-600 text-xs">Search and select users to send notifications to</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === "promotions" && (
+        <div className="grid grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <div className="bg-[#111] border border-zinc-800 rounded-xl p-5 space-y-4">
+              <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+                <Tag size={14} className="text-violet-500" />
+                Select Promotion
+              </h3>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-zinc-400">Promotion</label>
+                <select
+                  value={selectedPromotion}
+                  onChange={(e) => setSelectedPromotion(e.target.value)}
+                  className="w-full bg-[#09090b] border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-violet-500"
+                >
+                  <option value="">Choose a promotion...</option>
+                  {allPromotions.map((promo) => (
+                    <option key={promo.id} value={promo.id}>
+                      {promo.code} - {promo.name} ({promo.type === "PERCENTAGE" ? `${promo.discountValue}%` : `$${promo.discountValue}`})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedPromotion && (
+                <div className="bg-[#0a0a0a] border border-zinc-900 rounded-lg p-3 text-xs text-zinc-500">
+                  <p className="font-semibold text-zinc-400 mb-1">Selected Promotion Details:</p>
+                  {allPromotions.find(p => p.id === selectedPromotion)?.description}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-[#111] border border-zinc-800 rounded-xl p-5 space-y-4">
+              <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+                <Bell size={14} className="text-violet-500" />
+                Notification (Optional)
+              </h3>
+
+              <Input
+                label="Title"
+                value={promoNotifTitle}
+                onChange={(e) => setPromoNotifTitle(e.target.value)}
+                placeholder="🎉 New promotion for you!"
+              />
+
+              <div>
+                <label className="block text-sm font-medium text-zinc-400 mb-1">Message</label>
+                <textarea
+                  value={promoNotifBody}
+                  onChange={(e) => setPromoNotifBody(e.target.value)}
+                  placeholder="Check out our latest offer..."
+                  className="w-full bg-[#09090b] border border-zinc-800 rounded-lg px-3 py-2 text-white placeholder-neutral-600 text-sm resize-none h-20 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                />
+              </div>
+
+              <Input
+                label="Image URL (optional)"
+                value={promoImageUrl}
+                onChange={(e) => setPromoImageUrl(e.target.value)}
+                placeholder="https://example.com/promo.png"
+              />
+
+              <NotificationPreview title={promoNotifTitle} body={promoNotifBody} imageUrl={promoImageUrl} />
+            </div>
+
+            <Button
+              onClick={handlePromoAssign}
+              disabled={assigningPromo || !selectedPromotion || promoUsers.length === 0}
+              className="w-full"
+            >
+              <Gift size={14} className="mr-2" />
+              {assigningPromo
+                ? "Assigning..."
+                : `Assign to ${promoUsers.length} user${promoUsers.length !== 1 ? "s" : ""}`}
+            </Button>
+
+            {promoSent && (
+              <div className={`rounded-lg p-3 text-sm ${promoSent.success ? "bg-green-950 text-green-300" : "bg-red-950 text-red-300"}`}>
+                {promoSent.success
+                  ? `Success! Promotion assigned to ${promoSent.count} user${promoSent.count !== 1 ? "s" : ""}. ${promoNotifTitle ? "Notification sent." : ""}`
+                  : "Failed to assign promotion."}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-[#111] border border-zinc-800 rounded-xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+                <Users size={14} className="text-violet-500" />
+                Select Users
+              </h3>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const customers = allUsers.filter((u) => u.role === "CUSTOMER");
+                  setPromoUsers(customers);
+                }}
+                className="text-xs"
+              >
+                <Users size={12} className="mr-1" />
+                All Customers
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Filter size={14} className="text-zinc-600" />
+              <select
+                value={promoRoleFilter}
+                onChange={(e) => setPromoRoleFilter(e.target.value as RoleFilter)}
+                className="flex-1 bg-[#09090b] border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+              >
+                <option value="ALL">All Roles</option>
+                <option value="CUSTOMER">Customers</option>
+                <option value="DRIVER">Drivers</option>
+                <option value="BUSINESS_OWNER">Business Owners</option>
+              </select>
+            </div>
+
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+              <input
+                type="text"
+                value={promoSearch}
+                onChange={(e) => setPromoSearch(e.target.value)}
+                placeholder="Search by name or email..."
+                className="w-full bg-[#09090b] border border-zinc-800 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-violet-600"
+              />
+            </div>
+
+            {filteredPromoUsers.length > 0 && (
+              <div className="border border-zinc-800 rounded-lg overflow-hidden max-h-48 overflow-y-auto">
+                {filteredPromoUsers.map((user) => (
+                  <button
+                    key={user.id}
+                    onClick={() => {
+                      setPromoUsers((prev) => [...prev, user]);
+                      setPromoSearch("");
+                    }}
+                    className="w-full px-3 py-2 flex items-center gap-3 hover:bg-[#1a1a1a] transition-colors text-left border-b border-[#1a1a1a] last:border-0"
+                  >
+                    <div className="w-7 h-7 rounded-full bg-zinc-800/60 flex items-center justify-center text-xs text-zinc-500 flex-shrink-0">
+                      {user.firstName[0]}{user.lastName[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white truncate">
+                        {user.firstName} {user.lastName}
+                      </p>
+                      <p className="text-xs text-zinc-600 truncate">{user.email}</p>
+                    </div>
+                    <span className="text-[10px] text-zinc-600 uppercase">{user.role}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {promoUsers.length > 0 && (
+              <div>
+                <p className="text-xs text-zinc-600 mb-2">
+                  {promoUsers.length} user{promoUsers.length !== 1 ? "s" : ""} selected
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {promoUsers.map((user) => (
+                    <span
+                      key={user.id}
+                      className="inline-flex items-center gap-1.5 bg-[#1a1a1a] border border-[#333] rounded-full pl-2.5 pr-1.5 py-1 text-xs text-zinc-400"
+                    >
+                      {user.firstName} {user.lastName}
+                      <button
+                        onClick={() => setPromoUsers((prev) => prev.filter((u) => u.id !== user.id))}
+                        className="p-0.5 rounded-full hover:bg-zinc-800 transition-colors"
+                      >
+                        <X size={10} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {promoUsers.length === 0 && !promoSearch && (
+              <div className="text-center py-8">
+                <Users size={28} className="text-neutral-700 mx-auto mb-2" />
+                <p className="text-zinc-600 text-xs">Search and select users to assign promotion</p>
               </div>
             )}
           </div>

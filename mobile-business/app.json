@@ -33,15 +33,19 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/notification-icon.png",
-          "color": "#0b89a9",
-          "sounds": ["./assets/notification.wav"]
+          "color": "#0b89a9"
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true
     },
-    "scheme": "delivery-gjilan-business"
+    "scheme": "delivery-gjilan-business",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "dc536dcd-100f-4271-82f4-2e8fcbdbb345"
+      }
+    }
   }
 }

@@ -561,6 +561,7 @@ export type Mutation = {
   markSettlementAsPartiallyPaid: Settlement;
   markSettlementsAsPaid: Array<Settlement>;
   registerDeviceToken: Scalars['Boolean']['output'];
+  registerLiveActivityToken: Scalars['Boolean']['output'];
   removeUserFromPromotion: Scalars['Boolean']['output'];
   resendEmailVerification: SignupStepResponse;
   sendCampaign: NotificationCampaign;
@@ -799,6 +800,13 @@ export type MutationmarkSettlementsAsPaidArgs = {
 
 export type MutationregisterDeviceTokenArgs = {
   input: RegisterDeviceTokenInput;
+};
+
+
+export type MutationregisterLiveActivityTokenArgs = {
+  activityId: Scalars['String']['input'];
+  orderId: Scalars['ID']['input'];
+  token: Scalars['String']['input'];
 };
 
 
@@ -1235,6 +1243,7 @@ export type Query = {
   deliveryPricingConfig: DeliveryPricingConfig;
   deliveryPricingTiers: Array<DeliveryPricingTier>;
   deliveryZones: Array<DeliveryZone>;
+  deviceTokens: Array<DeviceToken>;
   driverBalance: SettlementSummary;
   drivers: Array<User>;
   getAllPromotions: Array<Promotion>;
@@ -1309,6 +1318,11 @@ export type QuerycalculateDeliveryPriceArgs = {
   businessId: Scalars['ID']['input'];
   dropoffLat: Scalars['Float']['input'];
   dropoffLng: Scalars['Float']['input'];
+};
+
+
+export type QuerydeviceTokensArgs = {
+  userId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 
@@ -1504,7 +1518,11 @@ export type SendNotificationResult = {
 
 export type SendPushNotificationInput = {
   body: Scalars['String']['input'];
+  category?: InputMaybe<Scalars['String']['input']>;
   data?: InputMaybe<Scalars['JSON']['input']>;
+  imageUrl?: InputMaybe<Scalars['String']['input']>;
+  relevanceScore?: InputMaybe<Scalars['Float']['input']>;
+  timeSensitive?: InputMaybe<Scalars['Boolean']['input']>;
   title: Scalars['String']['input'];
   userIds: Array<Scalars['ID']['input']>;
 };
@@ -2438,6 +2456,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   markSettlementAsPartiallyPaid?: Resolver<ResolversTypes['Settlement'], ParentType, ContextType, RequireFields<MutationmarkSettlementAsPartiallyPaidArgs, 'amount' | 'settlementId'>>;
   markSettlementsAsPaid?: Resolver<Array<ResolversTypes['Settlement']>, ParentType, ContextType, RequireFields<MutationmarkSettlementsAsPaidArgs, 'ids'>>;
   registerDeviceToken?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationregisterDeviceTokenArgs, 'input'>>;
+  registerLiveActivityToken?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationregisterLiveActivityTokenArgs, 'activityId' | 'orderId' | 'token'>>;
   removeUserFromPromotion?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationremoveUserFromPromotionArgs, 'promotionId' | 'userId'>>;
   resendEmailVerification?: Resolver<ResolversTypes['SignupStepResponse'], ParentType, ContextType>;
   sendCampaign?: Resolver<ResolversTypes['NotificationCampaign'], ParentType, ContextType, RequireFields<MutationsendCampaignArgs, 'id'>>;
@@ -2696,6 +2715,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   deliveryPricingConfig?: Resolver<ResolversTypes['DeliveryPricingConfig'], ParentType, ContextType>;
   deliveryPricingTiers?: Resolver<Array<ResolversTypes['DeliveryPricingTier']>, ParentType, ContextType>;
   deliveryZones?: Resolver<Array<ResolversTypes['DeliveryZone']>, ParentType, ContextType>;
+  deviceTokens?: Resolver<Array<ResolversTypes['DeviceToken']>, ParentType, ContextType, Partial<QuerydeviceTokensArgs>>;
   driverBalance?: Resolver<ResolversTypes['SettlementSummary'], ParentType, ContextType, RequireFields<QuerydriverBalanceArgs, 'driverId'>>;
   drivers?: Resolver<Array<ResolversTypes['User']>, ParentType, ContextType>;
   getAllPromotions?: Resolver<Array<ResolversTypes['Promotion']>, ParentType, ContextType, Partial<QuerygetAllPromotionsArgs>>;

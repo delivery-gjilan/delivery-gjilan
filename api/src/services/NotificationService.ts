@@ -4,6 +4,7 @@ import { NotificationType } from '@/database/schema/notifications';
 import { DeviceAppType, DevicePlatform } from '@/database/schema/deviceTokens';
 import logger from '@/lib/logger';
 import type { Message, MulticastMessage } from 'firebase-admin/messaging';
+import { LiveActivityTokenRepository } from '@/repositories/LiveActivityTokenRepository';
 
 export interface NotificationPayload {
     title: string;
@@ -11,6 +12,12 @@ export interface NotificationPayload {
     data?: Record<string, string>;
     /** Image URL to display in the notification (optional) */
     imageUrl?: string;
+    /** Mark as time-sensitive to bypass Focus modes (iOS 15+) */
+    timeSensitive?: boolean;
+    /** Notification category for interactive actions (e.g., "order-delivered") */
+    category?: string;
+    /** Relevance score for notification ordering (0.0 to 1.0) */
+    relevanceScore?: number;
 }
 
 export interface SendResult {
@@ -53,12 +60,14 @@ export class NotificationService {
         payload: NotificationPayload,
         type: NotificationType,
     ): Promise<SendResult> {
+        logger.info({ userId, title: payload.title }, 'notification:sendToUser — looking up device tokens');
         const tokens = await this.repo.getTokensByUserId(userId);
         if (tokens.length === 0) {
-            logger.debug({ userId }, 'No device tokens for user, skipping push');
+            logger.warn({ userId }, 'notification:sendToUser — NO device tokens found for user, skipping push');
             return { successCount: 0, failureCount: 0, staleTokens: [] };
         }
 
+        logger.info({ userId, tokenCount: tokens.length, platforms: tokens.map(t => t.platform) }, 'notification:sendToUser — found tokens, sending multicast');
         const tokenStrings = tokens.map((t) => t.token);
         const result = await this.sendMulticast(tokenStrings, payload);
 
@@ -151,14 +160,19 @@ export class NotificationService {
     private async sendMulticast(tokens: string[], payload: NotificationPayload): Promise<SendResult> {
         if (tokens.length === 0) return { successCount: 0, failureCount: 0, staleTokens: [] };
 
-        const messaging = getMessaging();
+        logger.info(
+            { totalTokens: tokens.length },
+            'notification:sendMulticast — sending via Firebase',
+        );
 
-        // FCM sendEachForMulticast accepts up to 500 tokens
+        const messaging = getMessaging();
         const BATCH_SIZE = 500;
+        
         let totalSuccess = 0;
         let totalFailure = 0;
-        const allStaleTokens: string[] = [];
+        const staleTokens: string[] = [];
 
+        // Send in batches (Firebase limit is 500 tokens per call)
         for (let i = 0; i < tokens.length; i += BATCH_SIZE) {
             const batch = tokens.slice(i, i + BATCH_SIZE);
 
@@ -183,17 +197,27 @@ export class NotificationService {
                             alert: { title: payload.title, body: payload.body },
                             sound: 'default',
                             badge: 1,
+                            // Time-sensitive: bypasses Focus modes for urgent notifications
+                            ...(payload.timeSensitive && {
+                                'interruption-level': 'time-sensitive',
+                                'relevance-score': payload.relevanceScore || 1.0,
+                            }),
+                            // Category: enables interactive action buttons
+                            ...(payload.category && { category: payload.category }),
                         },
+                    },
+                    headers: {
+                        // High priority for time-sensitive notifications
+                        'apns-priority': payload.timeSensitive ? '10' : '5',
                     },
                 },
             };
 
             const response = await messaging.sendEachForMulticast(multicastMessage);
-
             totalSuccess += response.successCount;
             totalFailure += response.failureCount;
 
-            // Identify stale/invalid tokens
+            // Detect stale tokens
             response.responses.forEach((resp, idx) => {
                 const token = batch[idx];
                 if (!token) return;
@@ -203,21 +227,149 @@ export class NotificationService {
                         code === 'messaging/registration-token-not-registered' ||
                         code === 'messaging/invalid-registration-token'
                     ) {
-                        allStaleTokens.push(token);
+                        staleTokens.push(token);
                     } else {
-                        logger.warn({ token, errorCode: code }, 'FCM send error');
+                        logger.warn({ token, errorCode: code }, 'notification:sendMulticast — FCM send error');
                     }
                 }
             });
         }
 
         // Clean up stale tokens
-        if (allStaleTokens.length > 0) {
-            logger.info({ count: allStaleTokens.length }, 'Removing stale FCM tokens');
-            await this.repo.removeDeviceTokensByIds(allStaleTokens);
+        if (staleTokens.length > 0) {
+            logger.info({ count: staleTokens.length }, 'notification:sendMulticast — removing stale tokens');
+            await this.repo.removeDeviceTokensByIds(staleTokens);
         }
 
-        logger.info({ successCount: totalSuccess, failureCount: totalFailure }, 'Multicast push result');
-        return { successCount: totalSuccess, failureCount: totalFailure, staleTokens: allStaleTokens };
+        logger.info(
+            { successCount: totalSuccess, failureCount: totalFailure },
+            'notification:sendMulticast — result',
+        );
+        return { successCount: totalSuccess, failureCount: totalFailure, staleTokens };
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Live Activity support (iOS Dynamic Island)
+    // ────────────────────────────────────────────────────────────────
+
+    /**
+     * Send Live Activity update to all active sessions for an order
+     * Updates the Dynamic Island with new ETA and status
+     */
+    async sendLiveActivityUpdate(
+        orderId: string,
+        updates: {
+            driverName: string;
+            estimatedMinutes: number;
+            status: 'preparing' | 'ready' | 'out_for_delivery' | 'delivered';
+        },
+    ): Promise<void> {
+        const liveActivityRepo = new LiveActivityTokenRepository();
+        const tokens = await liveActivityRepo.getTokensByOrderId(orderId);
+
+        if (tokens.length === 0) {
+            logger.debug({ orderId }, 'No Live Activity tokens for order');
+            return;
+        }
+
+        const messaging = getMessaging();
+
+        // Send update to each Live Activity
+        for (const tokenRecord of tokens) {
+            try {
+                const message: Message = {
+                    token: tokenRecord.pushToken,
+                    data: {
+                        driverName: updates.driverName,
+                        estimatedMinutes: String(updates.estimatedMinutes),
+                        status: updates.status,
+                        orderId: orderId,
+                        lastUpdated: new Date().toISOString(),
+                    },
+                    apns: {
+                        headers: {
+                            'apns-push-type': 'liveactivity', // Required for Live Activity updates
+                            'apns-priority': '10',
+                        },
+                        payload: {
+                            aps: {
+                                timestamp: Math.floor(Date.now() / 1000),
+                                event: 'update',
+                                'content-state': {
+                                    driverName: updates.driverName,
+                                    estimatedMinutes: updates.estimatedMinutes,
+                                    status: updates.status,
+                                    orderId: orderId,
+                                    lastUpdated: new Date().toISOString(),
+                                },
+                            },
+                        },
+                    },
+                };
+
+                await messaging.send(message);
+                logger.info(
+                    { orderId, activityId: tokenRecord.activityId, estimatedMinutes: updates.estimatedMinutes },
+                    'Sent Live Activity update',
+                );
+            } catch (error: any) {
+                const code = error?.code;
+                if (
+                    code === 'messaging/registration-token-not-registered' ||
+                    code === 'messaging/invalid-registration-token'
+                ) {
+                    // Token is stale, remove it
+                    logger.info({ activityId: tokenRecord.activityId }, 'Removing stale Live Activity token');
+                    await liveActivityRepo.removeToken(tokenRecord.activityId);
+                } else {
+                    logger.error({ error, orderId, activityId: tokenRecord.activityId }, 'Failed to send Live Activity update');
+                }
+            }
+        }
+    }
+
+    /**
+     * End all Live Activities for an order (when order is completed/cancelled)
+     */
+    async endLiveActivities(orderId: string): Promise<void> {
+        const liveActivityRepo = new LiveActivityTokenRepository();
+        const tokens = await liveActivityRepo.getTokensByOrderId(orderId);
+
+        if (tokens.length === 0) {
+            return;
+        }
+
+        const messaging = getMessaging();
+
+        // Send end event to each Live Activity
+        for (const tokenRecord of tokens) {
+            try {
+                const message: Message = {
+                    token: tokenRecord.pushToken,
+                    apns: {
+                        headers: {
+                            'apns-push-type': 'liveactivity',
+                            'apns-priority': '10',
+                        },
+                        payload: {
+                            aps: {
+                                timestamp: Math.floor(Date.now() / 1000),
+                                event: 'end',
+                                'dismissal-date': Math.floor(Date.now() / 1000) + 10, // Dismiss after 10 seconds
+                            },
+                        },
+                    },
+                };
+
+                await messaging.send(message);
+                logger.info({ orderId, activityId: tokenRecord.activityId }, 'Ended Live Activity');
+            } catch (error: any) {
+                logger.error({ error, orderId, activityId: tokenRecord.activityId }, 'Failed to end Live Activity');
+            }
+        }
+
+        // Clean up tokens after ending Live Activities
+        await liveActivityRepo.removeTokensByOrderId(orderId);
     }
 }
+

@@ -11,3 +11,9 @@ export const UNREGISTER_DEVICE_TOKEN = gql`
         unregisterDeviceToken(token: $token)
     }
 `;
+
+export const REGISTER_LIVE_ACTIVITY_TOKEN = gql`
+    mutation RegisterLiveActivityToken($token: String!, $activityId: String!, $orderId: ID!) {
+        registerLiveActivityToken(token: $token, activityId: $activityId, orderId: $orderId)
+    }
+`;

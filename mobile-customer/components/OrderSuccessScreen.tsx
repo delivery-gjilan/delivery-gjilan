@@ -15,15 +15,20 @@ import { useTranslations } from '@/hooks/useTranslations';
 
 const { width } = Dimensions.get('window');
 
+type SuccessModalType = 'order_created' | 'order_delivered';
+
 interface OrderSuccessScreenProps {
     orderId?: string | null;
-    onTrackOrder: () => void;
+    type?: SuccessModalType;
+    onTrackOrder?: () => void;
     onGoHome: () => void;
 }
 
-export default function OrderSuccessScreen({ orderId, onTrackOrder, onGoHome }: OrderSuccessScreenProps) {
+export default function OrderSuccessScreen({ orderId, type = 'order_created', onTrackOrder, onGoHome }: OrderSuccessScreenProps) {
     const theme = useTheme();
     const { t } = useTranslations();
+    
+    const isDelivered = type === 'order_delivered';
 
     const checkScale = useRef(new Animated.Value(0)).current;
     const titleOpacity = useRef(new Animated.Value(0)).current;
@@ -163,7 +168,7 @@ export default function OrderSuccessScreen({ orderId, onTrackOrder, onGoHome }: 
                         },
                     ]}
                 >
-                    {t.cart.order_success_title}
+                    {isDelivered ? t.orders.details.order_delivered : t.cart.order_success_title}
                 </Animated.Text>
 
                 {/* Subtitle */}
@@ -176,7 +181,7 @@ export default function OrderSuccessScreen({ orderId, onTrackOrder, onGoHome }: 
                         },
                     ]}
                 >
-                    {t.cart.order_success_subtitle}
+                    {isDelivered ? t.orders.details.order_delivered_message : t.cart.order_success_subtitle}
                 </Animated.Text>
             </View>
 
@@ -190,16 +195,31 @@ export default function OrderSuccessScreen({ orderId, onTrackOrder, onGoHome }: 
                     },
                 ]}
             >
-                <TouchableOpacity
-                    style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
-                    onPress={handleTrackOrder}
-                    activeOpacity={0.8}
-                >
-                    <Ionicons name="navigate-outline" size={20} color="#fff" />
-                    <Text style={styles.primaryButtonText}>
-                        {t.cart.order_success_track}
-                    </Text>
-                </TouchableOpacity>
+                {!isDelivered && onTrackOrder && (
+                    <TouchableOpacity
+                        style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
+                        onPress={handleTrackOrder}
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name="navigate-outline" size={20} color="#fff" />
+                        <Text style={styles.primaryButtonText}>
+                            {t.cart.order_success_track}
+                        </Text>
+                    </TouchableOpacity>
+                )}
+
+                {isDelivered && onTrackOrder && (
+                    <TouchableOpacity
+                        style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
+                        onPress={handleTrackOrder}
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name="receipt-outline" size={20} color="#fff" />
+                        <Text style={styles.primaryButtonText}>
+                            {t.orders.details.view_order}
+                        </Text>
+                    </TouchableOpacity>
+                )}
 
                 <TouchableOpacity
                     style={[styles.secondaryButton, { borderColor: theme.colors.border }]}
@@ -207,7 +227,7 @@ export default function OrderSuccessScreen({ orderId, onTrackOrder, onGoHome }: 
                     activeOpacity={0.7}
                 >
                     <Text style={[styles.secondaryButtonText, { color: theme.colors.subtext }]}>
-                        {t.common.close}
+                        {isDelivered ? t.common.go_home : t.common.close}
                     </Text>
                 </TouchableOpacity>
             </Animated.View>

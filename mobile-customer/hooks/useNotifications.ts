@@ -2,9 +2,10 @@ import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import Constants from 'expo-constants';
+import messaging from '@react-native-firebase/messaging';
 import { useMutation } from '@apollo/client/react';
 import { useAuthStore } from '@/store/authStore';
+import { toast } from '@/store/toastStore';
 import { REGISTER_DEVICE_TOKEN, UNREGISTER_DEVICE_TOKEN } from '@/graphql/operations/notifications';
 import { useRouter } from 'expo-router';
 
@@ -19,6 +20,73 @@ Notifications.setNotificationHandler({
         shouldShowList: true,
     }),
 });
+
+// ── Setup interactive notification categories ───────────────────────
+/**
+ * Configure notification categories with interactive action buttons.
+ * These buttons appear when user long-presses or swipes down on notifications.
+ */
+async function setupNotificationCategories() {
+    try {
+        // Category: Order on the way - Track Order button
+        await Notifications.setNotificationCategoryAsync('order-on-the-way', [
+            {
+                identifier: 'TRACK_ORDER',
+                buttonTitle: '📍 Track Order',
+                options: {
+                    opensAppToForeground: true,
+                },
+            },
+        ]);
+
+        // Category: Order delivered - Rate, Add Tip, and Support buttons
+        await Notifications.setNotificationCategoryAsync('order-delivered', [
+            {
+                identifier: 'RATE_ORDER',
+                buttonTitle: '⭐ Rate Order',
+                options: {
+                    opensAppToForeground: true,
+                },
+            },
+            {
+                identifier: 'ADD_TIP',
+                buttonTitle: '💵 Add Tip',
+                options: {
+                    opensAppToForeground: true,
+                },
+            },
+            {
+                identifier: 'CONTACT_SUPPORT',
+                buttonTitle: '💬 Support',
+                options: {
+                    opensAppToForeground: false, // Can handle in background
+                },
+            },
+        ]);
+
+        // Category: Order cancelled - Contact Support button
+        await Notifications.setNotificationCategoryAsync('order-cancelled', [
+            {
+                identifier: 'CONTACT_SUPPORT',
+                buttonTitle: '💬 Contact Support',
+                options: {
+                    opensAppToForeground: true,
+                },
+            },
+            {
+                identifier: 'VIEW_REFUND',
+                buttonTitle: '💰 View Refund',
+                options: {
+                    opensAppToForeground: true,
+                },
+            },
+        ]);
+
+        console.log('[Notifications] Interactive categories configured');
+    } catch (error) {
+        console.error('[Notifications] Failed to setup categories:', error);
+    }
+}
 
 /**
  * Hook that manages push notification lifecycle:
@@ -40,25 +108,47 @@ export function useNotifications() {
     const [registerToken] = useMutation(REGISTER_DEVICE_TOKEN);
     const [unregisterToken] = useMutation(UNREGISTER_DEVICE_TOKEN);
 
-    console.log('[useNotifications] Hook called, isAuthenticated:', isAuthenticated);
+    const resolveDeviceId = () => {
+        return Device.modelId || Device.osBuildId || Device.modelName || 'unknown';
+    };
+
+    console.log('[useNotifications] Hook initialized');
 
     useEffect(() => {
-        console.log('[useNotifications] Effect running, isAuthenticated:', isAuthenticated, 'hasAuthToken:', !!authToken);
+        console.log('[useNotifications] Auth effect running:', { 
+            isAuthenticated, 
+            hasAuthToken: !!authToken,
+            platform: Platform.OS 
+        });
         if (!isAuthenticated || !authToken) return;
 
         let mounted = true;
 
         async function setup() {
             try {
+                console.log('[Notifications] Starting setup process...');
+                
+                // Setup interactive notification categories
+                await setupNotificationCategories();
+                
                 // Request permission and get push token
                 const pushToken = await registerForPushNotifications();
-                if (!pushToken || !mounted) return;
+                if (!pushToken || !mounted) {
+                    console.log('[Notifications] No push token or component unmounted, aborting setup');
+                    return;
+                }
 
                 currentPushToken.current = pushToken;
 
                 // Register with API
-                const deviceId = Constants.installationId || Device.modelName || 'unknown';
-                await registerToken({
+                const deviceId = resolveDeviceId();
+                console.log('[Notifications] Registering token with backend...', {
+                    deviceId,
+                    platform: Platform.OS,
+                    tokenPreview: pushToken.substring(0, 20) + '...'
+                });
+                
+                const result = await registerToken({
                     variables: {
                         input: {
                             token: pushToken,
@@ -69,27 +159,84 @@ export function useNotifications() {
                     },
                 });
 
-                console.log('[Notifications] Device token registered:', pushToken.substring(0, 20) + '...');
+                console.log('[Notifications] Backend registration result:', result.data);
+                console.log('[Notifications] Device token registered successfully');
             } catch (error) {
                 console.error('[Notifications] Setup failed:', error);
+                if (error instanceof Error) {
+                    console.error('[Notifications] Error details:', {
+                        message: error.message,
+                        stack: error.stack,
+                    });
+                }
             }
         }
 
         setup();
 
+        // Listen for FCM token refresh — re-register with backend when Firebase issues a new token
+        const unsubscribeTokenRefresh = messaging().onTokenRefresh(async (newToken) => {
+            console.log('[Notifications] FCM token refreshed, re-registering...', {
+                tokenPreview: newToken.substring(0, 20) + '...',
+                tokenLength: newToken.length,
+            });
+
+            // Validate it's a real FCM token (not a raw APNs token)
+            if (newToken.length < 100 || !newToken.includes(':')) {
+                console.warn('[Notifications] Token refresh returned non-FCM token, ignoring:', {
+                    length: newToken.length,
+                });
+                return;
+            }
+
+            currentPushToken.current = newToken;
+            try {
+                await registerToken({
+                    variables: {
+                        input: {
+                            token: newToken,
+                            platform: Platform.OS === 'ios' ? 'IOS' : 'ANDROID',
+                            deviceId: resolveDeviceId(),
+                            appType: 'CUSTOMER',
+                        },
+                    },
+                });
+                console.log('[Notifications] Refreshed token registered successfully');
+            } catch (err) {
+                console.error('[Notifications] Failed to register refreshed token:', err);
+            }
+        });
+
         // Listen for notifications received while app is in foreground
         notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
-            console.log('[Notifications] Received in foreground:', notification.request.content.title);
+            const { title, body } = notification.request.content;
+            console.log('[Notifications] Received in foreground:', title);
+            
+            // Show in-app toast for better UX
+            if (title) {
+                toast.info(title, body || '');
+            }
         });
 
         // Listen for notification taps (foreground + background)
         responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
             const data = response.notification.request.content.data;
-            handleNotificationTap(data);
+            const actionIdentifier = response.actionIdentifier;
+            
+            console.log('[Notifications] Notification response:', { actionIdentifier, data });
+            
+            // Handle interactive action buttons
+            if (actionIdentifier && actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) {
+                handleNotificationAction(actionIdentifier, data);
+            } else {
+                // Default tap - navigate to screen
+                handleNotificationTap(data);
+            }
         });
 
         return () => {
             mounted = false;
+            unsubscribeTokenRefresh();
             if (notificationListener.current) {
                 notificationListener.current.remove();
             }
@@ -110,6 +257,53 @@ export function useNotifications() {
     }, [isAuthenticated]);
 
     /**
+     * Handle interactive notification action buttons.
+     */
+    function handleNotificationAction(actionId: string, data: Record<string, unknown>) {
+        const orderId = data.orderId as string | undefined;
+        
+        console.log('[Notifications] Handling action:', actionId, 'for order:', orderId);
+        
+        switch (actionId) {
+            case 'TRACK_ORDER':
+                if (orderId) {
+                    router.push(`/orders/${orderId}` as never);
+                }
+                break;
+                
+            case 'RATE_ORDER':
+                if (orderId) {
+                    // TODO: Navigate to rating screen or show rating modal
+                    router.push(`/orders/${orderId}` as never);
+                    toast.info('Rate Order', 'Please rate your order');
+                }
+                break;
+                
+            case 'ADD_TIP':
+                if (orderId) {
+                    // TODO: Navigate to tip screen or show tip modal
+                    router.push(`/orders/${orderId}` as never);
+                    toast.info('Add Tip', 'Add a tip for your driver');
+                }
+                break;
+                
+            case 'CONTACT_SUPPORT':
+                // TODO: Navigate to support chat or show contact options
+                router.push('/support' as never);
+                break;
+                
+            case 'VIEW_REFUND':
+                if (orderId) {
+                    router.push(`/orders/${orderId}` as never);
+                }
+                break;
+                
+            default:
+                console.warn('[Notifications] Unknown action:', actionId);
+        }
+    }
+
+    /**
      * Navigate to the appropriate screen when a notification is tapped.
      */
     function handleNotificationTap(data: Record<string, unknown>) {
@@ -127,35 +321,67 @@ export function useNotifications() {
 }
 
 /**
- * Request notification permissions and get the native device push token (FCM/APNs).
+ * Request notification permissions and get the FCM registration token.
+ * Uses @react-native-firebase/messaging to get a proper FCM token on both iOS and Android.
+ * Firebase Admin SDK requires FCM tokens — NOT raw APNs tokens.
  */
 async function registerForPushNotifications(): Promise<string | null> {
+    console.log('[Notifications] Starting registration...');
+    
     // Push notifications only work on physical devices
     if (!Device.isDevice) {
         console.warn('[Notifications] Must use a physical device for push notifications');
         return null;
     }
 
+    console.log('[Notifications] Device check passed, requesting permissions...');
+
     // Check/request permissions
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
 
+    console.log('[Notifications] Existing permission status:', existingStatus);
+
     if (existingStatus !== 'granted') {
         const { status } = await Notifications.requestPermissionsAsync();
         finalStatus = status;
+        console.log('[Notifications] Permission requested, new status:', status);
     }
 
     if (finalStatus !== 'granted') {
-        console.warn('[Notifications] Permission not granted');
+        console.warn('[Notifications] Permission not granted, final status:', finalStatus);
         return null;
     }
 
-    // Get the native device push token (FCM for Android, APNs for iOS)
-    const tokenData = await Notifications.getDevicePushTokenAsync();
-    const token = tokenData.data;
+    console.log('[Notifications] Permissions granted, getting FCM registration token...');
+
+    // Use Firebase Messaging to get the FCM registration token.
+    // On iOS, @react-native-firebase handles the APNs→FCM exchange automatically.
+    // This is required — Notifications.getDevicePushTokenAsync() returns a raw APNs
+    // token on iOS which the Firebase Admin SDK cannot send to directly.
+    const token = await messaging().getToken();
+
+    console.log('[Notifications] FCM token obtained:', token, 'length:', token.length);
+
+    // Validate this is a real FCM token, not a raw APNs device token.
+    // APNs tokens are 64 hex chars; FCM tokens are 100+ chars and contain a colon.
+    if (token.length < 100 || !token.includes(':')) {
+        console.error('[Notifications] Got non-FCM token (likely raw APNs token), retrying after delay...');
+        // Wait for the APNs→FCM exchange to complete and retry
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        const retryToken = await messaging().getToken();
+        console.log('[Notifications] Retry FCM token:', retryToken, 'length:', retryToken.length);
+        if (retryToken.length < 100 || !retryToken.includes(':')) {
+            console.error('[Notifications] Still got non-FCM token after retry, cannot register');
+            return null;
+        }
+        return retryToken;
+    }
 
     // Set up Android notification channel
     if (Platform.OS === 'android') {
+        console.log('[Notifications] Setting up Android notification channels...');
+        
         await Notifications.setNotificationChannelAsync('default', {
             name: 'Default',
             importance: Notifications.AndroidImportance.HIGH,
@@ -172,7 +398,10 @@ async function registerForPushNotifications(): Promise<string | null> {
             lightColor: '#0ea5e9',
             sound: 'default',
         });
+        
+        console.log('[Notifications] Android channels configured successfully');
     }
 
-    return token as string;
+    console.log('[Notifications] Registration complete, returning token');
+    return token;
 }

@@ -24,21 +24,40 @@ import {
 } from "lucide-react";
 
 const menu: any[] = [
+  // Core Operations
   { name: "Orders", href: "/dashboard/orders", icon: ClipboardList, businessAdminVisible: true },
   { name: "Market", href: "/dashboard/market", icon: Store, businessAdminVisible: true },
   { name: "Products", href: "/dashboard/products", icon: Package, businessAdminVisible: true },
   { name: "Deals", href: "/dashboard/deals", icon: Percent, businessAdminVisible: true },
+  
+  { divider: true, businessAdminVisible: true },
+  
+  // Business Management
   { name: "Statistics", href: "/dashboard/statistics", icon: BarChart3, businessAdminVisible: true },
   { name: "Finances", href: "/dashboard/finances", icon: DollarSign, businessAdminVisible: true },
   { name: "Settings", href: "/dashboard/settings", icon: Settings, businessAdminVisible: true },
-  { divider: true, name: "divider" },
+  
+  { divider: true, superAdminOnly: true },
+  { sectionHeader: "System Management", superAdminOnly: true },
+  
+  // System Management (Super Admin)
   { name: "Businesses", href: "/dashboard/businesses", icon: Store, superAdminOnly: true },
   { name: "Drivers", href: "/dashboard/drivers", icon: Truck, superAdminOnly: true },
   { name: "Map", href: "/dashboard/map", icon: Map, superAdminOnly: true },
   { name: "Banners", href: "/admin/banners", icon: Image, superAdminOnly: true },
+  
+  { divider: true, superAdminOnly: true },
+  { sectionHeader: "Configuration", superAdminOnly: true },
+  
+  // Configuration (Super Admin)
   { name: "Promotions", href: "/dashboard/promotions", icon: Tag, superAdminOnly: true },
   { name: "Delivery Pricing", href: "/dashboard/delivery-pricing", icon: Truck, superAdminOnly: true },
   { name: "Delivery Zones", href: "/dashboard/delivery-zones", icon: Map, superAdminOnly: true },
+  
+  { divider: true, superAdminOnly: true },
+  { sectionHeader: "Administration", superAdminOnly: true },
+  
+  // Administration (Super Admin)
   { name: "Admins", href: "/dashboard/admins", icon: UserCog, superAdminOnly: true },
   { name: "Users", href: "/dashboard/users", icon: Users, superAdminOnly: true },
   { name: "Notifications", href: "/dashboard/notifications", icon: Bell, superAdminOnly: true },
@@ -56,7 +75,12 @@ export default function Sidebar() {
   const isBusinessUser = isBusinessOwner || isBusinessEmployee;
 
   const filteredMenu = menu.filter((item: any) => {
-    if (item.divider) return isSuperAdmin || isAdmin;
+    if (item.divider || item.sectionHeader) {
+      // Show dividers/headers only if super admin or admin
+      if (item.superAdminOnly && !isSuperAdmin) return false;
+      if (item.businessAdminVisible && isBusinessUser) return true;
+      return isSuperAdmin || isAdmin;
+    }
     if (isSuperAdmin) return true;
     if (isAdmin && !item.superAdminOnly) return true;
     if (isBusinessUser && item.businessAdminVisible) {
@@ -85,6 +109,16 @@ export default function Sidebar() {
         {filteredMenu.map((item: any, index: number) => {
           if (item.divider) {
             return <div key={`divider-${index}`} className="h-px bg-zinc-800 my-2" />;
+          }
+
+          if (item.sectionHeader) {
+            return (
+              <div key={`section-${index}`} className="px-3 pt-3 pb-1.5">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-violet-400">
+                  {item.sectionHeader}
+                </span>
+              </div>
+            );
           }
 
           const Icon = item.icon;

@@ -4,12 +4,27 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { User } from '@/gql/graphql';
 import { deleteToken } from '@/utils/secureTokenStore';
 
+/**
+ * Authentication Store
+ * 
+ * IMPORTANT: Token is stored ONLY in SecureStore (via utils/secureTokenStore)
+ * - More secure (uses iOS Keychain / Android Keystore)
+ * - Single source of truth
+ * - Only persists user data in AsyncStorage (via Zustand)
+ * 
+ * Flow:
+ * 1. On login: Save token to SecureStore + update Zustand state
+ * 2. On app start: Load token from SecureStore → Zustand state
+ * 3. On logout: Clear SecureStore + clear Zustand state
+ */
+
 interface AuthState {
     token: string | null;
     user: User | null;
     isLoading: boolean;
     needsSignupCompletion: boolean;
     isAuthenticated: boolean;
+    hasHydrated: boolean; // Flag to know when Zustand has loaded from storage
 
     // Actions
     setToken: (token: string) => void;
@@ -35,6 +50,7 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
             needsSignupCompletion: false,
             isAuthenticated: false,
+            hasHydrated: false,
 
             setToken: (token) => {
                 set((state) => ({
@@ -81,17 +97,26 @@ export const useAuthStore = create<AuthState>()(
             name: 'auth-storage',
             storage: createJSONStorage(() => AsyncStorage),
             partialize: (state) => ({
-                token: state.token,
+                // Only persist user data, NOT the token
+                // Token is stored securely in SecureStore
                 user: state.user,
             }),
             onRehydrateStorage: () => (state) => {
                 if (!state) {
+                    console.log('[AuthStore] Hydration failed');
                     return;
                 }
 
-                // Recalculate isAuthenticated and needsSignupCompletion after rehydration
-                state.isAuthenticated = calculateIsAuthenticated(state.token, state.user);
+                // Note: token will be null after hydration, that's OK
+                // It gets loaded from SecureStore in useAuthInitialization
+                state.isAuthenticated = false; // Will be set correctly after token is loaded
                 state.needsSignupCompletion = !!state.user && state.user.signupStep !== 'COMPLETED';
+                state.hasHydrated = true;
+                
+                console.log('[AuthStore] Hydrated (user only)', {
+                    hasUser: !!state.user,
+                    userEmail: state.user?.email,
+                });
             },
         },
     ),

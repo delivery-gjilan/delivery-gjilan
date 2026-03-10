@@ -12,7 +12,7 @@ import { useCart } from '../hooks/useCart';
 import { useCartActions } from '../hooks/useCartActions';
 import { useCreateOrder } from '../hooks/useCreateOrder';
 import OrderConfirmDialog from '@/components/OrderConfirmDialog';
-import OrderSuccessScreen from '@/components/OrderSuccessScreen';
+import { useSuccessModalStore } from '@/store/useSuccessModalStore';
 import { useLazyQuery, useQuery, useMutation } from '@apollo/client/react';
 import { VALIDATE_PROMOTIONS, GET_PROMOTION_THRESHOLDS } from '@/graphql/operations/promotions';
 import { GET_MY_ADDRESSES, ADD_USER_ADDRESS, SET_DEFAULT_ADDRESS } from '@/graphql/operations/addresses';
@@ -34,6 +34,7 @@ export const CartScreen = () => {
     const { items, total, isEmpty } = useCart();
     const { updateQuantity, removeItem, clearCart, updateItemNotes } = useCartActions();
     const { createOrder, loading: orderLoading } = useCreateOrder();
+    const { showSuccess } = useSuccessModalStore();
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [deliveryPrice, setDeliveryPrice] = useState(2.0); // Default; updated from API
@@ -46,8 +47,6 @@ export const CartScreen = () => {
     const [pendingLocationToSave, setPendingLocationToSave] = useState<CheckoutLocation | null>(null);
     const [addressName, setAddressName] = useState('');
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-    const [showSuccessScreen, setShowSuccessScreen] = useState(false);
-    const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
     const [driverNotes, setDriverNotes] = useState('');
     const [promoError, setPromoError] = useState<string | null>(null);
     const [saveAddressError, setSaveAddressError] = useState<string | null>(null);
@@ -483,50 +482,35 @@ export const CartScreen = () => {
         setIsProcessing(true);
         try {
             const order = await createOrder(selectedLocation, appliedDeliveryPrice, finalTotal, promoResult?.code, driverNotes);
-            // Reset wizard & show success screen
+            const orderId = order?.id || null;
+            
+            console.log('[CartScreen] Order created:', orderId);
+            
+            // Clear cart and reset state
+            clearCart();
             setShowSaveAddressPrompt(false);
             setShowConfirmDialog(false);
-            setCreatedOrderId(order?.id || null);
-            setShowSuccessScreen(true);
             setStep(1);
-            // Clear cart AFTER setting success screen so isEmpty doesn't flash first
-            clearCart();
+            
+            // Show success modal first (it will be rendered at app level)
+            if (orderId) {
+                console.log('[CartScreen] Showing success modal');
+                showSuccess(orderId, 'order_created');
+            }
+            
+            // Then close cart modal after a brief delay
+            setTimeout(() => {
+                console.log('[CartScreen] Closing cart');
+                router.back();
+            }, 100);
         } catch (err) {
+            console.error('[CartScreen] Order creation failed:', err);
             setShowConfirmDialog(false);
             Alert.alert(t.cart.order_failed, t.cart.unable_create_order, [{ text: t.common.ok }]);
         } finally {
             setIsProcessing(false);
         }
     };
-
-    if (showSuccessScreen) {
-        return (
-            <Modal
-                visible
-                animationType="fade"
-                onRequestClose={() => {
-                    setShowSuccessScreen(false);
-                    router.replace('/(tabs)/home');
-                }}
-            >
-                <OrderSuccessScreen
-                    orderId={createdOrderId}
-                    onTrackOrder={() => {
-                        setShowSuccessScreen(false);
-                        if (createdOrderId) {
-                            router.replace(`/orders/${createdOrderId}` as any);
-                        } else {
-                            router.replace('/orders/active');
-                        }
-                    }}
-                    onGoHome={() => {
-                        setShowSuccessScreen(false);
-                        router.replace('/(tabs)/home');
-                    }}
-                />
-            </Modal>
-        );
-    }
 
     if (isEmpty) {
         return (

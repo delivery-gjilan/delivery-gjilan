@@ -16,6 +16,10 @@ export const sendPushNotification: NonNullable<MutationResolvers['sendPushNotifi
         data: input.data ? Object.fromEntries(
             Object.entries(input.data as Record<string, unknown>).map(([k, v]) => [k, String(v)])
         ) : undefined,
+        imageUrl: input.imageUrl || undefined,
+        timeSensitive: input.timeSensitive || false,
+        category: input.category || undefined,
+        relevanceScore: input.relevanceScore || undefined,
     };
 
     const result = await notificationService.sendToUsers(input.userIds, payload, 'ADMIN_ALERT');

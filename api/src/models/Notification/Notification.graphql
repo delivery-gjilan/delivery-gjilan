@@ -85,6 +85,10 @@ input SendPushNotificationInput {
     title: String!
     body: String!
     data: JSON
+    imageUrl: String
+    timeSensitive: Boolean
+    category: String
+    relevanceScore: Float
 }
 
 input CreateCampaignInput {
@@ -100,11 +104,13 @@ type Query {
     notificationCampaigns: [NotificationCampaign!]!
     notificationCampaign(id: ID!): NotificationCampaign
     previewCampaignAudience(query: JSON!): AudiencePreview!
+    deviceTokens(userId: ID): [DeviceToken!]!
 }
 
 type Mutation {
     registerDeviceToken(input: RegisterDeviceTokenInput!): Boolean!
     unregisterDeviceToken(token: String!): Boolean!
+    registerLiveActivityToken(token: String!, activityId: String!, orderId: ID!): Boolean!
     sendPushNotification(input: SendPushNotificationInput!): SendNotificationResult!
     createCampaign(input: CreateCampaignInput!): NotificationCampaign!
     sendCampaign(id: ID!): NotificationCampaign!

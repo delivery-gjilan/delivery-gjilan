@@ -31,7 +31,6 @@ export const deviceTokens = pgTable(
             .$onUpdate(() => sql`CURRENT_TIMESTAMP`),
     },
     (table) => [
-        uniqueIndex('device_tokens_user_device_idx').on(table.userId, table.deviceId),
         uniqueIndex('device_tokens_token_idx').on(table.token),
     ],
 );

@@ -3,7 +3,7 @@
     "name": "mobile-customer",
     "slug": "mobile-customer",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "deliveryapp",
     "userInterfaceStyle": "automatic",
@@ -12,9 +12,14 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "We use your location to set the delivery address.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSSupportsLiveActivities": true,
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       },
-      "bundleIdentifier": "com.anonymous.mobilecustomer"
+      "bundleIdentifier": "com.anonymous.mobilecustomer",
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "permissions": [
@@ -49,6 +54,7 @@
         }
       ],
       "@rnmapbox/maps",
+      "@react-native-firebase/app",
       [
         "expo-notifications",
         {
@@ -68,7 +74,10 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-build-properties",
+      "./plugins/patch-live-activities",
+      "./plugins/fix-firebase-modular-headers"
     ],
     "experiments": {
       "typedRoutes": true,

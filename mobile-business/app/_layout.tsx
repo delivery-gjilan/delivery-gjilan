@@ -4,7 +4,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { ApolloProvider, useQuery } from '@apollo/client/react';
 import { apolloClient } from '@/lib/apollo';
 import { useAuthStore } from '@/store/authStore';
-import * as SecureStore from 'expo-secure-store';
+import { useAuthInitialization } from '@/hooks/useAuthInitialization';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator } from 'react-native';
 import InfoBanner from '@/components/InfoBanner';
@@ -14,8 +14,7 @@ import { GET_STORE_STATUS } from '@/graphql/store';
 function AppContent() {
     const router = useRouter();
     const segments = useSegments();
-    const { isAuthenticated, login, logout } = useAuthStore();
-    const [isReady, setIsReady] = useState(false);
+    const { isAuthenticated, hasHydrated } = useAuthStore();
     const [bannerDismissed, setBannerDismissed] = useState(false);
 
     const { data: storeData } = useQuery(GET_STORE_STATUS, { pollInterval: 30_000 });
@@ -24,35 +23,12 @@ function AppContent() {
     const bannerType = (storeData?.getStoreStatus?.bannerType as InfoBannerType) ?? 'INFO';
     const showBanner = bannerEnabled && !!bannerMessage && !bannerDismissed;
 
-    // Restore authentication state
-    useEffect(() => {
-        const restoreAuth = async () => {
-            try {
-                const token = await SecureStore.getItemAsync('auth_token');
-                const userJson = await SecureStore.getItemAsync('auth_user');
-                
-                if (token && userJson) {
-                    const user = JSON.parse(userJson);
-                    // Validate business user roles
-                    if (user.role === 'BUSINESS_OWNER' || user.role === 'BUSINESS_EMPLOYEE') {
-                        login(user, token);
-                    } else {
-                        await SecureStore.deleteItemAsync('auth_token');
-                        await SecureStore.deleteItemAsync('auth_user');
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to restore auth:', error);
-            } finally {
-                setIsReady(true);
-            }
-        };
-        restoreAuth();
-    }, []);
+    // Initialize authentication
+    useAuthInitialization();
 
     // Navigation guard
     useEffect(() => {
-        if (!isReady) return;
+        if (!hasHydrated) return;
 
         const inTabsGroup = segments[0] === '(tabs)';
         
@@ -61,9 +37,10 @@ function AppContent() {
         } else if (isAuthenticated && !inTabsGroup && segments[0] !== '(tabs)') {
             router.replace('/(tabs)');
         }
-    }, [isAuthenticated, segments, isReady]);
+    }, [isAuthenticated, segments, hasHydrated, router]);
 
-    if (!isReady) {
+    // Show loading screen while hydrating
+    if (!hasHydrated) {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
                 <ActivityIndicator size="large" color="#0b89a9" />

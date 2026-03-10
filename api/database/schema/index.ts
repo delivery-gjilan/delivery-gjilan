@@ -18,6 +18,7 @@ export * from './userAddress';
 export * from './storeSettings';
 export * from './referrals';
 export * from './deviceTokens';
+export * from './liveActivityTokens';
 export * from './notifications';
 export * from './deliveryPricingTiers';
 export * from './deliveryZones';

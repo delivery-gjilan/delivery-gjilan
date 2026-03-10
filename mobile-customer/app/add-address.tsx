@@ -202,6 +202,10 @@ export default function AddEditAddressScreen() {
                         attributionEnabled={false}
                         scaleBarEnabled={false}
                         compassEnabled={false}
+                        scrollEnabled={true}
+                        zoomEnabled={true}
+                        pitchEnabled={false}
+                        rotateEnabled={false}
                     >
                         <MapLibreGL.Camera
                             ref={cameraRef}
@@ -237,6 +241,7 @@ export default function AddEditAddressScreen() {
 
                     {/* Instruction */}
                     <View
+                        pointerEvents="none"
                         className="absolute top-4 left-4 right-4 p-3 rounded-2xl"
                         style={{ backgroundColor: theme.colors.card + 'F0', ...styles.shadow }}
                     >

@@ -43,6 +43,7 @@ export const useAuth = () => {
 
         if (data?.initiateSignup) {
             const { token, user } = data.initiateSignup;
+            console.log('[Auth] Signup successful, saving token');
             await saveToken(token);
             storeLogin(token, user as User);
         }
@@ -99,6 +100,7 @@ export const useAuth = () => {
 
         if (data?.login) {
             const { token, user } = data.login;
+            console.log('[Auth] Login successful, saving token for user:', user.email);
             await saveToken(token);
             storeLogin(token, user as User);
         }
@@ -121,6 +123,7 @@ export const useAuth = () => {
 
     const logout = async () => {
         try {
+            console.log('[Auth] Logging out, clearing tokens');
             await deleteToken();
             storeLogout();
             // Force navigation to auth selection screen
@@ -129,7 +132,7 @@ export const useAuth = () => {
                 router.replace('/auth-selection');
             }
         } catch (error) {
-            console.error('Logout error:', error);
+            console.error('[Auth] Logout error:', error);
             // Still logout even if there's an error
             storeLogout();
         }

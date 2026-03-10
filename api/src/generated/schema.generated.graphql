@@ -557,6 +557,7 @@ type Mutation {
   markSettlementAsPartiallyPaid(amount: Float!, settlementId: ID!): Settlement!
   markSettlementsAsPaid(ids: [ID!]!): [Settlement!]!
   registerDeviceToken(input: RegisterDeviceTokenInput!): Boolean!
+  registerLiveActivityToken(activityId: String!, orderId: ID!, token: String!): Boolean!
   removeUserFromPromotion(promotionId: ID!, userId: ID!): Boolean!
   resendEmailVerification: SignupStepResponse!
   sendCampaign(id: ID!): NotificationCampaign!
@@ -835,6 +836,7 @@ type Query {
   deliveryPricingConfig: DeliveryPricingConfig!
   deliveryPricingTiers: [DeliveryPricingTier!]!
   deliveryZones: [DeliveryZone!]!
+  deviceTokens(userId: ID): [DeviceToken!]!
   driverBalance(driverId: ID!): SettlementSummary!
   drivers: [User!]!
   getAllPromotions(isActive: Boolean): [Promotion!]!
@@ -920,7 +922,11 @@ type SendNotificationResult {
 
 input SendPushNotificationInput {
   body: String!
+  category: String
   data: JSON
+  imageUrl: String
+  relevanceScore: Float
+  timeSensitive: Boolean
   title: String!
   userIds: [ID!]!
 }

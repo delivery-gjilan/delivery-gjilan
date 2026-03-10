@@ -15,7 +15,7 @@ import { useRouter } from 'expo-router';
 import { useMutation } from '@apollo/client/react';
 import { LOGIN_MUTATION } from '@/graphql/auth';
 import { useAuthStore } from '@/store/authStore';
-import * as SecureStore from 'expo-secure-store';
+import { saveToken } from '@/utils/secureTokenStore';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function LoginScreen() {
@@ -60,17 +60,17 @@ export default function LoginScreen() {
                 return;
             }
 
-            // Save to secure storage
-            await SecureStore.setItemAsync('auth_token', token);
-            await SecureStore.setItemAsync('auth_user', JSON.stringify(user));
+            // Save token to secure storage
+            console.log('[Login] Saving token for user:', user.email);
+            await saveToken(token);
 
-            // Update store
+            // Update store with user and token
             loginStore(user, token);
 
             // Navigate to main app
             router.replace('/(tabs)');
         } catch (error: any) {
-            console.error('Login error:', error);
+            console.error('[Login] Login error:', error);
             Alert.alert('Login Failed', error.message || 'Invalid email or password');
         }
     };

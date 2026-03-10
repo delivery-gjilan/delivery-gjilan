@@ -12,7 +12,7 @@ import {
     DbNotificationCampaign,
     NewDbNotificationCampaign,
 } from '@/database/schema/notifications';
-import { eq, inArray, and } from 'drizzle-orm';
+import { eq, inArray, and, sql } from 'drizzle-orm';
 
 export class NotificationRepository {
     constructor(private db: DbType) {}
@@ -20,19 +20,28 @@ export class NotificationRepository {
     // ── Device tokens ───────────────────────────────────────────────
 
     async upsertDeviceToken(data: NewDbDeviceToken): Promise<DbDeviceToken> {
-        const [token] = await this.db
+        // Delete all existing tokens for this user first, then insert the new one.
+        // A user/device only needs one active FCM token at a time.
+        await this.db
+            .delete(deviceTokens)
+            .where(eq(deviceTokens.userId, data.userId));
+
+        const [row] = await this.db
             .insert(deviceTokens)
             .values(data)
             .onConflictDoUpdate({
-                target: [deviceTokens.userId, deviceTokens.deviceId],
+                target: deviceTokens.token,
                 set: {
-                    token: data.token,
+                    userId: data.userId,
+                    deviceId: data.deviceId,
                     platform: data.platform,
                     appType: data.appType,
+                    updatedAt: sql`CURRENT_TIMESTAMP`,
                 },
             })
             .returning();
-        return token!;
+
+        return row!;
     }
 
     async removeDeviceToken(token: string): Promise<void> {
