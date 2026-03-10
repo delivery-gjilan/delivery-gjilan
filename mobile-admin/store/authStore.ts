@@ -45,6 +45,7 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: false,
 
             setToken: (token) => {
+                console.log('[AuthStore] Setting token:', token ? 'present' : 'null');
                 set((state) => ({
                     token,
                     isAuthenticated: calculateIsAuthenticated(token, state.user),
@@ -52,6 +53,7 @@ export const useAuthStore = create<AuthState>()(
             },
 
             setUser: (user) => {
+                console.log('[AuthStore] Setting user:', user ? user.email : 'null');
                 set((state) => ({
                     user,
                     isAuthenticated: calculateIsAuthenticated(state.token, user),
@@ -61,6 +63,7 @@ export const useAuthStore = create<AuthState>()(
             setLoading: (isLoading) => set({ isLoading }),
 
             login: (token, user) => {
+                console.log('[AuthStore] Logging in:', user.email);
                 set({
                     token,
                     user,
@@ -69,25 +72,34 @@ export const useAuthStore = create<AuthState>()(
             },
 
             logout: async () => {
+                console.log('[AuthStore] Logging out...');
                 await deleteToken();
                 set({
                     token: null,
                     user: null,
                     isAuthenticated: false,
                 });
+                console.log('[AuthStore] Logged out successfully');
             },
         }),
         {
             name: 'admin-auth-storage',
             storage: createJSONStorage(() => AsyncStorage),
+            // Only persist user data, NOT the token - token stored securely in SecureStore
             partialize: (state) => ({
-                token: state.token,
                 user: state.user,
             }),
             onRehydrateStorage: () => (state) => {
-                if (!state) return;
-                state.isAuthenticated = calculateIsAuthenticated(state.token, state.user);
-                state.hasHydrated = true;
+                console.log('[AuthStore] Starting rehydration...');
+                return () => {
+                    if (!state) {
+                        console.log('[AuthStore] Rehydration failed - no state');
+                        return;
+                    }
+                    // Token will be loaded separately from SecureStore on app startup
+                    console.log('[AuthStore] Hydrated with user:', state.user?.email || 'none');
+                    state.hasHydrated = true;
+                };
             },
         },
     ),

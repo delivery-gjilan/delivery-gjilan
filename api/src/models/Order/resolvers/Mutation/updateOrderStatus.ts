@@ -36,10 +36,22 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
     const isSuperAdmin = role === 'SUPER_ADMIN';
     const isDriver = role === 'DRIVER';
     const isBusinessAdmin = role === 'BUSINESS_OWNER' || role === 'BUSINESS_EMPLOYEE';
+    const isCustomer = role === 'CUSTOMER';
 
     let order;
 
-    if (isBusinessAdmin) {
+    if (isCustomer) {
+        // Allow customers to mark their own orders as DELIVERED for testing purposes
+        if (currentOrder.userId !== userData.userId) {
+            throw AppError.forbidden('Not authorized to update this order');
+        }
+
+        if (status !== 'DELIVERED') {
+            throw AppError.businessRule('Customers can only mark orders as DELIVERED');
+        }
+
+        order = await orderService.updateOrderStatus(id, status, true); // Skip validation
+    } else if (isBusinessAdmin) {
         if (!userData.businessId) {
             throw AppError.forbidden('Business admin has no business assigned');
         }

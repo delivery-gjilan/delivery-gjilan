@@ -130,18 +130,27 @@ function getTimeRemaining(estimatedReadyAt: string): { text: string; isOverdue: 
     return { text: `${diffMin}m remaining`, isOverdue: false };
 }
 
+function getElapsedTime(statusChangeDate: string): string {
+    const now = new Date();
+    const changed = new Date(statusChangeDate);
+    const diffMs = now.getTime() - changed.getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    const minutes = Math.floor(diffSec / 60);
+    const seconds = diffSec % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
 export default function OrdersScreen() {
     const { user } = useAuthStore();
-    const [selectedFilter, setSelectedFilter] = useState<OrderStatus | 'ALL'>('PENDING');
     const [etaModalVisible, setEtaModalVisible] = useState(false);
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const [selectedEta, setSelectedEta] = useState(15);
     const [, setTick] = useState(0);
     const lastTapRef = useRef<Record<string, number>>({});
 
-    // Tick every 30s to keep countdown timers fresh
+    // Tick every 1s to keep elapsed timers fresh
     useEffect(() => {
-        const interval = setInterval(() => setTick((t) => t + 1), 30000);
+        const interval = setInterval(() => setTick((t) => t + 1), 1000);
         return () => clearInterval(interval);
     }, []);
 
@@ -175,15 +184,6 @@ export default function OrdersScreen() {
         if (pDiff !== 0) return pDiff;
         return new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime();
     });
-
-    const filteredOrders = sortedOrders.filter((order) =>
-        selectedFilter === 'ALL' ? true : order.status === selectedFilter
-    );
-
-    const statusCounts = businessOrders.reduce<Record<string, number>>((acc, order) => {
-        acc[order.status] = (acc[order.status] || 0) + 1;
-        return acc;
-    }, {});
 
     const handleDoubleTap = useCallback((order: Order) => {
         const now = Date.now();
@@ -254,8 +254,6 @@ export default function OrdersScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     };
 
-    const pendingCount = statusCounts['PENDING'] || 0;
-
     const renderOrderCard = ({ item: order }: { item: Order }) => {
         const businessOrder = order.businesses.find((b) => b.business.id === user?.businessId);
         if (!businessOrder) return null;
@@ -280,263 +278,159 @@ export default function OrdersScreen() {
                 })}
             >
                 <View
-                    className="bg-card rounded-3xl mx-4 mb-5 overflow-hidden"
-                    style={{ borderLeftWidth: 5, borderLeftColor: STATUS_COLORS[order.status] }}
+                    className="bg-card rounded-2xl mx-3 mb-3 overflow-hidden"
+                    style={{ borderLeftWidth: 3, borderLeftColor: STATUS_COLORS[order.status] }}
                 >
-                    {/* ── Card Header ── */}
-                    <View className="p-5 pb-3">
-                        <View className="flex-row items-center justify-between mb-3">
+                    {/* ── Compact Header ── */}
+                    <View className="px-3 pt-3 pb-2">
+                        <View className="flex-row items-center justify-between mb-2">
                             <View className="flex-row items-center flex-1">
                                 <View
-                                    className="w-12 h-12 rounded-2xl items-center justify-center mr-3"
+                                    className="w-9 h-9 rounded-xl items-center justify-center mr-2"
                                     style={{ backgroundColor: STATUS_BG[order.status] }}
                                 >
                                     <Ionicons
                                         name={STATUS_ICONS[order.status]}
-                                        size={24}
+                                        size={18}
                                         color={STATUS_COLORS[order.status]}
                                     />
                                 </View>
                                 <View className="flex-1">
-                                    <Text className="text-text font-bold text-xl">#{order.displayId}</Text>
-                                    <Text className="text-subtext text-sm">
-                                        {timeAgo(order.orderDate)} • {formatTime(order.orderDate)}
-                                    </Text>
+                                    <Text className="text-text font-bold text-base">#{order.displayId}</Text>
+                                    <Text className="text-subtext text-xs">{timeAgo(order.orderDate)}</Text>
                                 </View>
                             </View>
                             <View
-                                className="px-4 py-2 rounded-full"
+                                className="px-2.5 py-1 rounded-full"
                                 style={{ backgroundColor: STATUS_BG[order.status] }}
                             >
-                                <Text className="font-bold text-sm" style={{ color: STATUS_COLORS[order.status] }}>
+                                <Text className="font-bold text-xs" style={{ color: STATUS_COLORS[order.status] }}>
                                     {STATUS_LABELS[order.status]}
                                 </Text>
                             </View>
                         </View>
 
-                        {/* Customer Info */}
-                        <View className="flex-row items-center bg-background/40 rounded-2xl p-3 mb-3">
-                            <View className="w-10 h-10 rounded-full bg-primary/20 items-center justify-center mr-3">
-                                <Ionicons name="person" size={20} color="#0b89a9" />
-                            </View>
-                            <View className="flex-1">
-                                <Text className="text-text font-semibold text-base">
-                                    {order.user?.firstName} {order.user?.lastName}
-                                </Text>
-                                {order.user?.phoneNumber && (
-                                    <Text className="text-subtext text-sm">{order.user.phoneNumber}</Text>
-                                )}
-                            </View>
-                            {order.dropOffLocation?.address && (
-                                <View className="flex-row items-center ml-2" style={{ maxWidth: 140 }}>
-                                    <Ionicons name="location" size={14} color="#9ca3af" />
-                                    <Text className="text-subtext text-xs ml-1" numberOfLines={1}>
-                                        {order.dropOffLocation.address}
-                                    </Text>
-                                </View>
-                            )}
+                        {/* Elapsed Time Counter */}
+                        <View className="flex-row items-center bg-background/40 rounded-xl px-2.5 py-2 mt-2">
+                            <Ionicons name="time-outline" size={16} color="#0b89a9" />
+                            <Text className="text-primary font-bold text-sm ml-2">
+                                {order.status === 'PENDING' && getElapsedTime(order.orderDate)}
+                                {order.status === 'PREPARING' && order.preparingAt && getElapsedTime(order.preparingAt)}
+                                {order.status === 'READY' && order.readyAt && getElapsedTime(order.readyAt)}
+                                {order.status === 'OUT_FOR_DELIVERY' && order.readyAt && getElapsedTime(order.readyAt)}
+                            </Text>
+                            <Text className="text-subtext text-xs ml-1">elapsed</Text>
                         </View>
 
-                        {/* Prep Time Countdown */}
+                        {/* Prep Time Countdown - Compact */}
                         {isPreparing && timeRemaining && (
                             <View
-                                className="flex-row items-center rounded-xl p-3 mb-3"
+                                className="flex-row items-center rounded-lg px-2.5 py-1.5 mt-2"
                                 style={{
                                     backgroundColor: timeRemaining.isOverdue ? '#ef444420' : '#3b82f620',
                                 }}
                             >
                                 <Ionicons
                                     name={timeRemaining.isOverdue ? 'warning' : 'timer'}
-                                    size={20}
+                                    size={14}
                                     color={timeRemaining.isOverdue ? '#ef4444' : '#3b82f6'}
                                 />
                                 <Text
-                                    className="font-bold text-base ml-2"
+                                    className="font-bold text-xs ml-1.5 flex-1"
                                     style={{ color: timeRemaining.isOverdue ? '#ef4444' : '#3b82f6' }}
                                 >
                                     {timeRemaining.text}
                                 </Text>
                                 {order.preparationMinutes && (
-                                    <Text className="text-subtext text-sm ml-auto">
-                                        ETA: {order.preparationMinutes} min
+                                    <Text className="text-subtext text-xs">
+                                        {order.preparationMinutes}min
                                     </Text>
                                 )}
                             </View>
                         )}
                     </View>
 
-                    {/* ── Items Section ── */}
-                    <View className="px-5 pb-3">
-                        <View className="flex-row items-center mb-3">
-                            <Ionicons name="cart" size={16} color="#9ca3af" />
-                            <Text className="text-subtext font-semibold text-sm ml-2 uppercase tracking-wider">
-                                Items ({totalItems})
-                            </Text>
-                        </View>
+                    {/* ── Items - Compact ── */}
+                    <View className="px-3 pb-2">
+                        <Text className="text-subtext font-semibold text-xs mb-1.5 uppercase tracking-wider">
+                            {totalItems} {totalItems === 1 ? 'Item' : 'Items'}
+                        </Text>
 
                         {businessOrder.items.map((item, index) => (
                             <View
                                 key={index}
-                                className="flex-row items-start py-3"
+                                className="flex-row items-center py-1.5"
                                 style={
                                     index < businessOrder.items.length - 1
-                                        ? { borderBottomWidth: 1, borderBottomColor: 'rgba(55,65,81,0.5)' }
+                                        ? { borderBottomWidth: 1, borderBottomColor: 'rgba(55,65,81,0.3)' }
                                         : {}
                                 }
                             >
-                                <View className="w-10 h-10 rounded-xl bg-primary/20 items-center justify-center mr-3">
-                                    <Text className="text-primary font-bold text-base">{item.quantity}×</Text>
+                                <View className="w-7 h-7 rounded-lg bg-primary/20 items-center justify-center mr-2">
+                                    <Text className="text-primary font-bold text-xs">{item.quantity}×</Text>
                                 </View>
                                 <View className="flex-1">
-                                    <Text className="text-text font-semibold text-base">{item.name}</Text>
+                                    <Text className="text-text font-semibold text-sm" numberOfLines={1}>
+                                        {item.name}
+                                    </Text>
                                     {item.notes && (
-                                        <View className="flex-row items-start mt-1.5">
-                                            <Ionicons
-                                                name="chatbubble"
-                                                size={12}
-                                                color="#f59e0b"
-                                                style={{ marginTop: 2 }}
-                                            />
-                                            <Text className="text-warning text-sm ml-1.5 flex-1 italic">
-                                                {item.notes}
-                                            </Text>
-                                        </View>
+                                        <Text className="text-warning text-xs mt-0.5 italic" numberOfLines={1}>
+                                            💬 {item.notes}
+                                        </Text>
                                     )}
                                 </View>
-                                <Text className="text-text font-semibold text-base ml-2">
+                                <Text className="text-text font-semibold text-sm ml-2">
                                     €{(item.price * item.quantity).toFixed(2)}
                                 </Text>
                             </View>
                         ))}
                     </View>
 
-                    {/* ── Total ── */}
-                    <View className="mx-5 pt-3 pb-4 border-t border-gray-600 flex-row items-center justify-between">
-                        <Text className="text-subtext font-semibold text-base">Subtotal</Text>
-                        <Text className="text-text font-bold text-xl">€{businessSubtotal.toFixed(2)}</Text>
+                    {/* ── Total - Compact ── */}
+                    <View className="mx-3 pt-2 pb-2.5 border-t border-gray-700 flex-row items-center justify-between">
+                        <Text className="text-subtext font-semibold text-sm">Total</Text>
+                        <Text className="text-text font-bold text-lg">€{businessSubtotal.toFixed(2)}</Text>
                     </View>
 
-                    {/* ── Actions ── */}
+                    {/* ── Actions - Compact ── */}
                     {isPending && (
                         <View className="flex-row border-t border-gray-700">
                             <TouchableOpacity
-                                className="flex-1 py-5 flex-row items-center justify-center border-r border-gray-700"
+                                className="flex-1 py-3 flex-row items-center justify-center border-r border-gray-700"
                                 style={{ backgroundColor: '#ef444415' }}
                                 onPress={() => handleRejectOrder(order.id)}
                             >
-                                <Ionicons name="close" size={22} color="#ef4444" />
-                                <Text className="text-danger font-bold text-base ml-2">Reject</Text>
+                                <Ionicons name="close" size={18} color="#ef4444" />
+                                <Text className="text-danger font-bold text-sm ml-1.5">Reject</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                className="flex-[2] py-5 flex-row items-center justify-center"
+                                className="flex-[2] py-3 flex-row items-center justify-center"
                                 style={{ backgroundColor: '#10b98115' }}
                                 onPress={() => handleAcceptTap(order.id)}
                             >
-                                <Ionicons name="checkmark-circle" size={22} color="#10b981" />
-                                <Text className="text-success font-bold text-base ml-2">Accept & Prepare</Text>
+                                <Ionicons name="checkmark-circle" size={18} color="#10b981" />
+                                <Text className="text-success font-bold text-sm ml-1.5">Accept</Text>
                             </TouchableOpacity>
                         </View>
                     )}
 
                     {isPreparing && (
                         <TouchableOpacity
-                            className="py-5 flex-row items-center justify-center border-t border-gray-700"
+                            className="py-3 flex-row items-center justify-center border-t border-gray-700"
                             style={{ backgroundColor: '#10b98115' }}
                             onPress={() => handleMarkReady(order.id)}
                         >
-                            <Ionicons name="checkmark-done-circle" size={22} color="#10b981" />
-                            <Text className="text-success font-bold text-base ml-2">Mark as Ready</Text>
+                            <Ionicons name="checkmark-done-circle" size={18} color="#10b981" />
+                            <Text className="text-success font-bold text-sm ml-1.5">Mark Ready</Text>
                         </TouchableOpacity>
-                    )}
-
-                    {/* Double-tap hint */}
-                    {canAct && (
-                        <View className="px-5 pb-3 pt-1">
-                            <Text className="text-center text-xs" style={{ color: 'rgba(156,163,175,0.5)' }}>
-                                Double-tap card to {isPending ? 'accept' : 'mark ready'}
-                            </Text>
-                        </View>
                     )}
                 </View>
             </Pressable>
         );
     };
 
-    const filters: Array<{
-        key: OrderStatus | 'ALL';
-        label: string;
-        icon: keyof typeof Ionicons.glyphMap;
-    }> = [
-        { key: 'PENDING', label: 'Pending', icon: 'alert-circle' },
-        { key: 'PREPARING', label: 'Preparing', icon: 'flame' },
-        { key: 'READY', label: 'Ready', icon: 'checkmark-circle' },
-        { key: 'ALL', label: 'All', icon: 'apps' },
-    ];
-
     return (
-        <SafeAreaView className="flex-1 bg-background">
-            {/* ── Header ── */}
-            <View className="px-6 pt-4 pb-3 border-b border-gray-800">
-                <View className="flex-row items-center justify-between">
-                    <View>
-                        <Text className="text-text text-3xl font-bold">Orders</Text>
-                        <Text className="text-subtext text-base mt-0.5">{user?.business?.name}</Text>
-                    </View>
-                    <View className="flex-row items-center">
-                        <View className="flex-row items-center bg-success/20 px-3 py-1.5 rounded-full mr-3">
-                            <View className="w-2.5 h-2.5 bg-success rounded-full mr-2" />
-                            <Text className="text-success font-semibold text-xs">LIVE</Text>
-                        </View>
-                        {pendingCount > 0 && (
-                            <View className="bg-warning px-3.5 py-1.5 rounded-full">
-                                <Text className="text-black font-bold text-sm">{pendingCount} new</Text>
-                            </View>
-                        )}
-                    </View>
-                </View>
-            </View>
-
-            {/* ── Filter Bar ── */}
-            <View className="px-4 py-3 flex-row">
-                {filters.map((filter) => {
-                    const isActive = selectedFilter === filter.key;
-                    const count =
-                        filter.key === 'ALL' ? businessOrders.length : statusCounts[filter.key] || 0;
-                    return (
-                        <TouchableOpacity
-                            key={filter.key}
-                            className="flex-1 mx-1 py-3 rounded-2xl flex-row items-center justify-center"
-                            style={{ backgroundColor: isActive ? '#0b89a9' : '#1f2937' }}
-                            onPress={() => setSelectedFilter(filter.key)}
-                        >
-                            <Ionicons name={filter.icon} size={18} color={isActive ? '#fff' : '#9ca3af'} />
-                            <Text
-                                className="font-bold text-sm ml-1.5"
-                                style={{ color: isActive ? '#fff' : '#9ca3af' }}
-                            >
-                                {filter.label}
-                            </Text>
-                            {count > 0 && (
-                                <View
-                                    className="ml-1.5 px-1.5 py-0.5 rounded-full min-w-[20px] items-center"
-                                    style={{
-                                        backgroundColor: isActive
-                                            ? 'rgba(255,255,255,0.3)'
-                                            : 'rgba(255,255,255,0.1)',
-                                    }}
-                                >
-                                    <Text
-                                        className="font-bold text-xs"
-                                        style={{ color: isActive ? '#fff' : '#9ca3af' }}
-                                    >
-                                        {count}
-                                    </Text>
-                                </View>
-                            )}
-                        </TouchableOpacity>
-                    );
-                })}
-            </View>
+        <SafeAreaView className="flex-1 bg-background" edges={['top']}>
 
             {/* ── Orders List ── */}
             {loading && !data ? (
@@ -546,28 +440,24 @@ export default function OrdersScreen() {
                 </View>
             ) : (
                 <FlatList
-                    data={filteredOrders}
+                    data={sortedOrders}
                     keyExtractor={(item) => item.id}
                     renderItem={renderOrderCard}
                     refreshControl={
                         <RefreshControl refreshing={false} onRefresh={refetch} tintColor="#0b89a9" />
                     }
                     ListEmptyComponent={
-                        <View className="items-center justify-center py-20">
-                            <View className="w-24 h-24 rounded-full bg-card items-center justify-center mb-6">
-                                <Ionicons name="receipt-outline" size={48} color="#6b7280" />
+                        <View className="items-center justify-center py-16">
+                            <View className="w-20 h-20 rounded-full bg-card items-center justify-center mb-4">
+                                <Ionicons name="receipt-outline" size={40} color="#6b7280" />
                             </View>
-                            <Text className="text-text text-xl font-bold mb-2">No Orders</Text>
-                            <Text className="text-subtext text-base text-center px-12">
-                                {selectedFilter === 'PENDING'
-                                    ? 'No pending orders right now. They will appear here in real-time.'
-                                    : selectedFilter === 'ALL'
-                                      ? 'No orders found for your business.'
-                                      : `No ${STATUS_LABELS[selectedFilter as OrderStatus].toLowerCase()} orders.`}
+                            <Text className="text-text text-lg font-bold mb-1">No Orders</Text>
+                            <Text className="text-subtext text-sm text-center px-12">
+                                No orders found for your business.
                             </Text>
                         </View>
                     }
-                    contentContainerStyle={{ paddingTop: 8, paddingBottom: 32 }}
+                    contentContainerStyle={{ paddingTop: 6, paddingBottom: 20 }}
                 />
             )}
 

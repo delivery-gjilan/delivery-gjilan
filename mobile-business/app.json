@@ -3,7 +3,7 @@
     "name": "Business Portal - Delivery Gjilan",
     "slug": "delivery-gjilan-business",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
@@ -14,14 +14,21 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.deliverygjilan.business"
+      "bundleIdentifier": "com.deliverygjilan.business",
+      "runtimeVersion": {
+        "policy": "appVersion"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundColor": "#000000"
       },
-      "package": "com.deliverygjilan.business"
+      "package": "com.deliverygjilan.business",
+      "edgeToEdgeEnabled": false,
+      "runtimeVersion": {
+        "policy": "appVersion"
+      }
     },
     "web": {
       "favicon": "./assets/images/favicon.png",
@@ -46,6 +53,12 @@
       "eas": {
         "projectId": "dc536dcd-100f-4271-82f4-2e8fcbdbb345"
       }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/dc536dcd-100f-4271-82f4-2e8fcbdbb345"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
     }
   }
 }

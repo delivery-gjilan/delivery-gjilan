@@ -65,7 +65,15 @@ function AppContent() {
                         <Stack.Screen name="signup" options={{ headerShown: false }} />
                         <Stack.Screen name="login" options={{ headerShown: false }} />
                         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                        <Stack.Screen name="business/[businessId]" options={{ headerShown: false }} />
+                        <Stack.Screen 
+                            name="business/[businessId]" 
+                            options={{ 
+                                headerShown: false,
+                                presentation: 'card',
+                                animation: 'slide_from_right',
+                                gestureEnabled: false,
+                            }} 
+                        />
                         <Stack.Screen name="product/[productId]" options={{ headerShown: false }} />
                         <Stack.Screen
                             name="cart"
@@ -80,10 +88,9 @@ function AppContent() {
                         <Stack.Screen
                             name="orders"
                             options={{
-                                presentation: 'modal',
-                                animation: 'slide_from_bottom',
-                                gestureDirection: 'vertical',
-                                gestureEnabled: true,
+                                presentation: 'card',
+                                animation: 'slide_from_right',
+                                gestureEnabled: false,
                                 headerShown: false,
                             }}
                         />

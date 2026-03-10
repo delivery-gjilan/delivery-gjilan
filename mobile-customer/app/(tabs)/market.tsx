@@ -711,6 +711,8 @@ export default function Market() {
                 onScroll={scrollHandler}
                 keyboardShouldPersistTaps="handled"
                 stickyHeaderIndices={[0]}
+                bounces={false}
+                overScrollMode="never"
             >
                 {/* ═══ 0: STICKY — Search Header + Category Tabs + Subcategory Pills ═══ */}
                 <View

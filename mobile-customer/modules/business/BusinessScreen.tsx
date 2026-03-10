@@ -334,7 +334,11 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
     if (isLoading) {
         return (
             <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['bottom']}>
-                <Animated.ScrollView showsVerticalScrollIndicator={false}>
+                <Animated.ScrollView 
+                    showsVerticalScrollIndicator={false}
+                    bounces={false}
+                    overScrollMode="never"
+                >
                     <BusinessHeaderSkeleton />
                     <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
                         {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -384,6 +388,8 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                 onScroll={scrollHandler}
                 keyboardShouldPersistTaps="handled"
                 stickyHeaderIndices={[2]}
+                bounces={false}
+                overScrollMode="never"
             >
                 {/* ═══ 0: Hero Image ═══ */}
                 <BusinessHeader business={business} scrollY={scrollY} />

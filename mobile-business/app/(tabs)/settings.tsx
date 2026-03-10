@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useAuthStore } from '@/store/authStore';
-import * as SecureStore from 'expo-secure-store';
 
 export default function SettingsScreen() {
     const router = useRouter();
@@ -17,9 +16,9 @@ export default function SettingsScreen() {
                 text: 'Logout',
                 style: 'destructive',
                 onPress: async () => {
-                    await SecureStore.deleteItemAsync('auth_token');
-                    await SecureStore.deleteItemAsync('auth_user');
-                    logout();
+                    console.log('[Settings] Logging out...');
+                    await logout();
+                    console.log('[Settings] Redirecting to login');
                     router.replace('/login');
                 },
             },

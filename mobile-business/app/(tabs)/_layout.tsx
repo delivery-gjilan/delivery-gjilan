@@ -3,11 +3,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@apollo/client/react';
 import { GET_BUSINESS_ORDERS } from '@/graphql/orders';
 import { useAuthStore } from '@/store/authStore';
-import { View, Text } from 'react-native';
+import { View, Text, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabLayout() {
     const { user } = useAuthStore();
     const { data } = useQuery(GET_BUSINESS_ORDERS, { pollInterval: 15000 });
+    const insets = useSafeAreaInsets();
 
     const pendingCount = (data?.orders || []).filter(
         (o: any) =>
@@ -24,8 +26,8 @@ export default function TabLayout() {
                 tabBarStyle: {
                     backgroundColor: '#1f2937',
                     borderTopColor: '#374151',
-                    height: 72,
-                    paddingBottom: 10,
+                    height: Platform.OS === 'android' ? 70 : 72,
+                    paddingBottom: Platform.OS === 'android' ? 8 : 10,
                     paddingTop: 10,
                 },
                 tabBarLabelStyle: {

@@ -10,8 +10,9 @@ import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { Order } from '@/gql/graphql';
 import { Image } from 'expo-image';
-import { useQuery } from '@apollo/client/react';
+import { useQuery, useMutation } from '@apollo/client/react';
 import { GET_ORDER_DRIVER } from '@/graphql/operations/orders';
+import { UPDATE_ORDER_STATUS } from '@/graphql/operations/orders/mutations';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useCartActions } from '@/modules/cart';
 import { useSuccessModalStore } from '@/store/useSuccessModalStore';
@@ -463,6 +464,31 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     }, [isDeliveryPhase, driverLocation?.latitude, driverLocation?.longitude]);
 
     // ─── Handlers ───────────────────────────────────────────
+    const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS);
+
+    const handleMarkAsDelivered = async () => {
+        Alert.alert(
+            'Test: Mark as Delivered',
+            'This will mark the order as delivered. Continue?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Mark Delivered',
+                    onPress: async () => {
+                        try {
+                            await updateOrderStatus({
+                                variables: { id: order.id, status: 'DELIVERED' as any },
+                            });
+                            Alert.alert('Success', 'Order marked as delivered!');
+                        } catch (err: any) {
+                            Alert.alert('Error', err.message || 'Failed to update order');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
     const handleCallDriver = async () => {
         if (!driverPhone) return;
         try { await Linking.openURL(`tel:${driverPhone}`); }
@@ -911,8 +937,8 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                         attributionEnabled={false}
                         scaleBarEnabled={false}
                         compassEnabled={false}
-                        scrollEnabled={true}
-                        zoomEnabled={true}
+                        scrollEnabled={false}
+                        zoomEnabled={false}
                         pitchEnabled={false}
                         rotateEnabled={false}
                     >
@@ -1157,6 +1183,26 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                 {showSummary ? '▲ Hide order summary' : '▼ Show order summary'}
                             </Text>
                         </TouchableOpacity>
+
+                        {/* ── TEST: Mark as Delivered Button ────── */}
+                        {order.status !== 'DELIVERED' && order.status !== 'CANCELLED' && (
+                            <TouchableOpacity
+                                onPress={handleMarkAsDelivered}
+                                activeOpacity={0.8}
+                                style={{
+                                    alignSelf: 'center',
+                                    marginBottom: 12,
+                                    backgroundColor: '#10b981',
+                                    paddingHorizontal: 16,
+                                    paddingVertical: 8,
+                                    borderRadius: 8,
+                                }}
+                            >
+                                <Text style={{ color: 'white', fontSize: 12, fontWeight: '700' }}>
+                                    🧪 TEST: Mark as Delivered
+                                </Text>
+                            </TouchableOpacity>
+                        )}
 
                         {/* ── Expanded Order Items ────────── */}
                         {showSummary && (
