@@ -23,6 +23,7 @@ const log = logger.child({ service: 'DriverServices' });
 
 let driverService: DriverService | null = null;
 let watchdogService: DriverWatchdogService | null = null;
+let initializingPromise: Promise<{ driverService: DriverService; watchdogService: DriverWatchdogService }> | null = null;
 
 export async function initializeDriverServices() {
   if (driverService && watchdogService) {
@@ -30,27 +31,40 @@ export async function initializeDriverServices() {
     return { driverService, watchdogService };
   }
 
-  log.info('driverServices:initializing');
+  if (initializingPromise) {
+    log.debug('driverServices:initializationInProgress');
+    return initializingPromise;
+  }
 
-  // Get database connection (initializes if needed)
-  const db = await getDB();
+  initializingPromise = (async () => {
+    log.info('driverServices:initializing');
 
-  // Repositories
-  const driverRepository = new DriverRepository(db);
-  const authRepository = new AuthRepository(db);
+    // Get database connection (initializes if needed)
+    const db = await getDB();
 
-  // Watchdog service - runs every 10 seconds to check connection states
-  watchdogService = new DriverWatchdogService(driverRepository, authRepository);
+    // Repositories
+    const driverRepository = new DriverRepository(db);
+    const authRepository = new AuthRepository(db);
 
-  // High-level service with heartbeat handling
-  driverService = new DriverService(db, authRepository, watchdogService);
+    // Watchdog service - runs every 10 seconds to check connection states
+    watchdogService = new DriverWatchdogService(driverRepository, authRepository);
 
-  // Start the watchdog
-  watchdogService.start();
+    // High-level service with heartbeat handling
+    driverService = new DriverService(db, authRepository, watchdogService);
 
-  log.info('driverServices:ready');
+    // Start the watchdog
+    watchdogService.start();
 
-  return { driverService, watchdogService };
+    log.info('driverServices:ready');
+
+    return { driverService, watchdogService };
+  })();
+
+  try {
+    return await initializingPromise;
+  } finally {
+    initializingPromise = null;
+  }
 }
 
 /**
@@ -59,6 +73,7 @@ export async function initializeDriverServices() {
  * Call this when your server is shutting down
  */
 export function shutdownDriverServices() {
+  initializingPromise = null;
   if (watchdogService) {
     watchdogService.stop();
     log.info('driverServices:shutdown');

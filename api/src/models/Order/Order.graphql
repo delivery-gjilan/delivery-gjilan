@@ -12,6 +12,11 @@ enum PromotionAppliesTo {
     DELIVERY
 }
 
+enum DriverCustomerNotificationKind {
+    ETA_LT_3_MIN
+    ARRIVED_WAITING
+}
+
 type OrderBusiness {
     business: Business!
     items: [OrderItem!]!
@@ -33,6 +38,16 @@ type OrderPromotion {
     promotionId: ID!
     appliesTo: PromotionAppliesTo!
     discountAmount: Float!
+}
+
+type OrderDriverLiveTracking {
+    orderId: ID!
+    driverId: ID!
+    latitude: Float!
+    longitude: Float!
+    navigationPhase: String
+    remainingEtaSeconds: Int
+    etaUpdatedAt: Date!
 }
 
 type Order {
@@ -74,6 +89,7 @@ type Mutation {
     startPreparing(id: ID!, preparationMinutes: Int!): Order!
     updatePreparationTime(id: ID!, preparationMinutes: Int!): Order!
     assignDriverToOrder(id: ID!, driverId: ID): Order!
+    driverNotifyCustomer(orderId: ID!, kind: DriverCustomerNotificationKind!): Boolean!
     cancelOrder(id: ID!): Order!
     createOrder(input: CreateOrderInput!): Order!
     createTestOrder: Order!
@@ -82,6 +98,7 @@ type Mutation {
 type Subscription {
     orderStatusUpdated(orderId: ID!): Order! @skipAuth
     userOrdersUpdated(input: SubscriptionInput!): [Order!]! @skipAuth
+    orderDriverLiveTracking(orderId: ID!, input: SubscriptionInput!): OrderDriverLiveTracking! @skipAuth
     allOrdersUpdated: [Order!]! @skipAuth
 }
 

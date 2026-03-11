@@ -4,6 +4,7 @@ export const GET_SETTLEMENTS = graphql(`
     query GetSettlements(
         $type: SettlementType
         $status: SettlementStatus
+        $direction: SettlementDirection
         $driverId: ID
         $businessId: ID
         $startDate: Date
@@ -14,6 +15,7 @@ export const GET_SETTLEMENTS = graphql(`
         settlements(
             type: $type
             status: $status
+            direction: $direction
             driverId: $driverId
             businessId: $businessId
             startDate: $startDate
@@ -23,6 +25,7 @@ export const GET_SETTLEMENTS = graphql(`
         ) {
             id
             type
+            direction
             driver {
                 id
                 firstName
@@ -40,8 +43,15 @@ export const GET_SETTLEMENTS = graphql(`
                 totalPrice
             }
             amount
+            currency
             status
             paidAt
+            paymentReference
+            paymentMethod
+            calculationDetails {
+                itemsBreakdown
+                rulesApplied
+            }
             createdAt
         }
     }

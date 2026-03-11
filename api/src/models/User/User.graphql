@@ -25,6 +25,11 @@ enum UserPermission {
     view_analytics
 }
 
+enum AppLanguage {
+    EN
+    AL
+}
+
 type User {
     id: ID!
     email: String!
@@ -45,6 +50,7 @@ type User {
     driverLocation: Location
     driverLocationUpdatedAt: Date
     referralCode: String
+    preferredLanguage: AppLanguage!
     permissions: [UserPermission!]!
 }
 
@@ -170,6 +176,7 @@ type Mutation {
     adminUpdateDriverLocation(driverId: ID!, latitude: Float!, longitude: Float!): User!
     updateDriverOnlineStatus(isOnline: Boolean!): User!
     generateReferralCode: String!
+    setMyPreferredLanguage(language: AppLanguage!): User!
 }
 
 type Subscription {

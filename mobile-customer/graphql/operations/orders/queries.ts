@@ -90,6 +90,12 @@ export const GET_ORDER = graphql(`
                     address
                 }
                 driverLocationUpdatedAt
+                driverConnection {
+                    activeOrderId
+                    navigationPhase
+                    remainingEtaSeconds
+                    etaUpdatedAt
+                }
             }
             businesses {
                 business {
@@ -188,6 +194,12 @@ export const GET_ORDER_DRIVER = graphql(`
                     address
                 }
                 driverLocationUpdatedAt
+                driverConnection {
+                    activeOrderId
+                    navigationPhase
+                    remainingEtaSeconds
+                    etaUpdatedAt
+                }
             }
         }
     }

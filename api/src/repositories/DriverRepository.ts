@@ -167,7 +167,7 @@ export class DriverRepository {
   }
 
   /**
-   * Mark drivers as STALE if lastHeartbeatAt is between 15-30 seconds ago
+   * Mark drivers as STALE if lastHeartbeatAt is between 45-90 seconds ago
    * Only affects drivers currently marked as CONNECTED
    */
   async markStaleDrivers(): Promise<DbDriver[]> {
@@ -179,7 +179,7 @@ export class DriverRepository {
       .where(
         and(
           isNotNull(driversTable.lastHeartbeatAt),
-          // Between 15 and 30 seconds ago (use raw SQL for interval to avoid parameterization)
+          // Between stale and lost thresholds (use raw SQL for interval to avoid parameterization)
           sql`${driversTable.lastHeartbeatAt} < now() - interval '${sql.raw(String(CONNECTION_THRESHOLDS.STALE))} seconds'`,
           sql`${driversTable.lastHeartbeatAt} >= now() - interval '${sql.raw(String(CONNECTION_THRESHOLDS.LOST))} seconds'`,
           // Only if currently CONNECTED
@@ -192,7 +192,7 @@ export class DriverRepository {
   }
 
   /**
-   * Mark drivers as LOST if lastHeartbeatAt is more than 30 seconds ago
+   * Mark drivers as LOST if lastHeartbeatAt is older than lost threshold (90 seconds)
    * Affects drivers marked as CONNECTED or STALE
    */
   async markLostDrivers(): Promise<DbDriver[]> {
@@ -204,7 +204,7 @@ export class DriverRepository {
       .where(
         and(
           isNotNull(driversTable.lastHeartbeatAt),
-          // More than 30 seconds ago (use raw SQL for interval to avoid parameterization)
+          // Older than lost threshold (use raw SQL for interval to avoid parameterization)
           sql`${driversTable.lastHeartbeatAt} < now() - interval '${sql.raw(String(CONNECTION_THRESHOLDS.LOST))} seconds'`,
           // Only if currently CONNECTED or STALE
           or(
@@ -216,6 +216,56 @@ export class DriverRepository {
       .returning();
 
     return result;
+  }
+
+  /**
+   * Mark one driver as STALE only if heartbeat is expired for stale threshold.
+   * This is used by realtime watchdog timers to avoid table-wide scans.
+   */
+  async markDriverStaleIfExpired(userId: string): Promise<DbDriver | undefined> {
+    const [driver] = await this.db
+      .update(driversTable)
+      .set({
+        connectionStatus: 'STALE',
+      })
+      .where(
+        and(
+          eq(driversTable.userId, userId),
+          isNotNull(driversTable.lastHeartbeatAt),
+          sql`${driversTable.lastHeartbeatAt} < now() - interval '${sql.raw(String(CONNECTION_THRESHOLDS.STALE))} seconds'`,
+          sql`${driversTable.lastHeartbeatAt} >= now() - interval '${sql.raw(String(CONNECTION_THRESHOLDS.LOST))} seconds'`,
+          eq(driversTable.connectionStatus, 'CONNECTED')
+        )
+      )
+      .returning();
+
+    return driver;
+  }
+
+  /**
+   * Mark one driver as LOST only if heartbeat is expired for lost threshold.
+   * This is used by realtime watchdog timers to avoid table-wide scans.
+   */
+  async markDriverLostIfExpired(userId: string): Promise<DbDriver | undefined> {
+    const [driver] = await this.db
+      .update(driversTable)
+      .set({
+        connectionStatus: 'LOST',
+      })
+      .where(
+        and(
+          eq(driversTable.userId, userId),
+          isNotNull(driversTable.lastHeartbeatAt),
+          sql`${driversTable.lastHeartbeatAt} < now() - interval '${sql.raw(String(CONNECTION_THRESHOLDS.LOST))} seconds'`,
+          or(
+            eq(driversTable.connectionStatus, 'CONNECTED'),
+            eq(driversTable.connectionStatus, 'STALE')
+          )
+        )
+      )
+      .returning();
+
+    return driver;
   }
 
   /**

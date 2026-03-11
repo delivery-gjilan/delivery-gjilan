@@ -1,3 +1,4 @@
+import { gql } from '@apollo/client';
 import { graphql } from '@/gql';
 
 export const USERS_QUERY = graphql(`
@@ -21,7 +22,7 @@ export const USERS_QUERY = graphql(`
   }
 `);
 
-export const DRIVERS_QUERY = graphql(`
+export const DRIVERS_QUERY = gql`
   query Drivers {
     drivers {
       id
@@ -45,10 +46,14 @@ export const DRIVERS_QUERY = graphql(`
         lastHeartbeatAt
         lastLocationUpdate
         disconnectedAt
+        activeOrderId
+        navigationPhase
+        remainingEtaSeconds
+        etaUpdatedAt
       }
     }
   }
-`);
+`;
 
 export const USER_BEHAVIOR_QUERY = graphql(`
   query UserBehavior($userId: ID!) {

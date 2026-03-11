@@ -6,3 +6,4 @@ export { ME_QUERY } from './me';
 export { LOGIN_MUTATION } from './login';
 export { RESEND_EMAIL_VERIFICATION_MUTATION } from './resendEmailVerification';
 export { DELETE_MY_ACCOUNT_MUTATION } from './deleteMyAccount';
+export { SET_MY_PREFERRED_LANGUAGE_MUTATION } from './setMyPreferredLanguage';

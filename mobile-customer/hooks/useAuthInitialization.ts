@@ -4,7 +4,8 @@ import { getToken } from '@/utils/secureTokenStore';
 import { useLazyQuery } from '@apollo/client/react';
 import { ME_QUERY } from '@/graphql/operations/auth';
 import { useRouter } from 'expo-router';
-import { SignupStep } from '@/gql/graphql';
+import { AppLanguage, SignupStep } from '@/gql/graphql';
+import { useLocaleStore } from '@/store/useLocaleStore';
 
 /**
  * Hook to initialize authentication state on app startup
@@ -15,6 +16,7 @@ export function useAuthInitialization() {
     const hasInitialized = useRef(false);
     const [isInitializing, setIsInitializing] = useState(true);
     const { setToken, setUser, logout, hasHydrated } = useAuthStore();
+    const setLanguageChoice = useLocaleStore((state) => state.setLanguageChoice);
 
     const [fetchMe, { data, error, loading }] = useLazyQuery(ME_QUERY, {
         fetchPolicy: 'network-only',
@@ -87,6 +89,11 @@ export function useAuthInitialization() {
         if (data?.me) {
             console.log('[AuthInit] ME query successful, user:', data.me.email, 'step:', data.me.signupStep);
             setUser(data.me as any);
+            if (data.me.preferredLanguage === AppLanguage.Al) {
+                setLanguageChoice('al');
+            } else {
+                setLanguageChoice('en');
+            }
 
             // Redirect based on signup completion status
             if (data.me.signupStep === SignupStep.Completed) {
@@ -100,7 +107,7 @@ export function useAuthInitialization() {
             setIsInitializing(false);
             hasInitialized.current = true;
         }
-    }, [data, error, loading, logout, router, setUser]);
+    }, [data, error, loading, logout, router, setLanguageChoice, setUser]);
 
     return {
         isInitializing,

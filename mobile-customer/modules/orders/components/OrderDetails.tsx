@@ -10,12 +10,14 @@ import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { Order } from '@/gql/graphql';
 import { Image } from 'expo-image';
-import { useQuery, useMutation } from '@apollo/client/react';
+import { useQuery, useMutation, useSubscription } from '@apollo/client/react';
 import { GET_ORDER_DRIVER } from '@/graphql/operations/orders';
+import { ORDER_DRIVER_LIVE_TRACKING } from '@/graphql/operations/orders/subscriptions';
 import { UPDATE_ORDER_STATUS } from '@/graphql/operations/orders/mutations';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useCartActions } from '@/modules/cart';
 import { useSuccessModalStore } from '@/store/useSuccessModalStore';
+import { useAuthStore } from '@/store/authStore';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -27,7 +29,6 @@ import Animated, {
     FadeInDown,
 } from 'react-native-reanimated';
 import { calculateHaversineDistance } from '@/utils/haversine';
-import { fetchRoute } from '@/utils/route';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Component, type ReactNode, type ErrorInfo } from 'react';
@@ -79,6 +80,35 @@ const formatOrderDate = (value?: string | null) => {
     });
 };
 
+const LIVE_DRIVER_ETA_TTL_MS = 20_000;
+const DRIVER_INTERPOLATION_TICK_MS = 66;
+const DRIVER_INTERPOLATION_MIN_MS = 350;
+const DRIVER_INTERPOLATION_MAX_MS = 8_000;
+const DRIVER_INTERPOLATION_RATIO = 0.9;
+const DRIVER_POSITION_EPSILON = 0.00001;
+const DRIVER_TELEPORT_GUARD_KM = 0.8;
+const DELIVERY_CAMERA_REFIT_MIN_INTERVAL_MS = 3500;
+const DELIVERY_CAMERA_REFIT_MIN_MOVE_KM = 0.08;
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+const calculateBearingDeg = (
+    fromLat: number,
+    fromLng: number,
+    toLat: number,
+    toLng: number,
+): number => {
+    const fromLatRad = (fromLat * Math.PI) / 180;
+    const toLatRad = (toLat * Math.PI) / 180;
+    const deltaLngRad = ((toLng - fromLng) * Math.PI) / 180;
+    const y = Math.sin(deltaLngRad) * Math.cos(toLatRad);
+    const x =
+        Math.cos(fromLatRad) * Math.sin(toLatRad) -
+        Math.sin(fromLatRad) * Math.cos(toLatRad) * Math.cos(deltaLngRad);
+    const angleDeg = (Math.atan2(y, x) * 180) / Math.PI;
+    return (angleDeg + 360) % 360;
+};
+
 // ─── Status Config ──────────────────────────────────────────
 const STATUS_CONFIG: Record<string, {
     color: string;
@@ -107,7 +137,7 @@ const STATUS_STEP_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 
 // ─── Pin Markers ────────────────────────────────────────────
 // Purple pin for business & driver (matches app theme)
-const PurplePin = ({ icon, size = 28 }: { icon: keyof typeof Ionicons.glyphMap; size?: number }) => (
+const PurplePin = ({ icon, size = 28, rotationDeg = 0 }: { icon: keyof typeof Ionicons.glyphMap; size?: number; rotationDeg?: number }) => (
     <View style={{ alignItems: 'center' }}>
         <View style={{
             width: size, height: size, borderRadius: size / 2,
@@ -116,7 +146,9 @@ const PurplePin = ({ icon, size = 28 }: { icon: keyof typeof Ionicons.glyphMap; 
             shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.4, shadowRadius: 6, elevation: 5,
         }}>
-            <Ionicons name={icon} size={size * 0.45} color="white" />
+            <View style={{ transform: [{ rotate: `${rotationDeg}deg` }] }}>
+                <Ionicons name={icon} size={size * 0.45} color="white" />
+            </View>
         </View>
         <View style={{ width: 2, height: 8, backgroundColor: '#7C3AED', marginTop: -1 }} />
         <View style={{ width: 8, height: 3, borderRadius: 4, backgroundColor: '#00000020', marginTop: 1 }} />
@@ -140,6 +172,60 @@ const LocationPin = () => (
         <View style={{ width: 8, height: 3, borderRadius: 4, backgroundColor: '#00000020', marginTop: 1 }} />
     </View>
 );
+
+const PreparingBusinessMarker = ({ active }: { active: boolean }) => {
+    const pulseScale = useSharedValue(1);
+    const pulseOpacity = useSharedValue(active ? 0.32 : 0);
+
+    useEffect(() => {
+        if (active) {
+            pulseScale.value = withRepeat(
+                withSequence(
+                    withTiming(1.85, { duration: 1300, easing: Easing.out(Easing.cubic) }),
+                    withTiming(1, { duration: 1300, easing: Easing.inOut(Easing.cubic) }),
+                ),
+                -1,
+                false,
+            );
+            pulseOpacity.value = withRepeat(
+                withSequence(
+                    withTiming(0.34, { duration: 900, easing: Easing.inOut(Easing.quad) }),
+                    withTiming(0.08, { duration: 1700, easing: Easing.inOut(Easing.quad) }),
+                ),
+                -1,
+                false,
+            );
+            return;
+        }
+
+        pulseScale.value = withTiming(1, { duration: 250 });
+        pulseOpacity.value = withTiming(0, { duration: 250 });
+    }, [active, pulseOpacity, pulseScale]);
+
+    const pulseAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: pulseScale.value }],
+        opacity: pulseOpacity.value,
+    }));
+
+    return (
+        <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+            <Animated.View
+                pointerEvents="none"
+                style={[
+                    {
+                        position: 'absolute',
+                        width: 62,
+                        height: 62,
+                        borderRadius: 31,
+                        backgroundColor: '#7C3AED',
+                    },
+                    pulseAnimatedStyle,
+                ]}
+            />
+            <PurplePin icon="restaurant" size={28} />
+        </View>
+    );
+};
 
 // ─── Icon Stepper ───────────────────────────────────────
 const IconStepper = ({ status, color, theme: th, t }: {
@@ -237,27 +323,214 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const { showSuccess } = useSuccessModalStore();
     const [hasFittedMap, setHasFittedMap] = useState(false);
     const [showSummary, setShowSummary] = useState(false);
+    const token = useAuthStore((state) => state.token);
+    const [interpolatedDriverLocation, setInterpolatedDriverLocation] = useState<{
+        latitude: number;
+        longitude: number;
+        address: string;
+    } | null>(null);
+    const [driverHeadingDeg, setDriverHeadingDeg] = useState(0);
+    const lastRenderedDriverLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
+    const interpolationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const lastHeartbeatReceivedAtRef = useRef<number | null>(null);
+    const lastObservedHeartbeatGapMsRef = useRef(5000);
+    const smoothedHeartbeatGapMsRef = useRef(5000);
+    const lastDeliveryCameraFitAtRef = useRef<number>(0);
+    const lastDeliveryCameraFitDriverRef = useRef<{ latitude: number; longitude: number } | null>(null);
 
-    // Route polyline from Mapbox Directions API (cached)
-    const [routeCoords, setRouteCoords] = useState<{ latitude: number; longitude: number }[]>([]);
-    const [routeDuration, setRouteDuration] = useState<number | null>(null);
+    const [liveDriverTracking, setLiveDriverTracking] = useState<{
+        orderId: string;
+        driverId: string;
+        latitude: number;
+        longitude: number;
+        navigationPhase?: string | null;
+        remainingEtaSeconds?: number | null;
+        etaUpdatedAt: string;
+    } | null>(null);
 
-    // ─── Driver Data (polled) ───────────────────────────────
+    // ─── Driver Data (initial/fallback query; live movement comes from subscription) ───────────────────────────────
     const { data: driverData } = useQuery(GET_ORDER_DRIVER, {
         variables: { id: order?.id ?? '' },
         skip: !order?.id,
         fetchPolicy: 'cache-and-network',
-        pollInterval:
-            order?.status === 'OUT_FOR_DELIVERY' ? 5000
-            : (order?.status === 'PREPARING' || order?.status === 'READY') ? 15000
-            : 0,
     });
+
+    const status = order?.status ?? 'PENDING';
+    const isDeliveryPhase = status === 'OUT_FOR_DELIVERY';
+    const isPreparingAnimationPhase = status === 'PENDING' || status === 'PREPARING';
+
+    const stopDriverInterpolation = useCallback(() => {
+        if (interpolationTimerRef.current) {
+            clearInterval(interpolationTimerRef.current);
+            interpolationTimerRef.current = null;
+        }
+    }, []);
+
+    useSubscription(ORDER_DRIVER_LIVE_TRACKING, {
+        variables: { orderId: order?.id ?? '', input: { token: token || '' } },
+        skip: !order?.id || !token || !isDeliveryPhase,
+        onData: ({ data }) => {
+            const payload = data.data?.orderDriverLiveTracking;
+            if (!payload) return;
+            setLiveDriverTracking(payload);
+        },
+        onError: (error) => {
+            console.warn('[OrderDetails] live tracking subscription error:', error);
+        },
+    });
+
+    useEffect(() => {
+        setLiveDriverTracking(null);
+        setInterpolatedDriverLocation(null);
+        setDriverHeadingDeg(0);
+        lastRenderedDriverLocationRef.current = null;
+        lastHeartbeatReceivedAtRef.current = null;
+        lastObservedHeartbeatGapMsRef.current = 5000;
+        smoothedHeartbeatGapMsRef.current = 5000;
+        stopDriverInterpolation();
+    }, [order?.id]);
+
+    useEffect(() => {
+        if (!isDeliveryPhase) {
+            setLiveDriverTracking(null);
+            setInterpolatedDriverLocation(null);
+            setDriverHeadingDeg(0);
+            lastRenderedDriverLocationRef.current = null;
+            lastHeartbeatReceivedAtRef.current = null;
+            smoothedHeartbeatGapMsRef.current = 5000;
+            stopDriverInterpolation();
+        }
+    }, [isDeliveryPhase, stopDriverInterpolation]);
+
+    useEffect(() => {
+        return () => {
+            stopDriverInterpolation();
+        };
+    }, [stopDriverInterpolation]);
 
     const driver = driverData?.order?.driver ?? (order as any)?.driver ?? null;
     const driverName = driver?.firstName ? `${driver.firstName} ${driver?.lastName || ''}`.trim() : null;
     const driverPhone = driver?.phoneNumber || '+383 44 123 456';
     const driverImageUrl = driver?.imageUrl || null;
-    const driverLocation = driver?.driverLocation ?? null;
+    const queriedDriverLocation = driver?.driverLocation ?? null;
+    const liveDriverRawLocation =
+        liveDriverTracking?.orderId === order?.id
+            ? {
+                  latitude: liveDriverTracking.latitude,
+                  longitude: liveDriverTracking.longitude,
+                  address: queriedDriverLocation?.address ?? '',
+              }
+            : null;
+
+    useEffect(() => {
+        if (!isDeliveryPhase || !liveDriverRawLocation) return;
+
+        const now = Date.now();
+        if (lastHeartbeatReceivedAtRef.current != null) {
+            const observedGap = now - lastHeartbeatReceivedAtRef.current;
+            if (Number.isFinite(observedGap) && observedGap > 0) {
+                lastObservedHeartbeatGapMsRef.current = clamp(observedGap, 500, 15_000);
+                const emaFactor = 0.2;
+                smoothedHeartbeatGapMsRef.current =
+                    smoothedHeartbeatGapMsRef.current * (1 - emaFactor) +
+                    lastObservedHeartbeatGapMsRef.current * emaFactor;
+            }
+        }
+        lastHeartbeatReceivedAtRef.current = now;
+
+        const target = liveDriverRawLocation;
+        const start = interpolatedDriverLocation ?? queriedDriverLocation ?? target;
+
+        const deltaLat = Math.abs(target.latitude - start.latitude);
+        const deltaLng = Math.abs(target.longitude - start.longitude);
+        if (deltaLat < DRIVER_POSITION_EPSILON && deltaLng < DRIVER_POSITION_EPSILON) {
+            setInterpolatedDriverLocation(target);
+            return;
+        }
+
+        const jumpDistanceKm = calculateHaversineDistance(
+            start.latitude,
+            start.longitude,
+            target.latitude,
+            target.longitude,
+        );
+        if (jumpDistanceKm >= DRIVER_TELEPORT_GUARD_KM) {
+            stopDriverInterpolation();
+            setInterpolatedDriverLocation(target);
+            lastRenderedDriverLocationRef.current = { latitude: target.latitude, longitude: target.longitude };
+            return;
+        }
+
+        const distanceFactor = jumpDistanceKm > 0.12 ? 0.8 : jumpDistanceKm < 0.01 ? 1.15 : 1;
+
+        const durationMs = clamp(
+            Math.round(smoothedHeartbeatGapMsRef.current * DRIVER_INTERPOLATION_RATIO * distanceFactor),
+            DRIVER_INTERPOLATION_MIN_MS,
+            DRIVER_INTERPOLATION_MAX_MS,
+        );
+
+        stopDriverInterpolation();
+        const startedAt = Date.now();
+        interpolationTimerRef.current = setInterval(() => {
+            const elapsed = Date.now() - startedAt;
+            const progress = clamp(elapsed / durationMs, 0, 1);
+            const easedProgress = 1 - Math.pow(1 - progress, 3);
+            const nextLat = start.latitude + (target.latitude - start.latitude) * easedProgress;
+            const nextLng = start.longitude + (target.longitude - start.longitude) * easedProgress;
+            const previousRendered = lastRenderedDriverLocationRef.current;
+            if (previousRendered) {
+                const stepDistanceKm = calculateHaversineDistance(
+                    previousRendered.latitude,
+                    previousRendered.longitude,
+                    nextLat,
+                    nextLng,
+                );
+                if (stepDistanceKm >= 0.002) {
+                    setDriverHeadingDeg(
+                        calculateBearingDeg(
+                            previousRendered.latitude,
+                            previousRendered.longitude,
+                            nextLat,
+                            nextLng,
+                        ),
+                    );
+                }
+            }
+            lastRenderedDriverLocationRef.current = { latitude: nextLat, longitude: nextLng };
+            setInterpolatedDriverLocation({
+                latitude: nextLat,
+                longitude: nextLng,
+                address: target.address,
+            });
+
+            if (progress >= 1) {
+                stopDriverInterpolation();
+            }
+        }, DRIVER_INTERPOLATION_TICK_MS);
+    }, [
+        isDeliveryPhase,
+        liveDriverRawLocation?.latitude,
+        liveDriverRawLocation?.longitude,
+        liveDriverRawLocation?.address,
+        interpolatedDriverLocation,
+        queriedDriverLocation,
+        stopDriverInterpolation,
+    ]);
+
+    const driverLocation =
+        liveDriverRawLocation
+            ? interpolatedDriverLocation ?? liveDriverRawLocation
+            : queriedDriverLocation;
+    const liveDriverConnection =
+        liveDriverTracking?.orderId === order?.id
+            ? {
+                  ...(driver?.driverConnection ?? {}),
+                  activeOrderId: liveDriverTracking.orderId,
+                  navigationPhase: liveDriverTracking.navigationPhase ?? null,
+                  remainingEtaSeconds: liveDriverTracking.remainingEtaSeconds ?? null,
+                  etaUpdatedAt: liveDriverTracking.etaUpdatedAt,
+              }
+            : driver?.driverConnection ?? null;
 
     // ─── Locations ──────────────────────────────────────────
     const pickupLocation = useMemo(() => {
@@ -269,54 +542,30 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const dropoffLocation = useMemo(() => order?.dropOffLocation ?? null, [order?.dropOffLocation]);
 
     // ─── Status ─────────────────────────────────────────────
-    const status = order?.status ?? 'PENDING';
     const config = STATUS_CONFIG[status] || STATUS_CONFIG.PENDING;
     const statusMessage = (t.orders.status_messages as any)?.[status.toLowerCase()] || '';
-    const isDeliveryPhase = status === 'OUT_FOR_DELIVERY';
     const isCompleted = status === 'DELIVERED';
     const isCancelled = status === 'CANCELLED';
     const businessName = order?.businesses?.[0]?.business?.name || '';
 
-    // ─── Fetch Route Polyline ───────────────────────────────
-    useEffect(() => {
-        const from = isDeliveryPhase && driverLocation ? driverLocation : pickupLocation;
-        const to = dropoffLocation;
-        
-        // Validate that we have valid coordinates
-        if (!from || !to || 
-            typeof from.latitude !== 'number' || typeof from.longitude !== 'number' ||
-            typeof to.latitude !== 'number' || typeof to.longitude !== 'number') {
-            return;
-        }
-
-        let cancelled = false;
-        fetchRoute(
-            { latitude: from.latitude, longitude: from.longitude },
-            { latitude: to.latitude, longitude: to.longitude }
-        ).then((result) => {
-            if (cancelled || !result) return;
-            setRouteCoords(result.coordinates);
-            setRouteDuration(result.durationMin);
-        }).catch((err) => {
-            console.error('[OrderDetails] Route fetch error:', err);
-        });
-
-        return () => { cancelled = true; };
-    }, [
-        pickupLocation?.latitude, pickupLocation?.longitude,
-        dropoffLocation?.latitude, dropoffLocation?.longitude,
-        driverLocation?.latitude, driverLocation?.longitude,
-        isDeliveryPhase,
-    ]);
-
-    // ─── ETA (prefer route-based, fallback to haversine) ────
+    // ─── ETA (prefer live heartbeat ETA, fallback to haversine) ────
     const deliveryEta = useMemo(() => {
-        // Route-based ETA from Mapbox (road distance)
-        if (routeDuration !== null) {
-            const prepMin = (status === 'PENDING' || status === 'PREPARING')
-                ? (order?.preparationMinutes ?? 0) : 0;
-            return Math.max(1, Math.ceil(routeDuration + prepMin));
+        const liveEtaOrderId = liveDriverConnection?.activeOrderId;
+        const liveEtaSeconds = liveDriverConnection?.remainingEtaSeconds;
+        const liveEtaUpdatedAt = liveDriverConnection?.etaUpdatedAt;
+        const liveEtaUpdatedAtMs = liveEtaUpdatedAt ? new Date(liveEtaUpdatedAt).getTime() : 0;
+        const liveEtaIsFresh =
+            liveEtaOrderId === order?.id &&
+            typeof liveEtaSeconds === 'number' &&
+            Number.isFinite(liveEtaSeconds) &&
+            liveEtaUpdatedAtMs > 0 &&
+            Date.now() - liveEtaUpdatedAtMs <= LIVE_DRIVER_ETA_TTL_MS;
+
+        if (liveEtaIsFresh) {
+            if (liveEtaSeconds <= 0) return 0;
+            return Math.max(1, Math.round(liveEtaSeconds / 60));
         }
+
         // Fallback: haversine
         if (isDeliveryPhase && driverLocation && dropoffLocation) {
             const dist = calculateHaversineDistance(
@@ -336,7 +585,17 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
             return driveMin;
         }
         return null;
-    }, [status, routeDuration, driverLocation, dropoffLocation, pickupLocation, order?.preparationMinutes]);
+    }, [
+        liveDriverConnection?.activeOrderId,
+        liveDriverConnection?.etaUpdatedAt,
+        liveDriverConnection?.remainingEtaSeconds,
+        order?.id,
+        status,
+        driverLocation,
+        dropoffLocation,
+        pickupLocation,
+        order?.preparationMinutes,
+    ]);
 
     // ─── Elapsed time ticker ────────────────────────────────
     const [, setTick] = useState(0);
@@ -450,6 +709,17 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         }
     }, [pickupLocation, dropoffLocation, driverLocation, isDeliveryPhase]);
 
+    useEffect(() => {
+        if (!pickupLocation && !dropoffLocation) return;
+        if (isDeliveryPhase && !driverLocation && !dropoffLocation) return;
+
+        const timeout = setTimeout(() => {
+            fitMapToMarkers();
+        }, 180);
+
+        return () => clearTimeout(timeout);
+    }, [isDeliveryPhase, status, fitMapToMarkers, pickupLocation, dropoffLocation]);
+
     // Initial fit
     useEffect(() => {
         if (hasFittedMap) return;
@@ -460,7 +730,33 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
 
     // Refit when delivery starts or driver moves
     useEffect(() => {
-        if (isDeliveryPhase && driverLocation) fitMapToMarkers();
+        if (!isDeliveryPhase || !driverLocation) return;
+
+        const now = Date.now();
+        const elapsed = now - lastDeliveryCameraFitAtRef.current;
+        const lastDriverAtFit = lastDeliveryCameraFitDriverRef.current;
+        const movedKm = lastDriverAtFit
+            ? calculateHaversineDistance(
+                  lastDriverAtFit.latitude,
+                  lastDriverAtFit.longitude,
+                  driverLocation.latitude,
+                  driverLocation.longitude,
+              )
+            : Number.POSITIVE_INFINITY;
+
+        const shouldRefit =
+            lastDeliveryCameraFitAtRef.current === 0 ||
+            elapsed >= DELIVERY_CAMERA_REFIT_MIN_INTERVAL_MS ||
+            movedKm >= DELIVERY_CAMERA_REFIT_MIN_MOVE_KM;
+
+        if (!shouldRefit) return;
+
+        fitMapToMarkers();
+        lastDeliveryCameraFitAtRef.current = now;
+        lastDeliveryCameraFitDriverRef.current = {
+            latitude: driverLocation.latitude,
+            longitude: driverLocation.longitude,
+        };
     }, [isDeliveryPhase, driverLocation?.latitude, driverLocation?.longitude]);
 
     // ─── Handlers ───────────────────────────────────────────
@@ -956,51 +1252,13 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                             }}
                         />
 
-                        {/* Route polyline (delivery phase only) */}
-                        {isDeliveryPhase && routeCoords.length > 1 && (
-                            <MapLibreGL.ShapeSource
-                                id="routeLine"
-                                shape={{
-                                    type: 'Feature',
-                                    properties: {},
-                                    geometry: {
-                                        type: 'LineString',
-                                        coordinates: routeCoords.map(c => [c.longitude, c.latitude]),
-                                    },
-                                }}
-                            >
-                                {/* Subtle glow */}
-                                <MapLibreGL.LineLayer
-                                    id="routeLineGlow"
-                                    style={{
-                                        lineColor: config.color,
-                                        lineWidth: 8,
-                                        lineOpacity: 0.12,
-                                        lineCap: 'round',
-                                        lineJoin: 'round',
-                                    }}
-                                />
-                                {/* Core line */}
-                                <MapLibreGL.LineLayer
-                                    id="routeLineFill"
-                                    style={{
-                                        lineColor: config.color,
-                                        lineWidth: 2.5,
-                                        lineOpacity: 0.9,
-                                        lineCap: 'round',
-                                        lineJoin: 'round',
-                                    }}
-                                />
-                            </MapLibreGL.ShapeSource>
-                        )}
-
                         {/* Business marker (pending / preparing / ready) */}
                         {!isDeliveryPhase && pickupLocation && typeof pickupLocation.latitude === 'number' && typeof pickupLocation.longitude === 'number' && (
                             <MapLibreGL.PointAnnotation
                                 id="pickup-marker"
                                 coordinate={[pickupLocation.longitude, pickupLocation.latitude]}
                             >
-                                <PurplePin icon="restaurant" size={28} />
+                                <PreparingBusinessMarker active={isPreparingAnimationPhase} />
                             </MapLibreGL.PointAnnotation>
                         )}
 
@@ -1010,7 +1268,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                 id="driver-marker"
                                 coordinate={[driverLocation.longitude, driverLocation.latitude]}
                             >
-                                <PurplePin icon="car" size={32} />
+                                <PurplePin icon="car" size={32} rotationDeg={driverHeadingDeg} />
                             </MapLibreGL.PointAnnotation>
                         )}
 

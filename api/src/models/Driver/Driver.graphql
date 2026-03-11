@@ -1,8 +1,8 @@
 """
 Connection status for drivers:
 - CONNECTED: Actively sending heartbeats
-- STALE: No heartbeat for 15 seconds (warning state)
-- LOST: No heartbeat for 30 seconds (offline state)
+- STALE: No heartbeat for 45 seconds (warning state)
+- LOST: No heartbeat for 90 seconds (offline state)
 - DISCONNECTED: Subscription closed or never connected
 """
 enum DriverConnectionStatus {
@@ -27,6 +27,18 @@ type DriverConnection {
     
     """Timestamp when driver was marked as DISCONNECTED"""
     disconnectedAt: Date
+
+    """Current navigation order this ETA belongs to"""
+    activeOrderId: ID
+
+    """Current navigation phase reported by the driver"""
+    navigationPhase: String
+
+    """Driver-reported remaining ETA in seconds"""
+    remainingEtaSeconds: Int
+
+    """When the ETA payload was last refreshed"""
+    etaUpdatedAt: Date
 }
 
 """Result of driver heartbeat mutation"""
@@ -91,6 +103,9 @@ extend type Mutation {
     driverHeartbeat(
         latitude: Float!
         longitude: Float!
+        activeOrderId: ID
+        navigationPhase: String
+        remainingEtaSeconds: Int
     ): DriverHeartbeatResult!
     
     """Admin mutation to manually set connection status (for testing/recovery)"""

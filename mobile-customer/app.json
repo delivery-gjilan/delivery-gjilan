@@ -77,6 +77,7 @@
       ],
       "expo-build-properties",
       "./plugins/patch-live-activities",
+      "./plugins/with-live-activity-extension",
       "./plugins/fix-firebase-modular-headers"
     ],
     "experiments": {

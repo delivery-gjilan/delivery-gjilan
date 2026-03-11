@@ -12,7 +12,6 @@ import { Table, Th, Td } from "@/components/ui/Table";
 import {
     CREATE_BUSINESS,
     DELETE_BUSINESS,
-    GET_BUSINESS,
     GET_BUSINESSES,
     UPDATE_BUSINESS,
 } from "@/graphql/operations/businesses";
@@ -67,8 +66,6 @@ export default function BusinessesPage() {
     const [createBusiness] = useMutation(CREATE_BUSINESS);
     const [updateBusiness] = useMutation(UPDATE_BUSINESS);
     const [deleteBusiness] = useMutation(DELETE_BUSINESS);
-
-    const [getBusinessDetails] = useMutation(GET_BUSINESS);
 
     /* --------------------------
      UI State

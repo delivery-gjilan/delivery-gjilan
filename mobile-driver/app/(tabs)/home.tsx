@@ -5,7 +5,13 @@ import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useAuth } from '@/hooks/useAuth';
 import { useMutation, useQuery, useSubscription } from '@apollo/client/react';
-import { ALL_ORDERS_UPDATED, ASSIGN_DRIVER_TO_ORDER, GET_ORDERS, UPDATE_ORDER_STATUS } from '@/graphql/operations/orders';
+import {
+    ALL_ORDERS_UPDATED,
+    ASSIGN_DRIVER_TO_ORDER,
+    DRIVER_NOTIFY_CUSTOMER,
+    GET_ORDERS,
+    UPDATE_ORDER_STATUS,
+} from '@/graphql/operations/orders';
 import { UPDATE_DRIVER_ONLINE_STATUS } from '@/graphql/operations/driverLocation';
 import { GET_MY_DRIVER_METRICS } from '@/graphql/operations/driver';
 import { Button } from '@/components/Button';
@@ -16,7 +22,7 @@ import * as Location from 'expo-location';
 
 export default function Home() {
     const theme = useTheme();
-    const { t } = useTranslations();
+    const { t, languageChoice } = useTranslations();
     const router = useRouter();
     const { logout } = useAuth();
     
@@ -67,8 +73,62 @@ export default function Home() {
 
     const [updateStatus, { loading: updating }] = useMutation(UPDATE_ORDER_STATUS);
     const [assignDriverToOrder, { loading: assigningOrder }] = useMutation(ASSIGN_DRIVER_TO_ORDER);
+    const [driverNotifyCustomer] = useMutation(DRIVER_NOTIFY_CUSTOMER);
     const [updatingId, setUpdatingId] = useState<string | null>(null);
+    const [notifyingOrderId, setNotifyingOrderId] = useState<string | null>(null);
+    const [notifyCooldownUntilByOrder, setNotifyCooldownUntilByOrder] = useState<Record<string, number>>({});
+    const [cooldownNowMs, setCooldownNowMs] = useState<number>(() => Date.now());
     const [updateOnlineStatus, { loading: updatingStatus }] = useMutation(UPDATE_DRIVER_ONLINE_STATUS);
+
+    const MANUAL_NOTIFY_COOLDOWN_SECONDS = 90;
+
+    const notifyCopy = useMemo(
+        () =>
+            languageChoice === 'al'
+                ? {
+                      sentTitle: 'Njoftimi u dergua',
+                      sentBody: 'Klienti u njoftua qe ju jeni ne pritje.',
+                      errorTitle: 'Njoftimi deshtoi',
+                      retryBody: 'Ju lutem provoni perseri.',
+                      cooldownTitle: 'Prisni pak',
+                      cooldownBody: (seconds: number) =>
+                          `Mund ta njoftoni klientin perseri pas ${seconds} sekondash.`,
+                      sending: 'Duke derguar...',
+                      notifyLong: 'Njofto klientin: Arrita dhe jam ne pritje',
+                      notifyShort: 'Njofto pritjen',
+                      notifyAgainIn: (seconds: number) => `Njofto perseri pas ${seconds}s`,
+                  }
+                : {
+                      sentTitle: 'Notification sent',
+                      sentBody: 'Customer has been notified that you are waiting.',
+                      errorTitle: 'Could not send notification',
+                      retryBody: 'Please try again.',
+                      cooldownTitle: 'Please wait',
+                      cooldownBody: (seconds: number) => `You can notify the customer again in ${seconds}s.`,
+                      sending: 'Sending...',
+                      notifyLong: 'Notify customer: I arrived and I am waiting',
+                      notifyShort: 'Notify Waiting',
+                      notifyAgainIn: (seconds: number) => `Notify again in ${seconds}s`,
+                  },
+        [languageChoice],
+    );
+
+    useEffect(() => {
+        const hasActiveCooldown = Object.values(notifyCooldownUntilByOrder).some((until) => until > Date.now());
+        if (!hasActiveCooldown) return;
+
+        const timer = setInterval(() => {
+            setCooldownNowMs(Date.now());
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [notifyCooldownUntilByOrder]);
+
+    const getManualNotifyCooldownSeconds = (orderId: string) => {
+        const until = notifyCooldownUntilByOrder[orderId] ?? 0;
+        if (until <= cooldownNowMs) return 0;
+        return Math.ceil((until - cooldownNowMs) / 1000);
+    };
     
     const handleOnlineStatusChange = async (newStatus: boolean) => {
         try {
@@ -292,6 +352,36 @@ export default function Home() {
         router.push({ pathname: '/(tabs)/map' });
     };
 
+    const handleNotifyCustomerWaiting = async (orderId: string) => {
+        const cooldownSeconds = getManualNotifyCooldownSeconds(orderId);
+        if (cooldownSeconds > 0) {
+            Alert.alert(notifyCopy.cooldownTitle, notifyCopy.cooldownBody(cooldownSeconds));
+            return;
+        }
+
+        try {
+            setNotifyingOrderId(orderId);
+            await driverNotifyCustomer({
+                variables: {
+                    orderId,
+                    kind: 'ARRIVED_WAITING',
+                },
+            });
+
+            setNotifyCooldownUntilByOrder((prev) => ({
+                ...prev,
+                [orderId]: Date.now() + MANUAL_NOTIFY_COOLDOWN_SECONDS * 1000,
+            }));
+
+            Alert.alert(notifyCopy.sentTitle, notifyCopy.sentBody);
+        } catch (err: any) {
+            console.error('[Home] Failed to notify customer', err);
+            Alert.alert(notifyCopy.errorTitle, err?.message || notifyCopy.retryBody);
+        } finally {
+            setNotifyingOrderId(null);
+        }
+    };
+
     return (
         <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }}>
             <Modal
@@ -501,13 +591,42 @@ export default function Home() {
                         </View>
 
                         {selectedOrder?.status === 'OUT_FOR_DELIVERY' && (
-                            <Pressable
-                                className="mt-3 py-3 rounded-2xl items-center"
-                                style={{ backgroundColor: theme.colors.income }}
-                                onPress={() => selectedOrder && openNavigation(selectedOrder)}
-                            >
-                                <Text className="text-white font-semibold">Start navigation</Text>
-                            </Pressable>
+                            <View className="mt-3 gap-2">
+                                {(() => {
+                                    const cooldownSeconds = selectedOrder?.id
+                                        ? getManualNotifyCooldownSeconds(selectedOrder.id)
+                                        : 0;
+                                    const isDisabled = notifyingOrderId === selectedOrder?.id || cooldownSeconds > 0;
+
+                                    return (
+                                        <>
+                                <Pressable
+                                    className="py-3 rounded-2xl items-center"
+                                    style={{ backgroundColor: theme.colors.income }}
+                                    onPress={() => selectedOrder && openNavigation(selectedOrder)}
+                                >
+                                    <Text className="text-white font-semibold">Start navigation</Text>
+                                </Pressable>
+                                <Pressable
+                                    className="py-3 rounded-2xl items-center"
+                                    style={{
+                                        backgroundColor: isDisabled ? theme.colors.border : theme.colors.primary,
+                                    }}
+                                    onPress={() => selectedOrder && handleNotifyCustomerWaiting(selectedOrder.id)}
+                                    disabled={isDisabled}
+                                >
+                                    <Text className="text-white font-semibold">
+                                        {notifyingOrderId === selectedOrder?.id
+                                            ? notifyCopy.sending
+                                            : cooldownSeconds > 0
+                                            ? notifyCopy.notifyAgainIn(cooldownSeconds)
+                                            : notifyCopy.notifyLong}
+                                    </Text>
+                                </Pressable>
+                                        </>
+                                    );
+                                })()}
+                            </View>
                         )}
                     </View>
                 </View>
@@ -757,6 +876,33 @@ export default function Home() {
                                                 >
                                                     <Text className="text-white font-bold">Continue Navigation</Text>
                                                 </Pressable>
+                                                {order.status === 'OUT_FOR_DELIVERY' && (
+                                                    (() => {
+                                                        const cooldownSeconds = getManualNotifyCooldownSeconds(order.id);
+                                                        const isDisabled = notifyingOrderId === order.id || cooldownSeconds > 0;
+
+                                                        return (
+                                                    <Pressable
+                                                        className="flex-1 py-3 rounded-2xl items-center"
+                                                        style={{
+                                                            backgroundColor: isDisabled
+                                                                ? theme.colors.border
+                                                                : theme.colors.income,
+                                                        }}
+                                                        onPress={() => handleNotifyCustomerWaiting(order.id)}
+                                                        disabled={isDisabled}
+                                                    >
+                                                        <Text className="text-white font-bold">
+                                                            {notifyingOrderId === order.id
+                                                                ? notifyCopy.sending
+                                                                : cooldownSeconds > 0
+                                                                ? notifyCopy.notifyAgainIn(cooldownSeconds)
+                                                                : notifyCopy.notifyShort}
+                                                        </Text>
+                                                    </Pressable>
+                                                        );
+                                                    })()
+                                                )}
                                             </View>
                                         </View>
                                     );

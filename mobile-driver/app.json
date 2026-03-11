@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "finance-tracker",
+    "name": "mobile-driver",
     "slug": "finance-tracker",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,21 +10,31 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.mobiledriver",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "We use your location to show drivers on the map.",
         "NSLocationAlwaysUsageDescription": "We need your location even when the app is closed to track deliveries.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location in the background to track deliveries in real-time.",
         "UIBackgroundModes": [
           "location",
+          "audio",
+          "location",
           "audio"
-        ]
+        ],
+        "MBXAccessToken": "pk.eyJ1IjoiYXJ0c2hhYmFuaTIwMDIiLCJhIjoiY21sZjlkbTNxMDIwOTNkc2F0cTZkYmZoeiJ9.C81uu49ST5NrfHZ58N9EXg",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION"
+        "ACCESS_BACKGROUND_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -34,7 +44,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.financetracker",
+      "package": "com.anonymous.mobiledriver",
       "googleServicesFile": "./google-services.json"
     },
     "web": {
@@ -65,15 +75,21 @@
           "enableBackgroundRemoteNotifications": true
         }
       ],
-      ["@badatgil/expo-mapbox-navigation", {
-        "accessToken": "pk.eyJ1IjoiYXJ0c2hhYmFuaTIwMDIiLCJhIjoiY21sZjlkbTNxMDIwOTNkc2F0cTZkYmZoeiJ9.C81uu49ST5NrfHZ58N9EXg",
-        "mapboxMapsVersion": "11.11.0"
-      }],
-      ["expo-build-properties", {
-        "ios": {
-          "useFrameworks": "static"
+      [
+        "@badatgil/expo-mapbox-navigation",
+        {
+          "accessToken": "pk.eyJ1IjoiYXJ0c2hhYmFuaTIwMDIiLCJhIjoiY21sZjlkbTNxMDIwOTNkc2F0cTZkYmZoeiJ9.C81uu49ST5NrfHZ58N9EXg",
+          "mapboxMapsVersion": "11.11.0"
         }
-      }],
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -109,6 +125,7 @@
       "eas": {
         "projectId": "852fbe30-bff7-44f8-8f05-17e0d81af30a"
       }
-    }
+    },
+    "owner": "artshabani2002"
   }
 }

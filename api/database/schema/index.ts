@@ -9,6 +9,8 @@ export * from './users';
 export * from './userPermissions';
 export * from './drivers';
 export * from './settlements';
+export * from './settlementRules';
+export * from './productPricing';
 export * from './auditLogs';
 export * from './userBehaviors';
 export * from './promotions';

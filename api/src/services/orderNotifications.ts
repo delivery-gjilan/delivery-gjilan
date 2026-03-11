@@ -1,5 +1,6 @@
 import { NotificationService, NotificationPayload } from '@/services/NotificationService';
 import logger from '@/lib/logger';
+import { cache } from '@/lib/cache';
 
 /**
  * Notification message templates for order status changes.
@@ -154,4 +155,94 @@ export function notifyAdmins(
     notificationService
         .sendToUsers(adminUserIds, payload, 'ADMIN_ALERT')
         .catch((err) => logger.error({ err }, 'Failed to send admin alert notification'));
+}
+
+export type DriverCustomerNotificationKind = 'ETA_LT_3_MIN' | 'ARRIVED_WAITING';
+
+const DRIVER_CUSTOMER_NOTIFICATION_TTL_SECONDS = 4 * 60 * 60;
+
+function driverCustomerNotificationKey(orderId: string, kind: DriverCustomerNotificationKind): string {
+    return `cache:driver-customer-notification:${orderId}:${kind}`;
+}
+
+export async function hasDriverCustomerNotificationBeenSent(
+    orderId: string,
+    kind: DriverCustomerNotificationKind,
+): Promise<boolean> {
+    const sent = await cache.get<boolean>(driverCustomerNotificationKey(orderId, kind));
+    return Boolean(sent);
+}
+
+export async function markDriverCustomerNotificationSent(
+    orderId: string,
+    kind: DriverCustomerNotificationKind,
+): Promise<void> {
+    await cache.set(
+        driverCustomerNotificationKey(orderId, kind),
+        true,
+        DRIVER_CUSTOMER_NOTIFICATION_TTL_SECONDS,
+    );
+}
+
+export function notifyCustomerFromDriver(
+    notificationService: NotificationService,
+    customerId: string,
+    orderId: string,
+    kind: DriverCustomerNotificationKind,
+    etaMinutes?: number,
+    preferredLanguage: 'en' | 'al' = 'en',
+): void {
+    const etaLabelEn =
+        etaMinutes && etaMinutes > 0
+            ? `Your driver is about ${etaMinutes} minute${etaMinutes === 1 ? '' : 's'} away.`
+            : 'Your driver is less than 3 minutes away.';
+    const etaLabelAl =
+        etaMinutes && etaMinutes > 0
+            ? `Shoferi eshte rreth ${etaMinutes} minute${etaMinutes === 1 ? '' : 'a'} larg.`
+            : 'Shoferi eshte me pak se 3 minuta larg.';
+
+    const contentByKind: Record<DriverCustomerNotificationKind, {
+        type: string;
+        titleEn: string;
+        titleAl: string;
+        bodyEn: string;
+        bodyAl: string;
+    }> = {
+        ETA_LT_3_MIN: {
+            type: 'DRIVER_ETA_LT_3_MIN',
+            titleEn: 'Driver is almost there',
+            titleAl: 'Shoferi pothuajse ka arritur',
+            bodyEn: etaLabelEn,
+            bodyAl: etaLabelAl,
+        },
+        ARRIVED_WAITING: {
+            type: 'DRIVER_ARRIVED_WAITING',
+            titleEn: 'Driver is waiting outside',
+            titleAl: 'Shoferi po pret jashte',
+            bodyEn: 'Your driver has arrived and is waiting for you.',
+            bodyAl: 'Shoferi ka arritur dhe po ju pret.',
+        },
+    };
+
+    const copy = contentByKind[kind];
+
+    const payload: NotificationPayload = {
+        title: preferredLanguage === 'al' ? copy.titleAl : copy.titleEn,
+        body: preferredLanguage === 'al' ? copy.bodyAl : copy.bodyEn,
+        data: {
+            orderId,
+            screen: 'orders/active',
+            type: copy.type,
+            language: preferredLanguage,
+        },
+        timeSensitive: true,
+        relevanceScore: kind === 'ETA_LT_3_MIN' ? 0.98 : 1,
+        category: 'order-on-the-way',
+    };
+
+    notificationService
+        .sendToUser(customerId, payload, 'ORDER_STATUS')
+        .catch((err) =>
+            logger.error({ err, customerId, orderId, kind }, 'Failed to send driver-to-customer notification'),
+        );
 }

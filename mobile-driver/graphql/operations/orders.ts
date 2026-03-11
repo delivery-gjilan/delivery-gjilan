@@ -117,6 +117,12 @@ export const UPDATE_ORDER_STATUS = gql`
     }
 `;
 
+export const DRIVER_NOTIFY_CUSTOMER = gql`
+    mutation DriverNotifyCustomer($orderId: ID!, $kind: DriverCustomerNotificationKind!) {
+        driverNotifyCustomer(orderId: $orderId, kind: $kind)
+    }
+`;
+
 export const ALL_ORDERS_UPDATED = gql`
     subscription AllOrdersUpdated {
         allOrdersUpdated {

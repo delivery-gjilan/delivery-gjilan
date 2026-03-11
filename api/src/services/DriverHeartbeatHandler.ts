@@ -13,8 +13,9 @@
 
 import { DriverRepository, CONNECTION_THRESHOLDS } from '@/repositories/DriverRepository';
 import { AuthRepository } from '@/repositories/AuthRepository';
-import { pubsub, publish, topics } from '@/lib/pubsub';
+import { pubsub, publish, topics, type OrderDriverLiveTrackingPayload } from '@/lib/pubsub';
 import { DbDriver } from '@/database/schema/drivers';
+import { clearLiveDriverEta, setLiveDriverEta } from '@/lib/driverEtaCache';
 import logger from '@/lib/logger';
 
 const log = logger.child({ service: 'HeartbeatHandler' });
@@ -53,6 +54,12 @@ export interface HeartbeatResult {
   lastHeartbeatAt: string;
 }
 
+export interface HeartbeatEtaPayload {
+  activeOrderId?: string | null;
+  navigationPhase?: string | null;
+  remainingEtaSeconds?: number | null;
+}
+
 export class DriverHeartbeatHandler {
   constructor(
     private driverRepository: DriverRepository,
@@ -70,7 +77,8 @@ export class DriverHeartbeatHandler {
   async processHeartbeat(
     userId: string,
     latitude: number,
-    longitude: number
+    longitude: number,
+    etaPayload?: HeartbeatEtaPayload
   ): Promise<HeartbeatResult> {
     const now = new Date();
     
@@ -108,6 +116,36 @@ export class DriverHeartbeatHandler {
         locationUpdated: false,
         lastHeartbeatAt: now.toISOString(),
       };
+    }
+
+    if (
+      etaPayload?.activeOrderId &&
+      etaPayload.remainingEtaSeconds != null &&
+      Number.isFinite(etaPayload.remainingEtaSeconds)
+    ) {
+      await setLiveDriverEta(userId, {
+        activeOrderId: etaPayload.activeOrderId,
+        navigationPhase: etaPayload.navigationPhase ?? null,
+        remainingEtaSeconds: Math.max(0, Math.round(etaPayload.remainingEtaSeconds)),
+        etaUpdatedAt: now.toISOString(),
+      });
+    } else {
+      await clearLiveDriverEta(userId);
+    }
+
+    if (etaPayload?.activeOrderId) {
+      this.publishOrderDriverLiveTracking({
+        orderId: etaPayload.activeOrderId,
+        driverId: userId,
+        latitude,
+        longitude,
+        navigationPhase: etaPayload.navigationPhase ?? null,
+        remainingEtaSeconds:
+          etaPayload.remainingEtaSeconds != null && Number.isFinite(etaPayload.remainingEtaSeconds)
+            ? Math.max(0, Math.round(etaPayload.remainingEtaSeconds))
+            : null,
+        etaUpdatedAt: now.toISOString(),
+      });
     }
 
     // Publish updates when reconnecting or when location write is refreshed.
@@ -178,6 +216,17 @@ export class DriverHeartbeatHandler {
       publish(pubsub, topics.allDriversChanged(), { drivers });
     } catch (error) {
       log.error({ err: error }, 'heartbeat:publish:error');
+    }
+  }
+
+  /**
+   * Publish granular per-order live tracking updates for customer map subscriptions.
+   */
+  private publishOrderDriverLiveTracking(payload: OrderDriverLiveTrackingPayload): void {
+    try {
+      publish(pubsub, topics.orderDriverLiveChanged(payload.orderId), payload);
+    } catch (error) {
+      log.error({ err: error, orderId: payload.orderId, driverId: payload.driverId }, 'heartbeat:publish:orderLive:error');
     }
   }
 

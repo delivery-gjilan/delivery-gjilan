@@ -1,5 +1,11 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { GraphQLError } from 'graphql';
+import {
+  DriverCustomerNotificationKind,
+  hasDriverCustomerNotificationBeenSent,
+  markDriverCustomerNotificationSent,
+  notifyCustomerFromDriver,
+} from '@/services/orderNotifications';
 
 /**
  * Driver Heartbeat Mutation
@@ -14,8 +20,8 @@ import { GraphQLError } from 'graphql';
  */
 export const driverHeartbeat: NonNullable<MutationResolvers['driverHeartbeat']> = async (
   _parent,
-  { latitude, longitude },
-  { driverService, userData }
+  { latitude, longitude, activeOrderId, navigationPhase, remainingEtaSeconds },
+  { driverService, userData, orderService, notificationService, authService }
 ) => {
   // Authorization
   if (!userData.userId) {
@@ -39,10 +45,49 @@ export const driverHeartbeat: NonNullable<MutationResolvers['driverHeartbeat']> 
   }
 
   // Process heartbeat
-  const result = await driverService.processHeartbeat(userData.userId, latitude, longitude);
+  const result = await driverService.processHeartbeat(userData.userId, latitude, longitude, {
+    activeOrderId,
+    navigationPhase,
+    remainingEtaSeconds,
+  });
 
   if (!result.success) {
     throw new GraphQLError('Failed to process heartbeat', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+  }
+
+  const shouldAutoNotifyCustomer =
+    Boolean(activeOrderId) &&
+    navigationPhase === 'to_dropoff' &&
+    remainingEtaSeconds != null &&
+    Number.isFinite(remainingEtaSeconds) &&
+    remainingEtaSeconds > 0 &&
+    remainingEtaSeconds <= 180;
+
+  if (shouldAutoNotifyCustomer && activeOrderId) {
+    const dbOrder = await orderService.orderRepository.findById(activeOrderId);
+    const etaKind: DriverCustomerNotificationKind = 'ETA_LT_3_MIN';
+
+    if (
+      dbOrder &&
+      dbOrder.driverId === userData.userId &&
+      dbOrder.status === 'OUT_FOR_DELIVERY'
+    ) {
+      const alreadySent = await hasDriverCustomerNotificationBeenSent(activeOrderId, etaKind);
+      if (!alreadySent) {
+        const customer = await authService.authRepository.findById(dbOrder.userId);
+        const customerPreferredLanguage: 'en' | 'al' = customer?.preferredLanguage === 'al' ? 'al' : 'en';
+
+        await markDriverCustomerNotificationSent(activeOrderId, etaKind);
+        notifyCustomerFromDriver(
+          notificationService,
+          dbOrder.userId,
+          activeOrderId,
+          etaKind,
+          Math.max(1, Math.ceil((remainingEtaSeconds as number) / 60)),
+          customerPreferredLanguage,
+        );
+      }
+    }
   }
 
   // Map the result to GraphQL type

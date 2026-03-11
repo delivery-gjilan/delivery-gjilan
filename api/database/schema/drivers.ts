@@ -5,8 +5,8 @@ import { users } from './users';
 /**
  * Connection status enum for drivers
  * - CONNECTED: Driver actively sending heartbeats
- * - STALE: No heartbeat for 15 seconds (warning state)
- * - LOST: No heartbeat for 30 seconds (offline state)
+ * - STALE: No heartbeat for 45 seconds (warning state)
+ * - LOST: No heartbeat for 90 seconds (offline state)
  * - DISCONNECTED: Subscription closed or never connected
  */
 const driverConnectionStatusValues = ['CONNECTED', 'STALE', 'LOST', 'DISCONNECTED'] as const;
@@ -68,7 +68,7 @@ export const drivers = pgTable('drivers', {
   /**
    * System-calculated connection status
    * Updated by watchdog service based on lastHeartbeatAt
-   * CONNECTED -> STALE (15s) -> LOST (30s) -> DISCONNECTED (subscription closed)
+    * CONNECTED -> STALE (45s) -> LOST (90s) -> DISCONNECTED (subscription closed)
    */
   connectionStatus: driverConnectionStatus('connection_status').default('DISCONNECTED').notNull(),
 

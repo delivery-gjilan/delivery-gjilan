@@ -25,5 +25,6 @@ export const me: NonNullable<QueryResolvers['me']> = async (_parent, _args, { au
         phoneVerified: user.phoneVerified,
         signupStep: user.signupStep,
         role: user.role,
+        preferredLanguage: user.preferredLanguage === 'al' ? 'AL' : 'EN',
     };
 };

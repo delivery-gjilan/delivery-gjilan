@@ -1,6 +1,11 @@
 enum SettlementType {
-    DRIVER_PAYMENT
-    BUSINESS_PAYMENT
+    DRIVER
+    BUSINESS
+}
+
+enum SettlementDirection {
+    RECEIVABLE
+    PAYABLE
 }
 
 enum SettlementStatus {
@@ -8,15 +13,33 @@ enum SettlementStatus {
     PAID
 }
 
+type RuleSnapshot {
+    appliedRules: JSON!
+}
+
+type CalculationDetails {
+    itemsBreakdown: JSON!
+    rulesApplied: JSON!
+}
+
 type Settlement {
     id: ID!
     type: SettlementType!
+    direction: SettlementDirection!
     driver: User
     business: Business
     order: Order!
     amount: Float!
+    currency: String!
     status: SettlementStatus!
+    ruleSnapshot: RuleSnapshot
+    calculationDetails: CalculationDetails
+    metadata: JSON
     paidAt: Date
+    paidBy: String
+    paymentReference: String
+    paymentMethod: String
+    createdBy: String
     createdAt: Date!
     updatedAt: Date!
 }
@@ -25,6 +48,8 @@ type SettlementSummary {
     totalAmount: Float!
     totalPending: Float!
     totalPaid: Float!
+    totalReceivable: Float!
+    totalPayable: Float!
     count: Int!
     pendingCount: Int!
 }
@@ -32,6 +57,7 @@ type SettlementSummary {
 type Query {
     settlements(
         type: SettlementType
+        direction: SettlementDirection
         status: SettlementStatus
         driverId: ID
         businessId: ID
@@ -54,11 +80,11 @@ type Query {
 }
 
 type Mutation {
-    markSettlementAsPaid(settlementId: ID!): Settlement!
-    markSettlementsAsPaid(ids: [ID!]!): [Settlement!]!
+    markSettlementAsPaid(settlementId: ID!, paymentReference: String, paymentMethod: String): Settlement!
+    markSettlementsAsPaid(ids: [ID!]!, paymentReference: String, paymentMethod: String): [Settlement!]!
     markSettlementAsPartiallyPaid(settlementId: ID!, amount: Float!): Settlement!
     unsettleSettlement(settlementId: ID!): Settlement!
-    updateCommissionPercentage(driverId: ID, businessId: ID, percentage: Float!): Boolean!
+    updateCommissionPercentage(driverId: ID, businessId: ID, percentage: Float!): Boolean! @deprecated(reason: "Use createSettlementRule instead")
     backfillSettlementsForDeliveredOrders: Int!
 }
 

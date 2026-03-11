@@ -10,7 +10,9 @@ import uploadRoutes from './routes/uploadRoutes';
 import debugRoutes from './routes/debugRoutes';
 import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/use/ws';
-import { initializeDriverServices, shutdownDriverServices } from '@/services/driverServices.init';
+import { decodeJwtToken } from '@/lib/utils/authUtils';
+import { getDriverServices, initializeDriverServices, shutdownDriverServices } from '@/services/driverServices.init';
+import { initializePubSubRedisBridge, shutdownPubSubRedisBridge } from '@/lib/pubsub';
 import { initSentry, Sentry } from '@/lib/sentry';
 import { requestLogger } from '@/lib/middleware/requestLogger';
 import logger from '@/lib/logger';
@@ -117,6 +119,9 @@ app.use(yoga.graphqlEndpoint, yoga);
 
 const httpServer = app.listen(port, async () => {
     logger.info({ port }, 'Server started on http://localhost:%d/graphql', port);
+
+    // Initialize cross-instance GraphQL pubsub bridge (falls back to in-memory if Redis is unavailable)
+    await initializePubSubRedisBridge();
     
     // Initialize Firebase Admin SDK for push notifications
     try {
@@ -138,8 +143,49 @@ const wsServer = new WebSocketServer({
     path: yoga.graphqlEndpoint,
 });
 
+const wsDriverSessions = new WeakMap<object, string>();
+
+function getBearerFromConnectionParams(connectionParams: unknown): string | null {
+    if (!connectionParams || typeof connectionParams !== 'object') {
+        return null;
+    }
+
+    const params = connectionParams as Record<string, unknown>;
+    const authValue = params.Authorization ?? params.authorization;
+    if (typeof authValue !== 'string' || !authValue.startsWith('Bearer ')) {
+        return null;
+    }
+
+    return authValue.slice(7);
+}
+
 useServer(
     {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        onConnect: async (ctx: any) => {
+            const token = getBearerFromConnectionParams(ctx.connectionParams);
+            if (!token) {
+                return;
+            }
+
+            try {
+                const decoded = decodeJwtToken(token);
+                if (decoded.role !== 'DRIVER' || !decoded.userId) {
+                    return;
+                }
+
+                wsDriverSessions.set(ctx.extra.socket, decoded.userId);
+
+                try {
+                    const { driverService } = getDriverServices();
+                    await driverService.handleReconnect(decoded.userId);
+                } catch (error) {
+                    logger.warn({ err: error, userId: decoded.userId }, 'driverSocket:reconnect:failed');
+                }
+            } catch {
+                // Invalid token: ignore and allow GraphQL auth to handle operation-level access.
+            }
+        },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         execute: (args: any) => args.rootValue.execute(args),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -172,6 +218,22 @@ useServer(
             if (errors.length) return errors;
             return args;
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        onDisconnect: async (ctx: any) => {
+            const userId = wsDriverSessions.get(ctx.extra.socket);
+            if (!userId) {
+                return;
+            }
+
+            wsDriverSessions.delete(ctx.extra.socket);
+
+            try {
+                const { driverService } = getDriverServices();
+                await driverService.handleDisconnect(userId);
+            } catch (error) {
+                logger.warn({ err: error, userId }, 'driverSocket:disconnect:failed');
+            }
+        },
     },
     wsServer,
 );
@@ -180,6 +242,7 @@ useServer(
 process.on('SIGTERM', async () => {
     logger.info('SIGTERM received, shutting down gracefully');
     shutdownDriverServices();
+    await shutdownPubSubRedisBridge();
     const { pool } = await import('../database');
     await pool?.end();
     await cache.disconnect();

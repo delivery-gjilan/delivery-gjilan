@@ -14,6 +14,7 @@ export const USER_ORDERS_UPDATED = graphql(`
         userOrdersUpdated(input: $input) {
             id
             displayId
+            userId
             orderPrice
             deliveryPrice
             totalPrice
@@ -26,6 +27,25 @@ export const USER_ORDERS_UPDATED = graphql(`
                 latitude
                 longitude
                 address
+            }
+            driver {
+                id
+                firstName
+                lastName
+                phoneNumber
+                imageUrl
+                driverLocation {
+                    latitude
+                    longitude
+                    address
+                }
+                driverLocationUpdatedAt
+                driverConnection {
+                    activeOrderId
+                    navigationPhase
+                    remainingEtaSeconds
+                    etaUpdatedAt
+                }
             }
             businesses {
                 business {
@@ -55,6 +75,20 @@ export const USER_ORDERS_UPDATED = graphql(`
                     price
                 }
             }
+        }
+    }
+`);
+
+export const ORDER_DRIVER_LIVE_TRACKING = graphql(`
+    subscription OrderDriverLiveTracking($orderId: ID!, $input: SubscriptionInput!) {
+        orderDriverLiveTracking(orderId: $orderId, input: $input) {
+            orderId
+            driverId
+            latitude
+            longitude
+            navigationPhase
+            remainingEtaSeconds
+            etaUpdatedAt
         }
     }
 `);

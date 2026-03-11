@@ -6,7 +6,7 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
 }
 
-export default function Input({ label, className = "", ...props }: InputProps) {
+function InputComponent({ label, className = "", ...props }: InputProps) {
   return (
     <div className="w-full">
       {label && (
@@ -21,4 +21,9 @@ export default function Input({ label, className = "", ...props }: InputProps) {
     </div>
   );
 }
+
+// Named export
+export { InputComponent as Input };
+// Default export for backward compatibility
+export default InputComponent;
 

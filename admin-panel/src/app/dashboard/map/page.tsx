@@ -16,7 +16,7 @@ import { GET_ORDERS } from "@/graphql/operations/orders/queries";
 import { ALL_ORDERS_SUBSCRIPTION } from "@/graphql/operations/orders/subscriptions";
 import { ASSIGN_DRIVER_TO_ORDER, UPDATE_ORDER_STATUS } from "@/graphql/operations/orders";
 import { ADMIN_UPDATE_DRIVER_LOCATION } from "@/graphql/operations/users/mutations";
-import { calculateRouteDistance } from "@/lib/utils/mapbox";
+import { calculateRouteDistance, getDirectionsTelemetry } from "@/lib/utils/mapbox";
 import { getInitials, getAvatarColor } from "@/lib/avatarUtils";
 import { toast } from 'sonner';
 
@@ -31,6 +31,16 @@ const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 const MAP_STYLE = process.env.NEXT_PUBLIC_MAP_STYLE_URL || "mapbox://styles/mapbox/streets-v12";
 
 const PENDING_WARNING_MS = 2 * 60 * 1000; // 2 minutes
+const SUBSCRIPTION_REFETCH_COOLDOWN_MS = 1500;
+const ANIMATION_COMMIT_INTERVAL_MS = 66; // ~15 FPS UI commits
+const DRIVER_GAP_DEFAULT_MS = 5000;
+const DRIVER_GAP_MIN_MS = 500;
+const DRIVER_GAP_MAX_MS = 15000;
+const DRIVER_TAU_MIN_MS = 110;
+const DRIVER_TAU_MAX_MS = 480;
+const DRIVER_LOOKAHEAD_MIN_SEC = 0.35;
+const DRIVER_LOOKAHEAD_MAX_SEC = 1.2;
+const DRIVER_TELEPORT_GUARD_METERS = 800;
 
 const ORDER_STATUS_COLORS = {
   PENDING: { bg: "bg-amber-500/10", border: "border-amber-500/50", text: "text-amber-500", marker: "#f59e0b", selectBg: "bg-amber-500/20", hex: "#f59e0b" },
@@ -73,6 +83,35 @@ const DRIVER_CONNECTION_COLORS = {
 const isValidLatLng = (lat: number, lng: number) =>
   Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
 
+const SERVER_TS_NO_TZ_REGEX = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?$/;
+const SERVER_TS_HAS_TZ_REGEX = /(Z|[+-]\d{2}:\d{2})$/i;
+
+const parseServerTimeMs = (value: string | null | undefined): number | null => {
+  if (!value) return null;
+  const raw = value.trim();
+  if (!raw) return null;
+
+  // Treat backend naive timestamps as UTC to avoid local TZ drift.
+  const isoLike = raw.includes(" ") ? raw.replace(" ", "T") : raw;
+  const normalized = SERVER_TS_NO_TZ_REGEX.test(isoLike) && !SERVER_TS_HAS_TZ_REGEX.test(isoLike)
+    ? `${isoLike}Z`
+    : isoLike;
+  const parsed = Date.parse(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const formatLocalDateTime = (timestampMs: number | null) => {
+  if (!timestampMs) return "-";
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(new Date(timestampMs));
+};
+
 const formatElapsed = (elapsedMs: number) => {
   const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
   const hours = Math.floor(totalSeconds / 3600);
@@ -83,13 +122,27 @@ const formatElapsed = (elapsedMs: number) => {
 };
 
 const formatHeartbeatElapsed = (lastHeartbeat: string | null | undefined, now: number) => {
-  if (!lastHeartbeat) return "Never";
-  const elapsed = now - new Date(lastHeartbeat).getTime();
+  const heartbeatMs = parseServerTimeMs(lastHeartbeat);
+  if (!heartbeatMs) return "Never";
+  const elapsed = now - heartbeatMs;
   if (elapsed < 0) return "Just now";
   if (elapsed < 5000) return "Just now";
   if (elapsed < 60000) return `${Math.floor(elapsed / 1000)}s ago`;
   if (elapsed < 3600000) return `${Math.floor(elapsed / 60000)}m ago`;
   return `${Math.floor(elapsed / 3600000)}h ago`;
+};
+
+const getOrderStatusStartMs = (order: any, fallbackNow: number) => {
+  const createdMs = parseServerTimeMs(order?.orderDate);
+  const updatedMs = parseServerTimeMs(order?.updatedAt);
+  const preparingMs = parseServerTimeMs(order?.preparingAt);
+
+  if (order?.status === "PENDING") return createdMs ?? updatedMs ?? fallbackNow;
+  if (order?.status === "READY") return preparingMs ?? updatedMs ?? createdMs ?? fallbackNow;
+  if (order?.status === "OUT_FOR_DELIVERY") return updatedMs ?? preparingMs ?? createdMs ?? fallbackNow;
+  if (order?.status === "DELIVERED" || order?.status === "CANCELLED") return updatedMs ?? createdMs ?? fallbackNow;
+
+  return updatedMs ?? createdMs ?? fallbackNow;
 };
 
 const isDriverAssignable = (driver: any) => {
@@ -111,6 +164,36 @@ const distanceMeters = (a: { latitude: number; longitude: number }, b: { latitud
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
   return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 };
+
+const bearingDeg = (from: { latitude: number; longitude: number }, to: { latitude: number; longitude: number }) => {
+  const fromLatRad = (from.latitude * Math.PI) / 180;
+  const toLatRad = (to.latitude * Math.PI) / 180;
+  const deltaLngRad = ((to.longitude - from.longitude) * Math.PI) / 180;
+  const y = Math.sin(deltaLngRad) * Math.cos(toLatRad);
+  const x =
+    Math.cos(fromLatRad) * Math.sin(toLatRad) -
+    Math.sin(fromLatRad) * Math.cos(toLatRad) * Math.cos(deltaLngRad);
+  const angleDeg = (Math.atan2(y, x) * 180) / Math.PI;
+  return (angleDeg + 360) % 360;
+};
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+const getOrderBusinesses = (order: any) => (
+  Array.isArray(order?.businesses) ? order.businesses : []
+);
+
+const getOrderBusinessItems = (businessEntry: any) => (
+  Array.isArray(businessEntry?.items) ? businessEntry.items : []
+);
+
+const normalizeOrderShape = (order: any) => ({
+  ...order,
+  businesses: getOrderBusinesses(order).map((businessEntry: any) => ({
+    ...businessEntry,
+    items: getOrderBusinessItems(businessEntry),
+  })),
+});
 
 // ╔══════════════════════════════════════════════════════════╗
 // ║               PREP TIME PROGRESS RING                   ║
@@ -153,6 +236,59 @@ interface DriverMotionTarget {
   updatedAtMs: number;
 }
 
+function getOrderEtaMinutes(
+  order: any,
+  distanceData: any,
+  nowMs: number,
+  routeProgress: number,
+  driver: any,
+): number | null {
+  const liveEtaOrderId = driver?.driverConnection?.activeOrderId;
+  const liveEtaSeconds = driver?.driverConnection?.remainingEtaSeconds;
+  const liveEtaUpdatedAt = driver?.driverConnection?.etaUpdatedAt;
+  const liveEtaUpdatedAtMs = liveEtaUpdatedAt ? new Date(liveEtaUpdatedAt).getTime() : 0;
+  const liveEtaIsFresh = liveEtaUpdatedAtMs > 0 && nowMs - liveEtaUpdatedAtMs <= 20000;
+
+  if (
+    liveEtaIsFresh &&
+    liveEtaOrderId === order.id &&
+    typeof liveEtaSeconds === "number" &&
+    Number.isFinite(liveEtaSeconds)
+  ) {
+    if (liveEtaSeconds <= 0) return 0;
+    return Math.max(1, Math.round(liveEtaSeconds / 60));
+  }
+
+  if (!distanceData) return null;
+
+  const calculatedAtMs = distanceData.calculatedAtMs ?? nowMs;
+  const elapsedSec = Math.max(0, (nowMs - calculatedAtMs) / 1000);
+
+  const toPickupSec = distanceData?.toPickup?.durationMin
+    ? Math.max(0, distanceData.toPickup.durationMin * 60)
+    : 0;
+  const toDropoffSec = distanceData?.toDropoff?.durationMin
+    ? Math.max(0, distanceData.toDropoff.durationMin * 60)
+    : 0;
+
+  if (order.status === "OUT_FOR_DELIVERY") {
+    const progressRemainingSec = toDropoffSec > 0 ? toDropoffSec * Math.max(0, 1 - routeProgress) : 0;
+    const decayedSec = Math.max(0, toDropoffSec - elapsedSec);
+    const remainingSec = Math.min(progressRemainingSec || decayedSec, decayedSec || progressRemainingSec);
+    if (remainingSec <= 0) return 0;
+    return Math.max(1, Math.round(remainingSec / 60));
+  }
+
+  if (toPickupSec > 0 || toDropoffSec > 0) {
+    const totalSec = toPickupSec + toDropoffSec;
+    const remainingSec = Math.max(0, totalSec - elapsedSec);
+    if (remainingSec <= 0) return 0;
+    return Math.max(1, Math.round(remainingSec / 60));
+  }
+
+  return null;
+}
+
 // ╔══════════════════════════════════════════════════════════╗
 // ║                    MAP PAGE                             ║
 // ╚══════════════════════════════════════════════════════════╝
@@ -163,18 +299,33 @@ export default function MapPage() {
   const { data: orderData, refetch: refetchOrders } = useQuery(GET_ORDERS);
   
   // Refetch when subscriptions fire (backend sends lightweight signal)
+  // Cooldown avoids bursts when multiple events arrive in quick succession.
+  const lastSubscriptionRefetchMsRef = useRef({ orders: 0, drivers: 0 });
   useSubscription(ALL_ORDERS_SUBSCRIPTION, {
-    onData: () => { refetchOrders(); },
+    onData: () => {
+      const nowMs = Date.now();
+      if (nowMs - lastSubscriptionRefetchMsRef.current.orders < SUBSCRIPTION_REFETCH_COOLDOWN_MS) return;
+      lastSubscriptionRefetchMsRef.current.orders = nowMs;
+      refetchOrders();
+    },
   });
   useSubscription(DRIVERS_UPDATED_SUBSCRIPTION, {
-    onData: () => { refetchDrivers(); },
+    onData: () => {
+      const nowMs = Date.now();
+      if (nowMs - lastSubscriptionRefetchMsRef.current.drivers < SUBSCRIPTION_REFETCH_COOLDOWN_MS) return;
+      lastSubscriptionRefetchMsRef.current.drivers = nowMs;
+      refetchDrivers();
+    },
   });
   
   const [assignDriver] = useMutation(ASSIGN_DRIVER_TO_ORDER);
-  const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS);
+  const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS, { fetchPolicy: "no-cache" });
 
   const businesses = useMemo(() => (businessData as any)?.businesses ?? [], [businessData]);
-  const orders = useMemo(() => (orderData as any)?.orders ?? [], [orderData]);
+  const orders = useMemo(
+    () => (((orderData as any)?.orders ?? []) as any[]).map(normalizeOrderShape),
+    [orderData],
+  );
   const drivers = useMemo(() => (driverData as any)?.drivers ?? [], [driverData]);
 
   const activeOrders = useMemo(
@@ -188,7 +339,11 @@ export default function MapPage() {
   const driverMotionTargetsRef = useRef<Record<string, DriverMotionTarget>>({});
   const animatedDriverPositionsRef = useRef<Record<string, AnimatedDriverPoint>>({});
   const lastAnimationFrameTsRef = useRef<number>(0);
+  const lastAnimationCommitTsRef = useRef<number>(0);
   const lastDriverLocationUpdateMsRef = useRef<Record<string, number>>({});
+  const observedDriverGapMsRef = useRef<Record<string, number>>({});
+  const smoothedDriverGapMsRef = useRef<Record<string, number>>({});
+  const driverHeadingDegRef = useRef<Record<string, number>>({});
   const orderRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // == STATE ==
@@ -209,13 +364,15 @@ export default function MapPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [showDriverPanel, setShowDriverPanel] = useState(true);
   const [detailPanelExpanded, setDetailPanelExpanded] = useState(false);
+  const [directionsTelemetry, setDirectionsTelemetry] = useState(() => getDirectionsTelemetry());
+  const [driverHeadingDeg, setDriverHeadingDeg] = useState<Record<string, number>>({});
 
   // == FILTERED ==
   const filteredOrders = useMemo(() => {
     return activeOrders.filter((order: any) => {
       if (filters.status !== "ALL" && order.status !== filters.status) return false;
       if (filters.driver !== "ALL" && order.driver?.id !== filters.driver) return false;
-      if (filters.business !== "ALL" && !order.businesses?.some((b: any) => b.business?.id === filters.business)) return false;
+      if (filters.business !== "ALL" && !getOrderBusinesses(order).some((b: any) => b.business?.id === filters.business)) return false;
       if (filters.unassignedOnly && order.driver) return false;
       return true;
     });
@@ -238,7 +395,7 @@ export default function MapPage() {
     const todayRevenue = todayDelivered.reduce((s: number, o: any) => s + (o.totalPrice || 0), 0);
 
     const pendingWarnings = pendingOrders.filter((o: any) => {
-      const orderDate = o.orderDate ? new Date(o.orderDate).getTime() : now;
+      const orderDate = parseServerTimeMs(o.orderDate) ?? now;
       return (now - orderDate) > PENDING_WARNING_MS;
     }).length;
 
@@ -287,6 +444,13 @@ export default function MapPage() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDirectionsTelemetry(getDirectionsTelemetry());
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Camera tracking
   useEffect(() => {
     if (!followingDriverId || !mapRef.current) return;
@@ -303,20 +467,31 @@ export default function MapPage() {
       const next = { ...prev };
       activeOrders.forEach((order: any) => {
         const prevStatus = prevOrderStatusRef.current[order.id];
+        const derivedStatusStartMs = getOrderStatusStartMs(order, now);
         if (!prevStatus) {
-          const orderDate = order.orderDate ? new Date(order.orderDate).getTime() : now;
-          next[order.id] = order.status === "PENDING" ? orderDate : now;
+          next[order.id] = derivedStatusStartMs;
           prevOrderStatusRef.current[order.id] = order.status;
         } else if (prevStatus !== order.status) {
-          next[order.id] = now;
+          next[order.id] = derivedStatusStartMs;
           prevOrderStatusRef.current[order.id] = order.status;
+        } else if (!next[order.id] || Math.abs(next[order.id] - derivedStatusStartMs) > 1000) {
+          next[order.id] = derivedStatusStartMs;
         }
       });
+
+      Object.keys(next).forEach((orderId) => {
+        if (!activeOrders.some((o: any) => o.id === orderId)) {
+          delete next[orderId];
+          delete prevOrderStatusRef.current[orderId];
+        }
+      });
+
       return next;
     });
-  }, [activeOrders.map((o: any) => `${o.id}-${o.status}`).join(","), now]);
+  }, [activeOrders.map((o: any) => `${o.id}-${o.status}-${o.updatedAt || ""}-${o.preparingAt || ""}`).join(","), now]);
 
   // Driver tracking & motion interpolation
+  // Keep this effect focused on driver snapshots only.
   useEffect(() => {
     if (!drivers.length) return;
     const nowTs = Date.now();
@@ -337,9 +512,27 @@ export default function MapPage() {
           return;
         }
 
+        if (lastSeenUpdateMs > 0 && updatedAtMs > lastSeenUpdateMs) {
+          const observedGapMs = clamp(updatedAtMs - lastSeenUpdateMs, DRIVER_GAP_MIN_MS, DRIVER_GAP_MAX_MS);
+          observedDriverGapMsRef.current[trackId] = observedGapMs;
+          const previousSmoothed = smoothedDriverGapMsRef.current[trackId] ?? DRIVER_GAP_DEFAULT_MS;
+          const emaFactor = 0.22;
+          smoothedDriverGapMsRef.current[trackId] =
+            previousSmoothed * (1 - emaFactor) + observedGapMs * emaFactor;
+        }
+
         lastDriverLocationUpdateMsRef.current[trackId] = updatedAtMs;
         let velocityLatPerSec = 0, velocityLngPerSec = 0;
         if (previousTarget) {
+          const jumpMeters = distanceMeters(
+            { latitude: previousTarget.latitude, longitude: previousTarget.longitude },
+            { latitude: newPos.latitude, longitude: newPos.longitude },
+          );
+          if (jumpMeters >= DRIVER_TELEPORT_GUARD_METERS) {
+            velocityLatPerSec = 0;
+            velocityLngPerSec = 0;
+            animatedDriverPositionsRef.current[trackId] = { latitude: newPos.latitude, longitude: newPos.longitude };
+          } else {
           const deltaSec = Math.max((updatedAtMs - previousTarget.updatedAtMs) / 1000, 0.001);
           const rawVelocityLat = (newPos.latitude - previousTarget.latitude) / deltaSec;
           const rawVelocityLng = (newPos.longitude - previousTarget.longitude) / deltaSec;
@@ -353,6 +546,7 @@ export default function MapPage() {
             velocityLatPerSec = previousTarget.velocityLatPerSec * (1 - velocityBlend) + rawVelocityLat * velocityBlend;
             velocityLngPerSec = previousTarget.velocityLngPerSec * (1 - velocityBlend) + rawVelocityLng * velocityBlend;
           }
+          }
         }
 
         driverMotionTargetsRef.current[trackId] = { latitude: newPos.latitude, longitude: newPos.longitude, timestamp: nowTs, velocityLatPerSec, velocityLngPerSec, updatedAtMs };
@@ -363,11 +557,16 @@ export default function MapPage() {
       });
       return next;
     });
+  }, [drivers]);
 
-    // Update route progress
+  // Update route progress in a single state commit
+  useEffect(() => {
+    if (!activeOrders.length) return;
+
+    const nextProgress: Record<string, number> = {};
     activeOrders.forEach((order: any) => {
       if (order.status === "OUT_FOR_DELIVERY" && order.driver) {
-        const driver = drivers.find((d: any) => d.id === order.driver.id);
+        const driver = driverMap[order.driver.id];
         const driverLocation = driver?.driverLocation;
         const routeGeometry = orderDistances[order.id]?.toDropoff?.geometry;
         if (driverLocation && routeGeometry && routeGeometry.length > 0) {
@@ -377,11 +576,15 @@ export default function MapPage() {
             if (dist < minDist) { minDist = dist; closestIndex = idx; }
           });
           const progress = routeGeometry.length > 1 ? closestIndex / (routeGeometry.length - 1) : 0;
-          setDriverProgressOnRoute((prev) => ({ ...prev, [order.driver.id]: progress }));
+          nextProgress[order.driver.id] = progress;
         }
       }
     });
-  }, [drivers, activeOrders, orderDistances]);
+
+    if (Object.keys(nextProgress).length > 0) {
+      setDriverProgressOnRoute((prev) => ({ ...prev, ...nextProgress }));
+    }
+  }, [activeOrders, orderDistances, driverMap]);
 
   // Smooth marker animation
   useEffect(() => {
@@ -392,12 +595,15 @@ export default function MapPage() {
       lastAnimationFrameTsRef.current = frameTs;
       const nowMs = Date.now();
       const nextAnimated = { ...animatedDriverPositionsRef.current };
+      const nextHeading = { ...driverHeadingDegRef.current };
       let hasAnyDriver = false;
 
       Object.entries(driverMotionTargetsRef.current).forEach(([driverId, target]) => {
         hasAnyDriver = true;
         const ageSec = Math.max((nowMs - target.timestamp) / 1000, 0);
-        const lookAheadSec = 1.2;
+        const smoothedGapMs = smoothedDriverGapMsRef.current[driverId] ?? DRIVER_GAP_DEFAULT_MS;
+        const normalizedGap = clamp((smoothedGapMs - DRIVER_GAP_MIN_MS) / (DRIVER_GAP_MAX_MS - DRIVER_GAP_MIN_MS), 0, 1);
+        const lookAheadSec = DRIVER_LOOKAHEAD_MIN_SEC + normalizedGap * (DRIVER_LOOKAHEAD_MAX_SEC - DRIVER_LOOKAHEAD_MIN_SEC);
         const staleAfterSec = 10;
         const decaySec = Math.max(ageSec - staleAfterSec, 0);
         const staleDecay = Math.exp(-decaySec / 4);
@@ -405,22 +611,42 @@ export default function MapPage() {
         const predictedLat = target.latitude + target.velocityLatPerSec * staleDecay * predictionWindowSec;
         const predictedLng = target.longitude + target.velocityLngPerSec * staleDecay * predictionWindowSec;
         const current = nextAnimated[driverId] || { latitude: target.latitude, longitude: target.longitude };
-        const tauMs = 300;
+        const distanceToPredictionMeters = distanceMeters(
+          { latitude: current.latitude, longitude: current.longitude },
+          { latitude: predictedLat, longitude: predictedLng },
+        );
+        const distanceFactor = distanceToPredictionMeters > 180 ? 0.72 : distanceToPredictionMeters < 18 ? 1.28 : 1;
+        const tauMs = clamp(smoothedGapMs * 0.06 * distanceFactor, DRIVER_TAU_MIN_MS, DRIVER_TAU_MAX_MS);
         const alpha = 1 - Math.exp(-dtMs / tauMs);
-        nextAnimated[driverId] = {
+        const nextPoint = {
           latitude: current.latitude + (predictedLat - current.latitude) * alpha,
           longitude: current.longitude + (predictedLng - current.longitude) * alpha,
         };
+        const headingStepMeters = distanceMeters(current, nextPoint);
+        if (headingStepMeters >= 1.5) {
+          nextHeading[driverId] = bearingDeg(current, nextPoint);
+        }
+        nextAnimated[driverId] = nextPoint;
       });
 
       if (hasAnyDriver) {
         animatedDriverPositionsRef.current = nextAnimated;
-        setAnimatedDriverPositions(nextAnimated);
+        driverHeadingDegRef.current = nextHeading;
+        const shouldCommit = (nowMs - lastAnimationCommitTsRef.current) >= ANIMATION_COMMIT_INTERVAL_MS;
+        if (shouldCommit) {
+          lastAnimationCommitTsRef.current = nowMs;
+          setAnimatedDriverPositions(nextAnimated);
+          setDriverHeadingDeg(nextHeading);
+        }
       }
       rafId = requestAnimationFrame(animate);
     };
     rafId = requestAnimationFrame(animate);
-    return () => { cancelAnimationFrame(rafId); lastAnimationFrameTsRef.current = 0; };
+    return () => {
+      cancelAnimationFrame(rafId);
+      lastAnimationFrameTsRef.current = 0;
+      lastAnimationCommitTsRef.current = 0;
+    };
   }, []);
 
   // Route calculation
@@ -450,13 +676,16 @@ export default function MapPage() {
   };
 
   useEffect(() => {
+    const abortController = new AbortController();
+    let cancelled = false;
+
     const calculateDistances = async () => {
+      const nextDistances: Record<string, any> = {};
       for (const order of activeOrders) {
         const cacheKey = `${order.id}-${order.driver?.id || "none"}-${order.status}`;
         const existingKey = orderDistances[order.id]
           ? `${order.id}-${orderDistances[order.id].driverId || "none"}-${orderDistances[order.id].status}`
           : null;
-        if (existingKey === cacheKey) continue;
 
         const firstBusiness = order.businesses?.[0]?.business;
         if (!firstBusiness?.location || !order.dropOffLocation) continue;
@@ -465,41 +694,76 @@ export default function MapPage() {
 
         try {
           if ((order.status === "READY" || order.status === "PENDING") && order.driver) {
-            const driver = drivers.find((d: any) => d.id === order.driver.id);
+            const driver = driverMap[order.driver.id];
             const driverLocation = driver?.driverLocation || order.driver?.driverLocation;
             if (!driverLocation) continue;
             const driverPos = { longitude: driverLocation.longitude, latitude: driverLocation.latitude };
-            if (!shouldRecalculateRoute(order.id, driverPos)) continue;
+
+            const shouldRecalc = shouldRecalculateRoute(order.id, driverPos);
+            if (existingKey === cacheKey && !shouldRecalc) continue;
+            if (!shouldRecalc) continue;
+
             const [toPickupRoute, toDropoffRoute] = await Promise.all([
-              calculateRouteDistance(driverPos, pickup),
-              calculateRouteDistance(pickup, dropoff),
+              calculateRouteDistance(driverPos, pickup, abortController.signal),
+              calculateRouteDistance(pickup, dropoff, abortController.signal),
             ]);
             if (toPickupRoute && toDropoffRoute) {
-              setOrderDistances((prev) => ({ ...prev, [order.id]: { toPickup: toPickupRoute, toDropoff: toDropoffRoute, driverId: order.driver.id, status: order.status } }));
+              nextDistances[order.id] = {
+                toPickup: toPickupRoute,
+                toDropoff: toDropoffRoute,
+                driverId: order.driver.id,
+                status: order.status,
+                calculatedAtMs: Date.now(),
+              };
             }
           } else if (order.status === "OUT_FOR_DELIVERY" && order.driver) {
-            const driver = drivers.find((d: any) => d.id === order.driver.id);
+            const driver = driverMap[order.driver.id];
             const driverLocation = driver?.driverLocation || order.driver?.driverLocation;
             if (!driverLocation) continue;
             const driverPos = { longitude: driverLocation.longitude, latitude: driverLocation.latitude };
-            if (!shouldRecalculateRoute(order.id, driverPos)) continue;
-            const toDropoffRoute = await calculateRouteDistance(driverPos, dropoff);
+
+            const shouldRecalc = shouldRecalculateRoute(order.id, driverPos);
+            if (existingKey === cacheKey && !shouldRecalc) continue;
+            if (!shouldRecalc) continue;
+
+            const toDropoffRoute = await calculateRouteDistance(driverPos, dropoff, abortController.signal);
             if (toDropoffRoute) {
-              setOrderDistances((prev) => ({ ...prev, [order.id]: { toDropoff: toDropoffRoute, driverId: order.driver.id, status: order.status } }));
+              nextDistances[order.id] = {
+                toDropoff: toDropoffRoute,
+                driverId: order.driver.id,
+                status: order.status,
+                calculatedAtMs: Date.now(),
+              };
             }
           } else if (!order.driver) {
-            const route = await calculateRouteDistance(pickup, dropoff);
+            if (existingKey === cacheKey && orderDistances[order.id]) continue;
+            const route = await calculateRouteDistance(pickup, dropoff, abortController.signal);
             if (route) {
-              setOrderDistances((prev) => ({ ...prev, [order.id]: { toDropoff: route, driverId: null, status: order.status } }));
+              nextDistances[order.id] = {
+                toDropoff: route,
+                driverId: null,
+                status: order.status,
+                calculatedAtMs: Date.now(),
+              };
             }
           }
         } catch (error) {
           console.error("Error calculating distance for order:", order.id, error);
         }
       }
+
+      if (!cancelled && Object.keys(nextDistances).length > 0) {
+        setOrderDistances((prev) => ({ ...prev, ...nextDistances }));
+      }
     };
+
     calculateDistances();
-  }, [activeOrders.map((o: any) => `${o.id}-${o.driver?.id || "none"}-${o.status}`).join(","), drivers]);
+
+    return () => {
+      cancelled = true;
+      abortController.abort();
+    };
+  }, [activeOrders.map((o: any) => `${o.id}-${o.driver?.id || "none"}-${o.status}`).join(","), driverMap]);
 
   // Auto-show route
   useEffect(() => {
@@ -564,7 +828,27 @@ export default function MapPage() {
 
   const handleUpdateStatus = async (orderId: string, status: string) => {
     try {
-      await updateOrderStatus({ variables: { id: orderId, status }, refetchQueries: ["GetOrders"] });
+      const order = activeOrders.find((o: any) => o.id === orderId);
+      if (!order) {
+        toast.error("Order not found");
+        return;
+      }
+
+      if (status === "OUT_FOR_DELIVERY" && !order.driver?.id) {
+        toast.error("Assign a driver before setting Out for Delivery");
+        return;
+      }
+
+      await updateOrderStatus({
+        variables: { id: orderId, status },
+        refetchQueries: ["GetOrders"],
+        awaitRefetchQueries: true,
+      });
+
+      if (status === "DELIVERED" || status === "CANCELLED") {
+        setSelectedOrderId(null);
+        setDetailPanelExpanded(false);
+      }
     } catch (error: any) {
       toast.error(error.message || "Failed to update status");
     }
@@ -573,8 +857,43 @@ export default function MapPage() {
   const focusOrder = useCallback((order: any) => {
     const map = mapRef.current?.getMap?.();
     if (!map || !order.dropOffLocation) return;
-    map.flyTo({ center: [order.dropOffLocation.longitude, order.dropOffLocation.latitude], zoom: 15, essential: true });
-  }, []);
+
+    const dropoff = order.dropOffLocation;
+    const driverLocation = order.driver?.id ? driverMap[order.driver.id]?.driverLocation : null;
+    const hasDriverLocation = isValidLatLng(driverLocation?.latitude, driverLocation?.longitude);
+    const pickup = order.businesses
+      ?.map((entry: any) => entry?.business?.location)
+      ?.find((location: any) => isValidLatLng(location?.latitude, location?.longitude));
+
+    const fitBoundsWithPadding = (from: { latitude: number; longitude: number }, to: { latitude: number; longitude: number }) => {
+      const minLng = Math.min(from.longitude, to.longitude);
+      const maxLng = Math.max(from.longitude, to.longitude);
+      const minLat = Math.min(from.latitude, to.latitude);
+      const maxLat = Math.max(from.latitude, to.latitude);
+
+      map.fitBounds(
+        [[minLng, minLat], [maxLng, maxLat]],
+        {
+          padding: { top: 90, bottom: 260, left: 330, right: 120 },
+          maxZoom: 15,
+          duration: 700,
+          essential: true,
+        }
+      );
+    };
+
+    if (order.status === "OUT_FOR_DELIVERY" && hasDriverLocation && isValidLatLng(dropoff.latitude, dropoff.longitude)) {
+      fitBoundsWithPadding(driverLocation, dropoff);
+      return;
+    }
+
+    if (pickup && isValidLatLng(dropoff.latitude, dropoff.longitude)) {
+      fitBoundsWithPadding(pickup, dropoff);
+      return;
+    }
+
+    map.flyTo({ center: [dropoff.longitude, dropoff.latitude], zoom: 15, duration: 600, essential: true });
+  }, [driverMap]);
 
   const selectOrder = useCallback((orderId: string) => {
     setSelectedOrderId(orderId);
@@ -748,7 +1067,7 @@ export default function MapPage() {
           const drop = order.dropOffLocation;
           if (!drop?.latitude || !drop?.longitude) return null;
           const statusColor = ORDER_STATUS_COLORS[order.status as keyof typeof ORDER_STATUS_COLORS] || ORDER_STATUS_COLORS.PENDING;
-          const businessNames = order.businesses?.map((b: any) => b.business?.name).filter(Boolean).join(", ") || "Order";
+          const businessNames = getOrderBusinesses(order).map((b: any) => b.business?.name).filter(Boolean).join(", ") || "Order";
           const isHovered = hoveredOrderId === order.id;
           const isSelected = selectedOrderId === order.id;
           const isPending = order.status === "PENDING";
@@ -820,7 +1139,11 @@ export default function MapPage() {
                   <div className="absolute inset-0 w-8 h-8 -top-1 -left-1 rounded-full border-2 border-emerald-400 animate-pulse" />
                 )}
                 {driver ? (
-                  <div className={`w-8 h-8 rounded-full ${getAvatarColor(driver.id)} flex items-center justify-center font-bold text-white text-xs border-2 ${statusStyle.border} shadow-lg transition-all hover:scale-125 ${isBusy ? `ring-1.5 ${statusStyle.ring}` : ""}`}>
+                  <div className={`relative w-8 h-8 rounded-full ${getAvatarColor(driver.id)} flex items-center justify-center font-bold text-white text-xs border-2 ${statusStyle.border} shadow-lg transition-all hover:scale-125 ${isBusy ? `ring-1.5 ${statusStyle.ring}` : ""}`}>
+                    <div
+                      className="absolute -top-2 w-0 h-0 border-l-[5px] border-r-[5px] border-b-[8px] border-l-transparent border-r-transparent border-b-white/90"
+                      style={{ left: '50%', transform: `translateX(-50%) rotate(${driverHeadingDeg[track.id] ?? 0}deg)` }}
+                    />
                     {getInitials(driver.firstName, driver.lastName)}
                   </div>
                 ) : (
@@ -1033,16 +1356,18 @@ export default function MapPage() {
               const businessName = order.businesses?.[0]?.business?.name || "Unknown";
               const isSelected = selectedOrderId === order.id;
               const isPending = order.status === "PENDING";
-              const orderDateMs = order.orderDate ? new Date(order.orderDate).getTime() : now;
+              const orderDateMs = parseServerTimeMs(order.orderDate) ?? now;
               const elapsed = now - orderDateMs;
               const pendingTooLong = isPending && elapsed > PENDING_WARNING_MS;
               const customerName = order.user ? `${order.user.firstName} ${order.user.lastName}` : "Unknown";
               const distanceData = orderDistances[order.id];
-              const etaMin = distanceData
-                ? distanceData.toPickup
-                  ? Math.round(distanceData.toPickup.durationMin + distanceData.toDropoff.durationMin)
-                  : Math.round(distanceData.toDropoff.durationMin)
-                : null;
+              const etaMin = getOrderEtaMinutes(
+                order,
+                distanceData,
+                now,
+                driverProgressOnRoute[order.driver?.id] || 0,
+                order.driver ? driverMap[order.driver.id] : null,
+              );
 
               return (
                 <button
@@ -1115,6 +1440,13 @@ export default function MapPage() {
         </div>
       </div>
 
+      <div className="absolute bottom-3 right-[88px] z-30 px-3 py-2 rounded-xl bg-black/80 border border-white/10 backdrop-blur-md text-[10px] text-zinc-300">
+        <div className="font-semibold text-zinc-100">Directions telemetry</div>
+        <div className="mt-1">calls/min: <span className="text-emerald-400">{directionsTelemetry.lastMinuteCalls}</span></div>
+        <div>cache hit: <span className="text-blue-400">{Math.round((directionsTelemetry.cacheHitRate || 0) * 100)}%</span></div>
+        <div>dedupe: <span className="text-violet-400">{directionsTelemetry.inFlightDedupHits}</span></div>
+      </div>
+
       {/* ════════════════ BOTTOM ORDER DETAIL PANEL ════════════════ */}
       {selectedOrder && (
         <BottomDetailPanel
@@ -1155,40 +1487,80 @@ function BottomDetailPanel({
   const [selectedDriverId, setSelectedDriverId] = useState(order.driver?.id || "");
   const [showItems, setShowItems] = useState(false);
   const statusColor = ORDER_STATUS_COLORS[order.status as keyof typeof ORDER_STATUS_COLORS] || ORDER_STATUS_COLORS.PENDING;
-  const businessNames = order.businesses?.map((b: any) => b.business?.name).filter(Boolean).join(", ") || "Unknown";
-  const businessPhones = order.businesses?.map((b: any) => b.business?.phoneNumber).filter(Boolean).join(", ") || "";
+  const orderBusinesses = getOrderBusinesses(order);
+  const businessNames = orderBusinesses.map((b: any) => b.business?.name).filter(Boolean).join(", ") || "Unknown";
+  const businessPhones = orderBusinesses.map((b: any) => b.business?.phoneNumber).filter(Boolean).join(", ") || "";
   const customerName = order.user ? `${order.user.firstName} ${order.user.lastName}`.trim() : "Unknown";
   const customerPhone = order.user?.phoneNumber || "";
   const distanceData = orderDistances[order.id];
-  const etaMin = distanceData
-    ? distanceData.toPickup
-      ? Math.round(distanceData.toPickup.durationMin + distanceData.toDropoff.durationMin)
-      : Math.round(distanceData.toDropoff.durationMin)
-    : null;
+  const etaMin = getOrderEtaMinutes(
+    order,
+    distanceData,
+    now,
+    driverProgressOnRoute[order.driver?.id] || 0,
+    order.driver ? driverMap[order.driver.id] : null,
+  );
   const isPending = order.status === "PENDING";
-  const orderDateMs = order.orderDate ? new Date(order.orderDate).getTime() : now;
-  const elapsed = now - orderDateMs;
+  const orderDateMs = parseServerTimeMs(order.orderDate) ?? now;
+  const elapsed = Math.max(0, now - orderDateMs);
   const pendingTooLong = isPending && elapsed > PENDING_WARNING_MS;
-  const statusStartMs = statusChangeTime[order.id] || orderDateMs;
-  const statusElapsed = now - statusStartMs;
-  const prepTimeMinutes = order.businesses?.[0]?.business?.avgPrepTimeMinutes;
+  const statusStartMs = statusChangeTime[order.id] || getOrderStatusStartMs(order, now);
+  const statusElapsed = Math.max(0, now - statusStartMs);
+  const createdAtLabel = formatLocalDateTime(orderDateMs);
+  const statusAtLabel = formatLocalDateTime(statusStartMs);
+  const pickupLocation = orderBusinesses
+    ?.map((entry: any) => entry?.business?.location)
+    ?.find((location: any) => isValidLatLng(location?.latitude, location?.longitude));
+
+  const assignableFreeDrivers = useMemo(() => {
+    return drivers
+      .filter((driver: any) => {
+        const hasLocation = isValidLatLng(driver?.driverLocation?.latitude, driver?.driverLocation?.longitude);
+        return hasLocation && isDriverAssignable(driver) && getActiveCountForDriver(driver.id, activeOrders) < MAX_DRIVER_ACTIVE_ORDERS;
+      })
+      .map((driver: any) => {
+        const distanceToPickupMeters = pickupLocation
+          ? distanceMeters(
+              { latitude: pickupLocation.latitude, longitude: pickupLocation.longitude },
+              { latitude: driver.driverLocation.latitude, longitude: driver.driverLocation.longitude },
+            )
+          : Infinity;
+        return {
+          driver,
+          distanceToPickupMeters,
+        };
+      })
+      .sort((a: any, b: any) => a.distanceToPickupMeters - b.distanceToPickupMeters);
+  }, [drivers, activeOrders, pickupLocation?.latitude, pickupLocation?.longitude]);
+
+  const recommendedDriver = !order.driver && assignableFreeDrivers.length > 0
+    ? assignableFreeDrivers[0]
+    : null;
+  const prepTimeMinutes = orderBusinesses[0]?.business?.avgPrepTimeMinutes;
   const prepProgress = (isPending || order.status === "READY") && prepTimeMinutes
     ? Math.min(statusElapsed / (prepTimeMinutes * 60 * 1000), 1)
     : order.status === "OUT_FOR_DELIVERY"
       ? driverProgressOnRoute[order.driver?.id] || 0
       : 0;
 
-  useEffect(() => { setSelectedDriverId(order.driver?.id || ""); }, [order.driver?.id]);
+  useEffect(() => {
+    setSelectedDriverId(order.driver?.id || "");
+  }, [order.driver?.id, order.id]);
+
+  useEffect(() => {
+    if (order.driver || !recommendedDriver || selectedDriverId) return;
+    setSelectedDriverId(recommendedDriver.driver.id);
+  }, [order.driver, recommendedDriver, selectedDriverId]);
 
   return (
-    <div className={`absolute bottom-0 left-[280px] right-[72px] z-40 transition-all duration-300 ${expanded ? "h-[320px]" : "h-[180px]"}`}>
+    <div className={`absolute bottom-0 left-[280px] right-[72px] z-40 transition-all duration-300 ${expanded ? "h-[272px]" : "h-[154px]"}`}>
       <div className="absolute inset-0 bg-[#0a0a0b]/95 backdrop-blur-xl border-t border-white/10 rounded-t-xl" />
 
       <div className="relative h-full flex flex-col">
         {/* Handle bar + header */}
-        <div className="flex items-center justify-between px-4 pt-2.5 pb-2">
+        <div className="flex items-center justify-between px-3.5 pt-2 pb-1.5">
           <div className="flex items-center gap-3">
-            <PrepTimeRing size={40} stroke={2.5} progress={prepProgress} color={pendingTooLong ? "#ef4444" : statusColor.hex}>
+            <PrepTimeRing size={34} stroke={2.5} progress={prepProgress} color={pendingTooLong ? "#ef4444" : statusColor.hex}>
               <div className={`text-[10px] font-bold ${pendingTooLong ? "text-red-400" : statusColor.text}`}>
                 {isPending ? `${Math.floor(elapsed / 60000)}m` : etaMin ? `${etaMin}m` : "\u2014"}
               </div>
@@ -1204,13 +1576,20 @@ function BottomDetailPanel({
                   </span>
                 )}
               </div>
-              <div className="text-sm font-semibold text-white mt-0.5">{businessNames}</div>
-              <div className="text-xs text-zinc-500">{"\u2192"} {customerName}</div>
+              <div className="text-[13px] font-semibold text-white leading-tight mt-0.5">{businessNames}</div>
+              <div className="text-[11px] text-zinc-500 leading-tight">{"\u2192"} {customerName}</div>
+              <div className="flex items-center gap-2 mt-1 text-[10px]">
+                <span className="text-zinc-500">Created</span>
+                <span className="font-mono text-zinc-300">{formatElapsed(elapsed)}</span>
+                <span className="text-zinc-600">|</span>
+                <span className="text-zinc-500">In status</span>
+                <span className={`font-mono ${pendingTooLong ? "text-red-400" : "text-zinc-300"}`}>{formatElapsed(statusElapsed)}</span>
+              </div>
             </div>
           </div>
 
           <div className="flex items-center gap-1.5">
-            <button onClick={onFocus} className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition" title="Focus on map">
+            <button onClick={onFocus} className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition" title="Fit pickup and dropoff">
               <Crosshair size={13} />
             </button>
             {distanceData && (
@@ -1231,10 +1610,10 @@ function BottomDetailPanel({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden px-4 pb-3">
-          <div className="grid grid-cols-4 gap-3">
+        <div className="flex-1 overflow-hidden px-3.5 pb-4">
+          <div className="grid grid-cols-12 gap-2.5">
             {/* Column 1: Order Info */}
-            <div className="space-y-2">
+            <div className="col-span-3 space-y-1.5">
               <div className="text-[9px] text-zinc-500 uppercase font-semibold">Order</div>
               <div className="space-y-1 text-xs">
                 <div className="flex justify-between">
@@ -1251,6 +1630,14 @@ function BottomDetailPanel({
                     {isPending ? formatElapsed(elapsed) : formatElapsed(statusElapsed)}
                   </span>
                 </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-zinc-500">Created at</span>
+                  <span className="text-zinc-400 text-right">{createdAtLabel}</span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-zinc-500">Status since</span>
+                  <span className="text-zinc-400 text-right">{statusAtLabel}</span>
+                </div>
                 {etaMin && (
                   <div className="flex justify-between">
                     <span className="text-zinc-500">ETA</span>
@@ -1261,9 +1648,9 @@ function BottomDetailPanel({
             </div>
 
             {/* Column 2: People */}
-            <div className="space-y-2">
+            <div className="col-span-3 space-y-1.5">
               <div className="text-[9px] text-zinc-500 uppercase font-semibold">People</div>
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <div className="flex items-center gap-2 p-1.5 rounded-lg bg-white/5">
                   <Store size={11} className="text-violet-400 flex-shrink-0" />
                   <div className="min-w-0">
@@ -1283,7 +1670,7 @@ function BottomDetailPanel({
             </div>
 
             {/* Column 3: Driver Assignment */}
-            <div className="space-y-2">
+            <div className="col-span-3 space-y-1.5">
               <div className="text-[9px] text-zinc-500 uppercase font-semibold">Driver</div>
               {order.driver ? (
                 <div className="flex items-center gap-2 p-1.5 rounded-lg bg-white/5">
@@ -1308,12 +1695,19 @@ function BottomDetailPanel({
                 </div>
               ) : (
                 <div className="space-y-1.5">
-                  <div className="max-h-[70px] overflow-y-auto space-y-1">
-                    {drivers.filter((d: any) => isDriverAssignable(d) && getActiveCountForDriver(d.id, activeOrders) < MAX_DRIVER_ACTIVE_ORDERS).map((driver: any) => {
+                  {recommendedDriver && Number.isFinite(recommendedDriver.distanceToPickupMeters) && (
+                    <div className="px-2 py-1 rounded-md bg-emerald-500/12 border border-emerald-500/30 text-[10px] text-emerald-300">
+                      Recommended: {recommendedDriver.driver.firstName} {recommendedDriver.driver.lastName}
+                      <span className="text-emerald-400/80"> ({(recommendedDriver.distanceToPickupMeters / 1000).toFixed(2)} km)</span>
+                    </div>
+                  )}
+                  <div className="max-h-[76px] overflow-y-auto space-y-1">
+                    {assignableFreeDrivers.map(({ driver, distanceToPickupMeters }: any) => {
                       const cs = (driver.driverConnection?.connectionStatus ?? "DISCONNECTED") as keyof typeof DRIVER_CONNECTION_COLORS;
                       const ss = DRIVER_CONNECTION_COLORS[cs];
                       const SI = ss.icon;
                       const isSelected = selectedDriverId === driver.id;
+                      const isRecommended = recommendedDriver?.driver?.id === driver.id;
                       return (
                         <button key={driver.id} onClick={() => setSelectedDriverId(driver.id)}
                           className={`w-full flex items-center gap-2 p-1 rounded text-left transition ${isSelected ? "bg-blue-500/20 border border-blue-500/40" : "bg-white/5 hover:bg-white/10 border border-transparent"}`}>
@@ -1322,7 +1716,9 @@ function BottomDetailPanel({
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="text-[10px] text-white truncate">{driver.firstName} {driver.lastName}</div>
+                            <div className="text-[9px] text-zinc-500">{Number.isFinite(distanceToPickupMeters) ? `${(distanceToPickupMeters / 1000).toFixed(2)} km` : "-"}</div>
                           </div>
+                          {isRecommended && <span className="text-[8px] px-1 py-0.5 rounded bg-emerald-500/25 text-emerald-300">BEST</span>}
                           <SI size={9} className={ss.text} />
                         </button>
                       );
@@ -1344,17 +1740,20 @@ function BottomDetailPanel({
             </div>
 
             {/* Column 4: Status & Actions */}
-            <div className="space-y-2">
+            <div className="col-span-3 space-y-1.5">
               <div className="text-[9px] text-zinc-500 uppercase font-semibold">Status</div>
               <select value={order.status} onChange={(e) => onUpdateStatus(order.id, e.target.value)}
                 className={`w-full border rounded-lg px-2 py-1.5 text-[11px] font-medium text-white ${statusColor.selectBg} ${statusColor.border}`}
                 style={{ colorScheme: "dark" }}>
                 <option value="PENDING" style={{ backgroundColor: "#1f2937" }}>Pending</option>
                 <option value="READY" style={{ backgroundColor: "#1f2937" }}>Ready</option>
-                <option value="OUT_FOR_DELIVERY" style={{ backgroundColor: "#1f2937" }}>Out for Delivery</option>
+                <option value="OUT_FOR_DELIVERY" style={{ backgroundColor: "#1f2937" }} disabled={!order.driver?.id}>Out for Delivery</option>
                 <option value="DELIVERED" style={{ backgroundColor: "#1f2937" }}>Delivered</option>
                 <option value="CANCELLED" style={{ backgroundColor: "#1f2937" }}>Cancelled</option>
               </select>
+              {!order.driver?.id && (
+                <div className="text-[9px] text-amber-400/90">Assign a driver to enable Out for Delivery.</div>
+              )}
 
               <div className="space-y-1">
                 {distanceData && (
@@ -1373,7 +1772,7 @@ function BottomDetailPanel({
                 )}
               </div>
 
-              {expanded && order.businesses?.length > 0 && (
+              {expanded && orderBusinesses.length > 0 && (
                 <div>
                   <button onClick={() => setShowItems(!showItems)}
                     className="text-[9px] text-zinc-600 uppercase hover:text-zinc-400 transition flex items-center gap-1">
@@ -1381,8 +1780,8 @@ function BottomDetailPanel({
                   </button>
                   {showItems && (
                     <div className="mt-1 space-y-0.5">
-                      {order.businesses.flatMap((b: any) =>
-                        (b.items || []).map((item: any, idx: number) => (
+                      {orderBusinesses.flatMap((b: any) =>
+                        getOrderBusinessItems(b).map((item: any, idx: number) => (
                           <div key={`${b.business?.id}-${idx}`} className="flex justify-between text-[9px]">
                             <span className="text-zinc-400">{item.quantity}x {item.name || "Item"}</span>
                             <span className="text-zinc-500">{"\u20AC"}{((item.price || 0) * item.quantity).toFixed(2)}</span>

@@ -1,8 +1,9 @@
 import type { UserResolvers } from './../../../generated/types.generated';
 import logger from '@/lib/logger';
 import { getUserPermissions } from '@/lib/utils/permissions';
+import { getLiveDriverEta } from '@/lib/driverEtaCache';
 
-export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'businessId'|'driverLocation'|'driverLocationUpdatedAt'|'email'|'emailVerified'|'firstName'|'flagColor'|'id'|'imageUrl'|'isOnline'|'lastName'|'permissions'|'phoneNumber'|'phoneVerified'|'referralCode'|'role'|'signupStep'|'__isTypeOf'> = {
+export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'businessId'|'driverLocation'|'driverLocationUpdatedAt'|'email'|'emailVerified'|'firstName'|'flagColor'|'id'|'imageUrl'|'isOnline'|'lastName'|'permissions'|'phoneNumber'|'phoneVerified'|'preferredLanguage'|'referralCode'|'role'|'signupStep'|'__isTypeOf'> = {
     permissions: async (parent) => {
         // Get permissions for this user
         const perms = await getUserPermissions({
@@ -81,12 +82,17 @@ export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'busines
         try {
             const driver = await loaders.driverByUserIdLoader.load(String(parent.id));
             if (!driver) return null;
+            const liveEta = await getLiveDriverEta(String(parent.id));
             return {
                 onlinePreference: driver.onlinePreference ?? false,
                 connectionStatus: driver.connectionStatus ?? 'DISCONNECTED',
                 lastHeartbeatAt: driver.lastHeartbeatAt,
                 lastLocationUpdate: driver.lastLocationUpdate,
                 disconnectedAt: driver.disconnectedAt,
+                activeOrderId: liveEta?.activeOrderId ?? null,
+                navigationPhase: liveEta?.navigationPhase ?? null,
+                remainingEtaSeconds: liveEta?.remainingEtaSeconds ?? null,
+                etaUpdatedAt: liveEta?.etaUpdatedAt ?? null,
             };
         } catch (error) {
             logger.error({ err: error }, 'user:driverConnection resolve failed');

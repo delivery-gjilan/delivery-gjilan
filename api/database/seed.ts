@@ -8,9 +8,11 @@ import { productStocks, NewDbProductStock } from './schema/productStock';
 import { orders, NewDbOrder } from './schema/orders';
 import { orderItems, NewDbOrderItem } from './schema/orderItems';
 import { users } from './schema/users';
+import { drivers } from './schema/drivers';
 import { promotions, userPromotions, promotionBusinessEligibility, userPromoMetadata } from './schema/promotions';
+import { settlements } from './schema/settlements';
 import { hashPassword } from '@/lib/utils/authUtils';
-import { OrderStatus } from '@/generated/types.generated';
+import { sql } from 'drizzle-orm';
 
 // Restaurant data with curated products and realistic images
 const RESTAURANTS_DATA = [
@@ -318,6 +320,44 @@ async function seed() {
 
     console.log('👥 Created 3 test customer users total');
 
+    // Create driver users and linked driver profiles
+    const seededDrivers = [
+        { firstName: 'Liridon', lastName: 'Berisha', email: 'driver1@demo.com' },
+        { firstName: 'Arben', lastName: 'Krasniqi', email: 'driver2@demo.com' },
+        { firstName: 'Dren', lastName: 'Hoxha', email: 'driver3@demo.com' },
+    ];
+
+    for (const [index, driverSeed] of seededDrivers.entries()) {
+        const driverUserId = faker.string.uuid();
+        const driverPassword = await hashPassword('12345678');
+
+        await db.insert(users).values({
+            id: driverUserId,
+            firstName: driverSeed.firstName,
+            lastName: driverSeed.lastName,
+            email: driverSeed.email,
+            password: driverPassword,
+            role: 'DRIVER',
+            emailVerified: true,
+            phoneVerified: true,
+            signupStep: 'COMPLETED',
+        });
+
+        await db.insert(drivers).values({
+            userId: driverUserId,
+            driverLat: 42.6629 + (index * 0.01),
+            driverLng: 21.4694 + (index * 0.01),
+            onlinePreference: true,
+            connectionStatus: 'CONNECTED',
+            commissionPercentage: '20',
+            maxActiveOrders: '2',
+            lastHeartbeatAt: new Date().toISOString(),
+            lastLocationUpdate: new Date().toISOString(),
+        });
+    }
+
+    console.log('🚗 Created 3 test drivers (driver1@demo.com, driver2@demo.com, driver3@demo.com)');
+
     // Store created businesses and their products
     const createdBusinesses: Array<{ id: string; name: string; products: Array<{ id: string; name: string; price: number }> }> = [];
 
@@ -615,6 +655,148 @@ async function seed() {
         console.warn('[SEED] Promotions seed skipped or error:', err);
     }
 
+    // Create test orders and settlements
+    try {
+        const businessList = await db.select().from(businesses).limit(10);
+        const driverList = await db.select().from(drivers).limit(5);
+        const customerList = await db.select().from(users).where(sql`${users.role} = 'CUSTOMER'`).limit(5);
+
+        if (businessList.length > 0 && driverList.length > 0 && customerList.length > 0) {
+            // Create delivered orders + matching settlements
+            for (let i = 0; i < 15; i++) {
+                const randomBusiness = businessList[Math.floor(Math.random() * businessList.length)];
+                const randomDriver = driverList[Math.floor(Math.random() * driverList.length)];
+                const randomCustomer = customerList[Math.floor(Math.random() * customerList.length)];
+
+                if (!randomBusiness || !randomDriver || !randomCustomer) {
+                    continue;
+                }
+
+                const orderAmount = Number((20 + Math.random() * 80).toFixed(2));
+                const deliveryFee = 3.5;
+                const createdAt = new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString();
+
+                const [newOrder] = await db.insert(orders).values({
+                    displayId: `GJ-S${String(i + 1).padStart(3, '0')}`,
+                    userId: randomCustomer.id,
+                    driverId: randomDriver.userId,
+                    price: orderAmount,
+                    deliveryPrice: deliveryFee,
+                    status: 'DELIVERED',
+                    dropoffLat: 42.4635,
+                    dropoffLng: 21.4694,
+                    dropoffAddress: 'Gjilan, Kosovo',
+                    deliveredAt: createdAt,
+                    orderDate: createdAt,
+                }).returning();
+
+                if (!newOrder) {
+                    continue;
+                }
+
+                // Business settlement (platform receivable)
+                const businessPlatformMarkup = Number((orderAmount * 0.15).toFixed(2));
+                const businessPaid = Math.random() > 0.6;
+                await db.insert(settlements).values({
+                    type: 'BUSINESS',
+                    direction: 'RECEIVABLE',
+                    businessId: randomBusiness.id,
+                    orderId: newOrder.id,
+                    amount: businessPlatformMarkup,
+                    status: businessPaid ? 'PAID' : 'PENDING',
+                    createdAt,
+                    paidAt: businessPaid ? new Date(Date.now() - Math.random() * 10 * 24 * 60 * 60 * 1000).toISOString() : null,
+                    paymentReference: businessPaid ? `PAY-${Date.now()}-${i}` : null,
+                    paymentMethod: businessPaid ? 'BANK_TRANSFER' : null,
+                    ruleSnapshot: {
+                        appliedRules: [
+                            {
+                                ruleId: 'platform-markup',
+                                ruleType: 'PLATFORM_MARKUP',
+                                config: { percentage: 15 },
+                                activeSince: createdAt,
+                                capturedAt: createdAt,
+                            },
+                        ],
+                    },
+                    calculationDetails: {
+                        orderSubtotal: orderAmount,
+                        deliveryFee,
+                        itemsBreakdown: [],
+                        rulesApplied: [
+                            {
+                                ruleType: 'PLATFORM_MARKUP',
+                                description: '15% platform markup',
+                                baseAmount: orderAmount,
+                                percentage: 15,
+                                amount: businessPlatformMarkup,
+                                direction: 'RECEIVABLE',
+                            },
+                        ],
+                        totalReceivable: businessPlatformMarkup,
+                        totalPayable: 0,
+                        netAmount: businessPlatformMarkup,
+                        currency: 'EUR',
+                    },
+                });
+
+                // Driver settlement (platform receivable from delivery fee share)
+                const driverCommission = Number((deliveryFee * 0.8).toFixed(2));
+                const driverPaid = Math.random() > 0.5;
+                await db.insert(settlements).values({
+                    type: 'DRIVER',
+                    direction: 'RECEIVABLE',
+                    driverId: randomDriver.id,
+                    orderId: newOrder.id,
+                    amount: driverCommission,
+                    status: driverPaid ? 'PAID' : 'PENDING',
+                    createdAt,
+                    paidAt: driverPaid ? new Date(Date.now() - Math.random() * 10 * 24 * 60 * 60 * 1000).toISOString() : null,
+                    paymentReference: driverPaid ? `DRV-${Date.now()}-${i}` : null,
+                    paymentMethod: driverPaid ? 'WALLET' : null,
+                    ruleSnapshot: {
+                        appliedRules: [
+                            {
+                                ruleId: 'driver-commission',
+                                ruleType: 'DRIVER_COMMISSION',
+                                config: { percentage: 80 },
+                                activeSince: createdAt,
+                                capturedAt: createdAt,
+                            },
+                        ],
+                    },
+                    calculationDetails: {
+                        orderSubtotal: orderAmount,
+                        deliveryFee,
+                        itemsBreakdown: [],
+                        rulesApplied: [
+                            {
+                                ruleType: 'DRIVER_COMMISSION',
+                                description: '80% driver commission',
+                                baseAmount: deliveryFee,
+                                percentage: 80,
+                                amount: driverCommission,
+                                direction: 'RECEIVABLE',
+                            },
+                        ],
+                        totalReceivable: driverCommission,
+                        totalPayable: 0,
+                        netAmount: driverCommission,
+                        currency: 'EUR',
+                    },
+                });
+            }
+
+            console.log('[SEED] ✅ Created 15 delivered orders with settlements');
+            console.log('[SEED]   - 15 business settlements');
+            console.log('[SEED]   - 15 driver settlements');
+        } else {
+            console.warn('[SEED] Settlements skipped: missing businesses, drivers, or customers');
+        }
+    } catch (err) {
+        console.warn('[SEED] Settlements seed skipped or error:', err);
+    }
+
     console.log('\n✅ Database seeded successfully!');
     console.log('\n📊 Summary:');
     const totalBusinesses = RESTAURANTS_DATA.length + MARKET_DATA.length;
@@ -629,7 +811,8 @@ async function seed() {
     console.log(`  - 3 test customer users created`);
     console.log('\n🔐 Credentials:');
     console.log('  Admin: admin@admin.com / 12345678');
-    console.log('  Customer: artshabani2002@gmail.com / 12345678\n');
+    console.log('  Customer: artshabani2002@gmail.com / 12345678');
+    console.log('  Drivers: driver1@demo.com, driver2@demo.com, driver3@demo.com / 12345678\n');
 }
 
 seed()

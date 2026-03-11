@@ -14,6 +14,7 @@ export const LOGIN_MUTATION = graphql(`
                 phoneVerified
                 phoneNumber
                 role
+                preferredLanguage
             }
             message
         }

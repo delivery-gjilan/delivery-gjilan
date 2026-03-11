@@ -1,5 +1,6 @@
 import type { UserResolvers } from './../../../generated/types.generated';
 import logger from '@/lib/logger';
+import { getLiveDriverEta } from '@/lib/driverEtaCache';
 
 /**
  * Driver-related User resolver
@@ -21,6 +22,7 @@ export const User: Pick<UserResolvers, 'commissionPercentage'|'driverConnection'
       if (!driver) {
         return null;
       }
+      const liveEta = await getLiveDriverEta(String(parent.id));
 
       const parseDate = (value: string | Date | null | undefined): Date | null => {
         if (!value) return null;
@@ -35,6 +37,10 @@ export const User: Pick<UserResolvers, 'commissionPercentage'|'driverConnection'
         lastHeartbeatAt: parseDate(driver.lastHeartbeatAt),
         lastLocationUpdate: parseDate(driver.lastLocationUpdate),
         disconnectedAt: parseDate(driver.disconnectedAt),
+        activeOrderId: liveEta?.activeOrderId ?? null,
+        navigationPhase: liveEta?.navigationPhase ?? null,
+        remainingEtaSeconds: liveEta?.remainingEtaSeconds ?? null,
+        etaUpdatedAt: parseDate(liveEta?.etaUpdatedAt),
       };
     } catch (error) {
       logger.error({ err: error, userId: parent.id }, 'driver:driverConnection resolve failed');

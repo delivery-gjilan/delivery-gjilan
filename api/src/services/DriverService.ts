@@ -4,6 +4,7 @@ import { AuthRepository } from '@/repositories/AuthRepository';
 import { DriverWatchdogService } from '@/services/DriverWatchdogService';
 import { DriverHeartbeatHandler } from '@/services/DriverHeartbeatHandler';
 import { DriverConnectionStatusType } from '@/database/schema/drivers';
+import type { HeartbeatEtaPayload } from '@/services/DriverHeartbeatHandler';
 
 /**
  * DriverService
@@ -46,15 +47,20 @@ export class DriverService {
    * Process heartbeat from driver
    * This is the main entry point for driver heartbeats
    */
-  async processHeartbeat(userId: string, latitude: number, longitude: number) {
+  async processHeartbeat(userId: string, latitude: number, longitude: number, etaPayload?: HeartbeatEtaPayload) {
     await this.ensureDriverProfile(userId);
-    return this.heartbeatHandler.processHeartbeat(userId, latitude, longitude);
+    const result = await this.heartbeatHandler.processHeartbeat(userId, latitude, longitude, etaPayload);
+    if (result.success) {
+      this.watchdogService.trackHeartbeat(userId, result.lastHeartbeatAt);
+    }
+    return result;
   }
 
   /**
    * Handle driver disconnection (subscription closed)
    */
   async handleDisconnect(userId: string) {
+    this.watchdogService.clearDriverTracking(userId);
     return this.heartbeatHandler.handleDisconnect(userId);
   }
 
@@ -62,7 +68,9 @@ export class DriverService {
    * Handle driver reconnection
    */
   async handleReconnect(userId: string) {
-    return this.heartbeatHandler.handleReconnect(userId);
+    const driver = await this.heartbeatHandler.handleReconnect(userId);
+    this.watchdogService.trackHeartbeat(userId, driver?.lastHeartbeatAt || undefined);
+    return driver;
   }
 
   /**
@@ -72,6 +80,7 @@ export class DriverService {
     await this.ensureDriverProfile(userId);
     const result = await this.heartbeatHandler.processHeartbeat(userId, latitude, longitude);
     if (result.success) {
+      this.watchdogService.trackHeartbeat(userId, result.lastHeartbeatAt);
       return this.driverRepository.getDriverByUserId(userId);
     }
     return undefined;
@@ -122,7 +131,18 @@ export class DriverService {
    * Admin: manually set driver connection status
    */
   async adminSetConnectionStatus(userId: string, status: DriverConnectionStatusType) {
-    return this.driverRepository.updateConnectionStatus(userId, status);
+    const driver = await this.driverRepository.updateConnectionStatus(userId, status);
+    if (!driver) {
+      return driver;
+    }
+
+    if (status === 'CONNECTED') {
+      this.watchdogService.trackHeartbeat(userId, driver.lastHeartbeatAt || undefined);
+    } else {
+      this.watchdogService.clearDriverTracking(userId);
+    }
+
+    return driver;
   }
 
   /**

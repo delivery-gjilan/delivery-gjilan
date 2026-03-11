@@ -22,6 +22,10 @@ export const DRIVERS_UPDATED_SUBSCRIPTION = graphql(`
         lastHeartbeatAt
         lastLocationUpdate
         disconnectedAt
+        activeOrderId
+        navigationPhase
+        remainingEtaSeconds
+        etaUpdatedAt
       }
     }
   }

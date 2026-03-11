@@ -46,6 +46,8 @@ const menu: any[] = [
   { name: "Map", href: "/dashboard/map", icon: Map, superAdminOnly: true },
   { name: "Banners", href: "/admin/banners", icon: Image, superAdminOnly: true },
   
+  { name: "Settlements", href: "/admin/financial", icon: DollarSign, superAdminOnly: true },
+  
   { divider: true, superAdminOnly: true },
   { sectionHeader: "Configuration", superAdminOnly: true },
   

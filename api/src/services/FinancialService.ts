@@ -2,6 +2,7 @@ import { Database } from '@/database';
 import { SettlementRepository } from '@/repositories/SettlementRepository';
 import { BusinessRepository } from '@/repositories/BusinessRepository';
 import { DriverRepository } from '@/repositories/DriverRepository';
+import { SettlementCalculationEngine } from '@/services/SettlementCalculationEngine';
 import { DbOrder, DbOrderItem, products as productsTable } from '@/database/schema';
 import { inArray } from 'drizzle-orm';
 import logger from '@/lib/logger';
@@ -14,22 +15,21 @@ const log = logger.child({ service: 'FinancialService' });
  * 
  * Flow:
  * 1. Order created with total price
- * 2. For each business: calculate their commission
- * 3. For driver: market earns commission from delivery fee
- * 4. Market earns commission from business order subtotal
+ * 2. Use SettlementCalculationEngine to calculate settlements based on rules
+ * 3. Store settlements with full audit trail
  */
 export class FinancialService {
     private settlementRepo: SettlementRepository;
+    private settlementEngine: SettlementCalculationEngine;
 
     constructor(private db: Database) {
         this.settlementRepo = new SettlementRepository(db);
+        this.settlementEngine = new SettlementCalculationEngine(db);
     }
 
     /**
      * Create settlements after an order is completed
-     * 
-    * Business Settlements: Market earns commission from business order subtotal
-    * Driver Settlement: Market earns commission from driver delivery fee
+     * Uses the SettlementCalculationEngine to apply all active rules
      */
     async createOrderSettlements(
         order: DbOrder,
@@ -37,58 +37,88 @@ export class FinancialService {
         driverId: string | null,
     ): Promise<void> {
         try {
+            // Check if settlements already exist for this order
             const existing = await this.settlementRepo.getSettlements({ orderId: order.id });
             if (existing.length > 0) {
+                log.info({ orderId: order.id }, 'settlements already exist for order');
                 return;
             }
 
-            // Group items by business to calculate per-business settlements
+            // Group items by business for calculation
             const itemsByBusiness = await this.groupItemsByBusiness(orderItems);
 
-            // Create business settlements
+            // Calculate settlements for each business using the engine
             for (const [businessId, items] of itemsByBusiness.entries()) {
                 const businessSubtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
                 
-                // Get business commission percentage
-                const business = await new BusinessRepository(this.db).findById(businessId);
-                const commissionPercentage = business?.commissionPercentage ? parseFloat(business.commissionPercentage.toString()) : 0;
+                const result = await this.settlementEngine.calculateOrderSettlements(
+                    order.id,
+                    businessId,
+                    'BUSINESS',
+                    businessSubtotal,
+                    order
+                );
 
-                // Calculate market commission from business subtotal
-                const businessAmount = businessSubtotal * (commissionPercentage / 100);
-
-                // Create settlement record for business
-                if (businessAmount > 0) {
+                // Create settlement records for each result
+                for (const settlement of result.settlements) {
                     await this.settlementRepo.createSettlement(
                         'BUSINESS_PAYMENT',
                         null,
                         businessId,
                         order.id,
-                        businessAmount,
+                        settlement.amount,
+                        settlement.direction,
+                        settlement.ruleSnapshot,
+                        settlement.calculationDetails
                     );
                 }
+
+                log.info({
+                    businessId,
+                    totalAmount: result.totalAmount,
+                    settlementCount: result.settlements.length
+                }, 'business settlements created');
             }
 
-            // Create driver settlement - commission from delivery fee
-            if (driverId) {
+            // Calculate driver settlement if there's a driver
+            if (driverId && order.deliveryPrice > 0) {
                 const driverRepo = new DriverRepository(this.db);
                 const driver =
                     (await driverRepo.getDriverByUserId(driverId)) ||
                     (await driverRepo.createDriver(driverId));
-                const driverCommissionPercentage = driver?.commissionPercentage
-                    ? parseFloat(driver.commissionPercentage.toString())
-                    : 0;
-                const driverAmount = order.deliveryPrice * (driverCommissionPercentage / 100);
 
-                if (driverAmount > 0 && driver?.id) {
-                    await this.settlementRepo.createSettlement(
-                        'DRIVER_PAYMENT',
-                        driver.id,
-                        null,
+                if (driver?.id) {
+                    const result = await this.settlementEngine.calculateOrderSettlements(
                         order.id,
-                        driverAmount,
+                        driver.id,
+                        'DRIVER',
+                        order.deliveryPrice,
+                        order
                     );
+
+                    // Create settlement records for each result
+                    for (const settlement of result.settlements) {
+                        await this.settlementRepo.createSettlement(
+                            'DRIVER_PAYMENT',
+                            driver.id,
+                            null,
+                            order.id,
+                            settlement.amount,
+                            settlement.direction,
+                            settlement.ruleSnapshot,
+                            settlement.calculationDetails
+                        );
+                    }
+
+                    log.info({
+                        driverId: driver.id,
+                        totalAmount: result.totalAmount,
+                        settlementCount: result.settlements.length
+                    }, 'driver settlements created');
                 }
             }
+
+            log.info({ orderId: order.id }, 'all order settlements created');
         } catch (error) {
             log.error({ err: error, orderId: order.id }, 'settlement:create:error');
             throw error;

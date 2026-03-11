@@ -1,7 +1,6 @@
 import { ApolloClient, InMemoryCache, HttpLink, from, split } from "@apollo/client";
 import { setContext } from "@apollo/client/link/context";
 import { onError } from "@apollo/client/link/error";
-import { CombinedGraphQLErrors } from "@apollo/client/errors";
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { createClient } from 'graphql-ws';
@@ -64,9 +63,9 @@ const authLink = setContext((_, { headers }) => {
     };
 });
 
-const errorLink = onError(({ error }) => {
-    if (CombinedGraphQLErrors.is(error)) {
-        for (const err of error.errors) {
+const errorLink = onError(({ graphQLErrors, networkError }) => {
+    if (graphQLErrors) {
+        for (const err of graphQLErrors) {
             const code = err.extensions?.code;
             if (code === "UNAUTHENTICATED" || code === "FORBIDDEN") {
                 // Auth errors — redirect to login
@@ -78,7 +77,8 @@ const errorLink = onError(({ error }) => {
             }
             toast.error(err.message || "An error occurred");
         }
-    } else {
+    }
+    if (networkError) {
         toast.error("Network error. Please check your connection.");
     }
 });

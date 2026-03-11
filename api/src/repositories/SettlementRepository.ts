@@ -146,16 +146,22 @@ export class SettlementRepository {
         businessId: string | null,
         orderId: string,
         amount: number,
+        direction: 'RECEIVABLE' | 'PAYABLE' = 'RECEIVABLE',
+        ruleSnapshot?: unknown,
+        calculationDetails?: unknown,
     ): Promise<DbSettlement> {
         const result = await this.db
             .insert(settlements)
             .values({
                 type: type as any,
+                direction: direction as any,
                 driverId,
                 businessId,
                 orderId,
                 amount: amount.toString(),
                 status: 'PENDING' as any,
+                ruleSnapshot: ruleSnapshot || null,
+                calculationDetails: calculationDetails || null,
             })
             .returning();
 

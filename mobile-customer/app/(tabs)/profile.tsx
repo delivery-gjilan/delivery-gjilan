@@ -9,7 +9,8 @@ import { useQuery, useMutation } from '@apollo/client/react';
 import { ProfileRow } from '@/components/ProfileRow';
 import { useAuthStore } from '@/store/authStore';
 import { useTranslations } from '@/hooks/useTranslations';
-import { DELETE_MY_ACCOUNT_MUTATION } from '@/graphql/operations/auth';
+import { DELETE_MY_ACCOUNT_MUTATION, SET_MY_PREFERRED_LANGUAGE_MUTATION } from '@/graphql/operations/auth';
+import { AppLanguage } from '@/gql/graphql';
 
 export default function Profile() {
     const theme = useTheme();
@@ -39,6 +40,7 @@ export default function Profile() {
     };
 
     const [deleteMyAccount, { loading: deletingAccount }] = useMutation(DELETE_MY_ACCOUNT_MUTATION);
+    const [setMyPreferredLanguage] = useMutation(SET_MY_PREFERRED_LANGUAGE_MUTATION);
 
     const handleDeleteAccount = () => {
         Alert.alert(
@@ -66,6 +68,20 @@ export default function Profile() {
     };
 
     const { t, languageChoice, setLanguageChoice } = useTranslations();
+
+    const handleLanguageChoice = async (choice: 'en' | 'al') => {
+        setLanguageChoice(choice);
+
+        try {
+            await setMyPreferredLanguage({
+                variables: {
+                    language: choice === 'al' ? AppLanguage.Al : AppLanguage.En,
+                },
+            });
+        } catch (error) {
+            console.error('[Profile] Failed to sync language preference:', error);
+        }
+    };
 
     const handleOrderHistoryPress = () => {
         router.push('/orders/history');
@@ -109,7 +125,7 @@ export default function Profile() {
                     </Text>
                     <View style={{ flexDirection: 'row', gap: 10 }}>
                         <TouchableOpacity
-                            onPress={() => setLanguageChoice('en')}
+                            onPress={() => handleLanguageChoice('en')}
                             style={{
                                 flex: 1,
                                 paddingVertical: 12,
@@ -132,7 +148,7 @@ export default function Profile() {
                             )}
                         </TouchableOpacity>
                         <TouchableOpacity
-                            onPress={() => setLanguageChoice('al')}
+                            onPress={() => handleLanguageChoice('al')}
                             style={{
                                 flex: 1,
                                 paddingVertical: 12,

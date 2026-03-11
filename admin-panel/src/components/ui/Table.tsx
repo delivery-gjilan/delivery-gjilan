@@ -23,3 +23,44 @@ export function Td({ children, colSpan, className = "" }: { children: React.Reac
     </td>
   );
 }
+
+// Shadcn-style exports for compatibility
+export function TableHeader({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <thead className={`[&_tr]:border-b border-zinc-800 ${className}`}>{children}</thead>;
+}
+
+export function TableBody({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <tbody className={`[&_tr:last-child]:border-0 ${className}`}>{children}</tbody>;
+}
+
+export function TableFooter({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <tfoot className={`bg-zinc-900 font-medium text-zinc-100 ${className}`}>{children}</tfoot>;
+}
+
+export function TableRow({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <tr className={`border-b border-zinc-800 transition-colors hover:bg-zinc-900/50 ${className}`}>
+      {children}
+    </tr>
+  );
+}
+
+export function TableHead({ children, className = "", ...props }: { children: React.ReactNode; className?: string; [key: string]: any }) {
+  return (
+    <th className={`h-12 px-4 text-left align-middle font-medium text-zinc-400 ${className}`} {...props}>
+      {children}
+    </th>
+  );
+}
+
+export function TableCell({ children, className = "", ...props }: { children: React.ReactNode; className?: string; [key: string]: any }) {
+  return (
+    <td className={`p-4 align-middle text-zinc-300 ${className}`} {...props}>
+      {children}
+    </td>
+  );
+}
+
+export function TableCaption({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <caption className={`mt-4 text-sm text-zinc-400 ${className}`}>{children}</caption>;
+}

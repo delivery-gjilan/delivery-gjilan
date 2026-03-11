@@ -149,6 +149,7 @@ export class AuthRepository {
             businessId?: string | null;
             adminNote?: string | null;
             flagColor?: string | null;
+            preferredLanguage?: string;
         }
     ): Promise<DbUser | undefined> {
         const [user] = await this.db

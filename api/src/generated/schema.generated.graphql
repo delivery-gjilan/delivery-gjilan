@@ -67,6 +67,11 @@ input AddWalletCreditInput {
   userId: ID!
 }
 
+enum AppLanguage {
+  AL
+  EN
+}
+
 type ApplicablePromotion {
   appliedAmount: Float!
   code: String
@@ -182,6 +187,11 @@ enum BusinessType {
   RESTAURANT
 }
 
+type CalculationDetails {
+  itemsBreakdown: JSON!
+  rulesApplied: JSON!
+}
+
 enum CampaignStatus {
   DRAFT
   FAILED
@@ -246,6 +256,19 @@ input CreateDeliveryZoneInput {
   sortOrder: Int
 }
 
+input CreateDynamicPricingRuleInput {
+  adjustmentConfig: JSON!
+  appliesTo: DynamicPricingRuleAppliesToInput!
+  businessId: String
+  conditionConfig: JSON!
+  conditionType: PricingConditionType!
+  description: String
+  name: String!
+  priority: Int
+  validFrom: String
+  validUntil: String
+}
+
 input CreateOrderInput {
   deliveryPrice: Float!
   driverNotes: String
@@ -306,6 +329,16 @@ input CreatePromotionInput {
   targetUserIds: [ID!]
   thresholdReward: String
   type: PromotionType!
+}
+
+input CreateSettlementRuleInput {
+  canStackWith: [String!]
+  config: JSON!
+  entityId: String!
+  entityType: SettlementEntityType!
+  notes: String
+  priority: Int
+  ruleType: SettlementRuleType!
 }
 
 input CreateUserInput {
@@ -387,11 +420,17 @@ type DeviceToken {
 }
 
 type DriverConnection {
+  """Current navigation order this ETA belongs to"""
+  activeOrderId: ID
+
   """System-calculated: current connection state"""
   connectionStatus: DriverConnectionStatus!
 
   """Timestamp when driver was marked as DISCONNECTED"""
   disconnectedAt: Date
+
+  """When the ETA payload was last refreshed"""
+  etaUpdatedAt: Date
 
   """Last timestamp when driver sent a heartbeat (every 5s)"""
   lastHeartbeatAt: Date
@@ -401,15 +440,21 @@ type DriverConnection {
   """
   lastLocationUpdate: Date
 
+  """Current navigation phase reported by the driver"""
+  navigationPhase: String
+
   """User's preference: "I want to work" toggle"""
   onlinePreference: Boolean!
+
+  """Driver-reported remaining ETA in seconds"""
+  remainingEtaSeconds: Int
 }
 
 """
 Connection status for drivers:
 - CONNECTED: Actively sending heartbeats
-- STALE: No heartbeat for 15 seconds (warning state)
-- LOST: No heartbeat for 30 seconds (offline state)
+- STALE: No heartbeat for 45 seconds (warning state)
+- LOST: No heartbeat for 90 seconds (offline state)
 - DISCONNECTED: Subscription closed or never connected
 """
 enum DriverConnectionStatus {
@@ -417,6 +462,11 @@ enum DriverConnectionStatus {
   DISCONNECTED
   LOST
   STALE
+}
+
+enum DriverCustomerNotificationKind {
+  ARRIVED_WAITING
+  ETA_LT_3_MIN
 }
 
 type DriverDailyMetrics {
@@ -460,6 +510,38 @@ type DriverHeartbeatResult {
   success: Boolean!
 }
 
+type DynamicPricingRule {
+  adjustmentConfig: JSON!
+  appliesTo: DynamicPricingRuleAppliesTo!
+  businessId: String
+  conditionConfig: JSON!
+  conditionType: PricingConditionType!
+  createdAt: String!
+  createdBy: String
+  description: String
+  id: ID!
+  isActive: Boolean!
+  name: String!
+  priority: Int!
+  updatedAt: String!
+  validFrom: String
+  validUntil: String
+}
+
+type DynamicPricingRuleAppliesTo {
+  allProducts: Boolean
+  categoryIds: [String!]
+  productIds: [String!]
+  subcategoryIds: [String!]
+}
+
+input DynamicPricingRuleAppliesToInput {
+  allProducts: Boolean
+  categoryIds: [String!]
+  productIds: [String!]
+  subcategoryIds: [String!]
+}
+
 enum EntityType {
   BUSINESS
   CATEGORY
@@ -500,6 +582,7 @@ input LoginInput {
 }
 
 type Mutation {
+  activateSettlementRule(id: ID!): SettlementRule!
   addUserAddress(input: AddUserAddressInput!): UserAddress!
   addWalletCredit(input: AddWalletCreditInput!): WalletTransaction!
 
@@ -522,24 +605,29 @@ type Mutation {
   createCampaign(input: CreateCampaignInput!): NotificationCampaign!
   createDeliveryPricingTier(input: CreateDeliveryPricingTierInput!): DeliveryPricingTier!
   createDeliveryZone(input: CreateDeliveryZoneInput!): DeliveryZone!
+  createDynamicPricingRule(input: CreateDynamicPricingRuleInput!): DynamicPricingRule!
   createOrder(input: CreateOrderInput!): Order!
   createProduct(input: CreateProductInput!): Product!
   createProductCategory(input: CreateProductCategoryInput!): ProductCategory!
   createProductSubcategory(input: CreateProductSubcategoryInput!): ProductSubcategory!
   createPromotion(input: CreatePromotionInput!): Promotion!
+  createSettlementRule(input: CreateSettlementRuleInput!): SettlementRule!
   createTestOrder: Order!
   createUser(input: CreateUserInput!): AuthResponse!
+  deactivateSettlementRule(id: ID!): SettlementRule!
   deductWalletCredit(amount: Float!, orderId: ID!, userId: ID!): WalletTransaction!
   deleteBanner(id: ID!): Boolean!
   deleteBusiness(id: ID!): Boolean!
   deleteCampaign(id: ID!): Boolean!
   deleteDeliveryPricingTier(id: ID!): Boolean!
   deleteDeliveryZone(id: ID!): Boolean!
+  deleteDynamicPricingRule(id: ID!): Boolean!
   deleteMyAccount: Boolean!
   deleteProduct(id: ID!): Boolean!
   deleteProductCategory(id: ID!): Boolean!
   deleteProductSubcategory(id: ID!): Boolean!
   deletePromotion(id: ID!): Boolean!
+  deleteSettlementRule(id: ID!): Boolean!
   deleteUser(id: ID!): Boolean!
   deleteUserAddress(id: ID!): Boolean!
 
@@ -548,14 +636,15 @@ type Mutation {
   Updates lastHeartbeatAt and connectionStatus to CONNECTED.
   Location is throttled: only written if >10s since last write OR moved >5m.
   """
-  driverHeartbeat(latitude: Float!, longitude: Float!): DriverHeartbeatResult!
+  driverHeartbeat(activeOrderId: ID, latitude: Float!, longitude: Float!, navigationPhase: String, remainingEtaSeconds: Int): DriverHeartbeatResult!
+  driverNotifyCustomer(kind: DriverCustomerNotificationKind!, orderId: ID!): Boolean!
   generateReferralCode: String!
   initiateSignup(input: InitiateSignupInput!): AuthResponse!
   login(input: LoginInput!): AuthResponse!
   markFirstOrderUsed(userId: ID!): UserPromoMetadata!
-  markSettlementAsPaid(settlementId: ID!): Settlement!
+  markSettlementAsPaid(paymentMethod: String, paymentReference: String, settlementId: ID!): Settlement!
   markSettlementAsPartiallyPaid(amount: Float!, settlementId: ID!): Settlement!
-  markSettlementsAsPaid(ids: [ID!]!): [Settlement!]!
+  markSettlementsAsPaid(ids: [ID!]!, paymentMethod: String, paymentReference: String): [Settlement!]!
   registerDeviceToken(input: RegisterDeviceTokenInput!): Boolean!
   registerLiveActivityToken(activityId: String!, orderId: ID!, token: String!): Boolean!
   removeUserFromPromotion(promotionId: ID!, userId: ID!): Boolean!
@@ -565,6 +654,7 @@ type Mutation {
   setBusinessSchedule(businessId: ID!, schedule: [BusinessDayHoursInput!]!): [BusinessDayHours!]!
   setDefaultAddress(id: ID!): Boolean!
   setDeliveryPricingTiers(input: SetDeliveryPricingTiersInput!): [DeliveryPricingTier!]!
+  setMyPreferredLanguage(language: AppLanguage!): User!
   setUserPermissions(permissions: [UserPermission!]!, userId: ID!): User!
   startPreparing(id: ID!, preparationMinutes: Int!): Order!
   submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
@@ -573,18 +663,21 @@ type Mutation {
   updateBanner(id: ID!, input: UpdateBannerInput!): Banner!
   updateBannerOrder(bannerId: ID!, newSortOrder: Int!): Banner!
   updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
-  updateCommissionPercentage(businessId: ID, driverId: ID, percentage: Float!): Boolean!
+  updateCommissionPercentage(businessId: ID, driverId: ID, percentage: Float!): Boolean! @deprecated(reason: "Use createSettlementRule instead")
   updateDeliveryPricingTier(id: ID!, input: UpdateDeliveryPricingTierInput!): DeliveryPricingTier!
   updateDeliveryZone(id: ID!, input: UpdateDeliveryZoneInput!): DeliveryZone!
   updateDriverLocation(latitude: Float!, longitude: Float!): User!
   updateDriverOnlineStatus(isOnline: Boolean!): User!
+  updateDynamicPricingRule(id: ID!, input: UpdateDynamicPricingRuleInput!): DynamicPricingRule!
   updateOrderStatus(id: ID!, status: OrderStatus!): Order!
   updatePreparationTime(id: ID!, preparationMinutes: Int!): Order!
   updateProduct(id: ID!, input: UpdateProductInput!): Product!
   updateProductCategory(id: ID!, input: UpdateProductCategoryInput!): ProductCategory!
+  updateProductPricing(businessId: ID!, input: UpdateProductPricingInput!, productId: ID!): ProductPricing!
   updateProductSubcategory(id: ID!, input: UpdateProductSubcategoryInput!): ProductSubcategory!
   updateProductsOrder(businessId: ID!, products: [ProductOrderInput!]!): Boolean!
   updatePromotion(input: UpdatePromotionInput!): Promotion!
+  updateSettlementRule(id: ID!, input: UpdateSettlementRuleInput!): SettlementRule!
   updateStoreStatus(input: UpdateStoreStatusInput!): StoreStatus!
   updateUser(input: UpdateUserInput!): User!
   updateUserAddress(input: UpdateUserAddressInput!): UserAddress!
@@ -659,6 +752,16 @@ type OrderBusiness {
   items: [OrderItem!]!
 }
 
+type OrderDriverLiveTracking {
+  driverId: ID!
+  etaUpdatedAt: Date!
+  latitude: Float!
+  longitude: Float!
+  navigationPhase: String
+  orderId: ID!
+  remainingEtaSeconds: Int
+}
+
 type OrderItem {
   imageUrl: String
   name: String!
@@ -696,6 +799,30 @@ input PolygonPointInput {
   lng: Float!
 }
 
+enum PriceAdjustmentType {
+  FIXED_AMOUNT
+  MULTIPLIER
+  PERCENTAGE
+}
+
+type PriceHistoryEntry {
+  baseCustomerPrice: String!
+  businessPrice: String!
+  changedAt: String!
+  changedBy: String
+  platformMarkup: String!
+  reason: String
+}
+
+enum PricingConditionType {
+  CUSTOM
+  DAY_OF_WEEK
+  DEMAND
+  SPECIAL_EVENT
+  TIME_OF_DAY
+  WEATHER
+}
+
 type Product {
   businessId: ID!
   categoryId: ID!
@@ -726,6 +853,18 @@ type ProductCategory {
 input ProductOrderInput {
   id: ID!
   sortOrder: Int!
+}
+
+type ProductPricing {
+  baseCustomerPrice: String!
+  businessId: String!
+  businessPrice: String!
+  createdAt: String!
+  id: ID!
+  platformMarkup: String!
+  priceHistory: [PriceHistoryEntry!]!
+  productId: String!
+  updatedAt: String!
 }
 
 type ProductSubcategory {
@@ -827,18 +966,21 @@ type PromotionUsage {
 }
 
 type Query {
+  activeRulesForEntity(entityId: String!, entityType: SettlementEntityType!): [SettlementRule!]!
   auditLog(id: ID!): AuditLog
   auditLogs(action: ActionType, actorId: ID, actorType: ActorType, endDate: DateTime, entityId: ID, entityType: EntityType, limit: Int, offset: Int, startDate: DateTime): AuditLogConnection!
   business(id: ID!): Business
   businessBalance(businessId: ID!): SettlementSummary!
   businesses: [Business!]!
   calculateDeliveryPrice(businessId: ID!, dropoffLat: Float!, dropoffLng: Float!): DeliveryPriceResult!
+  calculateProductPrice(productId: ID!): String!
   deliveryPricingConfig: DeliveryPricingConfig!
   deliveryPricingTiers: [DeliveryPricingTier!]!
   deliveryZones: [DeliveryZone!]!
   deviceTokens(userId: ID): [DeviceToken!]!
   driverBalance(driverId: ID!): SettlementSummary!
   drivers: [User!]!
+  dynamicPricingRules(businessId: ID): [DynamicPricingRule!]!
   getAllPromotions(isActive: Boolean): [Promotion!]!
   getApplicablePromotions(cart: CartContextInput!, manualCode: String): [ApplicablePromotion!]!
   getBanner(id: ID!): Banner
@@ -868,11 +1010,16 @@ type Query {
   product(id: ID!): Product
   productCategories(businessId: ID!): [ProductCategory!]!
   productCategory(id: ID!): ProductCategory
+  productPricing(productId: ID!): ProductPricing
+  productPricingByBusiness(businessId: ID!): [ProductPricing!]!
   productSubcategories(categoryId: ID!): [ProductSubcategory!]!
   productSubcategoriesByBusiness(businessId: ID!): [ProductSubcategory!]!
   products(businessId: ID!): [Product!]!
+  settlementRule(id: ID!): SettlementRule
+  settlementRuleSummary(entityId: String!, entityType: SettlementEntityType!): SettlementRuleSummary!
+  settlementRules(filter: SettlementRuleFilterInput): [SettlementRule!]!
   settlementSummary(businessId: ID, driverId: ID, endDate: Date, startDate: Date, type: SettlementType): SettlementSummary!
-  settlements(businessId: ID, driverId: ID, endDate: Date, limit: Int, offset: Int, startDate: Date, status: SettlementStatus, type: SettlementType): [Settlement!]!
+  settlements(businessId: ID, direction: SettlementDirection, driverId: ID, endDate: Date, limit: Int, offset: Int, startDate: Date, status: SettlementStatus, type: SettlementType): [Settlement!]!
   uncompletedOrders: [Order!]!
   userBehavior(userId: ID!): UserBehavior
   users: [User!]!
@@ -914,6 +1061,10 @@ input RegisterDeviceTokenInput {
   token: String!
 }
 
+type RuleSnapshot {
+  appliedRules: JSON!
+}
+
 type SendNotificationResult {
   failureCount: Int!
   success: Boolean!
@@ -938,14 +1089,70 @@ input SetDeliveryPricingTiersInput {
 type Settlement {
   amount: Float!
   business: Business
+  calculationDetails: CalculationDetails
   createdAt: Date!
+  createdBy: String
+  currency: String!
+  direction: SettlementDirection!
   driver: User
   id: ID!
+  metadata: JSON
   order: Order!
   paidAt: Date
+  paidBy: String
+  paymentMethod: String
+  paymentReference: String
+  ruleSnapshot: RuleSnapshot
   status: SettlementStatus!
   type: SettlementType!
   updatedAt: Date!
+}
+
+enum SettlementDirection {
+  PAYABLE
+  RECEIVABLE
+}
+
+enum SettlementEntityType {
+  BUSINESS
+  DRIVER
+}
+
+type SettlementRule {
+  activatedAt: String
+  activatedBy: String
+  canStackWith: [String!]!
+  config: JSON!
+  createdAt: String!
+  entityId: String!
+  entityType: SettlementEntityType!
+  id: ID!
+  isActive: Boolean!
+  notes: String
+  priority: Int!
+  ruleType: SettlementRuleType!
+  updatedAt: String!
+}
+
+input SettlementRuleFilterInput {
+  entityId: String
+  entityType: SettlementEntityType
+  isActive: Boolean
+  ruleType: SettlementRuleType
+}
+
+type SettlementRuleSummary {
+  activeRules: Int!
+  rulesByType: JSON!
+  totalRules: Int!
+}
+
+enum SettlementRuleType {
+  CUSTOM
+  DRIVER_VEHICLE_BONUS
+  FIXED_PER_ORDER
+  PERCENTAGE
+  PRODUCT_MARKUP
 }
 
 enum SettlementStatus {
@@ -958,12 +1165,14 @@ type SettlementSummary {
   pendingCount: Int!
   totalAmount: Float!
   totalPaid: Float!
+  totalPayable: Float!
   totalPending: Float!
+  totalReceivable: Float!
 }
 
 enum SettlementType {
-  BUSINESS_PAYMENT
-  DRIVER_PAYMENT
+  BUSINESS
+  DRIVER
 }
 
 enum SignupStep {
@@ -997,6 +1206,7 @@ type Subscription {
   auditLogCreated(action: ActionType, actorType: ActorType, entityType: EntityType): AuditLog!
   driverConnectionStatusChanged(driverId: ID!): DriverConnection!
   driversUpdated: [User!]!
+  orderDriverLiveTracking(input: SubscriptionInput!, orderId: ID!): OrderDriverLiveTracking!
   orderStatusUpdated(orderId: ID!): Order!
   settlementCreated(type: SettlementType): Settlement!
   settlementStatusChanged(id: ID!): Settlement!
@@ -1047,6 +1257,18 @@ input UpdateDeliveryZoneInput {
   sortOrder: Int
 }
 
+input UpdateDynamicPricingRuleInput {
+  adjustmentConfig: JSON
+  appliesTo: DynamicPricingRuleAppliesToInput
+  conditionConfig: JSON
+  description: String
+  isActive: Boolean
+  name: String
+  priority: Int
+  validFrom: String
+  validUntil: String
+}
+
 input UpdateProductCategoryInput {
   isActive: Boolean
   name: String
@@ -1064,6 +1286,12 @@ input UpdateProductInput {
   sortOrder: Int
   stock: Int
   subcategoryId: ID
+}
+
+input UpdateProductPricingInput {
+  businessPrice: String
+  platformMarkup: String
+  reason: String
 }
 
 input UpdateProductSubcategoryInput {
@@ -1090,6 +1318,13 @@ input UpdatePromotionInput {
   target: PromotionTarget
   thresholdReward: String
   type: PromotionType
+}
+
+input UpdateSettlementRuleInput {
+  canStackWith: [String!]
+  config: JSON
+  notes: String
+  priority: Int
 }
 
 input UpdateStoreStatusInput {
@@ -1138,6 +1373,7 @@ type User {
   permissions: [UserPermission!]!
   phoneNumber: String
   phoneVerified: Boolean!
+  preferredLanguage: AppLanguage!
   referralCode: String
   role: UserRole!
   signupStep: SignupStep!

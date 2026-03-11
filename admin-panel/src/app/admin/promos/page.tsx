@@ -12,23 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-
-const GET_ALL_PROMOTIONS = gql`
-  query GetAllPromotions($isActive: Boolean) {
-    getAllPromotions(isActive: $isActive) {
-      id
-      code
-      name
-      type
-      target
-      isActive
-      discountValue
-      currentGlobalUsage
-      maxGlobalUsage
-      totalRevenue
-    }
-  }
-`;
+import { GET_PROMOTIONS } from '@/graphql/operations/promotions/queries';
 
 const DELETE_PROMOTION = gql`
   mutation DeletePromotion($id: ID!) {
@@ -39,7 +23,7 @@ const DELETE_PROMOTION = gql`
 export default function PromotionsPage() {
   const [isActive, setIsActive] = useState<boolean | undefined>(undefined);
 
-  const { data, loading, error, refetch } = useQuery(GET_ALL_PROMOTIONS, {
+  const { data, loading, error, refetch } = useQuery(GET_PROMOTIONS, {
     variables: { isActive },
   });
 

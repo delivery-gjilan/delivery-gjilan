@@ -20,13 +20,26 @@ import { useAuthStore } from '@/store/authStore';
 import { getToken } from '@/utils/secureTokenStore';
 import { useDriverLocationOverrideStore } from '@/store/driverLocationOverrideStore';
 import { useNavigationLocationStore } from '@/store/navigationLocationStore';
+import { useNavigationStore } from '@/store/navigationStore';
 
 const HEARTBEAT_INTERVAL_MS = 5000; // Every 5 seconds
 const BACKGROUND_HEARTBEAT_TASK = 'driver-heartbeat-background-task';
 
 const DRIVER_HEARTBEAT_MUTATION = gql`
-  mutation DriverHeartbeat($latitude: Float!, $longitude: Float!) {
-    driverHeartbeat(latitude: $latitude, longitude: $longitude) {
+  mutation DriverHeartbeat(
+    $latitude: Float!
+    $longitude: Float!
+    $activeOrderId: ID
+    $navigationPhase: String
+    $remainingEtaSeconds: Int
+  ) {
+    driverHeartbeat(
+      latitude: $latitude
+      longitude: $longitude
+      activeOrderId: $activeOrderId
+      navigationPhase: $navigationPhase
+      remainingEtaSeconds: $remainingEtaSeconds
+    ) {
       success
       connectionStatus
       locationUpdated
@@ -38,8 +51,20 @@ const DRIVER_HEARTBEAT_MUTATION = gql`
 type ConnectionStatus = 'CONNECTED' | 'STALE' | 'LOST' | 'DISCONNECTED';
 
 const DRIVER_HEARTBEAT_MUTATION_TEXT = `
-  mutation DriverHeartbeat($latitude: Float!, $longitude: Float!) {
-    driverHeartbeat(latitude: $latitude, longitude: $longitude) {
+  mutation DriverHeartbeat(
+    $latitude: Float!
+    $longitude: Float!
+    $activeOrderId: ID
+    $navigationPhase: String
+    $remainingEtaSeconds: Int
+  ) {
+    driverHeartbeat(
+      latitude: $latitude
+      longitude: $longitude
+      activeOrderId: $activeOrderId
+      navigationPhase: $navigationPhase
+      remainingEtaSeconds: $remainingEtaSeconds
+    ) {
       success
       connectionStatus
       locationUpdated
@@ -123,6 +148,23 @@ export function useDriverHeartbeat() {
   const simulatedLocationRef = useRef<{ latitude: number; longitude: number }>({ latitude: 42.4635, longitude: 21.4694 });
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('DISCONNECTED');
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+
+  const getNavigationEtaPayload = useCallback(() => {
+    const navState = useNavigationStore.getState();
+    if (!navState.isNavigating || !navState.order?.id) {
+      return {};
+    }
+
+    if (navState.durationRemainingS == null || !Number.isFinite(navState.durationRemainingS)) {
+      return {};
+    }
+
+    return {
+      activeOrderId: navState.order.id,
+      navigationPhase: navState.phase,
+      remainingEtaSeconds: Math.max(0, Math.round(navState.durationRemainingS)),
+    };
+  }, []);
 
   const startBackgroundHeartbeat = useCallback(async () => {
     try {
@@ -344,6 +386,7 @@ export function useDriverHeartbeat() {
         variables: {
           latitude: location.latitude,
           longitude: location.longitude,
+          ...getNavigationEtaPayload(),
         },
       });
 
@@ -362,7 +405,7 @@ export function useDriverHeartbeat() {
       // Network error - mark as potentially stale
       setConnectionStatus((prev) => (prev === 'CONNECTED' ? 'STALE' : prev));
     }
-  }, [getCurrentLocation, sendHeartbeat]);
+  }, [getCurrentLocation, getNavigationEtaPayload, sendHeartbeat]);
 
   // Start heartbeat loop
   const startHeartbeat = useCallback(async () => {

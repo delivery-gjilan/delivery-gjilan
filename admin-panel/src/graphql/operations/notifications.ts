@@ -95,25 +95,6 @@ export const DELETE_CAMPAIGN = gql`
   }
 `;
 
-// New: Get all promotions for assignment
-export const GET_ALL_PROMOTIONS = gql`
-  query GetAllPromotions {
-    getAllPromotions(isActive: true) {
-      id
-      name
-      description
-      code
-      type
-      target
-      discountValue
-      maxDiscountCap
-      isActive
-      startsAt
-      endsAt
-    }
-  }
-`;
-
 // New: Assign promotion to users
 export const ASSIGN_PROMOTION_TO_USERS = gql`
   mutation AssignPromotionToUsers($input: AssignPromotionToUserInput!) {
