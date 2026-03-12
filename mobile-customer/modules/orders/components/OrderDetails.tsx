@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ActivityIndicator, Alert, Linking, Dimensions, ScrollView, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, Alert, Linking, Dimensions, ScrollView, LayoutAnimation, Platform, UIManager, Modal } from 'react-native';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -10,10 +10,10 @@ import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { Order } from '@/gql/graphql';
 import { Image } from 'expo-image';
-import { useQuery, useMutation, useSubscription } from '@apollo/client/react';
+import { useQuery, useSubscription } from '@apollo/client/react';
 import { GET_ORDER_DRIVER } from '@/graphql/operations/orders';
 import { ORDER_DRIVER_LIVE_TRACKING } from '@/graphql/operations/orders/subscriptions';
-import { UPDATE_ORDER_STATUS } from '@/graphql/operations/orders/mutations';
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useCartActions } from '@/modules/cart';
 import { useSuccessModalStore } from '@/store/useSuccessModalStore';
@@ -27,6 +27,7 @@ import Animated, {
     Easing,
     FadeIn,
     FadeInDown,
+    FadeOut,
 } from 'react-native-reanimated';
 import { calculateHaversineDistance } from '@/utils/haversine';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -87,10 +88,20 @@ const DRIVER_INTERPOLATION_MAX_MS = 8_000;
 const DRIVER_INTERPOLATION_RATIO = 0.9;
 const DRIVER_POSITION_EPSILON = 0.00001;
 const DRIVER_TELEPORT_GUARD_KM = 0.8;
-const DELIVERY_CAMERA_REFIT_MIN_INTERVAL_MS = 3500;
-const DELIVERY_CAMERA_REFIT_MIN_MOVE_KM = 0.08;
-
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+const AVATAR_COLORS = ['#2563EB', '#7C3AED', '#DB2777', '#EA580C', '#16A34A', '#4F46E5'];
+
+const getInitials = (firstName?: string | null, lastName?: string | null) => {
+    const first = firstName?.trim()?.charAt(0)?.toUpperCase() || '';
+    const last = lastName?.trim()?.charAt(0)?.toUpperCase() || '';
+    return `${first}${last}`.trim() || '?';
+};
+
+const getAvatarColor = (id?: string | null) => {
+    if (!id) return AVATAR_COLORS[0];
+    const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+};
 
 const calculateBearingDeg = (
     fromLat: number,
@@ -117,63 +128,114 @@ const STATUS_CONFIG: Record<string, {
     icon: keyof typeof Ionicons.glyphMap;
 }> = {
     PENDING: { color: '#F59E0B', bgColor: '#FEF3C7', textColor: '#92400E', icon: 'time' },
-    PREPARING: { color: '#3B82F6', bgColor: '#DBEAFE', textColor: '#1E40AF', icon: 'restaurant' },
-    READY: { color: '#10B981', bgColor: '#D1FAE5', textColor: '#065F46', icon: 'checkmark-circle' },
+    PREPARING: { color: '#7C3AED', bgColor: '#EDE9FE', textColor: '#5B21B6', icon: 'restaurant' },
+    READY: { color: '#7C3AED', bgColor: '#EDE9FE', textColor: '#5B21B6', icon: 'restaurant' },
     OUT_FOR_DELIVERY: { color: '#22C55E', bgColor: '#DCFCE7', textColor: '#166534', icon: 'bicycle' },
     DELIVERED: { color: '#22C55E', bgColor: '#DCFCE7', textColor: '#166534', icon: 'checkmark-done-circle' },
     CANCELLED: { color: '#EF4444', bgColor: '#FEE2E2', textColor: '#991B1B', icon: 'close-circle' },
 };
 
 // ─── Status Steps ───────────────────────────────────────────
-const STATUS_ORDER = ['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED'] as const;
+const STATUS_ORDER = ['PENDING', 'PREPARING', 'OUT_FOR_DELIVERY', 'DELIVERED'] as const;
 
 const STATUS_STEP_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
     PENDING: 'time',
     PREPARING: 'restaurant',
-    READY: 'checkmark-circle',
     OUT_FOR_DELIVERY: 'bicycle',
     DELIVERED: 'checkmark-done-circle',
 };
 
+const getCustomerVisibleStatus = (status: string) => (status === 'READY' ? 'PREPARING' : status);
+
 // ─── Pin Markers ────────────────────────────────────────────
-// Purple pin for business & driver (matches app theme)
-const PurplePin = ({ icon, size = 28, rotationDeg = 0 }: { icon: keyof typeof Ionicons.glyphMap; size?: number; rotationDeg?: number }) => (
+const MapPin = ({
+    icon,
+    size = 44,
+    shellColor = '#FFFFFF',
+    coreColor = '#0F172A',
+    iconSize = 18,
+    scale = 1,
+}: {
+    icon: keyof typeof Ionicons.glyphMap;
+    size?: number;
+    shellColor?: string;
+    coreColor?: string;
+    iconSize?: number;
+    scale?: number;
+}) => (
     <View style={{ alignItems: 'center' }}>
         <View style={{
-            width: size, height: size, borderRadius: size / 2,
+            alignItems: 'center',
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.16,
+            shadowRadius: 14,
+            elevation: 10,
+        }}>
+            <View style={{
+                width: size * scale,
+                height: size * scale,
+                borderRadius: (size * scale) / 2,
+                backgroundColor: shellColor,
+                borderWidth: 2,
+                borderColor: '#FFFFFF',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+            }}>
+                <View style={{
+                    width: Math.round(size * 0.62 * scale),
+                    height: Math.round(size * 0.62 * scale),
+                    borderRadius: Math.round(size * 0.31 * scale),
+                    backgroundColor: coreColor,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }}>
+                    <Ionicons name={icon} size={Math.round(iconSize * scale)} color="#FFFFFF" />
+                </View>
+            </View>
+            <View style={{
+                width: 18 * scale,
+                height: 18 * scale,
+                backgroundColor: shellColor,
+                transform: [{ rotate: '45deg' }],
+                marginTop: -9 * scale,
+                borderBottomRightRadius: 5 * scale,
+            }} />
+        </View>
+        <View style={{
+            width: 18 * scale,
+            height: 6 * scale,
+            borderRadius: 999,
+            backgroundColor: '#0000001A',
+            marginTop: 1 * scale,
+        }} />
+    </View>
+);
+
+const VehiclePin = ({ icon, size = 28, rotationDeg = 0, scale = 1 }: { icon: keyof typeof Ionicons.glyphMap; size?: number; rotationDeg?: number; scale?: number }) => (
+    <View style={{ alignItems: 'center' }}>
+        <View style={{
+            width: size * scale,
+            height: size * scale,
+            borderRadius: (size * scale) / 2,
             backgroundColor: '#7C3AED',
             alignItems: 'center', justifyContent: 'center',
             shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.4, shadowRadius: 6, elevation: 5,
         }}>
             <View style={{ transform: [{ rotate: `${rotationDeg}deg` }] }}>
-                <Ionicons name={icon} size={size * 0.45} color="white" />
+                <Ionicons name={icon} size={Math.round(size * 0.45 * scale)} color="white" />
             </View>
         </View>
-        <View style={{ width: 2, height: 8, backgroundColor: '#7C3AED', marginTop: -1 }} />
-        <View style={{ width: 8, height: 3, borderRadius: 4, backgroundColor: '#00000020', marginTop: 1 }} />
     </View>
 );
 
-// Standard location pin for user's dropoff address
-const LocationPin = () => (
-    <View style={{ alignItems: 'center' }}>
-        <View style={{
-            width: 24, height: 24, borderRadius: 12,
-            backgroundColor: '#EF4444',
-            alignItems: 'center', justifyContent: 'center',
-            shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.3, shadowRadius: 4, elevation: 4,
-            borderWidth: 2, borderColor: 'white',
-        }}>
-            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: 'white' }} />
-        </View>
-        <View style={{ width: 2, height: 8, backgroundColor: '#EF4444', marginTop: -1 }} />
-        <View style={{ width: 8, height: 3, borderRadius: 4, backgroundColor: '#00000020', marginTop: 1 }} />
-    </View>
+const HomeLocationPin = ({ scale = 1 }: { scale?: number }) => (
+    <MapPin icon="home" size={40} shellColor="#FFFFFF" coreColor="#111111" iconSize={18} scale={scale} />
 );
 
-const PreparingBusinessMarker = ({ active }: { active: boolean }) => {
+const BusinessMarker = ({ active, scale = 1 }: { active: boolean; scale?: number }) => {
     const pulseScale = useSharedValue(1);
     const pulseOpacity = useSharedValue(active ? 0.32 : 0);
 
@@ -214,15 +276,49 @@ const PreparingBusinessMarker = ({ active }: { active: boolean }) => {
                 style={[
                     {
                         position: 'absolute',
-                        width: 62,
-                        height: 62,
-                        borderRadius: 31,
-                        backgroundColor: '#7C3AED',
+                        width: 72 * scale,
+                        height: 72 * scale,
+                        borderRadius: 36 * scale,
+                        backgroundColor: '#F59E0B',
                     },
                     pulseAnimatedStyle,
                 ]}
             />
-            <PurplePin icon="restaurant" size={28} />
+            <MapPin icon="restaurant" size={46} shellColor="#FFFFFF" coreColor="#111111" iconSize={18} scale={scale} />
+        </View>
+    );
+};
+
+const DriverAvatar = ({
+    driver,
+    imageUrl,
+    size,
+    textSize,
+}: {
+    driver: any;
+    imageUrl?: string | null;
+    size: number;
+    textSize: number;
+}) => {
+    const initials = getInitials(driver?.firstName, driver?.lastName);
+    const backgroundColor = getAvatarColor(driver?.id);
+
+    if (imageUrl) {
+        return <Image source={{ uri: imageUrl }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
+    }
+
+    return (
+        <View style={{
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            backgroundColor,
+            alignItems: 'center',
+            justifyContent: 'center',
+        }}>
+            <Text style={{ color: '#FFFFFF', fontSize: textSize, fontWeight: '800', letterSpacing: 0.2 }}>
+                {initials}
+            </Text>
         </View>
     );
 };
@@ -234,13 +330,13 @@ const IconStepper = ({ status, color, theme: th, t }: {
     theme: any;
     t: any;
 }) => {
-    const currentIndex = STATUS_ORDER.indexOf(status as typeof STATUS_ORDER[number]);
+    const visibleStatus = getCustomerVisibleStatus(status);
+    const currentIndex = STATUS_ORDER.indexOf(visibleStatus as typeof STATUS_ORDER[number]);
     const isCancelled = status === 'CANCELLED';
 
     const stepLabels: Record<string, string> = {
         PENDING: t.orders.details.placed_at,
         PREPARING: t.orders.details.preparing_at,
-        READY: t.orders.details.ready_at,
         OUT_FOR_DELIVERY: t.orders.details.picked_up_at,
         DELIVERED: t.orders.details.delivered_at,
     };
@@ -250,18 +346,18 @@ const IconStepper = ({ status, color, theme: th, t }: {
             {STATUS_ORDER.map((step, index) => {
                 const done = !isCancelled && index < currentIndex;
                 const active = !isCancelled && index === currentIndex;
-                const upcoming = !done && !active;
                 const iconName = STATUS_STEP_ICONS[step];
                 const isLast = index === STATUS_ORDER.length - 1;
 
                 const iconColor = done ? '#22C55E' : active ? color : (th.dark ? '#3f3f46' : '#D1D5DB');
-                const lineColor = done ? '#22C55E' : (th.dark ? '#27272A' : '#E5E7EB');
+                const leftLineColor = !isCancelled && index <= currentIndex ? '#22C55E' : (th.dark ? '#27272A' : '#E5E7EB');
+                const rightLineColor = !isCancelled && index < currentIndex ? '#22C55E' : (th.dark ? '#27272A' : '#E5E7EB');
 
                 return (
                     <View key={step} style={{ flex: 1, alignItems: 'center' }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%' }}>
                             {index > 0 && (
-                                <View style={{ flex: 1, height: 2, backgroundColor: lineColor }} />
+                                <View style={{ flex: 1, height: 2, backgroundColor: leftLineColor }} />
                             )}
                             {index === 0 && <View style={{ flex: 1 }} />}
 
@@ -282,7 +378,7 @@ const IconStepper = ({ status, color, theme: th, t }: {
                             </View>
 
                             {!isLast && (
-                                <View style={{ flex: 1, height: 2, backgroundColor: done ? '#22C55E' : lineColor }} />
+                                <View style={{ flex: 1, height: 2, backgroundColor: rightLineColor }} />
                             )}
                             {isLast && <View style={{ flex: 1 }} />}
                         </View>
@@ -321,8 +417,12 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const prevStatusRef = useRef<string | null>(null);
     const { clearCart } = useCartActions();
     const { showSuccess } = useSuccessModalStore();
-    const [hasFittedMap, setHasFittedMap] = useState(false);
+    const focusedStatusKeyRef = useRef<string | null>(null);
+    // Stable ref so driver interpolation ticks (every ~66ms) don't cancel the focus timeout
+    const fitMapToMarkersRef = useRef<() => void>(() => {});
     const [showSummary, setShowSummary] = useState(false);
+    const [showDriverInfo, setShowDriverInfo] = useState(false);
+    const [mapZoomLevel, setMapZoomLevel] = useState(15.5);
     const token = useAuthStore((state) => state.token);
     const [interpolatedDriverLocation, setInterpolatedDriverLocation] = useState<{
         latitude: number;
@@ -335,9 +435,6 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const lastHeartbeatReceivedAtRef = useRef<number | null>(null);
     const lastObservedHeartbeatGapMsRef = useRef(5000);
     const smoothedHeartbeatGapMsRef = useRef(5000);
-    const lastDeliveryCameraFitAtRef = useRef<number>(0);
-    const lastDeliveryCameraFitDriverRef = useRef<{ latitude: number; longitude: number } | null>(null);
-
     const [liveDriverTracking, setLiveDriverTracking] = useState<{
         orderId: string;
         driverId: string;
@@ -356,8 +453,9 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     });
 
     const status = order?.status ?? 'PENDING';
+    const customerVisibleStatus = getCustomerVisibleStatus(status);
     const isDeliveryPhase = status === 'OUT_FOR_DELIVERY';
-    const isPreparingAnimationPhase = status === 'PENDING' || status === 'PREPARING';
+    const isPreparingAnimationPhase = status === 'PENDING';
     const orderBusinesses = useMemo(() => {
         if (!Array.isArray(order?.businesses)) return [];
         return order.businesses.map((biz: any) => ({
@@ -416,12 +514,13 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     }, [stopDriverInterpolation]);
 
     const driver = driverData?.order?.driver ?? (order as any)?.driver ?? null;
+    const hasAssignedDriver = Boolean(driver?.id);
     const driverName = driver?.firstName ? `${driver.firstName} ${driver?.lastName || ''}`.trim() : null;
     const driverPhone = driver?.phoneNumber || '+383 44 123 456';
     const driverImageUrl = driver?.imageUrl || null;
     const queriedDriverLocation = driver?.driverLocation ?? null;
     const liveDriverRawLocation =
-        liveDriverTracking?.orderId === order?.id
+        liveDriverTracking != null && liveDriverTracking.orderId === order?.id
             ? {
                   latitude: liveDriverTracking.latitude,
                   longitude: liveDriverTracking.longitude,
@@ -529,7 +628,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
             ? interpolatedDriverLocation ?? liveDriverRawLocation
             : queriedDriverLocation;
     const liveDriverConnection =
-        liveDriverTracking?.orderId === order?.id
+        liveDriverTracking != null && liveDriverTracking.orderId === order?.id
             ? {
                   ...(driver?.driverConnection ?? {}),
                   activeOrderId: liveDriverTracking.orderId,
@@ -549,14 +648,33 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const dropoffLocation = useMemo(() => order?.dropOffLocation ?? null, [order?.dropOffLocation]);
 
     // ─── Status ─────────────────────────────────────────────
-    const config = STATUS_CONFIG[status] || STATUS_CONFIG.PENDING;
-    const statusMessage = (t.orders.status_messages as any)?.[status.toLowerCase()] || '';
+    const config = STATUS_CONFIG[customerVisibleStatus] || STATUS_CONFIG.PENDING;
+    const statusMessage = (t.orders.status_messages as any)?.[customerVisibleStatus.toLowerCase()] || '';
     const isCompleted = status === 'DELIVERED';
     const isCancelled = status === 'CANCELLED';
+    const isPendingApproval = status === 'PENDING';
+    const isPreparingPhase = customerVisibleStatus === 'PREPARING';
     const businessName = orderBusinesses[0]?.business?.name || '';
 
-    // ─── ETA (prefer live heartbeat ETA, fallback to haversine) ────
+    // ─── ETA for PREPARING (restaurant prep only) ────
+    const preparationEta = useMemo(() => {
+        if (!isPreparingPhase) return null;
+
+        const prepTotal = Number(order?.preparationMinutes ?? 0);
+        if (!Number.isFinite(prepTotal) || prepTotal <= 0) return null;
+
+        const prepStartRaw = order?.preparingAt || order?.orderDate;
+        const prepStartMs = prepStartRaw ? new Date(prepStartRaw).getTime() : 0;
+        if (!prepStartMs || Number.isNaN(prepStartMs)) return Math.max(1, Math.round(prepTotal));
+
+        const elapsedMin = Math.max(0, (Date.now() - prepStartMs) / 60000);
+        return Math.max(1, Math.ceil(prepTotal - elapsedMin));
+    }, [isPreparingPhase, order?.preparationMinutes, order?.preparingAt, order?.orderDate]);
+
+    // ─── ETA for OUT_FOR_DELIVERY (delivery only) ────
     const deliveryEta = useMemo(() => {
+        if (!isDeliveryPhase) return null;
+
         const liveEtaOrderId = liveDriverConnection?.activeOrderId;
         const liveEtaSeconds = liveDriverConnection?.remainingEtaSeconds;
         const liveEtaUpdatedAt = liveDriverConnection?.etaUpdatedAt;
@@ -574,35 +692,26 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         }
 
         // Fallback: haversine
-        if (isDeliveryPhase && driverLocation && dropoffLocation) {
+        if (driverLocation && dropoffLocation) {
             const dist = calculateHaversineDistance(
                 driverLocation.latitude, driverLocation.longitude,
                 dropoffLocation.latitude, dropoffLocation.longitude
             );
             return Math.max(1, Math.ceil(dist * 2.5));
         }
-        if (pickupLocation && dropoffLocation) {
-            const dist = calculateHaversineDistance(
-                pickupLocation.latitude, pickupLocation.longitude,
-                dropoffLocation.latitude, dropoffLocation.longitude
-            );
-            const driveMin = Math.max(3, Math.ceil(dist * 2.5));
-            const prepMin = order?.preparationMinutes ?? 0;
-            if (status === 'PENDING' || status === 'PREPARING') return driveMin + prepMin;
-            return driveMin;
-        }
         return null;
     }, [
+        isDeliveryPhase,
         liveDriverConnection?.activeOrderId,
         liveDriverConnection?.etaUpdatedAt,
         liveDriverConnection?.remainingEtaSeconds,
         order?.id,
-        status,
         driverLocation,
         dropoffLocation,
-        pickupLocation,
-        order?.preparationMinutes,
     ]);
+
+    const currentEta = isPreparingPhase ? preparationEta : isDeliveryPhase ? deliveryEta : null;
+    const currentEtaLabel = isPreparingPhase ? t.orders.details.est_ready : isDeliveryPhase ? t.orders.details.est_delivery : '';
 
     // ─── Elapsed time ticker ────────────────────────────────
     const [, setTick] = useState(0);
@@ -627,45 +736,24 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         orderId: order?.id ?? '',
         orderDisplayId: order?.displayId ?? '',
         businessName: businessName,
-        enabled: !!(order?.id && (status === 'OUT_FOR_DELIVERY' || status === 'PREPARING' || status === 'READY')),
+        enabled: !!(order?.id && (status === 'OUT_FOR_DELIVERY' || customerVisibleStatus === 'PREPARING')),
     });
 
-    // Start Live Activity when order goes OUT_FOR_DELIVERY
-    useEffect(() => {
-        if (status === 'OUT_FOR_DELIVERY') {
-            const etaMinutes = deliveryEta ?? 0;
-            console.log('[OrderDetails] Starting Live Activity for OUT_FOR_DELIVERY');
-            startLiveActivity({
-                driverName: driverName || 'Driver',
-                estimatedMinutes: etaMinutes,
-                status: 'out_for_delivery',
-            });
-        }
-    }, [status, driverName, deliveryEta, startLiveActivity]);
-
-    // Update Live Activity when ETA or driver changes
-    useEffect(() => {
-        if (status === 'OUT_FOR_DELIVERY' || status === 'PREPARING' || status === 'READY') {
-            const etaMinutes = deliveryEta ?? 0;
-            const liveStatus = status === 'OUT_FOR_DELIVERY' ? 'out_for_delivery' 
-                : status === 'READY' ? 'ready' 
-                : 'preparing';
-            
-            updateLiveActivity({
-                driverName: driverName || 'Driver',
-                estimatedMinutes: etaMinutes,
-                status: liveStatus,
-            });
-        }
-    }, [deliveryEta, driverName, status, updateLiveActivity]);
-
-    // End Live Activity when delivered or cancelled
+    // Manage Live Activity: start/update when active, end when done
     useEffect(() => {
         if (isCompleted || isCancelled) {
-            console.log('[OrderDetails] Ending Live Activity (order completed/cancelled)');
             endLiveActivity();
+            return;
         }
-    }, [isCompleted, isCancelled, endLiveActivity]);
+        const etaMinutes = (isDeliveryPhase ? deliveryEta : isPreparingPhase ? preparationEta : null) ?? 0;
+        const liveStatus = status === 'OUT_FOR_DELIVERY' ? 'out_for_delivery'
+            : 'preparing';
+        if (status === 'OUT_FOR_DELIVERY') {
+            startLiveActivity({ driverName: driverName || 'Driver', estimatedMinutes: etaMinutes, status: liveStatus });
+        } else if (customerVisibleStatus === 'PREPARING') {
+            updateLiveActivity({ driverName: driverName || 'Driver', estimatedMinutes: etaMinutes, status: liveStatus });
+        }
+    }, [status, customerVisibleStatus, isCompleted, isCancelled, deliveryEta, preparationEta, isDeliveryPhase, isPreparingPhase, driverName, startLiveActivity, updateLiveActivity, endLiveActivity]);
 
     // ─── Detect Delivered → Show Success Modal ────────────────────────
     useEffect(() => {
@@ -676,15 +764,9 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
             // Clear cart and show success modal
             clearCart();
             showSuccess(orderId, 'order_delivered');
-            
-            // Navigate home after a brief delay
-            setTimeout(() => {
-                console.log('[OrderDetails] Navigating to home');
-                router.replace('/(tabs)/home');
-            }, 100);
         }
         if (order) prevStatusRef.current = order.status ?? null;
-    }, [order?.status, clearCart, router, showSuccess]);
+    }, [order?.status, clearCart, showSuccess]);
 
     // ─── Map Fitting (status-aware) ────────────────────────
     const fitMapToMarkers = useCallback(() => {
@@ -718,89 +800,42 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         }
     }, [pickupLocation, dropoffLocation, driverLocation, isDeliveryPhase]);
 
+    // Always keep the ref in sync with the latest callback (synchronous assignment, no effect needed)
+    fitMapToMarkersRef.current = fitMapToMarkers;
+
+    // Focus once per order+status. Driver movement must NOT be a dep here — it would cancel
+    // the 180ms timeout every ~66ms (interpolation tick) so it would never fire.
     useEffect(() => {
         if (!pickupLocation && !dropoffLocation) return;
-        if (isDeliveryPhase && !driverLocation && !dropoffLocation) return;
+
+        const focusKey = `${order?.id ?? 'unknown'}:${status}`;
+        if (focusedStatusKeyRef.current === focusKey) return;
 
         const timeout = setTimeout(() => {
-            fitMapToMarkers();
+            fitMapToMarkersRef.current();
+            focusedStatusKeyRef.current = focusKey;
         }, 180);
 
         return () => clearTimeout(timeout);
-    }, [isDeliveryPhase, status, fitMapToMarkers, pickupLocation, dropoffLocation]);
-
-    // Initial fit
-    useEffect(() => {
-        if (hasFittedMap) return;
-        if (pickupLocation || dropoffLocation) {
-            setTimeout(() => { fitMapToMarkers(); setHasFittedMap(true); }, 300);
-        }
-    }, [pickupLocation, dropoffLocation, hasFittedMap, fitMapToMarkers]);
-
-    // Refit when delivery starts or driver moves
-    useEffect(() => {
-        if (!isDeliveryPhase || !driverLocation) return;
-
-        const now = Date.now();
-        const elapsed = now - lastDeliveryCameraFitAtRef.current;
-        const lastDriverAtFit = lastDeliveryCameraFitDriverRef.current;
-        const movedKm = lastDriverAtFit
-            ? calculateHaversineDistance(
-                  lastDriverAtFit.latitude,
-                  lastDriverAtFit.longitude,
-                  driverLocation.latitude,
-                  driverLocation.longitude,
-              )
-            : Number.POSITIVE_INFINITY;
-
-        const shouldRefit =
-            lastDeliveryCameraFitAtRef.current === 0 ||
-            elapsed >= DELIVERY_CAMERA_REFIT_MIN_INTERVAL_MS ||
-            movedKm >= DELIVERY_CAMERA_REFIT_MIN_MOVE_KM;
-
-        if (!shouldRefit) return;
-
-        fitMapToMarkers();
-        lastDeliveryCameraFitAtRef.current = now;
-        lastDeliveryCameraFitDriverRef.current = {
-            latitude: driverLocation.latitude,
-            longitude: driverLocation.longitude,
-        };
-    }, [isDeliveryPhase, driverLocation?.latitude, driverLocation?.longitude]);
+    }, [order?.id, status, pickupLocation, dropoffLocation]);
 
     // ─── Handlers ───────────────────────────────────────────
-    const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS);
-
-    const handleMarkAsDelivered = async () => {
-        Alert.alert(
-            'Test: Mark as Delivered',
-            'This will mark the order as delivered. Continue?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Mark Delivered',
-                    onPress: async () => {
-                        try {
-                            await updateOrderStatus({
-                                variables: { id: order.id, status: 'DELIVERED' as any },
-                                refetchQueries: [{ query: GET_ORDER_DRIVER, variables: { id: order.id } }],
-                                awaitRefetchQueries: true,
-                            });
-                            Alert.alert('Success', 'Order marked as delivered!');
-                        } catch (err: any) {
-                            Alert.alert('Error', err.message || 'Failed to update order');
-                        }
-                    },
-                },
-            ]
-        );
-    };
-
-    const handleCallDriver = async () => {
+    const handleCallDriver = useCallback(async () => {
         if (!driverPhone) return;
         try { await Linking.openURL(`tel:${driverPhone}`); }
         catch { Alert.alert(t.orders.details.call_failed, t.orders.details.unable_open_dialer); }
-    };
+    }, [driverPhone, t.orders.details.call_failed, t.orders.details.unable_open_dialer]);
+
+    const markerScale = useMemo(() => {
+        const normalized = clamp((mapZoomLevel - 13) / 4, 0, 1);
+        return 0.68 + normalized * 0.32;
+    }, [mapZoomLevel]);
+
+    const handleCameraChanged = useCallback((event: any) => {
+        const nextZoom = event?.properties?.zoom;
+        if (typeof nextZoom !== 'number' || !Number.isFinite(nextZoom)) return;
+        setMapZoomLevel((prev) => (Math.abs(prev - nextZoom) > 0.04 ? nextZoom : prev));
+    }, []);
 
     // ─── Loading / Empty ────────────────────────────────────
     // Only show spinner on initial load (no data yet). During refetches
@@ -834,12 +869,19 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         longitudeDelta: 0.015,
     };
 
-    const totalItems = orderBusinesses.reduce((sum, b: any) => sum + (Array.isArray(b?.items) ? b.items.length : 0), 0);
-
     // ─── Toggle order summary ───────────────────────────────
     const handleToggleSummary = () => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setShowSummary(prev => !prev);
+    };
+
+    const handleOpenDriverInfo = () => {
+        if (!hasAssignedDriver) return;
+        setShowDriverInfo(true);
+    };
+
+    const handleCloseDriverInfo = () => {
+        setShowDriverInfo(false);
     };
 
     // ═════════════════════════════════════════════════════════
@@ -1185,11 +1227,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                 borderWidth: 2,
                                 borderColor: theme.colors.primary + '30',
                             }}>
-                                {driverImageUrl ? (
-                                    <Image source={{ uri: driverImageUrl }} style={{ width: 56, height: 56 }} />
-                                ) : (
-                                    <Ionicons name="person" size={26} color={theme.colors.primary} />
-                                )}
+                                <DriverAvatar driver={driver} imageUrl={driverImageUrl} size={56} textSize={18} />
                             </View>
                             <View style={{ flex: 1 }}>
                                 <Text style={{ fontSize: 11, color: theme.colors.subtext, marginBottom: 4, fontWeight: '600', letterSpacing: 0.5 }}>
@@ -1244,10 +1282,11 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                         attributionEnabled={false}
                         scaleBarEnabled={false}
                         compassEnabled={false}
-                        scrollEnabled={false}
-                        zoomEnabled={false}
-                        pitchEnabled={false}
-                        rotateEnabled={false}
+                        scrollEnabled={true}
+                        zoomEnabled={true}
+                        pitchEnabled={true}
+                        rotateEnabled={true}
+                        onCameraChanged={handleCameraChanged}
                     >
                         <MapLibreGL.Camera
                             ref={cameraRef}
@@ -1263,38 +1302,113 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                             }}
                         />
 
-                        {/* Business marker (pending / preparing / ready) */}
-                        {!isDeliveryPhase && pickupLocation && typeof pickupLocation.latitude === 'number' && typeof pickupLocation.longitude === 'number' && (
-                            <MapLibreGL.PointAnnotation
+                        {/* Business marker (always visible while order is active) */}
+                        {pickupLocation && typeof pickupLocation.latitude === 'number' && typeof pickupLocation.longitude === 'number' && (
+                            <MapLibreGL.MarkerView
                                 id="pickup-marker"
                                 coordinate={[pickupLocation.longitude, pickupLocation.latitude]}
+                                anchor={{ x: 0.5, y: 1 }}
                             >
-                                <PreparingBusinessMarker active={isPreparingAnimationPhase} />
-                            </MapLibreGL.PointAnnotation>
+                                <BusinessMarker active={isPreparingAnimationPhase} scale={markerScale} />
+                            </MapLibreGL.MarkerView>
                         )}
 
                         {/* Driver marker (delivery phase) */}
                         {isDeliveryPhase && driverLocation && typeof driverLocation.latitude === 'number' && typeof driverLocation.longitude === 'number' && (
-                            <MapLibreGL.PointAnnotation
+                            <MapLibreGL.MarkerView
                                 id="driver-marker"
                                 coordinate={[driverLocation.longitude, driverLocation.latitude]}
+                                anchor={{ x: 0.5, y: 1 }}
                             >
-                                <PurplePin icon="car" size={32} rotationDeg={driverHeadingDeg} />
-                            </MapLibreGL.PointAnnotation>
+                                <VehiclePin icon="bicycle" size={32} rotationDeg={driverHeadingDeg} scale={markerScale} />
+                            </MapLibreGL.MarkerView>
                         )}
 
-                        {/* User dropoff location */}
-                        {isDeliveryPhase && dropoffLocation && typeof dropoffLocation.latitude === 'number' && typeof dropoffLocation.longitude === 'number' && (
-                            <MapLibreGL.PointAnnotation
+                        {/* User dropoff location (always visible) */}
+                        {dropoffLocation && typeof dropoffLocation.latitude === 'number' && typeof dropoffLocation.longitude === 'number' && (
+                            <MapLibreGL.MarkerView
                                 id="dropoff-marker"
                                 coordinate={[dropoffLocation.longitude, dropoffLocation.latitude]}
+                                anchor={{ x: 0.5, y: 1 }}
                             >
-                                <LocationPin />
-                            </MapLibreGL.PointAnnotation>
+                                <HomeLocationPin scale={markerScale} />
+                            </MapLibreGL.MarkerView>
                         )}
                     </MapLibreGL.MapView>
                     </MapErrorBoundary>
                 ) : mapFallback}
+
+                <Modal visible={showDriverInfo} transparent animationType="fade" onRequestClose={handleCloseDriverInfo}>
+                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 }}>
+                        <TouchableOpacity
+                            activeOpacity={1}
+                            onPress={handleCloseDriverInfo}
+                            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)' }}
+                        />
+                        <View style={{
+                            width: '100%',
+                            maxWidth: 320,
+                            borderRadius: 24,
+                            padding: 20,
+                            backgroundColor: theme.colors.card,
+                            borderWidth: 1,
+                            borderColor: theme.colors.border,
+                        }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                                <DriverAvatar driver={driver} imageUrl={driverImageUrl} size={56} textSize={18} />
+                                <View style={{ flex: 1, marginLeft: 14 }}>
+                                    <Text style={{ color: theme.colors.subtext, fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginBottom: 4 }}>
+                                        {t.orders.details.driver?.toUpperCase() || 'DRIVER'}
+                                    </Text>
+                                    <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '800' }}>
+                                        {driverName || t.orders.details.finding_driver}
+                                    </Text>
+                                    {!!driverPhone && (
+                                        <Text style={{ color: theme.colors.subtext, fontSize: 13, marginTop: 2 }}>
+                                            {driverPhone}
+                                        </Text>
+                                    )}
+                                </View>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', gap: 10 }}>
+                                <TouchableOpacity
+                                    onPress={handleCallDriver}
+                                    style={{
+                                        flex: 1,
+                                        height: 46,
+                                        borderRadius: 14,
+                                        backgroundColor: '#22C55E',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        flexDirection: 'row',
+                                    }}
+                                >
+                                    <Ionicons name="call" size={18} color="#FFFFFF" />
+                                    <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700', marginLeft: 8 }}>
+                                        {t.orders.details.call_driver}
+                                    </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={handleCloseDriverInfo}
+                                    style={{
+                                        height: 46,
+                                        borderRadius: 14,
+                                        paddingHorizontal: 18,
+                                        borderWidth: 1,
+                                        borderColor: theme.colors.border,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                >
+                                    <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '700' }}>
+                                        {t.common.close}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
 
                 {/* ═══ Back Button (floating) ═══ */}
                 <View style={{ position: 'absolute', top: insets.top + 12, left: 16, zIndex: 10 }}>
@@ -1345,19 +1459,31 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                             flexDirection: 'row', alignItems: 'center', marginBottom: 16,
                         }}>
                             {/* Avatar (driver or default) */}
-                            <View style={{
-                                width: 48, height: 48, borderRadius: 24,
-                                backgroundColor: theme.dark ? '#1A1A22' : '#F3F4F6',
-                                alignItems: 'center', justifyContent: 'center',
-                                overflow: 'hidden', marginRight: 12,
-                                borderWidth: 2, borderColor: theme.dark ? '#27272A' : '#E5E7EB',
-                            }}>
-                                {driverImageUrl ? (
-                                    <Image source={{ uri: driverImageUrl }} style={{ width: 48, height: 48, borderRadius: 24 }} />
-                                ) : (
+                            {hasAssignedDriver ? (
+                                <TouchableOpacity
+                                    onPress={handleOpenDriverInfo}
+                                    activeOpacity={0.85}
+                                    style={{
+                                        width: 48, height: 48, borderRadius: 24,
+                                        backgroundColor: theme.dark ? '#1A1A22' : '#F3F4F6',
+                                        alignItems: 'center', justifyContent: 'center',
+                                        overflow: 'hidden', marginRight: 12,
+                                        borderWidth: 2, borderColor: theme.dark ? '#27272A' : '#E5E7EB',
+                                    }}
+                                >
+                                    <DriverAvatar driver={driver} imageUrl={driverImageUrl} size={48} textSize={15} />
+                                </TouchableOpacity>
+                            ) : (
+                                <View style={{
+                                    width: 48, height: 48, borderRadius: 24,
+                                    backgroundColor: theme.dark ? '#1A1A22' : '#F3F4F6',
+                                    alignItems: 'center', justifyContent: 'center',
+                                    overflow: 'hidden', marginRight: 12,
+                                    borderWidth: 2, borderColor: theme.dark ? '#27272A' : '#E5E7EB',
+                                }}>
                                     <Ionicons name="person-outline" size={24} color={theme.colors.subtext} />
-                                )}
-                            </View>
+                                </View>
+                            )}
 
                             {/* Status text + order id */}
                             <View style={{ flex: 1 }}>
@@ -1377,25 +1503,69 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                             </View>
 
                             {/* ETA badge */}
-                            {deliveryEta !== null && !isCompleted && !isCancelled && (
+                            {currentEta !== null && !isCompleted && !isCancelled && !isPendingApproval && (
                                 <View style={{
                                     backgroundColor: config.color + '15',
                                     borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8,
                                     alignItems: 'center',
                                 }}>
                                     <Text style={{ color: config.color, fontSize: 18, fontWeight: '800', lineHeight: 20 }}>
-                                        ~{deliveryEta}
+                                        ~{currentEta}
                                     </Text>
                                     <Text style={{ color: config.color, fontSize: 10, fontWeight: '600', marginTop: 1 }}>
-                                        {t.orders.details.min_short}
+                                        {currentEtaLabel} · {t.orders.details.min_short}
                                     </Text>
                                 </View>
                             )}
                         </Animated.View>
 
-                        {/* ── Icon stepper ───────────────── */}
+                        {/* ── Pending approval / timeline (smooth transition) ───────────────── */}
                         <View style={{ marginBottom: 16 }}>
-                            <IconStepper status={status} color={config.color} theme={theme} t={t} />
+                            {isPendingApproval ? (
+                                <Animated.View
+                                    key="pending-approval"
+                                    entering={FadeInDown.duration(320)}
+                                    exiting={FadeOut.duration(220)}
+                                    style={{
+                                        borderRadius: 16,
+                                        borderWidth: 1,
+                                        borderColor: theme.colors.border,
+                                        backgroundColor: theme.dark ? '#ffffff08' : '#00000005',
+                                        paddingVertical: 14,
+                                        paddingHorizontal: 14,
+                                    }}
+                                >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <View style={{
+                                            width: 32,
+                                            height: 32,
+                                            borderRadius: 16,
+                                            backgroundColor: '#F59E0B20',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            marginRight: 10,
+                                        }}>
+                                            <Ionicons name="time-outline" size={16} color="#F59E0B" />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={{ color: theme.colors.text, fontSize: 13, fontWeight: '800' }}>
+                                                {t.orders.status.pending}
+                                            </Text>
+                                            <Text style={{ color: theme.colors.subtext, fontSize: 12, marginTop: 2 }}>
+                                                {t.orders.status_messages.pending}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </Animated.View>
+                            ) : (
+                                <Animated.View
+                                    key="full-timeline"
+                                    entering={FadeInDown.duration(320)}
+                                    exiting={FadeOut.duration(220)}
+                                >
+                                    <IconStepper status={customerVisibleStatus} color={config.color} theme={theme} t={t} />
+                                </Animated.View>
+                            )}
                         </View>
 
                         {/* ── Driver Card ──────────────────── */}
@@ -1413,11 +1583,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                     alignItems: 'center', justifyContent: 'center',
                                     overflow: 'hidden', marginRight: 12,
                                 }}>
-                                    {driverImageUrl ? (
-                                        <Image source={{ uri: driverImageUrl }} style={{ width: 44, height: 44, borderRadius: 14 }} />
-                                    ) : (
-                                        <Ionicons name="person" size={20} color={config.color} />
-                                    )}
+                                    <DriverAvatar driver={driver} imageUrl={driverImageUrl} size={44} textSize={14} />
                                 </View>
 
                                 {/* Info */}
@@ -1452,26 +1618,6 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                 {showSummary ? '▲ Hide order summary' : '▼ Show order summary'}
                             </Text>
                         </TouchableOpacity>
-
-                        {/* ── TEST: Mark as Delivered Button ────── */}
-                        {order.status !== 'DELIVERED' && order.status !== 'CANCELLED' && (
-                            <TouchableOpacity
-                                onPress={handleMarkAsDelivered}
-                                activeOpacity={0.8}
-                                style={{
-                                    alignSelf: 'center',
-                                    marginBottom: 12,
-                                    backgroundColor: '#10b981',
-                                    paddingHorizontal: 16,
-                                    paddingVertical: 8,
-                                    borderRadius: 8,
-                                }}
-                            >
-                                <Text style={{ color: 'white', fontSize: 12, fontWeight: '700' }}>
-                                    🧪 TEST: Mark as Delivered
-                                </Text>
-                            </TouchableOpacity>
-                        )}
 
                         {/* ── Expanded Order Items ────────── */}
                         {showSummary && (
@@ -1531,8 +1677,6 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         </GestureHandlerRootView>
     );
 };
-
-// ─── Shared Styles ──────────────────────────────────────────
 
 // ─── Safe Wrapper (catches ALL render errors) ───────────────
 class OrderDetailsBoundary extends Component<

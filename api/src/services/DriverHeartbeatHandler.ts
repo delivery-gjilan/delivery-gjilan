@@ -106,7 +106,7 @@ export class DriverHeartbeatHandler {
     );
 
     if (shouldUpdateLocation) {
-      // Location is stored in drivers table only.
+      await this.publishDriverUpdate([userId]);
     }
 
     if (!updatedDriver) {
@@ -154,7 +154,7 @@ export class DriverHeartbeatHandler {
       if (wasDisconnected) {
         log.info({ userId, previousStatus: driver.connectionStatus }, 'heartbeat:reconnected');
       }
-      await this.publishDriverUpdate();
+      await this.publishDriverUpdate([userId]);
     }
 
     return {
@@ -210,9 +210,11 @@ export class DriverHeartbeatHandler {
   /**
    * Publish driver updates to GraphQL subscriptions
    */
-  private async publishDriverUpdate(): Promise<void> {
+  private async publishDriverUpdate(driverIds: string[]): Promise<void> {
     try {
-      const drivers = await this.authRepository.findDrivers();
+      if (driverIds.length === 0) return;
+      const drivers = await this.authRepository.findDriversByIds(driverIds);
+      if (drivers.length === 0) return;
       publish(pubsub, topics.allDriversChanged(), { drivers });
     } catch (error) {
       log.error({ err: error }, 'heartbeat:publish:error');
@@ -237,7 +239,7 @@ export class DriverHeartbeatHandler {
     log.info({ userId }, 'heartbeat:disconnect');
     
     await this.driverRepository.markDriverDisconnected(userId);
-    await this.publishDriverUpdate();
+    await this.publishDriverUpdate([userId]);
   }
 
   /**
@@ -247,7 +249,7 @@ export class DriverHeartbeatHandler {
     log.info({ userId }, 'heartbeat:reconnecting');
     
     const driver = await this.driverRepository.restoreDriverSession(userId);
-    await this.publishDriverUpdate();
+    await this.publishDriverUpdate([userId]);
     
     return driver;
   }

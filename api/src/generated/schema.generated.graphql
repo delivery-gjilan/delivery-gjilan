@@ -689,6 +689,8 @@ type Mutation {
   generateReferralCode: String!
   initiateSignup(input: InitiateSignupInput!): AuthResponse!
   login(input: LoginInput!): AuthResponse!
+  logoutAllSessions: Boolean!
+  logoutCurrentSession(refreshToken: String!): Boolean!
   markFirstOrderUsed(userId: ID!): UserPromoMetadata!
   markSettlementAsPaid(paymentMethod: String, paymentReference: String, settlementId: ID!): Settlement!
   markSettlementAsPartiallyPaid(amount: Float!, settlementId: ID!): Settlement!

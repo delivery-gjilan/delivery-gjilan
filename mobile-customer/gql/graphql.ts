@@ -86,6 +86,20 @@ export type AddWalletCreditInput = {
   userId: Scalars['ID']['input'];
 };
 
+export type AgoraRtcCredentials = {
+  __typename?: 'AgoraRtcCredentials';
+  appId: Scalars['String']['output'];
+  channelName: Scalars['String']['output'];
+  expiresAt: Scalars['DateTime']['output'];
+  token: Scalars['String']['output'];
+  uid: Scalars['Int']['output'];
+};
+
+export enum AgoraRtcRole {
+  Publisher = 'PUBLISHER',
+  Subscriber = 'SUBSCRIBER'
+}
+
 export enum AppLanguage {
   Al = 'AL',
   En = 'EN'
@@ -141,6 +155,7 @@ export type AuditLogConnection = {
 export type AuthResponse = {
   __typename?: 'AuthResponse';
   message: Scalars['String']['output'];
+  refreshToken?: Maybe<Scalars['String']['output']>;
   token: Scalars['String']['output'];
   user: User;
 };
@@ -454,12 +469,20 @@ export type DriverConnection = {
   __typename?: 'DriverConnection';
   /** Current navigation order this ETA belongs to */
   activeOrderId?: Maybe<Scalars['ID']['output']>;
+  /** Most recently reported battery level percentage from driver device */
+  batteryLevel?: Maybe<Scalars['Int']['output']>;
+  /** Whether driver opted in to battery telemetry sharing */
+  batteryOptIn: Scalars['Boolean']['output'];
+  /** When battery telemetry was last refreshed */
+  batteryUpdatedAt?: Maybe<Scalars['Date']['output']>;
   /** System-calculated: current connection state */
   connectionStatus: DriverConnectionStatus;
   /** Timestamp when driver was marked as DISCONNECTED */
   disconnectedAt?: Maybe<Scalars['Date']['output']>;
   /** When the ETA payload was last refreshed */
   etaUpdatedAt?: Maybe<Scalars['Date']['output']>;
+  /** Whether device reported it is currently charging */
+  isCharging?: Maybe<Scalars['Boolean']['output']>;
   /** Last timestamp when driver sent a heartbeat (every 5s) */
   lastHeartbeatAt?: Maybe<Scalars['Date']['output']>;
   /** Last timestamp when location was written to DB (throttled to every 10s) */
@@ -523,6 +546,23 @@ export type DriverHeartbeatResult = {
   /** Whether heartbeat was processed successfully */
   success: Scalars['Boolean']['output'];
 };
+
+export type DriverPttSignal = {
+  __typename?: 'DriverPttSignal';
+  action: DriverPttSignalAction;
+  adminId: Scalars['ID']['output'];
+  channelName: Scalars['String']['output'];
+  driverId: Scalars['ID']['output'];
+  muted: Scalars['Boolean']['output'];
+  timestamp: Scalars['DateTime']['output'];
+};
+
+export enum DriverPttSignalAction {
+  Mute = 'MUTE',
+  Started = 'STARTED',
+  Stopped = 'STOPPED',
+  Unmute = 'UNMUTE'
+}
 
 export type DynamicPricingRule = {
   __typename?: 'DynamicPricingRule';
@@ -601,6 +641,8 @@ export type Mutation = {
   activateSettlementRule: SettlementRule;
   addUserAddress: UserAddress;
   addWalletCredit: WalletTransaction;
+  /** Admin sends push-to-talk signaling state to one or multiple drivers */
+  adminSendPttSignal: Scalars['Boolean']['output'];
   /** Admin mutation to manually set connection status (for testing/recovery) */
   adminSetDriverConnectionStatus: User;
   adminUpdateDriverLocation: User;
@@ -647,6 +689,8 @@ export type Mutation = {
    */
   driverHeartbeat: DriverHeartbeatResult;
   driverNotifyCustomer: Scalars['Boolean']['output'];
+  /** Driver battery telemetry update (recommended every 5-10 minutes) */
+  driverUpdateBatteryStatus: DriverConnection;
   generateReferralCode: Scalars['String']['output'];
   initiateSignup: AuthResponse;
   login: AuthResponse;
@@ -654,6 +698,7 @@ export type Mutation = {
   markSettlementAsPaid: Settlement;
   markSettlementAsPartiallyPaid: Settlement;
   markSettlementsAsPaid: Array<Settlement>;
+  refreshToken: TokenRefreshResponse;
   registerDeviceToken: Scalars['Boolean']['output'];
   registerLiveActivityToken: Scalars['Boolean']['output'];
   removeUserFromPromotion: Scalars['Boolean']['output'];
@@ -709,6 +754,14 @@ export type MutationAddUserAddressArgs = {
 
 export type MutationAddWalletCreditArgs = {
   input: AddWalletCreditInput;
+};
+
+
+export type MutationAdminSendPttSignalArgs = {
+  action: DriverPttSignalAction;
+  channelName: Scalars['String']['input'];
+  driverIds: Array<Scalars['ID']['input']>;
+  muted?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 
@@ -905,6 +958,13 @@ export type MutationDriverNotifyCustomerArgs = {
 };
 
 
+export type MutationDriverUpdateBatteryStatusArgs = {
+  isCharging?: InputMaybe<Scalars['Boolean']['input']>;
+  level: Scalars['Int']['input'];
+  optIn: Scalars['Boolean']['input'];
+};
+
+
 export type MutationInitiateSignupArgs = {
   input: InitiateSignupInput;
 };
@@ -937,6 +997,11 @@ export type MutationMarkSettlementsAsPaidArgs = {
   ids: Array<Scalars['ID']['input']>;
   paymentMethod?: InputMaybe<Scalars['String']['input']>;
   paymentReference?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type MutationRefreshTokenArgs = {
+  refreshToken: Scalars['String']['input'];
 };
 
 
@@ -1469,6 +1534,8 @@ export type Query = {
   driverBalance: SettlementSummary;
   drivers: Array<User>;
   dynamicPricingRules: Array<DynamicPricingRule>;
+  /** Get Agora RTC credentials for the current authenticated user */
+  getAgoraRtcCredentials: AgoraRtcCredentials;
   getAllPromotions: Array<Promotion>;
   getApplicablePromotions: Array<ApplicablePromotion>;
   getBanner?: Maybe<Banner>;
@@ -1572,6 +1639,12 @@ export type QueryDriverBalanceArgs = {
 
 export type QueryDynamicPricingRulesArgs = {
   businessId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+
+export type QueryGetAgoraRtcCredentialsArgs = {
+  channelName: Scalars['String']['input'];
+  role: AgoraRtcRole;
 };
 
 
@@ -1934,6 +2007,8 @@ export type Subscription = {
   allOrdersUpdated: Array<Order>;
   auditLogCreated: AuditLog;
   driverConnectionStatusChanged: DriverConnection;
+  /** Per-driver push-to-talk signal stream (start/stop/mute/unmute) */
+  driverPttSignal: DriverPttSignal;
   driversUpdated: Array<User>;
   orderDriverLiveTracking: OrderDriverLiveTracking;
   orderStatusUpdated: Order;
@@ -1951,6 +2026,11 @@ export type SubscriptionAuditLogCreatedArgs = {
 
 
 export type SubscriptionDriverConnectionStatusChangedArgs = {
+  driverId: Scalars['ID']['input'];
+};
+
+
+export type SubscriptionDriverPttSignalArgs = {
   driverId: Scalars['ID']['input'];
 };
 
@@ -1982,6 +2062,12 @@ export type SubscriptionUserOrdersUpdatedArgs = {
 
 export type SubscriptionInput = {
   token: Scalars['String']['input'];
+};
+
+export type TokenRefreshResponse = {
+  __typename?: 'TokenRefreshResponse';
+  refreshToken: Scalars['String']['output'];
+  token: Scalars['String']['output'];
 };
 
 export type UpdateBannerInput = {
@@ -2309,7 +2395,7 @@ export type LoginMutationVariables = Exact<{
 }>;
 
 
-export type LoginMutation = { __typename?: 'Mutation', login: { __typename?: 'AuthResponse', token: string, message: string, user: { __typename?: 'User', id: string, email: string, firstName: string, lastName: string, signupStep: SignupStep, emailVerified: boolean, phoneVerified: boolean, phoneNumber?: string | null, role: UserRole, preferredLanguage: AppLanguage } } };
+export type LoginMutation = { __typename?: 'Mutation', login: { __typename?: 'AuthResponse', token: string, refreshToken?: string | null, message: string, user: { __typename?: 'User', id: string, email: string, firstName: string, lastName: string, signupStep: SignupStep, emailVerified: boolean, phoneVerified: boolean, phoneNumber?: string | null, role: UserRole, preferredLanguage: AppLanguage } } };
 
 export type MeQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -2546,7 +2632,7 @@ export const DeleteUserAddressDocument = {"kind":"Document","definitions":[{"kin
 export const SetDefaultAddressDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SetDefaultAddress"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"setDefaultAddress"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}]}}]} as unknown as DocumentNode<SetDefaultAddressMutation, SetDefaultAddressMutationVariables>;
 export const DeleteMyAccountDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteMyAccount"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteMyAccount"}}]}}]} as unknown as DocumentNode<DeleteMyAccountMutation, DeleteMyAccountMutationVariables>;
 export const InitiateSignupDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"InitiateSignup"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"InitiateSignupInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"initiateSignup"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"token"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"signupStep"}},{"kind":"Field","name":{"kind":"Name","value":"emailVerified"}},{"kind":"Field","name":{"kind":"Name","value":"phoneVerified"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}},{"kind":"Field","name":{"kind":"Name","value":"role"}}]}},{"kind":"Field","name":{"kind":"Name","value":"message"}}]}}]}}]} as unknown as DocumentNode<InitiateSignupMutation, InitiateSignupMutationVariables>;
-export const LoginDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"Login"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"LoginInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"login"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"token"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"signupStep"}},{"kind":"Field","name":{"kind":"Name","value":"emailVerified"}},{"kind":"Field","name":{"kind":"Name","value":"phoneVerified"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}},{"kind":"Field","name":{"kind":"Name","value":"role"}},{"kind":"Field","name":{"kind":"Name","value":"preferredLanguage"}}]}},{"kind":"Field","name":{"kind":"Name","value":"message"}}]}}]}}]} as unknown as DocumentNode<LoginMutation, LoginMutationVariables>;
+export const LoginDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"Login"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"LoginInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"login"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"token"}},{"kind":"Field","name":{"kind":"Name","value":"refreshToken"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"signupStep"}},{"kind":"Field","name":{"kind":"Name","value":"emailVerified"}},{"kind":"Field","name":{"kind":"Name","value":"phoneVerified"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}},{"kind":"Field","name":{"kind":"Name","value":"role"}},{"kind":"Field","name":{"kind":"Name","value":"preferredLanguage"}}]}},{"kind":"Field","name":{"kind":"Name","value":"message"}}]}}]}}]} as unknown as DocumentNode<LoginMutation, LoginMutationVariables>;
 export const MeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Me"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"me"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"signupStep"}},{"kind":"Field","name":{"kind":"Name","value":"emailVerified"}},{"kind":"Field","name":{"kind":"Name","value":"phoneVerified"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"role"}},{"kind":"Field","name":{"kind":"Name","value":"preferredLanguage"}}]}}]}}]} as unknown as DocumentNode<MeQuery, MeQueryVariables>;
 export const ResendEmailVerificationDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ResendEmailVerification"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"resendEmailVerification"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"userId"}},{"kind":"Field","name":{"kind":"Name","value":"currentStep"}},{"kind":"Field","name":{"kind":"Name","value":"message"}}]}}]}}]} as unknown as DocumentNode<ResendEmailVerificationMutation, ResendEmailVerificationMutationVariables>;
 export const SetMyPreferredLanguageDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SetMyPreferredLanguage"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"language"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"AppLanguage"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"setMyPreferredLanguage"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"language"},"value":{"kind":"Variable","name":{"kind":"Name","value":"language"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"preferredLanguage"}}]}}]}}]} as unknown as DocumentNode<SetMyPreferredLanguageMutation, SetMyPreferredLanguageMutationVariables>;

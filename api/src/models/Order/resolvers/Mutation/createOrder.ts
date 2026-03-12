@@ -1,6 +1,9 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { createAuditLogger } from '@/services/AuditLogger';
 import { AppError } from '@/lib/errors';
+import logger from '@/lib/logger';
+
+const log = logger.child({ resolver: 'createOrder' });
 
 export const createOrder: NonNullable<MutationResolvers['createOrder']> = async (
     _parent,
@@ -12,8 +15,20 @@ export const createOrder: NonNullable<MutationResolvers['createOrder']> = async 
         throw AppError.unauthorized();
     }
     const order = await orderService.createOrder(userData.userId, input);
-    await orderService.publishUserOrders(userData.userId!);
-    await orderService.publishAllOrders();
+
+    // Best-effort side effects: the order is already persisted, so don't fail the
+    // mutation response if realtime publish throws (e.g. transient WS/pubsub issues).
+    try {
+        await orderService.publishUserOrders(userData.userId!);
+    } catch (error) {
+        log.error({ err: error, userId: userData.userId, orderId: order.id }, 'createOrder:publishUserOrders:failed');
+    }
+
+    try {
+        await orderService.publishAllOrders();
+    } catch (error) {
+        log.error({ err: error, userId: userData.userId, orderId: order.id }, 'createOrder:publishAllOrders:failed');
+    }
 
     const logger = createAuditLogger(db, context);
     await logger.log({

@@ -6,29 +6,32 @@ import { useSuccessModalStore } from '@/store/useSuccessModalStore';
 
 export default function SuccessModalContainer() {
     const router = useRouter();
-    const { visible, orderId, type, hideSuccess } = useSuccessModalStore();
+    const { visible, orderId, type, phase, hideSuccess } = useSuccessModalStore();
 
-    console.log('[SuccessModalContainer] State:', { visible, orderId, type });
+    console.log('[SuccessModalContainer] State:', { visible, orderId, type, phase });
+
+    const navigateUnderModal = (navigate: () => void) => {
+        navigate();
+        setTimeout(() => {
+            hideSuccess();
+        }, 80);
+    };
 
     const handleTrackOrder = () => {
-        hideSuccess();
         if (orderId) {
-            // Use setTimeout to ensure modal closes before navigation
-            setTimeout(() => {
-                router.push(`/orders/${orderId}` as any);
-            }, 100);
+            navigateUnderModal(() => {
+                router.replace(`/orders/${orderId}` as any);
+            });
         }
     };
 
     const handleGoHome = () => {
-        hideSuccess();
-        // Use setTimeout to ensure modal closes before navigation
-        setTimeout(() => {
-            router.push('/(tabs)/home');
-        }, 100);
+        navigateUnderModal(() => {
+            router.replace('/(tabs)/home');
+        });
     };
 
-    console.log('[SuccessModalContainer] Rendering:', visible && type);
+    console.log('[SuccessModalContainer] Rendering:', visible && type, phase);
 
     if (!visible || !type) return null;
 
@@ -42,6 +45,7 @@ export default function SuccessModalContainer() {
             <OrderSuccessScreen
                 orderId={orderId}
                 type={type}
+                phase={phase}
                 onTrackOrder={handleTrackOrder}
                 onGoHome={handleGoHome}
             />

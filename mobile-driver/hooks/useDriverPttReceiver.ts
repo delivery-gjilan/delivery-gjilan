@@ -9,7 +9,6 @@ export function useDriverPttReceiver() {
   const driverId = useAuthStore((state) => state.user?.id);
 
   const [isAdminTalking, setIsAdminTalking] = useState(false);
-  const [isMutedByAdmin, setIsMutedByAdmin] = useState(false);
 
   const [getRtcCredentials] = useLazyQuery<{ getAgoraRtcCredentials: AgoraRtcCredentials }, QueryGetAgoraRtcCredentialsArgs>(GET_AGORA_RTC_CREDENTIALS, {
     fetchPolicy: 'no-cache',
@@ -55,7 +54,7 @@ export function useDriverPttReceiver() {
       },
       onUserJoined: (_connection: any, remoteUid: number) => {
         remotePublisherJoinedRef.current = true;
-        setIsAdminTalking(!isMutedByAdmin);
+        setIsAdminTalking(true);
         console.log('[PTT] Remote broadcaster joined', { remoteUid });
       },
       onUserMuteAudio: (_connection: any, remoteUid: number, muted: boolean) => {
@@ -160,33 +159,15 @@ export function useDriverPttReceiver() {
       if (!signal) return;
 
       if (signal.action === 'STARTED') {
-        setIsMutedByAdmin(Boolean(signal.muted));
         setIsAdminTalking(false);
-        if (!signal.muted) {
-          // Join first; visual talking state is set by Agora remote events.
-          await joinPttChannel(signal.channelName);
-        } else {
-          setIsAdminTalking(false);
-        }
+        await joinPttChannel(signal.channelName);
         return;
       }
 
       if (signal.action === 'STOPPED') {
         setIsAdminTalking(false);
-        setIsMutedByAdmin(false);
         await leavePttChannel();
         return;
-      }
-
-      if (signal.action === 'MUTE') {
-        setIsMutedByAdmin(true);
-        await leavePttChannel();
-        return;
-      }
-
-      if (signal.action === 'UNMUTE') {
-        setIsMutedByAdmin(false);
-        await joinPttChannel(signal.channelName);
       }
     },
   });
@@ -211,6 +192,5 @@ export function useDriverPttReceiver() {
 
   return {
     isAdminTalking,
-    isMutedByAdmin,
   };
 }

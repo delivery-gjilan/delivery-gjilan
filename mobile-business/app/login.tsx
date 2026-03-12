@@ -15,7 +15,7 @@ import { useRouter } from 'expo-router';
 import { useMutation } from '@apollo/client/react';
 import { LOGIN_MUTATION } from '@/graphql/auth';
 import { useAuthStore } from '@/store/authStore';
-import { saveToken } from '@/utils/secureTokenStore';
+import { saveRefreshToken, saveToken } from '@/utils/secureTokenStore';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function LoginScreen() {
@@ -47,7 +47,7 @@ export default function LoginScreen() {
                 throw new Error('Login failed');
             }
 
-            const { token, user } = data.login;
+            const { token, refreshToken, user } = data.login;
 
             // Validate business user
             if (user.role !== 'BUSINESS_OWNER' && user.role !== 'BUSINESS_EMPLOYEE') {
@@ -63,6 +63,9 @@ export default function LoginScreen() {
             // Save token to secure storage
             console.log('[Login] Saving token for user:', user.email);
             await saveToken(token);
+            if (refreshToken) {
+                await saveRefreshToken(refreshToken);
+            }
 
             // Update store with user and token
             loginStore(user, token);

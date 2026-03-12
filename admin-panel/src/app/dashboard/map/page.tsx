@@ -7,7 +7,7 @@ import {
   MapPin, X, Filter, Clock, Package, Phone,
   User, Store, Calendar, AlertCircle, WifiOff, Signal,
   SignalLow, SignalZero, ChevronDown, ChevronUp, Eye, EyeOff,
-  Zap, Route, ExternalLink, Crosshair, LocateFixed, Mic, MicOff, Radio
+  Zap, Route, ExternalLink, Crosshair, LocateFixed, Mic, Radio
 } from "lucide-react";
 import { GET_BUSINESSES } from "@/graphql/operations/businesses/queries";
 import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
@@ -297,26 +297,37 @@ function getOrderEtaMinutes(
 export default function MapPage() {
   // == DATA ==
   const { data: businessData } = useQuery(GET_BUSINESSES);
-  const { data: driverData, refetch: refetchDrivers } = useQuery(DRIVERS_QUERY, { pollInterval: 10000 });
+  const { data: driverData } = useQuery(DRIVERS_QUERY, { pollInterval: 10000 });
   const { data: orderData, refetch: refetchOrders } = useQuery(GET_ORDERS);
+  const [driversLive, setDriversLive] = useState<any[]>([]);
+
+  useEffect(() => {
+    if ((driverData as any)?.drivers) {
+      setDriversLive((driverData as any).drivers);
+    }
+  }, [driverData]);
   
   // Refetch when subscriptions fire (backend sends lightweight signal)
   // Cooldown avoids bursts when multiple events arrive in quick succession.
   const lastSubscriptionRefetchMsRef = useRef({ orders: 0, drivers: 0 });
   useSubscription(ALL_ORDERS_SUBSCRIPTION, {
     onData: () => {
-      const nowMs = Date.now();
-      if (nowMs - lastSubscriptionRefetchMsRef.current.orders < SUBSCRIPTION_REFETCH_COOLDOWN_MS) return;
-      lastSubscriptionRefetchMsRef.current.orders = nowMs;
+      lastSubscriptionRefetchMsRef.current.orders = Date.now();
       refetchOrders();
     },
   });
   useSubscription(DRIVERS_UPDATED_SUBSCRIPTION, {
-    onData: () => {
-      const nowMs = Date.now();
-      if (nowMs - lastSubscriptionRefetchMsRef.current.drivers < SUBSCRIPTION_REFETCH_COOLDOWN_MS) return;
-      lastSubscriptionRefetchMsRef.current.drivers = nowMs;
-      refetchDrivers();
+    onData: ({ data: subscriptionData }) => {
+      const incoming = (subscriptionData.data as any)?.driversUpdated as any[] | undefined;
+      if (!incoming || incoming.length === 0) return;
+
+      setDriversLive((prev) => {
+        const byId = new globalThis.Map<string, any>((prev || []).map((d: any) => [d.id, d]));
+        incoming.forEach((driver: any) => {
+          byId.set(driver.id, { ...byId.get(driver.id), ...driver });
+        });
+        return Array.from(byId.values());
+      });
     },
   });
   
@@ -330,7 +341,7 @@ export default function MapPage() {
     () => (((orderData as any)?.orders ?? []) as any[]).map(normalizeOrderShape),
     [orderData],
   );
-  const drivers = useMemo(() => (driverData as any)?.drivers ?? [], [driverData]);
+  const drivers = useMemo(() => driversLive ?? [], [driversLive]);
 
   const activeOrders = useMemo(
     () => orders.filter((o: any) => o.status !== "DELIVERED" && o.status !== "CANCELLED"),
@@ -348,7 +359,7 @@ export default function MapPage() {
   const observedDriverGapMsRef = useRef<Record<string, number>>({});
   const smoothedDriverGapMsRef = useRef<Record<string, number>>({});
   const driverHeadingDegRef = useRef<Record<string, number>>({});
-  const orderRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const orderRefs = useRef<Record<string, HTMLElement | null>>({});
 
   // == STATE ==
   const [now, setNow] = useState(Date.now());
@@ -374,7 +385,6 @@ export default function MapPage() {
   // == PTT STATE ==
   const [pttSelectedDriverIds, setPttSelectedDriverIds] = useState<string[]>([]);
   const [pttIsTalking, setPttIsTalking] = useState(false);
-  const [pttIsMuted, setPttIsMuted] = useState(false);
   const [pttChannelName, setPttChannelName] = useState<string | null>(null);
   const [pttError, setPttError] = useState<string>('');
   const [pttActiveDriverIds, setPttActiveDriverIds] = useState<string[]>([]);
@@ -508,7 +518,7 @@ export default function MapPage() {
       await client.join(creds.appId, creds.channelName, creds.token, creds.uid);
       await client.publish([micTrack]);
       micTrackRef.current = micTrack;
-      await sendPttSignal({ variables: { driverIds: targets, channelName, action: 'STARTED', muted: pttIsMuted } });
+      await sendPttSignal({ variables: { driverIds: targets, channelName, action: 'STARTED', muted: false } });
       setPttChannelName(channelName);
       setPttActiveDriverIds(targets);
       setPttIsTalking(true);
@@ -516,17 +526,7 @@ export default function MapPage() {
       setPttError(err instanceof Error ? err.message : 'Failed to start PTT');
       await stopTalking();
     }
-  }, [pttIsTalking, pttConnectedSelectedIds, pttIsMuted, getAgoraCredentials, ensureRtcClient, sendPttSignal, stopTalking]);
-
-  const handlePttMute = useCallback(async () => {
-    const nextMuted = !pttIsMuted;
-    setPttIsMuted(nextMuted);
-    if (micTrackRef.current) await micTrackRef.current.setEnabled(!nextMuted);
-    const targets = pttActiveDriverIds.length > 0 ? pttActiveDriverIds : pttConnectedSelectedIds;
-    if (pttChannelName && targets.length > 0) {
-      await sendPttSignal({ variables: { driverIds: targets, channelName: pttChannelName, action: nextMuted ? 'MUTE' : 'UNMUTE', muted: nextMuted } });
-    }
-  }, [pttIsMuted, pttChannelName, pttActiveDriverIds, pttConnectedSelectedIds, sendPttSignal]);
+  }, [pttIsTalking, pttConnectedSelectedIds, getAgoraCredentials, ensureRtcClient, sendPttSignal, stopTalking]);
 
   const togglePttDriver = useCallback((driverId: string) => {
     setPttSelectedDriverIds((prev) =>
@@ -926,7 +926,7 @@ export default function MapPage() {
     }
   };
 
-  const handleUpdateStatus = async (orderId: string, status: string) => {
+  const handleUpdateStatus = async (orderId: string, status: any) => {
     try {
       const order = activeOrders.find((o: any) => o.id === orderId);
       if (!order) {
@@ -1471,18 +1471,6 @@ export default function MapPage() {
                 <span className="text-zinc-500"> / {pttSelectedDriverIds.length}</span>
               )}
             </div>
-
-            {/* Mute toggle */}
-            <button
-              onClick={handlePttMute}
-              disabled={!pttIsTalking}
-              title={pttIsMuted ? 'Unmute' : 'Mute'}
-              className={`w-8 h-8 rounded-xl flex items-center justify-center transition ${
-                !pttIsTalking ? 'opacity-30 cursor-not-allowed bg-zinc-800' :
-                pttIsMuted ? 'bg-amber-500/20 text-amber-400' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-              }`}>
-              {pttIsMuted ? <MicOff size={14} /> : <Mic size={14} />}
-            </button>
 
             {/* Hold-to-talk button */}
             <button

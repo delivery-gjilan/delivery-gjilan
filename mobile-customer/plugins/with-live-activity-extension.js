@@ -28,9 +28,24 @@ struct DeliveryActivityAttributes: ActivityAttributes {
 `;
 
 // Custom native module – added to the MAIN APP target so it can call Activity<T>.request(...)
+// NOTE: DeliveryActivityAttributes is defined here (not as a separate file) to avoid a
+// duplicate-filename conflict with the extension target's DeliveryActivityAttributes.swift.
 const DELIVERY_LIVE_ACTIVITIES_SWIFT = `import Foundation
 import ActivityKit
 import React
+
+@available(iOS 16.1, *)
+struct DeliveryActivityAttributes: ActivityAttributes {
+    public struct ContentState: Codable, Hashable {
+        var driverName: String
+        var estimatedMinutes: Int
+        var status: String
+        var orderId: String
+        var lastUpdated: Int64  // Unix timestamp ms
+    }
+    var orderDisplayId: String
+    var businessName: String
+}
 
 @objc(DeliveryLiveActivities)
 class DeliveryLiveActivities: NSObject {
@@ -303,7 +318,84 @@ function withLiveActivityExtensionTarget(config) {
   return withXcodeProject(config, (cfg) => {
     const project = cfg.modResults;
 
+    const getMainAppDevelopmentTeam = () => {
+      const nativeTargets = project.pbxNativeTargetSection();
+      const buildConfigLists = project.pbxXCConfigurationList();
+      const buildConfigSection = project.pbxXCBuildConfigurationSection();
+
+      const mainAppTargetEntry = Object.values(nativeTargets).find((target) => {
+        return (
+          target &&
+          typeof target === 'object' &&
+          target.productType === '"com.apple.product-type.application"'
+        );
+      });
+
+      if (!mainAppTargetEntry || !mainAppTargetEntry.buildConfigurationList) {
+        return null;
+      }
+
+      const configListId = String(mainAppTargetEntry.buildConfigurationList).split(' ')[0].replace(/"/g, '');
+      const configList = buildConfigLists[configListId];
+      if (!configList || !Array.isArray(configList.buildConfigurations)) {
+        return null;
+      }
+
+      for (const configRef of configList.buildConfigurations) {
+        const configId = String(configRef.value || configRef).split(' ')[0].replace(/"/g, '');
+        const buildConfig = buildConfigSection[configId];
+        const teamId = buildConfig?.buildSettings?.DEVELOPMENT_TEAM;
+        if (teamId && String(teamId).trim().length > 0) {
+          return String(teamId).replace(/"/g, '');
+        }
+      }
+
+      return null;
+    };
+
+    const setTargetSigning = (targetUuid, developmentTeam) => {
+      if (!targetUuid || !developmentTeam) {
+        return;
+      }
+
+      const nativeTargets = project.pbxNativeTargetSection();
+      const buildConfigLists = project.pbxXCConfigurationList();
+      const buildConfigSection = project.pbxXCBuildConfigurationSection();
+      const target = nativeTargets[targetUuid];
+
+      if (!target || !target.buildConfigurationList) {
+        return;
+      }
+
+      const configListId = String(target.buildConfigurationList).split(' ')[0].replace(/"/g, '');
+      const configList = buildConfigLists[configListId];
+      if (!configList || !Array.isArray(configList.buildConfigurations)) {
+        return;
+      }
+
+      for (const configRef of configList.buildConfigurations) {
+        const configId = String(configRef.value || configRef).split(' ')[0].replace(/"/g, '');
+        const buildConfig = buildConfigSection[configId];
+        if (!buildConfig || !buildConfig.buildSettings) {
+          continue;
+        }
+
+        buildConfig.buildSettings.DEVELOPMENT_TEAM = developmentTeam;
+        buildConfig.buildSettings.CODE_SIGN_STYLE = 'Automatic';
+      }
+    };
+
+    const resolvedDevelopmentTeam =
+      cfg.ios?.appleTeamId ||
+      process.env.EXPO_APPLE_TEAM_ID ||
+      process.env.APPLE_TEAM_ID ||
+      getMainAppDevelopmentTeam();
+
     if (project.pbxTargetByName(EXTENSION_TARGET_NAME)) {
+      const existingTarget = project.pbxTargetByName(EXTENSION_TARGET_NAME);
+      if (existingTarget?.uuid && resolvedDevelopmentTeam) {
+        setTargetSigning(existingTarget.uuid, resolvedDevelopmentTeam);
+      }
       console.log('[LiveActivityExtension] Extension target already exists, skipping target creation');
       return cfg;
     }
@@ -341,6 +433,13 @@ function withLiveActivityExtensionTarget(config) {
       verbose: true,
     });
 
+    if (resolvedDevelopmentTeam) {
+      setTargetSigning(target.uuid, resolvedDevelopmentTeam);
+      console.log('[LiveActivityExtension] Applied extension signing team', { developmentTeam: resolvedDevelopmentTeam });
+    } else {
+      console.warn('[LiveActivityExtension] Could not resolve development team for extension target');
+    }
+
     console.log('[LiveActivityExtension] Created extension target and linked Swift sources');
 
     return cfg;
@@ -356,12 +455,8 @@ function withDeliveryLiveActivitiesModuleFiles(config) {
       const appName = cfg.modRequest.projectName;
       const appDir = path.join(cfg.modRequest.platformProjectRoot, appName);
 
-      // DeliveryActivityAttributes must exist in the main app target so the native
-      // module can reference Activity<DeliveryActivityAttributes> at compile time.
-      writeFile(
-        path.join(appDir, 'DeliveryActivityAttributes.swift'),
-        DELIVERY_ACTIVITY_ATTRIBUTES_SWIFT,
-      );
+      // DeliveryActivityAttributes is embedded inside DeliveryLiveActivities.swift
+      // (no separate file) to avoid a duplicate-filename conflict with the extension target.
 
       // Always overwrite so changes to the module are picked up on every prebuild.
       writeFile(
@@ -417,7 +512,6 @@ function withDeliveryLiveActivitiesModuleTarget(config) {
     ensureGroupRecursively(project, appName);
 
     const nativeModuleFiles = [
-      'DeliveryActivityAttributes.swift',
       'DeliveryLiveActivities.swift',
       'DeliveryLiveActivities.m',
     ];

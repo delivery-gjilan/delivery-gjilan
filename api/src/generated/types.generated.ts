@@ -684,6 +684,8 @@ export type Mutation = {
   generateReferralCode: Scalars['String']['output'];
   initiateSignup: AuthResponse;
   login: AuthResponse;
+  logoutAllSessions: Scalars['Boolean']['output'];
+  logoutCurrentSession: Scalars['Boolean']['output'];
   markFirstOrderUsed: UserPromoMetadata;
   markSettlementAsPaid: Settlement;
   markSettlementAsPartiallyPaid: Settlement;
@@ -962,6 +964,11 @@ export type MutationinitiateSignupArgs = {
 
 export type MutationloginArgs = {
   input: LoginInput;
+};
+
+
+export type MutationlogoutCurrentSessionArgs = {
+  refreshToken: Scalars['String']['input'];
 };
 
 
@@ -3011,6 +3018,8 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   generateReferralCode?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   initiateSignup?: Resolver<ResolversTypes['AuthResponse'], ParentType, ContextType, RequireFields<MutationinitiateSignupArgs, 'input'>>;
   login?: Resolver<ResolversTypes['AuthResponse'], ParentType, ContextType, RequireFields<MutationloginArgs, 'input'>>;
+  logoutAllSessions?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  logoutCurrentSession?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationlogoutCurrentSessionArgs, 'refreshToken'>>;
   markFirstOrderUsed?: Resolver<ResolversTypes['UserPromoMetadata'], ParentType, ContextType, RequireFields<MutationmarkFirstOrderUsedArgs, 'userId'>>;
   markSettlementAsPaid?: Resolver<ResolversTypes['Settlement'], ParentType, ContextType, RequireFields<MutationmarkSettlementAsPaidArgs, 'settlementId'>>;
   markSettlementAsPartiallyPaid?: Resolver<ResolversTypes['Settlement'], ParentType, ContextType, RequireFields<MutationmarkSettlementAsPartiallyPaidArgs, 'amount' | 'settlementId'>>;

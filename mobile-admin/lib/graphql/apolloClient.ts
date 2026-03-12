@@ -5,7 +5,7 @@ import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { createClient, Client } from 'graphql-ws';
 import { persistCache, AsyncStorageWrapper } from 'apollo3-cache-persist';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAuthStore } from '@/store/authStore';
+import { getValidAccessToken } from './authSession';
 
 const RECONNECT_DELAYS = [1000, 2000, 5000, 10000];
 
@@ -22,11 +22,7 @@ const logLink = new ApolloLink((operation, forward) => {
 });
 
 const authLink = new SetContextLink(async ({ headers }) => {
-    let token = useAuthStore.getState().token;
-    if (!token) {
-        const { getToken } = await import('@/utils/secureTokenStore');
-        token = await getToken();
-    }
+    const token = await getValidAccessToken();
     return {
         headers: {
             ...headers,
@@ -47,11 +43,7 @@ let reconnectAttempts = 0;
 const wsClient: Client = createClient({
     url: wsUrl,
     connectionParams: async () => {
-        let token = useAuthStore.getState().token;
-        if (!token) {
-            const { getToken } = await import('@/utils/secureTokenStore');
-            token = await getToken();
-        }
+        const token = await getValidAccessToken();
         return { Authorization: token ? `Bearer ${token}` : '' };
     },
     shouldRetry: () => true,

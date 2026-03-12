@@ -78,10 +78,9 @@ function AppContent() {
                         <Stack.Screen
                             name="cart"
                             options={{
-                                presentation: 'modal',
+                                presentation: 'fullScreenModal',
                                 animation: 'slide_from_bottom',
-                                gestureDirection: 'vertical',
-                                gestureEnabled: true,
+                                gestureEnabled: false,
                                 headerShown: false,
                             }}
                         />

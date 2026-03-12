@@ -1,4 +1,4 @@
-import { ApolloClient, InMemoryCache, HttpLink, ApolloLink } from '@apollo/client';
+import { ApolloClient, InMemoryCache, HttpLink, ApolloLink, Observable } from '@apollo/client';
 import { onError } from '@apollo/client/link/error';
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { getMainDefinition } from '@apollo/client/utilities';
@@ -9,6 +9,7 @@ import { persistCache, AsyncStorageWrapper } from 'apollo3-cache-persist';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../../store/authStore';
 import { toast } from '../../store/toastStore';
+import { getValidAccessToken, refreshAccessToken } from './authSession';
 
 const logLink = new ApolloLink((operation, forward) => {
     console.log('Request', {
@@ -18,13 +19,45 @@ const logLink = new ApolloLink((operation, forward) => {
     return forward(operation);
 });
 
-const errorLink = onError(({ error, operation }) => {
+const errorLink = onError(({ error, operation, forward }) => {
     if (CombinedGraphQLErrors.is(error)) {
         for (const err of error.errors) {
             if (err.extensions?.code === 'UNAUTHENTICATED' || err.message === 'Unauthorized') {
-                console.warn('[Apollo] Auth error — clearing session');
-                useAuthStore.getState().logout();
-                return; // Don't show toast for auth redirect
+                const alreadyRetried = operation.getContext().alreadyRetriedAuth === true;
+                if (alreadyRetried || !forward) {
+                    console.warn('[Apollo] Auth refresh failed or already retried; preserving session until manual logout');
+                    return;
+                }
+
+                return new Observable((observer) => {
+                    refreshAccessToken()
+                        .then((token) => {
+                            if (!token) {
+                                observer.error(error);
+                                return;
+                            }
+
+                            operation.setContext(({ headers = {} }) => ({
+                                alreadyRetriedAuth: true,
+                                headers: {
+                                    ...headers,
+                                    authorization: `Bearer ${token}`,
+                                },
+                            }));
+
+                            const subscription = forward(operation).subscribe({
+                                next: (value) => observer.next(value),
+                                error: (networkError) => observer.error(networkError),
+                                complete: () => observer.complete(),
+                            });
+
+                            return () => subscription.unsubscribe();
+                        })
+                        .catch((refreshError) => {
+                            console.warn('[Apollo] Token refresh failed:', refreshError);
+                            observer.error(error);
+                        });
+                });
             }
         }
         // Show first non-auth GraphQL error as toast
@@ -36,8 +69,7 @@ const errorLink = onError(({ error, operation }) => {
     } else {
         // Network or other error
         if ('statusCode' in error && (error as any).statusCode === 401) {
-            console.warn('[Apollo] 401 — clearing session');
-            useAuthStore.getState().logout();
+            console.warn('[Apollo] 401 received; preserving session until manual logout');
             return;
         }
         console.error('[Apollo] Network error:', error.message);
@@ -46,14 +78,7 @@ const errorLink = onError(({ error, operation }) => {
 });
 
 const authLink = new SetContextLink(async ({ headers }) => {
-    // Try to get token from Zustand store first (faster)
-    let token = useAuthStore.getState().token;
-
-    // If not in store, try secure storage (fallback)
-    if (!token) {
-        const { getToken } = await import('../../utils/secureTokenStore');
-        token = await getToken();
-    }
+    const token = await getValidAccessToken();
 
     return {
         headers: {
@@ -81,12 +106,7 @@ const wsLink = wsUrl
               url: wsUrl,
               lazy: true,
               connectionParams: async () => {
-                  // Get fresh token for each connection attempt
-                  let token = useAuthStore.getState().token;
-                  if (!token) {
-                      const { getToken } = await import('../../utils/secureTokenStore');
-                      token = await getToken();
-                  }
+                  const token = await getValidAccessToken();
                   return {
                       authorization: token ? `Bearer ${token}` : '',
                   };

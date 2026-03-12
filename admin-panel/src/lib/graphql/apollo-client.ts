@@ -155,7 +155,17 @@ const wsLink = typeof window !== "undefined" ? new GraphQLWsLink(
                 console.log('[WS] Connection closed', event);
             },
             error: (err) => {
-                console.error('[WS] WebSocket error:', err);
+                const normalized = err instanceof Error
+                    ? { message: err.message, name: err.name, stack: err.stack }
+                    : (() => {
+                        try {
+                            return JSON.parse(JSON.stringify(err));
+                        } catch {
+                            return { value: String(err) };
+                        }
+                    })();
+
+                console.error('[WS] WebSocket error:', normalized);
             },
         },
     })

@@ -1,9 +1,10 @@
-import { graphql } from '@/gql';
+import { gql } from '@apollo/client';
 
-export const LOGIN_MUTATION = graphql(`
+export const LOGIN_MUTATION = gql`
     mutation BusinessLogin($input: LoginInput!) {
         login(input: $input) {
             token
+            refreshToken
             user {
                 id
                 email
@@ -22,4 +23,4 @@ export const LOGIN_MUTATION = graphql(`
             message
         }
     }
-`);
+`;

@@ -15,14 +15,30 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSSupportsLiveActivities": true,
         "UIBackgroundModes": [
+          "remote-notification",
+          "remote-notification",
+          "remote-notification",
           "remote-notification"
         ]
       },
+      "appleTeamId": "87K8YXG5V8",
       "bundleIdentifier": "com.anonymous.mobilecustomer",
       "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -87,12 +103,15 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "049cecd4-f9e5-4d45-a73b-41b5391ca710"
+        "projectId": "e5c04b16-6851-4fce-aa03-e4a183f0becf"
       }
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "owner": "edonramadani"
+    "owner": "artshabani2002",
+    "updates": {
+      "url": "https://u.expo.dev/e5c04b16-6851-4fce-aa03-e4a183f0becf"
+    }
   }
 }

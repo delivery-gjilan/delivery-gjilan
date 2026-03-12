@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { User } from '@/gql/graphql';
-import { deleteToken } from '@/utils/secureTokenStore';
+import { deleteTokens } from '@/utils/secureTokenStore';
 
 /**
  * Authentication Store
@@ -27,7 +27,7 @@ interface AuthState {
     hasHydrated: boolean; // Flag to know when Zustand has loaded from storage
 
     // Actions
-    setToken: (token: string) => void;
+    setToken: (token: string | null) => void;
     setUser: (user: User | null) => void;
     setLoading: (loading: boolean) => void;
     login: (token: string, user: User) => void;
@@ -77,7 +77,7 @@ export const useAuthStore = create<AuthState>()(
                 }),
 
             logout: async () => {
-                await deleteToken();
+                await deleteTokens();
                 set({
                     token: null,
                     user: null,

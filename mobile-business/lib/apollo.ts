@@ -5,6 +5,7 @@ import { createClient } from 'graphql-ws';
 import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
 import { useAuthStore } from '@/store/authStore';
+import { getValidAccessToken } from './authSession';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000';
 const WS_URL = process.env.EXPO_PUBLIC_WS_URL || 'ws://localhost:4000';
@@ -25,7 +26,7 @@ const wsLink = new GraphQLWsLink(
         lazy: true,
         connectionParams: async () => {
             // Get fresh token for each connection attempt
-            const token = useAuthStore.getState().token;
+            const token = await getValidAccessToken();
             return token ? { authorization: `Bearer ${token}` } : {};
         },
         retryAttempts: Infinity,
@@ -56,8 +57,8 @@ const wsLink = new GraphQLWsLink(
 );
 
 // Auth Link
-const authLink = setContext((_, { headers }) => {
-    const token = useAuthStore.getState().token;
+const authLink = setContext(async (_, { headers }) => {
+    const token = await getValidAccessToken();
     return {
         headers: {
             ...headers,

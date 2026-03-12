@@ -6,7 +6,7 @@ import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { createClient, Client } from 'graphql-ws';
 import { persistCache, AsyncStorageWrapper } from 'apollo3-cache-persist';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAuthStore } from '@/store/authStore';
+import { getValidAccessToken } from './authSession';
 
 /**
  * Exponential backoff configuration for WebSocket reconnection
@@ -32,24 +32,21 @@ const errorLink = onError(({ graphQLErrors, networkError }) => {
     if (graphQLErrors) {
         for (const err of graphQLErrors) {
             if (err.extensions?.code === 'UNAUTHENTICATED' || err.message === 'Unauthorized') {
-                console.warn('[Apollo] Auth error — clearing session');
-                useAuthStore.getState().logout();
+                console.warn('[Apollo] Auth error:', err.message);
+                // DON'T auto-logout - let user stay logged in unless they explicitly log out
+                // Token refresh or reconnection will handle temporary auth issues
             }
         }
     }
     if (networkError && 'statusCode' in networkError && (networkError as any).statusCode === 401) {
-        console.warn('[Apollo] 401 — clearing session');
-        useAuthStore.getState().logout();
+        console.warn('[Apollo] 401 Unauthorized - token may need refresh');
+        // DON'T auto-logout - let user stay logged in
+        // This prevents forced logouts due to temporary auth issues or token expiry
     }
 });
 
 const authLink = new SetContextLink(async ({ headers }) => {
-    let token = useAuthStore.getState().token;
-
-    if (!token) {
-        const { getToken } = await import('@/utils/secureTokenStore');
-        token = await getToken();
-    }
+    const token = await getValidAccessToken();
 
     return {
         headers: {
@@ -72,11 +69,7 @@ let reconnectAttempts = 0;
 const wsClient: Client = createClient({
     url: wsUrl,
     connectionParams: async () => {
-        let token = useAuthStore.getState().token;
-        if (!token) {
-            const { getToken } = await import('@/utils/secureTokenStore');
-            token = await getToken();
-        }
+        const token = await getValidAccessToken();
 
         return {
             Authorization: token ? `Bearer ${token}` : '',

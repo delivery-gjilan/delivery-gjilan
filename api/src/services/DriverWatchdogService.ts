@@ -136,7 +136,11 @@ export class DriverWatchdogService {
       // Publish updates if any state changed
       const totalChanges = staleDrivers.length + lostDrivers.length;
       if (totalChanges > 0) {
-        await this.publishDriverUpdate();
+        const changedDriverIds = Array.from(new Set([
+          ...staleDrivers.map((d) => d.userId),
+          ...lostDrivers.map((d) => d.userId),
+        ]));
+        await this.publishDriverUpdate(changedDriverIds);
       }
 
       // Periodic status log — single COUNT(*) GROUP BY query, not a full table scan
@@ -157,9 +161,11 @@ export class DriverWatchdogService {
   /**
    * Publish driver updates to GraphQL subscriptions
    */
-  private async publishDriverUpdate(): Promise<void> {
+  private async publishDriverUpdate(userIds: string[]): Promise<void> {
     try {
-      const drivers = await this.authRepository.findDrivers();
+      if (userIds.length === 0) return;
+      const drivers = await this.authRepository.findDriversByIds(userIds);
+      if (drivers.length === 0) return;
       publish(pubsub, topics.allDriversChanged(), { drivers });
     } catch (error) {
       log.error({ err: error }, 'watchdog:publish:error');
@@ -199,7 +205,7 @@ export class DriverWatchdogService {
     const updated = await this.driverRepository.markDriverStaleIfExpired(userId);
     if (updated) {
       log.info({ userId }, 'watchdog:timer:marked:stale');
-      await this.publishDriverUpdate();
+      await this.publishDriverUpdate([userId]);
     }
   }
 
@@ -208,7 +214,7 @@ export class DriverWatchdogService {
     const updated = await this.driverRepository.markDriverLostIfExpired(userId);
     if (updated) {
       log.info({ userId }, 'watchdog:timer:marked:lost');
-      await this.publishDriverUpdate();
+      await this.publishDriverUpdate([userId]);
     }
   }
 }

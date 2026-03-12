@@ -44,81 +44,33 @@ export class FinancialService {
                 return;
             }
 
-            // Group items by business for calculation
-            const itemsByBusiness = await this.groupItemsByBusiness(orderItems);
+            const normalizedItems = Array.isArray(orderItems) ? orderItems : [];
+            const calculated = await this.settlementEngine.calculateOrderSettlements(
+                order,
+                normalizedItems,
+                driverId,
+            );
 
-            // Calculate settlements for each business using the engine
-            for (const [businessId, items] of itemsByBusiness.entries()) {
-                const businessSubtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-                
-                const result = await this.settlementEngine.calculateOrderSettlements(
-                    order.id,
-                    businessId,
-                    'BUSINESS',
-                    businessSubtotal,
-                    order
+            for (const settlement of calculated) {
+                const isBusiness = settlement.type === 'BUSINESS';
+                const settlementType = isBusiness ? 'BUSINESS_PAYMENT' : 'DRIVER_PAYMENT';
+
+                await this.settlementRepo.createSettlement(
+                    settlementType,
+                    isBusiness ? null : settlement.entityId,
+                    isBusiness ? settlement.entityId : null,
+                    settlement.orderId,
+                    settlement.amount,
+                    settlement.direction,
+                    settlement.ruleSnapshot,
+                    settlement.calculationDetails,
                 );
-
-                // Create settlement records for each result
-                for (const settlement of result.settlements) {
-                    await this.settlementRepo.createSettlement(
-                        'BUSINESS_PAYMENT',
-                        null,
-                        businessId,
-                        order.id,
-                        settlement.amount,
-                        settlement.direction,
-                        settlement.ruleSnapshot,
-                        settlement.calculationDetails
-                    );
-                }
-
-                log.info({
-                    businessId,
-                    totalAmount: result.totalAmount,
-                    settlementCount: result.settlements.length
-                }, 'business settlements created');
             }
 
-            // Calculate driver settlement if there's a driver
-            if (driverId && order.deliveryPrice > 0) {
-                const driverRepo = new DriverRepository(this.db);
-                const driver =
-                    (await driverRepo.getDriverByUserId(driverId)) ||
-                    (await driverRepo.createDriver(driverId));
-
-                if (driver?.id) {
-                    const result = await this.settlementEngine.calculateOrderSettlements(
-                        order.id,
-                        driver.id,
-                        'DRIVER',
-                        order.deliveryPrice,
-                        order
-                    );
-
-                    // Create settlement records for each result
-                    for (const settlement of result.settlements) {
-                        await this.settlementRepo.createSettlement(
-                            'DRIVER_PAYMENT',
-                            driver.id,
-                            null,
-                            order.id,
-                            settlement.amount,
-                            settlement.direction,
-                            settlement.ruleSnapshot,
-                            settlement.calculationDetails
-                        );
-                    }
-
-                    log.info({
-                        driverId: driver.id,
-                        totalAmount: result.totalAmount,
-                        settlementCount: result.settlements.length
-                    }, 'driver settlements created');
-                }
-            }
-
-            log.info({ orderId: order.id }, 'all order settlements created');
+            log.info({
+                orderId: order.id,
+                settlementCount: calculated.length,
+            }, 'all order settlements created');
         } catch (error) {
             log.error({ err: error, orderId: order.id }, 'settlement:create:error');
             throw error;

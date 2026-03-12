@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import { useAuthStore, AuthUser } from '@/store/authStore';
-import { saveToken } from '@/utils/secureTokenStore';
+import { saveRefreshToken, saveToken } from '@/utils/secureTokenStore';
 
 const LOGIN_MUTATION = gql`
     mutation Login($email: String!, $password: String!) {
         login(input: { email: $email, password: $password }) {
             token
+            refreshToken
             user {
                 id
                 firstName
@@ -57,6 +58,9 @@ export function useAuth() {
             };
 
             await saveToken(result.token);
+            if (result.refreshToken) {
+                await saveRefreshToken(result.refreshToken);
+            }
             storeLogin(result.token, user);
         } finally {
             setLoading(false);

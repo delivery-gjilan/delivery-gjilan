@@ -2,6 +2,7 @@ import { AuthRepository } from '@/repositories/AuthRepository';
 import { DbUser } from '@/database/schema/users';
 import { hashPassword, comparePassword, generateVerificationCode } from '@/lib/utils/authUtils';
 import jwt from 'jsonwebtoken';
+import { createHash, randomUUID } from 'crypto';
 import { AuthResponse, SignupStepResponse } from '@/generated/types.generated';
 import logger from '@/lib/logger';
 import { AppError } from '@/lib/errors';
@@ -9,7 +10,17 @@ import { AppError } from '@/lib/errors';
 const log = logger.child({ service: 'AuthService' });
 
 export class AuthService {
-    constructor(private authRepository: AuthRepository) {}
+    constructor(public authRepository: AuthRepository) {}
+
+    private hashRefreshToken(token: string): string {
+        return createHash('sha256').update(token).digest('hex');
+    }
+
+    private getRefreshTokenExpiryDate(): Date {
+        const date = new Date();
+        date.setDate(date.getDate() + 30);
+        return date;
+    }
 
     private getJwtSecret(): string {
         const secret = process.env.JWT_SECRET;
@@ -219,7 +230,20 @@ export class AuthService {
 
         // Generate short-lived access token plus long-lived refresh token.
         const token = await this.generateJWT(user.id);
-        const refreshToken = await this.generateRefreshToken(user.id);
+
+        let refreshToken: string | undefined;
+        try {
+            const candidateRefreshToken = await this.generateRefreshToken(user.id);
+            const refreshTokenHash = this.hashRefreshToken(candidateRefreshToken);
+            await this.authRepository.createRefreshTokenSession(
+                user.id,
+                refreshTokenHash,
+                this.getRefreshTokenExpiryDate().toISOString(),
+            );
+            refreshToken = candidateRefreshToken;
+        } catch (error) {
+            log.error({ userId: user.id, err: error }, 'auth:login:refreshSessionPersistFailed');
+        }
 
         return {
             token,
@@ -244,7 +268,7 @@ export class AuthService {
      */
     async generateRefreshToken(userId: string): Promise<string> {
         const secret = this.getRefreshSecret();
-        return jwt.sign({ userId, type: 'refresh' }, secret, { algorithm: 'HS256', expiresIn: '30d' });
+        return jwt.sign({ userId, type: 'refresh', jti: randomUUID() }, secret, { algorithm: 'HS256', expiresIn: '30d' });
     }
 
     /**
@@ -259,13 +283,40 @@ export class AuthService {
             }
             const user = await this.authRepository.findById(decoded.userId);
             if (!user) throw AppError.notFound('User');
+
+            const oldTokenHash = this.hashRefreshToken(refreshToken);
+            const hasActiveSession = await this.authRepository.hasActiveRefreshTokenSession(oldTokenHash, decoded.userId);
+            if (!hasActiveSession) {
+                throw AppError.unauthorized('Refresh token revoked or expired');
+            }
+
             const newToken = await this.generateJWT(decoded.userId);
             const newRefreshToken = await this.generateRefreshToken(decoded.userId);
+            const newTokenHash = this.hashRefreshToken(newRefreshToken);
+            const rotated = await this.authRepository.rotateRefreshTokenSession({
+                userId: decoded.userId,
+                oldTokenHash,
+                newTokenHash,
+                newExpiresAtIso: this.getRefreshTokenExpiryDate().toISOString(),
+            });
+            if (!rotated) {
+                throw AppError.unauthorized('Refresh token revoked or expired');
+            }
+
             return { token: newToken, refreshToken: newRefreshToken };
         } catch (err) {
             if (err instanceof AppError) throw err;
             throw AppError.unauthorized('Invalid or expired refresh token');
         }
+    }
+
+    async revokeCurrentRefreshTokenSession(userId: string, refreshToken: string): Promise<boolean> {
+        const tokenHash = this.hashRefreshToken(refreshToken);
+        return this.authRepository.revokeRefreshTokenSession(userId, tokenHash);
+    }
+
+    async revokeAllRefreshTokenSessions(userId: string): Promise<void> {
+        await this.authRepository.revokeAllRefreshTokenSessionsForUser(userId);
     }
 
     /**

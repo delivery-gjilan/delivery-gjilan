@@ -25,6 +25,9 @@ initSentry();
 const app = express();
 const port = Number(process.env.PORT) || 4000;
 
+// Respect upstream proxy IPs (ngrok/load balancers) so rate limiting uses real client addresses.
+app.set('trust proxy', 1);
+
 // ── Security headers ──
 app.use(helmet({ contentSecurityPolicy: false })); // CSP disabled for GraphiQL
 
@@ -42,10 +45,39 @@ app.use(cors({
 app.use(express.json({ limit: '16kb' }));
 
 // ── Rate limiting ──
+function getBearerFromHeaders(authHeader: string | undefined): string | null {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return null;
+    }
+    return authHeader.slice(7);
+}
+
+function getRateLimitKey(req: express.Request): string {
+    const token = getBearerFromHeaders(req.headers.authorization);
+    if (token) {
+        try {
+            const decoded = decodeJwtToken(token);
+            if (decoded?.userId) {
+                return `user:${decoded.userId}`;
+            }
+        } catch {
+            // Fall back to non-auth identifiers below.
+        }
+    }
+
+    const email = req.body?.variables?.input?.email;
+    if (typeof email === 'string' && email.trim()) {
+        return `email:${email.trim().toLowerCase()}`;
+    }
+
+    return `ip:${req.ip}`;
+}
+
 // General API limiter
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 500,                  // 500 requests per window
+    keyGenerator: getRateLimitKey,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests, please try again later.' },
@@ -55,6 +87,7 @@ const apiLimiter = rateLimit({
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 20,                   // 20 attempts per window
+    keyGenerator: getRateLimitKey,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many authentication attempts, please try again later.' },
@@ -64,23 +97,34 @@ const authLimiter = rateLimit({
 const uploadLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 50,                   // 50 uploads per window
+    keyGenerator: getRateLimitKey,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many upload requests, please try again later.' },
 });
 
-app.use('/graphql', apiLimiter);
-app.use('/api/upload', uploadLimiter);
-
-// Apply stricter auth rate limiting to auth-related GraphQL operations
+// Exclude high-frequency system operations from rate limiting
+const SYSTEM_OPERATIONS = new Set(['DriverHeartbeat', 'DriverBatteryReport']);
 const AUTH_OPERATIONS = new Set(['Login', 'InitiateSignup', 'RefreshToken', 'VerifyEmail', 'VerifyPhone', 'ResendEmailVerification']);
+
 app.use('/graphql', (req, res, next) => {
     const operationName = req.body?.operationName;
+    
+    // Skip rate limiting for critical system operations (heartbeats, etc.)
+    if (operationName && SYSTEM_OPERATIONS.has(operationName)) {
+        return next();
+    }
+    
+    // Apply stricter auth rate limiting
     if (operationName && AUTH_OPERATIONS.has(operationName)) {
         return authLimiter(req, res, next);
     }
-    next();
+    
+    // Apply general rate limiting for all other operations
+    return apiLimiter(req, res, next);
 });
+
+app.use('/api/upload', uploadLimiter);
 
 // Structured request logging (replaces the old console.log middleware)
 app.use(requestLogger);

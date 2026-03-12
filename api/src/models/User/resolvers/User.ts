@@ -69,6 +69,10 @@ export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'busines
             return null;
         }
     },
+    preferredLanguage: (parent) => {
+        const raw = (parent as any).preferredLanguage;
+        return raw?.toUpperCase() === 'AL' ? 'AL' : 'EN';
+    },
     commissionPercentage: async (parent, _args, { loaders }) => {
         if (parent.role !== 'DRIVER') return null;
         try {

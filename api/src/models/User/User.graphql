@@ -173,6 +173,8 @@ type Mutation {
     verifyPhone(input: VerifyPhoneInput!): SignupStepResponse!
     login(input: LoginInput!): AuthResponse! @skipAuth
     refreshToken(refreshToken: String!): TokenRefreshResponse! @skipAuth
+    logoutCurrentSession(refreshToken: String!): Boolean!
+    logoutAllSessions: Boolean!
     createUser(input: CreateUserInput!): AuthResponse!
     updateUser(input: UpdateUserInput!): User!
     deleteUser(id: ID!): Boolean!

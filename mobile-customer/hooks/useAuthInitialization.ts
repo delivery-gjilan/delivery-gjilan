@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
-import { getToken } from '@/utils/secureTokenStore';
 import { useLazyQuery } from '@apollo/client/react';
 import { ME_QUERY } from '@/graphql/operations/auth';
 import { useRouter } from 'expo-router';
 import { AppLanguage, SignupStep } from '@/gql/graphql';
 import { useLocaleStore } from '@/store/useLocaleStore';
+import { getValidAccessToken } from '@/lib/graphql/authSession';
 
 /**
  * Hook to initialize authentication state on app startup
@@ -15,7 +15,7 @@ export function useAuthInitialization() {
     const router = useRouter();
     const hasInitialized = useRef(false);
     const [isInitializing, setIsInitializing] = useState(true);
-    const { setToken, setUser, logout, hasHydrated } = useAuthStore();
+    const { setToken, setUser, user, logout, hasHydrated } = useAuthStore();
     const setLanguageChoice = useLocaleStore((state) => state.setLanguageChoice);
 
     const [fetchMe, { data, error, loading }] = useLazyQuery(ME_QUERY, {
@@ -38,7 +38,7 @@ export function useAuthInitialization() {
                 console.log('[AuthInit] Starting auth initialization');
                 
                 // Load token from SecureStore (single source of truth for tokens)
-                const token = await getToken();
+                const token = await getValidAccessToken();
 
                 // No token - redirect to auth selection
                 if (!token) {
@@ -72,16 +72,28 @@ export function useAuthInitialization() {
             return;
         }
 
-        // If there's an error or no user data, logout and redirect
+        // If ME query fails but we have a persisted user, keep session and proceed.
+        // This prevents forced logout on temporary network or backend issues.
         if (error || (data && !data.me)) {
             console.log('[AuthInit] ME query failed:', error?.message || 'No user data');
-            const handleAuthFailure = async () => {
-                await logout();
-                router.replace('/auth-selection');
+
+            if (user) {
+                console.log('[AuthInit] Falling back to persisted user session');
+                if (user.signupStep === SignupStep.Completed) {
+                    router.replace('/(tabs)/home');
+                } else {
+                    router.replace('/signup');
+                }
                 setIsInitializing(false);
                 hasInitialized.current = true;
-            };
-            handleAuthFailure();
+                return;
+            }
+
+            // No persisted user available; route to auth selection without clearing token.
+            // This ensures only explicit manual logout removes credentials.
+            router.replace('/auth-selection');
+            setIsInitializing(false);
+            hasInitialized.current = true;
             return;
         }
 
@@ -107,7 +119,7 @@ export function useAuthInitialization() {
             setIsInitializing(false);
             hasInitialized.current = true;
         }
-    }, [data, error, loading, logout, router, setLanguageChoice, setUser]);
+    }, [data, error, loading, router, setLanguageChoice, setUser, user]);
 
     return {
         isInitializing,

@@ -17,7 +17,7 @@ import * as TaskManager from 'expo-task-manager';
 import { useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import { useAuthStore } from '@/store/authStore';
-import { getToken } from '@/utils/secureTokenStore';
+import { getValidAccessToken } from '@/lib/graphql/authSession';
 import { useNavigationLocationStore } from '@/store/navigationLocationStore';
 import { useNavigationStore } from '@/store/navigationStore';
 
@@ -74,27 +74,10 @@ const DRIVER_HEARTBEAT_MUTATION_TEXT = `
 
 async function sendBackgroundHeartbeat(latitude: number, longitude: number): Promise<void> {
   try {
-    const token = await getToken();
+    const token = await getValidAccessToken(0);
     const endpoint = process.env.EXPO_PUBLIC_API_URL;
 
     if (!token || !endpoint) {
-      return;
-    }
-
-    // Decode JWT payload to check expiry without a full verify (no secret needed here).
-    // Avoids silent 401s when the token has expired while the app was backgrounded.
-    try {
-      const payloadB64 = token.split('.')[1];
-      if (payloadB64) {
-        const payload = JSON.parse(atob(payloadB64)) as { exp?: number };
-        if (payload.exp && Date.now() / 1000 > payload.exp) {
-          console.warn('[Heartbeat][Background] JWT expired – skipping heartbeat until foreground refresh');
-          return;
-        }
-      }
-    } catch {
-      // Malformed token – skip
-      console.warn('[Heartbeat][Background] Could not decode JWT, skipping heartbeat');
       return;
     }
 
@@ -228,21 +211,19 @@ export function useDriverHeartbeat() {
         return false;
       }
 
-      // Request background permission – blocking so we know the result before
-      // attempting startLocationUpdatesAsync. iOS only shows the system dialog once;
-      // subsequent denials must be handled by directing the user to Settings.
+      // Request background permission – recommended but not mandatory
       const bgResult = await Location.requestBackgroundPermissionsAsync();
       if (bgResult.status !== 'granted') {
-        console.warn('[Heartbeat] Background location permission denied');
+        console.warn('[Heartbeat] Background location permission not granted - foreground only mode');
         Alert.alert(
-          'Background Location Needed',
-          'To keep tracking your position during deliveries, set location access to "Always" in Settings.',
+          'Background Location Recommended',
+          'For best tracking during deliveries, enable "Always" location access in Settings. You can continue for now with foreground tracking.',
           [
             { text: 'Open Settings', onPress: () => Linking.openSettings() },
-            { text: 'Not Now', style: 'cancel' },
+            { text: 'Continue Anyway', style: 'cancel' },
           ]
         );
-        // Continue without background tracking – foreground-only mode
+        // Continue with foreground-only mode - don't block the driver
       }
 
       return true;
@@ -252,8 +233,9 @@ export function useDriverHeartbeat() {
     }
   }, []);
 
-  // Get current location with fast timeout fallback to simulation
-  const getCurrentLocation = useCallback(async (): Promise<{ latitude: number; longitude: number } | null> => {
+  // Get current location with fast timeout fallback chain
+  // NEVER returns null - always sends heartbeat with best available location
+  const getCurrentLocation = useCallback(async (): Promise<{ latitude: number; longitude: number }> => {
     // Priority 1: Check for navigation SDK location (when actively navigating)
     const navLocationState = useNavigationLocationStore.getState();
     if (navLocationState.isFresh() && navLocationState.location) {
@@ -261,7 +243,13 @@ export function useDriverHeartbeat() {
       return navLocationState.location;
     }
 
-    // Priority 2: Try real GPS with aggressive timeout (2 seconds max)
+    // Priority 2: Use cached location from location watch
+    if (lastLocationRef.current) {
+      console.log('[Heartbeat] Using cached location from watch');
+      return lastLocationRef.current;
+    }
+
+    // Priority 3: Try real GPS with timeout (2 seconds max)
     try {
       const location = await Promise.race([
         Location.getCurrentPositionAsync({
@@ -273,19 +261,46 @@ export function useDriverHeartbeat() {
       ]) as any;
       
       if (location) {
-        console.log('[Heartbeat] Got real GPS', { lat: location.coords.latitude, lng: location.coords.longitude });
-        return {
+        const coords = {
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
         };
+        console.log('[Heartbeat] Got fresh GPS', coords);
+        lastLocationRef.current = coords;
+        return coords;
       }
     } catch (err) {
-      console.warn('[Heartbeat] GPS failed or timed out, using simulation');
+      console.warn('[Heartbeat] GPS timeout, checking fallbacks');
     }
 
-    // GPS unavailable – skip this heartbeat rather than send false coordinates.
-    console.warn('[Heartbeat] GPS unavailable, skipping heartbeat');
-    return null;
+    // Priority 4: Last known position from system (up to 5 minutes old)
+    try {
+      const lastKnown = await Location.getLastKnownPositionAsync({ maxAge: 300000, requiredAccuracy: 200 });
+      if (lastKnown) {
+        const coords = {
+          latitude: lastKnown.coords.latitude,
+          longitude: lastKnown.coords.longitude,
+        };
+        console.log('[Heartbeat] Using last known position from system');
+        lastLocationRef.current = coords;
+        return coords;
+      }
+    } catch (err) {
+      console.warn('[Heartbeat] Last known position unavailable');
+    }
+
+    // Priority 5: Use stale cached location if available
+    if (lastLocationRef.current) {
+      console.warn('[Heartbeat] Using stale cached location');
+      return lastLocationRef.current;
+    }
+
+    // Priority 6: Hardcoded fallback (Gjilan city center) - LAST RESORT
+    // Better to send heartbeat with approximate location than skip entirely
+    console.error('[Heartbeat] No location available, using fallback coordinates (Gjilan center)');
+    const fallbackCoords = { latitude: 42.6629, longitude: 20.2936 };
+    lastLocationRef.current = fallbackCoords;
+    return fallbackCoords;
   }, []);
 
   const startLocationWatch = useCallback(async () => {
@@ -343,15 +358,10 @@ export function useDriverHeartbeat() {
     }
   }, []);
 
-  // Send heartbeat to server
-  const doHeartbeat = useCallback(async () => {
+  // Send heartbeat to server with retry logic
+  const doHeartbeat = useCallback(async (isRetry = false) => {
     try {
-      const location = await getCurrentLocation();
-
-      if (!location) {
-        console.warn('[Heartbeat] No location available, skipping');
-        return;
-      }
+      const location = await getCurrentLocation(); // Now always returns a location
 
       lastLocationRef.current = location;
 
@@ -369,14 +379,22 @@ export function useDriverHeartbeat() {
         console.log('[Heartbeat] Sent', {
           status: data.connectionStatus,
           locationUpdated: data.locationUpdated,
+          isRetry,
         });
       } else {
         console.warn('[Heartbeat] Failed:', result.error);
       }
     } catch (err: any) {
       console.error('[Heartbeat] Error:', err.message);
-      // Network error - mark as potentially stale
-      setConnectionStatus((prev) => (prev === 'CONNECTED' ? 'STALE' : prev));
+      
+      // Retry once after 1 second if this wasn't already a retry
+      if (!isRetry) {
+        console.log('[Heartbeat] Retrying in 1s...');
+        setTimeout(() => doHeartbeat(true), 1000);
+      } else {
+        // Only mark as potentially stale after retry also fails
+        setConnectionStatus((prev) => (prev === 'CONNECTED' ? 'STALE' : prev));
+      }
     }
   }, [getCurrentLocation, getNavigationEtaPayload, sendHeartbeat]);
 

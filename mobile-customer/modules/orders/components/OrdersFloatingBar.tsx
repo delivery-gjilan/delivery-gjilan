@@ -1,12 +1,16 @@
 import { View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useApolloClient } from '@apollo/client/react';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useActiveOrdersStore } from '../store/activeOrdersStore';
+import { GET_ORDER } from '@/graphql/operations/orders';
+import { toast } from '@/store/toastStore';
 
 export const OrdersFloatingBar = () => {
     const router = useRouter();
+    const apolloClient = useApolloClient();
     const theme = useTheme();
     const { t } = useTranslations();
 
@@ -15,11 +19,42 @@ export const OrdersFloatingBar = () => {
     if (!hasActiveOrders || activeOrders.length === 0) return null;
 
     // Since we only support 1 active order, take the first one
-    const activeOrder = activeOrders[0];
+    const activeOrder = activeOrders[0] as any;
+    const customerVisibleStatus = activeOrder.status === 'READY' ? 'PREPARING' : activeOrder.status;
 
     // Get business names
     const businessNames = activeOrder.businesses.map(b => b.business.name).join(', ');
     const displayBusinessName = businessNames.length > 30 ? businessNames.substring(0, 30) + '...' : businessNames;
+
+    const liveEtaSeconds = activeOrder?.driver?.driverConnection?.remainingEtaSeconds;
+    const liveEtaUpdatedAt = activeOrder?.driver?.driverConnection?.etaUpdatedAt;
+    const liveEtaMs = liveEtaUpdatedAt ? new Date(liveEtaUpdatedAt).getTime() : 0;
+    const liveEtaFresh =
+        customerVisibleStatus === 'OUT_FOR_DELIVERY' &&
+        typeof liveEtaSeconds === 'number' &&
+        Number.isFinite(liveEtaSeconds) &&
+        liveEtaMs > 0 &&
+        Date.now() - liveEtaMs <= 20_000;
+
+    const prepEta = (() => {
+        if (customerVisibleStatus !== 'PREPARING') return null;
+        const prepTotal = Number(activeOrder.preparationMinutes ?? 0);
+        if (!Number.isFinite(prepTotal) || prepTotal <= 0) return null;
+        const prepStart = activeOrder.preparingAt || activeOrder.orderDate;
+        const prepStartMs = prepStart ? new Date(prepStart).getTime() : 0;
+        if (!prepStartMs || Number.isNaN(prepStartMs)) return Math.max(1, Math.round(prepTotal));
+        const elapsedMin = Math.max(0, (Date.now() - prepStartMs) / 60000);
+        return Math.max(1, Math.ceil(prepTotal - elapsedMin));
+    })();
+
+    const deliveryEta = (() => {
+        if (!liveEtaFresh) return null;
+        if (liveEtaSeconds <= 0) return 0;
+        return Math.max(1, Math.round(liveEtaSeconds / 60));
+    })();
+
+    const etaMinutes = customerVisibleStatus === 'PREPARING' ? prepEta : customerVisibleStatus === 'OUT_FOR_DELIVERY' ? deliveryEta : null;
+    const etaLabel = customerVisibleStatus === 'PREPARING' ? t.orders.details.est_ready : customerVisibleStatus === 'OUT_FOR_DELIVERY' ? t.orders.details.est_delivery : '';
 
     // Determine status info with stronger colors
     const getStatusInfo = (status: string) => {
@@ -32,18 +67,12 @@ export const OrdersFloatingBar = () => {
                     icon: 'time-outline' as const,
                 };
             case 'PREPARING':
+            case 'READY':
                 return {
                     label: t.orders.status.preparing,
                     message: t.orders.status_messages.preparing,
-                    bgColor: '#3B82F6', // Blue
+                    bgColor: '#7C3AED', // Purple
                     icon: 'restaurant-outline' as const,
-                };
-            case 'READY':
-                return {
-                    label: t.orders.status.ready,
-                    message: t.orders.status_messages.ready,
-                    bgColor: '#10B981', // Green
-                    icon: 'checkmark-circle-outline' as const,
                 };
             case 'OUT_FOR_DELIVERY':
                 return {
@@ -76,12 +105,34 @@ export const OrdersFloatingBar = () => {
         }
     };
 
-    const statusInfo = getStatusInfo(activeOrder.status);
+    const statusInfo = getStatusInfo(customerVisibleStatus);
+
+    const handlePress = async () => {
+        try {
+            const result = await apolloClient.query({
+                query: GET_ORDER,
+                variables: { id: activeOrder.id },
+                fetchPolicy: 'network-only',
+            });
+
+            if (!result.data?.order) {
+                toast.warning(t.common.error, t.orders.banner_unavailable);
+                return;
+            }
+
+            router.push(`/orders/${activeOrder.id}`);
+        } catch (error) {
+            console.warn('[OrdersFloatingBar] Failed to load active order before navigation:', error);
+            toast.warning(t.common.error, t.orders.banner_connection_lost);
+        }
+    };
 
     return (
         <TouchableOpacity
             activeOpacity={0.9}
-            onPress={() => router.push(`/orders/${activeOrder.id}`)}
+            onPress={() => {
+                void handlePress();
+            }}
             className="flex-row items-center justify-between p-4 rounded-2xl w-full"
             style={{ backgroundColor: statusInfo.bgColor }}
         >
@@ -103,6 +154,12 @@ export const OrdersFloatingBar = () => {
                 <View className="bg-white/20 px-2 py-1 rounded-full">
                     <Text className="text-white text-xs font-semibold">{statusInfo.label}</Text>
                 </View>
+                {etaMinutes !== null && (
+                    <View className="bg-white/20 px-2 py-1 rounded-full">
+                        <Text className="text-white text-xs font-semibold">~{etaMinutes} {t.orders.details.min_short}</Text>
+                        <Text className="text-white/80 text-[10px] leading-3">{etaLabel}</Text>
+                    </View>
+                )}
                 <Ionicons name="chevron-forward" size={20} color="white" />
             </View>
         </TouchableOpacity>

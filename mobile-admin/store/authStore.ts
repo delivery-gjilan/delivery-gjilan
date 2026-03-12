@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import { deleteToken } from '@/utils/secureTokenStore';
+import { deleteTokens } from '@/utils/secureTokenStore';
 
 export type UserRole = 'ADMIN' | 'SUPER_ADMIN' | 'BUSINESS_OWNER' | 'BUSINESS_EMPLOYEE';
 
@@ -22,7 +22,7 @@ interface AuthState {
     hasHydrated: boolean;
     isAuthenticated: boolean;
 
-    setToken: (token: string) => void;
+    setToken: (token: string | null) => void;
     setUser: (user: AuthUser | null) => void;
     setLoading: (loading: boolean) => void;
     login: (token: string, user: AuthUser) => void;
@@ -73,7 +73,7 @@ export const useAuthStore = create<AuthState>()(
 
             logout: async () => {
                 console.log('[AuthStore] Logging out...');
-                await deleteToken();
+                await deleteTokens();
                 set({
                     token: null,
                     user: null,

@@ -347,6 +347,8 @@
         "driver_notes_placeholder": "e.g., Ring the doorbell twice"
     },
     "orders": {
+        "banner_connection_lost": "Connection lost. Reconnecting...",
+        "banner_unavailable": "Your active order is temporarily unavailable. Please try again in a moment.",
         "title": "My Orders",
         "subtitle": "Track your deliveries",
         "empty": "No orders yet",

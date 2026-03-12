@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert, Modal, TextInput, Animated, Dimensions, Platform, BackHandler, LayoutAnimation, UIManager } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -30,11 +30,12 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 export const CartScreen = () => {
     const router = useRouter();
     const theme = useTheme();
+    const insets = useSafeAreaInsets();
     const { t } = useTranslations();
     const { items, total, isEmpty } = useCart();
     const { updateQuantity, removeItem, clearCart, updateItemNotes } = useCartActions();
     const { createOrder, loading: orderLoading } = useCreateOrder();
-    const { showSuccess } = useSuccessModalStore();
+    const { showLoading, showSuccess, hideSuccess } = useSuccessModalStore();
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [deliveryPrice, setDeliveryPrice] = useState(2.0); // Default; updated from API
@@ -74,6 +75,7 @@ export const CartScreen = () => {
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const proceedButtonAnim = useRef(new Animated.Value(1)).current;
     const screenWidth = Dimensions.get('window').width;
+    const headerTopPadding = (insets.top || 0) + (Platform.OS === 'ios' ? 10 : 6);
 
     const [validatePromotionsManual, { loading: manualPromoLoading }] = useLazyQuery(VALIDATE_PROMOTIONS, {
         fetchPolicy: 'no-cache',
@@ -325,8 +327,11 @@ export const CartScreen = () => {
         setSelectedLocation(next);
         requestFeeForLocation(next);
 
-        // If this is a new location (not a saved address), ask if they want to save it
-        if (!next.addressId) {
+        // Only offer to save as default when user picks a new (unsaved) location AND
+        // they don't already have a default address. If they already have a default,
+        // just proceed to checkout without asking.
+        const hasDefaultAddress = savedAddresses.some((addr) => addr.priority === 1);
+        if (!next.addressId && !hasDefaultAddress) {
             setPendingLocationToSave(next);
             setAddressName('');
             setTimeout(() => setShowSaveAddressPrompt(true), 200);
@@ -480,6 +485,7 @@ export const CartScreen = () => {
         }
 
         setIsProcessing(true);
+        showLoading('order_created');
         try {
             const order = await createOrder(selectedLocation, appliedDeliveryPrice, finalTotal, promoResult?.code, driverNotes);
             const orderId = order?.id || null;
@@ -496,17 +502,30 @@ export const CartScreen = () => {
             if (orderId) {
                 console.log('[CartScreen] Showing success modal');
                 showSuccess(orderId, 'order_created');
+            } else {
+                hideSuccess();
             }
-            
-            // Then close cart modal after a brief delay
-            setTimeout(() => {
-                console.log('[CartScreen] Closing cart');
-                router.back();
-            }, 100);
         } catch (err) {
             console.error('[CartScreen] Order creation failed:', err);
+            hideSuccess();
             setShowConfirmDialog(false);
-            Alert.alert(t.cart.order_failed, t.cart.unable_create_order, [{ text: t.common.ok }]);
+
+            const errorMessage = err instanceof Error ? err.message : '';
+            if (errorMessage === 'Active order exists') {
+                // The user already gets a dedicated toast from useCreateOrder.
+                return;
+            }
+
+            const graphQLErrorMessage =
+                typeof (err as any)?.graphQLErrors?.[0]?.message === 'string'
+                    ? (err as any).graphQLErrors[0].message
+                    : null;
+
+            Alert.alert(
+                t.cart.order_failed,
+                graphQLErrorMessage || errorMessage || t.cart.unable_create_order,
+                [{ text: t.common.ok }],
+            );
         } finally {
             setIsProcessing(false);
         }
@@ -523,7 +542,7 @@ export const CartScreen = () => {
                 {/* Header */}
                 <View
                     className="flex-row items-center justify-between px-4 py-3 border-b"
-                    style={{ borderBottomColor: theme.colors.border }}
+                    style={{ borderBottomColor: theme.colors.border, paddingTop: headerTopPadding }}
                 >
                     <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
                         <Ionicons name="close" size={28} color={theme.colors.text} />
@@ -551,9 +570,21 @@ export const CartScreen = () => {
     return (
         <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }}>
 
-            {/* ─── Top stepper (no back button) ──── */}
-            <View className="flex-row items-center justify-center px-4 py-6">
-                <View className="flex-1 flex-row items-center justify-center">
+            {/* ─── Top header with back/close + stepper ──── */}
+            <View className="flex-row items-center px-4 pb-2" style={{ paddingTop: headerTopPadding }}>
+                <TouchableOpacity
+                    onPress={() => {
+                        if (step === 1) router.back();
+                        else if (step === 2) goToStep(1);
+                        else goToStep(2);
+                    }}
+                    className="w-10 h-10 rounded-full items-center justify-center"
+                    style={{ backgroundColor: theme.colors.card }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                    <Ionicons name={step === 1 ? 'close' : 'arrow-back'} size={22} color={theme.colors.text} />
+                </TouchableOpacity>
+                <View className="flex-1 flex-row items-center justify-center mx-2">
                 {([
                     { s: 1 as const, icon: 'cart-outline' as const, iconDone: 'cart' as const, label: t.cart.title },
                     { s: 2 as const, icon: 'location-outline' as const, iconDone: 'location' as const, label: t.cart.step_address ?? 'Address' },
@@ -587,6 +618,8 @@ export const CartScreen = () => {
                     );
                 })}
                 </View>
+                {/* Balance spacer equal width to back button */}
+                <View style={{ width: 40 }} />
             </View>
 
             {/* ─── STEP 1: Cart ───────────────────────── */}

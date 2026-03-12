@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { User, UserRole } from '@/gql/graphql';
-import { deleteToken } from '@/utils/secureTokenStore';
+import { deleteTokens } from '@/utils/secureTokenStore';
 
 interface AuthState {
     token: string | null;
@@ -21,7 +21,7 @@ interface AuthState {
     isOnline: boolean;
 
     // Actions
-    setToken: (token: string) => void;
+    setToken: (token: string | null) => void;
     setUser: (user: User | null) => void;
     setLoading: (loading: boolean) => void;
     setOnline: (online: boolean) => void;
@@ -85,7 +85,7 @@ export const useAuthStore = create<AuthState>()(
             },
 
             logout: async () => {
-                await deleteToken();
+                await deleteTokens();
                 set({
                     token: null,
                     user: null,

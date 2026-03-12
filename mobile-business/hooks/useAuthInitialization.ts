@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/store/authStore';
-import { getToken } from '@/utils/secureTokenStore';
+import { getValidAccessToken } from '@/lib/authSession';
 
 /**
  * Hook to initialize authentication state on app startup
@@ -28,7 +28,7 @@ export function useAuthInitialization() {
                 console.log('[AuthInit] Starting auth initialization');
                 
                 // Load token from SecureStore (single source of truth for tokens)
-                const token = await getToken();
+                const token = await getValidAccessToken();
 
                 // No token - redirect to login
                 if (!token) {

@@ -6,6 +6,7 @@ import {
     Animated,
     Dimensions,
     StyleSheet,
+    ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ConfettiCannon from 'react-native-confetti-cannon';
@@ -16,19 +17,22 @@ import { useTranslations } from '@/hooks/useTranslations';
 const { width } = Dimensions.get('window');
 
 type SuccessModalType = 'order_created' | 'order_delivered';
+type SuccessModalPhase = 'loading' | 'success';
 
 interface OrderSuccessScreenProps {
     orderId?: string | null;
     type?: SuccessModalType;
+    phase?: SuccessModalPhase;
     onTrackOrder?: () => void;
     onGoHome: () => void;
 }
 
-export default function OrderSuccessScreen({ orderId, type = 'order_created', onTrackOrder, onGoHome }: OrderSuccessScreenProps) {
+export default function OrderSuccessScreen({ orderId, type = 'order_created', phase = 'success', onTrackOrder, onGoHome }: OrderSuccessScreenProps) {
     const theme = useTheme();
     const { t } = useTranslations();
     
     const isDelivered = type === 'order_delivered';
+    const isLoading = phase === 'loading';
 
     const checkScale = useRef(new Animated.Value(0)).current;
     const titleOpacity = useRef(new Animated.Value(0)).current;
@@ -40,6 +44,16 @@ export default function OrderSuccessScreen({ orderId, type = 'order_created', on
     const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
+        if (isLoading) {
+            checkScale.setValue(0);
+            titleOpacity.setValue(1);
+            titleTranslateY.setValue(0);
+            subtitleOpacity.setValue(1);
+            buttonsOpacity.setValue(0);
+            buttonsTranslateY.setValue(30);
+            return;
+        }
+
         // Haptic feedback
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
@@ -97,7 +111,7 @@ export default function OrderSuccessScreen({ orderId, type = 'order_created', on
                 clearTimeout(autoCloseTimerRef.current);
             }
         };
-    }, [onGoHome]);
+    }, [checkScale, titleOpacity, titleTranslateY, subtitleOpacity, buttonsOpacity, buttonsTranslateY, isLoading, onGoHome]);
 
     const handleTrackOrder = () => {
         if (autoCloseTimerRef.current) {
@@ -116,23 +130,25 @@ export default function OrderSuccessScreen({ orderId, type = 'order_created', on
     return (
         <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
             {/* Confetti */}
-            <ConfettiCannon
-                ref={confettiRef}
-                count={120}
-                origin={{ x: width / 2, y: -20 }}
-                autoStart
-                fadeOut
-                fallSpeed={2800}
-                explosionSpeed={350}
-                colors={[
-                    theme.colors.primary,
-                    '#fbbf24', // amber
-                    '#34d399', // emerald
-                    '#60a5fa', // blue
-                    '#f472b6', // pink
-                    '#a78bfa', // violet
-                ]}
-            />
+            {!isLoading && (
+                <ConfettiCannon
+                    ref={confettiRef}
+                    count={120}
+                    origin={{ x: width / 2, y: -20 }}
+                    autoStart
+                    fadeOut
+                    fallSpeed={2800}
+                    explosionSpeed={350}
+                    colors={[
+                        theme.colors.primary,
+                        '#fbbf24',
+                        '#34d399',
+                        '#60a5fa',
+                        '#f472b6',
+                        '#a78bfa',
+                    ]}
+                />
+            )}
 
             {/* Content */}
             <View style={styles.content}>
@@ -143,7 +159,7 @@ export default function OrderSuccessScreen({ orderId, type = 'order_created', on
                         {
                             backgroundColor: theme.colors.primary + '15',
                             borderColor: theme.colors.primary + '30',
-                            transform: [{ scale: checkScale }],
+                            transform: [{ scale: isLoading ? 1 : checkScale }],
                         },
                     ]}
                 >
@@ -153,7 +169,11 @@ export default function OrderSuccessScreen({ orderId, type = 'order_created', on
                             { backgroundColor: theme.colors.primary },
                         ]}
                     >
-                        <Ionicons name="checkmark" size={40} color="#fff" />
+                        {isLoading ? (
+                            <ActivityIndicator size="large" color="#fff" />
+                        ) : (
+                            <Ionicons name="checkmark" size={40} color="#fff" />
+                        )}
                     </View>
                 </Animated.View>
 
@@ -168,7 +188,7 @@ export default function OrderSuccessScreen({ orderId, type = 'order_created', on
                         },
                     ]}
                 >
-                    {isDelivered ? t.orders.details.order_delivered : t.cart.order_success_title}
+                    {isLoading ? t.cart.placing_order : isDelivered ? t.orders.details.order_delivered : t.cart.order_success_title}
                 </Animated.Text>
 
                 {/* Subtitle */}
@@ -181,20 +201,21 @@ export default function OrderSuccessScreen({ orderId, type = 'order_created', on
                         },
                     ]}
                 >
-                    {isDelivered ? t.orders.details.order_delivered_message : t.cart.order_success_subtitle}
+                    {isLoading ? t.common.processing : isDelivered ? t.orders.details.order_delivered_message : t.cart.order_success_subtitle}
                 </Animated.Text>
             </View>
 
             {/* Buttons */}
-            <Animated.View
-                style={[
-                    styles.buttons,
-                    {
-                        opacity: buttonsOpacity,
-                        transform: [{ translateY: buttonsTranslateY }],
-                    },
-                ]}
-            >
+            {!isLoading && (
+                <Animated.View
+                    style={[
+                        styles.buttons,
+                        {
+                            opacity: buttonsOpacity,
+                            transform: [{ translateY: buttonsTranslateY }],
+                        },
+                    ]}
+                >
                 {!isDelivered && onTrackOrder && (
                     <TouchableOpacity
                         style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
@@ -230,7 +251,8 @@ export default function OrderSuccessScreen({ orderId, type = 'order_created', on
                         {isDelivered ? t.common.go_home : t.common.close}
                     </Text>
                 </TouchableOpacity>
-            </Animated.View>
+                </Animated.View>
+            )}
         </View>
     );
 }

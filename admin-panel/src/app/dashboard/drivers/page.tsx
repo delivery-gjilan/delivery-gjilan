@@ -58,9 +58,27 @@ export default function DriversPage() {
     const isSuperAdmin = admin?.role === "SUPER_ADMIN";
 
     const { data, loading, error, refetch } = useQuery<DriversResponse>(DRIVERS_QUERY);
+    const [drivers, setDrivers] = useState<DriverItem[]>([]);
+
+    useEffect(() => {
+        if (data?.drivers) {
+            setDrivers(data.drivers);
+        }
+    }, [data?.drivers]);
 
     useSubscription(DRIVERS_UPDATED_SUBSCRIPTION, {
-        onData: () => { refetch(); },
+        onData: ({ data: subscriptionData }) => {
+            const incoming = subscriptionData.data?.driversUpdated as DriverItem[] | undefined;
+            if (!incoming || incoming.length === 0) return;
+
+            setDrivers((prev) => {
+                const byId = new Map(prev.map((d) => [d.id, d]));
+                incoming.forEach((driver) => {
+                    byId.set(driver.id, { ...byId.get(driver.id), ...driver });
+                });
+                return Array.from(byId.values());
+            });
+        },
     });
 
     const [createDriver] = useMutation(CREATE_USER_MUTATION, {
@@ -101,7 +119,7 @@ export default function DriversPage() {
     const rtcClientRef = useRef<IAgoraRTCClient | null>(null);
     const micTrackRef = useRef<IMicrophoneAudioTrack | null>(null);
 
-    const selectedDrivers = (data?.drivers || []).filter((d) => selectedDriverIds.includes(d.id));
+    const selectedDrivers = drivers.filter((d) => selectedDriverIds.includes(d.id));
     const selectedConnectedDriverIds = selectedDrivers
         .filter((d) => d.driverConnection?.connectionStatus === 'CONNECTED')
         .map((d) => d.id);
@@ -404,7 +422,7 @@ export default function DriversPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {data?.drivers?.map((driver) => {
+                            {drivers.map((driver) => {
                                 const conn = driver.driverConnection;
                                 const status = conn?.connectionStatus ?? "DISCONNECTED";
                                 const isOnline = conn?.onlinePreference ?? false;
@@ -486,7 +504,7 @@ export default function DriversPage() {
                                     </tr>
                                 );
                             })}
-                            {!data?.drivers?.length && (
+                            {!drivers.length && (
                                 <tr>
                                     <Td colSpan={9}>
                                         <div className="text-center text-gray-500 py-8">No drivers found.</div>

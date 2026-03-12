@@ -21,7 +21,7 @@ function AppContent() {
     // Start heartbeat as soon as auth is established
     useDriverTracking();
     useNotifications();
-    const { isAdminTalking, isMutedByAdmin } = useDriverPttReceiver();
+    const { isAdminTalking } = useDriverPttReceiver();
 
     const { bannerEnabled, bannerMessage, bannerType } = useStoreStatus();
     const [bannerDismissed, setBannerDismissed] = useState(false);
@@ -33,7 +33,7 @@ function AppContent() {
                 <View className="absolute top-12 left-4 right-4 z-50 rounded-xl border border-red-500/40 bg-red-500/15 px-4 py-3 flex-row items-center gap-3">
                     <ActivityIndicator color="#fca5a5" size="small" />
                     <Text className="text-red-200 text-sm font-semibold">
-                        {isMutedByAdmin ? 'Admin muted audio' : 'Admin is talking'}
+                        Admin is talking
                     </Text>
                 </View>
             )}

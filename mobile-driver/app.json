@@ -3,6 +3,13 @@
     "name": "mobile-driver",
     "slug": "finance-tracker",
     "version": "1.0.0",
+    "platforms": ["ios", "android"],
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/1c06f250-74dc-4a5d-855c-f53e97df8c2e"
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "deliveryapp",
@@ -21,10 +28,6 @@
           "location",
           "audio",
           "location",
-          "audio",
-          "location",
-          "audio",
-          "location",
           "audio"
         ],
         "MBXAccessToken": "pk.eyJ1IjoiYXJ0c2hhYmFuaTIwMDIiLCJhIjoiY21sZjlkbTNxMDIwOTNkc2F0cTZkYmZoeiJ9.C81uu49ST5NrfHZ58N9EXg",
@@ -33,15 +36,6 @@
     },
     "android": {
       "permissions": [
-        "android.permission.RECORD_AUDIO",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_BACKGROUND_LOCATION",
-        "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_LOCATION",
         "android.permission.RECORD_AUDIO",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
@@ -147,12 +141,6 @@
         "projectId": "1c06f250-74dc-4a5d-855c-f53e97df8c2e"
       }
     },
-    "owner": "edonramadani",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/1c06f250-74dc-4a5d-855c-f53e97df8c2e"
-    }
+    "owner": "edonramadani"
   }
 }

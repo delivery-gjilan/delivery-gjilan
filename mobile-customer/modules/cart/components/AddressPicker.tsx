@@ -494,10 +494,11 @@ export default function AddressPicker({
                             // Clear any pending button enable timeout (from tap without drag)
                             if (buttonEnableTimeoutRef.current) clearTimeout(buttonEnableTimeoutRef.current);
                             
-                            // Don't geocode if user is still touching the map (momentum scrolling)
-                            if (isTouchingMapRef.current) {
-                                return;
-                            }
+                            // Region settled — the finger must be off the map (or momentum ended).
+                            // Always reset the touch flag here; relying on onResponderRelease is
+                            // unreliable because the native map view eats the gesture before the
+                            // React responder system sees the release event.
+                            isTouchingMapRef.current = false;
                             
                             // Check if position changed significantly (>10 meters ~= 0.0001 degrees)
                             const last = lastGeocodedPos.current;

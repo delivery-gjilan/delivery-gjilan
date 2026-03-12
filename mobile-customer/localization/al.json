@@ -347,6 +347,8 @@
         "driver_notes_placeholder": "p.sh., Bini zillin dy herë"
     },
     "orders": {
+        "banner_connection_lost": "Lidhja u humb. Po rilidhemi...",
+        "banner_unavailable": "Porosia juaj aktive përkohësisht nuk është e qasshme. Ju lutem provoni përsëri pas pak.",
         "title": "Porosinë e Mia",
         "subtitle": "Ndiqni dorëzimet tuaja",
         "empty": "Ende asnjë porosi",

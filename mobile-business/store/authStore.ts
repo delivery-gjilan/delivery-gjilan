@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import { deleteToken } from '@/utils/secureTokenStore';
+import { deleteTokens } from '@/utils/secureTokenStore';
 
 /**
  * Authentication Store
@@ -43,7 +43,7 @@ interface AuthStore {
     login: (user: AuthUser, token: string) => void;
     logout: () => Promise<void>;
     updateUser: (user: Partial<AuthUser>) => void;
-    setToken: (token: string) => void;
+    setToken: (token: string | null) => void;
 }
 
 const calculateIsAuthenticated = (token: string | null, user: AuthUser | null): boolean => {
@@ -82,7 +82,7 @@ export const useAuthStore = create<AuthStore>()(
             logout: async () => {
                 console.log('[AuthStore] Logging out');
                 try {
-                    await deleteToken();
+                    await deleteTokens();
                 } catch (error) {
                     console.error('[AuthStore] Error deleting token:', error);
                 }
