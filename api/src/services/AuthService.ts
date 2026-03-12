@@ -217,11 +217,13 @@ export class AuthService {
             throw AppError.badInput('Invalid email or password');
         }
 
-        // Generate JWT token (eternal - no expiration)
+        // Generate short-lived access token plus long-lived refresh token.
         const token = await this.generateJWT(user.id);
+        const refreshToken = await this.generateRefreshToken(user.id);
 
         return {
             token,
+            refreshToken,
             user,
             message: 'Login successful',
         };

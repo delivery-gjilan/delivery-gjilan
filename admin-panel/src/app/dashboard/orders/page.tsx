@@ -75,6 +75,22 @@ interface Order {
     } | null;
 }
 
+const normalizeOrderBusinesses = (order: any): OrderBusiness[] => {
+    if (!Array.isArray(order?.businesses)) return [];
+    return order.businesses.map((biz: any) => ({
+        ...biz,
+        items: Array.isArray(biz?.items) ? biz.items : [],
+    }));
+};
+
+const getOrderBusinessesSafe = (order: any): OrderBusiness[] => {
+    return Array.isArray(order?.businesses) ? order.businesses : [];
+};
+
+const getBusinessItemsSafe = (business: any): OrderItem[] => {
+    return Array.isArray(business?.items) ? business.items : [];
+};
+
 /* ---------------------------------------------------------
    STATUS CONFIG
 --------------------------------------------------------- */
@@ -199,8 +215,16 @@ export default function OrdersPage() {
     const isBusinessEmployee = admin?.role === "BUSINESS_EMPLOYEE";
     const isBusinessUser = isBusinessOwner || isBusinessEmployee;
 
+    const normalizedOrders = useMemo(() => {
+        const source = Array.isArray(orders) ? orders : [];
+        return source.map((order: any) => ({
+            ...order,
+            businesses: normalizeOrderBusinesses(order),
+        })) as Order[];
+    }, [orders]);
+
     const filteredOrders = useMemo(() => {
-        return (orders as Order[])
+        return normalizedOrders
             .slice()
             .sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime())
             .filter(order => {
@@ -214,7 +238,7 @@ export default function OrdersPage() {
                 }
                 return false;
             });
-    }, [orders, searchQuery]);
+    }, [normalizedOrders, searchQuery]);
 
     const activeOrders = useMemo(() =>
         filteredOrders.filter(o => o.status !== 'DELIVERED' && o.status !== 'CANCELLED'),
@@ -409,9 +433,9 @@ export default function OrdersPage() {
 
                                         {/* Items */}
                                         <div className="mb-3 space-y-1">
-                                            {order.businesses.map((biz, idx) => (
+                                            {getOrderBusinessesSafe(order).map((biz, idx) => (
                                                 <div key={idx}>
-                                                    {biz.items.slice(0, 3).map((item, itemIdx) => (
+                                                    {getBusinessItemsSafe(biz).slice(0, 3).map((item, itemIdx) => (
                                                         <div key={itemIdx}>
                                                             <div className="text-sm text-zinc-400 flex items-center gap-2">
                                                                 <span className="text-zinc-600">×{item.quantity}</span>
@@ -424,8 +448,8 @@ export default function OrdersPage() {
                                                             )}
                                                         </div>
                                                     ))}
-                                                    {biz.items.length > 3 && (
-                                                        <div className="text-xs text-zinc-600 ml-6">+{biz.items.length - 3} more</div>
+                                                    {getBusinessItemsSafe(biz).length > 3 && (
+                                                        <div className="text-xs text-zinc-600 ml-6">+{getBusinessItemsSafe(biz).length - 3} more</div>
                                                     )}
                                                 </div>
                                             ))}
@@ -520,7 +544,7 @@ export default function OrdersPage() {
                             ) : (
                                 activeOrders.map((order) => {
                                     const nextStatus = STATUS_FLOW[order.status];
-                                    const businessNames = order.businesses.map(b => b.business.name).join(", ");
+                                    const businessNames = getOrderBusinessesSafe(order).map(b => b.business.name).join(", ");
                                     return (
                                         <tr key={order.id} className="hover:bg-zinc-900/30 transition-colors">
                                             <Td><CopyableId displayId={order.displayId} /></Td>
@@ -615,7 +639,7 @@ export default function OrdersPage() {
                                 </tr>
                             ) : (
                                 completedOrders.map((order) => {
-                                    const businessNames = order.businesses.map(b => b.business.name).join(", ");
+                                    const businessNames = getOrderBusinessesSafe(order).map(b => b.business.name).join(", ");
                                     return (
                                         <tr key={order.id} className="hover:bg-zinc-900/30 transition-colors">
                                             <Td><CopyableId displayId={order.displayId} /></Td>
@@ -729,7 +753,7 @@ export default function OrdersPage() {
 
                         {/* Items by business */}
                         <div className="space-y-4">
-                            {selectedOrder.businesses.map((biz, idx) => (
+                            {getOrderBusinessesSafe(selectedOrder).map((biz, idx) => (
                                 <div key={idx} className="space-y-2">
                                     <div className="flex items-center gap-2 px-1">
                                         <Store size={14} className="text-violet-500" />
@@ -753,7 +777,7 @@ export default function OrdersPage() {
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {biz.items.map((item, itemIdx) => {
+                                                {getBusinessItemsSafe(biz).map((item, itemIdx) => {
                                                     let rowBorder = "";
                                                     if (biz.business.businessType === 'MARKET') {
                                                         if (item.quantityNeeded === 0) rowBorder = "border-l-2 border-l-green-500/50";

@@ -1,4 +1,4 @@
-import { useQuery } from '@apollo/client';
+import { useQuery } from '@apollo/client/react';
 import { GET_STORE_STATUS } from '@/graphql/operations/store';
 
 interface StoreStatus {

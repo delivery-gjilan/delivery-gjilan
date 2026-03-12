@@ -7,9 +7,9 @@ export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'busines
     permissions: async (parent) => {
         // Get permissions for this user
         const perms = await getUserPermissions({
-            userId: parent.id,
+            userId: String(parent.id),
             role: parent.role as any,
-            businessId: parent.businessId ?? undefined,
+            businessId: parent.businessId ? String(parent.businessId) : undefined,
         });
         
         return perms as any;
@@ -51,13 +51,16 @@ export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'busines
             const driver = await loaders.driverByUserIdLoader.load(String(parent.id));
             const value = driver?.lastLocationUpdate ?? null;
             if (!value) return null;
-            if (value instanceof Date) return value;
             if (typeof value === 'string') {
                 const normalized = value
                     .replace(' ', 'T')
                     .replace(/\+00\.?$/, 'Z')
                     .replace(/Z\.$/, 'Z');
                 const parsed = new Date(normalized);
+                return isNaN(parsed.getTime()) ? null : parsed;
+            }
+            if (typeof value === 'number') {
+                const parsed = new Date(value);
                 return isNaN(parsed.getTime()) ? null : parsed;
             }
             return null;
@@ -89,6 +92,10 @@ export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'busines
                 lastHeartbeatAt: driver.lastHeartbeatAt,
                 lastLocationUpdate: driver.lastLocationUpdate,
                 disconnectedAt: driver.disconnectedAt,
+                batteryLevel: driver.batteryLevel ?? null,
+                batteryOptIn: driver.batteryOptIn ?? false,
+                batteryUpdatedAt: driver.batteryUpdatedAt ?? null,
+                isCharging: driver.isCharging ?? null,
                 activeOrderId: liveEta?.activeOrderId ?? null,
                 navigationPhase: liveEta?.navigationPhase ?? null,
                 remainingEtaSeconds: liveEta?.remainingEtaSeconds ?? null,

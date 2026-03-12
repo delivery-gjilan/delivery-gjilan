@@ -8,21 +8,169 @@ const path = require('path');
 
 const EXTENSION_TARGET_NAME = 'DeliveryLiveActivityExtension';
 
+// Shared between extension AND main app targets
 const DELIVERY_ACTIVITY_ATTRIBUTES_SWIFT = `import ActivityKit
 import Foundation
 
+@available(iOS 16.1, *)
 struct DeliveryActivityAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable {
         var driverName: String
         var estimatedMinutes: Int
         var status: String
         var orderId: String
-        var lastUpdated: Date
+        var lastUpdated: Int64  // Unix timestamp ms
     }
 
     var orderDisplayId: String
     var businessName: String
 }
+`;
+
+// Custom native module – added to the MAIN APP target so it can call Activity<T>.request(...)
+const DELIVERY_LIVE_ACTIVITIES_SWIFT = `import Foundation
+import ActivityKit
+import React
+
+@objc(DeliveryLiveActivities)
+class DeliveryLiveActivities: NSObject {
+
+    // MARK: - startActivity
+    @objc
+    func startActivity(_ attributesDict: NSDictionary,
+                       state stateDict: NSDictionary,
+                       resolver resolve: @escaping RCTPromiseResolveBlock,
+                       rejecter reject: @escaping RCTPromiseRejectBlock) {
+        guard #available(iOS 16.2, *) else {
+            reject("NOT_SUPPORTED", "Live Activities require iOS 16.2+", nil)
+            return
+        }
+        let attrs = DeliveryActivityAttributes(
+            orderDisplayId: attributesDict["orderDisplayId"] as? String ?? "",
+            businessName: attributesDict["businessName"] as? String ?? ""
+        )
+        let contentState = DeliveryActivityAttributes.ContentState(
+            driverName: stateDict["driverName"] as? String ?? "",
+            estimatedMinutes: (stateDict["estimatedMinutes"] as? NSNumber)?.intValue ?? 0,
+            status: stateDict["status"] as? String ?? "",
+            orderId: stateDict["orderId"] as? String ?? "",
+            lastUpdated: (stateDict["lastUpdated"] as? NSNumber)?.int64Value ?? Int64(Date().timeIntervalSince1970 * 1000)
+        )
+        do {
+            let content = ActivityContent(state: contentState, staleDate: nil)
+            let activity = try Activity<DeliveryActivityAttributes>.request(
+                attributes: attrs,
+                content: content,
+                pushType: .token
+            )
+            resolve(activity.id)
+        } catch {
+            reject("START_ACTIVITY_ERROR", error.localizedDescription, error)
+        }
+    }
+
+    // MARK: - updateActivity
+    @objc
+    func updateActivity(_ activityId: String,
+                        state stateDict: NSDictionary,
+                        resolver resolve: @escaping RCTPromiseResolveBlock,
+                        rejecter reject: @escaping RCTPromiseRejectBlock) {
+        guard #available(iOS 16.2, *) else {
+            resolve(nil)
+            return
+        }
+        guard let activity = Activity<DeliveryActivityAttributes>.activities.first(where: { $0.id == activityId }) else {
+            reject("ACTIVITY_NOT_FOUND", "Activity not found: \\(activityId)", nil)
+            return
+        }
+        let newState = DeliveryActivityAttributes.ContentState(
+            driverName: stateDict["driverName"] as? String ?? "",
+            estimatedMinutes: (stateDict["estimatedMinutes"] as? NSNumber)?.intValue ?? 0,
+            status: stateDict["status"] as? String ?? "",
+            orderId: stateDict["orderId"] as? String ?? "",
+            lastUpdated: (stateDict["lastUpdated"] as? NSNumber)?.int64Value ?? Int64(Date().timeIntervalSince1970 * 1000)
+        )
+        Task {
+            let content = ActivityContent(state: newState, staleDate: nil)
+            await activity.update(content)
+            resolve(activityId)
+        }
+    }
+
+    // MARK: - endActivity
+    @objc
+    func endActivity(_ activityId: String,
+                     resolver resolve: @escaping RCTPromiseResolveBlock,
+                     rejecter reject: @escaping RCTPromiseRejectBlock) {
+        guard #available(iOS 16.2, *) else {
+            resolve(nil)
+            return
+        }
+        guard let activity = Activity<DeliveryActivityAttributes>.activities.first(where: { $0.id == activityId }) else {
+            resolve(nil)
+            return
+        }
+        Task {
+            await activity.end(nil, dismissalPolicy: .immediate)
+            resolve(nil)
+        }
+    }
+
+    // MARK: - getPushToken
+    @objc
+    func getPushToken(_ activityId: String,
+                      resolver resolve: @escaping RCTPromiseResolveBlock,
+                      rejecter reject: @escaping RCTPromiseRejectBlock) {
+        guard #available(iOS 16.1, *) else {
+            reject("NOT_SUPPORTED", "Live Activities require iOS 16.1+", nil)
+            return
+        }
+        guard let activity = Activity<DeliveryActivityAttributes>.activities.first(where: { $0.id == activityId }) else {
+            reject("ACTIVITY_NOT_FOUND", "Activity not found: \\(activityId)", nil)
+            return
+        }
+        if let tokenData = activity.pushToken {
+            resolve(tokenData.map { String(format: "%02x", $0) }.joined())
+            return
+        }
+        Task {
+            for await tokenData in activity.pushTokenUpdates {
+                resolve(tokenData.map { String(format: "%02x", $0) }.joined())
+                return
+            }
+            reject("NO_PUSH_TOKEN", "No push token available for activity \\(activityId)", nil)
+        }
+    }
+
+    @objc
+    static func requiresMainQueueSetup() -> Bool { return false }
+}
+`;
+
+// Objective-C bridge so RN can find the Swift module via NativeModules.DeliveryLiveActivities
+const DELIVERY_LIVE_ACTIVITIES_OBJC = `#import <React/RCTBridgeModule.h>
+
+@interface RCT_EXTERN_MODULE(DeliveryLiveActivities, NSObject)
+
+RCT_EXTERN_METHOD(startActivity:(NSDictionary *)attributesDict
+                  state:(NSDictionary *)stateDict
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(updateActivity:(NSString *)activityId
+                  state:(NSDictionary *)stateDict
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(endActivity:(NSString *)activityId
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(getPushToken:(NSString *)activityId
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
+@end
 `;
 
 const DELIVERY_LIVE_ACTIVITY_WIDGET_SWIFT = `import ActivityKit
@@ -106,14 +254,22 @@ const EXTENSION_INFO_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
 </plist>
 `;
 
+// Always write – ensures files track the plugin definition after every prebuild
+function writeFile(filePath, content) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, content, 'utf8');
+}
+
+// Keep ensureFile for widget UI files (users may want to customise the widget appearance)
 function ensureFile(filePath, content) {
   if (fs.existsSync(filePath)) {
     return;
   }
-
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, content, 'utf8');
 }
+
+// ─── Widget extension files ──────────────────────────────────────────────────
 
 function withLiveActivityExtensionFiles(config) {
   return withDangerousMod(config, [
@@ -121,7 +277,8 @@ function withLiveActivityExtensionFiles(config) {
     async (cfg) => {
       const extensionDir = path.join(cfg.modRequest.platformProjectRoot, EXTENSION_TARGET_NAME);
 
-      ensureFile(
+      // Always keep attributes in sync with the main app copy
+      writeFile(
         path.join(extensionDir, 'DeliveryActivityAttributes.swift'),
         DELIVERY_ACTIVITY_ATTRIBUTES_SWIFT,
       );
@@ -190,9 +347,151 @@ function withLiveActivityExtensionTarget(config) {
   });
 }
 
+// ─── Custom native module (main app target) ──────────────────────────────────
+
+function withDeliveryLiveActivitiesModuleFiles(config) {
+  return withDangerousMod(config, [
+    'ios',
+    async (cfg) => {
+      const appName = cfg.modRequest.projectName;
+      const appDir = path.join(cfg.modRequest.platformProjectRoot, appName);
+
+      // DeliveryActivityAttributes must exist in the main app target so the native
+      // module can reference Activity<DeliveryActivityAttributes> at compile time.
+      writeFile(
+        path.join(appDir, 'DeliveryActivityAttributes.swift'),
+        DELIVERY_ACTIVITY_ATTRIBUTES_SWIFT,
+      );
+
+      // Always overwrite so changes to the module are picked up on every prebuild.
+      writeFile(
+        path.join(appDir, 'DeliveryLiveActivities.swift'),
+        DELIVERY_LIVE_ACTIVITIES_SWIFT,
+      );
+
+      writeFile(
+        path.join(appDir, 'DeliveryLiveActivities.m'),
+        DELIVERY_LIVE_ACTIVITIES_OBJC,
+      );
+
+      console.log('[LiveActivityExtension] Wrote DeliveryLiveActivities native module to main app target dir:', appDir);
+      return cfg;
+    },
+  ]);
+}
+
+function withDeliveryLiveActivitiesModuleTarget(config) {
+  return withXcodeProject(config, (cfg) => {
+    const project = cfg.modResults;
+    const appName = cfg.modRequest.projectName;
+
+    // Find the main application target UUID
+    const targets = project.pbxNativeTargetSection();
+    const mainTargetEntry = Object.entries(targets).find(([, target]) => {
+      return (
+        typeof target === 'object' &&
+        target.productType === '"com.apple.product-type.application"'
+      );
+    });
+
+    if (!mainTargetEntry) {
+      console.warn('[LiveActivityExtension] Could not locate main app target – skipping native module Xcode registration');
+      return cfg;
+    }
+
+    const [mainTargetUuid] = mainTargetEntry;
+
+    // Guard against duplicate file references on incremental prebuilds
+    const existingRefs = Object.values(project.pbxFileReferenceSection());
+    const alreadyAdded = existingRefs.some(
+      (ref) =>
+        typeof ref === 'object' &&
+        (ref.path === '"DeliveryLiveActivities.swift"' || ref.name === '"DeliveryLiveActivities.swift"'),
+    );
+
+    if (alreadyAdded) {
+      console.log('[LiveActivityExtension] Native module already registered in Xcode project, skipping');
+      return cfg;
+    }
+
+    ensureGroupRecursively(project, appName);
+
+    const nativeModuleFiles = [
+      'DeliveryActivityAttributes.swift',
+      'DeliveryLiveActivities.swift',
+      'DeliveryLiveActivities.m',
+    ];
+
+    for (const file of nativeModuleFiles) {
+      addBuildSourceFileToGroup({
+        filepath: file,
+        groupName: appName,
+        project,
+        targetUuid: mainTargetUuid,
+        verbose: true,
+      });
+    }
+
+    console.log('[LiveActivityExtension] Registered DeliveryLiveActivities native module in main app Xcode target');
+    return cfg;
+  });
+}
+
+// ─── Podfile fix: disable code signing for resource bundle targets (Xcode 14+) ─
+
+function withResourceBundleSigningFix(config) {
+  return withDangerousMod(config, [
+    'ios',
+    async (cfg) => {
+      const podfilePath = path.join(cfg.modRequest.platformProjectRoot, 'Podfile');
+      if (!fs.existsSync(podfilePath)) {
+        console.warn('[ResourceBundleSigningFix] Podfile not found, skipping');
+        return cfg;
+      }
+
+      let podfile = fs.readFileSync(podfilePath, 'utf8');
+
+      const fixSnippet = `
+  # Fix Xcode 14+ resource bundle code signing
+  installer.pods_project.targets.each do |target|
+    if target.respond_to?(:product_type) && target.product_type == "com.apple.product-type.bundle"
+      target.build_configurations.each do |config|
+        config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+      end
+    end
+  end`;
+
+      if (podfile.includes('CODE_SIGNING_ALLOWED')) {
+        console.log('[ResourceBundleSigningFix] Podfile already patched, skipping');
+        return cfg;
+      }
+
+      // Insert our snippet into an existing post_install block if present,
+      // otherwise add a new post_install block.
+      if (podfile.includes('post_install do |installer|')) {
+        podfile = podfile.replace(
+          'post_install do |installer|',
+          `post_install do |installer|\n${fixSnippet}`,
+        );
+      } else {
+        podfile += `\npost_install do |installer|\n${fixSnippet}\nend\n`;
+      }
+
+      fs.writeFileSync(podfilePath, podfile, 'utf8');
+      console.log('[ResourceBundleSigningFix] Patched Podfile for Xcode 14+ resource bundle signing');
+      return cfg;
+    },
+  ]);
+}
+
+// ─── Compose ─────────────────────────────────────────────────────────────────
+
 function withLiveActivityExtension(config) {
   config = withLiveActivityExtensionFiles(config);
   config = withLiveActivityExtensionTarget(config);
+  config = withDeliveryLiveActivitiesModuleFiles(config);
+  config = withDeliveryLiveActivitiesModuleTarget(config);
+  config = withResourceBundleSigningFix(config);
   return config;
 }
 

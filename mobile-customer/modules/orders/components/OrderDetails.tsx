@@ -358,6 +358,13 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const status = order?.status ?? 'PENDING';
     const isDeliveryPhase = status === 'OUT_FOR_DELIVERY';
     const isPreparingAnimationPhase = status === 'PENDING' || status === 'PREPARING';
+    const orderBusinesses = useMemo(() => {
+        if (!Array.isArray(order?.businesses)) return [];
+        return order.businesses.map((biz: any) => ({
+            ...biz,
+            items: Array.isArray(biz?.items) ? biz.items : [],
+        }));
+    }, [order?.businesses]);
 
     const stopDriverInterpolation = useCallback(() => {
         if (interpolationTimerRef.current) {
@@ -535,9 +542,9 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     // ─── Locations ──────────────────────────────────────────
     const pickupLocation = useMemo(() => {
         if (order?.pickupLocations?.length) return order.pickupLocations[0];
-        if (order?.businesses?.[0]?.business?.location) return order.businesses[0].business.location;
+        if (orderBusinesses[0]?.business?.location) return orderBusinesses[0].business.location;
         return null;
-    }, [order?.pickupLocations, order?.businesses]);
+    }, [order?.pickupLocations, orderBusinesses]);
 
     const dropoffLocation = useMemo(() => order?.dropOffLocation ?? null, [order?.dropOffLocation]);
 
@@ -546,7 +553,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const statusMessage = (t.orders.status_messages as any)?.[status.toLowerCase()] || '';
     const isCompleted = status === 'DELIVERED';
     const isCancelled = status === 'CANCELLED';
-    const businessName = order?.businesses?.[0]?.business?.name || '';
+    const businessName = orderBusinesses[0]?.business?.name || '';
 
     // ─── ETA (prefer live heartbeat ETA, fallback to haversine) ────
     const deliveryEta = useMemo(() => {
@@ -625,11 +632,12 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
 
     // Start Live Activity when order goes OUT_FOR_DELIVERY
     useEffect(() => {
-        if (status === 'OUT_FOR_DELIVERY' && driverName && deliveryEta !== null) {
+        if (status === 'OUT_FOR_DELIVERY') {
+            const etaMinutes = deliveryEta ?? 0;
             console.log('[OrderDetails] Starting Live Activity for OUT_FOR_DELIVERY');
             startLiveActivity({
-                driverName: driverName,
-                estimatedMinutes: deliveryEta,
+                driverName: driverName || 'Driver',
+                estimatedMinutes: etaMinutes,
                 status: 'out_for_delivery',
             });
         }
@@ -637,14 +645,15 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
 
     // Update Live Activity when ETA or driver changes
     useEffect(() => {
-        if ((status === 'OUT_FOR_DELIVERY' || status === 'PREPARING' || status === 'READY') && driverName && deliveryEta !== null) {
+        if (status === 'OUT_FOR_DELIVERY' || status === 'PREPARING' || status === 'READY') {
+            const etaMinutes = deliveryEta ?? 0;
             const liveStatus = status === 'OUT_FOR_DELIVERY' ? 'out_for_delivery' 
                 : status === 'READY' ? 'ready' 
                 : 'preparing';
             
             updateLiveActivity({
-                driverName: driverName,
-                estimatedMinutes: deliveryEta,
+                driverName: driverName || 'Driver',
+                estimatedMinutes: etaMinutes,
                 status: liveStatus,
             });
         }
@@ -774,6 +783,8 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                         try {
                             await updateOrderStatus({
                                 variables: { id: order.id, status: 'DELIVERED' as any },
+                                refetchQueries: [{ query: GET_ORDER_DRIVER, variables: { id: order.id } }],
+                                awaitRefetchQueries: true,
                             });
                             Alert.alert('Success', 'Order marked as delivered!');
                         } catch (err: any) {
@@ -823,7 +834,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         longitudeDelta: 0.015,
     };
 
-    const totalItems = order.businesses?.reduce((sum, b) => sum + b.items.length, 0) ?? 0;
+    const totalItems = orderBusinesses.reduce((sum, b: any) => sum + (Array.isArray(b?.items) ? b.items.length : 0), 0);
 
     // ─── Toggle order summary ───────────────────────────────
     const handleToggleSummary = () => {
@@ -958,7 +969,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                             </View>
                         </View>
 
-                        {order.businesses?.map((biz, bizIdx) => (
+                        {orderBusinesses.map((biz, bizIdx) => (
                             <View key={bizIdx}>
                                 <View style={{
                                     paddingHorizontal: 18,
@@ -984,7 +995,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                     </View>
                                 </View>
 
-                                {biz.items.map((item, itemIdx) => (
+                                {(Array.isArray(biz?.items) ? biz.items : []).map((item, itemIdx) => (
                                     <View
                                         key={`${item.productId}-${itemIdx}`}
                                         style={{
@@ -1473,8 +1484,8 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                 borderColor: theme.colors.border,
                             }}>
                                 <ScrollView style={{ maxHeight: 160 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-                                    {order.businesses?.map((biz) =>
-                                        biz.items.map((item, idx) => (
+                                    {orderBusinesses.map((biz) =>
+                                        (Array.isArray(biz?.items) ? biz.items : []).map((item, idx) => (
                                             <View key={`${item.productId}-${idx}`} style={{
                                                 flexDirection: 'row', alignItems: 'center', paddingVertical: 6,
                                                 borderTopWidth: idx === 0 ? 0 : 1, borderTopColor: theme.colors.border + '15',

@@ -1,6 +1,6 @@
-import { graphql } from '@/gql';
+import { gql } from '@apollo/client';
 
-export const DRIVERS_UPDATED_SUBSCRIPTION = graphql(`
+export const DRIVERS_UPDATED_SUBSCRIPTION = gql`
   subscription DriversUpdated {
     driversUpdated {
       id
@@ -22,6 +22,10 @@ export const DRIVERS_UPDATED_SUBSCRIPTION = graphql(`
         lastHeartbeatAt
         lastLocationUpdate
         disconnectedAt
+        batteryLevel
+        batteryOptIn
+        batteryUpdatedAt
+        isCharging
         activeOrderId
         navigationPhase
         remainingEtaSeconds
@@ -29,4 +33,4 @@ export const DRIVERS_UPDATED_SUBSCRIPTION = graphql(`
       }
     }
   }
-`);
+`;

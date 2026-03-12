@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState, Fragment, useCallback } from "react";
-import { useQuery, useSubscription, useMutation } from "@apollo/client/react";
+import { useQuery, useSubscription, useMutation, useLazyQuery } from "@apollo/client/react";
 import Map, { Marker, Source, Layer } from "react-map-gl/mapbox";
 import {
   MapPin, X, Filter, Clock, Package, Phone,
   User, Store, Calendar, AlertCircle, WifiOff, Signal,
   SignalLow, SignalZero, ChevronDown, ChevronUp, Eye, EyeOff,
-  Zap, Route, ExternalLink, Crosshair, LocateFixed
+  Zap, Route, ExternalLink, Crosshair, LocateFixed, Mic, MicOff, Radio
 } from "lucide-react";
 import { GET_BUSINESSES } from "@/graphql/operations/businesses/queries";
 import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
@@ -17,6 +17,8 @@ import { ALL_ORDERS_SUBSCRIPTION } from "@/graphql/operations/orders/subscriptio
 import { ASSIGN_DRIVER_TO_ORDER, UPDATE_ORDER_STATUS } from "@/graphql/operations/orders";
 import { ADMIN_UPDATE_DRIVER_LOCATION } from "@/graphql/operations/users/mutations";
 import { calculateRouteDistance, getDirectionsTelemetry } from "@/lib/utils/mapbox";
+import { ADMIN_SEND_PTT_SIGNAL, GET_AGORA_RTC_CREDENTIALS } from "@/graphql/operations/users/ptt";
+import AgoraRTC, { IAgoraRTCClient, IMicrophoneAudioTrack } from 'agora-rtc-sdk-ng';
 import { getInitials, getAvatarColor } from "@/lib/avatarUtils";
 import { toast } from 'sonner';
 
@@ -24,7 +26,7 @@ import { toast } from 'sonner';
 // ║                      CONSTANTS                          ║
 // ╚══════════════════════════════════════════════════════════╝
 const DEFAULT_CENTER = { latitude: 42.4635, longitude: 21.4694 };
-const GJILAN_BOUNDS: [[number, number], [number, number]] = [[21.42, 42.43], [21.51, 42.5]];
+const GJILAN_BOUNDS: [[number, number], [number, number]] = [[21.39, 42.40], [21.55, 42.53]];
 const MIN_ZOOM = 11.5;
 const MAX_ZOOM = 17;
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -320,6 +322,8 @@ export default function MapPage() {
   
   const [assignDriver] = useMutation(ASSIGN_DRIVER_TO_ORDER);
   const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS, { fetchPolicy: "no-cache" });
+  const [sendPttSignal] = useMutation(ADMIN_SEND_PTT_SIGNAL);
+  const [getAgoraCredentials] = useLazyQuery(GET_AGORA_RTC_CREDENTIALS, { fetchPolicy: 'no-cache' });
 
   const businesses = useMemo(() => (businessData as any)?.businesses ?? [], [businessData]);
   const orders = useMemo(
@@ -366,6 +370,16 @@ export default function MapPage() {
   const [detailPanelExpanded, setDetailPanelExpanded] = useState(false);
   const [directionsTelemetry, setDirectionsTelemetry] = useState(() => getDirectionsTelemetry());
   const [driverHeadingDeg, setDriverHeadingDeg] = useState<Record<string, number>>({});
+
+  // == PTT STATE ==
+  const [pttSelectedDriverIds, setPttSelectedDriverIds] = useState<string[]>([]);
+  const [pttIsTalking, setPttIsTalking] = useState(false);
+  const [pttIsMuted, setPttIsMuted] = useState(false);
+  const [pttChannelName, setPttChannelName] = useState<string | null>(null);
+  const [pttError, setPttError] = useState<string>('');
+  const [pttActiveDriverIds, setPttActiveDriverIds] = useState<string[]>([]);
+  const rtcClientRef = useRef<IAgoraRTCClient | null>(null);
+  const micTrackRef = useRef<IMicrophoneAudioTrack | null>(null);
 
   // == FILTERED ==
   const filteredOrders = useMemo(() => {
@@ -433,6 +447,92 @@ export default function MapPage() {
     });
     return result;
   }, [drivers, driverFilter, activeOrders]);
+
+  // ╔══════════════════════════════════════════════════════════╗
+  // ║                   PTT HANDLERS                          ║
+  // ╚══════════════════════════════════════════════════════════╝
+
+  const pttConnectedSelectedIds = useMemo(
+    () => pttSelectedDriverIds.filter((id) => {
+      const d = drivers.find((d: any) => d.id === id);
+      return d?.driverConnection?.connectionStatus === 'CONNECTED';
+    }),
+    [pttSelectedDriverIds, drivers],
+  );
+
+  const ensureRtcClient = useCallback(async () => {
+    if (rtcClientRef.current) return rtcClientRef.current;
+    const client = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
+    await client.setClientRole('host');
+    rtcClientRef.current = client;
+    return client;
+  }, []);
+
+  const stopTalking = useCallback(async () => {
+    const targets = pttActiveDriverIds.length > 0 ? pttActiveDriverIds : pttConnectedSelectedIds;
+    if (pttChannelName && targets.length > 0) {
+      try {
+        await sendPttSignal({ variables: { driverIds: targets, channelName: pttChannelName, action: 'STOPPED', muted: false } });
+      } catch { /* ignore */ }
+    }
+    try {
+      if (rtcClientRef.current && micTrackRef.current) {
+        await rtcClientRef.current.unpublish([micTrackRef.current]);
+      }
+      micTrackRef.current?.stop();
+      micTrackRef.current?.close();
+      micTrackRef.current = null;
+      if (rtcClientRef.current) await rtcClientRef.current.leave();
+        rtcClientRef.current = null;
+    } catch { /* no-op */ }
+    setPttIsTalking(false);
+    setPttChannelName(null);
+    setPttActiveDriverIds([]);
+  }, [pttChannelName, pttActiveDriverIds, pttConnectedSelectedIds, sendPttSignal]);
+
+  const startTalking = useCallback(async () => {
+    if (pttIsTalking) return;
+    setPttError('');
+    if (pttConnectedSelectedIds.length === 0) {
+      setPttError('Select connected drivers first.');
+      return;
+    }
+    const channelName = `ptt-map-${Date.now()}`;
+    const targets = [...pttConnectedSelectedIds];
+    try {
+      const res = await getAgoraCredentials({ variables: { channelName, role: 'PUBLISHER' } });
+      const creds = res.data?.getAgoraRtcCredentials;
+      if (!creds) throw new Error('Failed to get Agora credentials');
+      const client = await ensureRtcClient();
+      const micTrack = await AgoraRTC.createMicrophoneAudioTrack();
+      await client.join(creds.appId, creds.channelName, creds.token, creds.uid);
+      await client.publish([micTrack]);
+      micTrackRef.current = micTrack;
+      await sendPttSignal({ variables: { driverIds: targets, channelName, action: 'STARTED', muted: pttIsMuted } });
+      setPttChannelName(channelName);
+      setPttActiveDriverIds(targets);
+      setPttIsTalking(true);
+    } catch (err) {
+      setPttError(err instanceof Error ? err.message : 'Failed to start PTT');
+      await stopTalking();
+    }
+  }, [pttIsTalking, pttConnectedSelectedIds, pttIsMuted, getAgoraCredentials, ensureRtcClient, sendPttSignal, stopTalking]);
+
+  const handlePttMute = useCallback(async () => {
+    const nextMuted = !pttIsMuted;
+    setPttIsMuted(nextMuted);
+    if (micTrackRef.current) await micTrackRef.current.setEnabled(!nextMuted);
+    const targets = pttActiveDriverIds.length > 0 ? pttActiveDriverIds : pttConnectedSelectedIds;
+    if (pttChannelName && targets.length > 0) {
+      await sendPttSignal({ variables: { driverIds: targets, channelName: pttChannelName, action: nextMuted ? 'MUTE' : 'UNMUTE', muted: nextMuted } });
+    }
+  }, [pttIsMuted, pttChannelName, pttActiveDriverIds, pttConnectedSelectedIds, sendPttSignal]);
+
+  const togglePttDriver = useCallback((driverId: string) => {
+    setPttSelectedDriverIds((prev) =>
+      prev.includes(driverId) ? prev.filter((id) => id !== driverId) : [...prev, driverId],
+    );
+  }, []);
 
   // ╔══════════════════════════════════════════════════════════╗
   // ║                     EFFECTS                             ║
@@ -991,7 +1091,7 @@ export default function MapPage() {
           if (order.status === "PENDING") {
             if (!routes.toDropoff) return null;
             return (
-              <Fragment key={`ors-${order.id}`}>
+              <Fragment key={`ors-pending-${order.id}-${showBothRoutes[order.id] ? 'both' : 'single'}-${order.driver ? 'driver' : 'nodriver'}`}>
                 <Source id={`or-${order.id}`} type="geojson"
                   data={{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: routes.toDropoff.geometry } }}>
                   <Layer id={`or-c-${order.id}`} type="line" paint={{ "line-color": "#78350f", "line-width": 8, "line-opacity": 0.6 }} layout={{ "line-cap": "round", "line-join": "round" }} />
@@ -1013,7 +1113,7 @@ export default function MapPage() {
           if (order.status === "READY") {
             if (order.driver && routes.toPickup) {
               return (
-                <Fragment key={`ors-${order.id}`}>
+                <Fragment key={`ors-ready-${order.id}-${showBothRoutes[order.id] ? 'both' : 'single'}-${order.driver ? 'driver' : 'nodriver'}`}>
                   <Source id={`otp-${order.id}`} type="geojson"
                     data={{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: routes.toPickup.geometry } }}>
                     <Layer id={`otp-c-${order.id}`} type="line" paint={{ "line-color": "#1e3a8a", "line-width": 8, "line-opacity": 0.6 }} layout={{ "line-cap": "round", "line-join": "round" }} />
@@ -1124,7 +1224,14 @@ export default function MapPage() {
           const isFollowing = followingDriverId === track.id;
 
           return (
-            <Marker key={`d-${track.id}`} latitude={pos.latitude} longitude={pos.longitude} anchor="bottom">
+            <Marker
+              key={`d-${track.id}`}
+              latitude={pos.latitude}
+              longitude={pos.longitude}
+              anchor="bottom"
+              pitchAlignment="viewport"
+              rotationAlignment="viewport"
+            >
               <div className={`relative flex flex-col items-center group cursor-pointer ${connectionStatus === "DISCONNECTED" || connectionStatus === "LOST" ? "opacity-50" : ""}`}
                 onClick={() => {
                   const newId = isFollowing ? null : track.id;
@@ -1139,7 +1246,10 @@ export default function MapPage() {
                   <div className="absolute inset-0 w-8 h-8 -top-1 -left-1 rounded-full border-2 border-emerald-400 animate-pulse" />
                 )}
                 {driver ? (
-                  <div className={`relative w-8 h-8 rounded-full ${getAvatarColor(driver.id)} flex items-center justify-center font-bold text-white text-xs border-2 ${statusStyle.border} shadow-lg transition-all hover:scale-125 ${isBusy ? `ring-1.5 ${statusStyle.ring}` : ""}`}>
+                  <div
+                    className={`relative w-8 h-8 rounded-full ${getAvatarColor(driver.id)} flex items-center justify-center font-bold text-white text-xs border-2 ${statusStyle.border} shadow-lg transition-all ${isBusy ? `ring-1.5 ${statusStyle.ring}` : ""}`}
+                    style={{ transform: 'translateZ(0)' }}
+                  >
                     <div
                       className="absolute -top-2 w-0 h-0 border-l-[5px] border-r-[5px] border-b-[8px] border-l-transparent border-r-transparent border-b-white/90"
                       style={{ left: '50%', transform: `translateX(-50%) rotate(${driverHeadingDeg[track.id] ?? 0}deg)` }}
@@ -1204,7 +1314,7 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* ════════════════ RIGHT EDGE DRIVER AVATARS (Discord-style) ════════════════ */}
+      {/* ════════════════ RIGHT EDGE DRIVER AVATARS (Discord-style) + PTT ════════════════ */}
       <div className="absolute right-0 top-0 bottom-0 z-20 w-[72px] bg-[#0a0a0b]/95 border-l border-white/5 flex flex-col">
         {/* Driver count header */}
         <div className="p-2 pt-4 border-b border-white/5 flex flex-col items-center gap-1">
@@ -1216,10 +1326,17 @@ export default function MapPage() {
             <User size={10} className="text-zinc-400" />
             <span className="text-[10px] font-bold text-zinc-400">{filteredDrivers.length}</span>
           </div>
+          {/* PTT selection counter */}
+          {pttSelectedDriverIds.length > 0 && (
+            <div className="flex items-center gap-1 mt-1" title="Selected for PTT">
+              <Radio size={9} className="text-violet-400" />
+              <span className="text-[10px] font-bold text-violet-400">{pttSelectedDriverIds.length}</span>
+            </div>
+          )}
         </div>
         
         {/* Driver avatars */}
-        <div className="flex-1 overflow-y-auto scrollbar-hide py-3 px-2" style={{ maxHeight: selectedOrder ? "calc(100vh - 380px)" : "calc(100vh - 100px)" }}>
+        <div className="flex-1 overflow-y-auto scrollbar-hide py-3 px-2" style={{ maxHeight: pttSelectedDriverIds.length > 0 ? "calc(100vh - 220px)" : selectedOrder ? "calc(100vh - 380px)" : "calc(100vh - 100px)" }}>
           <div className="flex flex-col items-center gap-2">
             {filteredDrivers.map((driver: any) => {
               const connectionStatus = (driver.driverConnection?.connectionStatus ?? "DISCONNECTED") as keyof typeof DRIVER_CONNECTION_COLORS;
@@ -1229,24 +1346,41 @@ export default function MapPage() {
               const hasLocation = driver.driverLocation?.latitude && driver.driverLocation?.longitude;
               const isTracking = followingDriverId === driver.id;
               const assignedOrders = activeOrders.filter((o: any) => o.driver?.id === driver.id);
+              const isPttSelected = pttSelectedDriverIds.includes(driver.id);
+              const isConnected = connectionStatus === 'CONNECTED';
 
               return (
-                <div key={driver.id} className="relative group">
+                <div key={driver.id} className="relative group flex flex-col items-center gap-1.5">
                   <button
                     onClick={() => {
                       if (!hasLocation) return;
-                      const newId = isTracking ? null : driver.id;
-                      setFollowingDriverId(newId);
-                      if (newId && mapRef.current && driver.driverLocation) {
-                        mapRef.current.jumpTo({ center: [driver.driverLocation.longitude, driver.driverLocation.latitude], zoom: 16 });
+                      setFollowingDriverId(null);
+                      if (mapRef.current && driver.driverLocation) {
+                        mapRef.current.flyTo({ center: [driver.driverLocation.longitude, driver.driverLocation.latitude], zoom: 16, duration: 700 });
                       }
                     }}
                     className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-white text-lg shadow-lg transition-all hover:scale-110 ${getAvatarColor(driver.id)} ${
-                      isTracking ? "ring-2 ring-blue-400 ring-offset-2 ring-offset-[#0a0a0b] scale-110" : ""
+                      isTracking ? "ring-2 ring-blue-400 ring-offset-2 ring-offset-[#0a0a0b] scale-110" :
+                      isPttSelected ? "ring-2 ring-violet-400 ring-offset-2 ring-offset-[#0a0a0b]" : ""
                     } ${connectionStatus === "DISCONNECTED" || connectionStatus === "LOST" ? "opacity-40" : ""}`}
-                    style={{ boxShadow: `0 4px 20px ${statusStyle.hex}40` }}
+                    style={{ boxShadow: isPttSelected ? `0 4px 20px #7c3aed60` : `0 4px 20px ${statusStyle.hex}40` }}
                     title={`${driver.firstName} ${driver.lastName}`}>
                     {getInitials(driver.firstName, driver.lastName)}
+                  </button>
+
+                  <button
+                    onClick={(e) => { e.stopPropagation(); togglePttDriver(driver.id); }}
+                    disabled={!isConnected}
+                    title={isPttSelected ? 'Remove from PTT' : isConnected ? 'Add to PTT' : 'Driver offline'}
+                    className={`h-5 min-w-[44px] px-2 rounded-full flex items-center justify-center gap-1 text-[9px] font-semibold transition ${
+                      isPttSelected
+                        ? 'bg-violet-500/25 text-violet-300 border border-violet-500/50'
+                        : isConnected
+                          ? 'bg-zinc-800 text-zinc-300 border border-zinc-700 hover:border-violet-500/40 hover:text-violet-300'
+                          : 'bg-zinc-900 text-zinc-600 border border-zinc-800 cursor-not-allowed'
+                    }`}>
+                    <Mic size={9} />
+                    {isPttSelected ? 'PTT' : 'Talk'}
                   </button>
                   
                   {/* Status badge */}
@@ -1254,15 +1388,22 @@ export default function MapPage() {
                     <StatusIcon size={9} style={{ color: statusStyle.hex }} />
                   </div>
                   
-                  {/* Busy badge */}
-                  {isBusy && (
+                  {/* PTT selected badge */}
+                  {isPttSelected && (
+                    <div className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-violet-500 flex items-center justify-center shadow-md z-10">
+                      <Mic size={8} className="text-white" />
+                    </div>
+                  )}
+                  
+                  {/* Busy badge (only when not PTT selected) */}
+                  {isBusy && !isPttSelected && (
                     <div className="absolute -top-0.5 -left-0.5 w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center text-[8px] font-bold text-white shadow-md">
                       {assignedOrders.length}
                     </div>
                   )}
                   
                   {/* Hover tooltip (left side) */}
-                  <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 hidden group-hover:block bg-black/95 text-white rounded-xl shadow-2xl z-[100] border border-white/20 min-w-[200px] backdrop-blur-sm pointer-events-none">
+                  <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 hidden group-hover:flex flex-col bg-black/95 text-white rounded-xl shadow-2xl z-[100] border border-white/20 min-w-[200px] backdrop-blur-sm pointer-events-auto">
                     <div className="p-3">
                       <div className="text-sm font-semibold text-white">{driver.firstName} {driver.lastName}</div>
                       {driver.phoneNumber && (
@@ -1292,6 +1433,20 @@ export default function MapPage() {
                           ))}
                         </div>
                       )}
+                      {/* PTT toggle button in tooltip */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); togglePttDriver(driver.id); }}
+                        disabled={!isConnected}
+                        className={`mt-3 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-semibold transition ${
+                          isPttSelected
+                            ? 'bg-violet-500/30 text-violet-300 border border-violet-500/50'
+                            : isConnected
+                              ? 'bg-zinc-800 text-zinc-300 hover:bg-violet-500/20 hover:text-violet-300 border border-zinc-700'
+                              : 'bg-zinc-900 text-zinc-600 border border-zinc-800 cursor-not-allowed'
+                        }`}>
+                        <Mic size={10} />
+                        {isPttSelected ? 'Remove from PTT' : isConnected ? 'Add to PTT' : 'Offline'}
+                      </button>
                     </div>
                     <div className="absolute top-1/2 -translate-y-1/2 left-full w-0 h-0 border-t-[6px] border-b-[6px] border-l-[6px] border-transparent border-l-black/95" />
                   </div>
@@ -1305,6 +1460,67 @@ export default function MapPage() {
             )}
           </div>
         </div>
+
+        {/* ── PTT Controls (shown when drivers are selected) ── */}
+        {pttSelectedDriverIds.length > 0 && (
+          <div className="border-t border-violet-500/30 bg-violet-950/40 p-2 flex flex-col items-center gap-2">
+            {/* Selected info */}
+            <div className="text-[9px] text-violet-300 text-center leading-tight">
+              <span className="font-bold">{pttConnectedSelectedIds.length}</span> ready
+              {pttSelectedDriverIds.length !== pttConnectedSelectedIds.length && (
+                <span className="text-zinc-500"> / {pttSelectedDriverIds.length}</span>
+              )}
+            </div>
+
+            {/* Mute toggle */}
+            <button
+              onClick={handlePttMute}
+              disabled={!pttIsTalking}
+              title={pttIsMuted ? 'Unmute' : 'Mute'}
+              className={`w-8 h-8 rounded-xl flex items-center justify-center transition ${
+                !pttIsTalking ? 'opacity-30 cursor-not-allowed bg-zinc-800' :
+                pttIsMuted ? 'bg-amber-500/20 text-amber-400' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+              }`}>
+              {pttIsMuted ? <MicOff size={14} /> : <Mic size={14} />}
+            </button>
+
+            {/* Hold-to-talk button */}
+            <button
+              onMouseDown={startTalking}
+              onMouseUp={stopTalking}
+              onMouseLeave={stopTalking}
+              onTouchStart={startTalking}
+              onTouchEnd={stopTalking}
+              disabled={pttConnectedSelectedIds.length === 0}
+              className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-lg ${
+                pttIsTalking
+                  ? 'bg-red-600 hover:bg-red-700 scale-110 shadow-red-500/40'
+                  : pttConnectedSelectedIds.length > 0
+                    ? 'bg-violet-600 hover:bg-violet-700 shadow-violet-500/40'
+                    : 'bg-zinc-800 cursor-not-allowed opacity-40'
+              }`}
+              title={pttIsTalking ? 'Release to stop' : 'Hold to talk'}>
+              <Mic size={18} className="text-white" />
+            </button>
+
+            <div className="text-[8px] text-zinc-500 text-center">
+              {pttIsTalking ? '🔴 Live' : 'Hold'}
+            </div>
+
+            {/* Error */}
+            {pttError && (
+              <div className="text-[8px] text-red-400 text-center leading-tight">{pttError}</div>
+            )}
+
+            {/* Clear selection */}
+            <button
+              onClick={() => { if (!pttIsTalking) setPttSelectedDriverIds([]); }}
+              disabled={pttIsTalking}
+              className="text-[8px] text-zinc-600 hover:text-zinc-400 transition disabled:opacity-30">
+              Clear
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ════════════════ TRACKING INDICATOR ════════════════ */}

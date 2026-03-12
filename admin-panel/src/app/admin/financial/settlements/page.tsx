@@ -14,18 +14,16 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/Select';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Building2, User, RefreshCw, Search, X } from 'lucide-react';
+import { ArrowLeft, Building2, ChevronRight, RefreshCw, Search, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { SettlementType, SettlementStatus, SettlementDirection } from '@/gql/graphql';
+import {
+  SettlementType,
+  SettlementStatus,
+  SettlementDirection,
+  type GetSettlementsQuery,
+} from '@/gql/graphql';
 import { gql } from '@apollo/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -35,6 +33,20 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+
+type SettlementRecord = GetSettlementsQuery['settlements'][number];
+
+type SettlementGroup = {
+  id: string;
+  name: string;
+  subtitle: string;
+  settlements: SettlementRecord[];
+  totalAmount: number;
+  pendingAmount: number;
+  paidAmount: number;
+  pendingCount: number;
+  paidCount: number;
+};
 
 const MARK_SETTLEMENT_AS_PAID = gql`
   mutation MarkSettlementAsPaid($settlementId: ID!) {
@@ -70,9 +82,7 @@ export default function SettlementsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | SettlementStatus>('all');
   const [directionFilter, setDirectionFilter] = useState<'all' | SettlementDirection>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [entityFilter, setEntityFilter] = useState<string>(''); // business or driver ID
-  const [entitySearch, setEntitySearch] = useState('');
-  const [isEntityDropdownOpen, setIsEntityDropdownOpen] = useState(false);
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [selectedSettlement, setSelectedSettlement] = useState<any>(null);
   const [partialAmount, setPartialAmount] = useState('');
 
@@ -109,6 +119,114 @@ export default function SettlementsPage() {
 
   const currentSettlements = activeTab === 'business' ? businessSettlements : driverSettlements;
   const loading = activeTab === 'business' ? businessLoading : driverLoading;
+
+  const getEntityId = (settlement: SettlementRecord) => {
+    if (activeTab === 'business') {
+      return settlement.business?.id || `unknown-business-${settlement.id}`;
+    }
+
+    return settlement.driver?.id || `unknown-driver-${settlement.id}`;
+  };
+
+  const getEntityName = (settlement: SettlementRecord) => {
+    if (activeTab === 'business') {
+      return settlement.business?.name || 'Unknown business';
+    }
+
+    if (!settlement.driver) {
+      return 'Unknown driver';
+    }
+
+    return `${settlement.driver.firstName} ${settlement.driver.lastName}`.trim() || 'Unknown driver';
+  };
+
+  const getEntitySubtitle = (settlement: SettlementRecord) => {
+    if (activeTab === 'business') {
+      return settlement.business?.id || 'No business id';
+    }
+
+    return settlement.driver?.phoneNumber || settlement.driver?.id || 'No driver reference';
+  };
+
+  const settlementGroupsMap = new Map<string, SettlementGroup>();
+
+  currentSettlements.forEach((settlement: SettlementRecord) => {
+    const groupId = getEntityId(settlement);
+    const existingGroup = settlementGroupsMap.get(groupId);
+    const amount = Number(settlement.amount || 0);
+
+    if (existingGroup) {
+      existingGroup.settlements.push(settlement);
+      existingGroup.totalAmount += amount;
+
+      if (settlement.status === SettlementStatus.Pending) {
+        existingGroup.pendingAmount += amount;
+        existingGroup.pendingCount += 1;
+      }
+
+      if (settlement.status === SettlementStatus.Paid) {
+        existingGroup.paidAmount += amount;
+        existingGroup.paidCount += 1;
+      }
+
+      return;
+    }
+
+    settlementGroupsMap.set(groupId, {
+      id: groupId,
+      name: getEntityName(settlement),
+      subtitle: getEntitySubtitle(settlement),
+      settlements: [settlement],
+      totalAmount: amount,
+      pendingAmount: settlement.status === SettlementStatus.Pending ? amount : 0,
+      paidAmount: settlement.status === SettlementStatus.Paid ? amount : 0,
+      pendingCount: settlement.status === SettlementStatus.Pending ? 1 : 0,
+      paidCount: settlement.status === SettlementStatus.Paid ? 1 : 0,
+    });
+  });
+
+  const settlementGroups = Array.from(settlementGroupsMap.values()).sort(
+    (left, right) => right.totalAmount - left.totalAmount
+  );
+
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+
+  const matchesSettlementSearch = (settlement: SettlementRecord) => {
+    if (!normalizedSearchQuery) {
+      return true;
+    }
+
+    return [
+      settlement.id,
+      settlement.order?.id,
+      settlement.paymentReference,
+      settlement.paymentMethod,
+      settlement.driver?.firstName,
+      settlement.driver?.lastName,
+      settlement.driver?.phoneNumber,
+      settlement.business?.name,
+    ]
+      .filter(Boolean)
+      .some((value) => value!.toString().toLowerCase().includes(normalizedSearchQuery));
+  };
+
+  const filteredGroups = settlementGroups.filter((group) => {
+    if (!normalizedSearchQuery) {
+      return true;
+    }
+
+    return [group.id, group.name, group.subtitle]
+      .filter(Boolean)
+      .some((value) => value.toLowerCase().includes(normalizedSearchQuery));
+  });
+
+  const selectedGroup = selectedEntityId
+    ? settlementGroups.find((group) => group.id === selectedEntityId) || null
+    : null;
+
+  const filteredSettlements = selectedGroup
+    ? selectedGroup.settlements.filter(matchesSettlementSearch)
+    : [];
 
   // Mark as paid mutation
   const [markAsPaid] = useMutation(MARK_SETTLEMENT_AS_PAID, {
@@ -167,71 +285,32 @@ export default function SettlementsPage() {
     },
   });
 
-  // Get unique entities for filtering
-  const entities = activeTab === 'business'
-    ? Array.from(
-        new Map(
-          businessSettlements
-            .filter((s: any) => s.business)
-            .map((s: any) => [s.business.id, s.business])
-        ).values()
-      )
-    : Array.from(
-        new Map(
-          driverSettlements
-            .filter((s: any) => s.driver)
-            .map((s: any) => [s.driver.id, s.driver])
-        ).values()
-      );
-
-  const filteredEntities = entities.filter((entity: any) => {
-    const searchText = entitySearch.toLowerCase();
-    if (activeTab === 'business') {
-      return entity.name?.toLowerCase().includes(searchText);
-    } else {
-      return (
-        entity.firstName?.toLowerCase().includes(searchText) ||
-        entity.lastName?.toLowerCase().includes(searchText)
-      );
-    }
-  });
-
-  // Filter settlements by search query and entity filter
-  const filteredSettlements = currentSettlements.filter((settlement: any) => {
-    // Filter by entity
-    if (entityFilter) {
-      if (activeTab === 'business' && settlement.business?.id !== entityFilter) {
-        return false;
-      }
-      if (activeTab === 'driver' && settlement.driver?.id !== entityFilter) {
-        return false;
-      }
-    }
-
-    // Filter by search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return (
-        settlement.id.toLowerCase().includes(query) ||
-        settlement.order?.id.toLowerCase().includes(query) ||
-        settlement.paymentReference?.toLowerCase().includes(query) ||
-        settlement.driver?.firstName?.toLowerCase().includes(query) ||
-        settlement.driver?.lastName?.toLowerCase().includes(query) ||
-        settlement.business?.name?.toLowerCase().includes(query)
-      );
-    }
-    return true;
-  });
-
   // Calculate totals for current view
+  const totalsSource = selectedGroup ? filteredSettlements : filteredGroups;
   const totals = {
-    total: filteredSettlements.reduce((sum: number, s: any) => sum + parseFloat(s.amount || 0), 0),
-    pending: filteredSettlements
-      .filter((s: any) => s.status === SettlementStatus.Pending)
-      .reduce((sum: number, s: any) => sum + parseFloat(s.amount || 0), 0),
-    paid: filteredSettlements
-      .filter((s: any) => s.status === SettlementStatus.Paid)
-      .reduce((sum: number, s: any) => sum + parseFloat(s.amount || 0), 0),
+    total: totalsSource.reduce(
+      (sum: number, item: SettlementRecord | SettlementGroup) =>
+        sum + ('amount' in item ? Number(item.amount || 0) : item.totalAmount),
+      0
+    ),
+    pending: totalsSource.reduce(
+      (sum: number, item: SettlementRecord | SettlementGroup) =>
+        sum + ('amount' in item
+          ? item.status === SettlementStatus.Pending
+            ? Number(item.amount || 0)
+            : 0
+          : item.pendingAmount),
+      0
+    ),
+    paid: totalsSource.reduce(
+      (sum: number, item: SettlementRecord | SettlementGroup) =>
+        sum + ('amount' in item
+          ? item.status === SettlementStatus.Paid
+            ? Number(item.amount || 0)
+            : 0
+          : item.paidAmount),
+      0
+    ),
   };
 
   const handleRefresh = () => {
@@ -242,85 +321,43 @@ export default function SettlementsPage() {
     }
   };
 
+  const resetGroupSelection = () => {
+    setSelectedEntityId(null);
+    setSearchQuery('');
+  };
+
   const renderContent = () => (
     <Card className="shadow-sm">
       {/* Filters and Stats Bar */}
       <div className="bg-muted/30">
         <div className="p-4">
+          {selectedGroup && (
+            <div className="mb-4 flex items-center justify-between rounded-lg border bg-background px-3 py-2">
+              <div>
+                <div className="text-sm font-semibold text-foreground">{selectedGroup.name}</div>
+                <div className="text-xs text-muted-foreground">
+                  {selectedGroup.subtitle} • {selectedGroup.settlements.length} settlements
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" onClick={resetGroupSelection} className="gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                Back to {activeTab === 'business' ? 'businesses' : 'drivers'}
+              </Button>
+            </div>
+          )}
+
           {/* Controls Row */}
           <div className="flex items-center gap-3 mb-4">
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder={`Search ${activeTab === 'business' ? 'business' : 'driver'} settlements...`}
+                placeholder={selectedGroup
+                  ? `Search ${activeTab === 'business' ? 'business' : 'driver'} settlements...`
+                  : `Search ${activeTab === 'business' ? 'business' : 'driver'} groups...`}
                 value={searchQuery}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
                 className="pl-9 h-10 bg-background"
               />
-            </div>
-
-            {/* Entity Filter Dropdown */}
-            <div className="relative">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsEntityDropdownOpen(!isEntityDropdownOpen)}
-                className="h-10"
-              >
-                {activeTab === 'business' ? <Building2 className="h-4 w-4 mr-2" /> : <User className="h-4 w-4 mr-2" />}
-                {entityFilter
-                  ? activeTab === 'business'
-                    ? entities.find((e: any) => e.id === entityFilter)?.name || 'Select'
-                    : `${entities.find((e: any) => e.id === entityFilter)?.firstName} ${entities.find((e: any) => e.id === entityFilter)?.lastName}`
-                  : 'All ' + (activeTab === 'business' ? 'Businesses' : 'Drivers')}
-                {entityFilter && <X className="h-3 w-3 ml-2" />}
-              </Button>
-
-              {isEntityDropdownOpen && (
-                <div className="absolute top-full left-0 mt-1 w-64 bg-background border rounded-md shadow-lg z-50">
-                  <div className="p-2 border-b">
-                    <Input
-                      placeholder={`Search ${activeTab === 'business' ? 'businesses' : 'drivers'}...`}
-                      value={entitySearch}
-                      onChange={(e) => setEntitySearch(e.target.value)}
-                      className="h-9 bg-muted/50"
-                      autoFocus
-                    />
-                  </div>
-                  <div className="max-h-64 overflow-y-auto">
-                    <Button
-                      variant={entityFilter === '' ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => {
-                        setEntityFilter('');
-                        setIsEntityDropdownOpen(false);
-                      }}
-                      className="w-full justify-start h-9 rounded-none"
-                    >
-                      All {activeTab === 'business' ? 'Businesses' : 'Drivers'}
-                    </Button>
-                    {filteredEntities.map((entity: any) => (
-                      <Button
-                        key={entity.id}
-                        variant={entityFilter === entity.id ? 'default' : 'ghost'}
-                        size="sm"
-                        onClick={() => {
-                          setEntityFilter(entity.id);
-                          setIsEntityDropdownOpen(false);
-                        }}
-                        className="w-full justify-start h-9 rounded-none text-left"
-                      >
-                        {activeTab === 'business' ? entity.name : `${entity.firstName} ${entity.lastName}`}
-                      </Button>
-                    ))}
-                    {filteredEntities.length === 0 && (
-                      <div className="p-3 text-center text-sm text-muted-foreground">
-                        No {activeTab === 'business' ? 'businesses' : 'drivers'} found
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
             
             <div className="flex items-center gap-2">
@@ -412,36 +449,52 @@ export default function SettlementsPage() {
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead className="font-semibold">{activeTab === 'business' ? 'Business' : 'Driver'}</TableHead>
-              <TableHead className="font-semibold">Direction</TableHead>
-              <TableHead className="font-semibold text-right">Amount</TableHead>
-              <TableHead className="font-semibold">Status</TableHead>
-              <TableHead className="font-semibold">Order ID</TableHead>
-              <TableHead className="font-semibold">Payment Ref</TableHead>
-              <TableHead className="font-semibold text-right">Date</TableHead>
-              <TableHead className="font-semibold text-right">Actions</TableHead>
+              {selectedGroup ? (
+                <>
+                  <TableHead className="font-semibold">{activeTab === 'business' ? 'Business' : 'Driver'}</TableHead>
+                  <TableHead className="font-semibold">Direction</TableHead>
+                  <TableHead className="font-semibold text-right">Amount</TableHead>
+                  <TableHead className="font-semibold">Status</TableHead>
+                  <TableHead className="font-semibold">Order ID</TableHead>
+                  <TableHead className="font-semibold">Payment Ref</TableHead>
+                  <TableHead className="font-semibold text-right">Date</TableHead>
+                  <TableHead className="font-semibold text-right">Actions</TableHead>
+                </>
+              ) : (
+                <>
+                  <TableHead className="font-semibold">{activeTab === 'business' ? 'Business' : 'Driver'}</TableHead>
+                  <TableHead className="font-semibold">Reference</TableHead>
+                  <TableHead className="font-semibold text-right">Settlements</TableHead>
+                  <TableHead className="font-semibold text-right">Pending</TableHead>
+                  <TableHead className="font-semibold text-right">Paid</TableHead>
+                  <TableHead className="font-semibold text-right">Total</TableHead>
+                  <TableHead className="font-semibold text-right">Actions</TableHead>
+                </>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               Array.from({ length: 10 }).map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell colSpan={8}>
+                  <TableCell colSpan={selectedGroup ? 8 : 7}>
                     <Skeleton className="h-9 w-full" />
                   </TableCell>
                 </TableRow>
               ))
-            ) : filteredSettlements.length === 0 ? (
+            ) : selectedGroup ? filteredSettlements.length === 0 : filteredGroups.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-20">
+                <TableCell colSpan={selectedGroup ? 8 : 7} className="text-center text-muted-foreground py-20">
                   <div className="flex flex-col items-center gap-2">
-                    <div className="text-lg font-medium">No settlements found</div>
+                    <div className="text-lg font-medium">
+                      {selectedGroup ? 'No settlements found' : `No ${activeTab === 'business' ? 'businesses' : 'drivers'} found`}
+                    </div>
                     <div className="text-sm">Try adjusting your filters or search query</div>
                   </div>
                 </TableCell>
               </TableRow>
-            ) : (
-              filteredSettlements.map((settlement: any) => (
+            ) : selectedGroup ? (
+              filteredSettlements.map((settlement: SettlementRecord) => (
                 <TableRow 
                   key={settlement.id}
                   className="hover:bg-muted/40"
@@ -465,15 +518,15 @@ export default function SettlementsPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="font-bold text-right tabular-nums">
-                    {settlement.currency} {parseFloat(settlement.amount).toFixed(2)}
+                    {settlement.currency} {Number(settlement.amount).toFixed(2)}
                   </TableCell>
                   <TableCell>
                     <Badge 
                       variant={settlement.status === SettlementStatus.Paid ? 'default' : 'secondary'}
                       className={cn(
-                        "font-medium",
-                        settlement.status === SettlementStatus.Paid && "bg-green-600",
-                        settlement.status === SettlementStatus.Pending && "bg-orange-500"
+                        'font-medium',
+                        settlement.status === SettlementStatus.Paid && 'bg-green-600',
+                        settlement.status === SettlementStatus.Pending && 'bg-orange-500'
                       )}
                     >
                       {settlement.status}
@@ -503,15 +556,64 @@ export default function SettlementsPage() {
                   </TableCell>
                 </TableRow>
               ))
+            ) : (
+              filteredGroups.map((group) => (
+                <TableRow 
+                  key={group.id}
+                  className="hover:bg-muted/40"
+                >
+                  <TableCell className="font-medium">
+                    <div>{group.name}</div>
+                    <div className="text-xs text-muted-foreground mt-1">{group.id}</div>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {group.subtitle}
+                  </TableCell>
+                  <TableCell className="text-right font-medium tabular-nums">
+                    {group.settlements.length}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-orange-600 font-medium">
+                    €{group.pendingAmount.toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-green-600 font-medium">
+                    €{group.paidAmount.toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-right font-bold tabular-nums">
+                    €{group.totalAmount.toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedEntityId(group.id);
+                        setSearchQuery('');
+                      }}
+                      className="gap-2"
+                    >
+                      View settlements
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
             )}
           </TableBody>
         </Table>
       </div>
       
-      {!loading && filteredSettlements.length > 0 && (
+      {!loading && (selectedGroup ? filteredSettlements.length > 0 : filteredGroups.length > 0) && (
         <div className="px-4 py-3 bg-muted/30">
           <p className="text-sm text-muted-foreground">
-            Showing <span className="font-semibold text-foreground">{filteredSettlements.length}</span> of <span className="font-semibold text-foreground">{currentSettlements.length}</span> settlements
+            {selectedGroup ? (
+              <>
+                Showing <span className="font-semibold text-foreground">{filteredSettlements.length}</span> of <span className="font-semibold text-foreground">{selectedGroup.settlements.length}</span> settlements for <span className="font-semibold text-foreground">{selectedGroup.name}</span>
+              </>
+            ) : (
+              <>
+                Showing <span className="font-semibold text-foreground">{filteredGroups.length}</span> of <span className="font-semibold text-foreground">{settlementGroups.length}</span> {activeTab === 'business' ? 'businesses' : 'drivers'}
+              </>
+            )}
           </p>
         </div>
       )}
@@ -528,9 +630,8 @@ export default function SettlementsPage() {
             size="sm"
             onClick={() => {
               setActiveTab('business');
-              setEntityFilter('');
-              setEntitySearch('');
-              setIsEntityDropdownOpen(false);
+              setSelectedEntityId(null);
+              setSearchQuery('');
             }}
             className="gap-2 h-9 px-4"
           >
@@ -542,9 +643,8 @@ export default function SettlementsPage() {
             size="sm"
             onClick={() => {
               setActiveTab('driver');
-              setEntityFilter('');
-              setEntitySearch('');
-              setIsEntityDropdownOpen(false);
+              setSelectedEntityId(null);
+              setSearchQuery('');
             }}
             className="gap-2 h-9 px-4"
           >

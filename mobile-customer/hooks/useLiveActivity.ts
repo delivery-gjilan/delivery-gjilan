@@ -1,16 +1,26 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { Platform } from 'react-native';
-// @ts-ignore - react-native-live-activities has incomplete TypeScript definitions
-import LiveActivities from 'react-native-live-activities';
+import { Platform, NativeModules } from 'react-native';
 import { useMutation } from '@apollo/client/react';
 import { REGISTER_LIVE_ACTIVITY_TOKEN } from '@/graphql/operations/notifications';
+
+// Typed interface for the custom DeliveryLiveActivities native module
+// (registered via RCT_EXTERN_MODULE in DeliveryLiveActivities.m)
+interface DeliveryLiveActivitiesModule {
+    startActivity(attributes: object, state: object): Promise<string>;
+    updateActivity(activityId: string, state: object): Promise<string>;
+    endActivity(activityId: string): Promise<void>;
+    getPushToken(activityId: string): Promise<string>;
+}
+
+const DeliveryLiveActivitiesNative: DeliveryLiveActivitiesModule | undefined =
+    (NativeModules as Record<string, unknown>).DeliveryLiveActivities as DeliveryLiveActivitiesModule | undefined;
 
 interface DeliveryActivityState {
     driverName: string;
     estimatedMinutes: number;
     status: 'preparing' | 'ready' | 'out_for_delivery' | 'delivered';
     orderId: string;
-    lastUpdated: Date;
+    lastUpdated: number; // Unix timestamp ms
 }
 
 interface DeliveryActivityAttributes {
@@ -27,13 +37,13 @@ interface UseLiveActivityOptions {
 
 /**
  * Hook to manage Live Activities (Dynamic Island) for delivery tracking.
- * 
+ *
  * Features:
  * - Automatically starts Live Activity when order is OUT_FOR_DELIVERY
  * - Updates ETA in real-time
  * - Ends Live Activity when order is DELIVERED or CANCELLED
  * - Registers push token with backend for remote updates
- * 
+ *
  * @example
  * const { startLiveActivity, updateLiveActivity, endLiveActivity } = useLiveActivity({
  *   orderId: order.id,
@@ -41,27 +51,32 @@ interface UseLiveActivityOptions {
  *   businessName: business.name,
  *   enabled: order.status === 'OUT_FOR_DELIVERY'
  * });
- * 
- * // Update ETA
- * updateLiveActivity({
- *   driverName: driver.firstName,
- *   estimatedMinutes: 15,
- *   status: 'out_for_delivery'
- * });
  */
 export function useLiveActivity({ orderId, orderDisplayId, businessName, enabled = false }: UseLiveActivityOptions) {
     const activityIdRef = useRef<string | null>(null);
     const [registerToken] = useMutation(REGISTER_LIVE_ACTIVITY_TOKEN);
 
-    // Check if Live Activities are supported and enabled
-    const isSupported = Platform.OS === 'ios' && Platform.Version >= '16.2';
+    // iOS version check: require 16.2+ for ActivityContent API
+    const platformVersionRaw = Platform.Version;
+    const iosVersionNumber = typeof platformVersionRaw === 'string'
+        ? parseFloat(platformVersionRaw)
+        : Number(platformVersionRaw);
+    const isSupported =
+        Platform.OS === 'ios' &&
+        Number.isFinite(iosVersionNumber) &&
+        iosVersionNumber >= 16.2 &&
+        !!DeliveryLiveActivitiesNative;
 
     /**
      * Start a Live Activity for this delivery
      */
     const startLiveActivity = useCallback(async (initialState: Omit<DeliveryActivityState, 'orderId' | 'lastUpdated'>) => {
         if (!isSupported || !enabled) {
-            console.log('[LiveActivity] Skipping: not supported or not enabled', { isSupported, enabled });
+            console.log('[LiveActivity] Skipping: not supported or not enabled', {
+                isSupported,
+                enabled,
+                hasNativeModule: !!DeliveryLiveActivitiesNative,
+            });
             return null;
         }
 
@@ -73,49 +88,36 @@ export function useLiveActivity({ orderId, orderDisplayId, businessName, enabled
                 return activityIdRef.current;
             }
 
-            const attributes: DeliveryActivityAttributes = {
-                orderDisplayId,
-                businessName,
-            };
+            const attributes: DeliveryActivityAttributes = { orderDisplayId, businessName };
 
             const state: DeliveryActivityState = {
                 ...initialState,
                 orderId,
-                lastUpdated: new Date(),
+                lastUpdated: Date.now(),
             };
 
             console.log('[LiveActivity] Starting Live Activity', { orderId, attributes, state });
 
-            // Start the Live Activity
-            // @ts-ignore - TypeScript definitions incomplete
-            const activityId = await LiveActivities.startActivity(attributes, state);
+            const activityId = await DeliveryLiveActivitiesNative!.startActivity(attributes, state);
             activityIdRef.current = activityId;
 
             console.log('[LiveActivity] Live Activity started', { activityId });
 
-            // Get the push token for this Live Activity and register with backend
+            // Get push token and register with backend
             try {
-                // @ts-ignore - TypeScript definitions incomplete
-                const pushToken = await LiveActivities.getPushToken(activityId);
+                const pushToken = await DeliveryLiveActivitiesNative!.getPushToken(activityId);
                 if (pushToken) {
-                    console.log('[LiveActivity] Got push token, registering with backend', { 
-                        activityId, 
-                        tokenPreview: pushToken.substring(0, 30) 
+                    console.log('[LiveActivity] Got push token, registering with backend', {
+                        activityId,
+                        tokenPreview: pushToken.substring(0, 30),
                     });
-
                     await registerToken({
-                        variables: {
-                            token: pushToken,
-                            activityId,
-                            orderId,
-                        },
+                        variables: { token: pushToken, activityId, orderId },
                     });
-
                     console.log('[LiveActivity] Push token registered with backend');
                 }
             } catch (tokenError) {
                 console.error('[LiveActivity] Failed to register push token:', tokenError);
-                // Don't fail the whole operation if token registration fails
             }
 
             return activityId;
@@ -137,13 +139,12 @@ export function useLiveActivity({ orderId, orderDisplayId, businessName, enabled
             const newState: DeliveryActivityState = {
                 ...updates,
                 orderId,
-                lastUpdated: new Date(),
+                lastUpdated: Date.now(),
             };
 
             console.log('[LiveActivity] Updating Live Activity', { activityId: activityIdRef.current, newState });
 
-            // @ts-ignore - TypeScript definitions incomplete
-            await LiveActivities.updateActivity(activityIdRef.current, newState);
+            await DeliveryLiveActivitiesNative!.updateActivity(activityIdRef.current, newState);
         } catch (error) {
             console.error('[LiveActivity] Failed to update Live Activity:', error);
         }
@@ -159,23 +160,19 @@ export function useLiveActivity({ orderId, orderDisplayId, businessName, enabled
 
         try {
             console.log('[LiveActivity] Ending Live Activity', { activityId: activityIdRef.current });
-
-            // @ts-ignore - TypeScript definitions incomplete
-            await LiveActivities.endActivity(activityIdRef.current);
+            await DeliveryLiveActivitiesNative!.endActivity(activityIdRef.current);
             activityIdRef.current = null;
-
             console.log('[LiveActivity] Live Activity ended');
         } catch (error) {
             console.error('[LiveActivity] Failed to end Live Activity:', error);
         }
-    }, [isSupported, orderId]);
+    }, [isSupported]);
 
     // Cleanup: end Live Activity when component unmounts
     useEffect(() => {
         return () => {
-            if (activityIdRef.current) {
-                // @ts-ignore - TypeScript definitions incomplete
-                LiveActivities.endActivity(activityIdRef.current).catch(console.error);
+            if (activityIdRef.current && DeliveryLiveActivitiesNative) {
+                DeliveryLiveActivitiesNative.endActivity(activityIdRef.current).catch(console.error);
             }
         };
     }, []);

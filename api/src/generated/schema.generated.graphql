@@ -67,6 +67,19 @@ input AddWalletCreditInput {
   userId: ID!
 }
 
+type AgoraRtcCredentials {
+  appId: String!
+  channelName: String!
+  expiresAt: DateTime!
+  token: String!
+  uid: Int!
+}
+
+enum AgoraRtcRole {
+  PUBLISHER
+  SUBSCRIBER
+}
+
 enum AppLanguage {
   AL
   EN
@@ -117,6 +130,7 @@ type AuditLogConnection {
 
 type AuthResponse {
   message: String!
+  refreshToken: String
   token: String!
   user: User!
 }
@@ -423,6 +437,15 @@ type DriverConnection {
   """Current navigation order this ETA belongs to"""
   activeOrderId: ID
 
+  """Most recently reported battery level percentage from driver device"""
+  batteryLevel: Int
+
+  """Whether driver opted in to battery telemetry sharing"""
+  batteryOptIn: Boolean!
+
+  """When battery telemetry was last refreshed"""
+  batteryUpdatedAt: Date
+
   """System-calculated: current connection state"""
   connectionStatus: DriverConnectionStatus!
 
@@ -431,6 +454,9 @@ type DriverConnection {
 
   """When the ETA payload was last refreshed"""
   etaUpdatedAt: Date
+
+  """Whether device reported it is currently charging"""
+  isCharging: Boolean
 
   """Last timestamp when driver sent a heartbeat (every 5s)"""
   lastHeartbeatAt: Date
@@ -510,6 +536,22 @@ type DriverHeartbeatResult {
   success: Boolean!
 }
 
+type DriverPttSignal {
+  action: DriverPttSignalAction!
+  adminId: ID!
+  channelName: String!
+  driverId: ID!
+  muted: Boolean!
+  timestamp: DateTime!
+}
+
+enum DriverPttSignalAction {
+  MUTE
+  STARTED
+  STOPPED
+  UNMUTE
+}
+
 type DynamicPricingRule {
   adjustmentConfig: JSON!
   appliesTo: DynamicPricingRuleAppliesTo!
@@ -586,6 +628,9 @@ type Mutation {
   addUserAddress(input: AddUserAddressInput!): UserAddress!
   addWalletCredit(input: AddWalletCreditInput!): WalletTransaction!
 
+  """Admin sends push-to-talk signaling state to one or multiple drivers"""
+  adminSendPttSignal(action: DriverPttSignalAction!, channelName: String!, driverIds: [ID!]!, muted: Boolean): Boolean!
+
   """
   Admin mutation to manually set connection status (for testing/recovery)
   """
@@ -638,6 +683,9 @@ type Mutation {
   """
   driverHeartbeat(activeOrderId: ID, latitude: Float!, longitude: Float!, navigationPhase: String, remainingEtaSeconds: Int): DriverHeartbeatResult!
   driverNotifyCustomer(kind: DriverCustomerNotificationKind!, orderId: ID!): Boolean!
+
+  """Driver battery telemetry update (recommended every 5-10 minutes)"""
+  driverUpdateBatteryStatus(isCharging: Boolean, level: Int!, optIn: Boolean!): DriverConnection!
   generateReferralCode: String!
   initiateSignup(input: InitiateSignupInput!): AuthResponse!
   login(input: LoginInput!): AuthResponse!
@@ -645,6 +693,7 @@ type Mutation {
   markSettlementAsPaid(paymentMethod: String, paymentReference: String, settlementId: ID!): Settlement!
   markSettlementAsPartiallyPaid(amount: Float!, settlementId: ID!): Settlement!
   markSettlementsAsPaid(ids: [ID!]!, paymentMethod: String, paymentReference: String): [Settlement!]!
+  refreshToken(refreshToken: String!): TokenRefreshResponse!
   registerDeviceToken(input: RegisterDeviceTokenInput!): Boolean!
   registerLiveActivityToken(activityId: String!, orderId: ID!, token: String!): Boolean!
   removeUserFromPromotion(promotionId: ID!, userId: ID!): Boolean!
@@ -981,6 +1030,9 @@ type Query {
   driverBalance(driverId: ID!): SettlementSummary!
   drivers: [User!]!
   dynamicPricingRules(businessId: ID): [DynamicPricingRule!]!
+
+  """Get Agora RTC credentials for the current authenticated user"""
+  getAgoraRtcCredentials(channelName: String!, role: AgoraRtcRole!): AgoraRtcCredentials!
   getAllPromotions(isActive: Boolean): [Promotion!]!
   getApplicablePromotions(cart: CartContextInput!, manualCode: String): [ApplicablePromotion!]!
   getBanner(id: ID!): Banner
@@ -1205,6 +1257,9 @@ type Subscription {
   allOrdersUpdated: [Order!]!
   auditLogCreated(action: ActionType, actorType: ActorType, entityType: EntityType): AuditLog!
   driverConnectionStatusChanged(driverId: ID!): DriverConnection!
+
+  """Per-driver push-to-talk signal stream (start/stop/mute/unmute)"""
+  driverPttSignal(driverId: ID!): DriverPttSignal!
   driversUpdated: [User!]!
   orderDriverLiveTracking(input: SubscriptionInput!, orderId: ID!): OrderDriverLiveTracking!
   orderStatusUpdated(orderId: ID!): Order!
@@ -1214,6 +1269,11 @@ type Subscription {
 }
 
 input SubscriptionInput {
+  token: String!
+}
+
+type TokenRefreshResponse {
+  refreshToken: String!
   token: String!
 }
 

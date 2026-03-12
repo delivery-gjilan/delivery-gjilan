@@ -12,12 +12,14 @@
 import { useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useDriverHeartbeat } from './useDriverHeartbeat';
+import { useDriverBatteryReporting } from './useDriverBatteryReporting';
 
 export function useDriverTracking() {
     const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
     const isOnline = useAuthStore((state) => state.isOnline);
     // Initialize heartbeat (runs when authenticated)
     useDriverHeartbeat();
+    useDriverBatteryReporting();
 
     useEffect(() => {
         if (isAuthenticated) {

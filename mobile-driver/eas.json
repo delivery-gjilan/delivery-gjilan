@@ -9,6 +9,7 @@
       "distribution": "internal",
       "env": {
         "NODE_ENV": "development",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
         "EXPO_PUBLIC_API_URL": "https://colloquial-deadra-cursorily.ngrok-free.dev/graphql",
         "EXPO_PUBLIC_MAPTILER_API_KEY": "J5uv4tZ8MpmOrnqpBl4J",
@@ -20,6 +21,7 @@
       "distribution": "internal",
       "env": {
         "NODE_ENV": "production",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
         "EXPO_PUBLIC_API_URL": "https://colloquial-deadra-cursorily.ngrok-free.dev/graphql",
         "EXPO_PUBLIC_MAPTILER_API_KEY": "J5uv4tZ8MpmOrnqpBl4J",
@@ -31,6 +33,7 @@
       "autoIncrement": true,
       "env": {
         "NODE_ENV": "production",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
         "EXPO_PUBLIC_API_URL": "https://colloquial-deadra-cursorily.ngrok-free.dev/graphql",
         "EXPO_PUBLIC_MAPTILER_API_KEY": "J5uv4tZ8MpmOrnqpBl4J",
@@ -40,6 +43,10 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascAppId": "6760439437"
+      }
+    }
   }
 }

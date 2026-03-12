@@ -87,14 +87,12 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "e5c04b16-6851-4fce-aa03-e4a183f0becf"
+        "projectId": "049cecd4-f9e5-4d45-a73b-41b5391ca710"
       }
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "updates": {
-      "url": "https://u.expo.dev/e5c04b16-6851-4fce-aa03-e4a183f0becf"
-    }
+    "owner": "edonramadani"
   }
 }

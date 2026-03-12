@@ -76,8 +76,14 @@ type SignupStepResponse {
 
 type AuthResponse {
     token: String!
+    refreshToken: String
     user: User!
     message: String!
+}
+
+type TokenRefreshResponse {
+    token: String!
+    refreshToken: String!
 }
 
 input InitiateSignupInput {
@@ -166,6 +172,7 @@ type Mutation {
     submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
     verifyPhone(input: VerifyPhoneInput!): SignupStepResponse!
     login(input: LoginInput!): AuthResponse! @skipAuth
+    refreshToken(refreshToken: String!): TokenRefreshResponse! @skipAuth
     createUser(input: CreateUserInput!): AuthResponse!
     updateUser(input: UpdateUserInput!): User!
     deleteUser(id: ID!): Boolean!

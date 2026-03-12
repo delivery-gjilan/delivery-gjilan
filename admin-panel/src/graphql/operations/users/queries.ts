@@ -46,6 +46,10 @@ export const DRIVERS_QUERY = gql`
         lastHeartbeatAt
         lastLocationUpdate
         disconnectedAt
+        batteryLevel
+        batteryOptIn
+        batteryUpdatedAt
+        isCharging
         activeOrderId
         navigationPhase
         remainingEtaSeconds

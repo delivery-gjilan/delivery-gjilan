@@ -18,11 +18,12 @@ export const User: Pick<UserResolvers, 'commissionPercentage'|'driverConnection'
     }
 
     try {
-      const driver = await driverService.getDriverWithConnection(parent.id);
+      const parentId = String(parent.id);
+      const driver = await driverService.getDriverWithConnection(parentId);
       if (!driver) {
         return null;
       }
-      const liveEta = await getLiveDriverEta(String(parent.id));
+      const liveEta = await getLiveDriverEta(parentId);
 
       const parseDate = (value: string | Date | null | undefined): Date | null => {
         if (!value) return null;
@@ -37,13 +38,17 @@ export const User: Pick<UserResolvers, 'commissionPercentage'|'driverConnection'
         lastHeartbeatAt: parseDate(driver.lastHeartbeatAt),
         lastLocationUpdate: parseDate(driver.lastLocationUpdate),
         disconnectedAt: parseDate(driver.disconnectedAt),
+        batteryLevel: driver.batteryLevel ?? null,
+        batteryOptIn: driver.batteryOptIn ?? false,
+        batteryUpdatedAt: parseDate(driver.batteryUpdatedAt),
+        isCharging: driver.isCharging ?? null,
         activeOrderId: liveEta?.activeOrderId ?? null,
         navigationPhase: liveEta?.navigationPhase ?? null,
         remainingEtaSeconds: liveEta?.remainingEtaSeconds ?? null,
         etaUpdatedAt: parseDate(liveEta?.etaUpdatedAt),
       };
     } catch (error) {
-      logger.error({ err: error, userId: parent.id }, 'driver:driverConnection resolve failed');
+      logger.error({ err: error, userId: String(parent.id) }, 'driver:driverConnection resolve failed');
       return null;
     }
   },

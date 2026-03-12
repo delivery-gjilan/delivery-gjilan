@@ -40,6 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } catch (error) {
                 console.error("Auth check failed:", error);
                 localStorage.removeItem("authToken");
+                localStorage.removeItem("refreshToken");
                 localStorage.removeItem("adminData");
             } finally {
                 setLoading(false);
@@ -78,6 +79,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             };
 
             localStorage.setItem("authToken", loginResult.token);
+            if (loginResult.refreshToken) {
+                localStorage.setItem("refreshToken", loginResult.refreshToken);
+            }
             localStorage.setItem("adminData", JSON.stringify(adminData));
             setAdmin(adminData);
         } finally {
@@ -87,6 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const logout = () => {
         localStorage.removeItem("authToken");
+        localStorage.removeItem("refreshToken");
         localStorage.removeItem("adminData");
         setAdmin(null);
     };

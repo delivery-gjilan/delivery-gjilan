@@ -163,7 +163,10 @@ export class AuthRepository {
     async deleteUser(userId: string): Promise<boolean> {
         const result = await this.db
             .update(users)
-            .set({ deletedAt: sql`CURRENT_TIMESTAMP` })
+            .set({
+                deletedAt: sql`CURRENT_TIMESTAMP`,
+                email: sql`'deleted_' || ${users.id} || '@deleted'`,
+            })
             .where(and(eq(users.id, userId), isNull(users.deletedAt)))
             .returning();
         return result.length > 0;

@@ -18,7 +18,6 @@ import { useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import { useAuthStore } from '@/store/authStore';
 import { getToken } from '@/utils/secureTokenStore';
-import { useDriverLocationOverrideStore } from '@/store/driverLocationOverrideStore';
 import { useNavigationLocationStore } from '@/store/navigationLocationStore';
 import { useNavigationStore } from '@/store/navigationStore';
 
@@ -145,7 +144,6 @@ export function useDriverHeartbeat() {
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const locationWatchRef = useRef<Location.LocationSubscription | null>(null);
   const lastLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
-  const simulatedLocationRef = useRef<{ latitude: number; longitude: number }>({ latitude: 42.4635, longitude: 21.4694 });
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('DISCONNECTED');
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
@@ -263,13 +261,7 @@ export function useDriverHeartbeat() {
       return navLocationState.location;
     }
 
-    // Priority 2: Manual simulation override
-    const overrideState = useDriverLocationOverrideStore.getState();
-    if (overrideState.isSimulationOverrideEnabled && overrideState.locationOverride) {
-      return overrideState.locationOverride;
-    }
-
-    // Priority 3: Try real GPS with aggressive timeout (2 seconds max)
+    // Priority 2: Try real GPS with aggressive timeout (2 seconds max)
     try {
       const location = await Promise.race([
         Location.getCurrentPositionAsync({
@@ -291,26 +283,7 @@ export function useDriverHeartbeat() {
       console.warn('[Heartbeat] GPS failed or timed out, using simulation');
     }
 
-    // Fallback: simulate location only in development builds.
-    // In production we skip the heartbeat rather than send false coordinates.
-    if (__DEV__) {
-      // Move ~10-15 meters per heartbeat (realistic drift for dev testing)
-      const latOffset = (Math.random() - 0.5) * 0.00027; // ±15m latitude
-      const lngOffset = (Math.random() - 0.5) * 0.00036; // ±15m longitude
-
-      simulatedLocationRef.current = {
-        latitude: simulatedLocationRef.current.latitude + latOffset,
-        longitude: simulatedLocationRef.current.longitude + lngOffset,
-      };
-
-      console.log('[Heartbeat] DEV SIMULATION: Random walk movement', {
-        lat: simulatedLocationRef.current.latitude,
-        lng: simulatedLocationRef.current.longitude,
-      });
-      return simulatedLocationRef.current;
-    }
-
-    // Production: GPS unavailable – caller will skip this heartbeat
+    // GPS unavailable – skip this heartbeat rather than send false coordinates.
     console.warn('[Heartbeat] GPS unavailable, skipping heartbeat');
     return null;
   }, []);

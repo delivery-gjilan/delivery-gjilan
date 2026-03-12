@@ -1,4 +1,4 @@
-import { pgTable, uuid, doublePrecision, timestamp, pgEnum, boolean, numeric } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, doublePrecision, timestamp, pgEnum, boolean, numeric, integer } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import { users } from './users';
 
@@ -71,6 +71,30 @@ export const drivers = pgTable('drivers', {
     * CONNECTED -> STALE (45s) -> LOST (90s) -> DISCONNECTED (subscription closed)
    */
   connectionStatus: driverConnectionStatus('connection_status').default('DISCONNECTED').notNull(),
+
+  /**
+   * Last reported battery percentage from the driver's device.
+   * Null means unknown or user has not opted in.
+   */
+  batteryLevel: integer('battery_level'),
+
+  /**
+   * Whether driver has explicitly opted in to battery sharing.
+   */
+  batteryOptIn: boolean('battery_opt_in').default(false).notNull(),
+
+  /**
+   * Timestamp when battery level was last updated by the mobile app.
+   */
+  batteryUpdatedAt: timestamp('battery_updated_at', {
+    withTimezone: true,
+    mode: 'string'
+  }),
+
+  /**
+   * Optional charging state flag from device telemetry.
+   */
+  isCharging: boolean('is_charging'),
 
   // Commission and payment tracking
   commissionPercentage: numeric('commission_percentage', { precision: 5, scale: 2 }).default('0').notNull(),

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, FormEvent } from "react";
-import { useQuery, useMutation, useSubscription } from "@apollo/client/react";
+import { useState, FormEvent, useEffect, useRef } from "react";
+import { useQuery, useMutation, useSubscription, useLazyQuery } from "@apollo/client/react";
 import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
 import { DRIVERS_UPDATED_SUBSCRIPTION } from "@/graphql/operations/users/subscriptions";
+import { ADMIN_SEND_PTT_SIGNAL, GET_AGORA_RTC_CREDENTIALS } from "@/graphql/operations/users/ptt";
 import {
     CREATE_USER_MUTATION,
     DELETE_USER_MUTATION,
@@ -14,7 +15,8 @@ import Input from "@/components/ui/Input";
 import { Table, Th, Td } from "@/components/ui/Table";
 import Modal from "@/components/ui/Modal";
 import { useAuth } from "@/lib/auth-context";
-import { Trash2, Plus, Signal, Settings2 } from "lucide-react";
+import { Trash2, Plus, Signal, Settings2, Mic, MicOff } from "lucide-react";
+import AgoraRTC, { IAgoraRTCClient, IMicrophoneAudioTrack } from 'agora-rtc-sdk-ng';
 
 interface DriverItem {
     id: string;
@@ -32,6 +34,10 @@ interface DriverItem {
         lastHeartbeatAt?: string;
         lastLocationUpdate?: string;
         disconnectedAt?: string;
+        batteryLevel?: number | null;
+        batteryOptIn?: boolean;
+        batteryUpdatedAt?: string;
+        isCharging?: boolean | null;
     };
 }
 
@@ -66,6 +72,8 @@ export default function DriversPage() {
     const [updateDriverSettings] = useMutation(ADMIN_UPDATE_DRIVER_SETTINGS_MUTATION, {
         onCompleted: () => { refetch(); setShowSettingsModal(false); setSettingsTarget(null); },
     });
+    const [sendPttSignal] = useMutation(ADMIN_SEND_PTT_SIGNAL);
+    const [getAgoraCredentials] = useLazyQuery(GET_AGORA_RTC_CREDENTIALS, { fetchPolicy: 'no-cache' });
 
     // Create modal state
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -83,6 +91,143 @@ export default function DriversPage() {
 
     const [formError, setFormError] = useState("");
     const [formSuccess, setFormSuccess] = useState("");
+    const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
+    const [isTalking, setIsTalking] = useState(false);
+    const [isMuted, setIsMuted] = useState(false);
+    const [pttChannelName, setPttChannelName] = useState<string | null>(null);
+    const [pttError, setPttError] = useState<string>("");
+    const [activePttDriverIds, setActivePttDriverIds] = useState<string[]>([]);
+
+    const rtcClientRef = useRef<IAgoraRTCClient | null>(null);
+    const micTrackRef = useRef<IMicrophoneAudioTrack | null>(null);
+
+    const selectedDrivers = (data?.drivers || []).filter((d) => selectedDriverIds.includes(d.id));
+    const selectedConnectedDriverIds = selectedDrivers
+        .filter((d) => d.driverConnection?.connectionStatus === 'CONNECTED')
+        .map((d) => d.id);
+    const selectedOfflineCount = selectedDrivers.length - selectedConnectedDriverIds.length;
+
+    const ensureRtcClient = async () => {
+        if (rtcClientRef.current) {
+            return rtcClientRef.current;
+        }
+
+        const client = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
+        await client.setClientRole('host');
+        rtcClientRef.current = client;
+        return client;
+    };
+
+    const stopTalking = async () => {
+        const targetDriverIds = activePttDriverIds.length > 0 ? activePttDriverIds : selectedConnectedDriverIds;
+
+        if (pttChannelName && targetDriverIds.length > 0) {
+            try {
+                await sendPttSignal({
+                    variables: {
+                        driverIds: targetDriverIds,
+                        channelName: pttChannelName,
+                        action: 'STOPPED',
+                        muted: false,
+                    },
+                });
+            } catch {
+                // Ignore signaling errors during teardown.
+            }
+        }
+
+        try {
+            if (rtcClientRef.current && micTrackRef.current) {
+                await rtcClientRef.current.unpublish([micTrackRef.current]);
+            }
+            micTrackRef.current?.stop();
+            micTrackRef.current?.close();
+            micTrackRef.current = null;
+            if (rtcClientRef.current) {
+                await rtcClientRef.current.leave();
+            }
+        } catch {
+            // no-op
+        }
+
+        setIsTalking(false);
+        setPttChannelName(null);
+        setActivePttDriverIds([]);
+    };
+
+    const startTalking = async () => {
+        if (isTalking) {
+            return;
+        }
+        setPttError('');
+        if (selectedConnectedDriverIds.length === 0) {
+            setPttError('Select at least one connected driver to start PTT.');
+            return;
+        }
+
+        const channelName = `ptt-${Date.now()}-${admin?.id || 'admin'}`;
+        const targetDriverIds = [...selectedConnectedDriverIds];
+
+        try {
+            const credsResult = await getAgoraCredentials({
+                variables: {
+                    channelName,
+                    role: 'PUBLISHER',
+                },
+            });
+
+            const creds = credsResult.data?.getAgoraRtcCredentials;
+            if (!creds) {
+                throw new Error('Failed to get Agora credentials');
+            }
+
+            const client = await ensureRtcClient();
+            const micTrack = await AgoraRTC.createMicrophoneAudioTrack();
+            await client.join(creds.appId, creds.channelName, creds.token, creds.uid);
+            await client.publish([micTrack]);
+
+            micTrackRef.current = micTrack;
+
+            await sendPttSignal({
+                variables: {
+                    driverIds: targetDriverIds,
+                    channelName,
+                    action: 'STARTED',
+                    muted: isMuted,
+                },
+            });
+
+            setPttChannelName(channelName);
+            setActivePttDriverIds(targetDriverIds);
+            setIsTalking(true);
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Failed to start PTT session';
+            setPttError(msg);
+            await stopTalking();
+        }
+    };
+
+    const handleToggleMute = async () => {
+        const nextMuted = !isMuted;
+        setIsMuted(nextMuted);
+
+        if (micTrackRef.current) {
+            await micTrackRef.current.setEnabled(!nextMuted);
+        }
+
+        const targetDriverIds = activePttDriverIds.length > 0 ? activePttDriverIds : selectedConnectedDriverIds;
+
+        if (pttChannelName && targetDriverIds.length > 0) {
+            await sendPttSignal({
+                variables: {
+                    driverIds: targetDriverIds,
+                    channelName: pttChannelName,
+                    action: nextMuted ? 'MUTE' : 'UNMUTE',
+                    muted: nextMuted,
+                },
+            });
+        }
+    };
 
     const handleCloseCreateModal = () => {
         setShowCreateModal(false);
@@ -172,6 +317,12 @@ export default function DriversPage() {
         }
     };
 
+    useEffect(() => {
+        return () => {
+            stopTalking();
+        };
+    }, []);
+
     return (
         <div className="text-white">
             <div className="mb-6 flex items-center justify-between">
@@ -199,16 +350,54 @@ export default function DriversPage() {
             )}
 
             <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+                <div className="border-b border-gray-800 p-4 bg-gray-900/80">
+                    <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
+                        <div>
+                            <p className="text-white font-medium">Push-to-Talk (PTT)</p>
+                            <p className="text-sm text-gray-400">
+                                Selected drivers: {selectedDrivers.length} | Connected: {selectedConnectedDriverIds.length}
+                                {selectedOfflineCount > 0 ? ` | Offline: ${selectedOfflineCount}` : ''}
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={handleToggleMute}
+                                disabled={!isTalking}
+                                className="text-yellow-300 border-yellow-700"
+                            >
+                                {isMuted ? <MicOff size={14} className="mr-1" /> : <Mic size={14} className="mr-1" />}
+                                {isMuted ? 'Unmute' : 'Mute'}
+                            </Button>
+                            <Button
+                                className={`${isTalking ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'} text-white`}
+                                onMouseDown={startTalking}
+                                onMouseUp={stopTalking}
+                                onMouseLeave={stopTalking}
+                                onTouchStart={startTalking}
+                                onTouchEnd={stopTalking}
+                            >
+                                <Mic size={16} className="mr-2" />
+                                {isTalking ? 'Release To Stop' : 'Hold To Talk'}
+                            </Button>
+                        </div>
+                    </div>
+                    {pttError && (
+                        <p className="text-red-300 text-sm mt-2">{pttError}</p>
+                    )}
+                </div>
                 {loading ? (
                     <p className="text-gray-400 p-6">Loading drivers...</p>
                 ) : (
                     <Table>
                         <thead>
                             <tr>
+                                <Th>Select</Th>
                                 <Th>Name</Th>
                                 <Th>Email</Th>
                                 <Th>Phone</Th>
                                 <Th>Status</Th>
+                                <Th>Battery</Th>
                                 <Th>Commission</Th>
                                 <Th>Max Orders</Th>
                                 <Th>Actions</Th>
@@ -222,6 +411,20 @@ export default function DriversPage() {
 
                                 return (
                                     <tr key={driver.id}>
+                                        <Td>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedDriverIds.includes(driver.id)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setSelectedDriverIds((prev) => [...prev, driver.id]);
+                                                    } else {
+                                                        setSelectedDriverIds((prev) => prev.filter((id) => id !== driver.id));
+                                                    }
+                                                }}
+                                                className="h-4 w-4 accent-emerald-500"
+                                            />
+                                        </Td>
                                         <Td>
                                             <div className="font-medium text-white">{driver.firstName} {driver.lastName}</div>
                                             <div className="mt-0.5">
@@ -237,6 +440,15 @@ export default function DriversPage() {
                                                 <Signal size={11} />
                                                 {status}
                                             </span>
+                                        </Td>
+                                        <Td>
+                                            {conn?.batteryOptIn && conn?.batteryLevel != null ? (
+                                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border ${conn.batteryLevel < 20 ? 'bg-red-500/10 text-red-300 border-red-700' : 'bg-emerald-500/10 text-emerald-300 border-emerald-700'}`}>
+                                                    {conn.isCharging ? 'Charging' : 'Battery'} {conn.batteryLevel}%
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-gray-500">Not shared</span>
+                                            )}
                                         </Td>
                                         <Td>
                                             <span className="text-white font-mono">
@@ -276,7 +488,7 @@ export default function DriversPage() {
                             })}
                             {!data?.drivers?.length && (
                                 <tr>
-                                    <Td colSpan={7}>
+                                    <Td colSpan={9}>
                                         <div className="text-center text-gray-500 py-8">No drivers found.</div>
                                     </Td>
                                 </tr>

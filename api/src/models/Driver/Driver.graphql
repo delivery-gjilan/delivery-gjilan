@@ -39,6 +39,47 @@ type DriverConnection {
 
     """When the ETA payload was last refreshed"""
     etaUpdatedAt: Date
+
+    """Most recently reported battery level percentage from driver device"""
+    batteryLevel: Int
+
+    """Whether driver opted in to battery telemetry sharing"""
+    batteryOptIn: Boolean!
+
+    """When battery telemetry was last refreshed"""
+    batteryUpdatedAt: Date
+
+    """Whether device reported it is currently charging"""
+    isCharging: Boolean
+}
+
+enum DriverPttSignalAction {
+    STARTED
+    STOPPED
+    MUTE
+    UNMUTE
+}
+
+type DriverPttSignal {
+    driverId: ID!
+    adminId: ID!
+    channelName: String!
+    action: DriverPttSignalAction!
+    muted: Boolean!
+    timestamp: DateTime!
+}
+
+enum AgoraRtcRole {
+    PUBLISHER
+    SUBSCRIBER
+}
+
+type AgoraRtcCredentials {
+    appId: String!
+    channelName: String!
+    uid: Int!
+    token: String!
+    expiresAt: DateTime!
 }
 
 """Result of driver heartbeat mutation"""
@@ -92,6 +133,9 @@ type DriverDailyMetrics {
 extend type Query {
     """Get live metrics for the authenticated driver"""
     myDriverMetrics: DriverDailyMetrics!
+
+    """Get Agora RTC credentials for the current authenticated user"""
+    getAgoraRtcCredentials(channelName: String!, role: AgoraRtcRole!): AgoraRtcCredentials!
 }
 
 extend type Mutation {
@@ -117,9 +161,23 @@ extend type Mutation {
         commissionPercentage: Float
         maxActiveOrders: Int
     ): User!
+
+    """Driver battery telemetry update (recommended every 5-10 minutes)"""
+    driverUpdateBatteryStatus(level: Int!, optIn: Boolean!, isCharging: Boolean): DriverConnection!
+
+    """Admin sends push-to-talk signaling state to one or multiple drivers"""
+    adminSendPttSignal(
+        driverIds: [ID!]!
+        channelName: String!
+        action: DriverPttSignalAction!
+        muted: Boolean
+    ): Boolean!
 }
 
 # Per-driver subscription (optional - for more granular updates)
 extend type Subscription {
     driverConnectionStatusChanged(driverId: ID!): DriverConnection! @skipAuth
+
+    """Per-driver push-to-talk signal stream (start/stop/mute/unmute)"""
+    driverPttSignal(driverId: ID!): DriverPttSignal! @skipAuth
 }

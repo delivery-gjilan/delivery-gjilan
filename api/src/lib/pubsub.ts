@@ -26,19 +26,29 @@ export type OrderDriverLiveTrackingPayload = {
     etaUpdatedAt: string;
 };
 
+export type DriverPttSignalPayload = {
+    driverId: string;
+    adminId: string;
+    channelName: string;
+    action: 'STARTED' | 'STOPPED' | 'MUTE' | 'UNMUTE';
+    muted: boolean;
+    timestamp: Date;
+};
+
 type PubSubPayloadMap = {
     'order.byId.updated': Order;
     'orders.byUser.changed': UserOrdersPayload;
     'orders.all.changed': AllOrdersPayload;
     'drivers.all.changed': DriversUpdatedPayload;
     'order.driver.live.changed': OrderDriverLiveTrackingPayload;
+    'driver.ptt.signal': DriverPttSignalPayload;
 };
 
 type TopicKey<K extends keyof PubSubPayloadMap> = `${K}.${string}` | `${K}`;
 
-type AnyTopicKey = TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed'>;
+type AnyTopicKey = TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed' | 'driver.ptt.signal'>;
 
-type AnyPayload = Order | UserOrdersPayload | AllOrdersPayload | DriversUpdatedPayload | OrderDriverLiveTrackingPayload;
+type AnyPayload = Order | UserOrdersPayload | AllOrdersPayload | DriversUpdatedPayload | OrderDriverLiveTrackingPayload | DriverPttSignalPayload;
 
 type PubSubChannels = {
     [K in keyof PubSubPayloadMap as TopicKey<K>]: [payload: PubSubPayloadMap[K]];
@@ -183,6 +193,8 @@ export const topics = {
     allDriversChanged: (): TopicKey<'drivers.all.changed'> => `drivers.all.changed`,
 
     orderDriverLiveChanged: (orderId: string): TopicKey<'order.driver.live.changed'> => `order.driver.live.changed.${orderId}`,
+
+    driverPttSignal: (driverId: string): TopicKey<'driver.ptt.signal'> => `driver.ptt.signal.${driverId}`,
 } as const;
 
 export function publish(p: PubSub, topic: TopicKey<'order.byId.updated'>, payload: Order): void;
@@ -191,14 +203,15 @@ export function publish(p: PubSub, topic: TopicKey<'orders.byUser.changed'>, pay
 export function publish(p: PubSub, topic: TopicKey<'orders.all.changed'>, payload: AllOrdersPayload): void;
 export function publish(p: PubSub, topic: TopicKey<'drivers.all.changed'>, payload: DriversUpdatedPayload): void;
 export function publish(p: PubSub, topic: TopicKey<'order.driver.live.changed'>, payload: OrderDriverLiveTrackingPayload): void;
+export function publish(p: PubSub, topic: TopicKey<'driver.ptt.signal'>, payload: DriverPttSignalPayload): void;
 export function publish(
     p: PubSub,
-    topic: TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed'>,
+    topic: TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed' | 'driver.ptt.signal'>,
     payload: AnyPayload,
 ): void;
 export function publish(
     p: PubSub,
-    topic: TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed'>,
+    topic: TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed' | 'driver.ptt.signal'>,
     payload: AnyPayload,
 ) {
     // @ts-expect-error can fix it but with unnecessary complexity
@@ -214,7 +227,8 @@ export function subscribe(p: PubSub, topic: TopicKey<'orders.all.changed'>): Ret
 
 export function subscribe(p: PubSub, topic: TopicKey<'drivers.all.changed'>): ReturnType<PubSub['subscribe']>;
 export function subscribe(p: PubSub, topic: TopicKey<'order.driver.live.changed'>): ReturnType<PubSub['subscribe']>;
+export function subscribe(p: PubSub, topic: TopicKey<'driver.ptt.signal'>): ReturnType<PubSub['subscribe']>;
 
-export function subscribe(p: PubSub, topic: TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed'>) {
+export function subscribe(p: PubSub, topic: TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed' | 'driver.ptt.signal'>) {
     return p.subscribe(topic);
 }
