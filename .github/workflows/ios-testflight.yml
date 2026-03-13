@@ -96,17 +96,54 @@ jobs:
         working-directory: ${{ env.APP_DIR }}/ios
         run: bundle install --jobs 4 --retry 3
 
+      - name: Debug signing input presence (safe)
+        env:
+          IOS_DIST_CERT_BASE64: ${{ secrets.IOS_DIST_CERT_BASE64 || secrets.APPLE_DIST_CERT_BASE64 || vars.IOS_DIST_CERT_BASE64 || vars.APPLE_DIST_CERT_BASE64 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD || secrets.APPLE_DIST_CERT_PASSWORD || vars.IOS_DIST_CERT_PASSWORD || vars.APPLE_DIST_CERT_PASSWORD }}
+          IOS_PROFILE_APP_BASE64: ${{ secrets.IOS_PROFILE_APP_BASE64 || secrets.IOS_MAIN_PROFILE_BASE64 || vars.IOS_PROFILE_APP_BASE64 || vars.IOS_MAIN_PROFILE_BASE64 }}
+          IOS_PROFILE_EXTENSION_BASE64: ${{ secrets.IOS_PROFILE_EXTENSION_BASE64 || secrets.IOS_EXT_PROFILE_BASE64 || vars.IOS_PROFILE_EXTENSION_BASE64 || vars.IOS_EXT_PROFILE_BASE64 }}
+          IOS_KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD || secrets.BUILD_KEYCHAIN_PASSWORD || vars.IOS_KEYCHAIN_PASSWORD || vars.BUILD_KEYCHAIN_PASSWORD }}
+        run: |
+          present() {
+            if [ -n "$1" ]; then echo "yes"; else echo "no"; fi
+          }
+          echo "IOS_DIST_CERT_BASE64 present: $(present "$IOS_DIST_CERT_BASE64")"
+          echo "IOS_DIST_CERT_PASSWORD present: $(present "$IOS_DIST_CERT_PASSWORD")"
+          echo "IOS_PROFILE_APP_BASE64 present: $(present "$IOS_PROFILE_APP_BASE64")"
+          echo "IOS_PROFILE_EXTENSION_BASE64 present: $(present "$IOS_PROFILE_EXTENSION_BASE64")"
+          echo "IOS_KEYCHAIN_PASSWORD present: $(present "$IOS_KEYCHAIN_PASSWORD")"
+
       - name: Install signing certificate and provisioning profiles
         env:
-          IOS_DIST_CERT_BASE64: ${{ secrets.IOS_DIST_CERT_BASE64 || secrets.APPLE_DIST_CERT_BASE64 }}
-          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD || secrets.APPLE_DIST_CERT_PASSWORD }}
-          IOS_PROFILE_APP_BASE64: ${{ secrets.IOS_PROFILE_APP_BASE64 || secrets.IOS_MAIN_PROFILE_BASE64 }}
-          IOS_PROFILE_EXTENSION_BASE64: ${{ secrets.IOS_PROFILE_EXTENSION_BASE64 || secrets.IOS_EXT_PROFILE_BASE64 }}
-          IOS_KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD || secrets.BUILD_KEYCHAIN_PASSWORD }}
+          IOS_DIST_CERT_BASE64: ${{ secrets.IOS_DIST_CERT_BASE64 || secrets.APPLE_DIST_CERT_BASE64 || vars.IOS_DIST_CERT_BASE64 || vars.APPLE_DIST_CERT_BASE64 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD || secrets.APPLE_DIST_CERT_PASSWORD || vars.IOS_DIST_CERT_PASSWORD || vars.APPLE_DIST_CERT_PASSWORD }}
+          IOS_PROFILE_APP_BASE64: ${{ secrets.IOS_PROFILE_APP_BASE64 || secrets.IOS_MAIN_PROFILE_BASE64 || vars.IOS_PROFILE_APP_BASE64 || vars.IOS_MAIN_PROFILE_BASE64 }}
+          IOS_PROFILE_EXTENSION_BASE64: ${{ secrets.IOS_PROFILE_EXTENSION_BASE64 || secrets.IOS_EXT_PROFILE_BASE64 || vars.IOS_PROFILE_EXTENSION_BASE64 || vars.IOS_EXT_PROFILE_BASE64 }}
+          IOS_KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD || secrets.BUILD_KEYCHAIN_PASSWORD || vars.IOS_KEYCHAIN_PASSWORD || vars.BUILD_KEYCHAIN_PASSWORD }}
         run: |
-          if [ -z "$IOS_DIST_CERT_BASE64" ] || [ -z "$IOS_DIST_CERT_PASSWORD" ] || [ -z "$IOS_PROFILE_APP_BASE64" ] || [ -z "$IOS_PROFILE_EXTENSION_BASE64" ] || [ -z "$IOS_KEYCHAIN_PASSWORD" ]; then
-            echo "Missing signing secrets. Required: IOS_DIST_CERT_BASE64, IOS_DIST_CERT_PASSWORD, IOS_PROFILE_APP_BASE64, IOS_PROFILE_EXTENSION_BASE64, IOS_KEYCHAIN_PASSWORD"
-            echo "Accepted aliases: APPLE_DIST_CERT_BASE64, APPLE_DIST_CERT_PASSWORD, IOS_MAIN_PROFILE_BASE64, IOS_EXT_PROFILE_BASE64, BUILD_KEYCHAIN_PASSWORD"
+          # Fallback: if extension profile is omitted, reuse the app profile.
+          # This works when a single profile covers both bundle identifiers.
+          if [ -z "$IOS_PROFILE_EXTENSION_BASE64" ] && [ -n "$IOS_PROFILE_APP_BASE64" ]; then
+            IOS_PROFILE_EXTENSION_BASE64="$IOS_PROFILE_APP_BASE64"
+            echo "IOS_PROFILE_EXTENSION_BASE64 not provided; reusing IOS_PROFILE_APP_BASE64"
+          fi
+
+          # Fallback: auto-generate temporary keychain password when not provided.
+          if [ -z "$IOS_KEYCHAIN_PASSWORD" ]; then
+            IOS_KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+            echo "IOS_KEYCHAIN_PASSWORD not provided; generated ephemeral keychain password"
+          fi
+
+          MISSING=()
+          [ -z "$IOS_DIST_CERT_BASE64" ] && MISSING+=("IOS_DIST_CERT_BASE64")
+          [ -z "$IOS_DIST_CERT_PASSWORD" ] && MISSING+=("IOS_DIST_CERT_PASSWORD")
+          [ -z "$IOS_PROFILE_APP_BASE64" ] && MISSING+=("IOS_PROFILE_APP_BASE64")
+          [ -z "$IOS_PROFILE_EXTENSION_BASE64" ] && MISSING+=("IOS_PROFILE_EXTENSION_BASE64")
+
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            echo "Missing signing secrets: ${MISSING[*]}"
+            echo "Required base names: IOS_DIST_CERT_BASE64, IOS_DIST_CERT_PASSWORD, IOS_PROFILE_APP_BASE64"
+            echo "Optional with fallback: IOS_PROFILE_EXTENSION_BASE64, IOS_KEYCHAIN_PASSWORD"
             exit 1
           fi
 
