@@ -168,15 +168,6 @@ export function useLiveActivity({ orderId, orderDisplayId, businessName, enabled
         }
     }, [isSupported]);
 
-    // Cleanup: end Live Activity when component unmounts
-    useEffect(() => {
-        return () => {
-            if (activityIdRef.current && DeliveryLiveActivitiesNative) {
-                DeliveryLiveActivitiesNative.endActivity(activityIdRef.current).catch(console.error);
-            }
-        };
-    }, []);
-
     return {
         startLiveActivity,
         updateLiveActivity,

@@ -299,6 +299,10 @@ export class NotificationService {
             status: 'preparing' | 'ready' | 'out_for_delivery' | 'delivered';
         },
     ): Promise<void> {
+        const liveActivityTopic =
+            process.env.LIVE_ACTIVITY_APNS_TOPIC ||
+            process.env.IOS_EXTENSION_BUNDLE_ID ||
+            'com.anonymous.mobilecustomer.DeliveryLiveActivityExtension';
         const liveActivityRepo = new LiveActivityTokenRepository();
         const tokens = await liveActivityRepo.getTokensByOrderId(orderId);
 
@@ -319,12 +323,13 @@ export class NotificationService {
                         estimatedMinutes: String(updates.estimatedMinutes),
                         status: updates.status,
                         orderId: orderId,
-                        lastUpdated: new Date().toISOString(),
+                        lastUpdated: String(Date.now()),
                     },
                     apns: {
                         headers: {
                             'apns-push-type': 'liveactivity', // Required for Live Activity updates
                             'apns-priority': '10',
+                            'apns-topic': liveActivityTopic,
                         },
                         payload: {
                             aps: {
@@ -335,7 +340,7 @@ export class NotificationService {
                                     estimatedMinutes: updates.estimatedMinutes,
                                     status: updates.status,
                                     orderId: orderId,
-                                    lastUpdated: new Date().toISOString(),
+                                    lastUpdated: Date.now(),
                                 },
                             },
                         },
@@ -367,6 +372,10 @@ export class NotificationService {
      * End all Live Activities for an order (when order is completed/cancelled)
      */
     async endLiveActivities(orderId: string): Promise<void> {
+        const liveActivityTopic =
+            process.env.LIVE_ACTIVITY_APNS_TOPIC ||
+            process.env.IOS_EXTENSION_BUNDLE_ID ||
+            'com.anonymous.mobilecustomer.DeliveryLiveActivityExtension';
         const liveActivityRepo = new LiveActivityTokenRepository();
         const tokens = await liveActivityRepo.getTokensByOrderId(orderId);
 
@@ -385,6 +394,7 @@ export class NotificationService {
                         headers: {
                             'apns-push-type': 'liveactivity',
                             'apns-priority': '10',
+                            'apns-topic': liveActivityTopic,
                         },
                         payload: {
                             aps: {

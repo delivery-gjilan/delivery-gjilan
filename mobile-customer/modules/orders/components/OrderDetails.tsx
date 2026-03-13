@@ -917,7 +917,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     }, [order?.orderDate, order?.status, (order as any)?.deliveredAt]);
 
     // ─── Live Activity (Dynamic Island) ─────────────────────
-    const { startLiveActivity, updateLiveActivity, endLiveActivity } = useLiveActivity({
+    const { startLiveActivity, endLiveActivity } = useLiveActivity({
         orderId: order?.id ?? '',
         orderDisplayId: order?.displayId ?? '',
         businessName: businessName,
@@ -936,9 +936,10 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         if (status === 'OUT_FOR_DELIVERY') {
             startLiveActivity({ driverName: driverName || 'Driver', estimatedMinutes: etaMinutes, status: liveStatus });
         } else if (customerVisibleStatus === 'PREPARING') {
-            updateLiveActivity({ driverName: driverName || 'Driver', estimatedMinutes: etaMinutes, status: liveStatus });
+            // Start during preparing as well so updates have an active activity to target.
+            startLiveActivity({ driverName: driverName || 'Driver', estimatedMinutes: etaMinutes, status: liveStatus });
         }
-    }, [status, customerVisibleStatus, isCompleted, isCancelled, deliveryEta, preparationEta, isDeliveryPhase, isPreparingPhase, driverName, startLiveActivity, updateLiveActivity, endLiveActivity]);
+    }, [status, customerVisibleStatus, isCompleted, isCancelled, deliveryEta, preparationEta, isDeliveryPhase, isPreparingPhase, driverName, startLiveActivity, endLiveActivity]);
 
     // ─── Map Fitting (status-aware) ────────────────────────
     const fitMapToMarkers = useCallback(() => {
