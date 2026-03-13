@@ -38,6 +38,7 @@ platform :ios do
     end
 
     build_path = File.expand_path("../build", __dir__)
+    buildlog_path = File.expand_path("../buildlogs", __dir__)
 
     gym_options = {
       scheme: scheme_name,
@@ -45,6 +46,8 @@ platform :ios do
       export_method: "app-store",
       output_directory: build_path,
       output_name: "app-testflight.ipa",
+      buildlog_path: buildlog_path,
+      xcargs: "-allowProvisioningUpdates",
       export_xcargs: "-allowProvisioningUpdates"
     }
 

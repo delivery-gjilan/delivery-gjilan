@@ -26,6 +26,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Select Xcode version
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "16.4"
+
+      - name: Print Xcode version
+        run: xcodebuild -version
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -85,6 +93,9 @@ jobs:
         working-directory: ${{ env.APP_DIR }}/ios
         run: bundle install --jobs 4 --retry 3
 
+      - name: Print available code signing identities
+        run: security find-identity -v -p codesigning || true
+
       - name: Build and upload to TestFlight
         working-directory: ${{ env.APP_DIR }}/ios
         env:
@@ -92,3 +103,22 @@ jobs:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: bundle exec fastlane beta
+
+      - name: Show gym log on failure
+        if: failure()
+        run: |
+          LOG_FILE=$(ls -t /Users/runner/Library/Logs/gym/*.log 2>/dev/null | head -n1 || true)
+          if [ -n "$LOG_FILE" ]; then
+            echo "Showing log: $LOG_FILE"
+            tail -n 300 "$LOG_FILE"
+          else
+            echo "No gym log file found"
+          fi
+
+      - name: Upload gym logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-gym-logs
+          path: /Users/runner/Library/Logs/gym/*.log
+          if-no-files-found: ignore
