@@ -16,6 +16,9 @@ concurrency:
 env:
   APP_DIR: mobile-customer
   NODE_VERSION: "20"
+  IOS_TEAM_ID: "87K8YXG5V8"
+  IOS_APP_BUNDLE_ID: "com.anonymous.mobilecustomer"
+  IOS_EXTENSION_BUNDLE_ID: "com.anonymous.mobilecustomer.DeliveryLiveActivityExtension"
 
 jobs:
   build-and-upload:
@@ -93,6 +96,49 @@ jobs:
         working-directory: ${{ env.APP_DIR }}/ios
         run: bundle install --jobs 4 --retry 3
 
+      - name: Install signing certificate and provisioning profiles
+        env:
+          IOS_DIST_CERT_BASE64: ${{ secrets.IOS_DIST_CERT_BASE64 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          IOS_PROFILE_APP_BASE64: ${{ secrets.IOS_PROFILE_APP_BASE64 }}
+          IOS_PROFILE_EXTENSION_BASE64: ${{ secrets.IOS_PROFILE_EXTENSION_BASE64 }}
+          IOS_KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
+        run: |
+          if [ -z "$IOS_DIST_CERT_BASE64" ] || [ -z "$IOS_DIST_CERT_PASSWORD" ] || [ -z "$IOS_PROFILE_APP_BASE64" ] || [ -z "$IOS_PROFILE_EXTENSION_BASE64" ] || [ -z "$IOS_KEYCHAIN_PASSWORD" ]; then
+            echo "Missing signing secrets. Required: IOS_DIST_CERT_BASE64, IOS_DIST_CERT_PASSWORD, IOS_PROFILE_APP_BASE64, IOS_PROFILE_EXTENSION_BASE64, IOS_KEYCHAIN_PASSWORD"
+            exit 1
+          fi
+
+          CERT_PATH="$RUNNER_TEMP/dist_cert.p12"
+          APP_PROFILE_PATH="$RUNNER_TEMP/app.mobileprovision"
+          EXT_PROFILE_PATH="$RUNNER_TEMP/ext.mobileprovision"
+          KEYCHAIN_PATH="$RUNNER_TEMP/ios-build.keychain-db"
+
+          echo -n "$IOS_DIST_CERT_BASE64" | base64 --decode -o "$CERT_PATH"
+          echo -n "$IOS_PROFILE_APP_BASE64" | base64 --decode -o "$APP_PROFILE_PATH"
+          echo -n "$IOS_PROFILE_EXTENSION_BASE64" | base64 --decode -o "$EXT_PROFILE_PATH"
+
+          security create-keychain -p "$IOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$IOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$IOS_DIST_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+
+          security cms -D -i "$APP_PROFILE_PATH" > "$RUNNER_TEMP/app_profile.plist"
+          APP_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$RUNNER_TEMP/app_profile.plist")
+          APP_PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$RUNNER_TEMP/app_profile.plist")
+          cp "$APP_PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$APP_PROFILE_UUID.mobileprovision"
+
+          security cms -D -i "$EXT_PROFILE_PATH" > "$RUNNER_TEMP/ext_profile.plist"
+          EXT_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$RUNNER_TEMP/ext_profile.plist")
+          EXT_PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$RUNNER_TEMP/ext_profile.plist")
+          cp "$EXT_PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$EXT_PROFILE_UUID.mobileprovision"
+
+          echo "IOS_MAIN_PROFILE_NAME=$APP_PROFILE_NAME" >> "$GITHUB_ENV"
+          echo "IOS_EXTENSION_PROFILE_NAME=$EXT_PROFILE_NAME" >> "$GITHUB_ENV"
+
       - name: Print available code signing identities
         run: security find-identity -v -p codesigning || true
 
@@ -102,6 +148,9 @@ jobs:
           APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          IOS_TEAM_ID: ${{ env.IOS_TEAM_ID }}
+          IOS_APP_BUNDLE_ID: ${{ env.IOS_APP_BUNDLE_ID }}
+          IOS_EXTENSION_BUNDLE_ID: ${{ env.IOS_EXTENSION_BUNDLE_ID }}
         run: bundle exec fastlane beta
 
       - name: Show gym log on failure

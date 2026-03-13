@@ -39,6 +39,36 @@ platform :ios do
 
     build_path = File.expand_path("../build", __dir__)
     buildlog_path = File.expand_path("../buildlogs", __dir__)
+    team_id = ENV["IOS_TEAM_ID"] || "87K8YXG5V8"
+    app_bundle_id = ENV["IOS_APP_BUNDLE_ID"] || "com.anonymous.mobilecustomer"
+    extension_bundle_id = ENV["IOS_EXTENSION_BUNDLE_ID"] || "com.anonymous.mobilecustomer.DeliveryLiveActivityExtension"
+    app_profile_name = ENV["IOS_MAIN_PROFILE_NAME"]
+    extension_profile_name = ENV["IOS_EXTENSION_PROFILE_NAME"]
+
+    UI.user_error!("Missing IOS_MAIN_PROFILE_NAME in environment") if app_profile_name.to_s.empty?
+    UI.user_error!("Missing IOS_EXTENSION_PROFILE_NAME in environment") if extension_profile_name.to_s.empty?
+
+    unless project_path.to_s.empty?
+      update_code_signing_settings(
+        use_automatic_signing: false,
+        path: project_path,
+        team_id: team_id,
+        code_sign_identity: "Apple Distribution",
+        targets: ["mobilecustomer"],
+        bundle_identifier: app_bundle_id,
+        profile_name: app_profile_name
+      )
+
+      update_code_signing_settings(
+        use_automatic_signing: false,
+        path: project_path,
+        team_id: team_id,
+        code_sign_identity: "Apple Distribution",
+        targets: ["DeliveryLiveActivityExtension"],
+        bundle_identifier: extension_bundle_id,
+        profile_name: extension_profile_name
+      )
+    end
 
     gym_options = {
       scheme: scheme_name,
@@ -47,7 +77,15 @@ platform :ios do
       output_directory: build_path,
       output_name: "app-testflight.ipa",
       buildlog_path: buildlog_path,
-      xcargs: "-allowProvisioningUpdates",
+      xcargs: "DEVELOPMENT_TEAM=#{team_id} CODE_SIGN_STYLE=Manual -allowProvisioningUpdates",
+      export_options: {
+        method: "app-store",
+        signingStyle: "manual",
+        provisioningProfiles: {
+          app_bundle_id => app_profile_name,
+          extension_bundle_id => extension_profile_name
+        }
+      },
       export_xcargs: "-allowProvisioningUpdates"
     }
 
