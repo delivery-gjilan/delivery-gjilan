@@ -37,7 +37,7 @@ jobs:
 
       - name: Generate native iOS project for Expo managed app
         working-directory: ${{ env.APP_DIR }}
-        run: npx expo prebuild --platform ios --non-interactive
+        run: npx expo prebuild --platform ios --non-interactive --clean
 
       - name: Restore Fastlane files into generated ios folder
         run: |
