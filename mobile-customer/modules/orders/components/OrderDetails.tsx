@@ -8,11 +8,12 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
-import { Order } from '@/gql/graphql';
+import { Order, OrderStatus } from '@/gql/graphql';
 import { Image } from 'expo-image';
 import { useQuery, useSubscription } from '@apollo/client/react';
 import { GET_ORDER_DRIVER } from '@/graphql/operations/orders';
 import { ORDER_DRIVER_LIVE_TRACKING } from '@/graphql/operations/orders/subscriptions';
+import { useUpdateOrderStatus } from '../hooks/useOrders';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
@@ -510,6 +511,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const fitMapToMarkersRef = useRef<() => void>(() => {});
     const [showSummary, setShowSummary] = useState(false);
     const [showDriverInfo, setShowDriverInfo] = useState(false);
+    const { update: updateOrderStatus, loading: isMarkingAsDelivered } = useUpdateOrderStatus();
     const [mapZoomLevel, setMapZoomLevel] = useState(15.5);
     const [interpolatedDriverLocation, setInterpolatedDriverLocation] = useState<{
         latitude: number;
@@ -998,6 +1000,18 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         try { await Linking.openURL(`tel:${driverPhone}`); }
         catch { Alert.alert(t.orders.details.call_failed, t.orders.details.unable_open_dialer); }
     }, [driverPhone, t.orders.details.call_failed, t.orders.details.unable_open_dialer]);
+
+    const handleMarkAsDelivered = useCallback(async () => {
+        if (!order?.id || isMarkingAsDelivered) return;
+
+        const result = await updateOrderStatus(order.id, OrderStatus.Delivered);
+        if (result.error) {
+            Alert.alert('Failed', 'Could not mark this order as delivered.');
+            return;
+        }
+
+        Alert.alert('Success', 'Order marked as delivered.');
+    }, [order?.id, isMarkingAsDelivered, updateOrderStatus]);
 
     const markerScale = useMemo(() => {
         const normalized = clamp((mapZoomLevel - 13) / 4, 0, 1);
@@ -1830,6 +1844,27 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                         >
                             <Text style={{ color: theme.colors.subtext, fontSize: 13, fontWeight: '600' }}>
                                 {showSummary ? '▲ Hide order summary' : '▼ Show order summary'}
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            onPress={handleMarkAsDelivered}
+                            activeOpacity={0.85}
+                            disabled={isMarkingAsDelivered}
+                            style={{
+                                alignSelf: 'center',
+                                marginBottom: 12,
+                                backgroundColor:
+                                    isMarkingAsDelivered
+                                        ? '#9CA3AF'
+                                        : '#16A34A',
+                                paddingHorizontal: 14,
+                                paddingVertical: 8,
+                                borderRadius: 999,
+                            }}
+                        >
+                            <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
+                                {isMarkingAsDelivered ? 'Marking...' : 'Mark as delivered (test)'}
                             </Text>
                         </TouchableOpacity>
 

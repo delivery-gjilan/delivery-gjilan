@@ -176,12 +176,39 @@ jobs:
           security cms -D -i "$APP_PROFILE_PATH" > "$RUNNER_TEMP/app_profile.plist"
           APP_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$RUNNER_TEMP/app_profile.plist")
           APP_PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$RUNNER_TEMP/app_profile.plist")
+          APP_PROFILE_APP_ID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" "$RUNNER_TEMP/app_profile.plist")
+          APP_PROFILE_EXPIRATION=$(/usr/libexec/PlistBuddy -c "Print :ExpirationDate" "$RUNNER_TEMP/app_profile.plist")
           cp "$APP_PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$APP_PROFILE_UUID.mobileprovision"
 
           security cms -D -i "$EXT_PROFILE_PATH" > "$RUNNER_TEMP/ext_profile.plist"
           EXT_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$RUNNER_TEMP/ext_profile.plist")
           EXT_PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$RUNNER_TEMP/ext_profile.plist")
+          EXT_PROFILE_APP_ID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" "$RUNNER_TEMP/ext_profile.plist")
+          EXT_PROFILE_EXPIRATION=$(/usr/libexec/PlistBuddy -c "Print :ExpirationDate" "$RUNNER_TEMP/ext_profile.plist")
           cp "$EXT_PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$EXT_PROFILE_UUID.mobileprovision"
+
+          EXPECTED_APP_APP_ID="${{ env.IOS_TEAM_ID }}.${{ env.IOS_APP_BUNDLE_ID }}"
+          EXPECTED_EXT_APP_ID="${{ env.IOS_TEAM_ID }}.${{ env.IOS_EXTENSION_BUNDLE_ID }}"
+
+          echo "Main profile: $APP_PROFILE_NAME"
+          echo "  - UUID: $APP_PROFILE_UUID"
+          echo "  - App ID: $APP_PROFILE_APP_ID"
+          echo "  - Expires: $APP_PROFILE_EXPIRATION"
+          echo "Extension profile: $EXT_PROFILE_NAME"
+          echo "  - UUID: $EXT_PROFILE_UUID"
+          echo "  - App ID: $EXT_PROFILE_APP_ID"
+          echo "  - Expires: $EXT_PROFILE_EXPIRATION"
+
+          if [ "$APP_PROFILE_APP_ID" != "$EXPECTED_APP_APP_ID" ]; then
+            echo "Main profile App ID mismatch. Expected: $EXPECTED_APP_APP_ID, got: $APP_PROFILE_APP_ID"
+            exit 1
+          fi
+
+          if [ "$EXT_PROFILE_APP_ID" != "$EXPECTED_EXT_APP_ID" ]; then
+            echo "Extension profile App ID mismatch. Expected: $EXPECTED_EXT_APP_ID, got: $EXT_PROFILE_APP_ID"
+            echo "Upload a provisioning profile created for the extension App ID: ${{ env.IOS_EXTENSION_BUNDLE_ID }}"
+            exit 1
+          fi
 
           echo "IOS_MAIN_PROFILE_NAME=$APP_PROFILE_NAME" >> "$GITHUB_ENV"
           echo "IOS_EXTENSION_PROFILE_NAME=$EXT_PROFILE_NAME" >> "$GITHUB_ENV"
