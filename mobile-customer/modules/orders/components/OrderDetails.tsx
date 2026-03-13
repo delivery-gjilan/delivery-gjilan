@@ -1009,7 +1009,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
             Alert.alert('Failed', 'Could not mark this order as delivered.');
             return;
         }
-
+//qap
         Alert.alert('Success', 'Order marked as delivered.');
     }, [order?.id, isMarkingAsDelivered, updateOrderStatus]);
 
