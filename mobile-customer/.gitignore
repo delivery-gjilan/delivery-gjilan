@@ -48,6 +48,15 @@ app-example
 /ios
 /android
 
+# Keep only CI Fastlane config in git for TestFlight pipeline
+!/ios/
+/ios/*
+!/ios/Gemfile
+!/ios/fastlane/
+/ios/fastlane/*
+!/ios/fastlane/Fastfile
+!/ios/fastlane/Appfile
+
 # Editor directories and files
 .idea
 .vscode

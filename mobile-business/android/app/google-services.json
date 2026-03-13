@@ -1,0 +1,97 @@
+{
+  "project_info": {
+    "project_number": "283403304701",
+    "project_id": "delivery-gjilan",
+    "storage_bucket": "delivery-gjilan.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:283403304701:android:ebf6fff09994b5c4ca0894",
+        "android_client_info": {
+          "package_name": "com.anonymous.financetracker"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "283403304701-omrectv9acrv6qol2k82uvplgjvpjuqv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCeZ3toVyDXjBRqFArqAo8R-f6u_MmP_pE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "283403304701-omrectv9acrv6qol2k82uvplgjvpjuqv.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:283403304701:android:092affaa9a1deca9ca0894",
+        "android_client_info": {
+          "package_name": "com.anonymous.mobilecustomer"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "283403304701-omrectv9acrv6qol2k82uvplgjvpjuqv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCeZ3toVyDXjBRqFArqAo8R-f6u_MmP_pE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "283403304701-omrectv9acrv6qol2k82uvplgjvpjuqv.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:283403304701:android:7e02e4c9106e2edfca0894",
+        "android_client_info": {
+          "package_name": "com.deliverygjilan.business"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "283403304701-omrectv9acrv6qol2k82uvplgjvpjuqv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCeZ3toVyDXjBRqFArqAo8R-f6u_MmP_pE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "283403304701-omrectv9acrv6qol2k82uvplgjvpjuqv.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
