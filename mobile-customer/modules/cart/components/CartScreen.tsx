@@ -12,7 +12,10 @@ import { useCart } from '../hooks/useCart';
 import { useCartActions } from '../hooks/useCartActions';
 import { useCreateOrder } from '../hooks/useCreateOrder';
 import { useSuccessModalStore } from '@/store/useSuccessModalStore';
-import { useLazyQuery, useQuery, useMutation } from '@apollo/client/react';
+import { useActiveOrdersStore } from '@/modules/orders/store/activeOrdersStore';
+import { useApolloClient, useLazyQuery, useQuery, useMutation } from '@apollo/client/react';
+import { GET_ORDERS } from '@/graphql/operations/orders';
+import { GET_PRODUCT } from '@/graphql/operations/products';
 import { VALIDATE_PROMOTIONS, GET_PROMOTION_THRESHOLDS } from '@/graphql/operations/promotions';
 import { GET_MY_ADDRESSES, ADD_USER_ADDRESS, SET_DEFAULT_ADDRESS } from '@/graphql/operations/addresses';
 import { CALCULATE_DELIVERY_PRICE } from '@/graphql/operations/deliveryPricing';
@@ -28,12 +31,15 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 export const CartScreen = () => {
     const router = useRouter();
+    const apolloClient = useApolloClient();
     const theme = useTheme();
     const { t } = useTranslations();
     const { items, total, isEmpty } = useCart();
     const { updateQuantity, removeItem, clearCart, updateItemNotes } = useCartActions();
     const { createOrder, loading: orderLoading } = useCreateOrder();
     const { showLoading, showSuccess, hideSuccess } = useSuccessModalStore();
+    const updateActiveOrder = useActiveOrdersStore((state) => state.updateOrder);
+    const setActiveOrders = useActiveOrdersStore((state) => state.setActiveOrders);
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [deliveryPrice, setDeliveryPrice] = useState(2.0); // Default; updated from API
@@ -211,7 +217,7 @@ export const CartScreen = () => {
 
     // Get saved addresses sorted by priority (default first)
     const savedAddresses = useMemo(() => {
-        return (addressesData?.myAddresses ?? []) as UserAddress[];
+        return ((addressesData as any)?.myAddresses ?? []) as UserAddress[];
     }, [addressesData]);
 
     // Auto-select default address on load
@@ -358,7 +364,7 @@ export const CartScreen = () => {
                 },
             });
             
-            const newAddressId = result.data?.addUserAddress?.id;
+            const newAddressId = (result.data as any)?.addUserAddress?.id;
             if (newAddressId) {
                 await setDefaultAddress({
                     variables: { id: newAddressId },
@@ -476,9 +482,101 @@ export const CartScreen = () => {
         ? promoResult?.totalPrice ?? Math.max(0, total + deliveryPrice - appliedDiscount)
         : Math.max(0, total + deliveryPrice - appliedDiscount);
 
+    const reconcileCartBeforeCheckout = useCallback(async () => {
+        if (items.length === 0) {
+            return false;
+        }
+
+        const uniqueProductIds = Array.from(new Set(items.map((item) => item.productId)));
+        const unavailableProductIds = new Set<string>();
+        let verificationFailed = false;
+
+        await Promise.all(
+            uniqueProductIds.map(async (productId) => {
+                try {
+                    const response = await apolloClient.query({
+                        query: GET_PRODUCT,
+                        variables: { id: productId },
+                        fetchPolicy: 'network-only',
+                    });
+
+                    const product = (response.data as any)?.product;
+                    if (!product || product.isAvailable === false) {
+                        unavailableProductIds.add(productId);
+                    }
+                } catch {
+                    verificationFailed = true;
+                }
+            }),
+        );
+
+        if (verificationFailed) {
+            console.warn('[CartScreen] Product reconciliation partially failed; continuing with server validation');
+            return true;
+        }
+
+        if (unavailableProductIds.size === 0) {
+            return true;
+        }
+
+        unavailableProductIds.forEach((productId) => {
+            removeItem(productId);
+        });
+
+        goToStep(1);
+        Alert.alert(
+            t.cart.order_failed,
+            'Some items in your cart are no longer available and were removed. Please review your cart and try again.',
+            [{ text: t.common.ok }],
+        );
+
+        return false;
+    }, [items, apolloClient, removeItem, goToStep, t]);
+
+    const syncActiveOrders = useCallback(
+        async (createdOrderId?: string | null) => {
+            const maxAttempts = createdOrderId ? 5 : 2;
+
+            for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+                try {
+                    const response = await apolloClient.query({
+                        query: GET_ORDERS,
+                        fetchPolicy: 'network-only',
+                    });
+
+                    const orders = (response.data as any)?.orders ?? [];
+                    const activeOrders = (orders as any[]).filter(
+                        (order) => order?.status !== 'DELIVERED' && order?.status !== 'CANCELLED',
+                    );
+
+                    setActiveOrders(activeOrders as any);
+
+                    if (!createdOrderId) {
+                        return;
+                    }
+
+                    const createdOrder = activeOrders.find((order) => String(order?.id) === String(createdOrderId));
+                    if (createdOrder || attempt === maxAttempts - 1) {
+                        return;
+                    }
+                } catch {
+                    // Best-effort sync; try again on transient network/cache issues.
+                }
+
+                await new Promise((resolve) => setTimeout(resolve, 700));
+            }
+        },
+        [apolloClient, setActiveOrders],
+    );
+
     const handleCheckout = async () => {
         if (!selectedLocation) {
             Alert.alert(t.cart.select_address, t.cart.select_address_alert);
+            return;
+        }
+
+        const canContinue = await reconcileCartBeforeCheckout();
+        if (!canContinue) {
             return;
         }
 
@@ -499,23 +597,22 @@ export const CartScreen = () => {
             
             // Keep current route and show success directly to avoid visible route flashes.
             if (orderId) {
+                updateActiveOrder(order as any);
                 console.log('[CartScreen] Showing success modal');
                 showSuccess(orderId, 'order_created');
             } else {
                 suppressAutoCloseRef.current = false;
                 hideSuccess();
             }
+
+            void syncActiveOrders(orderId ? String(orderId) : null);
         } catch (err) {
             console.error('[CartScreen] Order creation failed:', err);
             suppressAutoCloseRef.current = false;
             hideSuccess();
+            void syncActiveOrders();
 
             const errorMessage = err instanceof Error ? err.message : '';
-            if (errorMessage === 'Active order exists') {
-                // The user already gets a dedicated toast from useCreateOrder.
-                return;
-            }
-
             const graphQLErrorMessage =
                 typeof (err as any)?.graphQLErrors?.[0]?.message === 'string'
                     ? (err as any).graphQLErrors[0].message

@@ -9,18 +9,19 @@ import { useAuthStore } from '@/store/authStore';
  * Single authoritative subscription for order updates.
  * Writes the latest orders into the Apollo cache (which updates all active
  * useQuery(GET_ORDERS) watchers) AND updates the Zustand active-orders store.
- * Skips when there are no active orders to avoid unnecessary WebSocket traffic.
+ * Subscribes whenever a user is authenticated to avoid stale local state gaps.
  */
 export function useOrdersSubscription() {
     const userId = useAuthStore((state) => state.user?.id);
     const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-    const hasActiveOrders = useActiveOrdersStore((state) => state.hasActiveOrders);
     const setActiveOrders = useActiveOrdersStore((state) => state.setActiveOrders);
     const refetchInFlightRef = useRef(false);
     const refetchCooldownRef = useRef(0);
     const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const shouldSubscribe = isAuthenticated && hasActiveOrders;
+    // Always subscribe while authenticated so we can recover from temporary empty
+    // local state right after order creation/status transitions.
+    const shouldSubscribe = isAuthenticated && Boolean(userId);
 
     useEffect(() => {
         return () => {

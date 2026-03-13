@@ -23,7 +23,7 @@ export default function AddressesScreen() {
     const [deleteAddress] = useMutation(DELETE_USER_ADDRESS, {
         onCompleted: () => {
             refetch();
-            toast.success(t.addresses.deleted_success || 'Address deleted');
+            toast.success((t.addresses as any).deleted_success || 'Address deleted');
         },
         onError: (error) => {
             toast.error(t.common.error, error.message);
@@ -39,7 +39,7 @@ export default function AddressesScreen() {
         },
     });
 
-    const addresses = data?.myAddresses || [];
+    const addresses = (data as any)?.myAddresses || [];
 
     const handleDelete = (id: string, name: string) => {
         Alert.alert(

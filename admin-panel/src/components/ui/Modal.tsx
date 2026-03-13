@@ -5,16 +5,19 @@ import { X } from "lucide-react";
 
 export default function Modal({
   isOpen,
+  open,
   onClose,
   title,
   children,
 }: {
-  isOpen: boolean;
+  isOpen?: boolean;
+  open?: boolean;
   title: string;
   onClose: () => void;
   children: ReactNode;
 }) {
-  if (!isOpen) return null;
+  const visible = isOpen ?? open ?? false;
+  if (!visible) return null;
 
   return (
     <div 

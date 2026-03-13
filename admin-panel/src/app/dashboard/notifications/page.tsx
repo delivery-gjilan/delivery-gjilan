@@ -9,9 +9,9 @@ import {
   SEND_PUSH_NOTIFICATION,
   PREVIEW_CAMPAIGN_AUDIENCE,
   DELETE_CAMPAIGN,
-  GET_ALL_PROMOTIONS,
   ASSIGN_PROMOTION_TO_USERS,
 } from "@/graphql/operations/notifications";
+import { GET_PROMOTIONS as GET_ALL_PROMOTIONS } from "@/graphql/operations/promotions/queries";
 import { USERS_QUERY } from "@/graphql/operations/users/queries";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";

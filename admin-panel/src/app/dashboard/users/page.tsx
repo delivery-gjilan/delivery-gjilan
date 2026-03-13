@@ -278,7 +278,7 @@ export default function UsersPage() {
                         id: editingUser.id,
                         firstName: formData.firstName,
                         lastName: formData.lastName,
-                        role: formData.role,
+                        role: formData.role as any,
                         businessId: formData.businessId || null,
                     },
                 });

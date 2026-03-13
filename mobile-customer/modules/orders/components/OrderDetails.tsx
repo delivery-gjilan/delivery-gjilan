@@ -80,6 +80,32 @@ const formatOrderDate = (value?: string | null) => {
     });
 };
 
+const formatCurrency = (value: unknown) => {
+    const numberValue = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(numberValue)) {
+        return '0.00';
+    }
+    return numberValue.toFixed(2);
+};
+
+const toText = (value: unknown) => {
+    if (typeof value === 'string') {
+        return value;
+    }
+    if (value === null || value === undefined) {
+        return '';
+    }
+    return String(value);
+};
+
+const shortOrderId = (value: unknown, count = 8) => {
+    const text = toText(value);
+    if (!text) {
+        return '';
+    }
+    return text.slice(-count).toUpperCase();
+};
+
 const LIVE_DRIVER_ETA_TTL_MS = 20_000;
 const DRIVER_INTERPOLATION_TICK_MS = 50;
 const DRIVER_INTERPOLATION_MIN_MS = 220;
@@ -93,14 +119,15 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 const AVATAR_COLORS = ['#2563EB', '#7C3AED', '#DB2777', '#EA580C', '#16A34A', '#4F46E5'];
 
 const getInitials = (firstName?: string | null, lastName?: string | null) => {
-    const first = firstName?.trim()?.charAt(0)?.toUpperCase() || '';
-    const last = lastName?.trim()?.charAt(0)?.toUpperCase() || '';
+    const first = toText(firstName).trim().charAt(0).toUpperCase();
+    const last = toText(lastName).trim().charAt(0).toUpperCase();
     return `${first}${last}`.trim() || '?';
 };
 
-const getAvatarColor = (id?: string | null) => {
-    if (!id) return AVATAR_COLORS[0];
-    const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+const getAvatarColor = (id?: unknown) => {
+    const idText = toText(id);
+    if (!idText) return AVATAR_COLORS[0];
+    const hash = idText.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     return AVATAR_COLORS[hash % AVATAR_COLORS.length];
 };
 
@@ -589,6 +616,36 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
               }
             : null;
 
+    const getRoadSnappedLocation = useCallback(
+        (
+            location: { latitude: number; longitude: number; address: string } | null,
+            maxDistanceM: number,
+        ) => {
+            if (!location || deliveryRouteCoordinates.length < 2) {
+                return location;
+            }
+
+            const snapped = snapPointToRoute(location, deliveryRouteCoordinates);
+            if (!snapped || snapped.distanceM > maxDistanceM) {
+                return location;
+            }
+
+            return {
+                ...location,
+                latitude: snapped.latitude,
+                longitude: snapped.longitude,
+            };
+        },
+        [deliveryRouteCoordinates],
+    );
+
+    const liveDriverTargetLocation = useMemo(() => {
+        if (!liveDriverRawLocation) {
+            return null;
+        }
+        return getRoadSnappedLocation(liveDriverRawLocation, ROUTE_SNAP_MAX_DISTANCE_M);
+    }, [liveDriverRawLocation, getRoadSnappedLocation]);
+
     useEffect(() => {
         if (!isDeliveryPhase || !liveDriverTargetLocation) return;
 
@@ -763,39 +820,10 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         };
     }, [deliveryRouteCoordinates]);
 
-    const getRoadSnappedLocation = useCallback(
-        (
-            location: { latitude: number; longitude: number; address: string } | null,
-            maxDistanceM: number,
-        ) => {
-            if (!location || deliveryRouteCoordinates.length < 2) {
-                return location;
-            }
-
-            const snapped = snapPointToRoute(location, deliveryRouteCoordinates);
-            if (!snapped || snapped.distanceM > maxDistanceM) {
-                return location;
-            }
-
-            return {
-                ...location,
-                latitude: snapped.latitude,
-                longitude: snapped.longitude,
-            };
-        },
-        [deliveryRouteCoordinates],
-    );
-
-    const liveDriverTargetLocation = useMemo(() => {
-        if (!liveDriverRawLocation) {
-            return null;
-        }
-        return getRoadSnappedLocation(liveDriverRawLocation, ROUTE_SNAP_MAX_DISTANCE_M);
-    }, [liveDriverRawLocation, getRoadSnappedLocation]);
-
     // ─── Status ─────────────────────────────────────────────
     const config = STATUS_CONFIG[customerVisibleStatus] || STATUS_CONFIG.PENDING;
-    const statusMessage = (t.orders.status_messages as any)?.[customerVisibleStatus.toLowerCase()] || '';
+    const statusKey = toText(customerVisibleStatus).toLowerCase();
+    const statusMessage = (t.orders.status_messages as any)?.[statusKey] || '';
     const isCompleted = status === 'DELIVERED';
     const isCancelled = status === 'CANCELLED';
     const isPendingApproval = status === 'PENDING';
@@ -981,6 +1009,26 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         setMapZoomLevel((prev) => (Math.abs(prev - nextZoom) > 0.04 ? nextZoom : prev));
     }, []);
 
+    const fadeInEnter = useMemo(
+        () => (typeof (FadeIn as any)?.duration === 'function' ? (FadeIn as any).duration(400) : undefined),
+        [],
+    );
+    const fadeInDown320 = useMemo(
+        () => (typeof (FadeInDown as any)?.duration === 'function' ? (FadeInDown as any).duration(320) : undefined),
+        [],
+    );
+    const fadeOut220 = useMemo(
+        () => (typeof (FadeOut as any)?.duration === 'function' ? (FadeOut as any).duration(220) : undefined),
+        [],
+    );
+    const fadeInDown300Delay50 = useMemo(() => {
+        const base = typeof (FadeInDown as any)?.duration === 'function' ? (FadeInDown as any).duration(300) : undefined;
+        if (base && typeof base.delay === 'function') {
+            return base.delay(50);
+        }
+        return base;
+    }, []);
+
     // ─── Loading / Empty ────────────────────────────────────
     // Only show spinner on initial load (no data yet). During refetches
     // (subscription-triggered), `loading` flickers true but we already have
@@ -1122,7 +1170,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                             </Text>
                         </View>
                         <Text style={{ fontSize: 22, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.5 }}>
-                            #{order.displayId || order.id?.slice(-8).toUpperCase() || 'N/A'}
+                            #{toText(order.displayId) || shortOrderId(order.id) || 'N/A'}
                         </Text>
                     </View>
 
@@ -1150,7 +1198,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                 <Ionicons name="cart-outline" size={16} color={theme.colors.primary} style={{ marginRight: 8 }} />
                                 <Text style={{ fontSize: 15, fontWeight: '700', color: theme.colors.text, letterSpacing: -0.3 }}>
-                                    {t.orders.details.order_items}
+                                        {(t.orders.details as any).order_items || 'Order items'}
                                 </Text>
                             </View>
                         </View>
@@ -1176,7 +1224,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                             <Ionicons name="storefront" size={13} color={theme.colors.primary} />
                                         </View>
                                         <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text, letterSpacing: -0.3 }}>
-                                            {biz.business.name}
+                                            {toText(biz?.business?.name) || 'Business'}
                                         </Text>
                                     </View>
                                 </View>
@@ -1225,7 +1273,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                                 {item.name}
                                             </Text>
                                             <Text style={{ fontSize: 13, color: theme.colors.subtext, fontWeight: '600', marginTop: 4 }}>
-                                                {item.quantity} × €{item.price.toFixed(2)}
+                                                {item.quantity} × €{formatCurrency(item.price)}
                                             </Text>
                                             {item.notes && (
                                                 <View style={{
@@ -1245,7 +1293,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                         </View>
 
                                         <Text style={{ fontSize: 16, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.3 }}>
-                                            €{(item.price * item.quantity).toFixed(2)}
+                                            €{formatCurrency(Number(item.price) * Number(item.quantity))}
                                         </Text>
                                     </View>
                                 ))}
@@ -1277,13 +1325,13 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10, paddingLeft: 24 }}>
                             <Text style={{ fontSize: 14, color: theme.colors.subtext, fontWeight: '500' }}>{t.common.subtotal}</Text>
                             <Text style={{ fontSize: 14, color: theme.colors.text, fontWeight: '600' }}>
-                                €{order.orderPrice?.toFixed(2)}
+                                €{formatCurrency(order.orderPrice)}
                             </Text>
                         </View>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10, paddingLeft: 24 }}>
                             <Text style={{ fontSize: 14, color: '#22C55E', fontWeight: '600' }}>{t.common.delivery_fee || 'Delivery fee'}</Text>
                             <Text style={{ fontSize: 14, color: '#22C55E', fontWeight: '700' }}>
-                                €{(order.deliveryPrice ?? 0).toFixed(2)}
+                                €{formatCurrency(order.deliveryPrice ?? 0)}
                             </Text>
                         </View>
                         <View style={{
@@ -1303,7 +1351,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                 {t.common.total}
                             </Text>
                             <Text style={{ fontSize: 22, fontWeight: '800', color: theme.colors.primary, letterSpacing: -0.5 }}>
-                                €{order.totalPrice?.toFixed(2)}
+                                €{formatCurrency(order.totalPrice)}
                             </Text>
                         </View>
                     </View>
@@ -1337,7 +1385,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                     <Ionicons name="location" size={16} color={theme.colors.primary} />
                                 </View>
                                 <Text style={{ fontSize: 15, fontWeight: '700', color: theme.colors.text, letterSpacing: -0.3 }}>
-                                    {t.orders.details.delivery_address}
+                                    {(t.orders.details as any).delivery_address || 'Delivery address'}
                                 </Text>
                             </View>
                             <Text style={{ fontSize: 14, color: theme.colors.subtext, lineHeight: 22, fontWeight: '500', paddingLeft: 42 }}>
@@ -1620,7 +1668,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                     <View style={{ paddingHorizontal: 20 }}>
 
                         {/* ── Status row: avatar + message + ETA ── */}
-                        <Animated.View entering={FadeIn.duration(400)} style={{
+                        <Animated.View entering={fadeInEnter} style={{
                             flexDirection: 'row', alignItems: 'center', marginBottom: 16,
                         }}>
                             {/* Avatar (driver or default) */}
@@ -1657,7 +1705,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                 </Text>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 8 }}>
                                     <Text style={{ color: theme.colors.subtext, fontSize: 12 }}>
-                                        #{order.displayId || order.id?.slice(0, 8)}
+                                        #{toText(order.displayId) || shortOrderId(order.id)}
                                     </Text>
                                     {elapsedMin !== null && (
                                         <Text style={{ color: theme.colors.subtext, fontSize: 12 }}>
@@ -1689,8 +1737,8 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                             {isPendingApproval ? (
                                 <Animated.View
                                     key="pending-approval"
-                                    entering={FadeInDown.duration(320)}
-                                    exiting={FadeOut.duration(220)}
+                                    entering={fadeInDown320}
+                                    exiting={fadeOut220}
                                     style={{
                                         borderRadius: 16,
                                         borderWidth: 1,
@@ -1725,8 +1773,8 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                             ) : (
                                 <Animated.View
                                     key="full-timeline"
-                                    entering={FadeInDown.duration(320)}
-                                    exiting={FadeOut.duration(220)}
+                                    entering={fadeInDown320}
+                                    exiting={fadeOut220}
                                 >
                                     <IconStepper status={customerVisibleStatus} color={config.color} theme={theme} t={t} />
                                 </Animated.View>
@@ -1735,7 +1783,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
 
                         {/* ── Driver Card ──────────────────── */}
                         {(isDeliveryPhase || (driver && (status === 'READY' || isCompleted))) && (
-                            <Animated.View entering={FadeInDown.duration(300).delay(50)} style={{
+                            <Animated.View entering={fadeInDown300Delay50} style={{
                                 backgroundColor: theme.dark ? '#ffffff08' : '#00000005',
                                 borderRadius: 16, padding: 14, marginBottom: 12,
                                 flexDirection: 'row', alignItems: 'center',
@@ -1817,7 +1865,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                                     {item.quantity}× {item.name}
                                                 </Text>
                                                 <Text style={{ color: theme.colors.text, fontSize: 13, fontWeight: '600' }}>
-                                                    €{(item.price * item.quantity).toFixed(2)}
+                                                    €{formatCurrency(Number(item.price) * Number(item.quantity))}
                                                 </Text>
                                             </View>
                                         ))
@@ -1833,7 +1881,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                             {t.common.delivery_fee || 'Delivery fee'}
                                         </Text>
                                         <Text style={{ color: '#22C55E', fontSize: 12, fontWeight: '700' }}>
-                                            €{(order.deliveryPrice ?? 0).toFixed(2)}
+                                            €{formatCurrency(order.deliveryPrice ?? 0)}
                                         </Text>
                                     </View>
                                     <View
@@ -1847,7 +1895,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <Text style={{ color: theme.colors.text, fontSize: 15, fontWeight: '700' }}>{t.common.total}</Text>
                                         <Text style={{ color: config.color, fontSize: 15, fontWeight: '800' }}>
-                                            €{order.totalPrice?.toFixed(2)}
+                                            €{formatCurrency(order.totalPrice)}
                                         </Text>
                                     </View>
                                 </View>
@@ -1868,7 +1916,10 @@ class OrderDetailsBoundary extends Component<
 > {
     state = { hasError: false, error: '' };
     static getDerivedStateFromError(err: Error) {
-        return { hasError: true, error: err?.message || 'Unknown error' };
+        return {
+            hasError: true,
+            error: err?.message || 'Unknown error',
+        };
     }
     componentDidCatch(error: Error, info: ErrorInfo) {
         console.error('[OrderDetailsBoundary]', error, info);

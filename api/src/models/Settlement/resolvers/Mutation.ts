@@ -76,4 +76,4 @@ export const Mutation: MutationResolvers<AppContext> = {
         const repo = new SettlementRepository(db);
         return repo.unsettleSettlement(settlementId);
     },
-};
+} as any;

@@ -334,14 +334,6 @@ export class AuthService {
     }
 
     /**
-     * Get user by ID
-     */
-    async getUserById(userId: string): Promise<DbUser | null> {
-        const user = await this.authRepository.findById(userId);
-        return user || null;
-    }
-
-    /**
      * Create user directly with role (for admin use) - bypasses verification steps
      */
     async createUser(

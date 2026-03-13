@@ -70,6 +70,7 @@ async function ping(): Promise<{ ok: boolean; disabled: boolean }> {
 const TTL = {
     BUSINESSES: 5 * 60,         // 5 min — list rarely changes
     BUSINESS: 5 * 60,           // 5 min — individual detail
+    PRODUCTS: 2 * 60,           // 2 min — product lists change moderately
     CATEGORIES: 10 * 60,        // 10 min — very stable
     SUBCATEGORIES: 10 * 60,     // 10 min — very stable
 } as const;
@@ -78,6 +79,8 @@ const TTL = {
 const keys = {
     businesses: () => 'cache:businesses',
     business: (id: string) => `cache:business:${id}`,
+    products: (businessId: string) => `cache:products:${businessId}`,
+    product: (id: string) => `cache:product:${id}`,
     categories: (businessId: string) => `cache:categories:${businessId}`,
     subcategories: (businessId: string) => `cache:subcategories:${businessId}`,
     subcategoriesByCat: (categoryId: string) => `cache:subcategories-cat:${categoryId}`,
@@ -111,7 +114,7 @@ async function del(...keysToDel: string[]): Promise<void> {
         const redis = await getClient();
         if (!redis) return;
         if (keysToDel.length > 0) {
-            await redis.del(keysToDel);
+            await (redis as any).del(keysToDel);
         }
     } catch {
         // swallow
@@ -127,7 +130,7 @@ async function delPattern(pattern: string): Promise<void> {
             const result = await redis.scan(cursor, { MATCH: pattern, COUNT: 100 });
             cursor = result.cursor;
             if (result.keys.length > 0) {
-                await redis.del(result.keys);
+                await (redis as any).del(result.keys);
             }
         } while (cursor !== 0);
     } catch {
@@ -153,6 +156,13 @@ export const cache = {
     async invalidateAllBusinesses() {
         await del(keys.businesses());
         await delPattern('cache:business:*');
+    },
+
+    // ── Product helpers ──
+    async invalidateProducts(businessId: string, productId?: string) {
+        const toDelete = [keys.products(businessId)];
+        if (productId) toDelete.push(keys.product(productId));
+        await del(...toDelete);
     },
 
     // ── Category helpers ──

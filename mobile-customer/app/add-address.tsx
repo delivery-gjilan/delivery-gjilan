@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@apollo/client/react';
 import * as Location from 'expo-location';
-import { MapLibreGL } from '@/components/MapWrapper';
+import { MapLibreGL } from '@/components/MapWrapper.native';
 
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
@@ -13,6 +13,7 @@ import { ADD_USER_ADDRESS, UPDATE_USER_ADDRESS, GET_MY_ADDRESSES } from '@/graph
 import { toast } from '@/store/toastStore';
 
 const MAPBOX_STYLE = 'mapbox://styles/mapbox/dark-v11';
+const MAPTILER_API_KEY = process.env.EXPO_PUBLIC_MAPTILER_API_KEY ?? '';
 
 export default function AddEditAddressScreen() {
     const router = useRouter();
@@ -39,8 +40,9 @@ export default function AddEditAddressScreen() {
 
     // Pre-fill form fields when editing an existing address
     useEffect(() => {
-        if (!isEdit || !addressesData?.myAddresses) return;
-        const address = addressesData.myAddresses.find((a: any) => String(a.id) === String(id));
+        const savedAddresses = (addressesData as any)?.myAddresses;
+        if (!isEdit || !savedAddresses) return;
+        const address = savedAddresses.find((a: any) => String(a.id) === String(id));
         if (address) {
             setAddressName(address.addressName || '');
             setDisplayName(address.displayName || '');

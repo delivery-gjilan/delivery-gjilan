@@ -7,12 +7,30 @@ import {
 import {
     notifications,
     notificationCampaigns,
+    pushTelemetryEvents,
     DbNotification,
     NewDbNotification,
     DbNotificationCampaign,
     NewDbNotificationCampaign,
+    DbPushTelemetryEvent,
+    NewDbPushTelemetryEvent,
 } from '@/database/schema/notifications';
-import { eq, inArray, and, sql } from 'drizzle-orm';
+import { eq, inArray, and, sql, gte, desc } from 'drizzle-orm';
+
+export interface PushTelemetryEventsFilter {
+    hours?: number;
+    appType?: DbPushTelemetryEvent['appType'];
+    platform?: DbPushTelemetryEvent['platform'];
+    eventType?: DbPushTelemetryEvent['eventType'];
+    limit?: number;
+}
+
+export interface PushTelemetrySummary {
+    totalEvents: number;
+    byEvent: Array<{ key: string; count: number }>;
+    byAppType: Array<{ key: string; count: number }>;
+    byPlatform: Array<{ key: string; count: number }>;
+}
 
 export class NotificationRepository {
     constructor(private db: DbType) {}
@@ -20,11 +38,8 @@ export class NotificationRepository {
     // ── Device tokens ───────────────────────────────────────────────
 
     async upsertDeviceToken(data: NewDbDeviceToken): Promise<DbDeviceToken> {
-        // Delete all existing tokens for this user first, then insert the new one.
-        // A user/device only needs one active FCM token at a time.
-        await this.db
-            .delete(deviceTokens)
-            .where(eq(deviceTokens.userId, data.userId));
+        // Keep one token per user+device+appType, while still allowing true multi-device users.
+        await this.removeTokenForUserDeviceAppType(data.userId, data.deviceId, data.appType);
 
         const [row] = await this.db
             .insert(deviceTokens)
@@ -46,6 +61,12 @@ export class NotificationRepository {
 
     async removeDeviceToken(token: string): Promise<void> {
         await this.db.delete(deviceTokens).where(eq(deviceTokens.token, token));
+    }
+
+    async removeDeviceTokenForUser(token: string, userId: string): Promise<void> {
+        await this.db
+            .delete(deviceTokens)
+            .where(and(eq(deviceTokens.token, token), eq(deviceTokens.userId, userId)));
     }
 
     async removeDeviceTokensByIds(tokens: string[]): Promise<void> {
@@ -72,6 +93,18 @@ export class NotificationRepository {
             .where(and(eq(deviceTokens.userId, userId), eq(deviceTokens.deviceId, deviceId)));
     }
 
+    async removeTokenForUserDeviceAppType(userId: string, deviceId: string, appType: DbDeviceToken['appType']): Promise<void> {
+        await this.db
+            .delete(deviceTokens)
+            .where(
+                and(
+                    eq(deviceTokens.userId, userId),
+                    eq(deviceTokens.deviceId, deviceId),
+                    eq(deviceTokens.appType, appType),
+                ),
+            );
+    }
+
     // ── Notifications log ───────────────────────────────────────────
 
     async createNotification(data: NewDbNotification): Promise<DbNotification> {
@@ -82,6 +115,81 @@ export class NotificationRepository {
     async createNotifications(data: NewDbNotification[]): Promise<void> {
         if (data.length === 0) return;
         await this.db.insert(notifications).values(data);
+    }
+
+    async createPushTelemetryEvent(data: NewDbPushTelemetryEvent): Promise<DbPushTelemetryEvent> {
+        const [event] = await this.db.insert(pushTelemetryEvents).values(data).returning();
+        return event!;
+    }
+
+    async getPushTelemetryEvents(filter: PushTelemetryEventsFilter): Promise<DbPushTelemetryEvent[]> {
+        const conditions = [];
+        const hours = filter.hours ?? 24;
+        const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+        conditions.push(gte(pushTelemetryEvents.createdAt, since));
+
+        if (filter.appType) {
+            conditions.push(eq(pushTelemetryEvents.appType, filter.appType));
+        }
+
+        if (filter.platform) {
+            conditions.push(eq(pushTelemetryEvents.platform, filter.platform));
+        }
+
+        if (filter.eventType) {
+            conditions.push(eq(pushTelemetryEvents.eventType, filter.eventType));
+        }
+
+        return this.db
+            .select()
+            .from(pushTelemetryEvents)
+            .where(and(...conditions))
+            .orderBy(desc(pushTelemetryEvents.createdAt))
+            .limit(Math.min(Math.max(filter.limit ?? 100, 1), 500));
+    }
+
+    async getPushTelemetrySummary(hours = 24): Promise<PushTelemetrySummary> {
+        const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+        const timeCondition = gte(pushTelemetryEvents.createdAt, since);
+
+        const [totalRow] = await this.db
+            .select({ count: sql<number>`COUNT(*)::INT` })
+            .from(pushTelemetryEvents)
+            .where(timeCondition);
+
+        const byEventRows = await this.db
+            .select({
+                key: pushTelemetryEvents.eventType,
+                count: sql<number>`COUNT(*)::INT`,
+            })
+            .from(pushTelemetryEvents)
+            .where(timeCondition)
+            .groupBy(pushTelemetryEvents.eventType);
+
+        const byAppTypeRows = await this.db
+            .select({
+                key: pushTelemetryEvents.appType,
+                count: sql<number>`COUNT(*)::INT`,
+            })
+            .from(pushTelemetryEvents)
+            .where(timeCondition)
+            .groupBy(pushTelemetryEvents.appType);
+
+        const byPlatformRows = await this.db
+            .select({
+                key: pushTelemetryEvents.platform,
+                count: sql<number>`COUNT(*)::INT`,
+            })
+            .from(pushTelemetryEvents)
+            .where(timeCondition)
+            .groupBy(pushTelemetryEvents.platform);
+
+        return {
+            totalEvents: totalRow?.count ?? 0,
+            byEvent: byEventRows,
+            byAppType: byAppTypeRows,
+            byPlatform: byPlatformRows,
+        };
     }
 
     // ── Campaigns ───────────────────────────────────────────────────

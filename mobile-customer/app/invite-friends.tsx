@@ -30,7 +30,7 @@ export default function InviteFriendsScreen() {
         },
     });
 
-    const stats = data?.myReferralStats;
+    const stats = (data as any)?.myReferralStats;
     const referralCode = stats?.referralCode || '';
     const referralLink = `https://delivery-gjilan.com/signup?ref=${referralCode}`;
 

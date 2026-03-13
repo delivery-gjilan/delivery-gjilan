@@ -5,9 +5,8 @@ export function useProducts(businessId: string) {
     const { data, loading, error, refetch } = useQuery(GET_PRODUCTS, {
         variables: { businessId },
         skip: !businessId,
-        // Product lists don't change during a session. Serve from cache
-        // instantly; only hit the network if this businessId has never been fetched.
-        fetchPolicy: 'cache-first',
+        fetchPolicy: 'cache-and-network',
+        nextFetchPolicy: 'cache-first',
     });
 
     return {

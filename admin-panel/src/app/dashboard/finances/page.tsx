@@ -104,7 +104,7 @@ export default function FinancesDashboard() {
         onCompleted: () => refetchSettlements(),
     });
 
-    const settlements: Settlement[] = settlementsData?.settlements || [];
+    const settlements: Settlement[] = ((settlementsData as any)?.settlements || []) as Settlement[];
 
     // Sort by order total descending
     const sortedSettlements = useMemo(() => {
@@ -337,7 +337,7 @@ export default function FinancesDashboard() {
                                     <div className="absolute top-full left-0 mt-2 z-50 bg-[#1a1a1a] border border-zinc-800 rounded shadow-lg">
                                         <DateRange
                                             ranges={[dateRange]}
-                                            onChange={(item) => setDateRange(item.selection)}
+                                            onChange={(item: any) => setDateRange(item.selection)}
                                             maxDate={new Date()}
                                             rangeColors={['#06b6d4']}
                                             className="rdrCalendarWrapper dark-theme"

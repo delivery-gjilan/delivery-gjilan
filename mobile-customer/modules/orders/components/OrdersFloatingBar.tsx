@@ -1,16 +1,14 @@
 import { View, Text, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useApolloClient } from '@apollo/client/react';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useActiveOrdersStore } from '../store/activeOrdersStore';
-import { GET_ORDER } from '@/graphql/operations/orders';
 import { toast } from '@/store/toastStore';
 
 export const OrdersFloatingBar = () => {
     const router = useRouter();
-    const apolloClient = useApolloClient();
+    const pathname = usePathname();
     const theme = useTheme();
     const { t } = useTranslations();
 
@@ -18,13 +16,24 @@ export const OrdersFloatingBar = () => {
 
     if (!hasActiveOrders || activeOrders.length === 0) return null;
 
-    // Since we only support 1 active order, take the first one
+    const activeOrderCount = activeOrders.length;
+    // For multiple active orders, we highlight the first one for status coloring
+    // and route users to the active-orders list.
     const activeOrder = activeOrders[0] as any;
+    const activeOrderId = activeOrder?.id === null || activeOrder?.id === undefined ? null : String(activeOrder.id);
     const customerVisibleStatus = activeOrder.status === 'READY' ? 'PREPARING' : activeOrder.status;
 
     // Get business names
-    const businessNames = activeOrder.businesses.map(b => b.business.name).join(', ');
-    const displayBusinessName = businessNames.length > 30 ? businessNames.substring(0, 30) + '...' : businessNames;
+    const orderBusinesses = Array.isArray(activeOrder?.businesses) ? activeOrder.businesses : [];
+    const businessNames = orderBusinesses
+        .map((b: any) => (typeof b?.business?.name === 'string' ? b.business.name : ''))
+        .filter(Boolean)
+        .join(', ');
+    const displayBusinessName = businessNames
+        ? businessNames.length > 30
+            ? businessNames.substring(0, 30) + '...'
+            : businessNames
+        : t.orders.active_bar;
 
     const liveEtaSeconds = activeOrder?.driver?.driverConnection?.remainingEtaSeconds;
     const liveEtaUpdatedAt = activeOrder?.driver?.driverConnection?.etaUpdatedAt;
@@ -108,23 +117,32 @@ export const OrdersFloatingBar = () => {
     const statusInfo = getStatusInfo(customerVisibleStatus);
 
     const handlePress = async () => {
-        try {
-            const result = await apolloClient.query({
-                query: GET_ORDER,
-                variables: { id: activeOrder.id },
-                fetchPolicy: 'network-only',
+        if (!activeOrderId) {
+            console.warn('[OrdersFloatingBar] Press ignored: missing activeOrderId', {
+                pathname,
+                hasActiveOrders,
+                activeOrdersCount: activeOrders.length,
             });
-
-            if (!result.data?.order) {
-                toast.warning(t.common.error, t.orders.banner_unavailable);
-                return;
-            }
-
-            router.push(`/orders/${activeOrder.id}`);
-        } catch (error) {
-            console.warn('[OrdersFloatingBar] Failed to load active order before navigation:', error);
-            toast.warning(t.common.error, t.orders.banner_connection_lost);
+            toast.warning(t.common.error, (t.orders as any).banner_unavailable || 'Order details unavailable');
+            return;
         }
+
+        console.log('[OrdersFloatingBar] Press -> navigate', {
+            pathname,
+            activeOrderId,
+            status: activeOrder?.status,
+            activeOrderCount,
+        });
+
+        if (activeOrderCount > 1) {
+            router.push('/orders/active');
+            return;
+        }
+
+        router.push({
+            pathname: '/orders/[orderId]',
+            params: { orderId: activeOrderId },
+        } as never);
     };
 
     return (
@@ -141,12 +159,14 @@ export const OrdersFloatingBar = () => {
                     <Ionicons name={statusInfo.icon} size={20} color="white" />
                 </View>
                 <View className="flex-1">
-                    <Text className="text-white font-semibold text-base">{t.orders.active_bar}</Text>
+                    <Text className="text-white font-semibold text-base">
+                        {activeOrderCount > 1 ? `${activeOrderCount} ${t.orders.active_orders}` : t.orders.active_bar}
+                    </Text>
                     <Text className="text-white/80 text-xs" numberOfLines={1}>
-                        {displayBusinessName}
+                        {activeOrderCount > 1 ? 'Tap to view all active orders' : displayBusinessName}
                     </Text>
                     <Text className="text-white/70 text-xs mt-0.5" numberOfLines={1}>
-                        {statusInfo.message}
+                        {activeOrderCount > 1 ? 'Multiple orders are currently in progress' : statusInfo.message}
                     </Text>
                 </View>
             </View>

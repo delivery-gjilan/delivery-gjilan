@@ -6,7 +6,7 @@ import messaging from '@react-native-firebase/messaging';
 import { useMutation } from '@apollo/client/react';
 import { useAuthStore } from '@/store/authStore';
 import { toast } from '@/store/toastStore';
-import { REGISTER_DEVICE_TOKEN, UNREGISTER_DEVICE_TOKEN } from '@/graphql/operations/notifications';
+import { REGISTER_DEVICE_TOKEN, UNREGISTER_DEVICE_TOKEN, TRACK_PUSH_TELEMETRY } from '@/graphql/operations/notifications';
 import { useRouter } from 'expo-router';
 
 // ── Configure foreground notification behavior ─────────────────────
@@ -107,6 +107,7 @@ export function useNotifications() {
 
     const [registerToken] = useMutation(REGISTER_DEVICE_TOKEN);
     const [unregisterToken] = useMutation(UNREGISTER_DEVICE_TOKEN);
+    const [trackPushTelemetry] = useMutation(TRACK_PUSH_TELEMETRY);
 
     const resolveDeviceId = () => {
         return Device.modelId || Device.osBuildId || Device.modelName || 'unknown';
@@ -123,6 +124,33 @@ export function useNotifications() {
         if (!isAuthenticated || !authToken) return;
 
         let mounted = true;
+
+        const sendTelemetry = async (
+            eventType: 'RECEIVED' | 'OPENED' | 'ACTION_TAPPED' | 'TOKEN_REGISTERED' | 'TOKEN_REFRESHED' | 'TOKEN_UNREGISTERED',
+            extra?: Record<string, unknown>,
+        ) => {
+            try {
+                await trackPushTelemetry({
+                    variables: {
+                        input: {
+                            appType: 'CUSTOMER',
+                            platform: Platform.OS === 'ios' ? 'IOS' : 'ANDROID',
+                            eventType,
+                            token: currentPushToken.current,
+                            deviceId: resolveDeviceId(),
+                            notificationTitle: typeof extra?.notificationTitle === 'string' ? extra.notificationTitle : undefined,
+                            notificationBody: typeof extra?.notificationBody === 'string' ? extra.notificationBody : undefined,
+                            campaignId: typeof extra?.campaignId === 'string' ? extra.campaignId : undefined,
+                            orderId: typeof extra?.orderId === 'string' ? extra.orderId : undefined,
+                            actionId: typeof extra?.actionId === 'string' ? extra.actionId : undefined,
+                            metadata: extra,
+                        },
+                    },
+                });
+            } catch {
+                // Best-effort telemetry.
+            }
+        };
 
         async function setup() {
             try {
@@ -161,6 +189,7 @@ export function useNotifications() {
 
                 console.log('[Notifications] Backend registration result:', result.data);
                 console.log('[Notifications] Device token registered successfully');
+                await sendTelemetry('TOKEN_REGISTERED', { tokenPreview: `${pushToken.slice(0, 20)}...` });
             } catch (error) {
                 console.error('[Notifications] Setup failed:', error);
                 if (error instanceof Error) {
@@ -202,6 +231,7 @@ export function useNotifications() {
                     },
                 });
                 console.log('[Notifications] Refreshed token registered successfully');
+                await sendTelemetry('TOKEN_REFRESHED', { tokenPreview: `${newToken.slice(0, 20)}...` });
             } catch (err) {
                 console.error('[Notifications] Failed to register refreshed token:', err);
             }
@@ -216,6 +246,13 @@ export function useNotifications() {
             if (title) {
                 toast.info(title, body || '');
             }
+
+            void sendTelemetry('RECEIVED', {
+                notificationTitle: title,
+                notificationBody: body,
+                campaignId: typeof notification.request.content.data?.campaignId === 'string' ? notification.request.content.data.campaignId : undefined,
+                orderId: typeof notification.request.content.data?.orderId === 'string' ? notification.request.content.data.orderId : undefined,
+            });
         });
 
         // Listen for notification taps (foreground + background)
@@ -227,9 +264,22 @@ export function useNotifications() {
             
             // Handle interactive action buttons
             if (actionIdentifier && actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) {
+                void sendTelemetry('ACTION_TAPPED', {
+                    notificationTitle: response.notification.request.content.title,
+                    notificationBody: response.notification.request.content.body,
+                    campaignId: typeof data?.campaignId === 'string' ? data.campaignId : undefined,
+                    orderId: typeof data?.orderId === 'string' ? data.orderId : undefined,
+                    actionId: actionIdentifier,
+                });
                 handleNotificationAction(actionIdentifier, data);
             } else {
                 // Default tap - navigate to screen
+                void sendTelemetry('OPENED', {
+                    notificationTitle: response.notification.request.content.title,
+                    notificationBody: response.notification.request.content.body,
+                    campaignId: typeof data?.campaignId === 'string' ? data.campaignId : undefined,
+                    orderId: typeof data?.orderId === 'string' ? data.orderId : undefined,
+                });
                 handleNotificationTap(data);
             }
         });
@@ -249,6 +299,18 @@ export function useNotifications() {
     // Clean up token on logout
     useEffect(() => {
         if (!isAuthenticated && currentPushToken.current) {
+            void trackPushTelemetry({
+                variables: {
+                    input: {
+                        appType: 'CUSTOMER',
+                        platform: Platform.OS === 'ios' ? 'IOS' : 'ANDROID',
+                        eventType: 'TOKEN_UNREGISTERED',
+                        token: currentPushToken.current,
+                        deviceId: resolveDeviceId(),
+                    },
+                },
+            }).catch(() => null);
+
             unregisterToken({
                 variables: { token: currentPushToken.current },
             }).catch((err) => console.warn('[Notifications] Failed to unregister token:', err));

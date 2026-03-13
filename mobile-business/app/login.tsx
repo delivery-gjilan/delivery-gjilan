@@ -43,11 +43,13 @@ export default function LoginScreen() {
                 },
             });
 
-            if (!data?.login) {
+            const loginPayload = (data as any)?.login;
+
+            if (!loginPayload) {
                 throw new Error('Login failed');
             }
 
-            const { token, refreshToken, user } = data.login;
+            const { token, refreshToken, user } = loginPayload;
 
             // Validate business user
             if (user.role !== 'BUSINESS_OWNER' && user.role !== 'BUSINESS_EMPLOYEE') {

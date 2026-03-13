@@ -9,6 +9,7 @@ export default function Profile() {
     const theme = useTheme();
     const { t, languageChoice, setLanguageChoice } = useTranslations();
     const user = useAuthStore((state) => state.user);
+    const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim();
 
     const toggleLanguage = () => {
         const newLang = languageChoice === 'en' ? 'al' : 'en';
@@ -28,11 +29,11 @@ export default function Profile() {
                         style={{ backgroundColor: theme.colors.primary + '20' }}
                     >
                         <Text className="text-2xl font-bold" style={{ color: theme.colors.primary }}>
-                            {user?.name?.charAt(0)?.toUpperCase() ?? '?'}
+                            {displayName.charAt(0)?.toUpperCase() || '?'}
                         </Text>
                     </View>
                     <Text className="text-xl font-bold" style={{ color: theme.colors.text }}>
-                        {user?.name ?? '—'}
+                        {displayName || '—'}
                     </Text>
                     <Text className="text-sm mt-1" style={{ color: theme.colors.subtext }}>
                         {user?.email ?? '—'}

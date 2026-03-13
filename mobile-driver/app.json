@@ -18,6 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.mobiledriver",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSCameraUsageDescription": "Allow camera access to take and upload delivery proof photos when required.",
         "NSMicrophoneUsageDescription": "Allow microphone access to receive live push-to-talk voice updates from dispatch.",

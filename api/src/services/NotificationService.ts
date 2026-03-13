@@ -1,6 +1,6 @@
 import { getMessaging } from '@/lib/firebase';
 import { NotificationRepository } from '@/repositories/NotificationRepository';
-import { NotificationType } from '@/database/schema/notifications';
+import { NotificationType, PushTelemetryEventType } from '@/database/schema/notifications';
 import { DeviceAppType, DevicePlatform } from '@/database/schema/deviceTokens';
 import logger from '@/lib/logger';
 import type { Message, MulticastMessage } from 'firebase-admin/messaging';
@@ -26,6 +26,20 @@ export interface SendResult {
     staleTokens: string[];
 }
 
+export interface PushTelemetryPayload {
+    appType: DeviceAppType;
+    platform: DevicePlatform;
+    eventType: PushTelemetryEventType;
+    token?: string;
+    deviceId?: string;
+    notificationTitle?: string;
+    notificationBody?: string;
+    campaignId?: string;
+    orderId?: string;
+    actionId?: string;
+    metadata?: Record<string, unknown>;
+}
+
 export class NotificationService {
     constructor(public readonly repo: NotificationRepository) {}
 
@@ -47,8 +61,29 @@ export class NotificationService {
         return this.repo.removeDeviceToken(token);
     }
 
+    async unregisterTokenForUser(userId: string, token: string) {
+        return this.repo.removeDeviceTokenForUser(token, userId);
+    }
+
     async unregisterAllTokensForUser(userId: string) {
         return this.repo.removeTokensForUser(userId);
+    }
+
+    async trackPushTelemetry(userId: string, payload: PushTelemetryPayload) {
+        return this.repo.createPushTelemetryEvent({
+            userId,
+            appType: payload.appType,
+            platform: payload.platform,
+            eventType: payload.eventType,
+            token: payload.token,
+            deviceId: payload.deviceId,
+            notificationTitle: payload.notificationTitle,
+            notificationBody: payload.notificationBody,
+            campaignId: payload.campaignId,
+            orderId: payload.orderId,
+            actionId: payload.actionId,
+            metadata: payload.metadata,
+        });
     }
 
     // ────────────────────────────────────────────────────────────────

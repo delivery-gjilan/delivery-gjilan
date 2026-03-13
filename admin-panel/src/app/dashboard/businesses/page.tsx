@@ -198,7 +198,7 @@ export default function BusinessesPage() {
                 input: {
                     name: createForm.name,
                     phoneNumber: createForm.phoneNumber.trim() || null,
-                    businessType: createForm.businessType,
+                    businessType: createForm.businessType as any,
                     imageUrl: imageUrl || null,
                     location: {
                         latitude: createForm.location.latitude,
@@ -284,7 +284,7 @@ export default function BusinessesPage() {
                 input: {
                     name: editForm.name,
                     phoneNumber: editForm.phoneNumber.trim() || null,
-                    businessType: editForm.businessType,
+                    businessType: editForm.businessType as any,
                     imageUrl: imageUrl || null,
                     location: {
                         latitude: editForm.location.latitude,

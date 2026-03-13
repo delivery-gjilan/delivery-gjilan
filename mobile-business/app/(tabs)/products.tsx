@@ -28,11 +28,11 @@ import * as Haptics from 'expo-haptics';
 interface Product {
     id: string;
     name: string;
-    description?: string;
-    imageUrl?: string;
+    description?: string | null;
+    imageUrl?: string | null;
     price: number;
     isOnSale: boolean;
-    salePrice?: number;
+    salePrice?: number | null;
     isAvailable: boolean;
     stock: number;
     categoryId: string;

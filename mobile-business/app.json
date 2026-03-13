@@ -15,6 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.deliverygjilan.business",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "runtimeVersion": {
         "policy": "appVersion"
       }
@@ -24,6 +25,7 @@
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundColor": "#000000"
       },
+      "googleServicesFile": "./google-services.json",
       "package": "com.deliverygjilan.business",
       "edgeToEdgeEnabled": false,
       "runtimeVersion": {

@@ -1,6 +1,7 @@
 import { pgTable, uuid, text, timestamp, pgEnum, jsonb, integer, index, boolean, real } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import { users } from './users';
+import { deviceAppTypeEnum, devicePlatformEnum } from './deviceTokens';
 
 // ── Notification type enum ──────────────────────────────────────────
 const notificationTypeValues = ['ORDER_STATUS', 'ORDER_ASSIGNED', 'PROMOTIONAL', 'ADMIN_ALERT'] as const;
@@ -11,6 +12,18 @@ export type NotificationType = (typeof notificationTypeValues)[number];
 const campaignStatusValues = ['DRAFT', 'SENDING', 'SENT', 'FAILED'] as const;
 export const campaignStatusEnum = pgEnum('campaign_status', campaignStatusValues);
 export type CampaignStatus = (typeof campaignStatusValues)[number];
+
+// ── Push telemetry event enum ─────────────────────────────────────
+const pushTelemetryEventTypeValues = [
+    'RECEIVED',
+    'OPENED',
+    'ACTION_TAPPED',
+    'TOKEN_REGISTERED',
+    'TOKEN_REFRESHED',
+    'TOKEN_UNREGISTERED',
+] as const;
+export const pushTelemetryEventTypeEnum = pgEnum('push_telemetry_event_type', pushTelemetryEventTypeValues);
+export type PushTelemetryEventType = (typeof pushTelemetryEventTypeValues)[number];
 
 // ── notification_campaigns table ────────────────────────────────────
 export const notificationCampaigns = pgTable('notification_campaigns', {
@@ -68,7 +81,46 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
     }),
 }));
 
+// ── push_telemetry_events table ───────────────────────────────────
+export const pushTelemetryEvents = pgTable('push_telemetry_events', {
+    id: uuid('id').primaryKey().defaultRandom().notNull(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    appType: deviceAppTypeEnum('app_type').notNull(),
+    platform: devicePlatformEnum('platform').notNull(),
+    eventType: pushTelemetryEventTypeEnum('event_type').notNull(),
+    token: text('token'),
+    deviceId: text('device_id'),
+    notificationTitle: text('notification_title'),
+    notificationBody: text('notification_body'),
+    campaignId: uuid('campaign_id').references(() => notificationCampaigns.id, { onDelete: 'set null' }),
+    orderId: uuid('order_id'),
+    actionId: text('action_id'),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+        .default(sql`CURRENT_TIMESTAMP`)
+        .notNull(),
+}, (t) => ([
+    index('idx_push_telemetry_events_created_at').on(t.createdAt),
+    index('idx_push_telemetry_events_event_type').on(t.eventType),
+    index('idx_push_telemetry_events_app_type').on(t.appType),
+    index('idx_push_telemetry_events_platform').on(t.platform),
+    index('idx_push_telemetry_events_user_id').on(t.userId),
+]));
+
+export const pushTelemetryEventsRelations = relations(pushTelemetryEvents, ({ one }) => ({
+    user: one(users, {
+        fields: [pushTelemetryEvents.userId],
+        references: [users.id],
+    }),
+    campaign: one(notificationCampaigns, {
+        fields: [pushTelemetryEvents.campaignId],
+        references: [notificationCampaigns.id],
+    }),
+}));
+
 export type DbNotification = typeof notifications.$inferSelect;
 export type NewDbNotification = typeof notifications.$inferInsert;
 export type DbNotificationCampaign = typeof notificationCampaigns.$inferSelect;
 export type NewDbNotificationCampaign = typeof notificationCampaigns.$inferInsert;
+export type DbPushTelemetryEvent = typeof pushTelemetryEvents.$inferSelect;
+export type NewDbPushTelemetryEvent = typeof pushTelemetryEvents.$inferInsert;

@@ -10,6 +10,8 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.deliverygjilan.admin",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "We use your location to center the map on your position."
       }
@@ -23,7 +25,8 @@
         "backgroundColor": "#0f172a"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.deliverygjilan.admin"
+      "googleServicesFile": "./google-services.json",
+      "package": "com.deliverygjilan.adminn"
     },
     "web": {
       "output": "static",

@@ -50,6 +50,34 @@ export function useOrder(id: string) {
         nextFetchPolicy: 'cache-first', // But allow cache for subsequent reads on same screen
     });
 
+    useEffect(() => {
+        if (!id) {
+            console.warn('[useOrder] skipped: empty id');
+            return;
+        }
+
+        if (loading) {
+            console.log('[useOrder] loading', { id });
+            return;
+        }
+
+        if (error) {
+            const graphQLErrors = (error as any)?.graphQLErrors;
+            console.warn('[useOrder] error', {
+                id,
+                message: error.message,
+                graphQLErrors: graphQLErrors?.map((e: any) => e.message),
+            });
+            return;
+        }
+
+        console.log('[useOrder] success', {
+            id,
+            found: Boolean(data?.order),
+            status: (data as any)?.order?.status,
+        });
+    }, [id, loading, error, data]);
+
     return {
         order: data?.order || null,
         loading,

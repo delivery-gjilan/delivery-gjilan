@@ -32,7 +32,7 @@ export class SettlementRepository {
     }
 
     async getSettlements(filters: SettlementFilters): Promise<DbSettlement[]> {
-        let query = this.db.select().from(settlements);
+        let query: any = this.db.select().from(settlements);
         const conditions = [];
 
         if (filters.type) {
@@ -114,7 +114,7 @@ export class SettlementRepository {
             })
             .from(settlements)
             .where(whereClause)
-            .then((result) => result[0]);
+            .then((result: any[]) => result[0]);
 
         return {
             totalAmount: result.totalAmount || 0,
@@ -165,7 +165,7 @@ export class SettlementRepository {
             })
             .returning();
 
-        return result[0];
+        return result[0]!;
     }
 
     async markAsPaid(settlementId: string): Promise<DbSettlement> {
@@ -180,7 +180,7 @@ export class SettlementRepository {
             .where(eq(settlements.id, settlementId))
             .returning();
 
-        return result[0];
+        return result[0]!;
     }
 
     async markMultipleAsPaid(ids: string[]): Promise<DbSettlement[]> {
@@ -249,7 +249,7 @@ export class SettlementRepository {
                 .execute();
 
             const updated = await tx.select().from(settlements).where(eq(settlements.id, settlementId));
-            return updated[0];
+            return updated[0]!;
         });
     }
 
@@ -265,7 +265,7 @@ export class SettlementRepository {
             .where(eq(settlements.id, settlementId))
             .returning();
 
-        return result[0];
+        return result[0]!;
     }
 
     /**

@@ -302,7 +302,7 @@ export default function DriversPage() {
         }
         try {
             const { data: created } = await createDriver({
-                variables: { ...createForm, role: "DRIVER" },
+                variables: { ...createForm, role: "DRIVER" as any },
             }) as any;
             if (created?.createUser) {
                 setFormSuccess(created.createUser.message || "Driver created successfully");

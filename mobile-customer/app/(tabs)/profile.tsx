@@ -44,12 +44,12 @@ export default function Profile() {
 
     const handleDeleteAccount = () => {
         Alert.alert(
-            t.profile.delete_account_title,
-            t.profile.delete_account_message,
+            profileText.delete_account_title || 'Delete account',
+            profileText.delete_account_message || 'Are you sure you want to delete your account?',
             [
                 { text: t.common?.cancel || 'Cancel', style: 'cancel' },
                 {
-                    text: t.profile.delete_account_confirm,
+                    text: profileText.delete_account_confirm || 'Delete',
                     style: 'destructive',
                     onPress: async () => {
                         try {
@@ -58,7 +58,7 @@ export default function Profile() {
                         } catch (error) {
                             Alert.alert(
                                 t.common?.error || 'Error',
-                                t.profile.delete_account_error
+                                profileText.delete_account_error || 'Failed to delete account'
                             );
                         }
                     },
@@ -68,6 +68,7 @@ export default function Profile() {
     };
 
     const { t, languageChoice, setLanguageChoice } = useTranslations();
+    const profileText = t.profile as any;
 
     const handleLanguageChoice = async (choice: 'en' | 'al') => {
         setLanguageChoice(choice);
@@ -185,7 +186,7 @@ export default function Profile() {
                 {/* Account Actions */}
                 <View className="mb-6">
                     <ProfileRow
-                        title={t.profile.delete_account}
+                        title={profileText.delete_account || 'Delete account'}
                         icon="trash-outline"
                         onPress={handleDeleteAccount}
                         showDivider={false}

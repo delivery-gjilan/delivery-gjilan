@@ -19,13 +19,12 @@ export function useCreateOrder() {
         promoCode?: string | null,
         driverNotes?: string | null,
     ) => {
-        // Check if user already has an active order
+        // Keep this as UX guidance only; backend remains source of truth.
         if (hasActiveOrders) {
             toast.warning(
                 t.cart.active_order_exists_title,
                 t.cart.active_order_exists_message,
             );
-            throw new Error('Active order exists');
         }
 
         if (items.length === 0) {

@@ -1,10 +1,8 @@
-import type { DriverResolvers } from './../../../generated/types.generated';
-
 /**
  * Driver resolver handles the Driver GraphQL type
  * Drivers are completely separate from Users
  */
-export const Driver: DriverResolvers = {
+export const Driver: any = {
   id: (parent) => parent.id,
   email: (parent) => parent.email,
   firstName: (parent) => parent.firstName,

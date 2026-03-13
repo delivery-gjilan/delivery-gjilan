@@ -2,6 +2,7 @@ import type { MutationResolvers } from './../../../../generated/types.generated'
 import { createAuditLogger } from '@/services/AuditLogger';
 import { hasPermission } from '@/lib/utils/permissions';
 import { GraphQLError } from 'graphql';
+import { cache } from '@/lib/cache';
 
 export const createProduct: NonNullable<MutationResolvers['createProduct']> = async (
     _parent,
@@ -29,6 +30,7 @@ export const createProduct: NonNullable<MutationResolvers['createProduct']> = as
     }
     
     const result = await productService.createProduct(input);
+    await cache.invalidateProducts(input.businessId, result.id);
     
     // Log the action
     const logger = createAuditLogger(db, context);

@@ -3,8 +3,11 @@ import '../global.css';
 import { useAppSetup } from '@/hooks/useAppSetup';
 import { ActivityIndicator, View } from 'react-native';
 import Providers from '@/lib/graphql/providers';
+import { useNotifications } from '@/hooks/useNotifications';
 
 function AppContent() {
+    useNotifications();
+
     return (
         <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="login" options={{ headerShown: false }} />

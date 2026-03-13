@@ -1,6 +1,7 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { hasPermission } from '@/lib/utils/permissions';
 import { GraphQLError } from 'graphql';
+import { cache } from '@/lib/cache';
 
 export const updateProductsOrder: NonNullable<MutationResolvers['updateProductsOrder']> = async (
     _parent,
@@ -26,5 +27,7 @@ export const updateProductsOrder: NonNullable<MutationResolvers['updateProductsO
         }
     }
     
-    return productService.updateProductsOrder(businessId, products);
+    const result = await productService.updateProductsOrder(businessId, products);
+    await cache.invalidateProducts(businessId);
+    return result;
 };

@@ -448,6 +448,8 @@ export type DeliveryZoneMatch = {
 };
 
 export enum DeviceAppType {
+  Admin = 'ADMIN',
+  Business = 'BUSINESS',
   Customer = 'CUSTOMER',
   Driver = 'DRIVER'
 }
@@ -718,6 +720,7 @@ export type Mutation = {
   setUserPermissions: User;
   startPreparing: Order;
   submitPhoneNumber: SignupStepResponse;
+  trackPushTelemetry: Scalars['Boolean']['output'];
   unregisterDeviceToken: Scalars['Boolean']['output'];
   unsettleSettlement: Settlement;
   updateBanner: Banner;
@@ -1079,6 +1082,11 @@ export type MutationStartPreparingArgs = {
 
 export type MutationSubmitPhoneNumberArgs = {
   input: SubmitPhoneNumberInput;
+};
+
+
+export type MutationTrackPushTelemetryArgs = {
+  input: TrackPushTelemetryInput;
 };
 
 
@@ -1532,6 +1540,41 @@ export type PromotionUsage = {
   userId: Scalars['ID']['output'];
 };
 
+export type PushTelemetryEvent = {
+  __typename?: 'PushTelemetryEvent';
+  actionId?: Maybe<Scalars['String']['output']>;
+  appType: DeviceAppType;
+  campaignId?: Maybe<Scalars['ID']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  deviceId?: Maybe<Scalars['String']['output']>;
+  eventType: PushTelemetryEventType;
+  id: Scalars['ID']['output'];
+  metadata?: Maybe<Scalars['JSON']['output']>;
+  notificationBody?: Maybe<Scalars['String']['output']>;
+  notificationTitle?: Maybe<Scalars['String']['output']>;
+  orderId?: Maybe<Scalars['ID']['output']>;
+  platform: DevicePlatform;
+  token?: Maybe<Scalars['String']['output']>;
+  userId: Scalars['ID']['output'];
+};
+
+export enum PushTelemetryEventType {
+  ActionTapped = 'ACTION_TAPPED',
+  Opened = 'OPENED',
+  Received = 'RECEIVED',
+  TokenRefreshed = 'TOKEN_REFRESHED',
+  TokenRegistered = 'TOKEN_REGISTERED',
+  TokenUnregistered = 'TOKEN_UNREGISTERED'
+}
+
+export type PushTelemetrySummary = {
+  __typename?: 'PushTelemetrySummary';
+  byAppType: Array<TelemetryCount>;
+  byEvent: Array<TelemetryCount>;
+  byPlatform: Array<TelemetryCount>;
+  totalEvents: Scalars['Int']['output'];
+};
+
 export type Query = {
   __typename?: 'Query';
   activeRulesForEntity: Array<SettlementRule>;
@@ -1584,6 +1627,8 @@ export type Query = {
   productSubcategories: Array<ProductSubcategory>;
   productSubcategoriesByBusiness: Array<ProductSubcategory>;
   products: Array<Product>;
+  pushTelemetryEvents: Array<PushTelemetryEvent>;
+  pushTelemetrySummary: PushTelemetrySummary;
   settlementRule?: Maybe<SettlementRule>;
   settlementRuleSummary: SettlementRuleSummary;
   settlementRules: Array<SettlementRule>;
@@ -1781,6 +1826,20 @@ export type QueryProductSubcategoriesByBusinessArgs = {
 
 export type QueryProductsArgs = {
   businessId: Scalars['ID']['input'];
+};
+
+
+export type QueryPushTelemetryEventsArgs = {
+  appType?: InputMaybe<DeviceAppType>;
+  eventType?: InputMaybe<PushTelemetryEventType>;
+  hours?: InputMaybe<Scalars['Int']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  platform?: InputMaybe<DevicePlatform>;
+};
+
+
+export type QueryPushTelemetrySummaryArgs = {
+  hours?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -2052,6 +2111,7 @@ export type SubscriptionDriverPttSignalArgs = {
 
 
 export type SubscriptionOrderDriverLiveTrackingArgs = {
+  input?: InputMaybe<SubscriptionInput>;
   orderId: Scalars['ID']['input'];
 };
 
@@ -2070,10 +2130,39 @@ export type SubscriptionSettlementStatusChangedArgs = {
   id: Scalars['ID']['input'];
 };
 
+
+export type SubscriptionUserOrdersUpdatedArgs = {
+  input?: InputMaybe<SubscriptionInput>;
+};
+
+export type SubscriptionInput = {
+  token?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type TelemetryCount = {
+  __typename?: 'TelemetryCount';
+  count: Scalars['Int']['output'];
+  key: Scalars['String']['output'];
+};
+
 export type TokenRefreshResponse = {
   __typename?: 'TokenRefreshResponse';
   refreshToken: Scalars['String']['output'];
   token: Scalars['String']['output'];
+};
+
+export type TrackPushTelemetryInput = {
+  actionId?: InputMaybe<Scalars['String']['input']>;
+  appType: DeviceAppType;
+  campaignId?: InputMaybe<Scalars['ID']['input']>;
+  deviceId?: InputMaybe<Scalars['String']['input']>;
+  eventType: PushTelemetryEventType;
+  metadata?: InputMaybe<Scalars['JSON']['input']>;
+  notificationBody?: InputMaybe<Scalars['String']['input']>;
+  notificationTitle?: InputMaybe<Scalars['String']['input']>;
+  orderId?: InputMaybe<Scalars['ID']['input']>;
+  platform: DevicePlatform;
+  token?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type UpdateBannerInput = {
@@ -2694,6 +2783,24 @@ export type AssignPromotionToUsersMutationVariables = Exact<{
 
 export type AssignPromotionToUsersMutation = { __typename?: 'Mutation', assignPromotionToUsers: Array<{ __typename?: 'UserPromotion', id: string, userId: string, promotionId: string, assignedAt: string }> };
 
+export type GetPushTelemetrySummaryQueryVariables = Exact<{
+  hours?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type GetPushTelemetrySummaryQuery = { __typename?: 'Query', pushTelemetrySummary: { __typename?: 'PushTelemetrySummary', totalEvents: number, byEvent: Array<{ __typename?: 'TelemetryCount', key: string, count: number }>, byAppType: Array<{ __typename?: 'TelemetryCount', key: string, count: number }>, byPlatform: Array<{ __typename?: 'TelemetryCount', key: string, count: number }> } };
+
+export type GetPushTelemetryEventsQueryVariables = Exact<{
+  hours?: InputMaybe<Scalars['Int']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  appType?: InputMaybe<DeviceAppType>;
+  platform?: InputMaybe<DevicePlatform>;
+  eventType?: InputMaybe<PushTelemetryEventType>;
+}>;
+
+
+export type GetPushTelemetryEventsQuery = { __typename?: 'Query', pushTelemetryEvents: Array<{ __typename?: 'PushTelemetryEvent', id: string, userId: string, appType: DeviceAppType, platform: DevicePlatform, eventType: PushTelemetryEventType, deviceId?: string | null, notificationTitle?: string | null, notificationBody?: string | null, campaignId?: string | null, orderId?: string | null, actionId?: string | null, metadata?: any | null, createdAt: any }> };
+
 export type UpdateOrderStatusMutationVariables = Exact<{
   id: Scalars['ID']['input'];
   status: OrderStatus;
@@ -3156,6 +3263,8 @@ export const SendCampaignDocument = {"kind":"Document","definitions":[{"kind":"O
 export const SendPushNotificationDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SendPushNotification"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"SendPushNotificationInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sendPushNotification"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"success"}},{"kind":"Field","name":{"kind":"Name","value":"successCount"}},{"kind":"Field","name":{"kind":"Name","value":"failureCount"}}]}}]}}]} as unknown as DocumentNode<SendPushNotificationMutation, SendPushNotificationMutationVariables>;
 export const DeleteCampaignDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteCampaign"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteCampaign"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}]}}]} as unknown as DocumentNode<DeleteCampaignMutation, DeleteCampaignMutationVariables>;
 export const AssignPromotionToUsersDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"AssignPromotionToUsers"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"AssignPromotionToUserInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"assignPromotionToUsers"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"userId"}},{"kind":"Field","name":{"kind":"Name","value":"promotionId"}},{"kind":"Field","name":{"kind":"Name","value":"assignedAt"}}]}}]}}]} as unknown as DocumentNode<AssignPromotionToUsersMutation, AssignPromotionToUsersMutationVariables>;
+export const GetPushTelemetrySummaryDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetPushTelemetrySummary"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"hours"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"pushTelemetrySummary"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"hours"},"value":{"kind":"Variable","name":{"kind":"Name","value":"hours"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"totalEvents"}},{"kind":"Field","name":{"kind":"Name","value":"byEvent"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"key"}},{"kind":"Field","name":{"kind":"Name","value":"count"}}]}},{"kind":"Field","name":{"kind":"Name","value":"byAppType"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"key"}},{"kind":"Field","name":{"kind":"Name","value":"count"}}]}},{"kind":"Field","name":{"kind":"Name","value":"byPlatform"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"key"}},{"kind":"Field","name":{"kind":"Name","value":"count"}}]}}]}}]}}]} as unknown as DocumentNode<GetPushTelemetrySummaryQuery, GetPushTelemetrySummaryQueryVariables>;
+export const GetPushTelemetryEventsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetPushTelemetryEvents"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"hours"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"appType"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"DeviceAppType"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"platform"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"DevicePlatform"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"eventType"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"PushTelemetryEventType"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"pushTelemetryEvents"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"hours"},"value":{"kind":"Variable","name":{"kind":"Name","value":"hours"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"appType"},"value":{"kind":"Variable","name":{"kind":"Name","value":"appType"}}},{"kind":"Argument","name":{"kind":"Name","value":"platform"},"value":{"kind":"Variable","name":{"kind":"Name","value":"platform"}}},{"kind":"Argument","name":{"kind":"Name","value":"eventType"},"value":{"kind":"Variable","name":{"kind":"Name","value":"eventType"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"userId"}},{"kind":"Field","name":{"kind":"Name","value":"appType"}},{"kind":"Field","name":{"kind":"Name","value":"platform"}},{"kind":"Field","name":{"kind":"Name","value":"eventType"}},{"kind":"Field","name":{"kind":"Name","value":"deviceId"}},{"kind":"Field","name":{"kind":"Name","value":"notificationTitle"}},{"kind":"Field","name":{"kind":"Name","value":"notificationBody"}},{"kind":"Field","name":{"kind":"Name","value":"campaignId"}},{"kind":"Field","name":{"kind":"Name","value":"orderId"}},{"kind":"Field","name":{"kind":"Name","value":"actionId"}},{"kind":"Field","name":{"kind":"Name","value":"metadata"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}}]} as unknown as DocumentNode<GetPushTelemetryEventsQuery, GetPushTelemetryEventsQueryVariables>;
 export const UpdateOrderStatusDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateOrderStatus"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"status"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"OrderStatus"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateOrderStatus"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"status"},"value":{"kind":"Variable","name":{"kind":"Name","value":"status"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"orderPrice"}},{"kind":"Field","name":{"kind":"Name","value":"deliveryPrice"}},{"kind":"Field","name":{"kind":"Name","value":"totalPrice"}},{"kind":"Field","name":{"kind":"Name","value":"orderDate"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}}]}},{"kind":"Field","name":{"kind":"Name","value":"dropOffLocation"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}},{"kind":"Field","name":{"kind":"Name","value":"businesses"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"business"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"businessType"}}]}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"productId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"imageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"quantity"}},{"kind":"Field","name":{"kind":"Name","value":"price"}}]}}]}}]}}]}}]} as unknown as DocumentNode<UpdateOrderStatusMutation, UpdateOrderStatusMutationVariables>;
 export const CancelOrderDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CancelOrder"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"cancelOrder"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}}]}}]}}]} as unknown as DocumentNode<CancelOrderMutation, CancelOrderMutationVariables>;
 export const StartPreparingDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"StartPreparing"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"preparationMinutes"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"startPreparing"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"preparationMinutes"},"value":{"kind":"Variable","name":{"kind":"Name","value":"preparationMinutes"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"preparationMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"estimatedReadyAt"}},{"kind":"Field","name":{"kind":"Name","value":"preparingAt"}}]}}]}}]} as unknown as DocumentNode<StartPreparingMutation, StartPreparingMutationVariables>;

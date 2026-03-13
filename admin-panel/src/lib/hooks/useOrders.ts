@@ -128,7 +128,7 @@ export function useOrder(id: string): UseOrderResult {
 
 export function useOrdersByStatus(status: string): UseOrdersByStatusResult {
     const { data, loading, error, refetch } = useQuery(GET_ORDERS_BY_STATUS, {
-        variables: { status },
+        variables: { status: status as any },
         skip: !status,
     });
 
@@ -146,7 +146,7 @@ export function useUpdateOrderStatus(): UseUpdateOrderStatusResult {
     return {
         update: async (id, status) => {
             try {
-                const result = await mutate({ variables: { id, status } });
+                const result = await mutate({ variables: { id, status: status as any } });
                 return { success: true, data: result.data };
             } catch (err) {
                 return { success: false, error: (err as Error).message };

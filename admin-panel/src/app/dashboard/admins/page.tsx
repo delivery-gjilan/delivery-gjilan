@@ -150,7 +150,7 @@ export default function AdminsPage() {
                         id: editingUser.id,
                         firstName: formData.firstName,
                         lastName: formData.lastName,
-                        role: formData.role,
+                        role: formData.role as any,
                         businessId: (formData.role === 'BUSINESS_OWNER' || formData.role === 'BUSINESS_EMPLOYEE') ? formData.businessId : null,
                     },
                 });

@@ -2,6 +2,7 @@ import type { MutationResolvers } from './../../../../generated/types.generated'
 import { createAuditLogger } from '@/services/AuditLogger';
 import { hasPermission } from '@/lib/utils/permissions';
 import { GraphQLError } from 'graphql';
+import { cache } from '@/lib/cache';
 
 export const deleteProduct: NonNullable<MutationResolvers['deleteProduct']> = async (
     _parent,
@@ -29,6 +30,9 @@ export const deleteProduct: NonNullable<MutationResolvers['deleteProduct']> = as
         }
     }
     const result = await productService.deleteProduct(id);
+    if (product?.businessId) {
+        await cache.invalidateProducts(product.businessId, id);
+    }
     
     // Log the action
     if (result && product) {

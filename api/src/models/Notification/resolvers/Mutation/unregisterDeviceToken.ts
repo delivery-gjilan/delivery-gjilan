@@ -8,6 +8,6 @@ export const unregisterDeviceToken: NonNullable<MutationResolvers['unregisterDev
 ) => {
     if (!userData.userId) throw AppError.unauthorized();
 
-    await notificationService.unregisterToken(token);
+    await notificationService.unregisterTokenForUser(userData.userId, token);
     return true;
 };

@@ -2,7 +2,7 @@
 import { gql } from '@apollo/client';
 import { useQuery, useMutation } from '@apollo/client/react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/Button';
 import {
   Table,
   TableBody,
@@ -10,7 +10,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/ui/Table';
 import { Badge } from '@/components/ui/badge';
 import { GET_PROMOTIONS } from '@/graphql/operations/promotions/queries';
 

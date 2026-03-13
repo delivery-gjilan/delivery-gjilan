@@ -279,8 +279,12 @@ export type CreateBusinessInput = {
 
 export type CreateCampaignInput = {
   body: Scalars['String']['input'];
+  category?: InputMaybe<Scalars['String']['input']>;
   data?: InputMaybe<Scalars['JSON']['input']>;
+  imageUrl?: InputMaybe<Scalars['String']['input']>;
   query: Scalars['JSON']['input'];
+  relevanceScore?: InputMaybe<Scalars['Float']['input']>;
+  timeSensitive?: InputMaybe<Scalars['Boolean']['input']>;
   title: Scalars['String']['input'];
 };
 
@@ -443,6 +447,8 @@ export type DeliveryZoneMatch = {
 };
 
 export enum DeviceAppType {
+  Admin = 'ADMIN',
+  Business = 'BUSINESS',
   Customer = 'CUSTOMER',
   Driver = 'DRIVER'
 }
@@ -713,6 +719,7 @@ export type Mutation = {
   setUserPermissions: User;
   startPreparing: Order;
   submitPhoneNumber: SignupStepResponse;
+  trackPushTelemetry: Scalars['Boolean']['output'];
   unregisterDeviceToken: Scalars['Boolean']['output'];
   unsettleSettlement: Settlement;
   updateBanner: Banner;
@@ -1077,6 +1084,11 @@ export type MutationSubmitPhoneNumberArgs = {
 };
 
 
+export type MutationTrackPushTelemetryArgs = {
+  input: TrackPushTelemetryInput;
+};
+
+
 export type MutationUnregisterDeviceTokenArgs = {
   token: Scalars['String']['input'];
 };
@@ -1241,17 +1253,21 @@ export type Notification = {
 export type NotificationCampaign = {
   __typename?: 'NotificationCampaign';
   body: Scalars['String']['output'];
+  category?: Maybe<Scalars['String']['output']>;
   createdAt: Scalars['DateTime']['output'];
   data?: Maybe<Scalars['JSON']['output']>;
   failedCount: Scalars['Int']['output'];
   id: Scalars['ID']['output'];
+  imageUrl?: Maybe<Scalars['String']['output']>;
   query?: Maybe<Scalars['JSON']['output']>;
+  relevanceScore?: Maybe<Scalars['Float']['output']>;
   sender?: Maybe<User>;
   sentAt?: Maybe<Scalars['DateTime']['output']>;
   sentBy?: Maybe<Scalars['ID']['output']>;
   sentCount: Scalars['Int']['output'];
   status: CampaignStatus;
   targetCount: Scalars['Int']['output'];
+  timeSensitive: Scalars['Boolean']['output'];
   title: Scalars['String']['output'];
 };
 
@@ -1523,6 +1539,41 @@ export type PromotionUsage = {
   userId: Scalars['ID']['output'];
 };
 
+export type PushTelemetryEvent = {
+  __typename?: 'PushTelemetryEvent';
+  actionId?: Maybe<Scalars['String']['output']>;
+  appType: DeviceAppType;
+  campaignId?: Maybe<Scalars['ID']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  deviceId?: Maybe<Scalars['String']['output']>;
+  eventType: PushTelemetryEventType;
+  id: Scalars['ID']['output'];
+  metadata?: Maybe<Scalars['JSON']['output']>;
+  notificationBody?: Maybe<Scalars['String']['output']>;
+  notificationTitle?: Maybe<Scalars['String']['output']>;
+  orderId?: Maybe<Scalars['ID']['output']>;
+  platform: DevicePlatform;
+  token?: Maybe<Scalars['String']['output']>;
+  userId: Scalars['ID']['output'];
+};
+
+export enum PushTelemetryEventType {
+  ActionTapped = 'ACTION_TAPPED',
+  Opened = 'OPENED',
+  Received = 'RECEIVED',
+  TokenRefreshed = 'TOKEN_REFRESHED',
+  TokenRegistered = 'TOKEN_REGISTERED',
+  TokenUnregistered = 'TOKEN_UNREGISTERED'
+}
+
+export type PushTelemetrySummary = {
+  __typename?: 'PushTelemetrySummary';
+  byAppType: Array<TelemetryCount>;
+  byEvent: Array<TelemetryCount>;
+  byPlatform: Array<TelemetryCount>;
+  totalEvents: Scalars['Int']['output'];
+};
+
 export type Query = {
   __typename?: 'Query';
   activeRulesForEntity: Array<SettlementRule>;
@@ -1575,6 +1626,8 @@ export type Query = {
   productSubcategories: Array<ProductSubcategory>;
   productSubcategoriesByBusiness: Array<ProductSubcategory>;
   products: Array<Product>;
+  pushTelemetryEvents: Array<PushTelemetryEvent>;
+  pushTelemetrySummary: PushTelemetrySummary;
   settlementRule?: Maybe<SettlementRule>;
   settlementRuleSummary: SettlementRuleSummary;
   settlementRules: Array<SettlementRule>;
@@ -1772,6 +1825,20 @@ export type QueryProductSubcategoriesByBusinessArgs = {
 
 export type QueryProductsArgs = {
   businessId: Scalars['ID']['input'];
+};
+
+
+export type QueryPushTelemetryEventsArgs = {
+  appType?: InputMaybe<DeviceAppType>;
+  eventType?: InputMaybe<PushTelemetryEventType>;
+  hours?: InputMaybe<Scalars['Int']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  platform?: InputMaybe<DevicePlatform>;
+};
+
+
+export type QueryPushTelemetrySummaryArgs = {
+  hours?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -2043,6 +2110,7 @@ export type SubscriptionDriverPttSignalArgs = {
 
 
 export type SubscriptionOrderDriverLiveTrackingArgs = {
+  input?: InputMaybe<SubscriptionInput>;
   orderId: Scalars['ID']['input'];
 };
 
@@ -2061,10 +2129,39 @@ export type SubscriptionSettlementStatusChangedArgs = {
   id: Scalars['ID']['input'];
 };
 
+
+export type SubscriptionUserOrdersUpdatedArgs = {
+  input?: InputMaybe<SubscriptionInput>;
+};
+
+export type SubscriptionInput = {
+  token?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type TelemetryCount = {
+  __typename?: 'TelemetryCount';
+  count: Scalars['Int']['output'];
+  key: Scalars['String']['output'];
+};
+
 export type TokenRefreshResponse = {
   __typename?: 'TokenRefreshResponse';
   refreshToken: Scalars['String']['output'];
   token: Scalars['String']['output'];
+};
+
+export type TrackPushTelemetryInput = {
+  actionId?: InputMaybe<Scalars['String']['input']>;
+  appType: DeviceAppType;
+  campaignId?: InputMaybe<Scalars['ID']['input']>;
+  deviceId?: InputMaybe<Scalars['String']['input']>;
+  eventType: PushTelemetryEventType;
+  metadata?: InputMaybe<Scalars['JSON']['input']>;
+  notificationBody?: InputMaybe<Scalars['String']['input']>;
+  notificationTitle?: InputMaybe<Scalars['String']['input']>;
+  orderId?: InputMaybe<Scalars['ID']['input']>;
+  platform: DevicePlatform;
+  token?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type UpdateBannerInput = {

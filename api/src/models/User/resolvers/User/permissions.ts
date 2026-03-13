@@ -1,4 +1,4 @@
-import type { UserResolvers } from './../../../generated/types.generated';
+import type { UserResolvers } from './../../../../generated/types.generated';
 import { getUserPermissions } from '@/lib/utils/permissions';
 
 export const permissions: NonNullable<UserResolvers['permissions']> = async (

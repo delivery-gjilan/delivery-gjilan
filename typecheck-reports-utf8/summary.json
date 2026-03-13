@@ -1,0 +1,32 @@
+﻿[
+    {
+        "Project":  "api",
+        "ExitCode":  2,
+        "Log":  "typecheck-reports-utf8\\api.log"
+    },
+    {
+        "Project":  "admin-panel",
+        "ExitCode":  1,
+        "Log":  "typecheck-reports-utf8\\admin-panel.log"
+    },
+    {
+        "Project":  "mobile-business",
+        "ExitCode":  2,
+        "Log":  "typecheck-reports-utf8\\mobile-business.log"
+    },
+    {
+        "Project":  "mobile-customer",
+        "ExitCode":  2,
+        "Log":  "typecheck-reports-utf8\\mobile-customer.log"
+    },
+    {
+        "Project":  "mobile-driver",
+        "ExitCode":  2,
+        "Log":  "typecheck-reports-utf8\\mobile-driver.log"
+    },
+    {
+        "Project":  "mobile-admin",
+        "ExitCode":  0,
+        "Log":  "typecheck-reports-utf8\\mobile-admin.log"
+    }
+]

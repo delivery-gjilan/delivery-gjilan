@@ -17,3 +17,9 @@ export const REGISTER_LIVE_ACTIVITY_TOKEN = gql`
         registerLiveActivityToken(token: $token, activityId: $activityId, orderId: $orderId)
     }
 `;
+
+export const TRACK_PUSH_TELEMETRY = gql`
+    mutation TrackPushTelemetry($input: TrackPushTelemetryInput!) {
+        trackPushTelemetry(input: $input)
+    }
+`;

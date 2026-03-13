@@ -279,7 +279,7 @@ export default function BannersPage() {
         <Table>
           <thead>
             <tr>
-              <Th className="w-12"></Th>
+              <Th className="w-12">&nbsp;</Th>
               <Th className="w-32">Preview</Th>
               <Th>Title</Th>
               <Th>Subtitle</Th>

@@ -32,7 +32,7 @@ const wsLink = new GraphQLWsLink(
         shouldRetry: () => true,
         retryWait: async (retries) => {
             reconnectAttempts = retries;
-            const delay = RECONNECT_DELAYS[Math.min(retries, RECONNECT_DELAYS.length - 1)];
+            const delay = RECONNECT_DELAYS[Math.min(retries, RECONNECT_DELAYS.length - 1)] ?? 10000;
             console.log(`[WS] Reconnecting in ${delay}ms (attempt ${retries + 1})`);
             await new Promise((resolve) => setTimeout(resolve, delay));
         },
@@ -67,9 +67,10 @@ const authLink = setContext(async (_, { headers }) => {
 });
 
 // Error Link
-const errorLink = onError(({ graphQLErrors, networkError }) => {
+const errorLink = onError((errorContext: any) => {
+    const { graphQLErrors, networkError } = errorContext;
     if (graphQLErrors) {
-        graphQLErrors.forEach(({ message, locations, path }) => {
+        graphQLErrors.forEach(({ message, path }: any) => {
             console.error(`[GraphQL error]: Message: ${message}, Path: ${path}`);
             if (message.includes('Unauthorized') || message.includes('token')) {
                 console.warn('[Apollo] Auth-related error received, preserving session');

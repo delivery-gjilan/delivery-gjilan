@@ -444,6 +444,8 @@ export type DeliveryZoneMatch = {
 };
 
 export type DeviceAppType =
+  | 'ADMIN'
+  | 'BUSINESS'
   | 'CUSTOMER'
   | 'DRIVER';
 
@@ -708,6 +710,7 @@ export type Mutation = {
   setUserPermissions: User;
   startPreparing: Order;
   submitPhoneNumber: SignupStepResponse;
+  trackPushTelemetry: Scalars['Boolean']['output'];
   unregisterDeviceToken: Scalars['Boolean']['output'];
   unsettleSettlement: Settlement;
   updateBanner: Banner;
@@ -1069,6 +1072,11 @@ export type MutationstartPreparingArgs = {
 
 export type MutationsubmitPhoneNumberArgs = {
   input: SubmitPhoneNumberInput;
+};
+
+
+export type MutationtrackPushTelemetryArgs = {
+  input: TrackPushTelemetryInput;
 };
 
 
@@ -1515,6 +1523,40 @@ export type PromotionUsage = {
   userId: Scalars['ID']['output'];
 };
 
+export type PushTelemetryEvent = {
+  __typename?: 'PushTelemetryEvent';
+  actionId?: Maybe<Scalars['String']['output']>;
+  appType: DeviceAppType;
+  campaignId?: Maybe<Scalars['ID']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  deviceId?: Maybe<Scalars['String']['output']>;
+  eventType: PushTelemetryEventType;
+  id: Scalars['ID']['output'];
+  metadata?: Maybe<Scalars['JSON']['output']>;
+  notificationBody?: Maybe<Scalars['String']['output']>;
+  notificationTitle?: Maybe<Scalars['String']['output']>;
+  orderId?: Maybe<Scalars['ID']['output']>;
+  platform: DevicePlatform;
+  token?: Maybe<Scalars['String']['output']>;
+  userId: Scalars['ID']['output'];
+};
+
+export type PushTelemetryEventType =
+  | 'ACTION_TAPPED'
+  | 'OPENED'
+  | 'RECEIVED'
+  | 'TOKEN_REFRESHED'
+  | 'TOKEN_REGISTERED'
+  | 'TOKEN_UNREGISTERED';
+
+export type PushTelemetrySummary = {
+  __typename?: 'PushTelemetrySummary';
+  byAppType: Array<TelemetryCount>;
+  byEvent: Array<TelemetryCount>;
+  byPlatform: Array<TelemetryCount>;
+  totalEvents: Scalars['Int']['output'];
+};
+
 export type Query = {
   __typename?: 'Query';
   activeRulesForEntity: Array<SettlementRule>;
@@ -1567,6 +1609,8 @@ export type Query = {
   productSubcategories: Array<ProductSubcategory>;
   productSubcategoriesByBusiness: Array<ProductSubcategory>;
   products: Array<Product>;
+  pushTelemetryEvents: Array<PushTelemetryEvent>;
+  pushTelemetrySummary: PushTelemetrySummary;
   settlementRule?: Maybe<SettlementRule>;
   settlementRuleSummary: SettlementRuleSummary;
   settlementRules: Array<SettlementRule>;
@@ -1764,6 +1808,20 @@ export type QueryproductSubcategoriesByBusinessArgs = {
 
 export type QueryproductsArgs = {
   businessId: Scalars['ID']['input'];
+};
+
+
+export type QuerypushTelemetryEventsArgs = {
+  appType?: InputMaybe<DeviceAppType>;
+  eventType?: InputMaybe<PushTelemetryEventType>;
+  hours?: InputMaybe<Scalars['Int']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  platform?: InputMaybe<DevicePlatform>;
+};
+
+
+export type QuerypushTelemetrySummaryArgs = {
+  hours?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -2056,10 +2114,30 @@ export type SubscriptionInput = {
   token?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type TelemetryCount = {
+  __typename?: 'TelemetryCount';
+  count: Scalars['Int']['output'];
+  key: Scalars['String']['output'];
+};
+
 export type TokenRefreshResponse = {
   __typename?: 'TokenRefreshResponse';
   refreshToken: Scalars['String']['output'];
   token: Scalars['String']['output'];
+};
+
+export type TrackPushTelemetryInput = {
+  actionId?: InputMaybe<Scalars['String']['input']>;
+  appType: DeviceAppType;
+  campaignId?: InputMaybe<Scalars['ID']['input']>;
+  deviceId?: InputMaybe<Scalars['String']['input']>;
+  eventType: PushTelemetryEventType;
+  metadata?: InputMaybe<Scalars['JSON']['input']>;
+  notificationBody?: InputMaybe<Scalars['String']['input']>;
+  notificationTitle?: InputMaybe<Scalars['String']['input']>;
+  orderId?: InputMaybe<Scalars['ID']['input']>;
+  platform: DevicePlatform;
+  token?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type UpdateBannerInput = {
@@ -2456,7 +2534,7 @@ export type ResolversTypes = {
   DeliveryPricingTier: ResolverTypeWrapper<DeliveryPricingTier>;
   DeliveryZone: ResolverTypeWrapper<DeliveryZone>;
   DeliveryZoneMatch: ResolverTypeWrapper<DeliveryZoneMatch>;
-  DeviceAppType: ResolverTypeWrapper<'CUSTOMER' | 'DRIVER'>;
+  DeviceAppType: ResolverTypeWrapper<'CUSTOMER' | 'DRIVER' | 'BUSINESS' | 'ADMIN'>;
   DevicePlatform: ResolverTypeWrapper<'IOS' | 'ANDROID'>;
   DeviceToken: ResolverTypeWrapper<Omit<DeviceToken, 'appType' | 'platform'> & { appType: ResolversTypes['DeviceAppType'], platform: ResolversTypes['DevicePlatform'] }>;
   DriverConnection: ResolverTypeWrapper<Omit<DriverConnection, 'connectionStatus'> & { connectionStatus: ResolversTypes['DriverConnectionStatus'] }>;
@@ -2503,6 +2581,9 @@ export type ResolversTypes = {
   PromotionThreshold: ResolverTypeWrapper<PromotionThreshold>;
   PromotionType: ResolverTypeWrapper<'FIXED_AMOUNT' | 'PERCENTAGE' | 'FREE_DELIVERY' | 'WALLET_CREDIT'>;
   PromotionUsage: ResolverTypeWrapper<Omit<PromotionUsage, 'order' | 'promotion' | 'user'> & { order?: Maybe<ResolversTypes['Order']>, promotion?: Maybe<ResolversTypes['Promotion']>, user?: Maybe<ResolversTypes['User']> }>;
+  PushTelemetryEvent: ResolverTypeWrapper<Omit<PushTelemetryEvent, 'appType' | 'eventType' | 'platform'> & { appType: ResolversTypes['DeviceAppType'], eventType: ResolversTypes['PushTelemetryEventType'], platform: ResolversTypes['DevicePlatform'] }>;
+  PushTelemetryEventType: ResolverTypeWrapper<'RECEIVED' | 'OPENED' | 'ACTION_TAPPED' | 'TOKEN_REGISTERED' | 'TOKEN_REFRESHED' | 'TOKEN_UNREGISTERED'>;
+  PushTelemetrySummary: ResolverTypeWrapper<PushTelemetrySummary>;
   Query: ResolverTypeWrapper<{}>;
   Referral: ResolverTypeWrapper<Omit<Referral, 'referredUser' | 'status'> & { referredUser?: Maybe<ResolversTypes['User']>, status: ResolversTypes['ReferralStatus'] }>;
   ReferralStats: ResolverTypeWrapper<Omit<ReferralStats, 'referrals'> & { referrals: Array<ResolversTypes['Referral']> }>;
@@ -2528,7 +2609,9 @@ export type ResolversTypes = {
   SubmitPhoneNumberInput: SubmitPhoneNumberInput;
   Subscription: ResolverTypeWrapper<{}>;
   SubscriptionInput: SubscriptionInput;
+  TelemetryCount: ResolverTypeWrapper<TelemetryCount>;
   TokenRefreshResponse: ResolverTypeWrapper<TokenRefreshResponse>;
+  TrackPushTelemetryInput: TrackPushTelemetryInput;
   UpdateBannerInput: UpdateBannerInput;
   UpdateBusinessInput: UpdateBusinessInput;
   UpdateDeliveryPricingTierInput: UpdateDeliveryPricingTierInput;
@@ -2637,6 +2720,8 @@ export type ResolversParentTypes = {
   PromotionResult: Omit<PromotionResult, 'promotions'> & { promotions: Array<ResolversParentTypes['ApplicablePromotion']> };
   PromotionThreshold: PromotionThreshold;
   PromotionUsage: Omit<PromotionUsage, 'order' | 'promotion' | 'user'> & { order?: Maybe<ResolversParentTypes['Order']>, promotion?: Maybe<ResolversParentTypes['Promotion']>, user?: Maybe<ResolversParentTypes['User']> };
+  PushTelemetryEvent: PushTelemetryEvent;
+  PushTelemetrySummary: PushTelemetrySummary;
   Query: {};
   Referral: Omit<Referral, 'referredUser'> & { referredUser?: Maybe<ResolversParentTypes['User']> };
   ReferralStats: Omit<ReferralStats, 'referrals'> & { referrals: Array<ResolversParentTypes['Referral']> };
@@ -2655,7 +2740,9 @@ export type ResolversParentTypes = {
   SubmitPhoneNumberInput: SubmitPhoneNumberInput;
   Subscription: {};
   SubscriptionInput: SubscriptionInput;
+  TelemetryCount: TelemetryCount;
   TokenRefreshResponse: TokenRefreshResponse;
+  TrackPushTelemetryInput: TrackPushTelemetryInput;
   UpdateBannerInput: UpdateBannerInput;
   UpdateBusinessInput: UpdateBusinessInput;
   UpdateDeliveryPricingTierInput: UpdateDeliveryPricingTierInput;
@@ -2870,7 +2957,7 @@ export type DeliveryZoneMatchResolvers<ContextType = GraphQLContext, ParentType 
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
-export type DeviceAppTypeResolvers = EnumResolverSignature<{ CUSTOMER?: any, DRIVER?: any }, ResolversTypes['DeviceAppType']>;
+export type DeviceAppTypeResolvers = EnumResolverSignature<{ ADMIN?: any, BUSINESS?: any, CUSTOMER?: any, DRIVER?: any }, ResolversTypes['DeviceAppType']>;
 
 export type DevicePlatformResolvers = EnumResolverSignature<{ ANDROID?: any, IOS?: any }, ResolversTypes['DevicePlatform']>;
 
@@ -3047,6 +3134,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   setUserPermissions?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationsetUserPermissionsArgs, 'permissions' | 'userId'>>;
   startPreparing?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationstartPreparingArgs, 'id' | 'preparationMinutes'>>;
   submitPhoneNumber?: Resolver<ResolversTypes['SignupStepResponse'], ParentType, ContextType, RequireFields<MutationsubmitPhoneNumberArgs, 'input'>>;
+  trackPushTelemetry?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationtrackPushTelemetryArgs, 'input'>>;
   unregisterDeviceToken?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationunregisterDeviceTokenArgs, 'token'>>;
   unsettleSettlement?: Resolver<ResolversTypes['Settlement'], ParentType, ContextType, RequireFields<MutationunsettleSettlementArgs, 'settlementId'>>;
   updateBanner?: Resolver<ResolversTypes['Banner'], ParentType, ContextType, RequireFields<MutationupdateBannerArgs, 'id' | 'input'>>;
@@ -3330,6 +3418,34 @@ export type PromotionUsageResolvers<ContextType = GraphQLContext, ParentType ext
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
+export type PushTelemetryEventResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PushTelemetryEvent'] = ResolversParentTypes['PushTelemetryEvent']> = {
+  actionId?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  appType?: Resolver<ResolversTypes['DeviceAppType'], ParentType, ContextType>;
+  campaignId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
+  createdAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+  deviceId?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  eventType?: Resolver<ResolversTypes['PushTelemetryEventType'], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  metadata?: Resolver<Maybe<ResolversTypes['JSON']>, ParentType, ContextType>;
+  notificationBody?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  notificationTitle?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  orderId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
+  platform?: Resolver<ResolversTypes['DevicePlatform'], ParentType, ContextType>;
+  token?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  userId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type PushTelemetryEventTypeResolvers = EnumResolverSignature<{ ACTION_TAPPED?: any, OPENED?: any, RECEIVED?: any, TOKEN_REFRESHED?: any, TOKEN_REGISTERED?: any, TOKEN_UNREGISTERED?: any }, ResolversTypes['PushTelemetryEventType']>;
+
+export type PushTelemetrySummaryResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PushTelemetrySummary'] = ResolversParentTypes['PushTelemetrySummary']> = {
+  byAppType?: Resolver<Array<ResolversTypes['TelemetryCount']>, ParentType, ContextType>;
+  byEvent?: Resolver<Array<ResolversTypes['TelemetryCount']>, ParentType, ContextType>;
+  byPlatform?: Resolver<Array<ResolversTypes['TelemetryCount']>, ParentType, ContextType>;
+  totalEvents?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
 export type QueryResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Query'] = ResolversParentTypes['Query']> = {
   activeRulesForEntity?: Resolver<Array<ResolversTypes['SettlementRule']>, ParentType, ContextType, RequireFields<QueryactiveRulesForEntityArgs, 'entityId' | 'entityType'>>;
   auditLog?: Resolver<Maybe<ResolversTypes['AuditLog']>, ParentType, ContextType, RequireFields<QueryauditLogArgs, 'id'>>;
@@ -3379,6 +3495,8 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   productSubcategories?: Resolver<Array<ResolversTypes['ProductSubcategory']>, ParentType, ContextType, RequireFields<QueryproductSubcategoriesArgs, 'categoryId'>>;
   productSubcategoriesByBusiness?: Resolver<Array<ResolversTypes['ProductSubcategory']>, ParentType, ContextType, RequireFields<QueryproductSubcategoriesByBusinessArgs, 'businessId'>>;
   products?: Resolver<Array<ResolversTypes['Product']>, ParentType, ContextType, RequireFields<QueryproductsArgs, 'businessId'>>;
+  pushTelemetryEvents?: Resolver<Array<ResolversTypes['PushTelemetryEvent']>, ParentType, ContextType, Partial<QuerypushTelemetryEventsArgs>>;
+  pushTelemetrySummary?: Resolver<ResolversTypes['PushTelemetrySummary'], ParentType, ContextType, Partial<QuerypushTelemetrySummaryArgs>>;
   settlementRule?: Resolver<Maybe<ResolversTypes['SettlementRule']>, ParentType, ContextType, RequireFields<QuerysettlementRuleArgs, 'id'>>;
   settlementRuleSummary?: Resolver<ResolversTypes['SettlementRuleSummary'], ParentType, ContextType, RequireFields<QuerysettlementRuleSummaryArgs, 'entityId' | 'entityType'>>;
   settlementRules?: Resolver<Array<ResolversTypes['SettlementRule']>, ParentType, ContextType, Partial<QuerysettlementRulesArgs>>;
@@ -3526,6 +3644,12 @@ export type SubscriptionResolvers<ContextType = GraphQLContext, ParentType exten
   settlementStatusChanged?: SubscriptionResolver<ResolversTypes['Settlement'], "settlementStatusChanged", ParentType, ContextType, RequireFields<SubscriptionsettlementStatusChangedArgs, 'id'>>;
   storeStatusUpdated?: SubscriptionResolver<ResolversTypes['StoreStatus'], "storeStatusUpdated", ParentType, ContextType>;
   userOrdersUpdated?: SubscriptionResolver<Array<ResolversTypes['Order']>, "userOrdersUpdated", ParentType, ContextType, Partial<SubscriptionuserOrdersUpdatedArgs>>;
+};
+
+export type TelemetryCountResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['TelemetryCount'] = ResolversParentTypes['TelemetryCount']> = {
+  count?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  key?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
 export type TokenRefreshResponseResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['TokenRefreshResponse'] = ResolversParentTypes['TokenRefreshResponse']> = {
@@ -3713,6 +3837,9 @@ export type Resolvers<ContextType = GraphQLContext> = {
   PromotionThreshold?: PromotionThresholdResolvers<ContextType>;
   PromotionType?: PromotionTypeResolvers;
   PromotionUsage?: PromotionUsageResolvers<ContextType>;
+  PushTelemetryEvent?: PushTelemetryEventResolvers<ContextType>;
+  PushTelemetryEventType?: PushTelemetryEventTypeResolvers;
+  PushTelemetrySummary?: PushTelemetrySummaryResolvers<ContextType>;
   Query?: QueryResolvers<ContextType>;
   Referral?: ReferralResolvers<ContextType>;
   ReferralStats?: ReferralStatsResolvers<ContextType>;
@@ -3732,6 +3859,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   SignupStepResponse?: SignupStepResponseResolvers<ContextType>;
   StoreStatus?: StoreStatusResolvers<ContextType>;
   Subscription?: SubscriptionResolvers<ContextType>;
+  TelemetryCount?: TelemetryCountResolvers<ContextType>;
   TokenRefreshResponse?: TokenRefreshResponseResolvers<ContextType>;
   User?: UserResolvers<ContextType>;
   UserAddress?: UserAddressResolvers<ContextType>;

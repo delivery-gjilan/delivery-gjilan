@@ -98,7 +98,12 @@ export default function DashboardScreen() {
         gradientColors: string[];
     }) => (
         <View className="flex-1 min-w-[160px] m-2">
-            <LinearGradient colors={gradientColors} className="rounded-2xl p-4" start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+            <LinearGradient
+                colors={gradientColors as [string, string, ...string[]]}
+                className="rounded-2xl p-4"
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+            >
                 <View
                     className="w-12 h-12 rounded-full items-center justify-center mb-3"
                     style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}

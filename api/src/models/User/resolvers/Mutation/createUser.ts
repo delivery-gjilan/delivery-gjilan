@@ -49,7 +49,7 @@ export const createUser: NonNullable<MutationResolvers['createUser']> = async (_
 
     return {
         token: result.token,
-        user: result.user,
+        user: result.user as any,
         message: result.message,
     };
 };

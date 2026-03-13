@@ -24,35 +24,26 @@ export function BusinessHeader({ business, scrollY }: { business: Partial<Busine
 
     // Parallax on the image
     const imageStyle = useAnimatedStyle(() => {
-        if (!scrollY) return {};
+        const translateY = scrollY
+            ? interpolate(scrollY.value, [-100, 0, HERO_HEIGHT], [-30, 0, HERO_HEIGHT * 0.35], Extrapolate.CLAMP)
+            : 0;
+        const scale = scrollY
+            ? interpolate(scrollY.value, [-200, 0], [1.4, 1], Extrapolate.CLAMP)
+            : 1;
         return {
             transform: [
-                {
-                    translateY: interpolate(
-                        scrollY.value,
-                        [-100, 0, HERO_HEIGHT],
-                        [-30, 0, HERO_HEIGHT * 0.35],
-                        Extrapolate.CLAMP
-                    ),
-                },
-                {
-                    scale: interpolate(
-                        scrollY.value,
-                        [-200, 0],
-                        [1.4, 1],
-                        Extrapolate.CLAMP
-                    ),
-                },
+                { translateY },
+                { scale },
             ],
-        };
-    });
+        } as any;
+    }) as any;
 
     return (
         <View style={{ height: HERO_HEIGHT + LOGO_OVERLAP, overflow: 'visible' }}>
             {/* Hero image container */}
             <View style={{ height: HERO_HEIGHT, overflow: 'hidden' }}>
                 {/* Parallax Image */}
-                <Animated.View style={[{ position: 'absolute', top: -30, left: 0, right: 0, bottom: -30 }, imageStyle]}>
+                <Animated.View style={[{ position: 'absolute', top: -30, left: 0, right: 0, bottom: -30 }, imageStyle as any]}>
                     {business.imageUrl ? (
                         <Image
                             source={{ uri: business.imageUrl }}

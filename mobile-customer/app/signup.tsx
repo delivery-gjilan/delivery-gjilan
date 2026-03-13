@@ -296,7 +296,7 @@ export default function SignupScreen() {
                             }}
                         >
                             <Text className="text-center text-subtext">
-                                {t.auth.signup.already_have_account || 'Already have an account? '}
+                                {(t.auth.signup as any).already_have_account || 'Already have an account? '}
                                 <Text className="text-primary font-semibold">{t.auth.sign_in}</Text>
                             </Text>
                         </TouchableOpacity>                    </View>
@@ -364,7 +364,7 @@ export default function SignupScreen() {
                             }}
                         >
                             <Text className="text-center text-subtext">
-                                {t.auth.signup.already_have_account || 'Already have an account? '}
+                                {(t.auth.signup as any).already_have_account || 'Already have an account? '}
                                 <Text className="text-primary font-semibold">{t.auth.sign_in}</Text>
                             </Text>
                         </TouchableOpacity>
@@ -413,7 +413,7 @@ export default function SignupScreen() {
                             }}
                         >
                             <Text className="text-center text-subtext">
-                                {t.auth.signup.already_have_account || 'Already have an account? '}
+                                {(t.auth.signup as any).already_have_account || 'Already have an account? '}
                                 <Text className="text-primary font-semibold">{t.auth.sign_in}</Text>
                             </Text>
                         </TouchableOpacity>
@@ -475,7 +475,7 @@ export default function SignupScreen() {
                             }}
                         >
                             <Text className="text-center text-subtext">
-                                {t.auth.signup.already_have_account || 'Already have an account? '}
+                                {(t.auth.signup as any).already_have_account || 'Already have an account? '}
                                 <Text className="text-primary font-semibold">{t.auth.sign_in}</Text>
                             </Text>
                         </TouchableOpacity>

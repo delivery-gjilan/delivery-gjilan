@@ -5,7 +5,7 @@ import { users } from './users';
 const platformValues = ['IOS', 'ANDROID'] as const;
 export const devicePlatformEnum = pgEnum('device_platform', platformValues);
 
-const appTypeValues = ['CUSTOMER', 'DRIVER'] as const;
+const appTypeValues = ['CUSTOMER', 'DRIVER', 'BUSINESS', 'ADMIN'] as const;
 export const deviceAppTypeEnum = pgEnum('device_app_type', appTypeValues);
 
 export type DevicePlatform = (typeof platformValues)[number];
@@ -32,6 +32,11 @@ export const deviceTokens = pgTable(
     },
     (table) => [
         uniqueIndex('device_tokens_token_idx').on(table.token),
+        uniqueIndex('device_tokens_user_device_app_type_idx').on(
+            table.userId,
+            table.deviceId,
+            table.appType,
+        ),
     ],
 );
 

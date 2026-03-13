@@ -1,0 +1,60 @@
+name: ios-testflight
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-testflight-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  APP_DIR: mobile-customer
+  NODE_VERSION: "20"
+
+jobs:
+  build-and-upload:
+    runs-on: macos-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Generate native iOS project for Expo managed app
+        working-directory: ${{ env.APP_DIR }}
+        run: npx expo prebuild --platform ios --non-interactive
+
+      - name: Setup Ruby with bundler cache
+        uses: ruby/setup-ruby@v1
+        env:
+          BUNDLE_GEMFILE: ${{ github.workspace }}/${{ env.APP_DIR }}/ios/Gemfile
+        with:
+          ruby-version: "3.2"
+          bundler-cache: true
+
+      - name: Install gems
+        working-directory: ${{ env.APP_DIR }}/ios
+        run: bundle install --jobs 4 --retry 3
+
+      - name: Build and upload to TestFlight
+        working-directory: ${{ env.APP_DIR }}/ios
+        env:
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: bundle exec fastlane beta

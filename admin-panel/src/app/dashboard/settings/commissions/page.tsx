@@ -72,7 +72,7 @@ export default function CommissionSettings() {
         }
     };
 
-    const drivers: Driver[] = driversData?.drivers || [];
+    const drivers: Driver[] = ((driversData as any)?.drivers || []) as Driver[];
     const businesses: Business[] = businessesData?.businesses || [];
 
     return (

@@ -57,7 +57,7 @@ export class PromotionRepository {
     }
 
     async list(filters: PromotionFilters = {}): Promise<DbPromotion[]> {
-        let query = this.db.select().from(promotions);
+        let query: any = this.db.select().from(promotions);
 
         const conditions = [];
 
@@ -139,7 +139,7 @@ export class PromotionRepository {
     }
 
     async checkCodeExists(code: string, excludeId?: string): Promise<boolean> {
-        let query = this.db
+        let query: any = this.db
             .select()
             .from(promotions)
             .where(eq(promotions.code, code.toUpperCase()));
@@ -175,7 +175,7 @@ export class PromotionRepository {
     }
 
     async getUserAssignments(userId: string, onlyActive = true): Promise<any[]> {
-        let query = this.db
+        let query: any = this.db
             .select()
             .from(userPromotions)
             .where(eq(userPromotions.userId, userId));

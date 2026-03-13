@@ -34,3 +34,4 @@ export async function getDB() {
 // Export db instance for permission checking
 export { db, pool };
 export type DbType = typeof db;
+export type Database = NodePgDatabase<typeof dbSchema>;

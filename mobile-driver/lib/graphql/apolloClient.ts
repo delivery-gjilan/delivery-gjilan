@@ -16,7 +16,7 @@ const RECONNECT_DELAYS = [1000, 2000, 5000, 10000];
 
 function getNextReconnectDelay(retries: number): number {
   const index = Math.min(retries, RECONNECT_DELAYS.length - 1);
-  return RECONNECT_DELAYS[index];
+    return RECONNECT_DELAYS[index] ?? 10000;
 }
 
 const logLink = new ApolloLink((operation, forward) => {
@@ -28,7 +28,8 @@ const logLink = new ApolloLink((operation, forward) => {
     return forward(operation);
 });
 
-const errorLink = onError(({ graphQLErrors, networkError }) => {
+const errorLink = onError((errorContext: any) => {
+    const { graphQLErrors, networkError } = errorContext;
     if (graphQLErrors) {
         for (const err of graphQLErrors) {
             if (err.extensions?.code === 'UNAUTHENTICATED' || err.message === 'Unauthorized') {

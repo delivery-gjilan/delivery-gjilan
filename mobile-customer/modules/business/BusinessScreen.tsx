@@ -138,7 +138,6 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
     // ─── Derived Data ───────────────────────────────────────
     const categories = useMemo(() => {
         return (categoriesData?.productCategories ?? [])
-            .filter((c: any) => c.isActive !== false)
             .map((c: any) => ({ id: c.id, name: c.name }));
     }, [categoriesData]);
 

@@ -49,4 +49,4 @@ export const Settlement: SettlementResolvers = {
     createdAt: (settlement) => normalizeDateValue(settlement.createdAt),
     updatedAt: (settlement) => normalizeDateValue(settlement.updatedAt),
     paidAt: (settlement) => normalizeDateValue(settlement.paidAt ?? null),
-};
+} as any;

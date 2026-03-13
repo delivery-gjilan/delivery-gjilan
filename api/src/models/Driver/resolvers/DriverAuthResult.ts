@@ -1,4 +1,3 @@
-import type   { DriverAuthResultResolvers } from './../../../generated/types.generated';
-    export const DriverAuthResult: DriverAuthResultResolvers = {
+export const DriverAuthResult: any = {
     /* Implement DriverAuthResult resolver logic here */
   };

@@ -118,3 +118,55 @@ export const ASSIGN_PROMOTION_TO_USERS = gql`
     }
   }
 `;
+
+export const GET_PUSH_TELEMETRY_SUMMARY = gql`
+  query GetPushTelemetrySummary($hours: Int) {
+    pushTelemetrySummary(hours: $hours) {
+      totalEvents
+      byEvent {
+        key
+        count
+      }
+      byAppType {
+        key
+        count
+      }
+      byPlatform {
+        key
+        count
+      }
+    }
+  }
+`;
+
+export const GET_PUSH_TELEMETRY_EVENTS = gql`
+  query GetPushTelemetryEvents(
+    $hours: Int
+    $limit: Int
+    $appType: DeviceAppType
+    $platform: DevicePlatform
+    $eventType: PushTelemetryEventType
+  ) {
+    pushTelemetryEvents(
+      hours: $hours
+      limit: $limit
+      appType: $appType
+      platform: $platform
+      eventType: $eventType
+    ) {
+      id
+      userId
+      appType
+      platform
+      eventType
+      deviceId
+      notificationTitle
+      notificationBody
+      campaignId
+      orderId
+      actionId
+      metadata
+      createdAt
+    }
+  }
+`;

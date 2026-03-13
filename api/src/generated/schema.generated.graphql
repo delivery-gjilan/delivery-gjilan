@@ -417,6 +417,8 @@ type DeliveryZoneMatch {
 }
 
 enum DeviceAppType {
+  ADMIN
+  BUSINESS
   CUSTOMER
   DRIVER
 }
@@ -713,6 +715,7 @@ type Mutation {
   setUserPermissions(permissions: [UserPermission!]!, userId: ID!): User!
   startPreparing(id: ID!, preparationMinutes: Int!): Order!
   submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
+  trackPushTelemetry(input: TrackPushTelemetryInput!): Boolean!
   unregisterDeviceToken(token: String!): Boolean!
   unsettleSettlement(settlementId: ID!): Settlement!
   updateBanner(id: ID!, input: UpdateBannerInput!): Banner!
@@ -1024,6 +1027,39 @@ type PromotionUsage {
   userId: ID!
 }
 
+type PushTelemetryEvent {
+  actionId: String
+  appType: DeviceAppType!
+  campaignId: ID
+  createdAt: DateTime!
+  deviceId: String
+  eventType: PushTelemetryEventType!
+  id: ID!
+  metadata: JSON
+  notificationBody: String
+  notificationTitle: String
+  orderId: ID
+  platform: DevicePlatform!
+  token: String
+  userId: ID!
+}
+
+enum PushTelemetryEventType {
+  ACTION_TAPPED
+  OPENED
+  RECEIVED
+  TOKEN_REFRESHED
+  TOKEN_REGISTERED
+  TOKEN_UNREGISTERED
+}
+
+type PushTelemetrySummary {
+  byAppType: [TelemetryCount!]!
+  byEvent: [TelemetryCount!]!
+  byPlatform: [TelemetryCount!]!
+  totalEvents: Int!
+}
+
 type Query {
   activeRulesForEntity(entityId: String!, entityType: SettlementEntityType!): [SettlementRule!]!
   auditLog(id: ID!): AuditLog
@@ -1077,6 +1113,8 @@ type Query {
   productSubcategories(categoryId: ID!): [ProductSubcategory!]!
   productSubcategoriesByBusiness(businessId: ID!): [ProductSubcategory!]!
   products(businessId: ID!): [Product!]!
+  pushTelemetryEvents(appType: DeviceAppType, eventType: PushTelemetryEventType, hours: Int, limit: Int, platform: DevicePlatform): [PushTelemetryEvent!]!
+  pushTelemetrySummary(hours: Int): PushTelemetrySummary!
   settlementRule(id: ID!): SettlementRule
   settlementRuleSummary(entityId: String!, entityType: SettlementEntityType!): SettlementRuleSummary!
   settlementRules(filter: SettlementRuleFilterInput): [SettlementRule!]!
@@ -1283,9 +1321,28 @@ input SubscriptionInput {
   token: String
 }
 
+type TelemetryCount {
+  count: Int!
+  key: String!
+}
+
 type TokenRefreshResponse {
   refreshToken: String!
   token: String!
+}
+
+input TrackPushTelemetryInput {
+  actionId: String
+  appType: DeviceAppType!
+  campaignId: ID
+  deviceId: String
+  eventType: PushTelemetryEventType!
+  metadata: JSON
+  notificationBody: String
+  notificationTitle: String
+  orderId: ID
+  platform: DevicePlatform!
+  token: String
 }
 
 input UpdateBannerInput {

@@ -8,7 +8,7 @@ export function Table({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function Th({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+export function Th({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
   return (
     <th className={`px-4 py-2.5 text-zinc-500 bg-[#09090b] border-b border-[#1e1e22] text-[11px] font-medium uppercase tracking-wider ${className}`}>
       {children}
@@ -45,7 +45,7 @@ export function TableRow({ children, className = "" }: { children: React.ReactNo
   );
 }
 
-export function TableHead({ children, className = "", ...props }: { children: React.ReactNode; className?: string; [key: string]: any }) {
+export function TableHead({ children, className = "", ...props }: { children?: React.ReactNode; className?: string; [key: string]: any }) {
   return (
     <th className={`h-12 px-4 text-left align-middle font-medium text-zinc-400 ${className}`} {...props}>
       {children}

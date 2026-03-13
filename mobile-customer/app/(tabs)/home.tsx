@@ -86,7 +86,7 @@ export default function Discover() {
 
     // Map API banners to PromoSlider format
     const promoBanners = useMemo(() => {
-        const apiBanners = bannersData?.getBanners || [];
+        const apiBanners = (bannersData as any)?.getBanners || [];
         
         if (apiBanners.length > 0) {
             return apiBanners.map((banner: any) => ({

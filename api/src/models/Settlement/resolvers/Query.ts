@@ -22,4 +22,4 @@ export const Query: QueryResolvers<AppContext> = {
         const repo = new SettlementRepository(db);
         return repo.getBusinessBalance(businessId);
     },
-};
+} as any;

@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { MapLibreGL } from '@/components/MapWrapper';
+import { MapLibreGL } from '@/components/MapWrapper.native';
 import * as Location from 'expo-location';
 import Animated, {
     useSharedValue, useAnimatedStyle, withTiming,

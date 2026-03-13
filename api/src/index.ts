@@ -24,6 +24,9 @@ import { metricsEndpoint, metricsMiddleware } from '@/lib/metrics';
 import { realtimeMonitor } from '@/lib/realtimeMonitoring';
 import { getDB } from './../database';
 import { sql } from 'drizzle-orm';
+import type { GraphQLContext } from './graphql/context';
+
+export type AppContext = GraphQLContext;
 
 // ── Sentry must be initialised before any other middleware ──
 initSentry();

@@ -141,6 +141,20 @@
       "when": 1773374923179,
       "tag": "0019_lovely_yellow_claw",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1773408000000,
+      "tag": "0020_push_multidevice_app_types",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1773411000000,
+      "tag": "0021_push_telemetry_events",
+      "breakpoints": true
     }
   ]
 }

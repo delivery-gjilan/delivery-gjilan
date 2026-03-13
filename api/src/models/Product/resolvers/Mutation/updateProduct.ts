@@ -2,6 +2,7 @@ import type { MutationResolvers } from './../../../../generated/types.generated'
 import { createAuditLogger, createChangeMetadata } from '@/services/AuditLogger';
 import { hasPermission } from '@/lib/utils/permissions';
 import { GraphQLError } from 'graphql';
+import { cache } from '@/lib/cache';
 
 export const updateProduct: NonNullable<MutationResolvers['updateProduct']> = async (
     _parent,
@@ -29,6 +30,7 @@ export const updateProduct: NonNullable<MutationResolvers['updateProduct']> = as
         }
     }
     const result = await productService.updateProduct(id, input);
+    await cache.invalidateProducts(result.businessId, result.id);
     
     // Determine specific action based on what changed
     let action: any = 'PRODUCT_UPDATED';

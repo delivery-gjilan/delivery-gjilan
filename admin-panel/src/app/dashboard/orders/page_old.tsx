@@ -217,7 +217,6 @@ export default function OrdersPage() {
                 </div>
                 
                 {isBusinessAdmin ? (
-                    {/* CARD VIEW FOR BUSINESS ADMIN */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
                         {activeOrders.length === 0 ? (
                             <div className="col-span-full text-center text-neutral-500 py-8">
@@ -305,7 +304,6 @@ export default function OrdersPage() {
                         )}
                     </div>
                 ) : (
-                    {/* TABLE VIEW FOR SUPER ADMIN */}
                     <Table>
                     <thead>
                         <tr>
@@ -405,6 +403,7 @@ export default function OrdersPage() {
                         )}
                     </tbody>
                 </Table>
+            )}
             </div>
 
             {/* COMPLETED ORDERS SECTION */}

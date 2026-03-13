@@ -12,9 +12,8 @@ import { ListRestaurantCard } from '@/modules/business/components/ListRestaurant
 import { PromotionalBanner } from '@/modules/business/components/PromotionalBanner';
 import { FeaturedRestaurantCard } from '@/modules/business/components/FeaturedRestaurantCard';
 import { Skeleton } from '@/components/Skeleton';
-import { useQuery } from '@apollo/client/react';
-import { GET_PRODUCTS } from '@/graphql/operations/products/queries';
 import { useTranslations } from '@/hooks/useTranslations';
+import { useProducts } from '@/modules/product/hooks/useProducts';
 
 type FilterOption = 'all' | 'open' | 'promo';
 
@@ -22,6 +21,18 @@ type ListItem =
     | { type: 'restaurant'; data: any }
     | { type: 'promo-banner'; data: { id: string; title: string; subtitle?: string; price?: string; imageUrl: string; businessLogo?: string | null; businessName?: string } }
     | { type: 'featured'; data: { id: string; name: string; logoUrl?: string; menuItems: Array<{ name: string; price: string; imageUrl: string }> } };
+
+function selectPromoRestaurant(restaurants: any[]) {
+    if (restaurants.length === 0) return null;
+    return restaurants.find((r) => Boolean((r as any).activePromotion)) ?? restaurants[0];
+}
+
+function selectFeaturedRestaurant(restaurants: any[], excludedBusinessIds: Set<string>) {
+    const candidates = restaurants.filter((r) => !excludedBusinessIds.has(r.id));
+    if (candidates.length === 0) return null;
+    const openCandidate = candidates.find((r) => Boolean(r.isOpen));
+    return openCandidate ?? candidates[0];
+}
 
 export default function Restaurants() {
     const theme = useTheme();
@@ -63,31 +74,26 @@ export default function Restaurants() {
         return result;
     }, [restaurants, activeFilter]);
 
-    // Get products for first restaurant (for promo banner)
-    const promoBusinessId = filteredRestaurants[0]?.id;
-    const { data: promoProductsData } = useQuery(GET_PRODUCTS, {
-        variables: { businessId: promoBusinessId || '' },
-        skip: !promoBusinessId,
-    });
+    const promoRestaurant = useMemo(() => selectPromoRestaurant(filteredRestaurants), [filteredRestaurants]);
+    const featuredRestaurant = useMemo(() => {
+        const excludedIds = new Set<string>(promoRestaurant?.id ? [promoRestaurant.id] : []);
+        return selectFeaturedRestaurant(filteredRestaurants, excludedIds);
+    }, [filteredRestaurants, promoRestaurant]);
 
-    // Get products for featured restaurant (third in list)
-    const featuredBusinessId = filteredRestaurants[2]?.id;
-    const { data: featuredProductsData } = useQuery(GET_PRODUCTS, {
-        variables: { businessId: featuredBusinessId || '' },
-        skip: !featuredBusinessId,
-    });
+    const { products: promoProducts = [] } = useProducts(promoRestaurant?.id ?? '');
+    const { products: featuredProducts = [] } = useProducts(featuredRestaurant?.id ?? '');
 
     // Mix restaurants with promotional content
     const listItems = useMemo((): ListItem[] => {
         const items: ListItem[] = [];
         
-        filteredRestaurants.forEach((restaurant, index) => {
+        filteredRestaurants.forEach((restaurant) => {
             // Add regular restaurant card
             items.push({ type: 'restaurant', data: restaurant });
 
-            // Insert promotional banner after first restaurant using its products
-            if (index === 0 && promoProductsData?.products && promoProductsData.products.length > 0) {
-                const products = promoProductsData.products.filter((p) => p.imageUrl).slice(0, 2);
+            // Insert promotional banner after selected promo restaurant.
+            if (promoRestaurant && restaurant.id === promoRestaurant.id && promoProducts.length > 0) {
+                const products = promoProducts.filter((p: any) => p.imageUrl).slice(0, 2);
                 if (products.length > 0) {
                     items.push({
                         type: 'promo-banner',
@@ -104,10 +110,9 @@ export default function Restaurants() {
                 }
             }
 
-            // Insert featured restaurant card after second restaurant using its products
-            if (index === 1 && featuredProductsData?.products && filteredRestaurants.length > 2) {
-                const featured = filteredRestaurants[2];
-                const products = featuredProductsData.products
+            // Insert featured card after selected featured restaurant.
+            if (featuredRestaurant && restaurant.id === featuredRestaurant.id && featuredProducts.length > 0) {
+                const products = featuredProducts
                     .filter((p) => p.imageUrl && p.isAvailable)
                     .slice(0, 3)
                     .map((p) => ({
@@ -120,9 +125,9 @@ export default function Restaurants() {
                     items.push({
                         type: 'featured',
                         data: {
-                            id: featured.id,
-                            name: featured.name,
-                            logoUrl: featured.imageUrl,
+                            id: featuredRestaurant.id,
+                            name: featuredRestaurant.name,
+                            logoUrl: featuredRestaurant.imageUrl,
                             menuItems: products,
                         },
                     });
@@ -131,7 +136,7 @@ export default function Restaurants() {
         });
 
         return items;
-    }, [filteredRestaurants, promoProductsData, featuredProductsData]);
+    }, [filteredRestaurants, promoRestaurant, featuredRestaurant, promoProducts, featuredProducts, t.restaurants.special_offer]);
 
     const handleBusinessPress = (businessId: string) => {
         router.push(`/business/${businessId}`);
@@ -369,7 +374,7 @@ export default function Restaurants() {
                                     avgPrepTimeMinutes={(restaurant as any).avgPrepTimeMinutes}
                                     prepTimeOverrideMinutes={(restaurant as any).prepTimeOverrideMinutes}
                                     activePromotion={(restaurant as any).activePromotion}
-                                    isSponsored={restaurant.id === filteredRestaurants[0]?.id}
+                                    isSponsored={restaurant.id === promoRestaurant?.id}
                                 />
                             );
                         }}

@@ -45,7 +45,7 @@ export class AuditLogRepository {
         };
 
         const result = await this.db.insert(auditLogs).values(newLog).returning();
-        return result[0];
+        return result[0]!;
     }
 
     /**
@@ -83,7 +83,7 @@ export class AuditLogRepository {
         }
 
         // Build query for logs
-        let query = this.db.select().from(auditLogs);
+        let query: any = this.db.select().from(auditLogs);
 
         if (conditions.length > 0) {
             query = query.where(and(...conditions));
@@ -102,7 +102,7 @@ export class AuditLogRepository {
         const logs = await query;
 
         // Get total count for pagination
-        let countQuery = this.db.select({ count: sql<number>`count(*)::int` }).from(auditLogs);
+        let countQuery: any = this.db.select({ count: sql<number>`count(*)::int` }).from(auditLogs);
 
         if (conditions.length > 0) {
             countQuery = countQuery.where(and(...conditions));

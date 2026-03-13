@@ -20,6 +20,10 @@ export interface ApiContextInterface {
         role?: string;
         businessId?: string;
     };
+    // Legacy direct fields used by some resolvers
+    userId?: string;
+    role?: string;
+    businessId?: string;
     /** Unique correlation id for this HTTP request / WS operation */
     requestId: string;
     /** Per-request child logger — already bound with requestId + userId */
