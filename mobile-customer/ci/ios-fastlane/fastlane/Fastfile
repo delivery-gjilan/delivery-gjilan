@@ -12,8 +12,18 @@ platform :ios do
       in_house: false
     )
 
-    workspace_path = Dir["*.xcworkspace"].first
-    project_path = Dir["*.xcodeproj"].first
+    workspace_path = ENV["IOS_WORKSPACE_PATH"]
+    project_path = ENV["IOS_PROJECT_PATH"]
+
+    if workspace_path.to_s.empty?
+      workspace_candidates = Dir["**/*.xcworkspace"].sort
+      workspace_path = workspace_candidates.first
+    end
+
+    if project_path.to_s.empty?
+      project_candidates = Dir["**/*.xcodeproj"].sort.reject { |path| path.include?("Pods.xcodeproj") }
+      project_path = project_candidates.first
+    end
 
     UI.user_error!("No .xcworkspace or .xcodeproj found in the ios directory.") unless workspace_path || project_path
 
