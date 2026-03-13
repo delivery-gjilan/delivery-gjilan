@@ -49,7 +49,7 @@ type SettlementGroup = {
 };
 
 const MARK_SETTLEMENT_AS_PAID = gql`
-  mutation MarkSettlementAsPaid($settlementId: ID!) {
+  mutation MarkSettlementAsPaidPage($settlementId: ID!) {
     markSettlementAsPaid(settlementId: $settlementId) {
       id
       status
@@ -60,7 +60,7 @@ const MARK_SETTLEMENT_AS_PAID = gql`
 `;
 
 const MARK_SETTLEMENT_AS_PARTIALLY_PAID = gql`
-  mutation MarkSettlementAsPartiallyPaid($settlementId: ID!, $amount: Float!) {
+  mutation MarkSettlementAsPartiallyPaidPage($settlementId: ID!, $amount: Float!) {
     markSettlementAsPartiallyPaid(settlementId: $settlementId, amount: $amount) {
       id
       status

@@ -9,6 +9,7 @@ docker compose up -d
 
 # 2. Open Grafana
 #    → http://localhost:3100  (admin / admin)
+#    Prometheus is also available at http://localhost:9090
 #    Two dashboards are pre-provisioned:
 #      • API Overview — latency, error rate, request volume
 #      • Delivery & Orders — order flow, payments, drivers, auth
@@ -24,12 +25,16 @@ npm run dev
 ┌─────────────┐    JSON logs    ┌───────────┐          ┌──────┐
 │  Express API │───────────────→│ api/logs/  │←─ read ──│Promtail│
 │  (Pino)      │                └───────────┘          └──┬───┘
-│              │─── Sentry SDK ──→ sentry.io               │ push
+│              │── /metrics ───────────────────────────────┐│ push
+│              │─── Sentry SDK ──→ sentry.io               ││
 └─────────────┘                                        ┌──▼───┐
                                                        │ Loki  │
 ┌──────────────┐─── Sentry SDK ──→ sentry.io           └──┬───┘
-│ Mobile Apps  │                                       ┌──▼─────┐
-└──────────────┘                                       │ Grafana │
+│ Mobile Apps  │                              ┌──────────▼──────┐
+└──────────────┘                              │  Prometheus      │
+                                              └──────────┬──────┘
+                                                       ┌──▼─────┐
+                                                       │ Grafana │
                                                        └────────┘
 ```
 
@@ -41,6 +46,7 @@ npm run dev
 | **Sentry** | Error tracking + performance (API + mobile) | — |
 | **Loki** | Log aggregation & querying | 3200 |
 | **Promtail** | Log shipping (file → Loki) | 9080 |
+| **Prometheus** | Metrics scraping + alert inputs | 9090 |
 | **Grafana** | Dashboards, alerts, exploration | 3100 |
 
 ## Environment Variables
@@ -67,16 +73,33 @@ npm run dev
 | Mass Driver Disconnect | >5 watchdog force-offlines in 5min | Warning |
 | Zero Traffic | No requests for 10min | Critical |
 | Fatal Error | Any fatal-level log | Critical |
+| Subscription Reject Spike | >10 rejected subscriptions in 5min | Warning |
+| Subscription Runtime Errors | >5 subscription errors in 5min | Critical |
+| Pubsub Publish Failure | Any pubsub publish failure in 5min | Critical |
+
+## Why Grafana And Prometheus Exist If The Admin UI Exists
+
+- Prometheus is the metrics database. It scrapes `/metrics`, stores time-series numbers, and makes alert expressions possible.
+- Grafana is the operations console. It reads from Prometheus and Loki to show trends, dashboards, and alert history.
+- The admin-panel realtime screen is a separate operator-facing view for quick plain-language status. It is not a replacement for Grafana.
+
+Use the admin screen when you want an immediate answer.
+Use Grafana when you want charts, thresholds, alert history, or forensic investigation.
+
+## Current Local Stack
+
+- Loki handles logs.
+- Promtail ships logs to Loki.
+- Prometheus scrapes `/metrics` from the API.
+- Grafana sits on top and visualizes both logs and metrics.
 
 ## Scaling Roadmap
 
 ### Phase 2 — Prometheus Metrics
-```bash
-npm install prom-client
-```
-Uncomment `api/src/lib/metrics.ts`, add Prometheus to docker-compose, and create a Grafana datasource. This gives you:
+This is now wired in locally. It gives you:
 - Request rate / error rate / duration histograms
 - Node.js heap, event loop, active handles
+- Websocket, subscription, and pubsub health metrics
 - Custom business metrics (orders/min, revenue/hour)
 
 ### Phase 3 — OpenTelemetry Tracing

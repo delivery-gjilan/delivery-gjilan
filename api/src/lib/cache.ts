@@ -48,6 +48,24 @@ async function getClient(): Promise<RedisClientType | null> {
     }
 }
 
+async function ping(): Promise<{ ok: boolean; disabled: boolean }> {
+    if (disabled) {
+        return { ok: false, disabled: true };
+    }
+
+    try {
+        const redis = await getClient();
+        if (!redis) {
+            return { ok: false, disabled };
+        }
+
+        const result = await redis.ping();
+        return { ok: result === 'PONG', disabled: false };
+    } catch {
+        return { ok: false, disabled };
+    }
+}
+
 // ── Default TTLs (seconds) ──
 const TTL = {
     BUSINESSES: 5 * 60,         // 5 min — list rarely changes
@@ -126,6 +144,7 @@ export const cache = {
     set,
     del,
     delPattern,
+    ping,
 
     // ── Business helpers ──
     async invalidateBusiness(businessId: string) {

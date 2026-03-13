@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, FlatList, RefreshControl, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -20,10 +20,51 @@ export default function OrdersScreen() {
     const router = useRouter();
 
     const [activeTab, setActiveTab] = useState<StatusTab>('ALL');
-    const { data, loading, refetch }: any = useQuery(GET_ORDERS, { pollInterval: 30000 });
+    const { data, loading, refetch }: any = useQuery(GET_ORDERS);
+    const refetchCooldownRef = useRef(0);
+    const refetchInFlightRef = useRef(false);
+    const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (refetchTimerRef.current) {
+                clearTimeout(refetchTimerRef.current);
+                refetchTimerRef.current = null;
+            }
+        };
+    }, []);
+
+    const scheduleRefetch = useCallback(() => {
+        const now = Date.now();
+        const canRunNow = now - refetchCooldownRef.current >= 1200 && !refetchInFlightRef.current;
+
+        if (!canRunNow) {
+            if (refetchTimerRef.current) {
+                return;
+            }
+            refetchTimerRef.current = setTimeout(() => {
+                refetchTimerRef.current = null;
+                if (refetchInFlightRef.current) {
+                    return;
+                }
+                refetchInFlightRef.current = true;
+                refetchCooldownRef.current = Date.now();
+                refetch().finally(() => {
+                    refetchInFlightRef.current = false;
+                });
+            }, 350);
+            return;
+        }
+
+        refetchInFlightRef.current = true;
+        refetchCooldownRef.current = now;
+        refetch().finally(() => {
+            refetchInFlightRef.current = false;
+        });
+    }, [refetch]);
 
     useSubscription(ALL_ORDERS_SUBSCRIPTION, {
-        onData: () => refetch(),
+        onData: () => scheduleRefetch(),
     });
 
     const orders = data?.orders || [];

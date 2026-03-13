@@ -1,8 +1,8 @@
 import { gql } from '@apollo/client';
 
 export const ORDERS_SUBSCRIPTION = gql(`
-    subscription OrdersUpdated($token: String!) {
-        userOrdersUpdated(input: { token: $token }) {
+    subscription OrdersUpdated {
+        userOrdersUpdated {
             id
             displayId
             orderPrice

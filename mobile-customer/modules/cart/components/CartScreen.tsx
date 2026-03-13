@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert, Modal, TextInput, Animated, Dimensions, Platform, BackHandler, LayoutAnimation, UIManager } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -11,7 +11,6 @@ import { useTranslations } from '@/hooks/useTranslations';
 import { useCart } from '../hooks/useCart';
 import { useCartActions } from '../hooks/useCartActions';
 import { useCreateOrder } from '../hooks/useCreateOrder';
-import OrderConfirmDialog from '@/components/OrderConfirmDialog';
 import { useSuccessModalStore } from '@/store/useSuccessModalStore';
 import { useLazyQuery, useQuery, useMutation } from '@apollo/client/react';
 import { VALIDATE_PROMOTIONS, GET_PROMOTION_THRESHOLDS } from '@/graphql/operations/promotions';
@@ -30,7 +29,6 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 export const CartScreen = () => {
     const router = useRouter();
     const theme = useTheme();
-    const insets = useSafeAreaInsets();
     const { t } = useTranslations();
     const { items, total, isEmpty } = useCart();
     const { updateQuantity, removeItem, clearCart, updateItemNotes } = useCartActions();
@@ -47,7 +45,6 @@ export const CartScreen = () => {
     const [showSaveAddressPrompt, setShowSaveAddressPrompt] = useState(false);
     const [pendingLocationToSave, setPendingLocationToSave] = useState<CheckoutLocation | null>(null);
     const [addressName, setAddressName] = useState('');
-    const [showConfirmDialog, setShowConfirmDialog] = useState(false);
     const [driverNotes, setDriverNotes] = useState('');
     const [promoError, setPromoError] = useState<string | null>(null);
     const [saveAddressError, setSaveAddressError] = useState<string | null>(null);
@@ -75,7 +72,8 @@ export const CartScreen = () => {
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const proceedButtonAnim = useRef(new Animated.Value(1)).current;
     const screenWidth = Dimensions.get('window').width;
-    const headerTopPadding = (insets.top || 0) + (Platform.OS === 'ios' ? 10 : 6);
+    const headerTopPadding = Platform.OS === 'ios' ? 10 : 6;
+    const suppressAutoCloseRef = useRef(false);
 
     const [validatePromotionsManual, { loading: manualPromoLoading }] = useLazyQuery(VALIDATE_PROMOTIONS, {
         fetchPolicy: 'no-cache',
@@ -149,7 +147,7 @@ export const CartScreen = () => {
 
     // Auto-close cart when all items are removed
     useEffect(() => {
-        if (hadItemsOnMount.current && items.length === 0) {
+        if (!suppressAutoCloseRef.current && hadItemsOnMount.current && items.length === 0) {
             // Cart had items initially but is now empty - close it
             router.back();
         }
@@ -491,24 +489,26 @@ export const CartScreen = () => {
             const orderId = order?.id || null;
             
             console.log('[CartScreen] Order created:', orderId);
+
+            suppressAutoCloseRef.current = true;
             
             // Clear cart and reset state
             clearCart();
             setShowSaveAddressPrompt(false);
-            setShowConfirmDialog(false);
             setStep(1);
             
-            // Show success modal first (it will be rendered at app level)
+            // Keep current route and show success directly to avoid visible route flashes.
             if (orderId) {
                 console.log('[CartScreen] Showing success modal');
                 showSuccess(orderId, 'order_created');
             } else {
+                suppressAutoCloseRef.current = false;
                 hideSuccess();
             }
         } catch (err) {
             console.error('[CartScreen] Order creation failed:', err);
+            suppressAutoCloseRef.current = false;
             hideSuccess();
-            setShowConfirmDialog(false);
 
             const errorMessage = err instanceof Error ? err.message : '';
             if (errorMessage === 'Active order exists') {
@@ -966,7 +966,7 @@ export const CartScreen = () => {
                                 opacity: isProcessing ? 0.6 : 1,
                             }}
                             activeOpacity={0.8}
-                            onPress={() => setShowConfirmDialog(true)}
+                            onPress={handleCheckout}
                             disabled={isProcessing}
                         >
                             {isProcessing || orderLoading ? (
@@ -1167,16 +1167,6 @@ export const CartScreen = () => {
                     </View>
                 </Animated.View>
             )}
-
-            {/* Order Confirmation Dialog */}
-            <OrderConfirmDialog
-                visible={showConfirmDialog}
-                total={finalTotal.toFixed(2)}
-                loading={isProcessing || orderLoading}
-                onConfirm={handleCheckout}
-                onCancel={() => setShowConfirmDialog(false)}
-            />
-
         </SafeAreaView>
     );
 };

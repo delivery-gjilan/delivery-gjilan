@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Admin Panel
 
-## Getting Started
+This package is the Next.js admin dashboard for Delivery Gjilan. It is the main browser-based operations surface for:
 
-First, run the development server:
+- order management
+- driver visibility and live operations
+- finance and settlements
+- users, businesses, products, and promotions
+- store-level administrative actions
+
+## Run
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The app expects the API to be running as well.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `src/app` contains route-level screens and page composition
+- `src/components` contains shared admin UI components
+- `src/graphql/operations` contains handwritten GraphQL operations grouped by domain
+- `src/gql` contains generated GraphQL documents and types
+- `src/lib` contains client-side infrastructure such as Apollo hooks and utilities
 
-## Learn More
+## Realtime Model
 
-To learn more about Next.js, take a look at the following resources:
+The admin panel mainly uses subscriptions as change signals and then refetches the relevant queries.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Important examples:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- order list invalidation from order update subscriptions
+- driver list and live map refresh from `driversUpdated`
+- narrower tracking flows from `orderDriverLiveTracking` when the screen needs order-specific movement details
 
-## Deploy on Vercel
+This is intentional. The admin UI does not try to fully mirror backend state in-memory from websocket events alone.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Development Notes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- prefer the operations in `src/graphql/operations` over inlining large GraphQL strings inside pages
+- do not manually edit files in `src/gql`; regenerate them from codegen inputs
+- if a subscription or schema change breaks the admin panel, inspect both handwritten operations and generated outputs
+
+## Related Docs
+
+- [../docs/README.md](../docs/README.md)
+- [../docs/BACKEND/API.md](../docs/BACKEND/API.md)
+- [../docs/BACKEND/WATCHDOG_HEARTBEAT.md](../docs/BACKEND/WATCHDOG_HEARTBEAT.md)
+- [../docs/BUSINESS_LOGIC/SETTLEMENT.md](../docs/BUSINESS_LOGIC/SETTLEMENT.md)

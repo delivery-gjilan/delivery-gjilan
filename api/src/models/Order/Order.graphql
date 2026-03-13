@@ -50,6 +50,12 @@ type OrderDriverLiveTracking {
     etaUpdatedAt: Date!
 }
 
+# Backward-compatibility shim for older mobile clients that still send
+# a subscription input argument. The token field is ignored.
+input SubscriptionInput {
+    token: String
+}
+
 type Order {
     id: ID!
     displayId: String!
@@ -97,8 +103,8 @@ type Mutation {
 
 type Subscription {
     orderStatusUpdated(orderId: ID!): Order! @skipAuth
-    userOrdersUpdated(input: SubscriptionInput!): [Order!]! @skipAuth
-    orderDriverLiveTracking(orderId: ID!, input: SubscriptionInput!): OrderDriverLiveTracking! @skipAuth
+    userOrdersUpdated(input: SubscriptionInput): [Order!]! @skipAuth
+    orderDriverLiveTracking(orderId: ID!, input: SubscriptionInput): OrderDriverLiveTracking! @skipAuth
     allOrdersUpdated: [Order!]! @skipAuth
 }
 

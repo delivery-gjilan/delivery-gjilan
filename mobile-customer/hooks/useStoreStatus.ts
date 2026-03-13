@@ -1,10 +1,25 @@
+import { useEffect } from 'react';
 import { useQuery } from '@apollo/client/react';
-import { GET_STORE_STATUS } from '@/graphql/operations/store';
+import { GET_STORE_STATUS, STORE_STATUS_UPDATED } from '@/graphql/operations/store';
 
 export const useStoreStatus = () => {
-    const { data, loading, error } = useQuery(GET_STORE_STATUS, {
-        fetchPolicy: 'network-only', // Always fetch fresh on app open, no cache
+    const { data, loading, error, subscribeToMore } = useQuery(GET_STORE_STATUS, {
+        fetchPolicy: 'network-only',
     });
+
+    useEffect(() => {
+        const unsubscribe = subscribeToMore({
+            document: STORE_STATUS_UPDATED,
+            updateQuery: (prev, { subscriptionData }) => {
+                if (!subscriptionData.data?.storeStatusUpdated) return prev;
+                return {
+                    ...prev,
+                    getStoreStatus: subscriptionData.data.storeStatusUpdated,
+                };
+            },
+        });
+        return unsubscribe;
+    }, [subscribeToMore]);
 
     const status = data?.getStoreStatus;
 

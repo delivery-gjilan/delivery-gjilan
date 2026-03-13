@@ -49,13 +49,88 @@ export default function MapScreen() {
     const [orderRoutes, setOrderRoutes] = useState<Record<string, any>>({});
 
     // ─── Data Fetching ───
-    const { data: ordersData, loading: ordersLoading, refetch: refetchOrders }: any = useQuery(GET_ORDERS, {
-        pollInterval: 30000,
-    });
-    const { data: driversData }: any = useQuery(GET_DRIVERS, { pollInterval: 15000 });
+    const { data: ordersData, loading: ordersLoading, refetch: refetchOrders }: any = useQuery(GET_ORDERS);
+    const { data: driversData, refetch: refetchDrivers }: any = useQuery(GET_DRIVERS);
+    const ordersRefetchCooldownRef = useRef(0);
+    const ordersRefetchInFlightRef = useRef(false);
+    const ordersRefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const driversRefetchCooldownRef = useRef(0);
+    const driversRefetchInFlightRef = useRef(false);
+    const driversRefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    useSubscription(ALL_ORDERS_SUBSCRIPTION, { onData: () => refetchOrders() });
-    useSubscription(DRIVERS_UPDATED_SUBSCRIPTION);
+    useEffect(() => {
+        return () => {
+            if (ordersRefetchTimerRef.current) {
+                clearTimeout(ordersRefetchTimerRef.current);
+                ordersRefetchTimerRef.current = null;
+            }
+            if (driversRefetchTimerRef.current) {
+                clearTimeout(driversRefetchTimerRef.current);
+                driversRefetchTimerRef.current = null;
+            }
+        };
+    }, []);
+
+    const scheduleOrdersRefetch = useCallback(() => {
+        const now = Date.now();
+        const canRunNow = now - ordersRefetchCooldownRef.current >= 1200 && !ordersRefetchInFlightRef.current;
+
+        if (!canRunNow) {
+            if (ordersRefetchTimerRef.current) {
+                return;
+            }
+            ordersRefetchTimerRef.current = setTimeout(() => {
+                ordersRefetchTimerRef.current = null;
+                if (ordersRefetchInFlightRef.current) {
+                    return;
+                }
+                ordersRefetchInFlightRef.current = true;
+                ordersRefetchCooldownRef.current = Date.now();
+                refetchOrders().finally(() => {
+                    ordersRefetchInFlightRef.current = false;
+                });
+            }, 350);
+            return;
+        }
+
+        ordersRefetchInFlightRef.current = true;
+        ordersRefetchCooldownRef.current = now;
+        refetchOrders().finally(() => {
+            ordersRefetchInFlightRef.current = false;
+        });
+    }, [refetchOrders]);
+
+    const scheduleDriversRefetch = useCallback(() => {
+        const now = Date.now();
+        const canRunNow = now - driversRefetchCooldownRef.current >= 1200 && !driversRefetchInFlightRef.current;
+
+        if (!canRunNow) {
+            if (driversRefetchTimerRef.current) {
+                return;
+            }
+            driversRefetchTimerRef.current = setTimeout(() => {
+                driversRefetchTimerRef.current = null;
+                if (driversRefetchInFlightRef.current) {
+                    return;
+                }
+                driversRefetchInFlightRef.current = true;
+                driversRefetchCooldownRef.current = Date.now();
+                refetchDrivers().finally(() => {
+                    driversRefetchInFlightRef.current = false;
+                });
+            }, 350);
+            return;
+        }
+
+        driversRefetchInFlightRef.current = true;
+        driversRefetchCooldownRef.current = now;
+        refetchDrivers().finally(() => {
+            driversRefetchInFlightRef.current = false;
+        });
+    }, [refetchDrivers]);
+
+    useSubscription(ALL_ORDERS_SUBSCRIPTION, { onData: () => scheduleOrdersRefetch() });
+    useSubscription(DRIVERS_UPDATED_SUBSCRIPTION, { onData: () => scheduleDriversRefetch() });
 
     const orders = ordersData?.orders || [];
     const drivers = driversData?.drivers || [];

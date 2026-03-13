@@ -50,6 +50,10 @@ interface Campaign {
   title: string;
   body: string;
   data: Record<string, unknown> | null;
+  imageUrl: string | null;
+  timeSensitive: boolean;
+  category: string | null;
+  relevanceScore: number | null;
   query: Record<string, unknown> | null;
   targetCount: number;
   sentCount: number;
@@ -84,6 +88,56 @@ interface Promotion {
 type Tab = "campaigns" | "direct" | "promotions";
 type StatusFilter = "ALL" | "DRAFT" | "SENDING" | "SENT" | "FAILED";
 type RoleFilter = "ALL" | "CUSTOMER" | "DRIVER" | "BUSINESS_OWNER";
+
+const CAMPAIGN_CATEGORY_OPTIONS = [
+  { value: "", label: "None" },
+  { value: "promotion", label: "Promotion" },
+  { value: "general", label: "General" },
+  { value: "order-on-the-way", label: "Order On The Way" },
+  { value: "order-delivered", label: "Order Delivered" },
+  { value: "order-cancelled", label: "Order Cancelled" },
+];
+
+function isoDateDaysAgo(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString().slice(0, 10);
+}
+
+const AUDIENCE_PRESETS: Array<{ label: string; build: () => RuleGroup }> = [
+  {
+    label: "All Customers",
+    build: () => ({ operator: "AND", rules: [{ field: "role", op: "eq", value: "CUSTOMER" }] }),
+  },
+  {
+    label: "All Drivers",
+    build: () => ({ operator: "AND", rules: [{ field: "role", op: "eq", value: "DRIVER" }] }),
+  },
+  {
+    label: "Business Owners",
+    build: () => ({ operator: "AND", rules: [{ field: "role", op: "eq", value: "BUSINESS_OWNER" }] }),
+  },
+  {
+    label: "High Value Customers",
+    build: () => ({
+      operator: "AND",
+      rules: [
+        { field: "role", op: "eq", value: "CUSTOMER" },
+        { field: "totalSpend", op: "gte", value: "100" },
+      ],
+    }),
+  },
+  {
+    label: "Dormant Customers",
+    build: () => ({
+      operator: "AND",
+      rules: [
+        { field: "role", op: "eq", value: "CUSTOMER" },
+        { field: "lastOrderAt", op: "lt", value: isoDateDaysAgo(30) },
+      ],
+    }),
+  },
+];
 
 // â”€â”€ Status badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -163,6 +217,10 @@ export default function NotificationsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [campaignImageUrl, setCampaignImageUrl] = useState("");
+  const [campaignCategory, setCampaignCategory] = useState("");
+  const [campaignTimeSensitive, setCampaignTimeSensitive] = useState(false);
+  const [campaignRelevanceScore, setCampaignRelevanceScore] = useState("");
   const [queryGroup, setQueryGroup] = useState<RuleGroup>(createDefaultGroup());
   const [previewCount, setPreviewCount] = useState<number | null>(null);
   const [previewUsers, setPreviewUsers] = useState<UserItem[]>([]);
@@ -280,6 +338,10 @@ export default function NotificationsPage() {
   const resetCreateForm = () => {
     setTitle("");
     setBody("");
+    setCampaignImageUrl("");
+    setCampaignCategory("");
+    setCampaignTimeSensitive(false);
+    setCampaignRelevanceScore("");
     setPreviewCount(null);
     setPreviewUsers([]);
     setQueryGroup(createDefaultGroup());
@@ -289,7 +351,17 @@ export default function NotificationsPage() {
     if (!title.trim() || !body.trim()) return;
     try {
       await createCampaign({
-        variables: { input: { title: title.trim(), body: body.trim(), query: queryGroup } },
+        variables: {
+          input: {
+            title: title.trim(),
+            body: body.trim(),
+            imageUrl: campaignImageUrl.trim() || undefined,
+            category: campaignCategory || undefined,
+            timeSensitive: campaignTimeSensitive,
+            relevanceScore: campaignRelevanceScore.trim() ? Number(campaignRelevanceScore) : undefined,
+            query: queryGroup,
+          },
+        },
       });
       setShowCreate(false);
       resetCreateForm();
@@ -324,6 +396,10 @@ export default function NotificationsPage() {
   const handleDuplicate = (campaign: Campaign) => {
     setTitle(campaign.title);
     setBody(campaign.body);
+    setCampaignImageUrl(campaign.imageUrl || "");
+    setCampaignCategory(campaign.category || "");
+    setCampaignTimeSensitive(campaign.timeSensitive);
+    setCampaignRelevanceScore(campaign.relevanceScore != null ? String(campaign.relevanceScore) : "");
     if (campaign.query) {
       setQueryGroup(campaign.query as unknown as RuleGroup);
     }
@@ -1043,7 +1119,57 @@ export default function NotificationsPage() {
                 className="w-full bg-[#09090b] border border-zinc-800 rounded-lg px-3 py-2 text-white placeholder-neutral-600 text-sm resize-none h-20 focus:outline-none focus:ring-1 focus:ring-violet-500"
               />
             </div>
-            <NotificationPreview title={title} body={body} />
+
+            <Input
+              label="Image URL (optional)"
+              value={campaignImageUrl}
+              onChange={(e) => setCampaignImageUrl(e.target.value)}
+              placeholder="https://example.com/image.png"
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-zinc-400">Category</label>
+                <select
+                  value={campaignCategory}
+                  onChange={(e) => setCampaignCategory(e.target.value)}
+                  className="w-full bg-[#09090b] border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-violet-500"
+                >
+                  {CAMPAIGN_CATEGORY_OPTIONS.map((option) => (
+                    <option key={option.label} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <Input
+                label="Relevance Score"
+                type="number"
+                min="0"
+                max="1"
+                step="0.1"
+                value={campaignRelevanceScore}
+                onChange={(e) => setCampaignRelevanceScore(e.target.value)}
+                placeholder="0.0 - 1.0"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="campaign-time-sensitive"
+                checked={campaignTimeSensitive}
+                onChange={(e) => setCampaignTimeSensitive(e.target.checked)}
+                className="w-4 h-4 rounded border-zinc-700 bg-[#09090b] text-violet-600 focus:ring-violet-500"
+              />
+              <label htmlFor="campaign-time-sensitive" className="text-sm text-zinc-400 flex items-center gap-1.5">
+                <Zap size={14} className="text-violet-500" />
+                Time-sensitive (iOS Focus bypass)
+              </label>
+            </div>
+
+            <NotificationPreview title={title} body={body} imageUrl={campaignImageUrl} />
           </div>
 
           {/* Query Builder */}
@@ -1055,6 +1181,22 @@ export default function NotificationsPage() {
               <span className="text-[10px] text-zinc-600">
                 Build rules to target specific users
               </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {AUDIENCE_PRESETS.map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => {
+                    setQueryGroup(preset.build());
+                    setPreviewCount(null);
+                    setPreviewUsers([]);
+                  }}
+                  className="px-2.5 py-1 rounded-md border border-zinc-800 bg-[#0d0d0d] text-xs text-zinc-400 hover:text-white hover:border-zinc-700 transition-colors"
+                >
+                  {preset.label}
+                </button>
+              ))}
             </div>
             <QueryBuilder value={queryGroup} onChange={setQueryGroup} />
           </div>
@@ -1141,7 +1283,24 @@ export default function NotificationsPage() {
             {/* Content */}
             <div className="space-y-2">
               <h4 className="text-xs text-zinc-600 uppercase tracking-wider">Content</h4>
-              <NotificationPreview title={showDetail.title} body={showDetail.body} />
+              <NotificationPreview title={showDetail.title} body={showDetail.body} imageUrl={showDetail.imageUrl || undefined} />
+              <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                {showDetail.category && (
+                  <span className="px-2 py-1 rounded-full border border-zinc-800 bg-[#111]">
+                    category: {showDetail.category}
+                  </span>
+                )}
+                {showDetail.timeSensitive && (
+                  <span className="px-2 py-1 rounded-full border border-zinc-800 bg-[#111] text-violet-300">
+                    time-sensitive
+                  </span>
+                )}
+                {showDetail.relevanceScore != null && (
+                  <span className="px-2 py-1 rounded-full border border-zinc-800 bg-[#111]">
+                    relevance: {showDetail.relevanceScore}
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Delivery stats */}

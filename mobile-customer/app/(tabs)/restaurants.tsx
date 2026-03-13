@@ -3,7 +3,10 @@ import { View, Text, ScrollView, TouchableOpacity, FlatList } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/hooks/useTheme';
+import { useStoreStatus } from '@/hooks/useStoreStatus';
+import type { InfoBannerType } from '@/components/InfoBanner';
 import { useBusinesses } from '@/modules/business/hooks/useBusinesses';
 import { ListRestaurantCard } from '@/modules/business/components/ListRestaurantCard';
 import { PromotionalBanner } from '@/modules/business/components/PromotionalBanner';
@@ -26,6 +29,21 @@ export default function Restaurants() {
     const { businesses, loading, error, refetch } = useBusinesses();
     const [activeFilter, setActiveFilter] = useState<FilterOption>('all');
     const { t } = useTranslations();
+    const { bannerEnabled, bannerMessage, bannerType } = useStoreStatus();
+    const showBanner = bannerEnabled && !!bannerMessage;
+
+    const BANNER_ICON: Record<InfoBannerType, { name: React.ComponentProps<typeof Ionicons>['name']; color: string }> = {
+        INFO:    { name: 'information-circle', color: '#7C3AED' },
+        WARNING: { name: 'warning',            color: '#f59e0b' },
+        SUCCESS: { name: 'checkmark-circle',   color: '#22C55E' },
+    };
+    const bannerIconCfg = BANNER_ICON[(bannerType as InfoBannerType) ?? 'INFO'] ?? BANNER_ICON.INFO;
+
+    useFocusEffect(
+        React.useCallback(() => {
+            void refetch();
+        }, [refetch]),
+    );
 
     const restaurants = useMemo(
         () => (businesses || []).filter((b) => b.businessType === 'RESTAURANT'),
@@ -145,17 +163,26 @@ export default function Restaurants() {
                         <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>
                             {t.restaurants.title}
                         </Text>
-                        <TouchableOpacity
-                            style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 4,
-                                marginTop: 2,
-                            }}
-                        >
-                            <Text style={{ color: theme.colors.subtext, fontSize: 13 }}>{t.restaurants.city}</Text>
-                            <Ionicons name="chevron-down" size={14} color={theme.colors.subtext} />
-                        </TouchableOpacity>
+                        {showBanner ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                                <Ionicons name={bannerIconCfg.name} size={13} color={bannerIconCfg.color} />
+                                <Text style={{ color: bannerIconCfg.color, fontSize: 12, fontWeight: '600', flexShrink: 1 }} numberOfLines={1}>
+                                    {bannerMessage}
+                                </Text>
+                            </View>
+                        ) : (
+                            <TouchableOpacity
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    marginTop: 2,
+                                }}
+                            >
+                                <Text style={{ color: theme.colors.subtext, fontSize: 13 }}>{t.restaurants.city}</Text>
+                                <Ionicons name="chevron-down" size={14} color={theme.colors.subtext} />
+                            </TouchableOpacity>
+                        )}
                     </View>
                     <TouchableOpacity>
                         <Ionicons name="map-outline" size={24} color={theme.colors.text} />

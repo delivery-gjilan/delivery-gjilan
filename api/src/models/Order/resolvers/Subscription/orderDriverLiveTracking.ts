@@ -4,10 +4,16 @@
     import type { SubscriptionResolvers } from './../../../../generated/types.generated';
 
     export const orderDriverLiveTracking: NonNullable<SubscriptionResolvers['orderDriverLiveTracking']> = {
-      subscribe: async (_parent, { orderId, input }, { authService, orderService, pubsub }) => {
-        const token = input.token;
-        const userData = await authService.verifyJWT(token);
-        if (!userData) {
+      subscribe: async (_parent, { orderId }, { orderService, pubsub, userData }) => {
+        const contextUserId = userData?.userId;
+        const contextRole = userData?.role;
+        const contextBusinessId = userData?.businessId;
+
+        let effectiveUserId = contextUserId;
+        let effectiveRole = contextRole;
+        let effectiveBusinessId = contextBusinessId;
+
+        if (!effectiveUserId || !effectiveRole) {
           throw new GraphQLError('Authentication required', { extensions: { code: 'UNAUTHENTICATED' } });
         }
 
@@ -16,13 +22,13 @@
           throw new GraphQLError('Order not found', { extensions: { code: 'NOT_FOUND' } });
         }
 
-        const isAdmin = userData.role === 'SUPER_ADMIN';
-        const isDriver = userData.role === 'DRIVER' && order.driverId === userData.id;
-        const isCustomer = userData.role === 'CUSTOMER' && order.userId === userData.id;
+        const isAdmin = effectiveRole === 'SUPER_ADMIN';
+        const isDriver = effectiveRole === 'DRIVER' && order.driverId === effectiveUserId;
+        const isCustomer = effectiveRole === 'CUSTOMER' && order.userId === effectiveUserId;
 
         let isBusinessAdmin = false;
-        if ((userData.role === 'BUSINESS_OWNER' || userData.role === 'BUSINESS_EMPLOYEE') && userData.businessId) {
-          isBusinessAdmin = await orderService.orderContainsBusiness(orderId, userData.businessId);
+        if ((effectiveRole === 'BUSINESS_OWNER' || effectiveRole === 'BUSINESS_EMPLOYEE') && effectiveBusinessId) {
+          isBusinessAdmin = await orderService.orderContainsBusiness(orderId, effectiveBusinessId);
         }
 
         if (!isAdmin && !isDriver && !isCustomer && !isBusinessAdmin) {

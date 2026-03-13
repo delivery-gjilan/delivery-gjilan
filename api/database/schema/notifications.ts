@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, pgEnum, jsonb, integer, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, pgEnum, jsonb, integer, index, boolean, real } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import { users } from './users';
 
@@ -18,6 +18,10 @@ export const notificationCampaigns = pgTable('notification_campaigns', {
     title: text('title').notNull(),
     body: text('body').notNull(),
     data: jsonb('data').$type<Record<string, unknown>>(),
+    imageUrl: text('image_url'),
+    timeSensitive: boolean('time_sensitive').default(false).notNull(),
+    category: text('category'),
+    relevanceScore: real('relevance_score'),
     query: jsonb('query').$type<Record<string, unknown>>(),
     targetCount: integer('target_count').default(0).notNull(),
     sentCount: integer('sent_count').default(0).notNull(),

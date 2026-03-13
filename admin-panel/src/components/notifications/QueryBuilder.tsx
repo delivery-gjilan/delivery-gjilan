@@ -38,6 +38,7 @@ const FIELD_DEFINITIONS: FieldDef[] = [
   { value: "email", label: "Email", type: "text", category: "User" },
   { value: "firstName", label: "First Name", type: "text", category: "User" },
   { value: "lastName", label: "Last Name", type: "text", category: "User" },
+  { value: "businessId", label: "Business ID", type: "text", category: "User" },
   { value: "createdAt", label: "Account Created", type: "date", category: "User" },
   // Behavior fields
   { value: "totalOrders", label: "Total Orders", type: "number", category: "Behavior" },
@@ -58,6 +59,9 @@ const OPERATORS: Record<string, { value: string; label: string }[]> = {
   text: [
     { value: "eq", label: "equals" },
     { value: "ne", label: "not equals" },
+    { value: "contains", label: "contains" },
+    { value: "startsWith", label: "starts with" },
+    { value: "endsWith", label: "ends with" },
   ],
   number: [
     { value: "eq", label: "=" },

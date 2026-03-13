@@ -2,6 +2,58 @@ import { randomUUID } from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import logger from '@/lib/logger';
 
+type GraphQLRequestBody = {
+    operationName?: string;
+    query?: string;
+};
+
+const SLOW_GRAPHQL_OPERATION_MS = Number(process.env.SLOW_GRAPHQL_OPERATION_MS) || 750;
+
+function normalizeGraphQLOperationName(name: unknown): string {
+    if (typeof name !== 'string') {
+        return 'anonymous';
+    }
+
+    const trimmed = name.trim();
+    if (!trimmed) {
+        return 'anonymous';
+    }
+
+    return trimmed.length > 80 ? `${trimmed.slice(0, 80)}...` : trimmed;
+}
+
+function inferGraphQLOperationType(query: unknown): string {
+    if (typeof query !== 'string') {
+        return 'unknown';
+    }
+
+    const normalized = query.trimStart();
+    if (normalized.startsWith('{')) {
+        return 'query';
+    }
+
+    const match = normalized.match(/^(query|mutation|subscription)\b/i);
+    if (!match) {
+        return 'unknown';
+    }
+
+    return match[1].toLowerCase();
+}
+
+function getGraphQLMeta(req: Request): { operationName: string; operationType: string } | null {
+    if (req.path !== '/graphql') {
+        return null;
+    }
+
+    const body = req.body as GraphQLRequestBody | GraphQLRequestBody[] | undefined;
+    const operation = Array.isArray(body) ? body[0] : body;
+
+    return {
+        operationName: normalizeGraphQLOperationName(operation?.operationName),
+        operationType: inferGraphQLOperationType(operation?.query),
+    };
+}
+
 /**
  * Express middleware that:
  * 1. Attaches a unique `requestId` to every inbound request.
@@ -30,6 +82,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
     (req as any).log = log;
 
     const start = Date.now();
+    const graphqlMeta = getGraphQLMeta(req);
 
     log.info(
         {
@@ -51,9 +104,25 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
                 url: req.originalUrl,
                 statusCode: res.statusCode,
                 durationMs,
+                ...(graphqlMeta ? { operationName: graphqlMeta.operationName, operationType: graphqlMeta.operationType } : {}),
             },
             'request:finish',
         );
+
+        if (graphqlMeta && durationMs >= SLOW_GRAPHQL_OPERATION_MS) {
+            log.warn(
+                {
+                    method: req.method,
+                    url: req.originalUrl,
+                    statusCode: res.statusCode,
+                    durationMs,
+                    operationName: graphqlMeta.operationName,
+                    operationType: graphqlMeta.operationType,
+                    slowThresholdMs: SLOW_GRAPHQL_OPERATION_MS,
+                },
+                'graphql:slow-operation',
+            );
+        }
     });
 
     next();

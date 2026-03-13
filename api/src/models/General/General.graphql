@@ -36,10 +36,6 @@ input BusinessDayHoursInput {
     closesAt: String!  # "HH:MM"
 }
 
-input SubscriptionInput {
-    token: String!
-}
-
 enum BannerType {
     INFO
     WARNING
@@ -68,4 +64,8 @@ type Query {
 
 type Mutation {
     updateStoreStatus(input: UpdateStoreStatusInput!): StoreStatus!
+}
+
+extend type Subscription {
+    storeStatusUpdated: StoreStatus!
 }

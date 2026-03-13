@@ -49,6 +49,10 @@ type NotificationCampaign {
     title: String!
     body: String!
     data: JSON
+    imageUrl: String
+    timeSensitive: Boolean!
+    category: String
+    relevanceScore: Float
     query: JSON
     targetCount: Int!
     sentCount: Int!
@@ -95,6 +99,10 @@ input CreateCampaignInput {
     title: String!
     body: String!
     data: JSON
+    imageUrl: String
+    timeSensitive: Boolean
+    category: String
+    relevanceScore: Float
     query: JSON!
 }
 

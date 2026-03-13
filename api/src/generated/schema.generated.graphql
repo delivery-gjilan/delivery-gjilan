@@ -250,8 +250,12 @@ input CreateBusinessInput {
 
 input CreateCampaignInput {
   body: String!
+  category: String
   data: JSON
+  imageUrl: String
   query: JSON!
+  relevanceScore: Float
+  timeSensitive: Boolean
   title: String!
 }
 
@@ -750,17 +754,21 @@ type Notification {
 
 type NotificationCampaign {
   body: String!
+  category: String
   createdAt: DateTime!
   data: JSON
   failedCount: Int!
   id: ID!
+  imageUrl: String
   query: JSON
+  relevanceScore: Float
   sender: User
   sentAt: DateTime
   sentBy: ID
   sentCount: Int!
   status: CampaignStatus!
   targetCount: Int!
+  timeSensitive: Boolean!
   title: String!
 }
 
@@ -1263,15 +1271,16 @@ type Subscription {
   """Per-driver push-to-talk signal stream (start/stop/mute/unmute)"""
   driverPttSignal(driverId: ID!): DriverPttSignal!
   driversUpdated: [User!]!
-  orderDriverLiveTracking(input: SubscriptionInput!, orderId: ID!): OrderDriverLiveTracking!
+  orderDriverLiveTracking(input: SubscriptionInput, orderId: ID!): OrderDriverLiveTracking!
   orderStatusUpdated(orderId: ID!): Order!
   settlementCreated(type: SettlementType): Settlement!
   settlementStatusChanged(id: ID!): Settlement!
-  userOrdersUpdated(input: SubscriptionInput!): [Order!]!
+  storeStatusUpdated: StoreStatus!
+  userOrdersUpdated(input: SubscriptionInput): [Order!]!
 }
 
 input SubscriptionInput {
-  token: String!
+  token: String
 }
 
 type TokenRefreshResponse {

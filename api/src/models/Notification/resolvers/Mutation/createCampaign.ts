@@ -14,6 +14,10 @@ export const createCampaign: NonNullable<MutationResolvers['createCampaign']> = 
         title: input.title,
         body: input.body,
         data: input.data as Record<string, unknown> | undefined,
+        imageUrl: input.imageUrl ?? null,
+        timeSensitive: input.timeSensitive ?? false,
+        category: input.category ?? null,
+        relevanceScore: input.relevanceScore ?? null,
         query: input.query as Record<string, unknown>,
         sentBy: userData.userId,
     });

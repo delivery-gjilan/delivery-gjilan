@@ -11,3 +11,15 @@ export const GET_STORE_STATUS = graphql(`
         }
     }
 `);
+
+export const STORE_STATUS_UPDATED = graphql(`
+    subscription StoreStatusUpdated {
+        storeStatusUpdated {
+            isStoreClosed
+            closedMessage
+            bannerEnabled
+            bannerMessage
+            bannerType
+        }
+    }
+`);

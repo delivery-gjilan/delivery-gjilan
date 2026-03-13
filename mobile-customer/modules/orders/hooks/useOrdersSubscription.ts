@@ -1,4 +1,5 @@
 import { useSubscription } from '@apollo/client/react';
+import { useEffect, useRef } from 'react';
 import { GET_ORDERS, GET_ORDER } from '@/graphql/operations/orders';
 import { USER_ORDERS_UPDATED } from '@/graphql/operations/orders/subscriptions';
 import { useActiveOrdersStore } from '../store/activeOrdersStore';
@@ -11,27 +12,61 @@ import { useAuthStore } from '@/store/authStore';
  * Skips when there are no active orders to avoid unnecessary WebSocket traffic.
  */
 export function useOrdersSubscription() {
-    const token = useAuthStore((state) => state.token);
     const userId = useAuthStore((state) => state.user?.id);
     const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
     const hasActiveOrders = useActiveOrdersStore((state) => state.hasActiveOrders);
     const setActiveOrders = useActiveOrdersStore((state) => state.setActiveOrders);
+    const refetchInFlightRef = useRef(false);
+    const refetchCooldownRef = useRef(0);
+    const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const shouldSubscribe = !!token && isAuthenticated;
+    const shouldSubscribe = isAuthenticated && hasActiveOrders;
+
+    useEffect(() => {
+        return () => {
+            if (pendingTimerRef.current) {
+                clearTimeout(pendingTimerRef.current);
+                pendingTimerRef.current = null;
+            }
+        };
+    }, []);
 
     const { loading, error } = useSubscription(USER_ORDERS_UPDATED, {
-        variables: { input: { token: token || '' } },
         skip: !shouldSubscribe,
         onData: ({ client }) => {
-            // Signal received — refetch orders from server and update cache
-            client.refetchQueries({ 
-                include: [GET_ORDERS, GET_ORDER],
-                updateCache(cache) {
-                    // Clear the orders cache to force fresh data
-                    cache.evict({ fieldName: 'orders' });
-                    cache.gc();
-                },
-            }).then((results) => {
+            const now = Date.now();
+            const canRunNow = now - refetchCooldownRef.current >= 1000 && !refetchInFlightRef.current;
+
+            if (!canRunNow) {
+                if (pendingTimerRef.current) {
+                    return;
+                }
+                pendingTimerRef.current = setTimeout(() => {
+                    pendingTimerRef.current = null;
+                    if (refetchInFlightRef.current) {
+                        return;
+                    }
+                    refetchInFlightRef.current = true;
+                    refetchCooldownRef.current = Date.now();
+                    client.refetchQueries({ include: [GET_ORDERS, GET_ORDER] }).then((results) => {
+                        const orders = (results[0]?.data as any)?.orders ?? [];
+                        const activeOrders = orders.filter(
+                            (order: any) =>
+                                order.userId === userId &&
+                                order.status !== 'DELIVERED' &&
+                                order.status !== 'CANCELLED',
+                        );
+                        setActiveOrders(activeOrders as unknown as any);
+                    }).finally(() => {
+                        refetchInFlightRef.current = false;
+                    });
+                }, 350);
+                return;
+            }
+
+            refetchInFlightRef.current = true;
+            refetchCooldownRef.current = now;
+            client.refetchQueries({ include: [GET_ORDERS, GET_ORDER] }).then((results) => {
                 const orders = (results[0]?.data as any)?.orders ?? [];
                 const activeOrders = orders.filter(
                     (order: any) => 
@@ -40,6 +75,8 @@ export function useOrdersSubscription() {
                         order.status !== 'CANCELLED',
                 );
                 setActiveOrders(activeOrders as unknown as any);
+            }).finally(() => {
+                refetchInFlightRef.current = false;
             });
         },
         onError: (err) => {

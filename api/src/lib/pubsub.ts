@@ -2,6 +2,7 @@ import { createPubSub } from 'graphql-yoga';
 import { Order, User } from '@/generated/types.generated';
 import { createClient, RedisClientType } from 'redis';
 import logger from '@/lib/logger';
+import { realtimeMonitor } from '@/lib/realtimeMonitoring';
 
 export type UserOrdersPayload = {
     userId: string;
@@ -35,6 +36,14 @@ export type DriverPttSignalPayload = {
     timestamp: Date;
 };
 
+export type StoreStatusPayload = {
+    isStoreClosed: boolean;
+    closedMessage?: string | null;
+    bannerEnabled: boolean;
+    bannerMessage?: string | null;
+    bannerType: string;
+};
+
 type PubSubPayloadMap = {
     'order.byId.updated': Order;
     'orders.byUser.changed': UserOrdersPayload;
@@ -42,13 +51,14 @@ type PubSubPayloadMap = {
     'drivers.all.changed': DriversUpdatedPayload;
     'order.driver.live.changed': OrderDriverLiveTrackingPayload;
     'driver.ptt.signal': DriverPttSignalPayload;
+    'store.status.changed': StoreStatusPayload;
 };
 
 type TopicKey<K extends keyof PubSubPayloadMap> = `${K}.${string}` | `${K}`;
 
-type AnyTopicKey = TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed' | 'driver.ptt.signal'>;
+type AnyTopicKey = TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed' | 'driver.ptt.signal' | 'store.status.changed'>;
 
-type AnyPayload = Order | UserOrdersPayload | AllOrdersPayload | DriversUpdatedPayload | OrderDriverLiveTrackingPayload | DriverPttSignalPayload;
+type AnyPayload = Order | UserOrdersPayload | AllOrdersPayload | DriversUpdatedPayload | OrderDriverLiveTrackingPayload | DriverPttSignalPayload | StoreStatusPayload;
 
 type PubSubChannels = {
     [K in keyof PubSubPayloadMap as TopicKey<K>]: [payload: PubSubPayloadMap[K]];
@@ -179,6 +189,7 @@ function bridgePublish(topic: AnyTopicKey, payload: AnyPayload): void {
     };
 
     pubClient.publish(REDIS_PUBSUB_CHANNEL, JSON.stringify(message)).catch((error) => {
+        realtimeMonitor.recordPubsubPublishFailure(String(topic), 'Redis pubsub bridge publish failed');
         log.warn({ err: error, topic }, 'pubsubBridge:publish:failed');
     });
 }
@@ -195,6 +206,8 @@ export const topics = {
     orderDriverLiveChanged: (orderId: string): TopicKey<'order.driver.live.changed'> => `order.driver.live.changed.${orderId}`,
 
     driverPttSignal: (driverId: string): TopicKey<'driver.ptt.signal'> => `driver.ptt.signal.${driverId}`,
+
+    storeStatusChanged: (): TopicKey<'store.status.changed'> => 'store.status.changed',
 } as const;
 
 export function publish(p: PubSub, topic: TopicKey<'order.byId.updated'>, payload: Order): void;
@@ -204,18 +217,20 @@ export function publish(p: PubSub, topic: TopicKey<'orders.all.changed'>, payloa
 export function publish(p: PubSub, topic: TopicKey<'drivers.all.changed'>, payload: DriversUpdatedPayload): void;
 export function publish(p: PubSub, topic: TopicKey<'order.driver.live.changed'>, payload: OrderDriverLiveTrackingPayload): void;
 export function publish(p: PubSub, topic: TopicKey<'driver.ptt.signal'>, payload: DriverPttSignalPayload): void;
+export function publish(p: PubSub, topic: TopicKey<'store.status.changed'>, payload: StoreStatusPayload): void;
 export function publish(
     p: PubSub,
-    topic: TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed' | 'driver.ptt.signal'>,
+    topic: TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed' | 'driver.ptt.signal' | 'store.status.changed'>,
     payload: AnyPayload,
 ): void;
 export function publish(
     p: PubSub,
-    topic: TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed' | 'driver.ptt.signal'>,
+    topic: TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed' | 'driver.ptt.signal' | 'store.status.changed'>,
     payload: AnyPayload,
 ) {
     // @ts-expect-error can fix it but with unnecessary complexity
     p.publish(topic, payload);
+    realtimeMonitor.recordPubsubPublish(String(topic));
     bridgePublish(topic as AnyTopicKey, payload);
 }
 
@@ -228,7 +243,8 @@ export function subscribe(p: PubSub, topic: TopicKey<'orders.all.changed'>): Ret
 export function subscribe(p: PubSub, topic: TopicKey<'drivers.all.changed'>): ReturnType<PubSub['subscribe']>;
 export function subscribe(p: PubSub, topic: TopicKey<'order.driver.live.changed'>): ReturnType<PubSub['subscribe']>;
 export function subscribe(p: PubSub, topic: TopicKey<'driver.ptt.signal'>): ReturnType<PubSub['subscribe']>;
+export function subscribe(p: PubSub, topic: TopicKey<'store.status.changed'>): ReturnType<PubSub['subscribe']>;
 
-export function subscribe(p: PubSub, topic: TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed' | 'driver.ptt.signal'>) {
+export function subscribe(p: PubSub, topic: TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed' | 'driver.ptt.signal' | 'store.status.changed'>) {
     return p.subscribe(topic);
 }

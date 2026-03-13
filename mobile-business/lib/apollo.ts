@@ -4,7 +4,6 @@ import { getMainDefinition } from '@apollo/client/utilities';
 import { createClient } from 'graphql-ws';
 import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
-import { useAuthStore } from '@/store/authStore';
 import { getValidAccessToken } from './authSession';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000';
@@ -73,7 +72,7 @@ const errorLink = onError(({ graphQLErrors, networkError }) => {
         graphQLErrors.forEach(({ message, locations, path }) => {
             console.error(`[GraphQL error]: Message: ${message}, Path: ${path}`);
             if (message.includes('Unauthorized') || message.includes('token')) {
-                useAuthStore.getState().logout();
+                console.warn('[Apollo] Auth-related error received, preserving session');
             }
         });
     }

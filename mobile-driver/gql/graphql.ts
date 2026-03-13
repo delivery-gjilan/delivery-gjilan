@@ -154,6 +154,7 @@ export type AuditLogConnection = {
 export type AuthResponse = {
   __typename?: 'AuthResponse';
   message: Scalars['String']['output'];
+  refreshToken?: Maybe<Scalars['String']['output']>;
   token: Scalars['String']['output'];
   user: User;
 };
@@ -692,10 +693,13 @@ export type Mutation = {
   generateReferralCode: Scalars['String']['output'];
   initiateSignup: AuthResponse;
   login: AuthResponse;
+  logoutAllSessions: Scalars['Boolean']['output'];
+  logoutCurrentSession: Scalars['Boolean']['output'];
   markFirstOrderUsed: UserPromoMetadata;
   markSettlementAsPaid: Settlement;
   markSettlementAsPartiallyPaid: Settlement;
   markSettlementsAsPaid: Array<Settlement>;
+  refreshToken: TokenRefreshResponse;
   registerDeviceToken: Scalars['Boolean']['output'];
   registerLiveActivityToken: Scalars['Boolean']['output'];
   removeUserFromPromotion: Scalars['Boolean']['output'];
@@ -972,6 +976,11 @@ export type MutationLoginArgs = {
 };
 
 
+export type MutationLogoutCurrentSessionArgs = {
+  refreshToken: Scalars['String']['input'];
+};
+
+
 export type MutationMarkFirstOrderUsedArgs = {
   userId: Scalars['ID']['input'];
 };
@@ -994,6 +1003,11 @@ export type MutationMarkSettlementsAsPaidArgs = {
   ids: Array<Scalars['ID']['input']>;
   paymentMethod?: InputMaybe<Scalars['String']['input']>;
   paymentReference?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type MutationRefreshTokenArgs = {
+  refreshToken: Scalars['String']['input'];
 };
 
 
@@ -2006,6 +2020,7 @@ export type Subscription = {
   orderStatusUpdated: Order;
   settlementCreated: Settlement;
   settlementStatusChanged: Settlement;
+  storeStatusUpdated: StoreStatus;
   userOrdersUpdated: Array<Order>;
 };
 
@@ -2028,7 +2043,6 @@ export type SubscriptionDriverPttSignalArgs = {
 
 
 export type SubscriptionOrderDriverLiveTrackingArgs = {
-  input: SubscriptionInput;
   orderId: Scalars['ID']['input'];
 };
 
@@ -2047,13 +2061,10 @@ export type SubscriptionSettlementStatusChangedArgs = {
   id: Scalars['ID']['input'];
 };
 
-
-export type SubscriptionUserOrdersUpdatedArgs = {
-  input: SubscriptionInput;
-};
-
-export type SubscriptionInput = {
-  token: Scalars['String']['input'];
+export type TokenRefreshResponse = {
+  __typename?: 'TokenRefreshResponse';
+  refreshToken: Scalars['String']['output'];
+  token: Scalars['String']['output'];
 };
 
 export type UpdateBannerInput = {

@@ -31,6 +31,10 @@ export const sendCampaign: NonNullable<MutationResolvers['sendCampaign']> = asyn
                     Object.entries(campaign.data).map(([k, v]) => [k, String(v)])
                   )
                 : undefined,
+                        imageUrl: campaign.imageUrl || undefined,
+                        timeSensitive: campaign.timeSensitive,
+                        category: campaign.category || undefined,
+                        relevanceScore: campaign.relevanceScore ?? undefined,
         };
 
         const result = await notificationService.sendToUsers(userIds, payload, 'PROMOTIONAL');

@@ -1,7 +1,7 @@
 import { DbType } from '@/database';
 import { users } from '@/database/schema/users';
 import { userBehaviors } from '@/database/schema/userBehaviors';
-import { eq, gt, gte, lt, lte, ne, inArray, and, or, isNull, SQL } from 'drizzle-orm';
+import { eq, gt, gte, lt, lte, ne, inArray, and, or, isNull, SQL, ilike } from 'drizzle-orm';
 import logger from '@/lib/logger';
 import { AppError } from '@/lib/errors';
 
@@ -25,7 +25,7 @@ import { AppError } from '@/lib/errors';
  * }
  */
 
-type Operator = 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in';
+type Operator = 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'contains' | 'startsWith' | 'endsWith';
 
 interface Rule {
     field: string;
@@ -140,6 +140,12 @@ export class UserQueryService {
                 return eq(column, rule.value as string);
             case 'ne':
                 return ne(column, rule.value as string);
+            case 'contains':
+                return ilike(column, `%${String(rule.value)}%`);
+            case 'startsWith':
+                return ilike(column, `${String(rule.value)}%`);
+            case 'endsWith':
+                return ilike(column, `%${String(rule.value)}`);
             case 'gt':
                 return gt(column, rule.value as string);
             case 'gte':

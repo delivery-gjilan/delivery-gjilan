@@ -1,11 +1,12 @@
 # ───────────────────────────────────────────────────────────────
-# Observability stack — Grafana, Loki, Promtail
+# Observability stack — Grafana, Loki, Promtail, Prometheus
 #
 # Run:  docker compose -f observability/docker-compose.yml up -d
 #
 # Access:
 #   Grafana   → http://localhost:3100  (admin / admin)
 #   Loki API  → http://localhost:3200  (internal — Grafana reads from here)
+#   Prometheus → http://localhost:9090
 # ───────────────────────────────────────────────────────────────
 
 services:
@@ -39,6 +40,23 @@ services:
       loki:
         condition: service_healthy
 
+  # ── Prometheus: metrics scraping and alert inputs ─────────
+  prometheus:
+    image: prom/prometheus:v3.4.1
+    container_name: delivery-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
   # ── Grafana: dashboards + alerts ───────────────────────────
   grafana:
     image: grafana/grafana:11.6.0
@@ -59,9 +77,13 @@ services:
     depends_on:
       loki:
         condition: service_healthy
+      prometheus:
+        condition: service_started
 
 volumes:
   loki-data:
+    driver: local
+  prometheus-data:
     driver: local
   grafana-data:
     driver: local

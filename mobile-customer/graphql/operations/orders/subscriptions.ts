@@ -10,8 +10,8 @@ export const ORDER_STATUS_UPDATED = graphql(`
 `);
 
 export const USER_ORDERS_UPDATED = graphql(`
-    subscription UserOrdersUpdated($input: SubscriptionInput!) {
-        userOrdersUpdated(input: $input) {
+    subscription UserOrdersUpdated {
+        userOrdersUpdated {
             id
             displayId
             userId
@@ -80,8 +80,8 @@ export const USER_ORDERS_UPDATED = graphql(`
 `);
 
 export const ORDER_DRIVER_LIVE_TRACKING = graphql(`
-    subscription OrderDriverLiveTracking($orderId: ID!, $input: SubscriptionInput!) {
-        orderDriverLiveTracking(orderId: $orderId, input: $input) {
+    subscription OrderDriverLiveTracking($orderId: ID!) {
+        orderDriverLiveTracking(orderId: $orderId) {
             orderId
             driverId
             latitude

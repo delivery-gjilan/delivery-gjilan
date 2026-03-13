@@ -199,3 +199,108 @@ groups:
         annotations:
           summary: "Fatal error in API"
           description: "A fatal-level error was logged — the process may have crashed."
+
+      # ────────────────────────────────────────────
+      # 7. Subscription Reject Spike
+      # ────────────────────────────────────────────
+      - uid: subscription-reject-spike
+        title: "Subscription Reject Spike"
+        condition: reject_check
+        data:
+          - refId: rejected
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: sum(increase(graphql_subscribe_rejected_total[5m]))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: rejected
+          - refId: reject_check
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: "$rejected"
+              conditions:
+                - evaluator: { type: gt, params: [10] }
+                  operator: { type: and }
+                  reducer: { type: last }
+        for: 2m
+        labels:
+          severity: warning
+          service: realtime
+        annotations:
+          summary: "Subscription rejects are spiking"
+          description: "More than 10 subscription requests were rejected in the last 5 minutes. This usually points to validation or rate-limit pressure."
+
+      # ────────────────────────────────────────────
+      # 8. Subscription Runtime Errors
+      # ────────────────────────────────────────────
+      - uid: subscription-runtime-errors
+        title: "Subscription Runtime Errors"
+        condition: subscription_error_check
+        data:
+          - refId: subscription_errors
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: sum(increase(graphql_subscription_errors_total[5m]))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: subscription_errors
+          - refId: subscription_error_check
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: "$subscription_errors"
+              conditions:
+                - evaluator: { type: gt, params: [5] }
+                  operator: { type: and }
+                  reducer: { type: last }
+        for: 1m
+        labels:
+          severity: critical
+          service: realtime
+        annotations:
+          summary: "Subscription runtime errors detected"
+          description: "More than 5 subscription lifecycle errors were recorded in the last 5 minutes."
+
+      # ────────────────────────────────────────────
+      # 9. Pubsub Publish Failure
+      # ────────────────────────────────────────────
+      - uid: pubsub-publish-failure
+        title: "Pubsub Publish Failure"
+        condition: pubsub_failure_check
+        data:
+          - refId: pubsub_failures
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: sum(increase(pubsub_publish_failures_total[5m]))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: pubsub_failures
+          - refId: pubsub_failure_check
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: "$pubsub_failures"
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+                  operator: { type: and }
+                  reducer: { type: last }
+        for: 0m
+        labels:
+          severity: critical
+          service: realtime
+        annotations:
+          summary: "Pubsub publish failure detected"
+          description: "At least one pubsub publish failure occurred in the last 5 minutes. Check Redis bridge health and the realtime event feed immediately."

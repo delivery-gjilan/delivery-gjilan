@@ -15,8 +15,6 @@ import { GET_ORDER_DRIVER } from '@/graphql/operations/orders';
 import { ORDER_DRIVER_LIVE_TRACKING } from '@/graphql/operations/orders/subscriptions';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useCartActions } from '@/modules/cart';
-import { useSuccessModalStore } from '@/store/useSuccessModalStore';
 import { useAuthStore } from '@/store/authStore';
 import Animated, {
     useSharedValue,
@@ -34,6 +32,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Component, type ReactNode, type ErrorInfo } from 'react';
 import { useLiveActivity } from '@/hooks/useLiveActivity';
+import { fetchRoute } from '@/utils/route';
 
 // Lazy-load MapLibreGL to prevent crash if native module has issues
 let MapLibreGL: any = null;
@@ -82,12 +81,14 @@ const formatOrderDate = (value?: string | null) => {
 };
 
 const LIVE_DRIVER_ETA_TTL_MS = 20_000;
-const DRIVER_INTERPOLATION_TICK_MS = 66;
-const DRIVER_INTERPOLATION_MIN_MS = 350;
-const DRIVER_INTERPOLATION_MAX_MS = 8_000;
-const DRIVER_INTERPOLATION_RATIO = 0.9;
+const DRIVER_INTERPOLATION_TICK_MS = 50;
+const DRIVER_INTERPOLATION_MIN_MS = 220;
+const DRIVER_INTERPOLATION_MAX_MS = 6_000;
+const DRIVER_INTERPOLATION_RATIO = 0.82;
 const DRIVER_POSITION_EPSILON = 0.00001;
 const DRIVER_TELEPORT_GUARD_KM = 0.8;
+const ROUTE_SNAP_MAX_DISTANCE_M = 45;
+const ROUTE_SNAP_FALLBACK_DISTANCE_M = 70;
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const AVATAR_COLORS = ['#2563EB', '#7C3AED', '#DB2777', '#EA580C', '#16A34A', '#4F46E5'];
 
@@ -118,6 +119,69 @@ const calculateBearingDeg = (
         Math.sin(fromLatRad) * Math.cos(toLatRad) * Math.cos(deltaLngRad);
     const angleDeg = (Math.atan2(y, x) * 180) / Math.PI;
     return (angleDeg + 360) % 360;
+};
+
+const toPlanarMeters = (latitude: number, longitude: number) => {
+    const latRad = (latitude * Math.PI) / 180;
+    const metersPerDegLat = 111_320;
+    const metersPerDegLng = 111_320 * Math.cos(latRad);
+    return {
+        x: longitude * metersPerDegLng,
+        y: latitude * metersPerDegLat,
+    };
+};
+
+const projectPointToSegment = (
+    point: { latitude: number; longitude: number },
+    from: { latitude: number; longitude: number },
+    to: { latitude: number; longitude: number },
+) => {
+    const pointM = toPlanarMeters(point.latitude, point.longitude);
+    const fromM = toPlanarMeters(from.latitude, from.longitude);
+    const toM = toPlanarMeters(to.latitude, to.longitude);
+
+    const dx = toM.x - fromM.x;
+    const dy = toM.y - fromM.y;
+    const lengthSq = dx * dx + dy * dy;
+
+    if (lengthSq <= 1e-9) {
+        return {
+            latitude: from.latitude,
+            longitude: from.longitude,
+            distanceM: Math.hypot(pointM.x - fromM.x, pointM.y - fromM.y),
+        };
+    }
+
+    const t = clamp(((pointM.x - fromM.x) * dx + (pointM.y - fromM.y) * dy) / lengthSq, 0, 1);
+    const projectedX = fromM.x + dx * t;
+    const projectedY = fromM.y + dy * t;
+    const distanceM = Math.hypot(pointM.x - projectedX, pointM.y - projectedY);
+
+    return {
+        latitude: from.latitude + (to.latitude - from.latitude) * t,
+        longitude: from.longitude + (to.longitude - from.longitude) * t,
+        distanceM,
+    };
+};
+
+const snapPointToRoute = (
+    point: { latitude: number; longitude: number },
+    routeCoordinates: Array<{ latitude: number; longitude: number }>,
+) => {
+    if (routeCoordinates.length < 2) {
+        return null;
+    }
+
+    let best: { latitude: number; longitude: number; distanceM: number } | null = null;
+
+    for (let i = 0; i < routeCoordinates.length - 1; i += 1) {
+        const projected = projectPointToSegment(point, routeCoordinates[i], routeCoordinates[i + 1]);
+        if (!best || projected.distanceM < best.distanceM) {
+            best = projected;
+        }
+    }
+
+    return best;
 };
 
 // ─── Status Config ──────────────────────────────────────────
@@ -414,16 +478,12 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const insets = useSafeAreaInsets();
     const mapRef = useRef<any>(null);
     const cameraRef = useRef<any>(null);
-    const prevStatusRef = useRef<string | null>(null);
-    const { clearCart } = useCartActions();
-    const { showSuccess } = useSuccessModalStore();
     const focusedStatusKeyRef = useRef<string | null>(null);
     // Stable ref so driver interpolation ticks (every ~66ms) don't cancel the focus timeout
     const fitMapToMarkersRef = useRef<() => void>(() => {});
     const [showSummary, setShowSummary] = useState(false);
     const [showDriverInfo, setShowDriverInfo] = useState(false);
     const [mapZoomLevel, setMapZoomLevel] = useState(15.5);
-    const token = useAuthStore((state) => state.token);
     const [interpolatedDriverLocation, setInterpolatedDriverLocation] = useState<{
         latitude: number;
         longitude: number;
@@ -444,6 +504,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         remainingEtaSeconds?: number | null;
         etaUpdatedAt: string;
     } | null>(null);
+    const [deliveryRouteCoordinates, setDeliveryRouteCoordinates] = useState<Array<{ latitude: number; longitude: number }>>([]);
 
     // ─── Driver Data (initial/fallback query; live movement comes from subscription) ───────────────────────────────
     const { data: driverData } = useQuery(GET_ORDER_DRIVER, {
@@ -472,8 +533,8 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     }, []);
 
     useSubscription(ORDER_DRIVER_LIVE_TRACKING, {
-        variables: { orderId: order?.id ?? '', input: { token: token || '' } },
-        skip: !order?.id || !token || !isDeliveryPhase,
+        variables: { orderId: order?.id ?? '' },
+        skip: !order?.id || !isDeliveryPhase,
         onData: ({ data }) => {
             const payload = data.data?.orderDriverLiveTracking;
             if (!payload) return;
@@ -529,7 +590,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
             : null;
 
     useEffect(() => {
-        if (!isDeliveryPhase || !liveDriverRawLocation) return;
+        if (!isDeliveryPhase || !liveDriverTargetLocation) return;
 
         const now = Date.now();
         if (lastHeartbeatReceivedAtRef.current != null) {
@@ -544,7 +605,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         }
         lastHeartbeatReceivedAtRef.current = now;
 
-        const target = liveDriverRawLocation;
+        const target = liveDriverTargetLocation;
         const start = interpolatedDriverLocation ?? queriedDriverLocation ?? target;
 
         const deltaLat = Math.abs(target.latitude - start.latitude);
@@ -615,18 +676,20 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         }, DRIVER_INTERPOLATION_TICK_MS);
     }, [
         isDeliveryPhase,
-        liveDriverRawLocation?.latitude,
-        liveDriverRawLocation?.longitude,
-        liveDriverRawLocation?.address,
+        liveDriverTargetLocation?.latitude,
+        liveDriverTargetLocation?.longitude,
+        liveDriverTargetLocation?.address,
         interpolatedDriverLocation,
         queriedDriverLocation,
         stopDriverInterpolation,
     ]);
 
-    const driverLocation =
+    const driverLocation = getRoadSnappedLocation(
         liveDriverRawLocation
             ? interpolatedDriverLocation ?? liveDriverRawLocation
-            : queriedDriverLocation;
+            : queriedDriverLocation,
+        ROUTE_SNAP_FALLBACK_DISTANCE_M,
+    );
     const liveDriverConnection =
         liveDriverTracking != null && liveDriverTracking.orderId === order?.id
             ? {
@@ -646,6 +709,89 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     }, [order?.pickupLocations, orderBusinesses]);
 
     const dropoffLocation = useMemo(() => order?.dropOffLocation ?? null, [order?.dropOffLocation]);
+
+    useEffect(() => {
+        let isCancelled = false;
+
+        const loadDeliveryRoute = async () => {
+            if (!isDeliveryPhase || !pickupLocation || !dropoffLocation) {
+                setDeliveryRouteCoordinates([]);
+                return;
+            }
+
+            if (
+                typeof pickupLocation.latitude !== 'number' ||
+                typeof pickupLocation.longitude !== 'number' ||
+                typeof dropoffLocation.latitude !== 'number' ||
+                typeof dropoffLocation.longitude !== 'number'
+            ) {
+                setDeliveryRouteCoordinates([]);
+                return;
+            }
+
+            const result = await fetchRoute(
+                { latitude: pickupLocation.latitude, longitude: pickupLocation.longitude },
+                { latitude: dropoffLocation.latitude, longitude: dropoffLocation.longitude },
+            );
+
+            if (isCancelled) {
+                return;
+            }
+
+            setDeliveryRouteCoordinates(result?.coordinates ?? []);
+        };
+
+        loadDeliveryRoute();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [isDeliveryPhase, pickupLocation, dropoffLocation]);
+
+    const deliveryRouteShape = useMemo(() => {
+        if (deliveryRouteCoordinates.length < 2) {
+            return null;
+        }
+
+        return {
+            type: 'Feature' as const,
+            properties: {},
+            geometry: {
+                type: 'LineString' as const,
+                coordinates: deliveryRouteCoordinates.map((coord) => [coord.longitude, coord.latitude]),
+            },
+        };
+    }, [deliveryRouteCoordinates]);
+
+    const getRoadSnappedLocation = useCallback(
+        (
+            location: { latitude: number; longitude: number; address: string } | null,
+            maxDistanceM: number,
+        ) => {
+            if (!location || deliveryRouteCoordinates.length < 2) {
+                return location;
+            }
+
+            const snapped = snapPointToRoute(location, deliveryRouteCoordinates);
+            if (!snapped || snapped.distanceM > maxDistanceM) {
+                return location;
+            }
+
+            return {
+                ...location,
+                latitude: snapped.latitude,
+                longitude: snapped.longitude,
+            };
+        },
+        [deliveryRouteCoordinates],
+    );
+
+    const liveDriverTargetLocation = useMemo(() => {
+        if (!liveDriverRawLocation) {
+            return null;
+        }
+        return getRoadSnappedLocation(liveDriverRawLocation, ROUTE_SNAP_MAX_DISTANCE_M);
+    }, [liveDriverRawLocation, getRoadSnappedLocation]);
 
     // ─── Status ─────────────────────────────────────────────
     const config = STATUS_CONFIG[customerVisibleStatus] || STATUS_CONFIG.PENDING;
@@ -713,6 +859,17 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const currentEta = isPreparingPhase ? preparationEta : isDeliveryPhase ? deliveryEta : null;
     const currentEtaLabel = isPreparingPhase ? t.orders.details.est_ready : isDeliveryPhase ? t.orders.details.est_delivery : '';
 
+    // ─── Navigate back when order transitions to DELIVERED ──
+    // (so only the global success modal is shown, not the completed order view)
+    const prevStatusRef = useRef<string | undefined>(undefined);
+    useEffect(() => {
+        const prev = prevStatusRef.current;
+        prevStatusRef.current = status;
+        if (prev !== undefined && prev !== 'DELIVERED' && status === 'DELIVERED') {
+            router.back();
+        }
+    }, [status]);
+
     // ─── Elapsed time ticker ────────────────────────────────
     const [, setTick] = useState(0);
     useEffect(() => {
@@ -754,19 +911,6 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
             updateLiveActivity({ driverName: driverName || 'Driver', estimatedMinutes: etaMinutes, status: liveStatus });
         }
     }, [status, customerVisibleStatus, isCompleted, isCancelled, deliveryEta, preparationEta, isDeliveryPhase, isPreparingPhase, driverName, startLiveActivity, updateLiveActivity, endLiveActivity]);
-
-    // ─── Detect Delivered → Show Success Modal ────────────────────────
-    useEffect(() => {
-        if (order && prevStatusRef.current !== null && prevStatusRef.current !== 'DELIVERED' && order.status === 'DELIVERED') {
-            const orderId = order.id;
-            console.log('[OrderDetails] Order delivered, showing success modal:', orderId);
-            
-            // Clear cart and show success modal
-            clearCart();
-            showSuccess(orderId, 'order_delivered');
-        }
-        if (order) prevStatusRef.current = order.status ?? null;
-    }, [order?.status, clearCart, showSuccess]);
 
     // ─── Map Fitting (status-aware) ────────────────────────
     const fitMapToMarkers = useCallback(() => {
@@ -1136,16 +1280,21 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                 €{order.orderPrice?.toFixed(2)}
                             </Text>
                         </View>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14, paddingLeft: 24 }}>
-                            <Text style={{ fontSize: 14, color: theme.colors.subtext, fontWeight: '500' }}>{t.common.delivery}</Text>
-                            <Text style={{ fontSize: 14, color: theme.colors.text, fontWeight: '600' }}>
-                                €{order.deliveryPrice?.toFixed(2)}
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10, paddingLeft: 24 }}>
+                            <Text style={{ fontSize: 14, color: '#22C55E', fontWeight: '600' }}>{t.common.delivery_fee || 'Delivery fee'}</Text>
+                            <Text style={{ fontSize: 14, color: '#22C55E', fontWeight: '700' }}>
+                                €{(order.deliveryPrice ?? 0).toFixed(2)}
                             </Text>
                         </View>
                         <View style={{
-                            paddingTop: 14,
-                            borderTopWidth: 2,
+                            borderTopWidth: 1,
                             borderTopColor: theme.colors.border,
+                            borderStyle: 'dashed',
+                            marginVertical: 6,
+                            marginHorizontal: 24,
+                        }} />
+                        <View style={{
+                            paddingTop: 8,
                             flexDirection: 'row',
                             justifyContent: 'space-between',
                             alignItems: 'center',
@@ -1301,6 +1450,22 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                 zoomLevel: 15.5,
                             }}
                         />
+
+                        {/* Road route for delivery phase (helps anchor movement to streets) */}
+                        {isDeliveryPhase && deliveryRouteShape && (
+                            <MapLibreGL.ShapeSource id="delivery-route-source" shape={deliveryRouteShape as any}>
+                                <MapLibreGL.LineLayer
+                                    id="delivery-route-line"
+                                    style={{
+                                        lineColor: '#A78BFA',
+                                        lineWidth: 5,
+                                        lineOpacity: 0.55,
+                                        lineCap: 'round',
+                                        lineJoin: 'round',
+                                    }}
+                                />
+                            </MapLibreGL.ShapeSource>
+                        )}
 
                         {/* Business marker (always visible while order is active) */}
                         {pickupLocation && typeof pickupLocation.latitude === 'number' && typeof pickupLocation.longitude === 'number' && (
@@ -1661,12 +1826,30 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                 <View style={{
                                     borderTopWidth: 1, borderTopColor: theme.colors.border + '30',
                                     marginTop: 8, paddingTop: 10,
-                                    flexDirection: 'row', justifyContent: 'space-between',
+                                    gap: 6,
                                 }}>
-                                    <Text style={{ color: theme.colors.text, fontSize: 15, fontWeight: '700' }}>{t.common.total}</Text>
-                                    <Text style={{ color: config.color, fontSize: 15, fontWeight: '800' }}>
-                                        €{order.totalPrice?.toFixed(2)}
-                                    </Text>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Text style={{ color: '#22C55E', fontSize: 12, fontWeight: '600' }}>
+                                            {t.common.delivery_fee || 'Delivery fee'}
+                                        </Text>
+                                        <Text style={{ color: '#22C55E', fontSize: 12, fontWeight: '700' }}>
+                                            €{(order.deliveryPrice ?? 0).toFixed(2)}
+                                        </Text>
+                                    </View>
+                                    <View
+                                        style={{
+                                            borderTopWidth: 1,
+                                            borderTopColor: theme.colors.border,
+                                            borderStyle: 'dashed',
+                                            marginVertical: 4,
+                                        }}
+                                    />
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Text style={{ color: theme.colors.text, fontSize: 15, fontWeight: '700' }}>{t.common.total}</Text>
+                                        <Text style={{ color: config.color, fontSize: 15, fontWeight: '800' }}>
+                                            €{order.totalPrice?.toFixed(2)}
+                                        </Text>
+                                    </View>
                                 </View>
                             </View>
                         )}

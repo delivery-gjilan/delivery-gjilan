@@ -134,6 +134,13 @@
       "when": 1773335655995,
       "tag": "0018_blue_flatman",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1773374923179,
+      "tag": "0019_lovely_yellow_claw",
+      "breakpoints": true
     }
   ]
 }

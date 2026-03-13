@@ -1,242 +1,68 @@
 # Delivery Gjilan
 
-## Prerequisites
+Delivery Gjilan is a monorepo for the delivery platform: one API, one admin web app, four mobile apps, and an optional local observability stack.
 
-Ensure you have the following installed on your machine:
+## Workspace Layout
 
--   **Node.js**: v20 or higher
-    ```bash
-    node -v
-    ```
--   **TypeScript**: v5.7 or higher
-    ```bash
-    tsc -v
-    ```
--   **Docker**: v24
-    ```bash
-    docker --version
-    ```
--   **Docker Compose**: v2
-    ```bash
-    docker compose version
-    ```
+- `api` - GraphQL API, websocket subscriptions, business logic, Drizzle repositories, driver heartbeat/watchdog services
+- `admin-panel` - Next.js admin dashboard for operations, finance, users, and live map workflows
+- `mobile-customer` - customer ordering and live delivery tracking app
+- `mobile-driver` - driver app with heartbeat, navigation, and delivery execution flows
+- `mobile-business` - business app for order handling and store operations
+- `mobile-admin` - mobile admin companion app
+- `observability` - local Grafana, Loki, Promtail, and Sentry-oriented setup notes
 
----
+## Quick Start
 
-## Development Environment Setup
+Prerequisites:
 
-### Required VSCode Extensions
+- Node.js 20+
+- Docker with Compose
 
-Install the following extensions for the best development experience:
-
--   **ESLint** - JavaScript/TypeScript linting
--   **GraphQL: Language Feature Support** - GraphQL autocomplete and validation
--   **GraphQL: Syntax Highlighting** - Syntax highlighting for GraphQL
--   **JavaScript and TypeScript Nightly** - Latest TypeScript features
--   **Prettier - Code Formatter** - Code formatting
--   **Tailwind CSS IntelliSense** - Tailwind CSS autocomplete
-
-### Initial Setup
-
-1. **Install root dependencies:**
-
-    ```bash
-    npm install
-    ```
-
-    This sets up the monorepo workspace and installs GraphQLSP for TypeScript LSP support.
-
-2. **Configure TypeScript to use workspace version:**
-
-    - Open any TypeScript file in `admin-panel`
-    - Press `Cmd/Ctrl + Shift + P`
-    - Select **"TypeScript: Select TypeScript Version"** → **"Use Workspace Version"**
-    - Restart TS Server: `Cmd/Ctrl + Shift + P` → **"TypeScript: Restart TS Server"**
-
-3. **Configure Prettier as default formatter:**
-
-    - Open any TypeScript file
-    - Right click and select: **"Format Document With..."**
-    - Select: **"Configure Default Formatter..."**
-    - Choose **"Prettier - Code formatter"**
-
-4. **Format frequently:**
-    > **💡 Pro Tip**: Find the keyboard shortcut for "Format Document" (default: `Ctrl + Shift + I` on Linux/Windows, `Shift + Option + F` on Mac). Format your code frequently as you write to catch errors early and maintain consistent code style.
-
-### GraphQL Operations Organization
-
-GraphQL operations in the admin-panel are organized in `src/graphql/operations/` by domain:
-
-```
-src/graphql/operations/
-├── businesses/
-│   ├── queries.ts       # Business queries
-│   ├── mutations.ts     # Business mutations
-│   └── fragments.ts     # Reusable fragments
-├── products/
-│   ├── queries.ts
-│   ├── mutations.ts
-│   └── fragments.ts
-└── productCategories/
-    ├── queries.ts
-    ├── mutations.ts
-    └── fragments.ts
-```
-
-**Writing GraphQL Operations:**
-
--   Use the `graphql` function from `@/gql` to define operations
--   Each domain has separate files for queries, mutations, and fragments
--   Future: subscriptions will be added for real-time features
-
-**Example:**
-
-```typescript
-import { graphql } from "@/gql";
-
-export const GET_BUSINESSES = graphql(`
-    query GetBusinesses {
-        businesses {
-            id
-            name
-            businessType
-        }
-    }
-`);
-```
-
-**GraphQL Autocomplete:**
-
-If you've set up everything correctly (workspace TypeScript version + GraphQLSP), you'll get:
-
--   ✅ Field autocomplete as you type
--   ✅ Hover information showing types and descriptions
--   ✅ Real-time error detection for invalid fields
--   ✅ Deprecation warnings
-
----
-
-## Mobile Applications
-
-We have three mobile applications:
-- **`mobile-customer`** - Customer app for browsing, ordering, and tracking deliveries
-- **`mobile-driver`** - Driver app for accepting and managing delivery orders
-- **`mobile-business`** - Business app for managing orders, products, and operations
-
-The setup process is similar for all three apps.
-
-### Setup & Run
-
-1. Navigate to the application directory:
-
-    ```bash
-    cd mobile-customer
-    # OR
-    cd mobile-driver
-    # OR
-    cd mobile-business
-    ```
-
-2. Install dependencies:
-
-    ```bash
-    npm install
-    ```
-
-3. Start the development server:
-    ```bash
-    npm start
-    ```
-
-> **Note**: Each mobile app runs on a different port to avoid conflicts:
-> - mobile-customer: port 8082
-> - mobile-driver: port 8083
-> - mobile-business: port 8084
-
-### Running on Device/Emulator
-
-**Option 1: Expo Go (Physical Device)**
-
--   Install the **Expo Go** app on your phone.
--   Ensure your phone and computer are on the **same Wi-Fi network**.
--   Scan the QR code displayed in the terminal after running `npm start`.
-
-**Option 2: Android Emulator**
-
--   Install **Android Studio**.
--   Add the following environment variables to your `~/.bashrc` or `~/.zshrc` (adjust paths as necessary for your system):
-    ```bash
-    # Android SDK paths for Expo development
-    export ANDROID_HOME="/home/edon/Android/Sdk"
-    export ANDROID_SDK_ROOT="/home/edon/Android/Sdk"
-    export PATH="$PATH:/home/edon/Android/Sdk/platform-tools"
-    ```
--   Run `npm start` and press `a` in the terminal to open the app in the Android Emulator.
-
----
-
-## API & Database
-
-### Initial Setup
-
-1. Navigate to the API directory:
-
-    ```bash
-    cd api
-    ```
-
-2. Create the environment file:
-   Create a `.env` file in the `api` directory with the exact contents of `.env.example`:
-
-    ```bash
-    cp .env.example .env
-    ```
-
-3. Install dependencies:
-    ```bash
-    npm install
-    ```
-
-### Database Initialization
-
-1. Start the database container:
-
-    ```bash
-    cd database
-    docker compose up -d
-    # OR if you need sudo
-    sudo docker compose up -d
-    ```
-
-    > **Troubleshooting**: If the container fails to start, port `8081` might be in use.
-    >
-    > - **Recommended**: Find and terminate the process using port `8081`.
-    > - **Alternative**: Change the port in `api/database/docker-compose.yml` AND `api/.env` to an available port.
-
-2. Apply migrations:
-   Return to the `api` directory and run:
-    ```bash
-    npm run db:migrate
-    ```
-    _If this fails, please consult with Edon._
-
-### Running the API
-
-Start the development server:
+Install workspace dependencies:
 
 ```bash
-npm run dev
+npm install
 ```
 
-**Development Workflow:**
+Run the main apps from VS Code tasks or manually:
 
--   The server automatically restarts on code changes.
--   **GraphQL Changes**: Modifying `.graphql` files (e.g., adding fields or queries) automatically triggers `codegen` to generate TypeScript resolvers, then restarts the server.
--   **Environment Variables**: Changes to `.env` require a manual server restart.
+```bash
+cd api && npm run dev
+cd admin-panel && npm run dev
+cd mobile-customer && npm start -- --port 8082
+cd mobile-driver && npm start -- --port 8083
+cd mobile-business && npm start -- --port 8084
+```
 
----
+## Documentation
 
-## Database Development
+Use the docs hub instead of relying on scattered root markdown files:
+
+- [docs/README.md](docs/README.md)
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- [docs/BACKEND/API.md](docs/BACKEND/API.md)
+- [docs/BACKEND/WATCHDOG_HEARTBEAT.md](docs/BACKEND/WATCHDOG_HEARTBEAT.md)
+- [docs/BUSINESS_LOGIC/PRICING_PROMOTIONS.md](docs/BUSINESS_LOGIC/PRICING_PROMOTIONS.md)
+- [docs/MOBILE/OVERVIEW.md](docs/MOBILE/OVERVIEW.md)
+- [docs/MOBILE/PUSH_AND_LIVE_ACTIVITY.md](docs/MOBILE/PUSH_AND_LIVE_ACTIVITY.md)
+- [docs/BUSINESS_LOGIC/SETTLEMENT.md](docs/BUSINESS_LOGIC/SETTLEMENT.md)
+- [docs/OPERATIONS/NOTIFICATIONS.md](docs/OPERATIONS/NOTIFICATIONS.md)
+- [docs/OPERATIONS/MONITORING.md](docs/OPERATIONS/MONITORING.md)
+- [docs/OPERATIONS/APP_STORE_RELEASE.md](docs/OPERATIONS/APP_STORE_RELEASE.md)
+- [docs/OPERATIONS/ANALYTICS.md](docs/OPERATIONS/ANALYTICS.md)
+- [docs/OPERATIONS/SECURITY.md](docs/OPERATIONS/SECURITY.md)
+- [docs/OPERATIONS/OBSERVABILITY.md](docs/OPERATIONS/OBSERVABILITY.md)
+- [docs/OPERATIONS/TESTING_PIPELINE.md](docs/OPERATIONS/TESTING_PIPELINE.md)
+- [docs/OPERATIONS/ENVIRONMENTS_AND_RELEASES.md](docs/OPERATIONS/ENVIRONMENTS_AND_RELEASES.md)
+- [docs/OPERATIONS/DOCKER_AND_STRESS_TESTING.md](docs/OPERATIONS/DOCKER_AND_STRESS_TESTING.md)
+
+## Notes
+
+- Generated build output such as `mobile-customer/dist-test-ios/` should stay out of git.
+- Subscription auth now relies on websocket connection context rather than per-subscription token arguments.
+- The docs under `docs/` are the primary entrypoint for onboarding and maintenance.
+- The old root-level planning and rollout markdown files have been consolidated into the categorized docs under `docs/`.
 
 ### Making Schema Changes
 

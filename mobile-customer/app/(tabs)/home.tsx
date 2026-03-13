@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { View, Text, ScrollView, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/hooks/useTheme';
 import { useBusinesses } from '@/modules/business/hooks/useBusinesses';
 import { CompactRestaurantCard } from '@/modules/business/components/CompactRestaurantCard';
@@ -14,6 +15,8 @@ import { useEstimatedDeliveryPrice } from '@/hooks/useEstimatedDeliveryPrice';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useQuery } from '@apollo/client/react';
 import { GET_BANNERS } from '@/graphql/operations/banners';
+import { useStoreStatus } from '@/hooks/useStoreStatus';
+import type { WoltHeaderBannerType } from '@/components/WoltHeader';
 
 function HorizontalCardSkeleton() {
     const theme = useTheme();
@@ -43,9 +46,17 @@ function HorizontalCardSkeleton() {
 export default function Discover() {
     const theme = useTheme();
     const router = useRouter();
-    const { businesses, loading, error } = useBusinesses();
+    const { businesses, loading, error, refetch } = useBusinesses();
+        useFocusEffect(
+            React.useCallback(() => {
+                void refetch();
+            }, [refetch]),
+        );
+
     const { estimateDeliveryPrice } = useEstimatedDeliveryPrice();
     const { t } = useTranslations();
+    const { bannerEnabled, bannerMessage, bannerType } = useStoreStatus();
+    const showBanner = bannerEnabled && !!bannerMessage;
     
     // Fetch banners from API
     const { data: bannersData, loading: bannersLoading } = useQuery(GET_BANNERS, {
@@ -160,7 +171,11 @@ export default function Discover() {
     return (
         <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }} edges={['top']}>
             <View className="flex-1">
-                <WoltHeader onPressNotifications={() => console.log('Open notifications')} />
+                <WoltHeader
+                    onPressNotifications={() => console.log('Open notifications')}
+                    bannerMessage={showBanner ? bannerMessage : undefined}
+                    bannerType={(bannerType as WoltHeaderBannerType) ?? 'INFO'}
+                />
 
                 {loading ? (
                     <ScrollView showsVerticalScrollIndicator={false}>

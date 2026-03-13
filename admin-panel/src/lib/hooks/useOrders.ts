@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useSubscription } from '@apollo/client/react';
+import { useCallback, useEffect, useRef } from 'react';
 import {
     GET_ORDERS,
     GET_ORDER,
@@ -55,10 +56,52 @@ export function useOrders(): UseOrdersResult {
         fetchPolicy: 'network-only', // Changed from 'cache-and-network' to always fetch fresh data
     });
 
+    const refetchCooldownRef = useRef(0);
+    const refetchInFlightRef = useRef(false);
+    const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (refetchTimerRef.current) {
+                clearTimeout(refetchTimerRef.current);
+                refetchTimerRef.current = null;
+            }
+        };
+    }, []);
+
+    const scheduleRefetch = useCallback(() => {
+        const now = Date.now();
+        const canRunNow = now - refetchCooldownRef.current >= 1200 && !refetchInFlightRef.current;
+
+        if (!canRunNow) {
+            if (refetchTimerRef.current) {
+                return;
+            }
+            refetchTimerRef.current = setTimeout(() => {
+                refetchTimerRef.current = null;
+                if (refetchInFlightRef.current) {
+                    return;
+                }
+                refetchInFlightRef.current = true;
+                refetchCooldownRef.current = Date.now();
+                refetch().finally(() => {
+                    refetchInFlightRef.current = false;
+                });
+            }, 350);
+            return;
+        }
+
+        refetchInFlightRef.current = true;
+        refetchCooldownRef.current = now;
+        refetch().finally(() => {
+            refetchInFlightRef.current = false;
+        });
+    }, [refetch]);
+
     // Real-time subscription for updates — refetch on signal
     useSubscription(ALL_ORDERS_SUBSCRIPTION, {
         onData: () => {
-            refetch();
+            scheduleRefetch();
         },
     });
 

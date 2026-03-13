@@ -7,6 +7,10 @@ export const GET_NOTIFICATION_CAMPAIGNS = gql`
       title
       body
       data
+      imageUrl
+      timeSensitive
+      category
+      relevanceScore
       query
       targetCount
       sentCount
@@ -26,6 +30,10 @@ export const GET_NOTIFICATION_CAMPAIGN = gql`
       title
       body
       data
+      imageUrl
+      timeSensitive
+      category
+      relevanceScore
       query
       targetCount
       sentCount
@@ -59,6 +67,10 @@ export const CREATE_CAMPAIGN = gql`
       id
       title
       body
+      imageUrl
+      timeSensitive
+      category
+      relevanceScore
       status
       createdAt
     }

@@ -2,6 +2,7 @@ import type { MutationResolvers } from './../../../../generated/types.generated'
 import { getDB } from '@/database';
 import { storeSettings } from '@/database/schema/storeSettings';
 import { eq } from 'drizzle-orm';
+import { publish, pubsub, topics } from '@/lib/pubsub';
 
 export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus']> = async (
   _parent,
@@ -56,11 +57,22 @@ export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus
     .limit(1);
 
   const row = current[0]!;
-  return {
+  const result = {
     isStoreClosed: row.isStoreClosed,
     closedMessage: row.closedMessage,
     bannerEnabled: row.bannerEnabled,
     bannerMessage: row.bannerMessage,
     bannerType: (row.bannerType || 'info').toUpperCase(),
   };
+
+  // Broadcast to all subscribed clients
+  publish(pubsub, topics.storeStatusChanged(), {
+    isStoreClosed: result.isStoreClosed,
+    closedMessage: result.closedMessage,
+    bannerEnabled: result.bannerEnabled,
+    bannerMessage: result.bannerMessage,
+    bannerType: result.bannerType,
+  });
+
+  return result as any;
 };

@@ -41,7 +41,7 @@ export default function OrderSuccessScreen({ orderId, type = 'order_created', ph
     const buttonsOpacity = useRef(new Animated.Value(0)).current;
     const buttonsTranslateY = useRef(new Animated.Value(30)).current;
     const confettiRef = useRef<any>(null);
-    const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const autoCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         if (isLoading) {
@@ -117,7 +117,11 @@ export default function OrderSuccessScreen({ orderId, type = 'order_created', ph
         if (autoCloseTimerRef.current) {
             clearTimeout(autoCloseTimerRef.current);
         }
-        onTrackOrder();
+        if (onTrackOrder) {
+            onTrackOrder();
+            return;
+        }
+        onGoHome();
     };
 
     const handleGoHome = () => {

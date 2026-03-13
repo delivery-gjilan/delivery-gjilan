@@ -276,8 +276,12 @@ export type CreateBusinessInput = {
 
 export type CreateCampaignInput = {
   body: Scalars['String']['input'];
+  category?: InputMaybe<Scalars['String']['input']>;
   data?: InputMaybe<Scalars['JSON']['input']>;
+  imageUrl?: InputMaybe<Scalars['String']['input']>;
   query: Scalars['JSON']['input'];
+  relevanceScore?: InputMaybe<Scalars['Float']['input']>;
+  timeSensitive?: InputMaybe<Scalars['Boolean']['input']>;
   title: Scalars['String']['input'];
 };
 
@@ -1232,17 +1236,21 @@ export type Notification = {
 export type NotificationCampaign = {
   __typename?: 'NotificationCampaign';
   body: Scalars['String']['output'];
+  category?: Maybe<Scalars['String']['output']>;
   createdAt: Scalars['DateTime']['output'];
   data?: Maybe<Scalars['JSON']['output']>;
   failedCount: Scalars['Int']['output'];
   id: Scalars['ID']['output'];
+  imageUrl?: Maybe<Scalars['String']['output']>;
   query?: Maybe<Scalars['JSON']['output']>;
+  relevanceScore?: Maybe<Scalars['Float']['output']>;
   sender?: Maybe<User>;
   sentAt?: Maybe<Scalars['DateTime']['output']>;
   sentBy?: Maybe<Scalars['ID']['output']>;
   sentCount: Scalars['Int']['output'];
   status: CampaignStatus;
   targetCount: Scalars['Int']['output'];
+  timeSensitive: Scalars['Boolean']['output'];
   title: Scalars['String']['output'];
 };
 
@@ -1997,6 +2005,7 @@ export type Subscription = {
   orderStatusUpdated: Order;
   settlementCreated: Settlement;
   settlementStatusChanged: Settlement;
+  storeStatusUpdated: StoreStatus;
   userOrdersUpdated: Array<Order>;
 };
 
@@ -2019,7 +2028,7 @@ export type SubscriptiondriverPttSignalArgs = {
 
 
 export type SubscriptionorderDriverLiveTrackingArgs = {
-  input: SubscriptionInput;
+  input?: InputMaybe<SubscriptionInput>;
   orderId: Scalars['ID']['input'];
 };
 
@@ -2040,11 +2049,11 @@ export type SubscriptionsettlementStatusChangedArgs = {
 
 
 export type SubscriptionuserOrdersUpdatedArgs = {
-  input: SubscriptionInput;
+  input?: InputMaybe<SubscriptionInput>;
 };
 
 export type SubscriptionInput = {
-  token: Scalars['String']['input'];
+  token?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type TokenRefreshResponse = {
@@ -3080,17 +3089,21 @@ export type NotificationResolvers<ContextType = GraphQLContext, ParentType exten
 
 export type NotificationCampaignResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['NotificationCampaign'] = ResolversParentTypes['NotificationCampaign']> = {
   body?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  category?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
   data?: Resolver<Maybe<ResolversTypes['JSON']>, ParentType, ContextType>;
   failedCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   query?: Resolver<Maybe<ResolversTypes['JSON']>, ParentType, ContextType>;
+  relevanceScore?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   sender?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
   sentAt?: Resolver<Maybe<ResolversTypes['DateTime']>, ParentType, ContextType>;
   sentBy?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   sentCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   status?: Resolver<ResolversTypes['CampaignStatus'], ParentType, ContextType>;
   targetCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  timeSensitive?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   title?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
@@ -3507,11 +3520,12 @@ export type SubscriptionResolvers<ContextType = GraphQLContext, ParentType exten
   driverConnectionStatusChanged?: SubscriptionResolver<ResolversTypes['DriverConnection'], "driverConnectionStatusChanged", ParentType, ContextType, RequireFields<SubscriptiondriverConnectionStatusChangedArgs, 'driverId'>>;
   driverPttSignal?: SubscriptionResolver<ResolversTypes['DriverPttSignal'], "driverPttSignal", ParentType, ContextType, RequireFields<SubscriptiondriverPttSignalArgs, 'driverId'>>;
   driversUpdated?: SubscriptionResolver<Array<ResolversTypes['User']>, "driversUpdated", ParentType, ContextType>;
-  orderDriverLiveTracking?: SubscriptionResolver<ResolversTypes['OrderDriverLiveTracking'], "orderDriverLiveTracking", ParentType, ContextType, RequireFields<SubscriptionorderDriverLiveTrackingArgs, 'input' | 'orderId'>>;
+  orderDriverLiveTracking?: SubscriptionResolver<ResolversTypes['OrderDriverLiveTracking'], "orderDriverLiveTracking", ParentType, ContextType, RequireFields<SubscriptionorderDriverLiveTrackingArgs, 'orderId'>>;
   orderStatusUpdated?: SubscriptionResolver<ResolversTypes['Order'], "orderStatusUpdated", ParentType, ContextType, RequireFields<SubscriptionorderStatusUpdatedArgs, 'orderId'>>;
   settlementCreated?: SubscriptionResolver<ResolversTypes['Settlement'], "settlementCreated", ParentType, ContextType, Partial<SubscriptionsettlementCreatedArgs>>;
   settlementStatusChanged?: SubscriptionResolver<ResolversTypes['Settlement'], "settlementStatusChanged", ParentType, ContextType, RequireFields<SubscriptionsettlementStatusChangedArgs, 'id'>>;
-  userOrdersUpdated?: SubscriptionResolver<Array<ResolversTypes['Order']>, "userOrdersUpdated", ParentType, ContextType, RequireFields<SubscriptionuserOrdersUpdatedArgs, 'input'>>;
+  storeStatusUpdated?: SubscriptionResolver<ResolversTypes['StoreStatus'], "storeStatusUpdated", ParentType, ContextType>;
+  userOrdersUpdated?: SubscriptionResolver<Array<ResolversTypes['Order']>, "userOrdersUpdated", ParentType, ContextType, Partial<SubscriptionuserOrdersUpdatedArgs>>;
 };
 
 export type TokenRefreshResponseResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['TokenRefreshResponse'] = ResolversParentTypes['TokenRefreshResponse']> = {

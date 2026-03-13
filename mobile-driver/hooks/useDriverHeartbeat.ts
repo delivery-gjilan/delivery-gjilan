@@ -21,7 +21,8 @@ import { getValidAccessToken } from '@/lib/graphql/authSession';
 import { useNavigationLocationStore } from '@/store/navigationLocationStore';
 import { useNavigationStore } from '@/store/navigationStore';
 
-const HEARTBEAT_INTERVAL_MS = 5000; // Every 5 seconds
+const DEFAULT_HEARTBEAT_INTERVAL_MS = 5000; // Every 5 seconds
+const ACTIVE_DELIVERY_HEARTBEAT_INTERVAL_MS = 2000; // Every 2 seconds when OUT_FOR_DELIVERY
 const BACKGROUND_HEARTBEAT_TASK = 'driver-heartbeat-background-task';
 
 const DRIVER_HEARTBEAT_MUTATION = gql`
@@ -122,13 +123,22 @@ if (!TaskManager.isTaskDefined(BACKGROUND_HEARTBEAT_TASK)) {
 
 export function useDriverHeartbeat() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const navigationOrderStatus = useNavigationStore((state) => state.order?.status);
   const [sendHeartbeat] = useMutation(DRIVER_HEARTBEAT_MUTATION);
   
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const activeHeartbeatIntervalMsRef = useRef<number>(DEFAULT_HEARTBEAT_INTERVAL_MS);
+  const backgroundIntervalMsRef = useRef<number | null>(null);
   const locationWatchRef = useRef<Location.LocationSubscription | null>(null);
   const lastLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('DISCONNECTED');
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+
+  const getHeartbeatIntervalMs = useCallback(() => {
+    const navState = useNavigationStore.getState();
+    const isOutForDelivery = navState.isNavigating && navState.order?.status === 'OUT_FOR_DELIVERY';
+    return isOutForDelivery ? ACTIVE_DELIVERY_HEARTBEAT_INTERVAL_MS : DEFAULT_HEARTBEAT_INTERVAL_MS;
+  }, []);
 
   const getNavigationEtaPayload = useCallback(() => {
     const navState = useNavigationStore.getState();
@@ -147,11 +157,15 @@ export function useDriverHeartbeat() {
     };
   }, []);
 
-  const startBackgroundHeartbeat = useCallback(async () => {
+  const startBackgroundHeartbeat = useCallback(async (intervalMs: number) => {
     try {
       const hasStarted = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_HEARTBEAT_TASK);
-      if (hasStarted) {
+      if (hasStarted && backgroundIntervalMsRef.current === intervalMs) {
         return;
+      }
+
+      if (hasStarted) {
+        await Location.stopLocationUpdatesAsync(BACKGROUND_HEARTBEAT_TASK);
       }
 
       const backgroundPermission = await Location.requestBackgroundPermissionsAsync();
@@ -162,7 +176,7 @@ export function useDriverHeartbeat() {
 
       await Location.startLocationUpdatesAsync(BACKGROUND_HEARTBEAT_TASK, {
         accuracy: Location.Accuracy.Balanced,
-        timeInterval: HEARTBEAT_INTERVAL_MS,
+        timeInterval: intervalMs,
         distanceInterval: 5,
         pausesUpdatesAutomatically: false,
         showsBackgroundLocationIndicator: true,
@@ -172,7 +186,8 @@ export function useDriverHeartbeat() {
         },
       });
 
-      console.log('[Heartbeat] Background heartbeat started');
+      backgroundIntervalMsRef.current = intervalMs;
+      console.log('[Heartbeat] Background heartbeat started', { intervalMs });
     } catch (error) {
       console.warn('[Heartbeat] Failed to start background heartbeat:', error);
     }
@@ -186,6 +201,7 @@ export function useDriverHeartbeat() {
       }
 
       await Location.stopLocationUpdatesAsync(BACKGROUND_HEARTBEAT_TASK);
+      backgroundIntervalMsRef.current = null;
       console.log('[Heartbeat] Background heartbeat stopped');
     } catch (error) {
       console.warn('[Heartbeat] Failed to stop background heartbeat:', error);
@@ -398,6 +414,26 @@ export function useDriverHeartbeat() {
     }
   }, [getCurrentLocation, getNavigationEtaPayload, sendHeartbeat]);
 
+  const applyHeartbeatInterval = useCallback(async () => {
+    const intervalMs = getHeartbeatIntervalMs();
+    const previousMs = activeHeartbeatIntervalMsRef.current;
+
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+    }
+
+    heartbeatIntervalRef.current = setInterval(doHeartbeat, intervalMs);
+    activeHeartbeatIntervalMsRef.current = intervalMs;
+
+    await startBackgroundHeartbeat(intervalMs);
+
+    if (previousMs !== intervalMs) {
+      console.log('[Heartbeat] Interval changed', { fromMs: previousMs, toMs: intervalMs });
+    } else {
+      console.log('[Heartbeat] Interval applied', { intervalMs });
+    }
+  }, [doHeartbeat, getHeartbeatIntervalMs, startBackgroundHeartbeat]);
+
   // Start heartbeat loop
   const startHeartbeat = useCallback(async () => {
     if (heartbeatIntervalRef.current) {
@@ -412,13 +448,13 @@ export function useDriverHeartbeat() {
 
     // Send immediate heartbeat
     await startLocationWatch();
-    await startBackgroundHeartbeat();
-    console.log('[Heartbeat] Starting (interval: 5s)');
+    const initialIntervalMs = getHeartbeatIntervalMs();
+    console.log('[Heartbeat] Starting', { intervalMs: initialIntervalMs });
     await doHeartbeat();
 
-    // Start interval
-    heartbeatIntervalRef.current = setInterval(doHeartbeat, HEARTBEAT_INTERVAL_MS);
-  }, [requestPermissions, doHeartbeat, startLocationWatch]);
+    // Start interval (adaptive by delivery phase)
+    await applyHeartbeatInterval();
+  }, [requestPermissions, doHeartbeat, startLocationWatch, getHeartbeatIntervalMs, applyHeartbeatInterval]);
 
   // Stop heartbeat loop
   const stopHeartbeat = useCallback(() => {
@@ -447,6 +483,7 @@ export function useDriverHeartbeat() {
           console.log('[Heartbeat] Heartbeat stopped while backgrounded, restarting...');
           startHeartbeat();
         } else {
+          applyHeartbeatInterval();
           console.log('[Heartbeat] App foregrounded, heartbeat interval active');
         }
       }
@@ -457,7 +494,16 @@ export function useDriverHeartbeat() {
     return () => {
       subscription.remove();
     };
-  }, [isAuthenticated, startHeartbeat, doHeartbeat, startLocationWatch]);
+  }, [isAuthenticated, startHeartbeat, startLocationWatch, applyHeartbeatInterval]);
+
+  // Re-apply interval when delivery phase/status changes (2s on OUT_FOR_DELIVERY, 5s otherwise)
+  useEffect(() => {
+    if (!isAuthenticated || !heartbeatIntervalRef.current) {
+      return;
+    }
+
+    applyHeartbeatInterval();
+  }, [isAuthenticated, navigationOrderStatus, applyHeartbeatInterval]);
 
   // Main effect - start/stop based on auth only
   // Keep heartbeat active even if the driver toggles offline preference
