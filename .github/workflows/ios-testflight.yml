@@ -39,6 +39,13 @@ jobs:
         working-directory: ${{ env.APP_DIR }}
         run: npx expo prebuild --platform ios --non-interactive
 
+      - name: Restore Fastlane files into generated ios folder
+        run: |
+          mkdir -p "${{ env.APP_DIR }}/ios/fastlane"
+          cp "${{ env.APP_DIR }}/ci/ios-fastlane/Gemfile" "${{ env.APP_DIR }}/ios/Gemfile"
+          cp "${{ env.APP_DIR }}/ci/ios-fastlane/fastlane/Fastfile" "${{ env.APP_DIR }}/ios/fastlane/Fastfile"
+          cp "${{ env.APP_DIR }}/ci/ios-fastlane/fastlane/Appfile" "${{ env.APP_DIR }}/ios/fastlane/Appfile"
+
       - name: Setup Ruby with bundler cache
         uses: ruby/setup-ruby@v1
         env:
