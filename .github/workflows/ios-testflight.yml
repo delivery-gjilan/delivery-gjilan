@@ -229,11 +229,17 @@ jobs:
 
       - name: Show gym log on failure
         if: failure()
+        working-directory: ${{ env.APP_DIR }}/ios
         run: |
-          LOG_FILE=$(ls -t /Users/runner/Library/Logs/gym/*.log 2>/dev/null | head -n1 || true)
+          LOG_FILE=$(ls -t buildlogs/*.log 2>/dev/null | head -n1 || true)
+          if [ -z "$LOG_FILE" ]; then
+            LOG_FILE=$(ls -t /Users/runner/Library/Logs/gym/*.log 2>/dev/null | head -n1 || true)
+          fi
           if [ -n "$LOG_FILE" ]; then
             echo "Showing log: $LOG_FILE"
             tail -n 300 "$LOG_FILE"
+            echo "\nTop xcode errors (first 40):"
+            grep -nE "error:|\*\* ARCHIVE FAILED \*\*|no such module|module map file .* not found" "$LOG_FILE" | head -n 40 || true
           else
             echo "No gym log file found"
           fi
@@ -243,5 +249,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-gym-logs
-          path: /Users/runner/Library/Logs/gym/*.log
+          path: |
+            mobile-customer/ios/buildlogs/*.log
+            /Users/runner/Library/Logs/gym/*.log
           if-no-files-found: ignore
