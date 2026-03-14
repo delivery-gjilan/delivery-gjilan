@@ -184,7 +184,9 @@ jobs:
           fi
 
           echo "IOS_MAIN_PROFILE_NAME=$APP_NAME" >> "$GITHUB_ENV"
+          echo "IOS_MAIN_PROFILE_UUID=$APP_UUID" >> "$GITHUB_ENV"
           echo "IOS_EXTENSION_PROFILE_NAME=$EXT_NAME" >> "$GITHUB_ENV"
+          echo "IOS_EXTENSION_PROFILE_UUID=$EXT_UUID" >> "$GITHUB_ENV"
           security find-identity -v -p codesigning
 
       - name: Build and upload to TestFlight
@@ -198,6 +200,8 @@ jobs:
           IOS_TEAM_ID: ${{ env.IOS_TEAM_ID }}
           IOS_APP_BUNDLE_ID: ${{ env.IOS_APP_BUNDLE_ID }}
           IOS_EXTENSION_BUNDLE_ID: ${{ env.IOS_EXTENSION_BUNDLE_ID }}
+          IOS_MAIN_PROFILE_UUID: ${{ env.IOS_MAIN_PROFILE_UUID }}
+          IOS_EXTENSION_PROFILE_UUID: ${{ env.IOS_EXTENSION_PROFILE_UUID }}
         run: bundle exec fastlane beta
 
       - name: Show gym log on failure
