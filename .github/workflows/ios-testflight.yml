@@ -219,20 +219,17 @@ jobs:
         run: security find-identity -v -p codesigning || true
 
       - name: Build and upload to TestFlight
-        working-directory: ${{ env.APP_DIR }}/ios
-        env:
-          # Add these two lines to skip Sentry:
-          SENTRY_DISABLE_AUTO_UPLOAD: "true"
-          SENTRY_ALLOW_FAILURE: "true"
-          
-          # Keep your existing variables below:
-          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          IOS_TEAM_ID: ${{ env.IOS_TEAM_ID }}
-          IOS_APP_BUNDLE_ID: ${{ env.IOS_APP_BUNDLE_ID }}
-          IOS_EXTENSION_BUNDLE_ID: ${{ env.IOS_EXTENSION_BUNDLE_ID }}
-        run: bundle exec fastlane beta
+        working-directory: ${{ env.APP_DIR }}/ios
+        env:
+          SENTRY_DISABLE_AUTO_UPLOAD: "true"
+          SENTRY_ALLOW_FAILURE: "true"
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          IOS_TEAM_ID: ${{ env.IOS_TEAM_ID }}
+          IOS_APP_BUNDLE_ID: ${{ env.IOS_APP_BUNDLE_ID }}
+          IOS_EXTENSION_BUNDLE_ID: ${{ env.IOS_EXTENSION_BUNDLE_ID }}
+        run: bundle exec fastlane beta
 
       - name: Show gym log on failure
         if: failure()
