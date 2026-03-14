@@ -12,42 +12,49 @@ platform :ios do
       in_house: false
     )
 
+    # Discover workspace/project from env (set by CI) or by scanning the ios/ directory.
+    # Fastfile runs from within mobile-customer/ios/, so paths are relative to that.
     workspace_path = ENV["IOS_WORKSPACE_PATH"]
-    project_path = ENV["IOS_PROJECT_PATH"]
+    project_path   = ENV["IOS_PROJECT_PATH"]
 
     if workspace_path.to_s.empty?
-      workspace_candidates = Dir["**/*.xcworkspace"].sort.reject { |path| path.include?(".xcodeproj/") }
-      workspace_path = workspace_candidates.first
+      workspace_path = Dir["**/*.xcworkspace"]
+                         .reject { |p| p.include?(".xcodeproj/") }
+                         .sort
+                         .first
     end
 
     if project_path.to_s.empty?
-      project_candidates = Dir["**/*.xcodeproj"].sort.reject { |path| path.include?("Pods.xcodeproj") }
-      project_path = project_candidates.first
+      project_path = Dir["**/*.xcodeproj"]
+                       .reject { |p| p.include?("Pods.xcodeproj") }
+                       .sort
+                       .first
     end
 
     UI.user_error!("No .xcworkspace or .xcodeproj found in the ios directory.") unless workspace_path || project_path
 
-    scheme_name = ENV["IOS_SCHEME"]
-    if scheme_name.to_s.empty?
-      scheme_name =
-        if workspace_path
-          File.basename(workspace_path, ".xcworkspace")
-        else
-          File.basename(project_path, ".xcodeproj")
-        end
+    # Prefer workspace (CocoaPods); fall back to bare project
+    scheme_name = ENV["IOS_SCHEME"].to_s
+    if scheme_name.empty?
+      scheme_name = if workspace_path
+                      File.basename(workspace_path, ".xcworkspace")
+                    else
+                      File.basename(project_path, ".xcodeproj")
+                    end
     end
 
-    build_path = File.expand_path("../build", __dir__)
-    buildlog_path = File.expand_path("../buildlogs", __dir__)
-    team_id = ENV["IOS_TEAM_ID"] || "87K8YXG5V8"
-    app_bundle_id = ENV["IOS_APP_BUNDLE_ID"] || "com.anonymous.mobilecustomer"
-    extension_bundle_id = ENV["IOS_EXTENSION_BUNDLE_ID"] || "com.anonymous.mobilecustomer.DeliveryLiveActivityExtension"
-    app_profile_name = ENV["IOS_MAIN_PROFILE_NAME"]
+    build_path     = File.expand_path("../build",     __dir__)
+    buildlog_path  = File.expand_path("../buildlogs", __dir__)
+    team_id              = ENV["IOS_TEAM_ID"]              || "87K8YXG5V8"
+    app_bundle_id        = ENV["IOS_APP_BUNDLE_ID"]        || "com.anonymous.mobilecustomer"
+    extension_bundle_id  = ENV["IOS_EXTENSION_BUNDLE_ID"]  || "com.anonymous.mobilecustomer.DeliveryLiveActivityExtension"
+    app_profile_name     = ENV["IOS_MAIN_PROFILE_NAME"]
     extension_profile_name = ENV["IOS_EXTENSION_PROFILE_NAME"]
 
-    UI.user_error!("Missing IOS_MAIN_PROFILE_NAME in environment") if app_profile_name.to_s.empty?
+    UI.user_error!("Missing IOS_MAIN_PROFILE_NAME in environment")      if app_profile_name.to_s.empty?
     UI.user_error!("Missing IOS_EXTENSION_PROFILE_NAME in environment") if extension_profile_name.to_s.empty?
 
+    # Apply manual code-signing settings to the .xcodeproj (skip when project is absent)
     unless project_path.to_s.empty?
       update_code_signing_settings(
         use_automatic_signing: false,
@@ -70,6 +77,23 @@ platform :ios do
       )
     end
 
+    # Sync Live Activity Extension version/build to match the main app.
+    # Expo prebuild always generates these paths relative to ios/.
+    app_info_plist       = "mobilecustomer/Info.plist"
+    extension_info_plist = "DeliveryLiveActivityExtension/Info.plist"
+
+    if File.exist?(app_info_plist) && File.exist?(extension_info_plist)
+      app_version = get_info_plist_value(path: app_info_plist, key: "CFBundleShortVersionString")
+      app_build   = get_info_plist_value(path: app_info_plist, key: "CFBundleVersion")
+
+      set_info_plist_value(path: extension_info_plist, key: "CFBundleShortVersionString", value: app_version)
+      set_info_plist_value(path: extension_info_plist, key: "CFBundleVersion",            value: app_build)
+
+      UI.success("Synced Extension to version #{app_version} build #{app_build}")
+    else
+      UI.important("Could not find Info.plist files to sync versions — skipping.")
+    end
+
     gym_options = {
       scheme: scheme_name,
       clean: true,
@@ -82,18 +106,15 @@ platform :ios do
         method: "app-store",
         signingStyle: "manual",
         provisioningProfiles: {
-          app_bundle_id => app_profile_name,
+          app_bundle_id       => app_profile_name,
           extension_bundle_id => extension_profile_name
         }
       },
       export_xcargs: "-allowProvisioningUpdates"
     }
 
-    if workspace_path
-      gym_options[:workspace] = workspace_path
-    else
-      gym_options[:project] = project_path
-    end
+    gym_options[:workspace] = workspace_path if workspace_path
+    gym_options[:project]   = project_path   if !workspace_path && project_path
 
     ipa_path = gym(**gym_options)
 
