@@ -362,7 +362,6 @@ function withLiveActivityExtensionTarget(config) {
 
         if (!existing) {
           buildConfig.buildSettings.EXCLUDED_SOURCE_FILE_NAMES = [
-            '$(inherited)',
             ...exclusionsToEnsure,
           ];
           continue;
