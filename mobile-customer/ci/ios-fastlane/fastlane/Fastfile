@@ -70,6 +70,26 @@ platform :ios do
       )
     end
 
+    # ==========================================
+    # VERSION & BUILD NUMBER SYNC
+    # ==========================================
+    # Ensures the Live Activity Extension matches the Main App
+    app_info_plist = File.join(File.dirname(project_path), "mobilecustomer", "Info.plist")
+    extension_info_plist = File.join(File.dirname(project_path), "DeliveryLiveActivityExtension", "Info.plist")
+
+    if File.exist?(app_info_plist) && File.exist?(extension_info_plist)
+      app_version = get_info_plist_value(path: app_info_plist, key: "CFBundleShortVersionString")
+      app_build = get_info_plist_value(path: app_info_plist, key: "CFBundleVersion")
+
+      set_info_plist_value(path: extension_info_plist, key: "CFBundleShortVersionString", value: app_version)
+      set_info_plist_value(path: extension_info_plist, key: "CFBundleVersion", value: app_build)
+      
+      UI.success("✅ Synced Extension Version to #{app_version} and Build to #{app_build}")
+    else
+      UI.important("⚠️ Could not find Info.plist files to sync versions. Check your directory structure if validation fails.")
+    end
+    # ==========================================
+
     gym_options = {
       scheme: scheme_name,
       clean: true,
