@@ -418,7 +418,7 @@ function withLiveActivityExtensionTarget(config) {
     ensureGroupRecursively(project, EXTENSION_TARGET_NAME);
 
     addBuildSourceFileToGroup({
-      filepath: 'DeliveryActivityAttributes.swift',
+      filepath: `${EXTENSION_TARGET_NAME}/DeliveryActivityAttributes.swift`,
       groupName: EXTENSION_TARGET_NAME,
       project,
       targetUuid: target.uuid,
@@ -426,7 +426,7 @@ function withLiveActivityExtensionTarget(config) {
     });
 
     addBuildSourceFileToGroup({
-      filepath: 'DeliveryLiveActivityWidget.swift',
+      filepath: `${EXTENSION_TARGET_NAME}/DeliveryLiveActivityWidget.swift`,
       groupName: EXTENSION_TARGET_NAME,
       project,
       targetUuid: target.uuid,
@@ -512,8 +512,8 @@ function withDeliveryLiveActivitiesModuleTarget(config) {
     ensureGroupRecursively(project, appName);
 
     const nativeModuleFiles = [
-      'DeliveryLiveActivities.swift',
-      'DeliveryLiveActivities.m',
+      `${appName}/DeliveryLiveActivities.swift`,
+      `${appName}/DeliveryLiveActivities.m`,
     ];
 
     for (const file of nativeModuleFiles) {
