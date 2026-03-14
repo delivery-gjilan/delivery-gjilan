@@ -354,24 +354,28 @@ function withLiveActivityExtensionTarget(config) {
           continue;
         }
 
-        const exclusionPattern = `${EXTENSION_TARGET_NAME}/*.swift`;
+        const exclusionsToEnsure = [
+          'DeliveryActivityAttributes.swift',
+          'DeliveryLiveActivityWidget.swift',
+        ];
         const existing = buildConfig.buildSettings.EXCLUDED_SOURCE_FILE_NAMES;
 
         if (!existing) {
           buildConfig.buildSettings.EXCLUDED_SOURCE_FILE_NAMES = [
             '$(inherited)',
-            exclusionPattern,
+            ...exclusionsToEnsure,
           ];
           continue;
         }
 
         const existingValues = Array.isArray(existing) ? existing : [existing];
-        if (!existingValues.includes(exclusionPattern)) {
-          buildConfig.buildSettings.EXCLUDED_SOURCE_FILE_NAMES = [
-            ...existingValues,
-            exclusionPattern,
-          ];
+        const nextValues = [...existingValues];
+        for (const exclusion of exclusionsToEnsure) {
+          if (!nextValues.includes(exclusion)) {
+            nextValues.push(exclusion);
+          }
         }
+        buildConfig.buildSettings.EXCLUDED_SOURCE_FILE_NAMES = nextValues;
       }
     };
 
