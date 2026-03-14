@@ -318,6 +318,63 @@ function withLiveActivityExtensionTarget(config) {
   return withXcodeProject(config, (cfg) => {
     const project = cfg.modResults;
 
+    const setMainTargetSourceExclusions = () => {
+      const nativeTargets = project.pbxNativeTargetSection();
+      const buildConfigLists = project.pbxXCConfigurationList();
+      const buildConfigSection = project.pbxXCBuildConfigurationSection();
+
+      const mainAppTargetEntry = Object.entries(nativeTargets).find(([, target]) => {
+        return (
+          target &&
+          typeof target === 'object' &&
+          target.productType === '"com.apple.product-type.application"'
+        );
+      });
+
+      if (!mainAppTargetEntry) {
+        return;
+      }
+
+      const [mainTargetUuid] = mainAppTargetEntry;
+      const mainTarget = nativeTargets[mainTargetUuid];
+      if (!mainTarget || !mainTarget.buildConfigurationList) {
+        return;
+      }
+
+      const configListId = String(mainTarget.buildConfigurationList).split(' ')[0].replace(/"/g, '');
+      const configList = buildConfigLists[configListId];
+      if (!configList || !Array.isArray(configList.buildConfigurations)) {
+        return;
+      }
+
+      for (const configRef of configList.buildConfigurations) {
+        const configId = String(configRef.value || configRef).split(' ')[0].replace(/"/g, '');
+        const buildConfig = buildConfigSection[configId];
+        if (!buildConfig || !buildConfig.buildSettings) {
+          continue;
+        }
+
+        const exclusionPattern = `${EXTENSION_TARGET_NAME}/*.swift`;
+        const existing = buildConfig.buildSettings.EXCLUDED_SOURCE_FILE_NAMES;
+
+        if (!existing) {
+          buildConfig.buildSettings.EXCLUDED_SOURCE_FILE_NAMES = [
+            '$(inherited)',
+            exclusionPattern,
+          ];
+          continue;
+        }
+
+        const existingValues = Array.isArray(existing) ? existing : [existing];
+        if (!existingValues.includes(exclusionPattern)) {
+          buildConfig.buildSettings.EXCLUDED_SOURCE_FILE_NAMES = [
+            ...existingValues,
+            exclusionPattern,
+          ];
+        }
+      }
+    };
+
     const getMainAppDevelopmentTeam = () => {
       const nativeTargets = project.pbxNativeTargetSection();
       const buildConfigLists = project.pbxXCConfigurationList();
@@ -396,6 +453,7 @@ function withLiveActivityExtensionTarget(config) {
       if (existingTarget?.uuid && resolvedDevelopmentTeam) {
         setTargetSigning(existingTarget.uuid, resolvedDevelopmentTeam);
       }
+      setMainTargetSourceExclusions();
       console.log('[LiveActivityExtension] Extension target already exists, skipping target creation');
       return cfg;
     }
@@ -439,6 +497,8 @@ function withLiveActivityExtensionTarget(config) {
     } else {
       console.warn('[LiveActivityExtension] Could not resolve development team for extension target');
     }
+
+    setMainTargetSourceExclusions();
 
     console.log('[LiveActivityExtension] Created extension target and linked Swift sources');
 
