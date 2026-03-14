@@ -16,7 +16,7 @@ platform :ios do
     project_path = ENV["IOS_PROJECT_PATH"]
 
     if workspace_path.to_s.empty?
-      workspace_candidates = Dir["**/*.xcworkspace"].sort
+      workspace_candidates = Dir["**/*.xcworkspace"].sort.reject { |path| path.include?(".xcodeproj/") }
       workspace_path = workspace_candidates.first
     end
 
