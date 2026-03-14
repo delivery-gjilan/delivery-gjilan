@@ -29,6 +29,105 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Preflight — validate signing secrets and provisioning profiles
+        env:
+          IOS_DIST_CERT_BASE64: ${{ secrets.IOS_DIST_CERT_BASE64 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          IOS_PROFILE_APP_BASE64: ${{ secrets.IOS_PROFILE_APP_BASE64 }}
+          IOS_PROFILE_EXTENSION_BASE64: ${{ secrets.IOS_PROFILE_EXTENSION_BASE64 }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          FAILED=0
+
+          # ── 1. Required secrets present ──────────────────────────────────────
+          echo "=== Checking required secrets ==="
+          for VAR in IOS_DIST_CERT_BASE64 IOS_DIST_CERT_PASSWORD IOS_PROFILE_APP_BASE64 \
+                     APP_STORE_CONNECT_API_KEY APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID; do
+            if [ -z "${!VAR}" ]; then
+              echo "  MISSING: $VAR"
+              FAILED=1
+            else
+              echo "  OK:      $VAR"
+            fi
+          done
+
+          if [ -z "$IOS_PROFILE_EXTENSION_BASE64" ]; then
+            echo "  WARN:    IOS_PROFILE_EXTENSION_BASE64 not set — will fall back to app profile"
+            IOS_PROFILE_EXTENSION_BASE64="$IOS_PROFILE_APP_BASE64"
+          else
+            echo "  OK:      IOS_PROFILE_EXTENSION_BASE64"
+          fi
+
+          [ "$FAILED" = "1" ] && { echo "Aborting: missing secrets."; exit 1; }
+
+          # ── 2. Decode profiles ───────────────────────────────────────────────
+          APP_PROFILE_PATH="$RUNNER_TEMP/preflight_app.mobileprovision"
+          EXT_PROFILE_PATH="$RUNNER_TEMP/preflight_ext.mobileprovision"
+
+          decode_b64() {
+            local src="$1" dst="$2"
+            if ! printf "%s" "$src" | base64 --decode > "$dst" 2>/dev/null; then
+              printf "%s" "$src" | base64 -D > "$dst"
+            fi
+          }
+
+          decode_b64 "$IOS_PROFILE_APP_BASE64"       "$APP_PROFILE_PATH"
+          decode_b64 "$IOS_PROFILE_EXTENSION_BASE64" "$EXT_PROFILE_PATH"
+
+          # ── 3. Read App IDs from profiles ────────────────────────────────────
+          security cms -D -i "$APP_PROFILE_PATH" > "$RUNNER_TEMP/preflight_app.plist"
+          security cms -D -i "$EXT_PROFILE_PATH" > "$RUNNER_TEMP/preflight_ext.plist"
+
+          APP_ID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" "$RUNNER_TEMP/preflight_app.plist")
+          EXT_ID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" "$RUNNER_TEMP/preflight_ext.plist")
+          APP_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$RUNNER_TEMP/preflight_app.plist")
+          EXT_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$RUNNER_TEMP/preflight_ext.plist")
+          APP_EXPIRY=$(/usr/libexec/PlistBuddy -c "Print :ExpirationDate" "$RUNNER_TEMP/preflight_app.plist")
+          EXT_EXPIRY=$(/usr/libexec/PlistBuddy -c "Print :ExpirationDate" "$RUNNER_TEMP/preflight_ext.plist")
+
+          EXPECTED_APP_ID="${{ env.IOS_TEAM_ID }}.${{ env.IOS_APP_BUNDLE_ID }}"
+          EXPECTED_EXT_ID="${{ env.IOS_TEAM_ID }}.${{ env.IOS_EXTENSION_BUNDLE_ID }}"
+
+          echo ""
+          echo "=== Provisioning profile check ==="
+          echo "  Main profile:      $APP_NAME"
+          echo "    App ID:          $APP_ID"
+          echo "    Expected:        $EXPECTED_APP_ID"
+          echo "    Expires:         $APP_EXPIRY"
+          echo "  Extension profile: $EXT_NAME"
+          echo "    App ID:          $EXT_ID"
+          echo "    Expected:        $EXPECTED_EXT_ID"
+          echo "    Expires:         $EXT_EXPIRY"
+
+          # ── 4. Validate App IDs ──────────────────────────────────────────────
+          if [ "$APP_ID" != "$EXPECTED_APP_ID" ]; then
+            echo ""
+            echo "FAIL: Main profile App ID mismatch."
+            echo "      Expected: $EXPECTED_APP_ID"
+            echo "      Got:      $APP_ID"
+            echo "      Fix: upload a profile created for bundle ID '${{ env.IOS_APP_BUNDLE_ID }}' as IOS_PROFILE_APP_BASE64"
+            FAILED=1
+          else
+            echo "  PASS: Main profile App ID matches."
+          fi
+
+          if [ "$EXT_ID" != "$EXPECTED_EXT_ID" ]; then
+            echo ""
+            echo "FAIL: Extension profile App ID mismatch."
+            echo "      Expected: $EXPECTED_EXT_ID"
+            echo "      Got:      $EXT_ID"
+            echo "      Fix: upload a profile created for bundle ID '${{ env.IOS_EXTENSION_BUNDLE_ID }}' as IOS_PROFILE_EXTENSION_BASE64"
+            FAILED=1
+          else
+            echo "  PASS: Extension profile App ID matches."
+          fi
+
+          [ "$FAILED" = "1" ] && exit 1
+          echo ""
+          echo "All preflight checks passed."
+
       - name: Select Xcode version
         uses: maxim-lobanov/setup-xcode@v1
         with:

@@ -222,33 +222,6 @@ struct DeliveryLiveActivityWidget: Widget {
             .padding(12)
             .activityBackgroundTint(Color(.systemBackground))
             .activitySystemActionForegroundColor(Color.accentColor)
-        } dynamicIsland: { context in
-            DynamicIsland {
-                DynamicIslandExpandedRegion(.leading) {
-                    Text("\\(context.state.estimatedMinutes)m")
-                        .font(.headline)
-                }
-                DynamicIslandExpandedRegion(.trailing) {
-                    Text(context.state.status.replacingOccurrences(of: "_", with: " ").capitalized)
-                        .font(.caption)
-                }
-                DynamicIslandExpandedRegion(.bottom) {
-                    HStack {
-                        Text(context.attributes.businessName)
-                        Spacer()
-                        Text(context.state.driverName)
-                    }
-                    .font(.caption)
-                }
-            } compactLeading: {
-                Text("\\(context.state.estimatedMinutes)m")
-                    .font(.caption2)
-            } compactTrailing: {
-                Image(systemName: "bicycle")
-            } minimal: {
-                Image(systemName: "bicycle")
-            }
-            .keylineTint(Color.accentColor)
         }
     }
 }
@@ -298,7 +271,7 @@ function withLiveActivityExtensionFiles(config) {
         DELIVERY_ACTIVITY_ATTRIBUTES_SWIFT,
       );
 
-      ensureFile(
+      writeFile(
         path.join(extensionDir, 'DeliveryLiveActivityWidget.swift'),
         DELIVERY_LIVE_ACTIVITY_WIDGET_SWIFT,
       );
