@@ -29,13 +29,109 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Preflight — validate signing secrets and provisioning profiles
+        env:
+          IOS_DIST_CERT_BASE64: ${{ secrets.IOS_DIST_CERT_BASE64 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          IOS_PROFILE_APP_BASE64: ${{ secrets.IOS_PROFILE_APP_BASE64 }}
+          IOS_PROFILE_EXTENSION_BASE64: ${{ secrets.IOS_PROFILE_EXTENSION_BASE64 }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          FAILED=0
+
+          # ── 1. Required secrets present ──────────────────────────────────────
+          echo "=== Checking required secrets ==="
+          for VAR in IOS_DIST_CERT_BASE64 IOS_DIST_CERT_PASSWORD IOS_PROFILE_APP_BASE64 \
+                     APP_STORE_CONNECT_API_KEY APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID; do
+            if [ -z "${!VAR}" ]; then
+              echo "  MISSING: $VAR"
+              FAILED=1
+            else
+              echo "  OK:      $VAR"
+            fi
+          done
+
+          if [ -z "$IOS_PROFILE_EXTENSION_BASE64" ]; then
+            echo "  WARN:    IOS_PROFILE_EXTENSION_BASE64 not set — will fall back to app profile"
+            IOS_PROFILE_EXTENSION_BASE64="$IOS_PROFILE_APP_BASE64"
+          else
+            echo "  OK:      IOS_PROFILE_EXTENSION_BASE64"
+          fi
+
+          [ "$FAILED" = "1" ] && { echo "Aborting: missing secrets."; exit 1; }
+
+          # ── 2. Decode profiles ───────────────────────────────────────────────
+          APP_PROFILE_PATH="$RUNNER_TEMP/preflight_app.mobileprovision"
+          EXT_PROFILE_PATH="$RUNNER_TEMP/preflight_ext.mobileprovision"
+
+          decode_b64() {
+            local src="$1" dst="$2"
+            if ! printf "%s" "$src" | base64 --decode > "$dst" 2>/dev/null; then
+              printf "%s" "$src" | base64 -D > "$dst"
+            fi
+          }
+
+          decode_b64 "$IOS_PROFILE_APP_BASE64"       "$APP_PROFILE_PATH"
+          decode_b64 "$IOS_PROFILE_EXTENSION_BASE64" "$EXT_PROFILE_PATH"
+
+          # ── 3. Read App IDs from profiles ────────────────────────────────────
+          security cms -D -i "$APP_PROFILE_PATH" > "$RUNNER_TEMP/preflight_app.plist"
+          security cms -D -i "$EXT_PROFILE_PATH" > "$RUNNER_TEMP/preflight_ext.plist"
+
+          APP_ID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" "$RUNNER_TEMP/preflight_app.plist")
+          EXT_ID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" "$RUNNER_TEMP/preflight_ext.plist")
+          APP_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$RUNNER_TEMP/preflight_app.plist")
+          EXT_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$RUNNER_TEMP/preflight_ext.plist")
+          APP_EXPIRY=$(/usr/libexec/PlistBuddy -c "Print :ExpirationDate" "$RUNNER_TEMP/preflight_app.plist")
+          EXT_EXPIRY=$(/usr/libexec/PlistBuddy -c "Print :ExpirationDate" "$RUNNER_TEMP/preflight_ext.plist")
+
+          EXPECTED_APP_ID="${{ env.IOS_TEAM_ID }}.${{ env.IOS_APP_BUNDLE_ID }}"
+          EXPECTED_EXT_ID="${{ env.IOS_TEAM_ID }}.${{ env.IOS_EXTENSION_BUNDLE_ID }}"
+
+          echo ""
+          echo "=== Provisioning profile check ==="
+          echo "  Main profile:      $APP_NAME"
+          echo "    App ID:          $APP_ID"
+          echo "    Expected:        $EXPECTED_APP_ID"
+          echo "    Expires:         $APP_EXPIRY"
+          echo "  Extension profile: $EXT_NAME"
+          echo "    App ID:          $EXT_ID"
+          echo "    Expected:        $EXPECTED_EXT_ID"
+          echo "    Expires:         $EXT_EXPIRY"
+
+          # ── 4. Validate App IDs ──────────────────────────────────────────────
+          if [ "$APP_ID" != "$EXPECTED_APP_ID" ]; then
+            echo ""
+            echo "FAIL: Main profile App ID mismatch."
+            echo "      Expected: $EXPECTED_APP_ID"
+            echo "      Got:      $APP_ID"
+            echo "      Fix: upload a profile created for bundle ID '${{ env.IOS_APP_BUNDLE_ID }}' as IOS_PROFILE_APP_BASE64"
+            FAILED=1
+          else
+            echo "  PASS: Main profile App ID matches."
+          fi
+
+          if [ "$EXT_ID" != "$EXPECTED_EXT_ID" ]; then
+            echo ""
+            echo "FAIL: Extension profile App ID mismatch."
+            echo "      Expected: $EXPECTED_EXT_ID"
+            echo "      Got:      $EXT_ID"
+            echo "      Fix: upload a profile created for bundle ID '${{ env.IOS_EXTENSION_BUNDLE_ID }}' as IOS_PROFILE_EXTENSION_BASE64"
+            FAILED=1
+          else
+            echo "  PASS: Extension profile App ID matches."
+          fi
+
+          [ "$FAILED" = "1" ] && exit 1
+          echo ""
+          echo "All preflight checks passed."
+
       - name: Select Xcode version
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: "16.4"
-
-      - name: Print Xcode version
-        run: xcodebuild -version
+          xcode-version: "latest"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -64,26 +160,28 @@ jobs:
       - name: Verify iOS native project exists
         working-directory: ${{ env.APP_DIR }}
         run: |
-          echo "Checking generated iOS project files"
-          ls -la ios
-          find ios -maxdepth 3 -type d \( -name "*.xcodeproj" -o -name "*.xcworkspace" \) || true
-          PROJECT_PATH=$(find ios -maxdepth 3 -type d -name "*.xcodeproj" ! -name "Pods.xcodeproj" -print -quit)
           WORKSPACE_PATH=$(find ios -maxdepth 3 -type d -name "*.xcworkspace" ! -path "*.xcodeproj/*" -print -quit)
+          PROJECT_PATH=$(find ios -maxdepth 3 -type d -name "*.xcodeproj" ! -name "Pods.xcodeproj" -print -quit)
+
           if [ -z "$PROJECT_PATH" ] && [ -z "$WORKSPACE_PATH" ]; then
             echo "No .xcodeproj or .xcworkspace generated by expo prebuild"
             exit 1
           fi
+
           if [ -n "$WORKSPACE_PATH" ]; then
             WORKSPACE_REL=${WORKSPACE_PATH#ios/}
             echo "IOS_WORKSPACE_PATH=$WORKSPACE_REL" >> "$GITHUB_ENV"
             echo "IOS_SCHEME=$(basename "$WORKSPACE_REL" .xcworkspace)" >> "$GITHUB_ENV"
+            echo "Found workspace: $WORKSPACE_REL"
           fi
+
           if [ -n "$PROJECT_PATH" ]; then
             PROJECT_REL=${PROJECT_PATH#ios/}
             echo "IOS_PROJECT_PATH=$PROJECT_REL" >> "$GITHUB_ENV"
             if [ -z "$WORKSPACE_PATH" ]; then
               echo "IOS_SCHEME=$(basename "$PROJECT_REL" .xcodeproj)" >> "$GITHUB_ENV"
             fi
+            echo "Found project: $PROJECT_REL"
           fi
 
       - name: Setup Ruby with bundler cache
@@ -94,58 +192,40 @@ jobs:
           ruby-version: "3.2"
           bundler-cache: true
 
-      - name: Install gems
-        working-directory: ${{ env.APP_DIR }}/ios
-        run: bundle install --jobs 4 --retry 3
-
-      - name: Debug signing input presence (safe)
-        env:
-          IOS_DIST_CERT_BASE64: ${{ secrets.IOS_DIST_CERT_BASE64 || secrets.APPLE_DIST_CERT_BASE64 || vars.IOS_DIST_CERT_BASE64 || vars.APPLE_DIST_CERT_BASE64 }}
-          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD || secrets.APPLE_DIST_CERT_PASSWORD || vars.IOS_DIST_CERT_PASSWORD || vars.APPLE_DIST_CERT_PASSWORD }}
-          IOS_PROFILE_APP_BASE64: ${{ secrets.IOS_PROFILE_APP_BASE64 || secrets.IOS_MAIN_PROFILE_BASE64 || vars.IOS_PROFILE_APP_BASE64 || vars.IOS_MAIN_PROFILE_BASE64 }}
-          IOS_PROFILE_EXTENSION_BASE64: ${{ secrets.IOS_PROFILE_EXTENSION_BASE64 || secrets.IOS_EXT_PROFILE_BASE64 || vars.IOS_PROFILE_EXTENSION_BASE64 || vars.IOS_EXT_PROFILE_BASE64 }}
-          IOS_KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD || secrets.BUILD_KEYCHAIN_PASSWORD || vars.IOS_KEYCHAIN_PASSWORD || vars.BUILD_KEYCHAIN_PASSWORD }}
-        run: |
-          present() {
-            if [ -n "$1" ]; then echo "yes"; else echo "no"; fi
-          }
-          echo "IOS_DIST_CERT_BASE64 present: $(present "$IOS_DIST_CERT_BASE64")"
-          echo "IOS_DIST_CERT_PASSWORD present: $(present "$IOS_DIST_CERT_PASSWORD")"
-          echo "IOS_PROFILE_APP_BASE64 present: $(present "$IOS_PROFILE_APP_BASE64")"
-          echo "IOS_PROFILE_EXTENSION_BASE64 present: $(present "$IOS_PROFILE_EXTENSION_BASE64")"
-          echo "IOS_KEYCHAIN_PASSWORD present: $(present "$IOS_KEYCHAIN_PASSWORD")"
-
       - name: Install signing certificate and provisioning profiles
         env:
-          IOS_DIST_CERT_BASE64: ${{ secrets.IOS_DIST_CERT_BASE64 || secrets.APPLE_DIST_CERT_BASE64 || vars.IOS_DIST_CERT_BASE64 || vars.APPLE_DIST_CERT_BASE64 }}
-          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD || secrets.APPLE_DIST_CERT_PASSWORD || vars.IOS_DIST_CERT_PASSWORD || vars.APPLE_DIST_CERT_PASSWORD }}
-          IOS_PROFILE_APP_BASE64: ${{ secrets.IOS_PROFILE_APP_BASE64 || secrets.IOS_MAIN_PROFILE_BASE64 || vars.IOS_PROFILE_APP_BASE64 || vars.IOS_MAIN_PROFILE_BASE64 }}
-          IOS_PROFILE_EXTENSION_BASE64: ${{ secrets.IOS_PROFILE_EXTENSION_BASE64 || secrets.IOS_EXT_PROFILE_BASE64 || vars.IOS_PROFILE_EXTENSION_BASE64 || vars.IOS_EXT_PROFILE_BASE64 }}
-          IOS_KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD || secrets.BUILD_KEYCHAIN_PASSWORD || vars.IOS_KEYCHAIN_PASSWORD || vars.BUILD_KEYCHAIN_PASSWORD }}
+          IOS_DIST_CERT_BASE64: ${{ secrets.IOS_DIST_CERT_BASE64 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          IOS_PROFILE_APP_BASE64: ${{ secrets.IOS_PROFILE_APP_BASE64 }}
+          IOS_PROFILE_EXTENSION_BASE64: ${{ secrets.IOS_PROFILE_EXTENSION_BASE64 }}
+          IOS_KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
         run: |
-          # Fallback: if extension profile is omitted, reuse the app profile.
-          # This works when a single profile covers both bundle identifiers.
+          echo "Checking signing secrets..."
+          echo "IOS_DIST_CERT_BASE64 present:       $([ -n "$IOS_DIST_CERT_BASE64" ] && echo yes || echo NO)"
+          echo "IOS_DIST_CERT_PASSWORD present:     $([ -n "$IOS_DIST_CERT_PASSWORD" ] && echo yes || echo NO)"
+          echo "IOS_PROFILE_APP_BASE64 present:     $([ -n "$IOS_PROFILE_APP_BASE64" ] && echo yes || echo NO)"
+          echo "IOS_PROFILE_EXTENSION_BASE64 present: $([ -n "$IOS_PROFILE_EXTENSION_BASE64" ] && echo yes || echo NO)"
+
+          # Extension profile is optional — fall back to app profile if omitted
           if [ -z "$IOS_PROFILE_EXTENSION_BASE64" ] && [ -n "$IOS_PROFILE_APP_BASE64" ]; then
             IOS_PROFILE_EXTENSION_BASE64="$IOS_PROFILE_APP_BASE64"
             echo "IOS_PROFILE_EXTENSION_BASE64 not provided; reusing IOS_PROFILE_APP_BASE64"
           fi
 
-          # Fallback: auto-generate temporary keychain password when not provided.
+          # Keychain password is optional — auto-generate if omitted
           if [ -z "$IOS_KEYCHAIN_PASSWORD" ]; then
             IOS_KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
             echo "IOS_KEYCHAIN_PASSWORD not provided; generated ephemeral keychain password"
           fi
 
           MISSING=()
-          [ -z "$IOS_DIST_CERT_BASE64" ] && MISSING+=("IOS_DIST_CERT_BASE64")
-          [ -z "$IOS_DIST_CERT_PASSWORD" ] && MISSING+=("IOS_DIST_CERT_PASSWORD")
-          [ -z "$IOS_PROFILE_APP_BASE64" ] && MISSING+=("IOS_PROFILE_APP_BASE64")
+          [ -z "$IOS_DIST_CERT_BASE64" ]        && MISSING+=("IOS_DIST_CERT_BASE64")
+          [ -z "$IOS_DIST_CERT_PASSWORD" ]       && MISSING+=("IOS_DIST_CERT_PASSWORD")
+          [ -z "$IOS_PROFILE_APP_BASE64" ]       && MISSING+=("IOS_PROFILE_APP_BASE64")
           [ -z "$IOS_PROFILE_EXTENSION_BASE64" ] && MISSING+=("IOS_PROFILE_EXTENSION_BASE64")
 
           if [ ${#MISSING[@]} -gt 0 ]; then
-            echo "Missing signing secrets: ${MISSING[*]}"
-            echo "Required base names: IOS_DIST_CERT_BASE64, IOS_DIST_CERT_PASSWORD, IOS_PROFILE_APP_BASE64"
-            echo "Optional with fallback: IOS_PROFILE_EXTENSION_BASE64, IOS_KEYCHAIN_PASSWORD"
+            echo "Missing required secrets: ${MISSING[*]}"
             exit 1
           fi
 
@@ -155,15 +235,14 @@ jobs:
           KEYCHAIN_PATH="$RUNNER_TEMP/ios-build.keychain-db"
 
           decode_base64_to_file() {
-            local input="$1"
-            local out_file="$2"
+            local input="$1" out_file="$2"
             if ! printf "%s" "$input" | base64 --decode > "$out_file" 2>/dev/null; then
               printf "%s" "$input" | base64 -D > "$out_file"
             fi
           }
 
-          decode_base64_to_file "$IOS_DIST_CERT_BASE64" "$CERT_PATH"
-          decode_base64_to_file "$IOS_PROFILE_APP_BASE64" "$APP_PROFILE_PATH"
+          decode_base64_to_file "$IOS_DIST_CERT_BASE64"        "$CERT_PATH"
+          decode_base64_to_file "$IOS_PROFILE_APP_BASE64"      "$APP_PROFILE_PATH"
           decode_base64_to_file "$IOS_PROFILE_EXTENSION_BASE64" "$EXT_PROFILE_PATH"
 
           security create-keychain -p "$IOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
@@ -176,57 +255,52 @@ jobs:
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
 
           security cms -D -i "$APP_PROFILE_PATH" > "$RUNNER_TEMP/app_profile.plist"
-          APP_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$RUNNER_TEMP/app_profile.plist")
-          APP_PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$RUNNER_TEMP/app_profile.plist")
-          APP_PROFILE_APP_ID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" "$RUNNER_TEMP/app_profile.plist")
-          APP_PROFILE_EXPIRATION=$(/usr/libexec/PlistBuddy -c "Print :ExpirationDate" "$RUNNER_TEMP/app_profile.plist")
-          cp "$APP_PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$APP_PROFILE_UUID.mobileprovision"
+          APP_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$RUNNER_TEMP/app_profile.plist")
+          APP_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$RUNNER_TEMP/app_profile.plist")
+          APP_ID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" "$RUNNER_TEMP/app_profile.plist")
+          cp "$APP_PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$APP_UUID.mobileprovision"
 
           security cms -D -i "$EXT_PROFILE_PATH" > "$RUNNER_TEMP/ext_profile.plist"
-          EXT_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$RUNNER_TEMP/ext_profile.plist")
-          EXT_PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$RUNNER_TEMP/ext_profile.plist")
-          EXT_PROFILE_APP_ID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" "$RUNNER_TEMP/ext_profile.plist")
-          EXT_PROFILE_EXPIRATION=$(/usr/libexec/PlistBuddy -c "Print :ExpirationDate" "$RUNNER_TEMP/ext_profile.plist")
-          cp "$EXT_PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$EXT_PROFILE_UUID.mobileprovision"
+          EXT_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$RUNNER_TEMP/ext_profile.plist")
+          EXT_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$RUNNER_TEMP/ext_profile.plist")
+          EXT_ID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" "$RUNNER_TEMP/ext_profile.plist")
+          cp "$EXT_PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$EXT_UUID.mobileprovision"
 
-          EXPECTED_APP_APP_ID="${{ env.IOS_TEAM_ID }}.${{ env.IOS_APP_BUNDLE_ID }}"
-          EXPECTED_EXT_APP_ID="${{ env.IOS_TEAM_ID }}.${{ env.IOS_EXTENSION_BUNDLE_ID }}"
+          EXPECTED_APP_ID="${{ env.IOS_TEAM_ID }}.${{ env.IOS_APP_BUNDLE_ID }}"
+          EXPECTED_EXT_ID="${{ env.IOS_TEAM_ID }}.${{ env.IOS_EXTENSION_BUNDLE_ID }}"
 
-          echo "Main profile: $APP_PROFILE_NAME"
-          echo "  - UUID: $APP_PROFILE_UUID"
-          echo "  - App ID: $APP_PROFILE_APP_ID"
-          echo "  - Expires: $APP_PROFILE_EXPIRATION"
-          echo "Extension profile: $EXT_PROFILE_NAME"
-          echo "  - UUID: $EXT_PROFILE_UUID"
-          echo "  - App ID: $EXT_PROFILE_APP_ID"
-          echo "  - Expires: $EXT_PROFILE_EXPIRATION"
+          echo "Main profile: $APP_NAME (UUID: $APP_UUID, App ID: $APP_ID)"
+          echo "Extension profile: $EXT_NAME (UUID: $EXT_UUID, App ID: $EXT_ID)"
 
-          if [ "$APP_PROFILE_APP_ID" != "$EXPECTED_APP_APP_ID" ]; then
-            echo "Main profile App ID mismatch. Expected: $EXPECTED_APP_APP_ID, got: $APP_PROFILE_APP_ID"
+          if [ "$APP_ID" != "$EXPECTED_APP_ID" ]; then
+            echo "Main profile App ID mismatch. Expected: $EXPECTED_APP_ID, got: $APP_ID"
             exit 1
           fi
 
-          if [ "$EXT_PROFILE_APP_ID" != "$EXPECTED_EXT_APP_ID" ]; then
-            echo "Extension profile App ID mismatch. Expected: $EXPECTED_EXT_APP_ID, got: $EXT_PROFILE_APP_ID"
-            echo "Upload a provisioning profile created for the extension App ID: ${{ env.IOS_EXTENSION_BUNDLE_ID }}"
+          if [ "$EXT_ID" != "$EXPECTED_EXT_ID" ]; then
+            echo "Extension profile App ID mismatch. Expected: $EXPECTED_EXT_ID, got: $EXT_ID"
             exit 1
           fi
 
-          echo "IOS_MAIN_PROFILE_NAME=$APP_PROFILE_NAME" >> "$GITHUB_ENV"
-          echo "IOS_EXTENSION_PROFILE_NAME=$EXT_PROFILE_NAME" >> "$GITHUB_ENV"
-
-      - name: Print available code signing identities
-        run: security find-identity -v -p codesigning || true
+          echo "IOS_MAIN_PROFILE_NAME=$APP_NAME" >> "$GITHUB_ENV"
+          echo "IOS_MAIN_PROFILE_UUID=$APP_UUID" >> "$GITHUB_ENV"
+          echo "IOS_EXTENSION_PROFILE_NAME=$EXT_NAME" >> "$GITHUB_ENV"
+          echo "IOS_EXTENSION_PROFILE_UUID=$EXT_UUID" >> "$GITHUB_ENV"
+          security find-identity -v -p codesigning
 
       - name: Build and upload to TestFlight
         working-directory: ${{ env.APP_DIR }}/ios
         env:
+          SENTRY_DISABLE_AUTO_UPLOAD: "true"
+          SENTRY_ALLOW_FAILURE: "true"
           APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           IOS_TEAM_ID: ${{ env.IOS_TEAM_ID }}
           IOS_APP_BUNDLE_ID: ${{ env.IOS_APP_BUNDLE_ID }}
           IOS_EXTENSION_BUNDLE_ID: ${{ env.IOS_EXTENSION_BUNDLE_ID }}
+          IOS_MAIN_PROFILE_UUID: ${{ env.IOS_MAIN_PROFILE_UUID }}
+          IOS_EXTENSION_PROFILE_UUID: ${{ env.IOS_EXTENSION_PROFILE_UUID }}
         run: bundle exec fastlane beta
 
       - name: Show gym log on failure
@@ -240,8 +314,8 @@ jobs:
           if [ -n "$LOG_FILE" ]; then
             echo "Showing log: $LOG_FILE"
             tail -n 1200 "$LOG_FILE"
-            echo "\nTop xcode errors (first 40):"
-            grep -nE "(^| )error:|\*\* ARCHIVE FAILED \*\*|no such module|module map file .* not found|Command SwiftCompile failed" "$LOG_FILE" | grep -v "warning:" | head -n 120 || true
+            echo "\nTop xcode errors:"
+            grep -nE "error:|\*\* ARCHIVE FAILED \*\*|no such module|Command SwiftCompile failed" "$LOG_FILE" | head -n 80 || true
           else
             echo "No gym log file found"
           fi
