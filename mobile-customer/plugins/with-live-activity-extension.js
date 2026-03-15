@@ -203,44 +203,39 @@ struct DeliveryLiveActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: DeliveryActivityAttributes.self) { context in
             VStack(alignment: .leading, spacing: 8) {
-                Text(context.attributes.businessName)
+                Text("Lock Screen Debug")
                     .font(.headline)
-                Text("Order #\\(context.attributes.orderDisplayId)")
+                    .foregroundStyle(Color.white)
+                Text("Data: \\(context.attributes.businessName)")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                HStack {
-                    Text(context.state.status.replacingOccurrences(of: "_", with: " ").capitalized)
-                        .font(.body)
-                    Spacer()
-                    Text("~\\(context.state.estimatedMinutes) min")
-                        .font(.body.weight(.semibold))
-                }
-                Text(context.state.driverName)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.white.opacity(0.8))
             }
             .padding(12)
-            .activityBackgroundTint(Color(.systemBackground))
-            .activitySystemActionForegroundColor(Color.accentColor)
+            .activityBackgroundTint(Color.blue)
+            .activitySystemActionForegroundColor(Color.white)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Text(context.attributes.businessName)
-                        .font(.caption)
+                    Text("LIVE")
+                        .foregroundStyle(Color.white)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Text("~\\(context.state.estimatedMinutes) min")
-                        .font(.caption.weight(.semibold))
+                    Text("DATA")
+                        .foregroundStyle(Color.white)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    Text(context.state.status.replacingOccurrences(of: "_", with: " ").capitalized)
+                    Text("Delivery Status: \\(context.state.status)")
+                        .foregroundStyle(Color.white)
                 }
             } compactLeading: {
-                Text(context.attributes.businessName.prefix(1))
+                Text("L")
+                    .foregroundStyle(Color.blue)
             } compactTrailing: {
-                Text("\\(context.state.estimatedMinutes)m")
+                Text("!")
+                    .foregroundStyle(Color.blue)
             } minimal: {
-                Text("\\(context.state.estimatedMinutes)m")
+                Text("L")
+                    .foregroundStyle(Color.blue)
             }
         }
     }
@@ -627,13 +622,54 @@ function withLiveActivityExtensionTarget(config) {
     if (mainTargetUuid) {
       // 1. Add target dependency
       project.addTargetDependency(mainTargetUuid, [target.uuid]);
+
+      // 2. Embed the extension (PlugIns)
+      const pbxCopyFilesBuildPhase = project.hash.project.objects['PBXCopyFilesBuildPhase'] || {};
+      let embedPhaseUuid = Object.keys(pbxCopyFilesBuildPhase).find(key => {
+          const phase = pbxCopyFilesBuildPhase[key];
+          return typeof phase === 'object' && (phase.name === '"Embed App Extensions"' || phase.dstSubfolderSpec === '13');
+      });
+
+      if (!embedPhaseUuid) {
+        const newPhase = project.addBuildPhase([], 'PBXCopyFilesBuildPhase', 'Embed App Extensions', mainTargetUuid, 'app_extension');
+        if (newPhase && newPhase.buildPhase) {
+          newPhase.buildPhase.dstSubfolderSpec = 13;
+        }
+        embedPhaseUuid = newPhase.uuid;
+      }
+
+      const productFileRef = target.pbxNativeTarget.productReference;
+      const productFile = project.pbxFileReferenceSection()[productFileRef];
+      if (productFile && embedPhaseUuid) {
+        const file = {
+            fileRef: productFileRef,
+            basename: productFile.path,
+            settings: { ATTRIBUTES: ['RemoveHeadersOnCopy'] }
+        };
+        const buildFile = project.addToPbxBuildFileSection(file);
+        if (buildFile && buildFile.uuid) {
+          if (!project.hash.project.objects['PBXCopyFilesBuildPhase'][embedPhaseUuid].files) {
+            project.hash.project.objects['PBXCopyFilesBuildPhase'][embedPhaseUuid].files = [];
+          }
+          project.hash.project.objects['PBXCopyFilesBuildPhase'][embedPhaseUuid].files.push({
+            value: buildFile.uuid,
+            comment: productFile.path.replace(/"/g, '')
+          });
+        }
+      }
     }
 
     if (resolvedDevelopmentTeam) {
       console.log('[LiveActivityExtension] Applied extension signing team', { developmentTeam: resolvedDevelopmentTeam });
     }
 
-    console.log('[LiveActivityExtension] Created extension target, added dependency, and linked Swift sources');
+    // Link frameworks necessary for Live Activities
+    const frameworks = ['ActivityKit.framework', 'WidgetKit.framework', 'SwiftUI.framework'];
+    for (const framework of frameworks) {
+      project.addFramework(framework, { target: target.uuid });
+    }
+
+    console.log('[LiveActivityExtension] Created extension target, added dependency, and linked Swift sources/frameworks');
 
     return cfg;
   });
