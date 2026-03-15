@@ -116,7 +116,7 @@ export const canManageProducts = (userData: UserData, targetBusinessId?: string)
         return true;
     }
     
-    // Business employee can also manage products (mark available/unavailable, update stock)
+    // Business employee can also manage products (availability, pricing, details)
     if (userData.role === 'BUSINESS_EMPLOYEE' && userData.businessId === targetBusinessId) {
         return true;
     }

@@ -15,7 +15,6 @@ Business management mobile app for restaurant owners and employees to manage ord
 
 ### 🍔 Product Management
 - **Add/Edit/Delete Products** - Full CRUD operations for menu items
-- **Stock Management** - Track inventory levels, low stock alerts
 - **Availability Toggle** - Quickly mark items as available/unavailable
 - **Product Categories** - Organize products by category
 - **Sale Pricing** - Support for sale prices and promotions
@@ -25,7 +24,7 @@ Business management mobile app for restaurant owners and employees to manage ord
 ### 📊 Dashboard & Analytics
 - **Today's Overview** - Total orders, revenue, completion rate
 - **Active Orders** - Real-time count of pending and preparing orders
-- **Product Status** - Track unavailable and low stock items
+- **Product Status** - Track availability of products
 - **Quick Actions** - Access common settings and features
 - **Real-time Updates** - Auto-refresh with pull-to-refresh support
 
@@ -98,7 +97,7 @@ Users must have a `businessId` associated with their account.
 ### Products
 - `GET_BUSINESS_PRODUCTS` - Fetch all products and categories
 - `CREATE_PRODUCT` - Add new product
-- `UPDATE_PRODUCT` - Edit product details, stock, availability
+- `UPDATE_PRODUCT` - Edit product details and availability
 - `DELETE_PRODUCT` - Remove product
 - `CREATE_CATEGORY` - Add product category
 

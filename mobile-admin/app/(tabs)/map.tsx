@@ -1,20 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery, useSubscription } from '@apollo/client/react';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Region } from 'react-native-maps';
-import { useTheme } from '@/hooks/useTheme';
+import Mapbox from '@rnmapbox/maps';
 import { GET_ORDERS, ALL_ORDERS_SUBSCRIPTION } from '@/graphql/orders';
 import { GET_DRIVERS, DRIVERS_UPDATED_SUBSCRIPTION } from '@/graphql/drivers';
 import { GJILAN_CENTER, GJILAN_BOUNDS, ORDER_STATUS_COLORS } from '@/utils/constants';
 import { getInitials } from '@/utils/helpers';
-import { calculateRouteDistance, toLatLng } from '@/utils/mapbox';
+import { calculateRouteDistance } from '@/utils/mapbox';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-// ─── Constants ───
 const STATUS_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
     PENDING: 'time-outline',
     PREPARING: 'restaurant-outline',
@@ -29,28 +25,34 @@ const STATUS_LABELS: Record<string, string> = {
     OUT_FOR_DELIVERY: 'Delivering',
 };
 
-// Helper to convert hex to rgba
-const hexToRgba = (hex: string, alpha: number): string => {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+type RouteData = {
+    distanceKm: number;
+    durationMin: number;
+    geometry: Array<[number, number]>;
 };
 
-// ─── Main Map Screen ───
+const toLineFeature = (geometry: Array<[number, number]>) => ({
+    type: 'Feature' as const,
+    properties: {},
+    geometry: {
+        type: 'LineString' as const,
+        coordinates: geometry,
+    },
+});
+
 export default function MapScreen() {
-    const theme = useTheme();
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const mapRef = useRef<MapView>(null);
+    const cameraRef = useRef<Mapbox.Camera>(null);
+    const hasMapboxToken = Boolean(process.env.EXPO_PUBLIC_MAPBOX_TOKEN?.trim());
 
     const [focusedOrderId, setFocusedOrderId] = useState<string | null>(null);
     const [trackingDriverId, setTrackingDriverId] = useState<string | null>(null);
-    const [orderRoutes, setOrderRoutes] = useState<Record<string, any>>({});
+    const [orderRoutes, setOrderRoutes] = useState<Record<string, { toPickup?: RouteData; toDropoff?: RouteData; cacheKey: string }>>({});
 
-    // ─── Data Fetching ───
     const { data: ordersData, loading: ordersLoading, refetch: refetchOrders }: any = useQuery(GET_ORDERS);
     const { data: driversData, refetch: refetchDrivers }: any = useQuery(GET_DRIVERS);
+
     const ordersRefetchCooldownRef = useRef(0);
     const ordersRefetchInFlightRef = useRef(false);
     const ordersRefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -60,30 +62,19 @@ export default function MapScreen() {
 
     useEffect(() => {
         return () => {
-            if (ordersRefetchTimerRef.current) {
-                clearTimeout(ordersRefetchTimerRef.current);
-                ordersRefetchTimerRef.current = null;
-            }
-            if (driversRefetchTimerRef.current) {
-                clearTimeout(driversRefetchTimerRef.current);
-                driversRefetchTimerRef.current = null;
-            }
+            if (ordersRefetchTimerRef.current) clearTimeout(ordersRefetchTimerRef.current);
+            if (driversRefetchTimerRef.current) clearTimeout(driversRefetchTimerRef.current);
         };
     }, []);
 
     const scheduleOrdersRefetch = useCallback(() => {
         const now = Date.now();
         const canRunNow = now - ordersRefetchCooldownRef.current >= 1200 && !ordersRefetchInFlightRef.current;
-
         if (!canRunNow) {
-            if (ordersRefetchTimerRef.current) {
-                return;
-            }
+            if (ordersRefetchTimerRef.current) return;
             ordersRefetchTimerRef.current = setTimeout(() => {
                 ordersRefetchTimerRef.current = null;
-                if (ordersRefetchInFlightRef.current) {
-                    return;
-                }
+                if (ordersRefetchInFlightRef.current) return;
                 ordersRefetchInFlightRef.current = true;
                 ordersRefetchCooldownRef.current = Date.now();
                 refetchOrders().finally(() => {
@@ -103,16 +94,11 @@ export default function MapScreen() {
     const scheduleDriversRefetch = useCallback(() => {
         const now = Date.now();
         const canRunNow = now - driversRefetchCooldownRef.current >= 1200 && !driversRefetchInFlightRef.current;
-
         if (!canRunNow) {
-            if (driversRefetchTimerRef.current) {
-                return;
-            }
+            if (driversRefetchTimerRef.current) return;
             driversRefetchTimerRef.current = setTimeout(() => {
                 driversRefetchTimerRef.current = null;
-                if (driversRefetchInFlightRef.current) {
-                    return;
-                }
+                if (driversRefetchInFlightRef.current) return;
                 driversRefetchInFlightRef.current = true;
                 driversRefetchCooldownRef.current = Date.now();
                 refetchDrivers().finally(() => {
@@ -135,12 +121,10 @@ export default function MapScreen() {
     const orders = ordersData?.orders || [];
     const drivers = driversData?.drivers || [];
 
-    // ─── Filtered Data ───
-    const activeOrders = useMemo(() => {
-        return orders.filter((o: any) =>
-            ['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'].includes(o.status),
-        );
-    }, [orders]);
+    const activeOrders = useMemo(
+        () => orders.filter((o: any) => ['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'].includes(o.status)),
+        [orders],
+    );
 
     const onlineDrivers = useMemo(
         () => drivers.filter((d: any) => d.driverConnection?.connectionStatus === 'CONNECTED'),
@@ -154,7 +138,6 @@ export default function MapScreen() {
 
     const focusedRoute = focusedOrder ? orderRoutes[focusedOrder.id] : null;
 
-    // ─── Route Calculation (Mapbox Directions API) ───
     useEffect(() => {
         const calcRoutes = async () => {
             for (const order of activeOrders) {
@@ -178,6 +161,7 @@ export default function MapScreen() {
                             calculateRouteDistance(driverPos, pickup),
                             calculateRouteDistance(pickup, dropoff),
                         ]);
+
                         if (toPickup && toDropoff) {
                             setOrderRoutes((prev) => ({ ...prev, [order.id]: { toPickup, toDropoff, cacheKey } }));
                         }
@@ -201,32 +185,29 @@ export default function MapScreen() {
                 }
             }
         };
+
         calcRoutes();
     }, [activeOrders.map((o: any) => `${o.id}-${o.driver?.id || 'none'}-${o.status}`).join(','), drivers]);
 
-    // ─── Track driver location ───
     useEffect(() => {
-        if (!trackingDriverId || !mapRef.current) return;
+        if (!trackingDriverId) return;
         const trackedDriver = drivers.find((d: any) => d.id === trackingDriverId);
         const loc = trackedDriver?.driverLocation;
         if (loc?.latitude && loc?.longitude) {
-            mapRef.current.animateToRegion({
-                latitude: loc.latitude,
-                longitude: loc.longitude,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
-            }, 500);
+            cameraRef.current?.setCamera({
+                centerCoordinate: [loc.longitude, loc.latitude],
+                zoomLevel: 15,
+                animationDuration: 500,
+            });
         }
     }, [trackingDriverId, drivers]);
 
-    // ─── Handlers ───
     const handleRecenter = useCallback(() => {
-        mapRef.current?.animateToRegion({
-            latitude: GJILAN_CENTER.latitude,
-            longitude: GJILAN_CENTER.longitude,
-            latitudeDelta: 0.06,
-            longitudeDelta: 0.06,
-        }, 600);
+        cameraRef.current?.setCamera({
+            centerCoordinate: [GJILAN_CENTER.longitude, GJILAN_CENTER.latitude],
+            zoomLevel: 12,
+            animationDuration: 600,
+        });
         setTrackingDriverId(null);
     }, []);
 
@@ -239,30 +220,33 @@ export default function MapScreen() {
 
         const lats: number[] = [];
         const lngs: number[] = [];
-        if (bizLoc) { lats.push(bizLoc.latitude); lngs.push(bizLoc.longitude); }
-        if (dropLoc) { lats.push(dropLoc.latitude); lngs.push(dropLoc.longitude); }
-        if (driverLoc) { lats.push(driverLoc.latitude); lngs.push(driverLoc.longitude); }
+        if (bizLoc) {
+            lats.push(bizLoc.latitude);
+            lngs.push(bizLoc.longitude);
+        }
+        if (dropLoc) {
+            lats.push(dropLoc.latitude);
+            lngs.push(dropLoc.longitude);
+        }
+        if (driverLoc) {
+            lats.push(driverLoc.latitude);
+            lngs.push(driverLoc.longitude);
+        }
 
-        if (lats.length >= 2 && mapRef.current) {
+        if (lats.length >= 2) {
             const padLat = 0.006;
             const padLng = 0.006;
             const minLat = Math.min(...lats) - padLat;
             const maxLat = Math.max(...lats) + padLat;
             const minLng = Math.min(...lngs) - padLng;
             const maxLng = Math.max(...lngs) + padLng;
-            mapRef.current.animateToRegion({
-                latitude: (minLat + maxLat) / 2,
-                longitude: (minLng + maxLng) / 2,
-                latitudeDelta: maxLat - minLat,
-                longitudeDelta: maxLng - minLng,
-            }, 800);
-        } else if (bizLoc && mapRef.current) {
-            mapRef.current.animateToRegion({
-                latitude: bizLoc.latitude,
-                longitude: bizLoc.longitude,
-                latitudeDelta: 0.008,
-                longitudeDelta: 0.008,
-            }, 800);
+            cameraRef.current?.fitBounds([maxLng, maxLat], [minLng, minLat], [80, 60, 180, 60], 800);
+        } else if (bizLoc) {
+            cameraRef.current?.setCamera({
+                centerCoordinate: [bizLoc.longitude, bizLoc.latitude],
+                zoomLevel: 15,
+                animationDuration: 800,
+            });
         }
     }, [drivers]);
 
@@ -270,176 +254,142 @@ export default function MapScreen() {
         setFocusedOrderId(null);
     }, []);
 
-    const clampToBounds = useCallback((region: Region) => {
-        if (!mapRef.current) return;
-        const { northEast, southWest } = GJILAN_BOUNDS;
-        let lat = region.latitude;
-        let lng = region.longitude;
-        let clamped = false;
-        const latD2 = region.latitudeDelta / 2;
-        const lngD2 = region.longitudeDelta / 2;
-        if (lat - latD2 < southWest.latitude) { lat = southWest.latitude + latD2; clamped = true; }
-        if (lat + latD2 > northEast.latitude) { lat = northEast.latitude - latD2; clamped = true; }
-        if (lng - lngD2 < southWest.longitude) { lng = southWest.longitude + lngD2; clamped = true; }
-        if (lng + lngD2 > northEast.longitude) { lng = northEast.longitude - lngD2; clamped = true; }
-        if (clamped) {
-            mapRef.current.animateToRegion({ latitude: lat, longitude: lng, latitudeDelta: region.latitudeDelta, longitudeDelta: region.longitudeDelta }, 200);
-        }
-    }, []);
-
-    // ─── Render ───
     return (
         <View style={styles.container}>
-            {/* Map */}
-            <MapView
-                ref={mapRef}
-                provider={PROVIDER_GOOGLE}
-                style={styles.map}
-                initialRegion={{
-                    latitude: GJILAN_CENTER.latitude,
-                    longitude: GJILAN_CENTER.longitude,
-                    latitudeDelta: 0.06,
-                    longitudeDelta: 0.06,
-                }}
-                minZoomLevel={12}
-                maxZoomLevel={18}
-                showsUserLocation={false}
-                showsMyLocationButton={false}
-                showsCompass={false}
-                onRegionChangeComplete={clampToBounds}
-                onPress={dismissFocusedOrder}>
+            {hasMapboxToken ? (
+                <Mapbox.MapView
+                    style={styles.map}
+                    styleURL="mapbox://styles/mapbox/streets-v12"
+                    logoEnabled={false}
+                    compassEnabled={false}
+                    scaleBarEnabled={false}
+                    rotateEnabled={false}
+                    onPress={dismissFocusedOrder}>
+                    <Mapbox.Camera
+                        ref={cameraRef}
+                        defaultSettings={{
+                            centerCoordinate: [GJILAN_CENTER.longitude, GJILAN_CENTER.latitude],
+                            zoomLevel: 12,
+                        }}
+                        bounds={{
+                            ne: [GJILAN_BOUNDS.northEast.longitude, GJILAN_BOUNDS.northEast.latitude],
+                            sw: [GJILAN_BOUNDS.southWest.longitude, GJILAN_BOUNDS.southWest.latitude],
+                        }}
+                    />
 
-                {/* ── Route polylines (non-focused orders: subtle) ── */}
-                {activeOrders.map((order: any) => {
-                    if (order.id === focusedOrderId) return null;
-                    const route = orderRoutes[order.id];
-                    if (!route) return null;
-                    const color = ORDER_STATUS_COLORS[order.status] || '#6b7280';
+                    {activeOrders.map((order: any) => {
+                        if (order.id === focusedOrderId) return null;
+                        const route = orderRoutes[order.id];
+                        if (!route) return null;
+                        const color = ORDER_STATUS_COLORS[order.status] || '#6b7280';
 
-                    if (route.toPickup && route.toDropoff) {
                         return (
                             <React.Fragment key={`route-${order.id}`}>
-                                <Polyline coordinates={toLatLng(route.toPickup.geometry)} strokeColor={color} strokeWidth={2} lineDashPattern={[6, 4]} />
-                                <Polyline coordinates={toLatLng(route.toDropoff.geometry)} strokeColor={color} strokeWidth={2} lineDashPattern={[6, 4]} />
+                                {route.toPickup && (
+                                    <Mapbox.ShapeSource id={`route-pickup-${order.id}`} shape={toLineFeature(route.toPickup.geometry)}>
+                                        <Mapbox.LineLayer id={`route-pickup-layer-${order.id}`} style={{ lineColor: color, lineWidth: 2, lineDasharray: [2, 2] }} />
+                                    </Mapbox.ShapeSource>
+                                )}
+                                {route.toDropoff && (
+                                    <Mapbox.ShapeSource id={`route-dropoff-${order.id}`} shape={toLineFeature(route.toDropoff.geometry)}>
+                                        <Mapbox.LineLayer id={`route-dropoff-layer-${order.id}`} style={{ lineColor: color, lineWidth: 2, lineDasharray: [2, 2] }} />
+                                    </Mapbox.ShapeSource>
+                                )}
                             </React.Fragment>
                         );
-                    } else if (route.toDropoff) {
+                    })}
+
+                    {focusedOrder && focusedRoute?.toDropoff && (
+                        <Mapbox.ShapeSource id={`focused-route-${focusedOrder.id}`} shape={toLineFeature(focusedRoute.toDropoff.geometry)}>
+                            <Mapbox.LineLayer id={`focused-route-bg-${focusedOrder.id}`} style={{ lineColor: '#ffffff', lineWidth: 7 }} />
+                            <Mapbox.LineLayer
+                                id={`focused-route-fg-${focusedOrder.id}`}
+                                style={{ lineColor: ORDER_STATUS_COLORS[focusedOrder.status] || '#6b7280', lineWidth: 4 }}
+                            />
+                        </Mapbox.ShapeSource>
+                    )}
+
+                    {drivers.map((driver: any) => {
+                        const loc = driver.driverLocation;
+                        if (!loc?.latitude || !loc?.longitude) return null;
+                        const isOnline = driver.driverConnection?.connectionStatus === 'CONNECTED';
+                        const isTracking = trackingDriverId === driver.id;
+                        const bgColor = isOnline ? '#22c55e' : '#94a3b8';
+
                         return (
-                            <Polyline key={`route-${order.id}`} coordinates={toLatLng(route.toDropoff.geometry)} strokeColor={color} strokeWidth={2} lineDashPattern={[6, 4]} />
-                        );
-                    }
-                    return null;
-                })}
-
-                {/* ── Focused order route (prominent with casing) ── */}
-                {focusedOrder && focusedRoute && (() => {
-                    const statusColor = ORDER_STATUS_COLORS[focusedOrder.status] || '#6b7280';
-
-                    if (focusedRoute.toPickup && focusedRoute.toDropoff) {
-                        return (
-                            <>
-                                <Polyline coordinates={toLatLng(focusedRoute.toPickup.geometry)} strokeColor="#ffffff" strokeWidth={7} />
-                                <Polyline coordinates={toLatLng(focusedRoute.toPickup.geometry)} strokeColor="#4285F4" strokeWidth={4} />
-                                <Polyline coordinates={toLatLng(focusedRoute.toDropoff.geometry)} strokeColor="#F59E0B" strokeWidth={3} lineDashPattern={[8, 6]} />
-                            </>
-                        );
-                    } else if (focusedRoute.toDropoff) {
-                        const routeColor = focusedOrder.status === 'OUT_FOR_DELIVERY' ? '#8B5CF6' : statusColor;
-                        return (
-                            <>
-                                <Polyline coordinates={toLatLng(focusedRoute.toDropoff.geometry)} strokeColor="#ffffff" strokeWidth={7} />
-                                <Polyline coordinates={toLatLng(focusedRoute.toDropoff.geometry)} strokeColor={routeColor} strokeWidth={4} />
-                            </>
-                        );
-                    }
-                    return null;
-                })()}
-
-                {/* ── Driver Markers on map ── */}
-                {drivers.map((driver: any) => {
-                    const loc = driver.driverLocation;
-                    if (!loc?.latitude || !loc?.longitude) return null;
-                    const isOnline = driver.driverConnection?.connectionStatus === 'CONNECTED';
-                    const isTracking = trackingDriverId === driver.id;
-                    const bgColor = isOnline ? '#22c55e' : '#94a3b8';
-
-                    return (
-                        <Marker
-                            key={`driver-${driver.id}`}
-                            coordinate={{ latitude: loc.latitude, longitude: loc.longitude }}
-                            tracksViewChanges={false}
-                            onPress={() => {
-                                setFocusedOrderId(null);
-                                if (isTracking) {
-                                    setTrackingDriverId(null);
-                                } else {
-                                    setTrackingDriverId(driver.id);
-                                    mapRef.current?.animateToRegion({
-                                        latitude: loc.latitude,
-                                        longitude: loc.longitude,
-                                        latitudeDelta: 0.01,
-                                        longitudeDelta: 0.01,
-                                    }, 600);
-                                }
-                            }}>
-                            <View style={styles.markerContainer}>
-                                {isTracking && (
-                                    <View style={[styles.trackingRing, { borderColor: '#3b82f6' }]} />
-                                )}
-                                <View style={[styles.driverMapMarker, { backgroundColor: bgColor, borderColor: isTracking ? '#3b82f6' : '#fff' }]}>
-                                    <Text style={styles.driverMapInitial}>
-                                        {getInitials(`${driver.firstName} ${driver.lastName}`)}
-                                    </Text>
+                            <Mapbox.PointAnnotation
+                                key={`driver-${driver.id}`}
+                                id={`driver-${driver.id}`}
+                                coordinate={[loc.longitude, loc.latitude]}
+                                onSelected={() => {
+                                    setFocusedOrderId(null);
+                                    if (isTracking) {
+                                        setTrackingDriverId(null);
+                                    } else {
+                                        setTrackingDriverId(driver.id);
+                                        cameraRef.current?.setCamera({
+                                            centerCoordinate: [loc.longitude, loc.latitude],
+                                            zoomLevel: 15,
+                                            animationDuration: 600,
+                                        });
+                                    }
+                                }}>
+                                <View style={styles.markerContainer}>
+                                    {isTracking && <View style={[styles.trackingRing, { borderColor: '#3b82f6' }]} />}
+                                    <View style={[styles.driverMapMarker, { backgroundColor: bgColor, borderColor: isTracking ? '#3b82f6' : '#fff' }]}>
+                                        <Text style={styles.driverMapInitial}>{getInitials(`${driver.firstName} ${driver.lastName}`)}</Text>
+                                    </View>
                                 </View>
-                            </View>
-                        </Marker>
-                    );
-                })}
+                            </Mapbox.PointAnnotation>
+                        );
+                    })}
 
-                {/* ── Order Markers (dropoff only, matching admin-panel style) ── */}
-                {activeOrders.map((order: any) => {
-                    const statusColor = ORDER_STATUS_COLORS[order.status] || '#6b7280';
-                    const isFocused = order.id === focusedOrderId;
-                    const isPending = order.status === 'PENDING';
-                    const dropLoc = order.dropOffLocation;
+                    {activeOrders.map((order: any) => {
+                        const statusColor = ORDER_STATUS_COLORS[order.status] || '#6b7280';
+                        const isFocused = order.id === focusedOrderId;
+                        const dropLoc = order.dropOffLocation;
+                        if (!dropLoc?.latitude || !dropLoc?.longitude) return null;
 
-                    if (!dropLoc?.latitude || !dropLoc?.longitude) return null;
-
-                    return (
-                        <Marker
-                            key={`order-${order.id}`}
-                            coordinate={{ latitude: dropLoc.latitude, longitude: dropLoc.longitude }}
-                            anchor={{ x: 0.5, y: 0.5 }}
-                            tracksViewChanges={false}
-                            onPress={() => focusOrder(order)}>
-                            <View style={styles.orderMarkerContainer}>
-                                {/* Pending pulse ring */}
-                                {isPending && (
-                                    <View style={styles.pendingPulseRing} />
-                                )}
-                                {/* Main marker circle */}
-                                <View style={[styles.orderMarker, {
-                                    backgroundColor: hexToRgba(statusColor, 0.08),
-                                    borderColor: hexToRgba(statusColor, 0.5),
-                                    borderWidth: isFocused ? 3 : 2,
-                                    transform: [{ scale: isFocused ? 1.15 : 1 }],
-                                }]}>
-                                    <Ionicons name="cube" size={16} color={statusColor} />
+                        return (
+                            <Mapbox.PointAnnotation
+                                key={`order-${order.id}`}
+                                id={`order-${order.id}`}
+                                coordinate={[dropLoc.longitude, dropLoc.latitude]}
+                                onSelected={() => focusOrder(order)}>
+                                <View style={styles.orderMarkerContainer}>
+                                    <View
+                                        style={[
+                                            styles.orderMarker,
+                                            {
+                                                backgroundColor: 'rgba(255,255,255,0.96)',
+                                                borderColor: statusColor,
+                                                borderWidth: isFocused ? 3 : 2,
+                                                transform: [{ scale: isFocused ? 1.15 : 1 }],
+                                            },
+                                        ]}>
+                                        <Ionicons name="cube" size={16} color={statusColor} />
+                                    </View>
                                 </View>
-                            </View>
-                        </Marker>
-                    );
-                })}
-            </MapView>
+                            </Mapbox.PointAnnotation>
+                        );
+                    })}
+                </Mapbox.MapView>
+            ) : (
+                <View style={styles.mapsSetupContainer}>
+                    <View style={styles.mapsSetupCard}>
+                        <Ionicons name="map-outline" size={30} color="#64748b" />
+                        <Text style={styles.mapsSetupTitle}>Mapbox Token Required</Text>
+                        <Text style={styles.mapsSetupText}>Set EXPO_PUBLIC_MAPBOX_TOKEN to enable the live map.</Text>
+                    </View>
+                </View>
+            )}
 
-            {/* ═══ Driver overlay – right sidebar ═══ */}
-            {onlineDrivers.length > 0 && (
+            {hasMapboxToken && onlineDrivers.length > 0 && (
                 <View style={[styles.driverSidebar, { top: insets.top + 16 }]}>
                     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 4 }}>
                         {onlineDrivers.slice(0, 10).map((driver: any) => {
                             const isTracking = trackingDriverId === driver.id;
                             const loc = driver.driverLocation;
-
                             return (
                                 <Pressable
                                     key={driver.id}
@@ -450,28 +400,23 @@ export default function MapScreen() {
                                         } else {
                                             setTrackingDriverId(driver.id);
                                             if (loc?.latitude && loc?.longitude) {
-                                                mapRef.current?.animateToRegion({
-                                                    latitude: loc.latitude,
-                                                    longitude: loc.longitude,
-                                                    latitudeDelta: 0.01,
-                                                    longitudeDelta: 0.01,
-                                                }, 600);
+                                                cameraRef.current?.setCamera({
+                                                    centerCoordinate: [loc.longitude, loc.latitude],
+                                                    zoomLevel: 15,
+                                                    animationDuration: 600,
+                                                });
                                             }
                                         }
                                     }}
-                                    style={[styles.driverAvatar, {
-                                        borderColor: isTracking ? '#3b82f6' : '#22c55e',
-                                        borderWidth: isTracking ? 3 : 2,
-                                        transform: [{ scale: isTracking ? 1.1 : 1 }],
-                                    }]}>
-                                    <Text style={styles.driverAvatarText}>
-                                        {getInitials(`${driver.firstName} ${driver.lastName}`)}
-                                    </Text>
-                                    {isTracking && (
-                                        <View style={styles.trackBadge}>
-                                            <Ionicons name="eye" size={9} color="#fff" />
-                                        </View>
-                                    )}
+                                    style={[
+                                        styles.driverAvatar,
+                                        {
+                                            borderColor: isTracking ? '#3b82f6' : '#22c55e',
+                                            borderWidth: isTracking ? 3 : 2,
+                                            transform: [{ scale: isTracking ? 1.1 : 1 }],
+                                        },
+                                    ]}>
+                                    <Text style={styles.driverAvatarText}>{getInitials(`${driver.firstName} ${driver.lastName}`)}</Text>
                                 </Pressable>
                             );
                         })}
@@ -479,13 +424,9 @@ export default function MapScreen() {
                 </View>
             )}
 
-            {/* ═══ Order overlay – bottom strip ═══ */}
-            {activeOrders.length > 0 && !focusedOrder && (
+            {hasMapboxToken && activeOrders.length > 0 && !focusedOrder && (
                 <View style={[styles.orderStrip, { bottom: insets.bottom + 8 }]}>
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={{ paddingHorizontal: 12, gap: 10 }}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, gap: 10 }}>
                         {activeOrders.map((order: any) => {
                             const statusColor = ORDER_STATUS_COLORS[order.status] || '#6b7280';
                             const iconName = STATUS_ICONS[order.status] ?? 'ellipse-outline';
@@ -493,10 +434,7 @@ export default function MapScreen() {
                             const route = orderRoutes[order.id];
 
                             return (
-                                <Pressable
-                                    key={order.id}
-                                    onPress={() => focusOrder(order)}
-                                    style={[styles.orderCard, { borderLeftColor: statusColor }]}>
+                                <Pressable key={order.id} onPress={() => focusOrder(order)} style={[styles.orderCard, { borderLeftColor: statusColor }]}>
                                     <View style={[styles.orderCardIcon, { backgroundColor: statusColor }]}>
                                         <Ionicons name={iconName as any} size={14} color="#fff" />
                                     </View>
@@ -507,9 +445,6 @@ export default function MapScreen() {
                                             {route?.toDropoff ? ` · ${route.toDropoff.distanceKm.toFixed(1)}km` : ''}
                                         </Text>
                                     </View>
-                                    {!order.driver && (
-                                        <View style={styles.unassignedDot} />
-                                    )}
                                 </Pressable>
                             );
                         })}
@@ -517,23 +452,20 @@ export default function MapScreen() {
                 </View>
             )}
 
-            {/* ═══ Recenter button ═══ */}
-            <View style={[styles.recenterBtn, { bottom: focusedOrder ? 140 + insets.bottom : (activeOrders.length > 0 ? 100 + insets.bottom : 20 + insets.bottom) }]}>
-                <Pressable style={styles.mapBtn} onPress={handleRecenter}>
-                    <Ionicons name="locate" size={22} color="#4285F4" />
-                </Pressable>
-            </View>
+            {hasMapboxToken && (
+                <View style={[styles.recenterBtn, { bottom: focusedOrder ? 140 + insets.bottom : activeOrders.length > 0 ? 100 + insets.bottom : 20 + insets.bottom }]}>
+                    <Pressable style={styles.mapBtn} onPress={handleRecenter}>
+                        <Ionicons name="locate" size={22} color="#4285F4" />
+                    </Pressable>
+                </View>
+            )}
 
-            {/* ═══ Focused order bottom bar ═══ */}
-            {focusedOrder && (() => {
+            {hasMapboxToken && focusedOrder && (() => {
                 const statusColor = ORDER_STATUS_COLORS[focusedOrder.status] || '#6b7280';
                 const bizName = focusedOrder.businesses?.[0]?.business?.name ?? 'Unknown';
-                const customerName = focusedOrder.user
-                    ? `${focusedOrder.user.firstName} ${focusedOrder.user.lastName}`
-                    : 'Customer';
+                const customerName = focusedOrder.user ? `${focusedOrder.user.firstName} ${focusedOrder.user.lastName}` : 'Customer';
                 const iconName = STATUS_ICONS[focusedOrder.status] ?? 'ellipse-outline';
-                const isAssigned = !!focusedOrder.driver;
-                const driverName = isAssigned ? `${focusedOrder.driver.firstName} ${focusedOrder.driver.lastName}` : null;
+                const driverName = focusedOrder.driver ? `${focusedOrder.driver.firstName} ${focusedOrder.driver.lastName}` : null;
 
                 return (
                     <View style={[styles.focusedBar, { paddingBottom: insets.bottom + 8, backgroundColor: statusColor }]}>
@@ -546,23 +478,13 @@ export default function MapScreen() {
                                 {STATUS_LABELS[focusedOrder.status]} · {customerName}
                                 {driverName ? ` · ${driverName}` : ' · Unassigned'}
                             </Text>
-                            {focusedRoute && (
+                            {focusedRoute?.toDropoff && (
                                 <View style={styles.focusedRouteRows}>
-                                    {focusedRoute.toPickup && (
-                                        <View style={styles.focusedRouteRow}>
-                                            <Ionicons name="restaurant" size={12} color="rgba(255,255,255,0.85)" />
-                                            <Text style={styles.focusedRouteText}>
-                                                {focusedRoute.toPickup.distanceKm.toFixed(1)} km · {Math.ceil(focusedRoute.toPickup.durationMin)} min
-                                            </Text>
-                                            <Text style={styles.focusedRouteLabel}>→ Pickup</Text>
-                                        </View>
-                                    )}
                                     <View style={styles.focusedRouteRow}>
-                                        <Ionicons name="flag" size={12} color={focusedRoute.toPickup ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.85)'} />
-                                        <Text style={focusedRoute.toPickup ? styles.focusedRouteTextSm : styles.focusedRouteText}>
+                                        <Ionicons name="flag" size={12} color="rgba(255,255,255,0.85)" />
+                                        <Text style={styles.focusedRouteText}>
                                             {focusedRoute.toDropoff.distanceKm.toFixed(1)} km · {Math.ceil(focusedRoute.toDropoff.durationMin)} min
                                         </Text>
-                                        <Text style={styles.focusedRouteLabel}>→ Dropoff</Text>
                                     </View>
                                 </View>
                             )}
@@ -572,18 +494,13 @@ export default function MapScreen() {
                             onPress={() => {
                                 setFocusedOrderId(null);
                                 router.push(`/order/${focusedOrder.id}`);
-                            }}
-                            hitSlop={8}>
+                            }}>
                             <Ionicons name="open-outline" size={20} color="#fff" />
-                        </Pressable>
-                        <Pressable style={styles.focusedCloseBtn} onPress={dismissFocusedOrder} hitSlop={8}>
-                            <Ionicons name="close" size={22} color="rgba(255,255,255,0.7)" />
                         </Pressable>
                     </View>
                 );
             })()}
 
-            {/* Loading */}
             {ordersLoading && !ordersData && (
                 <View style={styles.loadingOverlay}>
                     <ActivityIndicator size="large" color="#6366f1" />
@@ -596,8 +513,37 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1 },
     map: { flex: 1 },
-
-    /* ── Map Markers ── */
+    mapsSetupContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 24,
+        backgroundColor: '#f8fafc',
+    },
+    mapsSetupCard: {
+        width: '100%',
+        maxWidth: 360,
+        backgroundColor: '#ffffff',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        paddingVertical: 20,
+        paddingHorizontal: 16,
+        alignItems: 'center',
+    },
+    mapsSetupTitle: {
+        marginTop: 10,
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#0f172a',
+    },
+    mapsSetupText: {
+        marginTop: 8,
+        fontSize: 13,
+        lineHeight: 18,
+        textAlign: 'center',
+        color: '#475569',
+    },
     markerContainer: { alignItems: 'center' },
     driverMapMarker: {
         width: 36,
@@ -643,16 +589,6 @@ const styles = StyleSheet.create({
         shadowRadius: 6,
         elevation: 6,
     },
-    pendingPulseRing: {
-        position: 'absolute',
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#ef4444',
-        opacity: 0.4,
-    },
-
-    /* ── Driver sidebar (right) ── */
     driverSidebar: {
         position: 'absolute',
         right: 12,
@@ -677,21 +613,6 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         color: '#fff',
     },
-    trackBadge: {
-        position: 'absolute',
-        bottom: -2,
-        right: -2,
-        width: 18,
-        height: 18,
-        borderRadius: 9,
-        backgroundColor: '#3b82f6',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1.5,
-        borderColor: '#fff',
-    },
-
-    /* ── Order strip (bottom) ── */
     orderStrip: {
         position: 'absolute',
         left: 0,
@@ -722,9 +643,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         marginRight: 10,
     },
-    orderCardInfo: {
-        flex: 1,
-    },
+    orderCardInfo: { flex: 1 },
     orderCardBiz: {
         fontSize: 13,
         fontWeight: '700',
@@ -735,15 +654,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         marginTop: 2,
     },
-    unassignedDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: '#ef4444',
-        marginLeft: 6,
-    },
-
-    /* ── Recenter ── */
     recenterBtn: {
         position: 'absolute',
         right: 16,
@@ -762,8 +672,6 @@ const styles = StyleSheet.create({
         shadowRadius: 6,
         elevation: 5,
     },
-
-    /* ── Focused order bar ── */
     focusedBar: {
         position: 'absolute',
         left: 0,
@@ -810,16 +718,6 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#fff',
     },
-    focusedRouteTextSm: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: 'rgba(255,255,255,0.7)',
-    },
-    focusedRouteLabel: {
-        fontSize: 11,
-        fontWeight: '500',
-        color: 'rgba(255,255,255,0.6)',
-    },
     focusedViewBtn: {
         width: 44,
         height: 44,
@@ -828,15 +726,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    focusedCloseBtn: {
-        width: 38,
-        height: 38,
-        borderRadius: 19,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-
-    /* ── Loading ── */
     loadingOverlay: {
         ...StyleSheet.absoluteFillObject,
         justifyContent: 'center',

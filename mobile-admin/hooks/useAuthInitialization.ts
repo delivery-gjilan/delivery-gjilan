@@ -13,6 +13,20 @@ export function useAuthInitialization() {
     const { setToken, logout, hasHydrated, user } = useAuthStore();
 
     useEffect(() => {
+        if (hasHydrated) return;
+
+        // Fallback: if persist rehydration does not complete, do not block app navigation forever.
+        const timeout = setTimeout(() => {
+            if (!useAuthStore.getState().hasHydrated) {
+                console.warn('[AuthInit] Hydration timeout reached, forcing hydration state');
+                useAuthStore.setState({ hasHydrated: true });
+            }
+        }, 2000);
+
+        return () => clearTimeout(timeout);
+    }, [hasHydrated]);
+
+    useEffect(() => {
         if (hasInitialized.current) {
             return;
         }

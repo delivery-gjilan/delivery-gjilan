@@ -766,26 +766,14 @@ export default function OrdersPage() {
                                             <thead>
                                                 <tr className="bg-[#09090b] border-b border-zinc-800">
                                                     <th className="px-3 py-2 text-left text-[10px] font-medium text-zinc-500 uppercase tracking-wider">Product</th>
-                                                    {biz.business.businessType === 'MARKET' && (
-                                                        <>
-                                                            <th className="px-3 py-2 text-center text-[10px] font-medium text-zinc-500 uppercase tracking-wider">In Stock</th>
-                                                            <th className="px-3 py-2 text-center text-[10px] font-medium text-zinc-500 uppercase tracking-wider">Need</th>
-                                                        </>
-                                                    )}
                                                     <th className="px-3 py-2 text-right text-[10px] font-medium text-zinc-500 uppercase tracking-wider">Price</th>
                                                     <th className="px-3 py-2 text-right text-[10px] font-medium text-zinc-500 uppercase tracking-wider">Total</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {getBusinessItemsSafe(biz).map((item, itemIdx) => {
-                                                    let rowBorder = "";
-                                                    if (biz.business.businessType === 'MARKET') {
-                                                        if (item.quantityNeeded === 0) rowBorder = "border-l-2 border-l-green-500/50";
-                                                        else if (item.quantityInStock > 0) rowBorder = "border-l-2 border-l-yellow-500/50";
-                                                        else rowBorder = "border-l-2 border-l-amber-500/50";
-                                                    }
                                                     return (
-                                                        <tr key={itemIdx} className={`border-b border-zinc-800/60 hover:bg-zinc-900/30 ${rowBorder}`}>
+                                                        <tr key={itemIdx} className="border-b border-zinc-800/60 hover:bg-zinc-900/30">
                                                             <td className="px-3 py-2.5">
                                                                 <div className="flex items-center gap-2">
                                                                     {item.imageUrl && (
@@ -802,20 +790,6 @@ export default function OrdersPage() {
                                                                     </div>
                                                                 </div>
                                                             </td>
-                                                            {biz.business.businessType === 'MARKET' && (
-                                                                <>
-                                                                    <td className="px-3 py-2.5 text-center">
-                                                                        <span className={`text-sm font-medium ${item.quantityInStock > 0 ? "text-green-400" : "text-zinc-600"}`}>
-                                                                            {item.quantityInStock}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td className="px-3 py-2.5 text-center">
-                                                                        <span className={`text-sm font-medium ${item.quantityNeeded > 0 ? "text-amber-400" : "text-zinc-600"}`}>
-                                                                            {item.quantityNeeded}
-                                                                        </span>
-                                                                    </td>
-                                                                </>
-                                                            )}
                                                             <td className="px-3 py-2.5 text-right text-sm text-zinc-300">${item.price.toFixed(2)}</td>
                                                             <td className="px-3 py-2.5 text-right text-sm font-medium text-white">
                                                                 ${(item.quantity * item.price).toFixed(2)}
