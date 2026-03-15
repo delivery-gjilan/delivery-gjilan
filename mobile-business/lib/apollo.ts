@@ -18,6 +18,17 @@ const httpLink = new HttpLink({
 const RECONNECT_DELAYS = [1000, 2000, 5000, 10000];
 let reconnectAttempts = 0;
 
+let wsHealth = {
+    isConnected: false,
+    reconnectAttempts: 0,
+    lastConnectedAt: null as string | null,
+    lastDisconnectedAt: null as string | null,
+};
+
+export function getWsHealthSnapshot() {
+    return { ...wsHealth };
+}
+
 // WebSocket Link for subscriptions
 const wsLink = new GraphQLWsLink(
     createClient({
@@ -43,13 +54,31 @@ const wsLink = new GraphQLWsLink(
                 if (reconnectAttempts > 0) {
                     console.log(`[WS] Reconnected after ${reconnectAttempts} attempts`);
                 }
+                wsHealth = {
+                    isConnected: true,
+                    reconnectAttempts,
+                    lastConnectedAt: new Date().toISOString(),
+                    lastDisconnectedAt: wsHealth.lastDisconnectedAt,
+                };
                 reconnectAttempts = 0;
             },
             closed: (event) => {
                 console.log('[WS] Connection closed', event);
+                wsHealth = {
+                    ...wsHealth,
+                    isConnected: false,
+                    reconnectAttempts,
+                    lastDisconnectedAt: new Date().toISOString(),
+                };
             },
             error: (err) => {
                 console.error('[WS] WebSocket error:', err);
+                wsHealth = {
+                    ...wsHealth,
+                    isConnected: false,
+                    reconnectAttempts,
+                    lastDisconnectedAt: new Date().toISOString(),
+                };
             },
         },
     })

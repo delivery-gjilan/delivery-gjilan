@@ -187,6 +187,47 @@ input BusinessDayHoursInput {
   opensAt: String!
 }
 
+type BusinessDeviceHealth {
+  appState: String
+  appVersion: String
+  batteryLevel: Int
+  businessId: ID!
+  createdAt: DateTime!
+  deviceId: String!
+  id: ID!
+  isCharging: Boolean
+  lastHeartbeatAt: DateTime!
+  lastOrderId: ID
+  lastOrderSignalAt: DateTime
+  lastPushReceivedAt: DateTime
+  metadata: JSON
+  networkType: String
+  onlineStatus: BusinessDeviceOnlineStatus!
+  platform: DevicePlatform!
+  receivingOrders: Boolean!
+  subscriptionAlive: Boolean!
+  updatedAt: DateTime!
+  userId: ID!
+}
+
+input BusinessDeviceHeartbeatInput {
+  appState: String
+  appVersion: String
+  batteryLevel: Int
+  deviceId: String!
+  isCharging: Boolean
+  metadata: JSON
+  networkType: String
+  platform: DevicePlatform!
+  subscriptionAlive: Boolean!
+}
+
+enum BusinessDeviceOnlineStatus {
+  OFFLINE
+  ONLINE
+  STALE
+}
+
 type BusinessPromotion {
   description: String
   discountValue: Float
@@ -318,7 +359,6 @@ input CreateProductInput {
   name: String!
   price: Float!
   salePrice: Float
-  stock: Int
   subcategoryId: ID
 }
 
@@ -650,6 +690,8 @@ type Mutation {
   assignDriverToOrder(driverId: ID, id: ID!): Order!
   assignPromotionToUsers(input: AssignPromotionToUserInput!): [UserPromotion!]!
   backfillSettlementsForDeliveredOrders: Int!
+  businessDeviceHeartbeat(input: BusinessDeviceHeartbeatInput!): Boolean!
+  businessDeviceOrderSignal(deviceId: String!, orderId: ID): Boolean!
   cancelOrder(id: ID!): Order!
   createBanner(input: CreateBannerInput!): Banner!
   createBusiness(input: CreateBusinessInput!): Business!
@@ -898,7 +940,6 @@ type Product {
   price: Float!
   salePrice: Float
   sortOrder: Int!
-  stock: Int!
   subcategoryId: ID
   updatedAt: String!
 }
@@ -1066,6 +1107,7 @@ type Query {
   auditLogs(action: ActionType, actorId: ID, actorType: ActorType, endDate: DateTime, entityId: ID, entityType: EntityType, limit: Int, offset: Int, startDate: DateTime): AuditLogConnection!
   business(id: ID!): Business
   businessBalance(businessId: ID!): SettlementSummary!
+  businessDeviceHealth(hours: Int): [BusinessDeviceHealth!]!
   businesses: [Business!]!
   calculateDeliveryPrice(businessId: ID!, dropoffLat: Float!, dropoffLng: Float!): DeliveryPriceResult!
   calculateProductPrice(productId: ID!): String!
@@ -1412,7 +1454,6 @@ input UpdateProductInput {
   price: Float
   salePrice: Float
   sortOrder: Int
-  stock: Int
   subcategoryId: ID
 }
 

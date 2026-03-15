@@ -109,9 +109,6 @@
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "owner": "artshabani2002",
-    "updates": {
-      "url": "https://u.expo.dev/e5c04b16-6851-4fce-aa03-e4a183f0becf"
-    }
+    "owner": "artshabani2002"
   }
 }

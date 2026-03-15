@@ -12,7 +12,6 @@ export const UPDATE_PRODUCT = graphql(`
     mutation UpdateProduct($id: ID!, $input: UpdateProductInput!) {
         updateProduct(id: $id, input: $input) {
             id
-            stock
         }
     }
 `);

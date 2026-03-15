@@ -241,7 +241,7 @@ jobs:
             echo "Showing log: $LOG_FILE"
             tail -n 1200 "$LOG_FILE"
             echo "\nTop xcode errors (first 40):"
-            grep -nE "error:|\*\* ARCHIVE FAILED \*\*|no such module|module map file .* not found|Command SwiftCompile failed|SwiftCompile normal" "$LOG_FILE" | head -n 80 || true
+            grep -nE "(^| )error:|\*\* ARCHIVE FAILED \*\*|no such module|module map file .* not found|Command SwiftCompile failed" "$LOG_FILE" | grep -v "warning:" | head -n 120 || true
           else
             echo "No gym log file found"
           fi
@@ -254,4 +254,5 @@ jobs:
           path: |
             mobile-customer/ios/buildlogs/*.log
             /Users/runner/Library/Logs/gym/*.log
+            /Users/runner/Library/Developer/Xcode/DerivedData/**/Logs/Build/*.xcresult
           if-no-files-found: ignore

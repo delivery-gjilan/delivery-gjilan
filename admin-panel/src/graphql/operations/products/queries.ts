@@ -18,7 +18,6 @@ export const GET_BUSINESS_PRODUCTS_AND_CATEGORIES = graphql(`
             salePrice
             isAvailable
             sortOrder
-            stock
         }
     }
 `);

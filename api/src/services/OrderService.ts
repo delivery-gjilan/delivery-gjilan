@@ -10,11 +10,10 @@ import {
     businesses as businessesTable,
     businessHours as businessHoursTable,
     userBehaviors as userBehaviorsTable,
-    productStocks as productStocksTable,
     orderPromotions as orderPromotionsTable,
 } from '@/database/schema';
 import { userPromoMetadata } from '@/database/schema';
-import { and, eq, gte, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Order, OrderBusiness, OrderItem, OrderStatus, CreateOrderInput } from '@/generated/types.generated';
 import type { DbOrder } from '@/database/schema/orders';
 import { PubSub, publish, subscribe, topics } from '@/lib/pubsub';
@@ -250,32 +249,6 @@ export class OrderService {
             }
         }
 
-        // Decrement stock for ordered products atomically (prevent overselling)
-        for (const item of itemsToCreate) {
-            // Atomic: UPDATE stock = stock - quantity WHERE stock >= quantity
-            const updated = await db.update(productStocksTable)
-                .set({ stock: sql`${productStocksTable.stock} - ${item.quantity}` })
-                .where(and(
-                    eq(productStocksTable.productId, item.productId),
-                    gte(productStocksTable.stock, item.quantity),
-                ))
-                .returning();
-
-            // If no rows updated, either no stock entry exists (untracked) or insufficient stock
-            if (updated.length === 0) {
-                // Check if a stock entry exists at all
-                const existingStock = await db.select().from(productStocksTable)
-                    .where(eq(productStocksTable.productId, item.productId))
-                    .then(rows => rows[0]);
-
-                if (existingStock) {
-                    // Stock entry exists but insufficient — oversold
-                    throw AppError.badInput(`Insufficient stock for product. Only ${existingStock.stock} available.`);
-                }
-                // No stock entry = product doesn't track stock, proceed normally
-            }
-        }
-
         return this.mapToOrder(createdOrder);
     }
 
@@ -300,12 +273,6 @@ export class OrderService {
             : [];
         const productById = new Map(productsRows.map(p => [p.id, p]));
 
-        // Batch-fetch all stock records (1 query)
-        const stockRows = productIds.length > 0
-            ? await db.select().from(productStocksTable).where(inArray(productStocksTable.productId, productIds))
-            : [];
-        const stockByProductId = new Map(stockRows.map(s => [s.productId, s]));
-
         // Build businessMap in memory — zero per-item queries
         const businessMap = new Map<string, OrderItem[]>();
 
@@ -317,17 +284,14 @@ export class OrderService {
                 businessMap.set(product.businessId, []);
             }
 
-            const stockRecord = stockByProductId.get(product.id);
-            const currentStock = stockRecord?.stock ?? 0;
-            const originalStock = Math.max(0, currentStock + item.quantity);
             businessMap.get(product.businessId)!.push({
                 productId: item.productId,
                 name: product.name,
                 imageUrl: product.imageUrl || undefined,
                 quantity: item.quantity,
                 price: item.price,
-                quantityInStock: Math.min(item.quantity, originalStock),
-                quantityNeeded: Math.max(0, item.quantity - originalStock),
+                quantityInStock: item.quantity,
+                quantityNeeded: 0,
                 notes: item.notes || undefined,
             });
         }
@@ -567,26 +531,6 @@ export class OrderService {
         // Get order items
         const db = await getDB();
         const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, id));
-
-        // Restore stock for cancelled order items
-        for (const item of items) {
-            const existingStock = await db.select().from(productStocksTable)
-                .where(eq(productStocksTable.productId, item.productId))
-                .then(rows => rows[0]);
-
-            if (existingStock) {
-                // Update existing stock entry
-                await db.update(productStocksTable)
-                    .set({ stock: sql`${productStocksTable.stock} + ${item.quantity}` })
-                    .where(eq(productStocksTable.productId, item.productId));
-            } else {
-                // Create stock entry with restored quantity
-                await db.insert(productStocksTable).values({
-                    productId: item.productId,
-                    stock: item.quantity,
-                }).onConflictDoNothing();
-            }
-        }
 
         const order = await this.updateOrderStatus(id, 'CANCELLED');
 

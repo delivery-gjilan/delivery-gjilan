@@ -3,7 +3,6 @@ import { businesses } from './businesses';
 import { productCategories } from './productCategories';
 import { productSubcategories } from './productSubcategories';
 import { relations, sql } from 'drizzle-orm';
-import { productStocks } from './productStock';
 
 export const products = pgTable('products', {
     id: uuid('id').primaryKey().defaultRandom().notNull(),
@@ -53,7 +52,6 @@ export const productsRelations = relations(products, ({ one }) => ({
         fields: [products.subcategoryId],
         references: [productSubcategories.id],
     }),
-    productStock: one(productStocks),
 }));
 
 export type DbProduct = typeof products.$inferSelect;

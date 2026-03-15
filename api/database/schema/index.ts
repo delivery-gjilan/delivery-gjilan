@@ -14,7 +14,6 @@ export * from './productPricing';
 export * from './auditLogs';
 export * from './userBehaviors';
 export * from './promotions';
-export * from './productStock';
 export * from './orderPromotions';
 export * from './userAddress';
 export * from './storeSettings';

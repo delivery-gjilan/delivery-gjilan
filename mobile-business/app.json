@@ -15,10 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.deliverygjilan.business",
-      "googleServicesFile": "./GoogleService-Info.plist",
-      "runtimeVersion": {
-        "policy": "appVersion"
-      }
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "adaptiveIcon": {
@@ -27,10 +24,7 @@
       },
       "googleServicesFile": "./google-services.json",
       "package": "com.deliverygjilan.business",
-      "edgeToEdgeEnabled": false,
-      "runtimeVersion": {
-        "policy": "appVersion"
-      }
+      "edgeToEdgeEnabled": false
     },
     "web": {
       "favicon": "./assets/images/favicon.png",
@@ -59,8 +53,6 @@
     "updates": {
       "url": "https://u.expo.dev/dc536dcd-100f-4271-82f4-2e8fcbdbb345"
     },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    }
+    "runtimeVersion": "1.0.0"
   }
 }

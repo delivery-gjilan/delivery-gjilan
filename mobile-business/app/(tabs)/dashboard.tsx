@@ -16,7 +16,6 @@ interface DashboardStats {
     completedToday: number;
     totalProducts: number;
     unavailableProducts: number;
-    lowStockProducts: number;
 }
 
 export default function DashboardScreen() {
@@ -29,7 +28,6 @@ export default function DashboardScreen() {
         completedToday: 0,
         totalProducts: 0,
         unavailableProducts: 0,
-        lowStockProducts: 0,
     });
 
     const { data: ordersData, loading: ordersLoading, refetch: refetchOrders } = useQuery(GET_BUSINESS_ORDERS, {
@@ -71,7 +69,6 @@ export default function DashboardScreen() {
             completedToday: todayOrders.filter((order: any) => order.status === 'DELIVERED').length,
             totalProducts: products.length,
             unavailableProducts: products.filter((p: any) => !p.isAvailable).length,
-            lowStockProducts: products.filter((p: any) => p.stock < 10 && p.stock > 0).length,
         };
 
         setStats(newStats);
@@ -200,14 +197,6 @@ export default function DashboardScreen() {
                             value={stats.unavailableProducts}
                             color="#ef4444"
                             gradientColors={['#ef4444', '#f87171']}
-                        />
-                        <StatCard
-                            icon="warning"
-                            label="Low Stock"
-                            value={stats.lowStockProducts}
-                            subtitle="Less than 10 items"
-                            color="#f59e0b"
-                            gradientColors={['#f59e0b', '#fbbf24']}
                         />
                     </View>
                 </View>

@@ -215,6 +215,48 @@ export type BusinessDayHoursInput = {
   opensAt: Scalars['String']['input'];
 };
 
+export type BusinessDeviceHealth = {
+  __typename?: 'BusinessDeviceHealth';
+  appState?: Maybe<Scalars['String']['output']>;
+  appVersion?: Maybe<Scalars['String']['output']>;
+  batteryLevel?: Maybe<Scalars['Int']['output']>;
+  businessId: Scalars['ID']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  deviceId: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  isCharging?: Maybe<Scalars['Boolean']['output']>;
+  lastHeartbeatAt: Scalars['DateTime']['output'];
+  lastOrderId?: Maybe<Scalars['ID']['output']>;
+  lastOrderSignalAt?: Maybe<Scalars['DateTime']['output']>;
+  lastPushReceivedAt?: Maybe<Scalars['DateTime']['output']>;
+  metadata?: Maybe<Scalars['JSON']['output']>;
+  networkType?: Maybe<Scalars['String']['output']>;
+  onlineStatus: BusinessDeviceOnlineStatus;
+  platform: DevicePlatform;
+  receivingOrders: Scalars['Boolean']['output'];
+  subscriptionAlive: Scalars['Boolean']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+  userId: Scalars['ID']['output'];
+};
+
+export type BusinessDeviceHeartbeatInput = {
+  appState?: InputMaybe<Scalars['String']['input']>;
+  appVersion?: InputMaybe<Scalars['String']['input']>;
+  batteryLevel?: InputMaybe<Scalars['Int']['input']>;
+  deviceId: Scalars['String']['input'];
+  isCharging?: InputMaybe<Scalars['Boolean']['input']>;
+  metadata?: InputMaybe<Scalars['JSON']['input']>;
+  networkType?: InputMaybe<Scalars['String']['input']>;
+  platform: DevicePlatform;
+  subscriptionAlive: Scalars['Boolean']['input'];
+};
+
+export enum BusinessDeviceOnlineStatus {
+  Offline = 'OFFLINE',
+  Online = 'ONLINE',
+  Stale = 'STALE'
+}
+
 export type BusinessPromotion = {
   __typename?: 'BusinessPromotion';
   description?: Maybe<Scalars['String']['output']>;
@@ -348,7 +390,6 @@ export type CreateProductInput = {
   name: Scalars['String']['input'];
   price: Scalars['Float']['input'];
   salePrice?: InputMaybe<Scalars['Float']['input']>;
-  stock?: InputMaybe<Scalars['Int']['input']>;
   subcategoryId?: InputMaybe<Scalars['ID']['input']>;
 };
 
@@ -657,6 +698,8 @@ export type Mutation = {
   assignDriverToOrder: Order;
   assignPromotionToUsers: Array<UserPromotion>;
   backfillSettlementsForDeliveredOrders: Scalars['Int']['output'];
+  businessDeviceHeartbeat: Scalars['Boolean']['output'];
+  businessDeviceOrderSignal: Scalars['Boolean']['output'];
   cancelOrder: Order;
   createBanner: Banner;
   createBusiness: Business;
@@ -802,6 +845,17 @@ export type MutationAssignDriverToOrderArgs = {
 
 export type MutationAssignPromotionToUsersArgs = {
   input: AssignPromotionToUserInput;
+};
+
+
+export type MutationBusinessDeviceHeartbeatArgs = {
+  input: BusinessDeviceHeartbeatInput;
+};
+
+
+export type MutationBusinessDeviceOrderSignalArgs = {
+  deviceId: Scalars['String']['input'];
+  orderId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 
@@ -1403,7 +1457,6 @@ export type Product = {
   price: Scalars['Float']['output'];
   salePrice?: Maybe<Scalars['Float']['output']>;
   sortOrder: Scalars['Int']['output'];
-  stock: Scalars['Int']['output'];
   subcategoryId?: Maybe<Scalars['ID']['output']>;
   updatedAt: Scalars['String']['output'];
 };
@@ -1582,6 +1635,7 @@ export type Query = {
   auditLogs: AuditLogConnection;
   business?: Maybe<Business>;
   businessBalance: SettlementSummary;
+  businessDeviceHealth: Array<BusinessDeviceHealth>;
   businesses: Array<Business>;
   calculateDeliveryPrice: DeliveryPriceResult;
   calculateProductPrice: Scalars['String']['output'];
@@ -1672,6 +1726,11 @@ export type QueryBusinessArgs = {
 
 export type QueryBusinessBalanceArgs = {
   businessId: Scalars['ID']['input'];
+};
+
+
+export type QueryBusinessDeviceHealthArgs = {
+  hours?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -2232,7 +2291,6 @@ export type UpdateProductInput = {
   price?: InputMaybe<Scalars['Float']['input']>;
   salePrice?: InputMaybe<Scalars['Float']['input']>;
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
-  stock?: InputMaybe<Scalars['Int']['input']>;
   subcategoryId?: InputMaybe<Scalars['ID']['input']>;
 };
 

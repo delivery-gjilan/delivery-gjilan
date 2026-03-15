@@ -27,7 +27,7 @@ export function MarketProductCard({ product, businessType, onPress, descriptionO
     const discountPercent = hasDiscount
         ? Math.round(((product.price - product.salePrice!) / product.price) * 100)
         : 0;
-    const isSoldOut = !product.isAvailable || product.stock === 0;
+    const isSoldOut = !product.isAvailable;
 
     return (
         <TouchableOpacity

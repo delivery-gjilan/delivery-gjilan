@@ -89,7 +89,6 @@ interface Product {
     salePrice?: number | null;
     isAvailable: boolean;
     sortOrder: number;
-    stock: number;
 }
 
 /* ===============================================
@@ -543,9 +542,6 @@ function MarketContent({ businessId }: { businessId: string }) {
                                             Price
                                         </th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                            Stock
-                                        </th>
-                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider w-24">
                                             On Sale
                                         </th>
                                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider w-24">
@@ -970,18 +966,6 @@ function ProductRow({
                 </div>
             </td>
 
-            {/* Stock */}
-            <td className="px-4 py-3">
-                <div className={`flex items-center gap-2 px-2 py-1 rounded text-sm font-medium ${
-                    product.stock > 0
-                        ? 'bg-green-500/20 text-green-300'
-                        : 'bg-red-500/20 text-red-300'
-                }`}>
-                    <Package size={14} />
-                    <span>{product.stock} pcs</span>
-                </div>
-            </td>
-
             {/* On Sale Toggle */}
             <td className="px-4 py-3 text-center">
                 <button
@@ -1284,7 +1268,6 @@ function ProductModal({
         imageUrl: '',
         isOnSale: false,
         isAvailable: true,
-        stock: '',
     });
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -1311,7 +1294,6 @@ function ProductModal({
                     imageUrl: modal.data.imageUrl || '',
                     isOnSale: modal.data.isOnSale,
                     isAvailable: modal.data.isAvailable,
-                    stock: modal.data.stock?.toString() || '0',
                 });
                 setImagePreview(modal.data.imageUrl || null);
             } else {
@@ -1325,7 +1307,6 @@ function ProductModal({
                     imageUrl: '',
                     isOnSale: false,
                     isAvailable: true,
-                    stock: '',
                 });
                 setImagePreview(null);
             }
@@ -1402,7 +1383,6 @@ function ProductModal({
             isOnSale: form.isOnSale,
             salePrice: form.isOnSale && form.salePrice ? parseFloat(form.salePrice) : undefined,
             isAvailable: form.isAvailable,
-            stock: form.stock ? parseInt(form.stock, 10) : 0,
         };
 
         const result =
@@ -1514,18 +1494,6 @@ function ProductModal({
                             disabled={!form.isOnSale}
                         />
                     </div>
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">
-                        Stock (pieces)
-                    </label>
-                    <Input
-                        type="number"
-                        placeholder="0"
-                        value={form.stock}
-                        onChange={(e) => setForm({ ...form, stock: e.target.value })}
-                    />
                 </div>
 
                 <div>

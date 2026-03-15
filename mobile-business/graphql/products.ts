@@ -16,7 +16,6 @@ export const GET_BUSINESS_PRODUCTS = graphql(`
             salePrice
             isAvailable
             sortOrder
-            stock
             createdAt
             updatedAt
         }
@@ -39,7 +38,6 @@ export const CREATE_PRODUCT = graphql(`
             imageUrl
             price
             isAvailable
-            stock
         }
     }
 `);
@@ -55,7 +53,6 @@ export const UPDATE_PRODUCT = graphql(`
             isOnSale
             salePrice
             isAvailable
-            stock
         }
     }
 `);
