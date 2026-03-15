@@ -25,7 +25,9 @@ const errorLink = onError(({ error, operation, forward }) => {
             if (err.extensions?.code === 'UNAUTHENTICATED' || err.message === 'Unauthorized') {
                 const alreadyRetried = operation.getContext().alreadyRetriedAuth === true;
                 if (alreadyRetried || !forward) {
-                    console.warn('[Apollo] Auth refresh failed or already retried; preserving session until manual logout');
+                    console.warn(
+                        '[Apollo] Auth refresh failed or already retried; preserving session until manual logout',
+                    );
                     return;
                 }
 
@@ -156,25 +158,31 @@ const splitLink = wsLink
 
 export const cache = new InMemoryCache({
     typePolicies: {
-        Order:       { keyFields: ['id'], fields: { businesses: { merge: false } } },
-        Business:    { keyFields: ['id'], fields: { products:   { merge: false } } },
-        Product:     { keyFields: ['id'] },
-        User:        { keyFields: ['id'] },
-        Driver:      { keyFields: ['id'] },
-        Settlement:  { keyFields: ['id'] },
+        Order: { keyFields: ['id'], fields: { businesses: { merge: false } } },
+        Business: { keyFields: ['id'], fields: { products: { merge: false } } },
+        Product: { keyFields: ['id'] },
+        User: { keyFields: ['id'] },
+        Driver: { keyFields: ['id'] },
+        Settlement: { keyFields: ['id'] },
         UserAddress: { keyFields: ['id'] },
-        Promotion:   { keyFields: ['id'] },
+        Promotion: { keyFields: ['id'] },
         Query: {
             fields: {
-                order: { read(_, { args, toReference }) {
-                    return toReference({ __typename: 'Order', id: args?.id });
-                }},
-                business: { read(_, { args, toReference }) {
-                    return toReference({ __typename: 'Business', id: args?.id });
-                }},
-                product: { read(_, { args, toReference }) {
-                    return toReference({ __typename: 'Product', id: args?.id });
-                }},
+                order: {
+                    read(_, { args, toReference }) {
+                        return toReference({ __typename: 'Order', id: args?.id });
+                    },
+                },
+                business: {
+                    read(_, { args, toReference }) {
+                        return toReference({ __typename: 'Business', id: args?.id });
+                    },
+                },
+                product: {
+                    read(_, { args, toReference }) {
+                        return toReference({ __typename: 'Product', id: args?.id });
+                    },
+                },
             },
         },
     },

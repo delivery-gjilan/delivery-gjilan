@@ -4,19 +4,36 @@ export const GET_PRODUCTS = graphql(`
     query GetProducts($businessId: ID!) {
         products(businessId: $businessId) {
             id
-            businessId
-            categoryId
-            subcategoryId
             name
-            description
             imageUrl
-            price
-            isOnSale
-            salePrice
-            isAvailable
-            sortOrder
-            createdAt
-            updatedAt
+            basePrice
+            isOffer
+            variants {
+                id
+                name
+                imageUrl
+                price
+                isOnSale
+                salePrice
+                isAvailable
+            }
+            product {
+                id
+                businessId
+                categoryId
+                subcategoryId
+                name
+                description
+                imageUrl
+                price
+                isOnSale
+                salePrice
+                isAvailable
+                sortOrder
+                isOffer
+                createdAt
+                updatedAt
+            }
         }
     }
 `);
@@ -36,6 +53,51 @@ export const GET_PRODUCT = graphql(`
             salePrice
             isAvailable
             sortOrder
+            isOffer
+            variantGroupId
+            variants {
+                id
+                name
+                price
+                isOnSale
+                salePrice
+                isAvailable
+                imageUrl
+                description
+            }
+            optionGroups {
+                id
+                name
+                minSelections
+                maxSelections
+                displayOrder
+                options {
+                    id
+                    name
+                    extraPrice
+                    linkedProductId
+                    displayOrder
+                    linkedProduct {
+                        id
+                        name
+                        imageUrl
+                        price
+                        optionGroups {
+                            id
+                            name
+                            minSelections
+                            maxSelections
+                            displayOrder
+                            options {
+                                id
+                                name
+                                extraPrice
+                                displayOrder
+                            }
+                        }
+                    }
+                }
+            }
             createdAt
             updatedAt
         }

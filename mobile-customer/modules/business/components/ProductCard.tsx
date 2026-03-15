@@ -1,31 +1,34 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, Platform, Image } from 'react-native';
 import { router } from 'expo-router';
-import { Product, BusinessType } from '@/gql/graphql';
+import { ProductCard as GqlProductCard, BusinessType } from '@/gql/graphql';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { CartControls } from './CartControls';
 
 interface ProductCardProps {
-    product: Partial<Product>;
+    productCard: GqlProductCard;
     businessType?: BusinessType;
 }
 
-export function ProductCard({ product, businessType }: ProductCardProps) {
+export function ProductCard({ productCard, businessType }: ProductCardProps) {
     const theme = useTheme();
     const { t } = useTranslations();
 
+    // Use product from card if single product, otherwise use first variant or just base card info
+    const product = productCard.product || productCard.variants[0];
+    const hasVariants = productCard.variants.length > 0;
+
     const handlePress = () => {
-        if (!product.id) return;
-        router.push(`/product/${product.id}`);
+        if (!productCard.id) return;
+        router.push(`/product/${productCard.id}`);
     };
 
-    const effectivePrice = product.isOnSale && product.salePrice ? product.salePrice : (product.price ?? 0);
-    const hasDiscount = !!(product.isOnSale && product.salePrice);
-    const discountPercent = hasDiscount
-        ? Math.round(((product.price - product.salePrice!) / product.price) * 100)
-        : 0;
+    const effectivePrice = product?.isOnSale && product?.salePrice ? product.salePrice : (productCard.basePrice ?? 0);
+    const hasDiscount = !!(product?.isOnSale && product?.salePrice);
+    const discountPercent =
+        hasDiscount && product ? Math.round(((product.price - (product.salePrice ?? 0)) / product.price) * 100) : 0;
 
     return (
         <TouchableOpacity
@@ -55,9 +58,9 @@ export function ProductCard({ product, businessType }: ProductCardProps) {
                         flexShrink: 0, // Prevent image from shrinking
                     }}
                 >
-                    {product.imageUrl ? (
+                    {productCard.imageUrl || product?.imageUrl ? (
                         <Image
-                            source={{ uri: product.imageUrl }}
+                            source={{ uri: productCard.imageUrl || product?.imageUrl || '' }}
                             style={{ width: 112, height: 112 }}
                             resizeMode="cover"
                         />
@@ -95,38 +98,50 @@ export function ProductCard({ product, businessType }: ProductCardProps) {
                             numberOfLines={2}
                             ellipsizeMode="tail"
                         >
-                            {product.name}
+                            {productCard.name}
                         </Text>
 
-                        {product.description && (
+                        {(productCard.product?.description || product?.description) && (
                             <Text
                                 className="text-xs leading-4"
                                 style={{ color: theme.colors.subtext }}
                                 numberOfLines={2}
                                 ellipsizeMode="tail"
                             >
-                                {product.description}
+                                {productCard.product?.description || product?.description}
                             </Text>
                         )}
                     </View>
 
-                    {/* Price Section and Cart Controls */}
-                    <View className="flex-row items-center justify-between" style={{ marginTop: 8, minHeight: 32 }}>
-                        <View className="flex-row items-baseline" style={{ gap: 8, flexShrink: 1 }}>
-                            <Text className="text-lg font-bold" style={{ color: theme.colors.primary }}>
-                                €{effectivePrice.toFixed(2)}
-                            </Text>
-                            {hasDiscount && (
+                    <View className="flex-row items-center justify-between" style={{ marginTop: 8, minHeight: 40 }}>
+                        <View style={{ flexShrink: 1 }}>
+                            <View className="flex-row items-baseline" style={{ gap: 4 }}>
+                                {hasVariants && !hasDiscount && (
+                                    <Text className="text-xs" style={{ color: theme.colors.subtext }}>from</Text>
+                                )}
+                                <Text className="text-lg font-bold" style={{ color: theme.colors.primary }}>
+                                    €{effectivePrice.toFixed(2)}
+                                </Text>
+                            </View>
+                            {hasDiscount && product && (
                                 <Text className="text-xs line-through" style={{ color: theme.colors.subtext }}>
                                     €{product.price.toFixed(2)}
                                 </Text>
                             )}
                         </View>
 
-                        {/* Cart Controls */}
-                        {product.isAvailable && (
+                        {/* Cart Controls or Customize Button */}
+                        {productCard.product?.isAvailable !== false && (
                             <View style={{ flexShrink: 0, marginLeft: 8 }}>
-                                <CartControls product={product} businessType={businessType} />
+                                {!hasVariants && !productCard.isOffer ? (
+                                    <CartControls product={productCard.product!} businessType={businessType} />
+                                ) : (
+                                    <View className="bg-primary/10 px-3 py-2 rounded-full">
+                                        <Text className="text-primary text-xs font-bold">
+                                            {productCard.isOffer ? 'Configure' : 'Options'}
+                                        </Text>
+                                    </View>
+                                )}
                             </View>
                         )}
                     </View>

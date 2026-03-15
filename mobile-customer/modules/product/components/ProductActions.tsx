@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, Platform, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,10 +10,12 @@ import { useProductActions } from '../hooks/useProductActions';
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 interface ProductActionsProps {
-    product: Partial<Product>;
+    product: any;
+    selectedOptions: Record<string, string[]>;
+    parentProduct?: any;
 }
 
-export function ProductActions({ product }: ProductActionsProps) {
+export function ProductActions({ product, selectedOptions, parentProduct }: ProductActionsProps) {
     const theme = useTheme();
     const { t } = useTranslations();
     const insets = useSafeAreaInsets();
@@ -31,7 +33,16 @@ export function ProductActions({ product }: ProductActionsProps) {
         addToCart,
         updateCart,
         removeFromCart,
-    } = useProductActions(product);
+    } = useProductActions(product, selectedOptions, parentProduct);
+
+    // Validation: Check if all mandatory option groups have enough selections
+    const isSelectionValid = useMemo(() => {
+        const optionGroups = product.optionGroups || parentProduct?.optionGroups || [];
+        return optionGroups.every((og: any) => {
+            const selected = selectedOptions[og.id] || [];
+            return selected.length >= og.minSelections;
+        });
+    }, [product, selectedOptions, parentProduct]);
 
     const triggerFloatingAnimation = () => {
         setShowFloatingNumber(true);
@@ -76,12 +87,14 @@ export function ProductActions({ product }: ProductActionsProps) {
     }
 
     const getButtonText = () => {
+        if (!isSelectionValid) return 'Please select required options';
         if (!isInCart) return t.product.add_to_order;
         if (hasQuantityChanged) return t.product.update_order;
         return t.product.in_cart;
     };
 
     const handleMainAction = () => {
+        if (!isSelectionValid) return;
         if (!isInCart) {
             // Bounce animation for adding to cart
             Animated.sequence([
@@ -163,11 +176,11 @@ export function ProductActions({ product }: ProductActionsProps) {
                 {/* Main Action Button */}
                 <AnimatedTouchable
                     onPress={handleMainAction}
-                    disabled={isInCart && !hasQuantityChanged}
+                    disabled={!isSelectionValid || (isInCart && !hasQuantityChanged)}
                     className="py-4 rounded-xl items-center"
                     style={{
-                        backgroundColor: isInCart && !hasQuantityChanged ? theme.colors.subtext : theme.colors.primary,
-                        opacity: isInCart && !hasQuantityChanged ? 0.5 : 1,
+                        backgroundColor: (!isSelectionValid || (isInCart && !hasQuantityChanged)) ? theme.colors.subtext : theme.colors.primary,
+                        opacity: (!isSelectionValid || (isInCart && !hasQuantityChanged)) ? 0.5 : 1,
                         transform: [{ scale: buttonScaleAnim }]
                     }}
                     activeOpacity={0.7}

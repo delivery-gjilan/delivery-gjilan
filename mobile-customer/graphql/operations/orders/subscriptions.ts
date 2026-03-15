@@ -68,11 +68,37 @@ export const USER_ORDERS_UPDATED = graphql(`
                     }
                 }
                 items {
+                    id
                     productId
                     name
                     imageUrl
                     quantity
-                    price
+                    unitPrice
+                    parentOrderItemId
+                    selectedOptions {
+                        id
+                        optionGroupId
+                        optionGroupName
+                        optionId
+                        optionName
+                        priceAtOrder
+                    }
+                    childItems {
+                        id
+                        productId
+                        name
+                        imageUrl
+                        quantity
+                        unitPrice
+                        selectedOptions {
+                            id
+                            optionGroupId
+                            optionGroupName
+                            optionId
+                            optionName
+                            priceAtOrder
+                        }
+                    }
                 }
             }
         }

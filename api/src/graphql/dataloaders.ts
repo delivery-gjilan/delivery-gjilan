@@ -3,7 +3,12 @@ import { DbType } from '@/database';
 import { users, DbUser } from '@/database/schema/users';
 import { drivers, DbDriver } from '@/database/schema/drivers';
 import { orderPromotions, DbOrderPromotion } from '@/database/schema/orderPromotions';
-import { inArray, eq } from 'drizzle-orm';
+import { optionGroups, DbOptionGroup } from '@/database/schema/optionGroups';
+import { options, DbOption } from '@/database/schema/options';
+import { products, DbProduct } from '@/database/schema/products';
+import { orderItems, DbOrderItem } from '@/database/schema/orderItems';
+import { orderItemOptions, DbOrderItemOption } from '@/database/schema/orderItemOptions';
+import { inArray } from 'drizzle-orm';
 
 /**
  * Batch-loads users by their IDs.
@@ -11,7 +16,10 @@ import { inArray, eq } from 'drizzle-orm';
  */
 export function createUserLoader(db: DbType) {
     return new DataLoader<string, DbUser | null>(async (ids) => {
-        const rows = await db.select().from(users).where(inArray(users.id, [...ids]));
+        const rows = await db
+            .select()
+            .from(users)
+            .where(inArray(users.id, [...ids]));
         const map = new Map(rows.map((r) => [r.id, r]));
         return ids.map((id) => map.get(id) ?? null);
     });
@@ -23,7 +31,10 @@ export function createUserLoader(db: DbType) {
  */
 export function createDriverByUserIdLoader(db: DbType) {
     return new DataLoader<string, DbDriver | null>(async (userIds) => {
-        const rows = await db.select().from(drivers).where(inArray(drivers.userId, [...userIds]));
+        const rows = await db
+            .select()
+            .from(drivers)
+            .where(inArray(drivers.userId, [...userIds]));
         const map = new Map(rows.map((r) => [r.userId, r]));
         return userIds.map((id) => map.get(id) ?? null);
     });
@@ -49,10 +60,119 @@ export function createOrderPromotionsLoader(db: DbType) {
     });
 }
 
+/**
+ * Batch-loads option groups by productId.
+ * Resolves N+1 in Product.optionGroups field resolver.
+ */
+export function createOptionGroupsByProductIdLoader(db: DbType) {
+    return new DataLoader<string, DbOptionGroup[]>(async (productIds) => {
+        const rows = await db
+            .select()
+            .from(optionGroups)
+            .where(inArray(optionGroups.productId, [...productIds]))
+            .orderBy(optionGroups.displayOrder);
+        const map = new Map<string, DbOptionGroup[]>();
+        for (const row of rows) {
+            const arr = map.get(row.productId) ?? [];
+            arr.push(row);
+            map.set(row.productId, arr);
+        }
+        return productIds.map((id) => map.get(id) ?? []);
+    });
+}
+
+/**
+ * Batch-loads options by optionGroupId.
+ * Resolves N+1 in OptionGroup.options field resolver.
+ */
+export function createOptionsByOptionGroupIdLoader(db: DbType) {
+    return new DataLoader<string, DbOption[]>(async (groupIds) => {
+        const rows = await db
+            .select()
+            .from(options)
+            .where(inArray(options.optionGroupId, [...groupIds]))
+            .orderBy(options.displayOrder);
+        const map = new Map<string, DbOption[]>();
+        for (const row of rows) {
+            const arr = map.get(row.optionGroupId) ?? [];
+            arr.push(row);
+            map.set(row.optionGroupId, arr);
+        }
+        return groupIds.map((id) => map.get(id) ?? []);
+    });
+}
+
+/**
+ * Batch-loads products by variant group ID.
+ * Resolves N+1 in Product.variants field resolver.
+ */
+export function createVariantsByGroupIdLoader(db: DbType) {
+    return new DataLoader<string, DbProduct[]>(async (groupIds) => {
+        const rows = await db
+            .select()
+            .from(products)
+            .where(inArray(products.groupId, [...groupIds]));
+        const map = new Map<string, DbProduct[]>();
+        for (const row of rows) {
+            if (!row.groupId) continue;
+            const arr = map.get(row.groupId) ?? [];
+            arr.push(row);
+            map.set(row.groupId, arr);
+        }
+        return groupIds.map((id) => map.get(id) ?? []);
+    });
+}
+
+/**
+ * Batch-loads order item options by orderItemId.
+ * Resolves N+1 in OrderItem.selectedOptions field resolver.
+ */
+export function createOrderItemOptionsByOrderItemIdLoader(db: DbType) {
+    return new DataLoader<string, DbOrderItemOption[]>(async (orderItemIds) => {
+        const rows = await db
+            .select()
+            .from(orderItemOptions)
+            .where(inArray(orderItemOptions.orderItemId, [...orderItemIds]));
+        const map = new Map<string, DbOrderItemOption[]>();
+        for (const row of rows) {
+            const arr = map.get(row.orderItemId) ?? [];
+            arr.push(row);
+            map.set(row.orderItemId, arr);
+        }
+        return orderItemIds.map((id) => map.get(id) ?? []);
+    });
+}
+
+/**
+ * Batch-loads child order items by parentOrderItemId.
+ * Resolves N+1 in OrderItem.childItems field resolver.
+ */
+export function createChildItemsByParentOrderItemIdLoader(db: DbType) {
+    return new DataLoader<string, DbOrderItem[]>(async (parentIds) => {
+        const rows = await db
+            .select()
+            .from(orderItems)
+            .where(inArray(orderItems.parentOrderItemId, [...parentIds]));
+        const map = new Map<string, DbOrderItem[]>();
+        for (const row of rows) {
+            if (!row.parentOrderItemId) continue;
+            const arr = map.get(row.parentOrderItemId) ?? [];
+            arr.push(row);
+            map.set(row.parentOrderItemId, arr);
+        }
+        return parentIds.map((id) => map.get(id) ?? []);
+    });
+}
+
 export interface DataLoaders {
     userLoader: DataLoader<string, DbUser | null>;
     driverByUserIdLoader: DataLoader<string, DbDriver | null>;
     orderPromotionsLoader: DataLoader<string, DbOrderPromotion[]>;
+    optionGroupsByProductIdLoader: DataLoader<string, DbOptionGroup[]>;
+    optionsByOptionGroupIdLoader: DataLoader<string, DbOption[]>;
+    variantsByGroupIdLoader: DataLoader<string, DbProduct[]>;
+    orderItemOptionsByOrderItemIdLoader: DataLoader<string, DbOrderItemOption[]>;
+    childItemsByParentOrderItemIdLoader: DataLoader<string, DbOrderItem[]>;
 }
 
 export function createDataLoaders(db: DbType): DataLoaders {
@@ -60,5 +180,10 @@ export function createDataLoaders(db: DbType): DataLoaders {
         userLoader: createUserLoader(db),
         driverByUserIdLoader: createDriverByUserIdLoader(db),
         orderPromotionsLoader: createOrderPromotionsLoader(db),
+        optionGroupsByProductIdLoader: createOptionGroupsByProductIdLoader(db),
+        optionsByOptionGroupIdLoader: createOptionsByOptionGroupIdLoader(db),
+        variantsByGroupIdLoader: createVariantsByGroupIdLoader(db),
+        orderItemOptionsByOrderItemIdLoader: createOrderItemOptionsByOrderItemIdLoader(db),
+        childItemsByParentOrderItemIdLoader: createChildItemsByParentOrderItemIdLoader(db),
     };
 }

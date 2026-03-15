@@ -6,6 +6,8 @@ const createProductSchema = z.object({
     businessId: z.uuid('Invalid Business ID'),
     categoryId: z.uuid('Invalid Category ID'),
     subcategoryId: z.uuid('Invalid Subcategory ID').optional().nullable(),
+    variantGroupId: z.uuid('Invalid Variant Group ID').optional().nullable(),
+    isOffer: z.boolean().optional(),
     name: z.string().min(1, 'Name is required'),
     description: z.string().optional().nullable(),
     imageUrl: z.string().optional().nullable(),
@@ -19,6 +21,7 @@ const createProductSchema = z.object({
 const updateProductSchema = z.object({
     categoryId: z.uuid('Invalid Category ID').optional(),
     subcategoryId: z.uuid('Invalid Subcategory ID').optional().nullable(),
+    variantGroupId: z.uuid('Invalid Variant Group ID').optional().nullable(),
     name: z.string().min(1, 'Name is required').optional(),
     description: z.string().optional().nullable(),
     imageUrl: z.string().optional().nullable(),

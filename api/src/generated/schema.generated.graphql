@@ -287,6 +287,27 @@ input CreateDynamicPricingRuleInput {
   validUntil: String
 }
 
+input CreateOptionGroupInput {
+  displayOrder: Int
+  maxSelections: Int!
+  minSelections: Int!
+  name: String!
+  options: [CreateOptionInput!]!
+  productId: ID!
+}
+
+input CreateOptionInput {
+  displayOrder: Int
+  extraPrice: Float
+  linkedProductId: ID
+  name: String!
+}
+
+input CreateOrderChildItemInput {
+  productId: ID!
+  selectedOptions: [CreateOrderItemOptionInput!]!
+}
+
 input CreateOrderInput {
   deliveryPrice: Float!
   driverNotes: String
@@ -297,10 +318,17 @@ input CreateOrderInput {
 }
 
 input CreateOrderItemInput {
+  childItems: [CreateOrderChildItemInput!]
   notes: String
   price: Float!
   productId: ID!
   quantity: Int!
+  selectedOptions: [CreateOrderItemOptionInput!]!
+}
+
+input CreateOrderItemOptionInput {
+  optionGroupId: ID!
+  optionId: ID!
 }
 
 input CreateProductCategoryInput {
@@ -314,16 +342,23 @@ input CreateProductInput {
   description: String
   imageUrl: String
   isAvailable: Boolean
+  isOffer: Boolean
   isOnSale: Boolean
   name: String!
   price: Float!
   salePrice: Float
   stock: Int
   subcategoryId: ID
+  variantGroupId: ID
 }
 
 input CreateProductSubcategoryInput {
   categoryId: ID!
+  name: String!
+}
+
+input CreateProductVariantGroupInput {
+  businessId: ID!
   name: String!
 }
 
@@ -657,10 +692,13 @@ type Mutation {
   createDeliveryPricingTier(input: CreateDeliveryPricingTierInput!): DeliveryPricingTier!
   createDeliveryZone(input: CreateDeliveryZoneInput!): DeliveryZone!
   createDynamicPricingRule(input: CreateDynamicPricingRuleInput!): DynamicPricingRule!
+  createOption(input: CreateOptionInput!, optionGroupId: ID!): Option!
+  createOptionGroup(input: CreateOptionGroupInput!): OptionGroup!
   createOrder(input: CreateOrderInput!): Order!
   createProduct(input: CreateProductInput!): Product!
   createProductCategory(input: CreateProductCategoryInput!): ProductCategory!
   createProductSubcategory(input: CreateProductSubcategoryInput!): ProductSubcategory!
+  createProductVariantGroup(input: CreateProductVariantGroupInput!): ProductVariantGroup!
   createPromotion(input: CreatePromotionInput!): Promotion!
   createSettlementRule(input: CreateSettlementRuleInput!): SettlementRule!
   createTestOrder: Order!
@@ -674,9 +712,12 @@ type Mutation {
   deleteDeliveryZone(id: ID!): Boolean!
   deleteDynamicPricingRule(id: ID!): Boolean!
   deleteMyAccount: Boolean!
+  deleteOption(id: ID!): Boolean!
+  deleteOptionGroup(id: ID!): Boolean!
   deleteProduct(id: ID!): Boolean!
   deleteProductCategory(id: ID!): Boolean!
   deleteProductSubcategory(id: ID!): Boolean!
+  deleteProductVariantGroup(id: ID!): Boolean!
   deletePromotion(id: ID!): Boolean!
   deleteSettlementRule(id: ID!): Boolean!
   deleteUser(id: ID!): Boolean!
@@ -727,6 +768,8 @@ type Mutation {
   updateDriverLocation(latitude: Float!, longitude: Float!): User!
   updateDriverOnlineStatus(isOnline: Boolean!): User!
   updateDynamicPricingRule(id: ID!, input: UpdateDynamicPricingRuleInput!): DynamicPricingRule!
+  updateOption(id: ID!, input: UpdateOptionInput!): Option!
+  updateOptionGroup(id: ID!, input: UpdateOptionGroupInput!): OptionGroup!
   updateOrderStatus(id: ID!, status: OrderStatus!): Order!
   updatePreparationTime(id: ID!, preparationMinutes: Int!): Order!
   updateProduct(id: ID!, input: UpdateProductInput!): Product!
@@ -782,6 +825,26 @@ enum NotificationType {
   PROMOTIONAL
 }
 
+type Option {
+  displayOrder: Int!
+  extraPrice: Float!
+  id: ID!
+  linkedProduct: Product
+  linkedProductId: ID
+  name: String!
+  optionGroupId: ID!
+}
+
+type OptionGroup {
+  displayOrder: Int!
+  id: ID!
+  maxSelections: Int!
+  minSelections: Int!
+  name: String!
+  options: [Option!]!
+  productId: ID!
+}
+
 type Order {
   businesses: [OrderBusiness!]!
   deliveredAt: Date
@@ -825,14 +888,27 @@ type OrderDriverLiveTracking {
 }
 
 type OrderItem {
+  childItems: [OrderItem!]!
+  id: ID!
   imageUrl: String
   name: String!
   notes: String
-  price: Float!
+  parentOrderItemId: ID
   productId: ID!
   quantity: Int!
   quantityInStock: Int!
   quantityNeeded: Int!
+  selectedOptions: [OrderItemOption!]!
+  unitPrice: Float!
+}
+
+type OrderItemOption {
+  id: ID!
+  optionGroupId: ID!
+  optionGroupName: String!
+  optionId: ID!
+  optionName: String!
+  priceAtOrder: Float!
 }
 
 type OrderPromotion {
@@ -893,14 +969,29 @@ type Product {
   id: ID!
   imageUrl: String
   isAvailable: Boolean!
+  isOffer: Boolean!
   isOnSale: Boolean!
   name: String!
+  optionGroups: [OptionGroup!]!
   price: Float!
   salePrice: Float
   sortOrder: Int!
   stock: Int!
   subcategoryId: ID
   updatedAt: String!
+  variantGroup: ProductVariantGroup
+  variantGroupId: ID
+  variants: [Product!]!
+}
+
+type ProductCard {
+  basePrice: Float!
+  id: ID!
+  imageUrl: String
+  isOffer: Boolean!
+  name: String!
+  product: Product
+  variants: [Product!]!
 }
 
 type ProductCategory {
@@ -935,6 +1026,12 @@ type ProductSubcategory {
   id: ID!
   name: String!
   updatedAt: String!
+}
+
+type ProductVariantGroup {
+  businessId: ID!
+  id: ID!
+  name: String!
 }
 
 type Promotion {
@@ -1101,6 +1198,7 @@ type Query {
   myReferralStats: ReferralStats!
   notificationCampaign(id: ID!): NotificationCampaign
   notificationCampaigns: [NotificationCampaign!]!
+  offers(businessId: ID!): [Product!]!
   order(id: ID!): Order
   orders: [Order!]!
   ordersByStatus(status: OrderStatus!): [Order!]!
@@ -1112,7 +1210,7 @@ type Query {
   productPricingByBusiness(businessId: ID!): [ProductPricing!]!
   productSubcategories(categoryId: ID!): [ProductSubcategory!]!
   productSubcategoriesByBusiness(businessId: ID!): [ProductSubcategory!]!
-  products(businessId: ID!): [Product!]!
+  products(businessId: ID!): [ProductCard!]!
   pushTelemetryEvents(appType: DeviceAppType, eventType: PushTelemetryEventType, hours: Int, limit: Int, platform: DevicePlatform): [PushTelemetryEvent!]!
   pushTelemetrySummary(hours: Int): PushTelemetrySummary!
   settlementRule(id: ID!): SettlementRule
@@ -1397,6 +1495,20 @@ input UpdateDynamicPricingRuleInput {
   validUntil: String
 }
 
+input UpdateOptionGroupInput {
+  displayOrder: Int
+  maxSelections: Int
+  minSelections: Int
+  name: String
+}
+
+input UpdateOptionInput {
+  displayOrder: Int
+  extraPrice: Float
+  linkedProductId: ID
+  name: String
+}
+
 input UpdateProductCategoryInput {
   isActive: Boolean
   name: String
@@ -1414,6 +1526,7 @@ input UpdateProductInput {
   sortOrder: Int
   stock: Int
   subcategoryId: ID
+  variantGroupId: ID
 }
 
 input UpdateProductPricingInput {

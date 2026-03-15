@@ -1288,11 +1288,62 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                                 {item.name}
                                             </Text>
                                             <Text style={{ fontSize: 13, color: theme.colors.subtext, fontWeight: '600', marginTop: 4 }}>
-                                                {item.quantity} × €{formatCurrency(item.price)}
+                                                {item.quantity} × €{formatCurrency(item.unitPrice)}
                                             </Text>
+
+                                            {/* Selected Options */}
+                                            {item.selectedOptions && item.selectedOptions.length > 0 && (
+                                                <View style={{ marginTop: 6, gap: 2 }}>
+                                                    {item.selectedOptions.map((opt: any) => (
+                                                        <View key={opt.id} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                            <Ionicons name="add-circle-outline" size={12} color={theme.colors.subtext} style={{ marginRight: 4 }} />
+                                                            <Text style={{ fontSize: 12, color: theme.colors.subtext }}>
+                                                                {opt.optionName} {opt.priceAtOrder > 0 ? `(+€${formatCurrency(opt.priceAtOrder)})` : ''}
+                                                            </Text>
+                                                        </View>
+                                                    ))}
+                                                </View>
+                                            )}
+
+                                            {/* Child Items (Offers) */}
+                                            {item.childItems && item.childItems.length > 0 && (
+                                                <View style={{ marginTop: 8, gap: 6 }}>
+                                                    {item.childItems.map((child: any) => (
+                                                        <View key={child.id} style={{ 
+                                                            paddingLeft: 12, 
+                                                            paddingVertical: 6,
+                                                            borderLeftWidth: 1,
+                                                            borderLeftColor: theme.colors.border + '50',
+                                                            backgroundColor: theme.colors.border + '08',
+                                                            borderRadius: 4,
+                                                        }}>
+                                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                                <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.text }}>
+                                                                    {child.name}
+                                                                </Text>
+                                                                {child.unitPrice > 0 && (
+                                                                    <Text style={{ fontSize: 12, color: theme.colors.subtext }}>
+                                                                        €{formatCurrency(child.unitPrice)}
+                                                                    </Text>
+                                                                )}
+                                                            </View>
+                                                            {child.selectedOptions && child.selectedOptions.length > 0 && (
+                                                                <View style={{ marginTop: 2, gap: 1 }}>
+                                                                    {child.selectedOptions.map((opt: any) => (
+                                                                        <Text key={opt.id} style={{ fontSize: 11, color: theme.colors.subtext }}>
+                                                                            • {opt.optionName}
+                                                                        </Text>
+                                                                    ))}
+                                                                </View>
+                                                            )}
+                                                        </View>
+                                                    ))}
+                                                </View>
+                                            )}
+
                                             {item.notes && (
                                                 <View style={{
-                                                    marginTop: 6,
+                                                    marginTop: 10,
                                                     paddingHorizontal: 8,
                                                     paddingVertical: 4,
                                                     backgroundColor: theme.colors.primary + '10',
@@ -1308,7 +1359,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                         </View>
 
                                         <Text style={{ fontSize: 16, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.3 }}>
-                                            €{formatCurrency(Number(item.price) * Number(item.quantity))}
+                                            €{formatCurrency(Number(item.unitPrice) * Number(item.quantity))}
                                         </Text>
                                     </View>
                                 ))}

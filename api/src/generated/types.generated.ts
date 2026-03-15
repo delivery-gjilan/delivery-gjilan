@@ -313,6 +313,27 @@ export type CreateDynamicPricingRuleInput = {
   validUntil?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type CreateOptionGroupInput = {
+  displayOrder?: InputMaybe<Scalars['Int']['input']>;
+  maxSelections: Scalars['Int']['input'];
+  minSelections: Scalars['Int']['input'];
+  name: Scalars['String']['input'];
+  options: Array<CreateOptionInput>;
+  productId: Scalars['ID']['input'];
+};
+
+export type CreateOptionInput = {
+  displayOrder?: InputMaybe<Scalars['Int']['input']>;
+  extraPrice?: InputMaybe<Scalars['Float']['input']>;
+  linkedProductId?: InputMaybe<Scalars['ID']['input']>;
+  name: Scalars['String']['input'];
+};
+
+export type CreateOrderChildItemInput = {
+  productId: Scalars['ID']['input'];
+  selectedOptions: Array<CreateOrderItemOptionInput>;
+};
+
 export type CreateOrderInput = {
   deliveryPrice: Scalars['Float']['input'];
   driverNotes?: InputMaybe<Scalars['String']['input']>;
@@ -323,10 +344,17 @@ export type CreateOrderInput = {
 };
 
 export type CreateOrderItemInput = {
+  childItems?: InputMaybe<Array<CreateOrderChildItemInput>>;
   notes?: InputMaybe<Scalars['String']['input']>;
   price: Scalars['Float']['input'];
   productId: Scalars['ID']['input'];
   quantity: Scalars['Int']['input'];
+  selectedOptions: Array<CreateOrderItemOptionInput>;
+};
+
+export type CreateOrderItemOptionInput = {
+  optionGroupId: Scalars['ID']['input'];
+  optionId: Scalars['ID']['input'];
 };
 
 export type CreateProductCategoryInput = {
@@ -340,16 +368,23 @@ export type CreateProductInput = {
   description?: InputMaybe<Scalars['String']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   isAvailable?: InputMaybe<Scalars['Boolean']['input']>;
+  isOffer?: InputMaybe<Scalars['Boolean']['input']>;
   isOnSale?: InputMaybe<Scalars['Boolean']['input']>;
   name: Scalars['String']['input'];
   price: Scalars['Float']['input'];
   salePrice?: InputMaybe<Scalars['Float']['input']>;
   stock?: InputMaybe<Scalars['Int']['input']>;
   subcategoryId?: InputMaybe<Scalars['ID']['input']>;
+  variantGroupId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 export type CreateProductSubcategoryInput = {
   categoryId: Scalars['ID']['input'];
+  name: Scalars['String']['input'];
+};
+
+export type CreateProductVariantGroupInput = {
+  businessId: Scalars['ID']['input'];
   name: Scalars['String']['input'];
 };
 
@@ -654,10 +689,13 @@ export type Mutation = {
   createDeliveryPricingTier: DeliveryPricingTier;
   createDeliveryZone: DeliveryZone;
   createDynamicPricingRule: DynamicPricingRule;
+  createOption: Option;
+  createOptionGroup: OptionGroup;
   createOrder: Order;
   createProduct: Product;
   createProductCategory: ProductCategory;
   createProductSubcategory: ProductSubcategory;
+  createProductVariantGroup: ProductVariantGroup;
   createPromotion: Promotion;
   createSettlementRule: SettlementRule;
   createTestOrder: Order;
@@ -671,9 +709,12 @@ export type Mutation = {
   deleteDeliveryZone: Scalars['Boolean']['output'];
   deleteDynamicPricingRule: Scalars['Boolean']['output'];
   deleteMyAccount: Scalars['Boolean']['output'];
+  deleteOption: Scalars['Boolean']['output'];
+  deleteOptionGroup: Scalars['Boolean']['output'];
   deleteProduct: Scalars['Boolean']['output'];
   deleteProductCategory: Scalars['Boolean']['output'];
   deleteProductSubcategory: Scalars['Boolean']['output'];
+  deleteProductVariantGroup: Scalars['Boolean']['output'];
   deletePromotion: Scalars['Boolean']['output'];
   deleteSettlementRule: Scalars['Boolean']['output'];
   deleteUser: Scalars['Boolean']['output'];
@@ -723,6 +764,8 @@ export type Mutation = {
   updateDriverLocation: User;
   updateDriverOnlineStatus: User;
   updateDynamicPricingRule: DynamicPricingRule;
+  updateOption: Option;
+  updateOptionGroup: OptionGroup;
   updateOrderStatus: Order;
   updatePreparationTime: Order;
   updateProduct: Product;
@@ -830,6 +873,17 @@ export type MutationcreateDynamicPricingRuleArgs = {
 };
 
 
+export type MutationcreateOptionArgs = {
+  input: CreateOptionInput;
+  optionGroupId: Scalars['ID']['input'];
+};
+
+
+export type MutationcreateOptionGroupArgs = {
+  input: CreateOptionGroupInput;
+};
+
+
 export type MutationcreateOrderArgs = {
   input: CreateOrderInput;
 };
@@ -847,6 +901,11 @@ export type MutationcreateProductCategoryArgs = {
 
 export type MutationcreateProductSubcategoryArgs = {
   input: CreateProductSubcategoryInput;
+};
+
+
+export type MutationcreateProductVariantGroupArgs = {
+  input: CreateProductVariantGroupInput;
 };
 
 
@@ -907,6 +966,16 @@ export type MutationdeleteDynamicPricingRuleArgs = {
 };
 
 
+export type MutationdeleteOptionArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type MutationdeleteOptionGroupArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
 export type MutationdeleteProductArgs = {
   id: Scalars['ID']['input'];
 };
@@ -918,6 +987,11 @@ export type MutationdeleteProductCategoryArgs = {
 
 
 export type MutationdeleteProductSubcategoryArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type MutationdeleteProductVariantGroupArgs = {
   id: Scalars['ID']['input'];
 };
 
@@ -1144,6 +1218,18 @@ export type MutationupdateDynamicPricingRuleArgs = {
 };
 
 
+export type MutationupdateOptionArgs = {
+  id: Scalars['ID']['input'];
+  input: UpdateOptionInput;
+};
+
+
+export type MutationupdateOptionGroupArgs = {
+  id: Scalars['ID']['input'];
+  input: UpdateOptionGroupInput;
+};
+
+
 export type MutationupdateOrderStatusArgs = {
   id: Scalars['ID']['input'];
   status: OrderStatus;
@@ -1268,6 +1354,28 @@ export type NotificationType =
   | 'ORDER_STATUS'
   | 'PROMOTIONAL';
 
+export type Option = {
+  __typename?: 'Option';
+  displayOrder: Scalars['Int']['output'];
+  extraPrice: Scalars['Float']['output'];
+  id: Scalars['ID']['output'];
+  linkedProduct?: Maybe<Product>;
+  linkedProductId?: Maybe<Scalars['ID']['output']>;
+  name: Scalars['String']['output'];
+  optionGroupId: Scalars['ID']['output'];
+};
+
+export type OptionGroup = {
+  __typename?: 'OptionGroup';
+  displayOrder: Scalars['Int']['output'];
+  id: Scalars['ID']['output'];
+  maxSelections: Scalars['Int']['output'];
+  minSelections: Scalars['Int']['output'];
+  name: Scalars['String']['output'];
+  options: Array<Option>;
+  productId: Scalars['ID']['output'];
+};
+
 export type Order = {
   __typename?: 'Order';
   businesses: Array<OrderBusiness>;
@@ -1315,14 +1423,28 @@ export type OrderDriverLiveTracking = {
 
 export type OrderItem = {
   __typename?: 'OrderItem';
+  childItems: Array<OrderItem>;
+  id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
   name: Scalars['String']['output'];
   notes?: Maybe<Scalars['String']['output']>;
-  price: Scalars['Float']['output'];
+  parentOrderItemId?: Maybe<Scalars['ID']['output']>;
   productId: Scalars['ID']['output'];
   quantity: Scalars['Int']['output'];
   quantityInStock: Scalars['Int']['output'];
   quantityNeeded: Scalars['Int']['output'];
+  selectedOptions: Array<OrderItemOption>;
+  unitPrice: Scalars['Float']['output'];
+};
+
+export type OrderItemOption = {
+  __typename?: 'OrderItemOption';
+  id: Scalars['ID']['output'];
+  optionGroupId: Scalars['ID']['output'];
+  optionGroupName: Scalars['String']['output'];
+  optionId: Scalars['ID']['output'];
+  optionName: Scalars['String']['output'];
+  priceAtOrder: Scalars['Float']['output'];
 };
 
 export type OrderPromotion = {
@@ -1384,14 +1506,30 @@ export type Product = {
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
   isAvailable: Scalars['Boolean']['output'];
+  isOffer: Scalars['Boolean']['output'];
   isOnSale: Scalars['Boolean']['output'];
   name: Scalars['String']['output'];
+  optionGroups: Array<OptionGroup>;
   price: Scalars['Float']['output'];
   salePrice?: Maybe<Scalars['Float']['output']>;
   sortOrder: Scalars['Int']['output'];
   stock: Scalars['Int']['output'];
   subcategoryId?: Maybe<Scalars['ID']['output']>;
   updatedAt: Scalars['String']['output'];
+  variantGroup?: Maybe<ProductVariantGroup>;
+  variantGroupId?: Maybe<Scalars['ID']['output']>;
+  variants: Array<Product>;
+};
+
+export type ProductCard = {
+  __typename?: 'ProductCard';
+  basePrice: Scalars['Float']['output'];
+  id: Scalars['ID']['output'];
+  imageUrl?: Maybe<Scalars['String']['output']>;
+  isOffer: Scalars['Boolean']['output'];
+  name: Scalars['String']['output'];
+  product?: Maybe<Product>;
+  variants: Array<Product>;
 };
 
 export type ProductCategory = {
@@ -1429,6 +1567,13 @@ export type ProductSubcategory = {
   id: Scalars['ID']['output'];
   name: Scalars['String']['output'];
   updatedAt: Scalars['String']['output'];
+};
+
+export type ProductVariantGroup = {
+  __typename?: 'ProductVariantGroup';
+  businessId: Scalars['ID']['output'];
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
 };
 
 export type Promotion = {
@@ -1597,6 +1742,7 @@ export type Query = {
   myReferralStats: ReferralStats;
   notificationCampaign?: Maybe<NotificationCampaign>;
   notificationCampaigns: Array<NotificationCampaign>;
+  offers: Array<Product>;
   order?: Maybe<Order>;
   orders: Array<Order>;
   ordersByStatus: Array<Order>;
@@ -1608,7 +1754,7 @@ export type Query = {
   productPricingByBusiness: Array<ProductPricing>;
   productSubcategories: Array<ProductSubcategory>;
   productSubcategoriesByBusiness: Array<ProductSubcategory>;
-  products: Array<Product>;
+  products: Array<ProductCard>;
   pushTelemetryEvents: Array<PushTelemetryEvent>;
   pushTelemetrySummary: PushTelemetrySummary;
   settlementRule?: Maybe<SettlementRule>;
@@ -1753,6 +1899,11 @@ export type QuerygetWalletTransactionsArgs = {
 
 export type QuerynotificationCampaignArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type QueryoffersArgs = {
+  businessId: Scalars['ID']['input'];
 };
 
 
@@ -2192,6 +2343,20 @@ export type UpdateDynamicPricingRuleInput = {
   validUntil?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type UpdateOptionGroupInput = {
+  displayOrder?: InputMaybe<Scalars['Int']['input']>;
+  maxSelections?: InputMaybe<Scalars['Int']['input']>;
+  minSelections?: InputMaybe<Scalars['Int']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type UpdateOptionInput = {
+  displayOrder?: InputMaybe<Scalars['Int']['input']>;
+  extraPrice?: InputMaybe<Scalars['Float']['input']>;
+  linkedProductId?: InputMaybe<Scalars['ID']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+};
+
 export type UpdateProductCategoryInput = {
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
@@ -2209,6 +2374,7 @@ export type UpdateProductInput = {
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
   stock?: InputMaybe<Scalars['Int']['input']>;
   subcategoryId?: InputMaybe<Scalars['ID']['input']>;
+  variantGroupId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 export type UpdateProductPricingInput = {
@@ -2519,11 +2685,16 @@ export type ResolversTypes = {
   CreateDeliveryPricingTierInput: CreateDeliveryPricingTierInput;
   CreateDeliveryZoneInput: CreateDeliveryZoneInput;
   CreateDynamicPricingRuleInput: CreateDynamicPricingRuleInput;
+  CreateOptionGroupInput: CreateOptionGroupInput;
+  CreateOptionInput: CreateOptionInput;
+  CreateOrderChildItemInput: CreateOrderChildItemInput;
   CreateOrderInput: CreateOrderInput;
   CreateOrderItemInput: CreateOrderItemInput;
+  CreateOrderItemOptionInput: CreateOrderItemOptionInput;
   CreateProductCategoryInput: CreateProductCategoryInput;
   CreateProductInput: CreateProductInput;
   CreateProductSubcategoryInput: CreateProductSubcategoryInput;
+  CreateProductVariantGroupInput: CreateProductVariantGroupInput;
   CreatePromotionInput: CreatePromotionInput;
   CreateSettlementRuleInput: CreateSettlementRuleInput;
   CreateUserInput: CreateUserInput;
@@ -2557,10 +2728,13 @@ export type ResolversTypes = {
   Notification: ResolverTypeWrapper<Omit<Notification, 'type'> & { type: ResolversTypes['NotificationType'] }>;
   NotificationCampaign: ResolverTypeWrapper<Omit<NotificationCampaign, 'sender' | 'status'> & { sender?: Maybe<ResolversTypes['User']>, status: ResolversTypes['CampaignStatus'] }>;
   NotificationType: ResolverTypeWrapper<'ORDER_STATUS' | 'ORDER_ASSIGNED' | 'PROMOTIONAL' | 'ADMIN_ALERT'>;
+  Option: ResolverTypeWrapper<Option>;
+  OptionGroup: ResolverTypeWrapper<OptionGroup>;
   Order: ResolverTypeWrapper<Omit<Order, 'businesses' | 'driver' | 'orderPromotions' | 'status' | 'user'> & { businesses: Array<ResolversTypes['OrderBusiness']>, driver?: Maybe<ResolversTypes['User']>, orderPromotions?: Maybe<Array<ResolversTypes['OrderPromotion']>>, status: ResolversTypes['OrderStatus'], user?: Maybe<ResolversTypes['User']> }>;
   OrderBusiness: ResolverTypeWrapper<Omit<OrderBusiness, 'business'> & { business: ResolversTypes['Business'] }>;
   OrderDriverLiveTracking: ResolverTypeWrapper<OrderDriverLiveTracking>;
   OrderItem: ResolverTypeWrapper<OrderItem>;
+  OrderItemOption: ResolverTypeWrapper<OrderItemOption>;
   OrderPromotion: ResolverTypeWrapper<Omit<OrderPromotion, 'appliesTo'> & { appliesTo: ResolversTypes['PromotionAppliesTo'] }>;
   OrderStatus: ResolverTypeWrapper<'PENDING' | 'PREPARING' | 'READY' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED'>;
   PolygonPoint: ResolverTypeWrapper<PolygonPoint>;
@@ -2569,10 +2743,12 @@ export type ResolversTypes = {
   PriceHistoryEntry: ResolverTypeWrapper<PriceHistoryEntry>;
   PricingConditionType: ResolverTypeWrapper<'TIME_OF_DAY' | 'DAY_OF_WEEK' | 'WEATHER' | 'DEMAND' | 'SPECIAL_EVENT' | 'CUSTOM'>;
   Product: ResolverTypeWrapper<Product>;
+  ProductCard: ResolverTypeWrapper<ProductCard>;
   ProductCategory: ResolverTypeWrapper<ProductCategory>;
   ProductOrderInput: ProductOrderInput;
   ProductPricing: ResolverTypeWrapper<ProductPricing>;
   ProductSubcategory: ResolverTypeWrapper<ProductSubcategory>;
+  ProductVariantGroup: ResolverTypeWrapper<ProductVariantGroup>;
   Promotion: ResolverTypeWrapper<Omit<Promotion, 'assignedUsers' | 'eligibleBusinesses' | 'target' | 'type'> & { assignedUsers?: Maybe<Array<ResolversTypes['UserPromotion']>>, eligibleBusinesses?: Maybe<Array<ResolversTypes['Business']>>, target: ResolversTypes['PromotionTarget'], type: ResolversTypes['PromotionType'] }>;
   PromotionAnalyticsResult: ResolverTypeWrapper<Omit<PromotionAnalyticsResult, 'promotion'> & { promotion: ResolversTypes['Promotion'] }>;
   PromotionAppliesTo: ResolverTypeWrapper<'PRICE' | 'DELIVERY'>;
@@ -2617,6 +2793,8 @@ export type ResolversTypes = {
   UpdateDeliveryPricingTierInput: UpdateDeliveryPricingTierInput;
   UpdateDeliveryZoneInput: UpdateDeliveryZoneInput;
   UpdateDynamicPricingRuleInput: UpdateDynamicPricingRuleInput;
+  UpdateOptionGroupInput: UpdateOptionGroupInput;
+  UpdateOptionInput: UpdateOptionInput;
   UpdateProductCategoryInput: UpdateProductCategoryInput;
   UpdateProductInput: UpdateProductInput;
   UpdateProductPricingInput: UpdateProductPricingInput;
@@ -2671,11 +2849,16 @@ export type ResolversParentTypes = {
   CreateDeliveryPricingTierInput: CreateDeliveryPricingTierInput;
   CreateDeliveryZoneInput: CreateDeliveryZoneInput;
   CreateDynamicPricingRuleInput: CreateDynamicPricingRuleInput;
+  CreateOptionGroupInput: CreateOptionGroupInput;
+  CreateOptionInput: CreateOptionInput;
+  CreateOrderChildItemInput: CreateOrderChildItemInput;
   CreateOrderInput: CreateOrderInput;
   CreateOrderItemInput: CreateOrderItemInput;
+  CreateOrderItemOptionInput: CreateOrderItemOptionInput;
   CreateProductCategoryInput: CreateProductCategoryInput;
   CreateProductInput: CreateProductInput;
   CreateProductSubcategoryInput: CreateProductSubcategoryInput;
+  CreateProductVariantGroupInput: CreateProductVariantGroupInput;
   CreatePromotionInput: CreatePromotionInput;
   CreateSettlementRuleInput: CreateSettlementRuleInput;
   CreateUserInput: CreateUserInput;
@@ -2702,19 +2885,24 @@ export type ResolversParentTypes = {
   Mutation: {};
   Notification: Notification;
   NotificationCampaign: Omit<NotificationCampaign, 'sender'> & { sender?: Maybe<ResolversParentTypes['User']> };
+  Option: Option;
+  OptionGroup: OptionGroup;
   Order: Omit<Order, 'businesses' | 'driver' | 'orderPromotions' | 'user'> & { businesses: Array<ResolversParentTypes['OrderBusiness']>, driver?: Maybe<ResolversParentTypes['User']>, orderPromotions?: Maybe<Array<ResolversParentTypes['OrderPromotion']>>, user?: Maybe<ResolversParentTypes['User']> };
   OrderBusiness: Omit<OrderBusiness, 'business'> & { business: ResolversParentTypes['Business'] };
   OrderDriverLiveTracking: OrderDriverLiveTracking;
   OrderItem: OrderItem;
+  OrderItemOption: OrderItemOption;
   OrderPromotion: OrderPromotion;
   PolygonPoint: PolygonPoint;
   PolygonPointInput: PolygonPointInput;
   PriceHistoryEntry: PriceHistoryEntry;
   Product: Product;
+  ProductCard: ProductCard;
   ProductCategory: ProductCategory;
   ProductOrderInput: ProductOrderInput;
   ProductPricing: ProductPricing;
   ProductSubcategory: ProductSubcategory;
+  ProductVariantGroup: ProductVariantGroup;
   Promotion: Omit<Promotion, 'assignedUsers' | 'eligibleBusinesses'> & { assignedUsers?: Maybe<Array<ResolversParentTypes['UserPromotion']>>, eligibleBusinesses?: Maybe<Array<ResolversParentTypes['Business']>> };
   PromotionAnalyticsResult: Omit<PromotionAnalyticsResult, 'promotion'> & { promotion: ResolversParentTypes['Promotion'] };
   PromotionResult: Omit<PromotionResult, 'promotions'> & { promotions: Array<ResolversParentTypes['ApplicablePromotion']> };
@@ -2748,6 +2936,8 @@ export type ResolversParentTypes = {
   UpdateDeliveryPricingTierInput: UpdateDeliveryPricingTierInput;
   UpdateDeliveryZoneInput: UpdateDeliveryZoneInput;
   UpdateDynamicPricingRuleInput: UpdateDynamicPricingRuleInput;
+  UpdateOptionGroupInput: UpdateOptionGroupInput;
+  UpdateOptionInput: UpdateOptionInput;
   UpdateProductCategoryInput: UpdateProductCategoryInput;
   UpdateProductInput: UpdateProductInput;
   UpdateProductPricingInput: UpdateProductPricingInput;
@@ -3084,10 +3274,13 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   createDeliveryPricingTier?: Resolver<ResolversTypes['DeliveryPricingTier'], ParentType, ContextType, RequireFields<MutationcreateDeliveryPricingTierArgs, 'input'>>;
   createDeliveryZone?: Resolver<ResolversTypes['DeliveryZone'], ParentType, ContextType, RequireFields<MutationcreateDeliveryZoneArgs, 'input'>>;
   createDynamicPricingRule?: Resolver<ResolversTypes['DynamicPricingRule'], ParentType, ContextType, RequireFields<MutationcreateDynamicPricingRuleArgs, 'input'>>;
+  createOption?: Resolver<ResolversTypes['Option'], ParentType, ContextType, RequireFields<MutationcreateOptionArgs, 'input' | 'optionGroupId'>>;
+  createOptionGroup?: Resolver<ResolversTypes['OptionGroup'], ParentType, ContextType, RequireFields<MutationcreateOptionGroupArgs, 'input'>>;
   createOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationcreateOrderArgs, 'input'>>;
   createProduct?: Resolver<ResolversTypes['Product'], ParentType, ContextType, RequireFields<MutationcreateProductArgs, 'input'>>;
   createProductCategory?: Resolver<ResolversTypes['ProductCategory'], ParentType, ContextType, RequireFields<MutationcreateProductCategoryArgs, 'input'>>;
   createProductSubcategory?: Resolver<ResolversTypes['ProductSubcategory'], ParentType, ContextType, RequireFields<MutationcreateProductSubcategoryArgs, 'input'>>;
+  createProductVariantGroup?: Resolver<ResolversTypes['ProductVariantGroup'], ParentType, ContextType, RequireFields<MutationcreateProductVariantGroupArgs, 'input'>>;
   createPromotion?: Resolver<ResolversTypes['Promotion'], ParentType, ContextType, RequireFields<MutationcreatePromotionArgs, 'input'>>;
   createSettlementRule?: Resolver<ResolversTypes['SettlementRule'], ParentType, ContextType, RequireFields<MutationcreateSettlementRuleArgs, 'input'>>;
   createTestOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType>;
@@ -3101,9 +3294,12 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   deleteDeliveryZone?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteDeliveryZoneArgs, 'id'>>;
   deleteDynamicPricingRule?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteDynamicPricingRuleArgs, 'id'>>;
   deleteMyAccount?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  deleteOption?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteOptionArgs, 'id'>>;
+  deleteOptionGroup?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteOptionGroupArgs, 'id'>>;
   deleteProduct?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteProductArgs, 'id'>>;
   deleteProductCategory?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteProductCategoryArgs, 'id'>>;
   deleteProductSubcategory?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteProductSubcategoryArgs, 'id'>>;
+  deleteProductVariantGroup?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteProductVariantGroupArgs, 'id'>>;
   deletePromotion?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeletePromotionArgs, 'id'>>;
   deleteSettlementRule?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteSettlementRuleArgs, 'id'>>;
   deleteUser?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteUserArgs, 'id'>>;
@@ -3146,6 +3342,8 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   updateDriverLocation?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationupdateDriverLocationArgs, 'latitude' | 'longitude'>>;
   updateDriverOnlineStatus?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationupdateDriverOnlineStatusArgs, 'isOnline'>>;
   updateDynamicPricingRule?: Resolver<ResolversTypes['DynamicPricingRule'], ParentType, ContextType, RequireFields<MutationupdateDynamicPricingRuleArgs, 'id' | 'input'>>;
+  updateOption?: Resolver<ResolversTypes['Option'], ParentType, ContextType, RequireFields<MutationupdateOptionArgs, 'id' | 'input'>>;
+  updateOptionGroup?: Resolver<ResolversTypes['OptionGroup'], ParentType, ContextType, RequireFields<MutationupdateOptionGroupArgs, 'id' | 'input'>>;
   updateOrderStatus?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationupdateOrderStatusArgs, 'id' | 'status'>>;
   updatePreparationTime?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationupdatePreparationTimeArgs, 'id' | 'preparationMinutes'>>;
   updateProduct?: Resolver<ResolversTypes['Product'], ParentType, ContextType, RequireFields<MutationupdateProductArgs, 'id' | 'input'>>;
@@ -3198,6 +3396,28 @@ export type NotificationCampaignResolvers<ContextType = GraphQLContext, ParentTy
 
 export type NotificationTypeResolvers = EnumResolverSignature<{ ADMIN_ALERT?: any, ORDER_ASSIGNED?: any, ORDER_STATUS?: any, PROMOTIONAL?: any }, ResolversTypes['NotificationType']>;
 
+export type OptionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Option'] = ResolversParentTypes['Option']> = {
+  displayOrder?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  extraPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  linkedProduct?: Resolver<Maybe<ResolversTypes['Product']>, ParentType, ContextType>;
+  linkedProductId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
+  name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  optionGroupId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type OptionGroupResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['OptionGroup'] = ResolversParentTypes['OptionGroup']> = {
+  displayOrder?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  maxSelections?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  minSelections?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  options?: Resolver<Array<ResolversTypes['Option']>, ParentType, ContextType>;
+  productId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
 export type OrderResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Order'] = ResolversParentTypes['Order']> = {
   businesses?: Resolver<Array<ResolversTypes['OrderBusiness']>, ParentType, ContextType>;
   deliveredAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
@@ -3244,14 +3464,28 @@ export type OrderDriverLiveTrackingResolvers<ContextType = GraphQLContext, Paren
 };
 
 export type OrderItemResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['OrderItem'] = ResolversParentTypes['OrderItem']> = {
+  childItems?: Resolver<Array<ResolversTypes['OrderItem']>, ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   notes?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
-  price?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  parentOrderItemId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   productId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   quantity?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   quantityInStock?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   quantityNeeded?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  selectedOptions?: Resolver<Array<ResolversTypes['OrderItemOption']>, ParentType, ContextType>;
+  unitPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type OrderItemOptionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['OrderItemOption'] = ResolversParentTypes['OrderItemOption']> = {
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  optionGroupId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  optionGroupName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  optionId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  optionName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  priceAtOrder?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -3293,14 +3527,30 @@ export type ProductResolvers<ContextType = GraphQLContext, ParentType extends Re
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   isAvailable?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  isOffer?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   isOnSale?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  optionGroups?: Resolver<Array<ResolversTypes['OptionGroup']>, ParentType, ContextType>;
   price?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   salePrice?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   sortOrder?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   stock?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   subcategoryId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  variantGroup?: Resolver<Maybe<ResolversTypes['ProductVariantGroup']>, ParentType, ContextType>;
+  variantGroupId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
+  variants?: Resolver<Array<ResolversTypes['Product']>, ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type ProductCardResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['ProductCard'] = ResolversParentTypes['ProductCard']> = {
+  basePrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  isOffer?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  product?: Resolver<Maybe<ResolversTypes['Product']>, ParentType, ContextType>;
+  variants?: Resolver<Array<ResolversTypes['Product']>, ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -3333,6 +3583,13 @@ export type ProductSubcategoryResolvers<ContextType = GraphQLContext, ParentType
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type ProductVariantGroupResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['ProductVariantGroup'] = ResolversParentTypes['ProductVariantGroup']> = {
+  businessId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -3483,6 +3740,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   myReferralStats?: Resolver<ResolversTypes['ReferralStats'], ParentType, ContextType>;
   notificationCampaign?: Resolver<Maybe<ResolversTypes['NotificationCampaign']>, ParentType, ContextType, RequireFields<QuerynotificationCampaignArgs, 'id'>>;
   notificationCampaigns?: Resolver<Array<ResolversTypes['NotificationCampaign']>, ParentType, ContextType>;
+  offers?: Resolver<Array<ResolversTypes['Product']>, ParentType, ContextType, RequireFields<QueryoffersArgs, 'businessId'>>;
   order?: Resolver<Maybe<ResolversTypes['Order']>, ParentType, ContextType, RequireFields<QueryorderArgs, 'id'>>;
   orders?: Resolver<Array<ResolversTypes['Order']>, ParentType, ContextType>;
   ordersByStatus?: Resolver<Array<ResolversTypes['Order']>, ParentType, ContextType, RequireFields<QueryordersByStatusArgs, 'status'>>;
@@ -3494,7 +3752,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   productPricingByBusiness?: Resolver<Array<ResolversTypes['ProductPricing']>, ParentType, ContextType, RequireFields<QueryproductPricingByBusinessArgs, 'businessId'>>;
   productSubcategories?: Resolver<Array<ResolversTypes['ProductSubcategory']>, ParentType, ContextType, RequireFields<QueryproductSubcategoriesArgs, 'categoryId'>>;
   productSubcategoriesByBusiness?: Resolver<Array<ResolversTypes['ProductSubcategory']>, ParentType, ContextType, RequireFields<QueryproductSubcategoriesByBusinessArgs, 'businessId'>>;
-  products?: Resolver<Array<ResolversTypes['Product']>, ParentType, ContextType, RequireFields<QueryproductsArgs, 'businessId'>>;
+  products?: Resolver<Array<ResolversTypes['ProductCard']>, ParentType, ContextType, RequireFields<QueryproductsArgs, 'businessId'>>;
   pushTelemetryEvents?: Resolver<Array<ResolversTypes['PushTelemetryEvent']>, ParentType, ContextType, Partial<QuerypushTelemetryEventsArgs>>;
   pushTelemetrySummary?: Resolver<ResolversTypes['PushTelemetrySummary'], ParentType, ContextType, Partial<QuerypushTelemetrySummaryArgs>>;
   settlementRule?: Resolver<Maybe<ResolversTypes['SettlementRule']>, ParentType, ContextType, RequireFields<QuerysettlementRuleArgs, 'id'>>;
@@ -3815,10 +4073,13 @@ export type Resolvers<ContextType = GraphQLContext> = {
   Notification?: NotificationResolvers<ContextType>;
   NotificationCampaign?: NotificationCampaignResolvers<ContextType>;
   NotificationType?: NotificationTypeResolvers;
+  Option?: OptionResolvers<ContextType>;
+  OptionGroup?: OptionGroupResolvers<ContextType>;
   Order?: OrderResolvers<ContextType>;
   OrderBusiness?: OrderBusinessResolvers<ContextType>;
   OrderDriverLiveTracking?: OrderDriverLiveTrackingResolvers<ContextType>;
   OrderItem?: OrderItemResolvers<ContextType>;
+  OrderItemOption?: OrderItemOptionResolvers<ContextType>;
   OrderPromotion?: OrderPromotionResolvers<ContextType>;
   OrderStatus?: OrderStatusResolvers;
   PolygonPoint?: PolygonPointResolvers<ContextType>;
@@ -3826,9 +4087,11 @@ export type Resolvers<ContextType = GraphQLContext> = {
   PriceHistoryEntry?: PriceHistoryEntryResolvers<ContextType>;
   PricingConditionType?: PricingConditionTypeResolvers;
   Product?: ProductResolvers<ContextType>;
+  ProductCard?: ProductCardResolvers<ContextType>;
   ProductCategory?: ProductCategoryResolvers<ContextType>;
   ProductPricing?: ProductPricingResolvers<ContextType>;
   ProductSubcategory?: ProductSubcategoryResolvers<ContextType>;
+  ProductVariantGroup?: ProductVariantGroupResolvers<ContextType>;
   Promotion?: PromotionResolvers<ContextType>;
   PromotionAnalyticsResult?: PromotionAnalyticsResultResolvers<ContextType>;
   PromotionAppliesTo?: PromotionAppliesToResolvers;

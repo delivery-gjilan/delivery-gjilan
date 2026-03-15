@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Alert } from 'react-native';
 import { Product, BusinessType } from '@/gql/graphql';
 import { useCart } from '@/modules/cart/hooks/useCart';
@@ -10,25 +10,23 @@ export function useProductInCart(product: Partial<Product>, businessType?: Busin
 
     const id = product.id ?? '';
 
-    // Find the current quantity of this product in the cart
-    const quantity = useMemo(() => {
-        const cartItem = items.find((item) => item.productId === id);
-        return cartItem?.quantity || 0;
-    }, [items, id]);
-
+    // Find the current quantity of this product in the cart (sum of all configurations)
+    const quantity = useMemo(() => items.filter((item) => item.productId === id).reduce((sum, item) => sum + item.quantity, 0), [items, id]);
     const addToCart = () => {
         if (!id) return;
-        const price = product.isOnSale && product.salePrice ? product.salePrice : (product.price ?? 0);
+        const unitPrice = product.isOnSale && product.salePrice ? product.salePrice : (product.price ?? 0);
 
         const error = addItem({
+            cartItemId: id, // Simple product (no options) uses productId as cartItemId
             productId: id,
             name: product.name ?? 'Unknown',
-            price,
+            unitPrice,
             quantity: 1,
             imageUrl: product.imageUrl || undefined,
             businessId: product.businessId ?? '',
             businessType: businessType,
             originalPrice: product.isOnSale && product.salePrice ? product.price : undefined,
+            selectedOptions: [],
         });
 
         if (error) {
@@ -38,11 +36,13 @@ export function useProductInCart(product: Partial<Product>, businessType?: Busin
 
     const incrementQuantity = () => {
         if (!id) return;
+        // Simple case: increment the one with no options (cartItemId === productId)
         updateQuantity(id, quantity + 1);
     };
 
     const decrementQuantity = () => {
         if (!id) return;
+        // Simple case: decrement the one with no options
         updateQuantity(id, quantity - 1);
     };
 

@@ -28,11 +28,37 @@ export const CREATE_ORDER = graphql(`
                     }
                 }
                 items {
+                    id
                     productId
                     name
                     imageUrl
                     quantity
-                    price
+                    unitPrice
+                    parentOrderItemId
+                    selectedOptions {
+                        id
+                        optionGroupId
+                        optionGroupName
+                        optionId
+                        optionName
+                        priceAtOrder
+                    }
+                    childItems {
+                        id
+                        productId
+                        name
+                        imageUrl
+                        quantity
+                        unitPrice
+                        selectedOptions {
+                            id
+                            optionGroupId
+                            optionGroupName
+                            optionId
+                            optionName
+                            priceAtOrder
+                        }
+                    }
                 }
             }
         }
@@ -72,11 +98,37 @@ export const UPDATE_ORDER_STATUS = graphql(`
                     }
                 }
                 items {
+                    id
                     productId
                     name
                     imageUrl
                     quantity
-                    price
+                    unitPrice
+                    parentOrderItemId
+                    selectedOptions {
+                        id
+                        optionGroupId
+                        optionGroupName
+                        optionId
+                        optionName
+                        priceAtOrder
+                    }
+                    childItems {
+                        id
+                        productId
+                        name
+                        imageUrl
+                        quantity
+                        unitPrice
+                        selectedOptions {
+                            id
+                            optionGroupId
+                            optionGroupName
+                            optionId
+                            optionName
+                            priceAtOrder
+                        }
+                    }
                 }
             }
         }
@@ -116,11 +168,37 @@ export const CANCEL_ORDER = graphql(`
                     }
                 }
                 items {
+                    id
                     productId
                     name
                     imageUrl
                     quantity
-                    price
+                    unitPrice
+                    parentOrderItemId
+                    selectedOptions {
+                        id
+                        optionGroupId
+                        optionGroupName
+                        optionId
+                        optionName
+                        priceAtOrder
+                    }
+                    childItems {
+                        id
+                        productId
+                        name
+                        imageUrl
+                        quantity
+                        unitPrice
+                        selectedOptions {
+                            id
+                            optionGroupId
+                            optionGroupName
+                            optionId
+                            optionName
+                            priceAtOrder
+                        }
+                    }
                 }
             }
         }

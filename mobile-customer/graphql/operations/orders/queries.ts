@@ -38,11 +38,37 @@ export const GET_ORDERS = graphql(`
                     }
                 }
                 items {
+                    id
                     productId
                     name
                     imageUrl
                     quantity
-                    price
+                    unitPrice
+                    parentOrderItemId
+                    selectedOptions {
+                        id
+                        optionGroupId
+                        optionGroupName
+                        optionId
+                        optionName
+                        priceAtOrder
+                    }
+                    childItems {
+                        id
+                        productId
+                        name
+                        imageUrl
+                        quantity
+                        unitPrice
+                        selectedOptions {
+                            id
+                            optionGroupId
+                            optionGroupName
+                            optionId
+                            optionName
+                            priceAtOrder
+                        }
+                    }
                 }
             }
         }
@@ -118,11 +144,37 @@ export const GET_ORDER = graphql(`
                     isOpen
                 }
                 items {
+                    id
                     productId
                     name
                     imageUrl
                     quantity
-                    price
+                    unitPrice
+                    parentOrderItemId
+                    selectedOptions {
+                        id
+                        optionGroupId
+                        optionGroupName
+                        optionId
+                        optionName
+                        priceAtOrder
+                    }
+                    childItems {
+                        id
+                        productId
+                        name
+                        imageUrl
+                        quantity
+                        unitPrice
+                        selectedOptions {
+                            id
+                            optionGroupId
+                            optionGroupName
+                            optionId
+                            optionName
+                            priceAtOrder
+                        }
+                    }
                 }
             }
         }
@@ -166,11 +218,37 @@ export const GET_ORDERS_BY_STATUS = graphql(`
                     }
                 }
                 items {
+                    id
                     productId
                     name
                     imageUrl
                     quantity
-                    price
+                    unitPrice
+                    parentOrderItemId
+                    selectedOptions {
+                        id
+                        optionGroupId
+                        optionGroupName
+                        optionId
+                        optionName
+                        priceAtOrder
+                    }
+                    childItems {
+                        id
+                        productId
+                        name
+                        imageUrl
+                        quantity
+                        unitPrice
+                        selectedOptions {
+                            id
+                            optionGroupId
+                            optionGroupName
+                            optionId
+                            optionName
+                            priceAtOrder
+                        }
+                    }
                 }
             }
         }
@@ -245,11 +323,37 @@ export const UNCOMPLETED_ORDERS = graphql(`
                     }
                 }
                 items {
+                    id
                     productId
                     name
                     imageUrl
                     quantity
-                    price
+                    unitPrice
+                    parentOrderItemId
+                    selectedOptions {
+                        id
+                        optionGroupId
+                        optionGroupName
+                        optionId
+                        optionName
+                        priceAtOrder
+                    }
+                    childItems {
+                        id
+                        productId
+                        name
+                        imageUrl
+                        quantity
+                        unitPrice
+                        selectedOptions {
+                            id
+                            optionGroupId
+                            optionGroupName
+                            optionId
+                            optionName
+                            priceAtOrder
+                        }
+                    }
                 }
             }
         }

@@ -16,16 +16,15 @@ function validateMultiRestaurant(currentItems: CartItem[], newItem: CartItem): s
     // If the new product already exists in the cart (same productId), it's an increment — allow
     if (currentItems.some((i) => i.productId === newItem.productId)) return null;
 
-    // Find existing restaurant businessIds in the cart
     const restaurantBusinessIds = new Set(
-        currentItems
-            .filter((i) => !i.businessType || i.businessType === 'RESTAURANT')
-            .map((i) => i.businessId),
+        currentItems.filter((i) => !i.businessType || i.businessType === 'RESTAURANT').map((i) => i.businessId),
     );
 
-    // If the new item is from a restaurant that's NOT already in the cart, and there's already another restaurant
     if (restaurantBusinessIds.size > 0 && !restaurantBusinessIds.has(newItem.businessId)) {
-        return 'You can only order from one restaurant at a time. Please clear your cart or finish your current order first.';
+        return (
+            'You can only order from one restaurant at a time. ' +
+            'Please clear your cart or finish your current order first.'
+        );
     }
 
     return null;
@@ -33,9 +32,9 @@ function validateMultiRestaurant(currentItems: CartItem[], newItem: CartItem): s
 
 interface CartActionsStore {
     addItem: (item: CartItem) => string | null; // returns error message or null
-    removeItem: (productId: string) => void;
-    updateQuantity: (productId: string, quantity: number) => void;
-    updateItemNotes: (productId: string, notes: string) => void;
+    removeItem: (cartItemId: string) => void;
+    updateQuantity: (cartItemId: string, quantity: number) => void;
+    updateItemNotes: (cartItemId: string, notes: string) => void;
     clearCart: () => void;
 }
 
@@ -47,7 +46,8 @@ export const useCartActionsStore = create<CartActionsStore>((set) => ({
         if (error) return error;
 
         useCartDataStore.setState((state) => {
-            const existingItemIndex = state.items.findIndex((i) => i.productId === item.productId);
+            // Find item by cartItemId to update quantity if it's the exact same item instance
+            const existingItemIndex = state.items.findIndex((i) => i.cartItemId === item.cartItemId);
 
             if (existingItemIndex >= 0) {
                 const newItems = [...state.items];
@@ -58,34 +58,35 @@ export const useCartActionsStore = create<CartActionsStore>((set) => ({
                 return { items: newItems };
             }
 
+            // If not an existing item instance, add it as a new item
             return { items: [...state.items, item] };
         });
-        
+
         // Trigger animation and haptic feedback
         useCartAnimationStore.getState().triggerAnimation();
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         return null;
     },
-    removeItem: (productId) => {
+    removeItem: (cartItemId) => {
         useCartDataStore.setState((state) => ({
-            items: state.items.filter((i) => i.productId !== productId),
+            items: state.items.filter((i) => i.cartItemId !== cartItemId),
         }));
     },
-    updateQuantity: (productId, quantity) => {
+    updateQuantity: (cartItemId, quantity) => {
         useCartDataStore.setState((state) => {
             if (quantity <= 0) {
                 return {
-                    items: state.items.filter((i) => i.productId !== productId),
+                    items: state.items.filter((i) => i.cartItemId !== cartItemId),
                 };
             }
             return {
-                items: state.items.map((i) => (i.productId === productId ? { ...i, quantity } : i)),
+                items: state.items.map((i) => (i.cartItemId === cartItemId ? { ...i, quantity } : i)),
             };
         });
     },
-    updateItemNotes: (productId, notes) => {
+    updateItemNotes: (cartItemId, notes) => {
         useCartDataStore.setState((state) => ({
-            items: state.items.map((i) => (i.productId === productId ? { ...i, notes } : i)),
+            items: state.items.map((i) => (i.cartItemId === cartItemId ? { ...i, notes } : i)),
         }));
     },
     clearCart: () => {

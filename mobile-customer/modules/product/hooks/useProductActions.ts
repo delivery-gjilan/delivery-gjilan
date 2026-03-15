@@ -8,24 +8,29 @@ import { Product } from '@/gql/graphql';
 import { GET_BUSINESS } from '@/graphql/operations/businesses';
 import { useTranslations } from '@/hooks/useTranslations';
 
-export function useProductActions(product: Partial<Product>) {
+export function useProductActions(product: any, selectedOptions: Record<string, string[]> = {}, parentProduct?: any) {
     const { items } = useCart();
     const { addItem, updateQuantity, removeItem } = useCartActions();
     const { t } = useTranslations();
 
     // Fetch business type (should be cached from business screen)
     const { data: businessData } = useQuery(GET_BUSINESS, {
-        variables: { id: product.businessId ?? '' },
-        skip: !product.businessId,
+        variables: { id: (product.businessId || parentProduct?.businessId) ?? '' },
+        skip: !(product.businessId || parentProduct?.businessId),
         fetchPolicy: 'cache-first',
     });
     const businessType = businessData?.business?.businessType;
 
+    // Generate unique cart item ID based on productId and selected options
+    const cartItemId = useMemo(() => {
+        const optionPart = Object.values(selectedOptions).flat().sort().join('-');
+        return optionPart ? `${product.id}-${optionPart}` : product.id;
+    }, [product.id, selectedOptions]);
+
     // Find cart item
-    const id = product.id ?? '';
     const cartItem = useMemo(() => {
-        return items.find((item) => item.productId === id);
-    }, [items, id]);
+        return items.find((item) => item.cartItemId === cartItemId);
+    }, [items, cartItemId]);
 
     // Local quantity state
     const [localQuantity, setLocalQuantity] = useState(cartItem?.quantity || 1);
@@ -42,16 +47,63 @@ export function useProductActions(product: Partial<Product>) {
     };
 
     const addToCart = () => {
-        if (!id) return;
+        if (!product.id) return;
+
+        // Build selected options and child items for CartItem
+        const cartItemOptions: {
+            optionGroupId: string;
+            optionId: string;
+            name: string;
+            extraPrice: number;
+        }[] = [];
+
+        const childItems: {
+            productId: string;
+            name: string;
+            imageUrl?: string;
+            selectedOptions: any[]; // Nested options not fully supported in UI yet
+        }[] = [];
+
+        Object.entries(selectedOptions).forEach(([groupId, optionIds]) => {
+            const group = (product.optionGroups || parentProduct?.optionGroups)?.find((og: any) => og.id === groupId);
+            if (group) {
+                optionIds.forEach((oid) => {
+                    const opt = group.options.find((o: any) => o.id === oid);
+                    if (opt) {
+                        cartItemOptions.push({
+                            optionGroupId: groupId,
+                            optionId: oid,
+                            name: opt.name,
+                            extraPrice: opt.extraPrice,
+                        });
+
+                        if (opt.linkedProductId) {
+                            childItems.push({
+                                productId: opt.linkedProductId,
+                                name: opt.linkedProduct?.name || opt.name,
+                                imageUrl: opt.linkedProduct?.imageUrl || undefined,
+                                selectedOptions: [],
+                            });
+                        }
+                    }
+                });
+            }
+        });
+
+        const unitPrice = product.isOnSale && product.salePrice ? product.salePrice : (product.price ?? 0);
+
         const error = addItem({
-            productId: id,
+            cartItemId,
+            productId: product.id,
             name: product.name ?? 'Unknown',
-            price: product.isOnSale && product.salePrice ? product.salePrice : (product.price ?? 0),
+            unitPrice,
             quantity: localQuantity,
-            imageUrl: product.imageUrl || undefined,
-            businessId: product.businessId ?? '',
+            imageUrl: product.imageUrl || parentProduct?.imageUrl || undefined,
+            businessId: (product.businessId || parentProduct?.businessId) ?? '',
             businessType: businessType,
             originalPrice: product.isOnSale && product.salePrice ? product.price : undefined,
+            selectedOptions: cartItemOptions,
+            childItems: childItems.length > 0 ? childItems : undefined,
         });
 
         if (error) {
@@ -64,16 +116,16 @@ export function useProductActions(product: Partial<Product>) {
     };
 
     const updateCart = () => {
-        if (!id) return;
-        updateQuantity(id, localQuantity);
+        if (!cartItemId) return;
+        updateQuantity(cartItemId, localQuantity);
 
         // Navigate back to previous screen
         router.back();
     };
 
     const removeFromCart = () => {
-        if (!id) return;
-        removeItem(id);
+        if (!cartItemId) return;
+        removeItem(cartItemId);
         setLocalQuantity(1);
     };
 

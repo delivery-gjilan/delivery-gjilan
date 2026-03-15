@@ -1,1 +1,0 @@
-ALTER TABLE "drivers" ADD COLUMN "max_active_orders" numeric(3, 0) DEFAULT '2' NOT NULL;

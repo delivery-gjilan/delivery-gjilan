@@ -13,6 +13,26 @@ interface ProductScreenProps {
 
 export function ProductScreen({ productId }: ProductScreenProps) {
     const { product, loading, error } = useProduct(productId);
+    const [selectedVariantId, setSelectedVariantId] = React.useState<string | null>(null);
+    const [selectedOptions, setSelectedOptions] = React.useState<Record<string, string[]>>({});
+
+    // Initialize variant and options when product is loaded
+    React.useEffect(() => {
+        if (product) {
+            // If it's a variant group (the productId itself is a groupId, and product has variants)
+            // or if the product itself has variants
+            if (product.variants && product.variants.length > 0 && !selectedVariantId) {
+                setSelectedVariantId(product.variants[0].id);
+            }
+
+            // Initialize mandatory options with empty arrays if not present
+            const initialOptions: Record<string, string[]> = {};
+            product.optionGroups?.forEach((og) => {
+                initialOptions[og.id] = [];
+            });
+            setSelectedOptions(initialOptions);
+        }
+    }, [product, selectedVariantId]);
 
     if (loading) {
         return (
@@ -40,13 +60,27 @@ export function ProductScreen({ productId }: ProductScreenProps) {
         );
     }
 
+    // Determine the active product (the variant if selected, or the base product)
+    const activeProduct = product.variants?.find((v) => v.id === selectedVariantId) || product;
+
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
             <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-                <ProductHeader product={product} />
-                <ProductDetails product={product} />
+                <ProductHeader product={activeProduct} />
+                <ProductDetails
+                    product={product}
+                    activeProduct={activeProduct}
+                    selectedVariantId={selectedVariantId}
+                    setSelectedVariantId={setSelectedVariantId}
+                    selectedOptions={selectedOptions}
+                    setSelectedOptions={setSelectedOptions}
+                />
             </ScrollView>
-            <ProductActions product={product} />
+            <ProductActions
+                product={activeProduct}
+                selectedOptions={selectedOptions}
+                parentProduct={product}
+            />
         </SafeAreaView>
     );
 }

@@ -12,9 +12,12 @@ import {
     userBehaviors as userBehaviorsTable,
     productStocks as productStocksTable,
     orderPromotions as orderPromotionsTable,
+    orderItemOptions as orderItemOptionsTable,
+    optionGroups as optionGroupsTable,
+    options as optionsDbTable,
 } from '@/database/schema';
 import { userPromoMetadata } from '@/database/schema';
-import { and, eq, gte, inArray, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNull, sql } from 'drizzle-orm';
 import type { Order, OrderBusiness, OrderItem, OrderStatus, CreateOrderInput } from '@/generated/types.generated';
 import type { DbOrder } from '@/database/schema/orders';
 import { PubSub, publish, subscribe, topics } from '@/lib/pubsub';
@@ -64,14 +67,75 @@ export class OrderService {
         }
 
         // 2. Validate Products and Calculate Totals (batch fetch to avoid N+1)
-        const productIds = input.items.map((item) => item.productId);
-        const allProducts = await this.productRepository.findByIds(productIds);
+        // Collect all product IDs including child items
+        const allProductIds = new Set<string>();
+        for (const itemInput of input.items) {
+            allProductIds.add(itemInput.productId);
+            if (itemInput.childItems) {
+                for (const child of itemInput.childItems) {
+                    allProductIds.add(child.productId);
+                }
+            }
+        }
+        const allProducts = await this.productRepository.findByIds([...allProductIds]);
         const productMap = new Map(allProducts.map((p) => [p.id, p]));
 
         let calculatedItemsTotal = 0;
-        const itemsToCreate = [];
+        const itemsToCreate: Array<{
+            productId: string;
+            quantity: number;
+            unitPrice: number;
+            notes: string | null;
+            selectedOptions?: Array<{ optionGroupId: string; optionId: string }>;
+            childItems?: Array<{
+                productId: string;
+                selectedOptions: Array<{ optionGroupId: string; optionId: string }>;
+            }>;
+        }> = [];
         const cartItems = [] as Array<{ productId: string; businessId: string; quantity: number; price: number }>;
         const businessIds = new Set<string>();
+
+        // Collect all option IDs for batch validation
+        const allOptionIds = new Set<string>();
+        const allOptionGroupIds = new Set<string>();
+        for (const itemInput of input.items) {
+            if (itemInput.selectedOptions) {
+                for (const so of itemInput.selectedOptions) {
+                    allOptionIds.add(so.optionId);
+                    allOptionGroupIds.add(so.optionGroupId);
+                }
+            }
+            if (itemInput.childItems) {
+                for (const child of itemInput.childItems) {
+                    if (child.selectedOptions) {
+                        for (const so of child.selectedOptions) {
+                            allOptionIds.add(so.optionId);
+                            allOptionGroupIds.add(so.optionGroupId);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Batch-fetch options and option groups for price snapshots and validation
+        const db = await getDB();
+        const optionRows =
+            allOptionIds.size > 0
+                ? await db
+                      .select()
+                      .from(optionsDbTable)
+                      .where(inArray(optionsDbTable.id, [...allOptionIds]))
+                : [];
+        const optionById = new Map(optionRows.map((o) => [o.id, o]));
+
+        const optionGroupRows =
+            allOptionGroupIds.size > 0
+                ? await db
+                      .select()
+                      .from(optionGroupsTable)
+                      .where(inArray(optionGroupsTable.id, [...allOptionGroupIds]))
+                : [];
+        const optionGroupById = new Map(optionGroupRows.map((og) => [og.id, og]));
 
         for (const itemInput of input.items) {
             const product = productMap.get(itemInput.productId);
@@ -82,24 +146,55 @@ export class OrderService {
                 throw AppError.badInput(`Product ${product.name} is currently unavailable`);
             }
 
-            // Use DB price for security, or validate input price
-            // Here taking DB price to be safe
-            const price = Number(product.isOnSale && product.salePrice ? product.salePrice : product.price);
-            log.debug({ price, quantity: itemInput.quantity, productId: itemInput.productId }, 'order:item:price');
-            calculatedItemsTotal += price * itemInput.quantity;
+            // Use DB price for security
+            const unitPrice = Number(product.isOnSale && product.salePrice ? product.salePrice : product.price);
+            log.debug({ unitPrice, quantity: itemInput.quantity, productId: itemInput.productId }, 'order:item:price');
+
+            // Calculate options extra price
+            let optionsExtra = 0;
+            if (itemInput.selectedOptions) {
+                for (const so of itemInput.selectedOptions) {
+                    const opt = optionById.get(so.optionId);
+                    if (!opt) throw AppError.badInput(`Option ${so.optionId} not found`);
+                    optionsExtra += opt.extraPrice;
+                }
+            }
+
+            calculatedItemsTotal += (unitPrice + optionsExtra) * itemInput.quantity;
+
+            // Also calculate child item options extra (child unitPrice is 0, but options may cost extra)
+            if (itemInput.childItems) {
+                for (const child of itemInput.childItems) {
+                    const childProduct = productMap.get(child.productId);
+                    if (!childProduct) throw AppError.notFound(`Product with ID ${child.productId}`);
+                    if (childProduct.isOffer)
+                        throw AppError.badInput(`Child product ${child.productId} cannot be an offer`);
+                    let childOptionsExtra = 0;
+                    if (child.selectedOptions) {
+                        for (const so of child.selectedOptions) {
+                            const opt = optionById.get(so.optionId);
+                            if (!opt) throw AppError.badInput(`Option ${so.optionId} not found`);
+                            childOptionsExtra += opt.extraPrice;
+                        }
+                    }
+                    calculatedItemsTotal += childOptionsExtra * itemInput.quantity;
+                }
+            }
 
             itemsToCreate.push({
                 productId: itemInput.productId,
                 quantity: itemInput.quantity,
-                price: price, // Store the price at time of purchase
+                unitPrice,
                 notes: itemInput.notes || null,
+                selectedOptions: itemInput.selectedOptions ?? [],
+                childItems: itemInput.childItems ?? undefined,
             });
 
             cartItems.push({
                 productId: itemInput.productId,
                 businessId: product.businessId,
                 quantity: itemInput.quantity,
-                price: price,
+                price: unitPrice,
             });
 
             businessIds.add(product.businessId);
@@ -108,8 +203,6 @@ export class OrderService {
         log.debug({ itemsTotal: calculatedItemsTotal, deliveryPrice: input.deliveryPrice }, 'order:totals');
 
         // 2a. Validate multi-restaurant restriction
-        // Customers can order from at most 1 restaurant (+ market/pharmacy is fine)
-        const db = await getDB();
         const orderBusinesses = await db
             .select({ id: businessesTable.id, businessType: businessesTable.businessType })
             .from(businessesTable)
@@ -117,12 +210,14 @@ export class OrderService {
 
         const restaurantCount = orderBusinesses.filter((b) => b.businessType === 'RESTAURANT').length;
         if (restaurantCount > 1) {
-            throw AppError.businessRule('You can only order from one restaurant at a time. Please remove items from one restaurant before adding from another.');
+            throw AppError.businessRule(
+                'You can only order from one restaurant at a time. Please remove items from one restaurant before adding from another.',
+            );
         }
 
         // 2b. Check that all businesses are currently open
         const now = new Date();
-        const currentDay = now.getDay(); // 0 = Sunday
+        const currentDay = now.getDay();
         const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
         for (const bizId of businessIds) {
@@ -134,7 +229,6 @@ export class OrderService {
                 );
 
             if (hoursRows.length === 0) {
-                // No schedule rows for today — check legacy opensAt/closesAt on business row
                 const [biz] = await db.select().from(businessesTable).where(eq(businessesTable.id, bizId));
                 if (biz) {
                     const isOpenLegacy =
@@ -168,11 +262,7 @@ export class OrderService {
             businessIds: Array.from(businessIds),
         };
 
-        const promoResult = await promotionEngine.applyPromotions(
-            userId,
-            cartContext,
-            input.promoCode || undefined,
-        );
+        const promoResult = await promotionEngine.applyPromotions(userId, cartContext, input.promoCode || undefined);
 
         if (input.promoCode && promoResult.promotions.length === 0) {
             throw AppError.badInput('Invalid promo code');
@@ -201,10 +291,77 @@ export class OrderService {
             driverNotes: input.driverNotes || null,
         };
 
-        const createdOrder = await this.orderRepository.create(orderData, itemsToCreate);
+        // Build flat items for repository (without child items — those are inserted separately)
+        const flatItems = itemsToCreate.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            notes: item.notes,
+        }));
+
+        const createdOrder = await this.orderRepository.create(orderData, flatItems);
 
         if (!createdOrder) {
-            throw AppError.businessRule('Failed to create order: no items were associated or the database insert failed');
+            throw AppError.businessRule(
+                'Failed to create order: no items were associated or the database insert failed',
+            );
+        }
+
+        // Now insert child items and order_item_options
+        // First, fetch the created order items to get their IDs
+        const createdItems = await db
+            .select()
+            .from(orderItemsTable)
+            .where(and(eq(orderItemsTable.orderId, createdOrder.id), isNull(orderItemsTable.parentOrderItemId)));
+
+        // Match created items back to input items by productId + unitPrice
+        for (let i = 0; i < itemsToCreate.length; i++) {
+            const inputItem = itemsToCreate[i];
+            const createdItem = createdItems.find(
+                (ci) => ci.productId === inputItem.productId && ci.unitPrice === inputItem.unitPrice,
+            );
+            if (!createdItem) continue;
+
+            // Insert order_item_options for this top-level item
+            if (inputItem.selectedOptions && inputItem.selectedOptions.length > 0) {
+                await db.insert(orderItemOptionsTable).values(
+                    inputItem.selectedOptions.map((so) => ({
+                        orderItemId: createdItem.id,
+                        optionGroupId: so.optionGroupId,
+                        optionId: so.optionId,
+                        priceAtOrder: optionById.get(so.optionId)?.extraPrice ?? 0,
+                    })),
+                );
+            }
+
+            // Insert child items for offers
+            if (inputItem.childItems && inputItem.childItems.length > 0) {
+                for (const childInput of inputItem.childItems) {
+                    const [childItem] = await db
+                        .insert(orderItemsTable)
+                        .values({
+                            orderId: createdOrder.id,
+                            productId: childInput.productId,
+                            parentOrderItemId: createdItem.id,
+                            quantity: inputItem.quantity,
+                            unitPrice: 0, // child items are covered by the offer price
+                            notes: null,
+                        })
+                        .returning();
+
+                    // Insert order_item_options for child item
+                    if (childInput.selectedOptions && childInput.selectedOptions.length > 0) {
+                        await db.insert(orderItemOptionsTable).values(
+                            childInput.selectedOptions.map((so) => ({
+                                orderItemId: childItem.id,
+                                optionGroupId: so.optionGroupId,
+                                optionId: so.optionId,
+                                priceAtOrder: optionById.get(so.optionId)?.extraPrice ?? 0,
+                            })),
+                        );
+                    }
+                }
+            }
         }
 
         await this.updateUserBehaviorOnOrderCreated(userId, createdOrder.orderDate || null);
@@ -227,20 +384,25 @@ export class OrderService {
             );
 
             // Store promotions in orderPromotions table
-            const db = await getDB();
             for (const promo of promoResult.promotions) {
                 const appliesTo = promo.target === 'FIRST_ORDER' || promo.target === 'DISCOUNT' ? 'PRICE' : 'DELIVERY';
-                const discountAmount = promo.target === 'FIRST_ORDER' || promo.target === 'DISCOUNT'
-                    ? promoResult.totalDiscount
-                    : promoResult.freeDeliveryApplied ? effectiveDeliveryPrice : 0;
+                const discountAmount =
+                    promo.target === 'FIRST_ORDER' || promo.target === 'DISCOUNT'
+                        ? promoResult.totalDiscount
+                        : promoResult.freeDeliveryApplied
+                          ? effectiveDeliveryPrice
+                          : 0;
 
                 if (discountAmount > 0) {
-                    await db.insert(orderPromotionsTable).values({
-                        orderId: createdOrder.id,
-                        promotionId: promo.id,
-                        appliesTo,
-                        discountAmount,
-                    }).onConflictDoNothing();
+                    await db
+                        .insert(orderPromotionsTable)
+                        .values({
+                            orderId: createdOrder.id,
+                            promotionId: promo.id,
+                            appliesTo,
+                            discountAmount,
+                        })
+                        .onConflictDoNothing();
                 }
             }
 
@@ -250,29 +412,26 @@ export class OrderService {
             }
         }
 
-        // Decrement stock for ordered products atomically (prevent overselling)
-        for (const item of itemsToCreate) {
-            // Atomic: UPDATE stock = stock - quantity WHERE stock >= quantity
-            const updated = await db.update(productStocksTable)
+        // Decrement stock for ordered top-level products only (not child items of offers)
+        for (const item of flatItems) {
+            const updated = await db
+                .update(productStocksTable)
                 .set({ stock: sql`${productStocksTable.stock} - ${item.quantity}` })
-                .where(and(
-                    eq(productStocksTable.productId, item.productId),
-                    gte(productStocksTable.stock, item.quantity),
-                ))
+                .where(
+                    and(eq(productStocksTable.productId, item.productId), gte(productStocksTable.stock, item.quantity)),
+                )
                 .returning();
 
-            // If no rows updated, either no stock entry exists (untracked) or insufficient stock
             if (updated.length === 0) {
-                // Check if a stock entry exists at all
-                const existingStock = await db.select().from(productStocksTable)
+                const existingStock = await db
+                    .select()
+                    .from(productStocksTable)
                     .where(eq(productStocksTable.productId, item.productId))
-                    .then(rows => rows[0]);
+                    .then((rows) => rows[0]);
 
                 if (existingStock) {
-                    // Stock entry exists but insufficient — oversold
                     throw AppError.badInput(`Insufficient stock for product. Only ${existingStock.stock} available.`);
                 }
-                // No stock entry = product doesn't track stock, proceed normally
             }
         }
 
@@ -281,35 +440,109 @@ export class OrderService {
 
     private async ensureUserPromoMetadata(userId: string): Promise<void> {
         const db = await getDB();
-        await db
-            .insert(userPromoMetadata)
-            .values({ userId })
-            .onConflictDoNothing();
+        await db.insert(userPromoMetadata).values({ userId }).onConflictDoNothing();
     }
 
     private async mapToOrder(dbOrder: DbOrder): Promise<Order> {
         const db = await getDB();
 
-        // Fetch all items for this order (1 query)
-        const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, dbOrder.id));
+        // Fetch all items for this order (1 query) — both top-level and children
+        const allItems = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, dbOrder.id));
+
+        // Batch-fetch all order_item_options for these items (1 query)
+        const allItemIds = allItems.map((i) => i.id);
+        const allItemOptionRows =
+            allItemIds.length > 0
+                ? await db
+                      .select()
+                      .from(orderItemOptionsTable)
+                      .where(inArray(orderItemOptionsTable.orderItemId, allItemIds))
+                : [];
+
+        // Batch-fetch option groups and options for names
+        const ogIds = [...new Set(allItemOptionRows.map((r) => r.optionGroupId))];
+        const optIds = [...new Set(allItemOptionRows.map((r) => r.optionId))];
+        const ogRows =
+            ogIds.length > 0
+                ? await db.select().from(optionGroupsTable).where(inArray(optionGroupsTable.id, ogIds))
+                : [];
+        const optRows =
+            optIds.length > 0 ? await db.select().from(optionsDbTable).where(inArray(optionsDbTable.id, optIds)) : [];
+        const ogNameById = new Map(ogRows.map((og) => [og.id, og.name]));
+        const optNameById = new Map(optRows.map((o) => [o.id, o.name]));
+
+        // Group item options by orderItemId
+        const itemOptionsMap = new Map<string, typeof allItemOptionRows>();
+        for (const row of allItemOptionRows) {
+            const arr = itemOptionsMap.get(row.orderItemId) ?? [];
+            arr.push(row);
+            itemOptionsMap.set(row.orderItemId, arr);
+        }
 
         // Batch-fetch all products for those items (1 query)
-        const productIds = [...new Set(items.map(i => i.productId))];
-        const productsRows = productIds.length > 0
-            ? await db.select().from(productsTable).where(inArray(productsTable.id, productIds))
-            : [];
-        const productById = new Map(productsRows.map(p => [p.id, p]));
+        const productIds = [...new Set(allItems.map((i) => i.productId))];
+        const productsRows =
+            productIds.length > 0
+                ? await db.select().from(productsTable).where(inArray(productsTable.id, productIds))
+                : [];
+        const productById = new Map(productsRows.map((p) => [p.id, p]));
 
         // Batch-fetch all stock records (1 query)
-        const stockRows = productIds.length > 0
-            ? await db.select().from(productStocksTable).where(inArray(productStocksTable.productId, productIds))
-            : [];
-        const stockByProductId = new Map(stockRows.map(s => [s.productId, s]));
+        const stockRows =
+            productIds.length > 0
+                ? await db.select().from(productStocksTable).where(inArray(productStocksTable.productId, productIds))
+                : [];
+        const stockByProductId = new Map(stockRows.map((s) => [s.productId, s]));
+
+        // Separate top-level and child items
+        const topLevelItems = allItems.filter((i) => !i.parentOrderItemId);
+        const childItemsMap = new Map<string, typeof allItems>();
+        for (const item of allItems) {
+            if (item.parentOrderItemId) {
+                const arr = childItemsMap.get(item.parentOrderItemId) ?? [];
+                arr.push(item);
+                childItemsMap.set(item.parentOrderItemId, arr);
+            }
+        }
+
+        // Helper to build an OrderItem from a DB row
+        const buildOrderItem = (item: (typeof allItems)[0]): OrderItem => {
+            const product = productById.get(item.productId);
+            const stockRecord = stockByProductId.get(item.productId);
+            const currentStock = stockRecord?.stock ?? 0;
+            const originalStock = Math.max(0, currentStock + item.quantity);
+
+            const selectedOptions = (itemOptionsMap.get(item.id) ?? []).map((oio) => ({
+                id: oio.id,
+                optionGroupId: oio.optionGroupId,
+                optionGroupName: ogNameById.get(oio.optionGroupId) ?? '',
+                optionId: oio.optionId,
+                optionName: optNameById.get(oio.optionId) ?? '',
+                priceAtOrder: oio.priceAtOrder,
+            }));
+
+            const children = (childItemsMap.get(item.id) ?? []).map(buildOrderItem);
+
+            return {
+                id: item.id,
+                productId: item.productId,
+                name: product?.name ?? '',
+                imageUrl: product?.imageUrl || undefined,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                quantityInStock: Math.min(item.quantity, originalStock),
+                quantityNeeded: Math.max(0, item.quantity - originalStock),
+                notes: item.notes || undefined,
+                selectedOptions,
+                childItems: children,
+                parentOrderItemId: item.parentOrderItemId || undefined,
+            };
+        };
 
         // Build businessMap in memory — zero per-item queries
         const businessMap = new Map<string, OrderItem[]>();
 
-        for (const item of items) {
+        for (const item of topLevelItems) {
             const product = productById.get(item.productId);
             if (!product) continue;
 
@@ -317,29 +550,17 @@ export class OrderService {
                 businessMap.set(product.businessId, []);
             }
 
-            const stockRecord = stockByProductId.get(product.id);
-            const currentStock = stockRecord?.stock ?? 0;
-            const originalStock = Math.max(0, currentStock + item.quantity);
-            businessMap.get(product.businessId)!.push({
-                productId: item.productId,
-                name: product.name,
-                imageUrl: product.imageUrl || undefined,
-                quantity: item.quantity,
-                price: item.price,
-                quantityInStock: Math.min(item.quantity, originalStock),
-                quantityNeeded: Math.max(0, item.quantity - originalStock),
-                notes: item.notes || undefined,
-            });
+            businessMap.get(product.businessId)!.push(buildOrderItem(item));
         }
 
         // Batch-fetch all businesses (1 query)
         const businessIds = [...businessMap.keys()];
-        const businessRows = businessIds.length > 0
-            ? await db.select().from(businessesTable).where(inArray(businessesTable.id, businessIds))
-            : [];
-        const businessById = new Map(businessRows.map(b => [b.id, b]));
+        const businessRows =
+            businessIds.length > 0
+                ? await db.select().from(businessesTable).where(inArray(businessesTable.id, businessIds))
+                : [];
+        const businessById = new Map(businessRows.map((b) => [b.id, b]));
 
-        // Build businessOrderList in memory — zero per-business queries
         const businessOrderList: OrderBusiness[] = [];
 
         for (const [businessId, orderItems] of businessMap) {
@@ -365,7 +586,7 @@ export class OrderService {
                         commissionPercentage: Number(business.commissionPercentage),
                         createdAt: new Date(business.createdAt),
                         updatedAt: new Date(business.updatedAt),
-                        isOpen: true, // field-level resolver on Business type computes the real value
+                        isOpen: true,
                     },
                     items: orderItems,
                 });
@@ -493,9 +714,7 @@ export class OrderService {
         const currentStatus = order.status as OrderStatus;
         const allowed = OrderService.VALID_TRANSITIONS[currentStatus];
         if (!allowed || !allowed.includes(newStatus)) {
-            throw AppError.businessRule(
-                `Invalid status transition: ${currentStatus} → ${newStatus}`,
-            );
+            throw AppError.businessRule(`Invalid status transition: ${currentStatus} → ${newStatus}`);
         }
     }
 
@@ -564,27 +783,34 @@ export class OrderService {
             throw AppError.notFound('Order');
         }
 
-        // Get order items
+        // Get top-level order items only (child items' stock is not tracked separately)
         const db = await getDB();
-        const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, id));
+        const items = await db
+            .select()
+            .from(orderItemsTable)
+            .where(and(eq(orderItemsTable.orderId, id), isNull(orderItemsTable.parentOrderItemId)));
 
         // Restore stock for cancelled order items
         for (const item of items) {
-            const existingStock = await db.select().from(productStocksTable)
+            const existingStock = await db
+                .select()
+                .from(productStocksTable)
                 .where(eq(productStocksTable.productId, item.productId))
-                .then(rows => rows[0]);
+                .then((rows) => rows[0]);
 
             if (existingStock) {
-                // Update existing stock entry
-                await db.update(productStocksTable)
+                await db
+                    .update(productStocksTable)
                     .set({ stock: sql`${productStocksTable.stock} + ${item.quantity}` })
                     .where(eq(productStocksTable.productId, item.productId));
             } else {
-                // Create stock entry with restored quantity
-                await db.insert(productStocksTable).values({
-                    productId: item.productId,
-                    stock: item.quantity,
-                }).onConflictDoNothing();
+                await db
+                    .insert(productStocksTable)
+                    .values({
+                        productId: item.productId,
+                        stock: item.quantity,
+                    })
+                    .onConflictDoNothing();
             }
         }
 
@@ -746,7 +972,7 @@ export class OrderService {
                 .from(orderItemsTable)
                 .innerJoin(productsTable, eq(orderItemsTable.productId, productsTable.id))
                 .where(eq(productsTable.businessId, businessId))
-                .then(rows => rows.map(r => r.orderId));
+                .then((rows) => rows.map((r) => r.orderId));
 
             if (orderIds.length === 0) return [];
 
@@ -756,7 +982,7 @@ export class OrderService {
                 orderBy: (tbl, { desc }) => [desc(tbl.createdAt)],
             });
 
-            return Promise.all(dbOrders.map(o => this.mapToOrder(o)));
+            return Promise.all(dbOrders.map((o) => this.mapToOrder(o)));
         } catch (error) {
             log.error({ err: error, businessId }, 'order:filterByBusiness:error');
             throw error;
@@ -771,17 +997,16 @@ export class OrderService {
                 .from(orderItemsTable)
                 .innerJoin(productsTable, eq(orderItemsTable.productId, productsTable.id))
                 .where(eq(productsTable.businessId, businessId))
-                .then(rows => rows.map(r => r.orderId));
+                .then((rows) => rows.map((r) => r.orderId));
 
             if (orderIds.length === 0) return [];
 
             const dbOrders = await db.query.orders.findMany({
-                where: (tbl, { and: andOp, eq: eqOp }) =>
-                    andOp(inArray(tbl.id, orderIds), eqOp(tbl.status, status)),
+                where: (tbl, { and: andOp, eq: eqOp }) => andOp(inArray(tbl.id, orderIds), eqOp(tbl.status, status)),
                 orderBy: (tbl, { desc }) => [desc(tbl.createdAt)],
             });
 
-            return Promise.all(dbOrders.map(o => this.mapToOrder(o)));
+            return Promise.all(dbOrders.map((o) => this.mapToOrder(o)));
         } catch (error) {
             log.error({ err: error, businessId, status }, 'order:filterByBusinessAndStatus:error');
             throw error;
@@ -796,10 +1021,7 @@ export class OrderService {
                 .select({ orderId: orderItemsTable.orderId })
                 .from(orderItemsTable)
                 .innerJoin(productsTable, eq(orderItemsTable.productId, productsTable.id))
-                .where(and(
-                    eq(orderItemsTable.orderId, orderId),
-                    eq(productsTable.businessId, businessId),
-                ))
+                .where(and(eq(orderItemsTable.orderId, orderId), eq(productsTable.businessId, businessId)))
                 .limit(1);
             return match.length > 0;
         } catch (error) {

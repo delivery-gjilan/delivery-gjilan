@@ -42,13 +42,15 @@ app.use(helmet({ contentSecurityPolicy: false })); // CSP disabled for GraphiQL
 
 // ── CORS ──
 const allowedOrigins = process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
+    ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
     : ['http://localhost:3000', 'http://localhost:8082', 'http://localhost:8083', 'http://localhost:8084'];
 
-app.use(cors({
-    origin: allowedOrigins,
-    credentials: true,
-}));
+app.use(
+    cors({
+        origin: allowedOrigins,
+        credentials: true,
+    }),
+);
 
 // ── Body parsing with size limit ──
 app.use(express.json({ limit: '16kb' }));
@@ -85,50 +87,60 @@ function getRateLimitKey(req: express.Request): string {
 // General API limiter
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 500,                  // 500 requests per window
+    max: 500, // 500 requests per window
     keyGenerator: getRateLimitKey,
     standardHeaders: true,
     legacyHeaders: false,
+    validate: { keyGenerator: false },
     message: { error: 'Too many requests, please try again later.' },
 });
 
 // Stricter limiter for auth-related operations (GraphQL login/signup)
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 20,                   // 20 attempts per window
+    max: 20, // 20 attempts per window
     keyGenerator: getRateLimitKey,
     standardHeaders: true,
     legacyHeaders: false,
+    validate: { keyGenerator: false },
     message: { error: 'Too many authentication attempts, please try again later.' },
 });
 
 // Upload limiter
 const uploadLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 50,                   // 50 uploads per window
+    max: 50, // 50 uploads per window
     keyGenerator: getRateLimitKey,
     standardHeaders: true,
     legacyHeaders: false,
+    validate: { keyGenerator: false },
     message: { error: 'Too many upload requests, please try again later.' },
 });
 
 // Exclude high-frequency system operations from rate limiting
 const SYSTEM_OPERATIONS = new Set(['DriverHeartbeat', 'DriverBatteryReport']);
-const AUTH_OPERATIONS = new Set(['Login', 'InitiateSignup', 'RefreshToken', 'VerifyEmail', 'VerifyPhone', 'ResendEmailVerification']);
+const AUTH_OPERATIONS = new Set([
+    'Login',
+    'InitiateSignup',
+    'RefreshToken',
+    'VerifyEmail',
+    'VerifyPhone',
+    'ResendEmailVerification',
+]);
 
 app.use('/graphql', (req, res, next) => {
     const operationName = req.body?.operationName;
-    
+
     // Skip rate limiting for critical system operations (heartbeats, etc.)
     if (operationName && SYSTEM_OPERATIONS.has(operationName)) {
         return next();
     }
-    
+
     // Apply stricter auth rate limiting
     if (operationName && AUTH_OPERATIONS.has(operationName)) {
         return authLimiter(req, res, next);
     }
-    
+
     // Apply general rate limiting for all other operations
     return apiLimiter(req, res, next);
 });
@@ -223,12 +235,15 @@ const httpServer = app.listen(port, async () => {
 
     // Initialize cross-instance GraphQL pubsub bridge (falls back to in-memory if Redis is unavailable)
     await initializePubSubRedisBridge();
-    
+
     // Initialize Firebase Admin SDK for push notifications
     try {
         initializeFirebase();
     } catch (error) {
-        logger.warn({ err: error }, 'Firebase not initialized — push notifications disabled. Set FIREBASE_SERVICE_ACCOUNT_KEY env var.');
+        logger.warn(
+            { err: error },
+            'Firebase not initialized — push notifications disabled. Set FIREBASE_SERVICE_ACCOUNT_KEY env var.',
+        );
     }
 
     // Initialize driver services (heartbeat checker)
@@ -313,7 +328,12 @@ function graphQLErrorSummary(errors: readonly GraphQLError[]): { codes: string[]
     const codes = errors
         .map((error) => error.extensions?.code)
         .filter((value): value is string => typeof value === 'string');
-    const detail = errors.map((error) => error.message).filter(Boolean).slice(0, 3).join(' | ') || 'Subscription lifecycle error';
+    const detail =
+        errors
+            .map((error) => error.message)
+            .filter(Boolean)
+            .slice(0, 3)
+            .join(' | ') || 'Subscription lifecycle error';
     return { codes, detail };
 }
 
@@ -441,13 +461,24 @@ useServer(
             if (errors.length) {
                 const summary = graphQLErrorSummary(errors);
                 realtimeMonitor.recordSubscribeRejected({ socketId, operationName, reason: 'validation_failed' });
-                logger.warn({ socketId, operationName, codes: summary.codes, detail: summary.detail }, 'ws:subscribe:validationFailed');
+                logger.warn(
+                    { socketId, operationName, codes: summary.codes, detail: summary.detail },
+                    'ws:subscribe:validationFailed',
+                );
                 return errors;
             }
             incrementSocketSubscriptions(socket);
             rememberSocketOperation(socket, String(id), operationName);
             realtimeMonitor.recordSubscribeAccepted({ socketId, operationId: String(id), operationName });
-            logger.info({ socketId, operationId: String(id), operationName, activeOnSocket: wsSubscriptionCounts.get(socket) ?? 0 }, 'ws:subscribe:accepted');
+            logger.info(
+                {
+                    socketId,
+                    operationId: String(id),
+                    operationName,
+                    activeOnSocket: wsSubscriptionCounts.get(socket) ?? 0,
+                },
+                'ws:subscribe:accepted',
+            );
             return args;
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -458,7 +489,15 @@ useServer(
 
             decrementSocketSubscriptions(socket);
             realtimeMonitor.recordSubscribeCompleted({ socketId, operationId: String(id), operationName });
-            logger.info({ socketId, operationId: String(id), operationName, activeOnSocket: wsSubscriptionCounts.get(socket) ?? 0 }, 'ws:subscribe:completed');
+            logger.info(
+                {
+                    socketId,
+                    operationId: String(id),
+                    operationName,
+                    activeOnSocket: wsSubscriptionCounts.get(socket) ?? 0,
+                },
+                'ws:subscribe:completed',
+            );
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onError: async (ctx: any, id: any, payload: any, errors: readonly GraphQLError[]) => {
@@ -474,7 +513,10 @@ useServer(
                 phase: 'runtime',
                 detail: summary.detail,
             });
-            logger.error({ socketId, operationId: String(id), operationName, codes: summary.codes, detail: summary.detail }, 'ws:subscribe:error');
+            logger.error(
+                { socketId, operationId: String(id), operationName, codes: summary.codes, detail: summary.detail },
+                'ws:subscribe:error',
+            );
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onDisconnect: async (ctx: any) => {

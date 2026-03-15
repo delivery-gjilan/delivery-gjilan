@@ -21,10 +21,7 @@ export function useCreateOrder() {
     ) => {
         // Keep this as UX guidance only; backend remains source of truth.
         if (hasActiveOrders) {
-            toast.warning(
-                t.cart.active_order_exists_title,
-                t.cart.active_order_exists_message,
-            );
+            toast.warning(t.cart.active_order_exists_title, t.cart.active_order_exists_message);
         }
 
         if (items.length === 0) {
@@ -38,8 +35,20 @@ export function useCreateOrder() {
         const orderItems = items.map((item) => ({
             productId: item.productId,
             quantity: item.quantity,
-            price: item.price,
+            price: item.unitPrice,
             notes: item.notes || null,
+            selectedOptions: item.selectedOptions.map((opt) => ({
+                optionGroupId: opt.optionGroupId,
+                optionId: opt.optionId,
+            })),
+            childItems:
+                item.childItems?.map((child) => ({
+                    productId: child.productId,
+                    selectedOptions: child.selectedOptions.map((opt) => ({
+                        optionGroupId: opt.optionGroupId,
+                        optionId: opt.optionId,
+                    })),
+                })) || [],
         }));
 
         try {

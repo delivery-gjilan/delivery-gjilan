@@ -22,15 +22,28 @@ type OrderBusiness {
     items: [OrderItem!]!
 }
 
+type OrderItemOption {
+    id: ID!
+    optionGroupId: ID!
+    optionGroupName: String!
+    optionId: ID!
+    optionName: String!
+    priceAtOrder: Float!
+}
+
 type OrderItem {
+    id: ID!
     productId: ID!
     name: String!
     imageUrl: String
     quantity: Int!
-    price: Float!
+    unitPrice: Float!
+    notes: String
     quantityInStock: Int!
     quantityNeeded: Int!
-    notes: String
+    selectedOptions: [OrderItemOption!]!
+    childItems: [OrderItem!]!
+    parentOrderItemId: ID
 }
 
 type OrderPromotion {
@@ -108,18 +121,30 @@ type Subscription {
     allOrdersUpdated: [Order!]! @skipAuth
 }
 
-input CreateOrderInput {
-    items: [CreateOrderItemInput!]!
-    dropOffLocation: LocationInput!
-    deliveryPrice: Float!
-    totalPrice: Float! # For validation/check
-    promoCode: String
-    driverNotes: String
+input CreateOrderItemOptionInput {
+    optionGroupId: ID!
+    optionId: ID!
+}
+
+input CreateOrderChildItemInput {
+    productId: ID!
+    selectedOptions: [CreateOrderItemOptionInput!]!
 }
 
 input CreateOrderItemInput {
     productId: ID!
     quantity: Int!
-    price: Float! # For validation/check
+    price: Float!
     notes: String
+    selectedOptions: [CreateOrderItemOptionInput!]!
+    childItems: [CreateOrderChildItemInput!]
+}
+
+input CreateOrderInput {
+    items: [CreateOrderItemInput!]!
+    dropOffLocation: LocationInput!
+    deliveryPrice: Float!
+    totalPrice: Float!
+    promoCode: String
+    driverNotes: String
 }
