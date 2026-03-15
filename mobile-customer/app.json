@@ -22,7 +22,7 @@
         ]
       },
       "appleTeamId": "87K8YXG5V8",
-      "bundleIdentifier": "com.anonymous.mobilecustomer",
+      "bundleIdentifier": "com.artshabani.mobilecustomer",
       "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {

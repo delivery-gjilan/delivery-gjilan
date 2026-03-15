@@ -725,9 +725,9 @@ function withLiveActivityExtensionTarget(config) {
 
     // Ensure the extension target has build phases
     if (typeof project.addBuildPhase === 'function') {
-        project.addBuildPhase([], 'PBXSourcesBuildPhase', 'Sources', targetUuid);
-        project.addBuildPhase([], 'PBXFrameworksBuildPhase', 'Frameworks', targetUuid);
-        project.addBuildPhase([], 'PBXResourcesBuildPhase', 'Resources', targetUuid);
+      project.addBuildPhase([], 'PBXSourcesBuildPhase', 'Sources', targetUuid);
+      project.addBuildPhase([], 'PBXFrameworksBuildPhase', 'Frameworks', targetUuid);
+      project.addBuildPhase([], 'PBXResourcesBuildPhase', 'Resources', targetUuid);
     }
 
     // Helper to add file and link to target
@@ -741,12 +741,12 @@ function withLiveActivityExtensionTarget(config) {
 
       if (existingFileKey) {
         const pbxFile = {
-            fileRef: existingFileKey,
-            basename: filename
+          fileRef: existingFileKey,
+          basename: filename
         };
         project.addToPbxBuildFileSection(pbxFile);
         if (typeof project.addToPbxSourcesBuildPhase === 'function') {
-            project.addToPbxSourcesBuildPhase(pbxFile, targetUuid);
+          project.addToPbxSourcesBuildPhase(pbxFile, targetUuid);
         }
       } else {
         addBuildSourceFileToGroup({
@@ -784,8 +784,8 @@ function withLiveActivityExtensionTarget(config) {
       // 2. Embed the extension (PlugIns)
       const pbxCopyFilesBuildPhase = project.hash.project.objects['PBXCopyFilesBuildPhase'] || {};
       let embedPhaseUuid = Object.keys(pbxCopyFilesBuildPhase).find(key => {
-          const phase = pbxCopyFilesBuildPhase[key];
-          return typeof phase === 'object' && (phase.name === '"Embed App Extensions"' || phase.dstSubfolderSpec === '13');
+        const phase = pbxCopyFilesBuildPhase[key];
+        return typeof phase === 'object' && (phase.name === '"Embed App Extensions"' || phase.dstSubfolderSpec === '13');
       });
 
       if (!embedPhaseUuid) {
@@ -800,9 +800,9 @@ function withLiveActivityExtensionTarget(config) {
       const productFile = project.pbxFileReferenceSection()[productFileRef];
       if (productFile && embedPhaseUuid) {
         const file = {
-            fileRef: productFileRef,
-            basename: productFile.path,
-            settings: { ATTRIBUTES: ['RemoveHeadersOnCopy'] }
+          fileRef: productFileRef,
+          basename: productFile.path,
+          settings: { ATTRIBUTES: ['RemoveHeadersOnCopy'] }
         };
         const buildFile = project.addToPbxBuildFileSection(file);
         if (buildFile && buildFile.uuid) {
