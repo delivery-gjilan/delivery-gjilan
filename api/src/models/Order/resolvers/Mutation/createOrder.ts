@@ -4,7 +4,7 @@ import { AppError } from '@/lib/errors';
 import logger from '@/lib/logger';
 import { users } from '@/database/schema';
 import { and, inArray, isNull } from 'drizzle-orm';
-import { notifyAdminsNewOrder, notifyBusinessNewOrder } from '@/services/orderNotifications';
+import { notifyAdminsNewOrder, notifyBusinessNewOrder, updateLiveActivity } from '@/services/orderNotifications';
 
 const log = logger.child({ resolver: 'createOrder' });
 
@@ -78,6 +78,18 @@ export const createOrder: NonNullable<MutationResolvers['createOrder']> = async 
         }
     } catch (error) {
         log.error({ err: error, orderId: order.id }, 'createOrder:notifyBusinessNewOrder:failed');
+    }
+
+    try {
+        updateLiveActivity(
+            context.notificationService,
+            String(order.id),
+            'pending',
+            'Your driver',
+            0,
+        );
+    } catch (error) {
+        log.error({ err: error, orderId: order.id }, 'createOrder:updateLiveActivity:failed');
     }
 
     const logger = createAuditLogger(db, context);

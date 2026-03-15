@@ -18,7 +18,7 @@ const DeliveryLiveActivitiesNative: DeliveryLiveActivitiesModule | undefined =
 interface DeliveryActivityState {
     driverName: string;
     estimatedMinutes: number;
-    status: 'preparing' | 'ready' | 'out_for_delivery' | 'delivered';
+    status: 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered';
     orderId: string;
     lastUpdated: number; // Unix timestamp ms
 }
@@ -167,6 +167,13 @@ export function useLiveActivity({ orderId, orderDisplayId, businessName, enabled
             console.error('[LiveActivity] Failed to end Live Activity:', error);
         }
     }, [isSupported]);
+
+    // Safety net: if tracking is disabled (e.g. delivered/cancelled), end active activity.
+    useEffect(() => {
+        if (!enabled || !isSupported) {
+            void endLiveActivity();
+        }
+    }, [enabled, isSupported, endLiveActivity]);
 
     return {
         startLiveActivity,

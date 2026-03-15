@@ -923,7 +923,12 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         orderId: order?.id ?? '',
         orderDisplayId: order?.displayId ?? '',
         businessName: businessName,
-        enabled: !!(order?.id && (status === 'OUT_FOR_DELIVERY' || customerVisibleStatus === 'PREPARING')),
+        enabled: !!(
+            order?.id &&
+            !isCompleted &&
+            !isCancelled &&
+            (status === 'PENDING' || customerVisibleStatus === 'PREPARING' || status === 'OUT_FOR_DELIVERY')
+        ),
     });
 
     // Manage Live Activity: start/update when active, end when done
@@ -933,10 +938,15 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
             return;
         }
         const etaMinutes = (isDeliveryPhase ? deliveryEta : isPreparingPhase ? preparationEta : null) ?? 0;
-        const liveStatus = status === 'OUT_FOR_DELIVERY' ? 'out_for_delivery'
-            : 'preparing';
+        const liveStatus = status === 'OUT_FOR_DELIVERY'
+            ? 'out_for_delivery'
+            : status === 'PENDING'
+                ? 'pending'
+                : 'preparing';
         if (status === 'OUT_FOR_DELIVERY') {
             startLiveActivity({ driverName: driverName || 'Driver', estimatedMinutes: etaMinutes, status: liveStatus });
+        } else if (status === 'PENDING') {
+            startLiveActivity({ driverName: driverName || 'Driver', estimatedMinutes: 0, status: liveStatus });
         } else if (customerVisibleStatus === 'PREPARING') {
             // Start during preparing as well so updates have an active activity to target.
             startLiveActivity({ driverName: driverName || 'Driver', estimatedMinutes: etaMinutes, status: liveStatus });

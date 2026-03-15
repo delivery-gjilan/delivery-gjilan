@@ -411,7 +411,7 @@ export class NotificationService {
         updates: {
             driverName: string;
             estimatedMinutes: number;
-            status: 'preparing' | 'ready' | 'out_for_delivery' | 'delivered';
+            status: 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered';
         },
     ): Promise<void> {
         const liveActivityTopic =
@@ -503,8 +503,23 @@ export class NotificationService {
         // Send end event to each Live Activity
         for (const tokenRecord of tokens) {
             try {
+                const finalState = {
+                    driverName: 'Your driver',
+                    estimatedMinutes: 0,
+                    status: 'delivered',
+                    orderId,
+                    lastUpdated: Date.now(),
+                };
+
                 const message: Message = {
                     token: tokenRecord.pushToken,
+                    data: {
+                        driverName: finalState.driverName,
+                        estimatedMinutes: String(finalState.estimatedMinutes),
+                        status: finalState.status,
+                        orderId,
+                        lastUpdated: String(finalState.lastUpdated),
+                    },
                     apns: {
                         headers: {
                             'apns-push-type': 'liveactivity',
@@ -515,6 +530,7 @@ export class NotificationService {
                             aps: {
                                 timestamp: Math.floor(Date.now() / 1000),
                                 event: 'end',
+                                'content-state': finalState,
                                 'dismissal-date': Math.floor(Date.now() / 1000) + 10, // Dismiss after 10 seconds
                             },
                         },

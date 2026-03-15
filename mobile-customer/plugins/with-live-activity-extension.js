@@ -200,42 +200,200 @@ struct DeliveryLiveActivityBundle: WidgetBundle {
 }
 
 struct DeliveryLiveActivityWidget: Widget {
+  private let islandPurple = Color(red: 0.43, green: 0.27, blue: 0.86)
+  private let pendingAmber = Color(red: 0.96, green: 0.67, blue: 0.16)
+  private let preparingOrange = Color(red: 0.98, green: 0.49, blue: 0.13)
+  private let etaGreen = Color(red: 0.16, green: 0.82, blue: 0.43)
+
+  private func driverInitial(from name: String) -> String {
+    let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard let first = trimmed.first else { return "D" }
+    return String(first).uppercased()
+  }
+
+  private func normalizedEtaMinutes(_ minutes: Int) -> Int {
+    max(0, min(minutes, 120))
+  }
+
+  private func etaProgress(_ minutes: Int) -> Double {
+    let normalized = Double(normalizedEtaMinutes(minutes)) / 120.0
+    return max(0.05, 1.0 - normalized)
+  }
+
+  private func etaLabel(_ minutes: Int) -> String {
+    "\\(max(0, minutes))m"
+  }
+
+  private func normalizedStatus(_ status: String) -> String {
+    switch status.lowercased() {
+    case "pending":
+      return "pending"
+    case "out_for_delivery":
+      return "out_for_delivery"
+    case "preparing", "ready":
+      return "preparing"
+    default:
+      return "preparing"
+    }
+  }
+
+  private func statusAccent(_ status: String) -> Color {
+    switch normalizedStatus(status) {
+    case "pending":
+      return pendingAmber
+    case "out_for_delivery":
+      return etaGreen
+    default:
+      return preparingOrange
+    }
+  }
+
+  private func statusTitle(_ status: String) -> String {
+    switch normalizedStatus(status) {
+    case "pending":
+      return "Order Received"
+    case "out_for_delivery":
+      return "On the Way"
+    default:
+      return "Preparing"
+    }
+  }
+
+  private func statusSubtitle(_ status: String) -> String {
+    switch normalizedStatus(status) {
+    case "pending":
+      return "Waiting for business confirmation"
+    case "out_for_delivery":
+      return "Driver is heading to your address"
+    default:
+      return "Kitchen is preparing your order"
+    }
+  }
+
+  private func statusSymbol(_ status: String) -> String {
+    switch normalizedStatus(status) {
+    case "pending":
+      return "clock.badge"
+    case "out_for_delivery":
+      return "location.fill"
+    default:
+      return "fork.knife"
+    }
+  }
+
+  private func showsEta(_ status: String) -> Bool {
+    let key = normalizedStatus(status)
+    return key == "preparing" || key == "out_for_delivery"
+  }
+
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: DeliveryActivityAttributes.self) { context in
+            let accent = statusAccent(context.state.status)
             VStack(alignment: .leading, spacing: 8) {
-                Text("Lock Screen Debug")
+                Text(statusTitle(context.state.status))
                     .font(.headline)
                     .foregroundStyle(Color.white)
-                Text("Data: \\(context.attributes.businessName)")
+                Text(context.attributes.businessName)
                     .font(.subheadline)
                     .foregroundStyle(Color.white.opacity(0.8))
+                HStack(spacing: 6) {
+                    Image(systemName: statusSymbol(context.state.status))
+                        .font(.caption.weight(.semibold))
+                    Text(statusSubtitle(context.state.status))
+                        .font(.caption)
+                }
+                .foregroundStyle(accent)
             }
             .padding(12)
-            .activityBackgroundTint(Color.blue)
+            .activityBackgroundTint(accent.opacity(0.3))
             .activitySystemActionForegroundColor(Color.white)
         } dynamicIsland: { context in
+            let statusKey = normalizedStatus(context.state.status)
+            let accent = statusAccent(context.state.status)
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Text("LIVE")
-                        .foregroundStyle(Color.white)
+                HStack(spacing: 6) {
+                  Text(driverInitial(from: context.state.driverName))
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundStyle(islandPurple)
+                  Image(systemName: "scooter")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(islandPurple)
+                }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Text("DATA")
-                        .foregroundStyle(Color.white)
+                if showsEta(statusKey) {
+                  let progress = etaProgress(context.state.estimatedMinutes)
+                  ZStack {
+                    Circle()
+                      .stroke(accent.opacity(0.22), lineWidth: 5)
+                    Circle()
+                      .trim(from: 0, to: progress)
+                      .stroke(accent, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                      .rotationEffect(.degrees(-90))
+                    Text(etaLabel(context.state.estimatedMinutes))
+                      .font(.system(size: 11, weight: .bold, design: .rounded))
+                      .foregroundStyle(accent)
+                  }
+                  .frame(width: 44, height: 44)
+                } else {
+                  ZStack {
+                    Circle()
+                      .fill(accent.opacity(0.18))
+                    Image(systemName: "clock")
+                      .font(.system(size: 15, weight: .bold))
+                      .foregroundStyle(accent)
+                  }
+                  .frame(width: 34, height: 34)
+                }
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    Text("Delivery Status: \\(context.state.status)")
-                        .foregroundStyle(Color.white)
+                VStack(alignment: .leading, spacing: 2) {
+                  Text(context.attributes.businessName)
+                    .font(.caption)
+                    .foregroundStyle(Color.white.opacity(0.85))
+                  if showsEta(statusKey) {
+                    Text("ETA \\(etaLabel(context.state.estimatedMinutes)) - \\(statusTitle(context.state.status))")
+                      .font(.subheadline)
+                      .foregroundStyle(accent)
+                  } else {
+                    Text("Order is pending confirmation")
+                      .font(.subheadline)
+                      .foregroundStyle(accent)
+                  }
+                }
                 }
             } compactLeading: {
-                Text("L")
-                    .foregroundStyle(Color.blue)
+              HStack(spacing: 3) {
+                Text(driverInitial(from: context.state.driverName))
+                  .font(.system(size: 14, weight: .bold, design: .rounded))
+                Image(systemName: "scooter")
+                  .font(.system(size: 11, weight: .semibold))
+              }
+              .foregroundStyle(islandPurple)
             } compactTrailing: {
-                Text("!")
-                    .foregroundStyle(Color.blue)
+              if showsEta(statusKey) {
+                let progress = etaProgress(context.state.estimatedMinutes)
+                ZStack {
+                  Circle()
+                    .stroke(accent.opacity(0.22), lineWidth: 3)
+                  Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                  Text(etaLabel(context.state.estimatedMinutes))
+                    .font(.system(size: 8, weight: .bold, design: .rounded))
+                    .foregroundStyle(accent)
+                }
+                .frame(width: 30, height: 30)
+              } else {
+                Image(systemName: "clock.badge")
+                  .font(.system(size: 13, weight: .bold))
+                  .foregroundStyle(accent)
+              }
             } minimal: {
-                Text("L")
-                    .foregroundStyle(Color.blue)
+              Image(systemName: "scooter")
+                .foregroundStyle(accent)
             }
         }
     }

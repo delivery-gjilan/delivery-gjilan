@@ -88,12 +88,12 @@ export function notifyCustomerOrderStatus(
 export function updateLiveActivity(
     notificationService: NotificationService,
     orderId: string,
-    status: 'preparing' | 'ready' | 'out_for_delivery' | 'delivered',
+    status: 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered',
     driverName: string = 'Your driver',
     estimatedMinutes: number = 0,
 ): void {
     // Only send Live Activity updates for relevant statuses
-    if (!['preparing', 'ready', 'out_for_delivery', 'delivered'].includes(status)) {
+    if (!['pending', 'preparing', 'ready', 'out_for_delivery', 'delivered'].includes(status)) {
         return;
     }
 
