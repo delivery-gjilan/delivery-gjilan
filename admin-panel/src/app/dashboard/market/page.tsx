@@ -21,6 +21,8 @@ import {
     useUpdateProduct,
     useDeleteProduct,
     useUpdateProductsOrder,
+    useCreateProductVariantGroup,
+    useDeleteProductVariantGroup,
 } from "@/lib/hooks/useProducts";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -81,14 +83,22 @@ interface Product {
     id: string;
     categoryId: string;
     subcategoryId?: string | null;
+    variantGroupId?: string | null;
+    variantGroupName?: string | null;
     name: string;
     description?: string | null;
     price: number;
     imageUrl?: string | null;
+    isOffer: boolean;
     isOnSale: boolean;
     salePrice?: number | null;
     isAvailable: boolean;
     sortOrder: number;
+}
+
+interface VariantGroupOption {
+    id: string;
+    name: string;
 }
 
 /* ===============================================
@@ -180,6 +190,8 @@ function MarketContent({ businessId }: { businessId: string }) {
     const { update: updateProduct } = useUpdateProduct();
     const { delete: deleteProduct } = useDeleteProduct();
     const { updateOrder: updateProductsOrder } = useUpdateProductsOrder();
+    const { createVariantGroup } = useCreateProductVariantGroup();
+    const { deleteVariantGroup } = useDeleteProductVariantGroup();
 
     // Modal states
     const [categoryModal, setCategoryModal] = useState<{ open: boolean; mode: 'create' | 'edit'; data?: any }>({
@@ -204,6 +216,10 @@ function MarketContent({ businessId }: { businessId: string }) {
         type: 'category' | 'subcategory' | 'product';
         id: string;
         name: string;
+        isOffer?: boolean;
+        variantGroupId?: string;
+        variantGroupName?: string;
+        variantGroupCount?: number;
     } | null>(null);
 
     // Drag and drop sensors
@@ -219,6 +235,19 @@ function MarketContent({ businessId }: { businessId: string }) {
         if (selectedCategoryId === "all") return [];
         return (subcategories as Subcategory[]).filter((s) => s.categoryId === selectedCategoryId);
     }, [selectedCategoryId, subcategories]);
+
+    const variantGroups = useMemo<VariantGroupOption[]>(() => {
+        const deduped = new Map<string, VariantGroupOption>();
+        (products as Product[]).forEach((product) => {
+            if (!product.variantGroupId) return;
+            if (deduped.has(product.variantGroupId)) return;
+            deduped.set(product.variantGroupId, {
+                id: product.variantGroupId,
+                name: product.variantGroupName || `Variant Group ${product.variantGroupId.slice(0, 6)}`,
+            });
+        });
+        return Array.from(deduped.values()).sort((a, b) => a.name.localeCompare(b.name));
+    }, [products]);
 
     // Filter products
     const filteredProducts = useMemo(() => {
@@ -578,6 +607,12 @@ function MarketContent({ businessId }: { businessId: string }) {
                                                         type: 'product',
                                                         id: product.id,
                                                         name: product.name,
+                                                        isOffer: product.isOffer,
+                                                        variantGroupId: product.variantGroupId || undefined,
+                                                        variantGroupName: product.variantGroupName || undefined,
+                                                        variantGroupCount: product.variantGroupId
+                                                            ? filteredProducts.filter((p) => p.variantGroupId === product.variantGroupId).length
+                                                            : 0,
                                                     })
                                                 }
                                                 onToggleSale={() => toggleSale(product)}
@@ -643,6 +678,7 @@ function MarketContent({ businessId }: { businessId: string }) {
                 businessId={businessId}
                 categories={categories as Category[]}
                 subcategories={subcategories as Subcategory[]}
+                variantGroups={variantGroups}
                 onClose={() => setProductModal({ open: false, mode: 'create' })}
                 onCreate={async (input) => {
                     const result = await createProduct(input);
@@ -660,12 +696,19 @@ function MarketContent({ businessId }: { businessId: string }) {
                     }
                     return result;
                 }}
+                onCreateVariantGroup={async (name) => {
+                    const result = await createVariantGroup({ businessId, name });
+                    if (result.success) {
+                        await refetchProducts();
+                    }
+                    return result;
+                }}
             />
 
             <DeleteModal
                 modal={deleteModal}
                 onClose={() => setDeleteModal(null)}
-                onConfirm={async () => {
+                onConfirm={async ({ deleteWholeVariantGroup }) => {
                     if (!deleteModal) return { success: false };
                     
                     let result;
@@ -676,7 +719,11 @@ function MarketContent({ businessId }: { businessId: string }) {
                         result = await deleteSubcategory(deleteModal.id);
                         if (result.success) await refetchSubcategories();
                     } else {
-                        result = await deleteProduct(deleteModal.id);
+                        if (deleteWholeVariantGroup && deleteModal.variantGroupId) {
+                            result = await deleteVariantGroup(deleteModal.variantGroupId);
+                        } else {
+                            result = await deleteProduct(deleteModal.id);
+                        }
                         if (result.success) await refetchProducts();
                     }
                     
@@ -1244,9 +1291,11 @@ interface ProductModalProps {
     businessId: string;
     categories: Category[];
     subcategories: Subcategory[];
+    variantGroups: VariantGroupOption[];
     onClose: () => void;
     onCreate: (input: CreateProductInput) => Promise<{ success: boolean; error?: string }>;
     onUpdate: (id: string, input: UpdateProductInput) => Promise<{ success: boolean; error?: string }>;
+    onCreateVariantGroup: (name: string) => Promise<{ success: boolean; data?: any; error?: string }>;
 }
 
 function ProductModal({
@@ -1254,21 +1303,27 @@ function ProductModal({
     businessId,
     categories,
     subcategories,
+    variantGroups,
     onClose,
     onCreate,
     onUpdate,
+    onCreateVariantGroup,
 }: ProductModalProps) {
     const [form, setForm] = useState({
         categoryId: '',
         subcategoryId: '',
+        variantGroupId: '',
         name: '',
         description: '',
         price: '',
         salePrice: '',
         imageUrl: '',
+        isOffer: false,
+        isVariant: false,
         isOnSale: false,
         isAvailable: true,
     });
+    const [variantModalOpen, setVariantModalOpen] = useState(false);
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [uploadingImage, setUploadingImage] = useState(false);
@@ -1287,11 +1342,14 @@ function ProductModal({
                 setForm({
                     categoryId: modal.data.categoryId,
                     subcategoryId: modal.data.subcategoryId || '',
+                    variantGroupId: modal.data.variantGroupId || '',
                     name: modal.data.name,
                     description: modal.data.description || '',
                     price: modal.data.price.toString(),
                     salePrice: modal.data.salePrice?.toString() || '',
                     imageUrl: modal.data.imageUrl || '',
+                    isOffer: modal.data.isOffer || false,
+                    isVariant: Boolean(modal.data.variantGroupId),
                     isOnSale: modal.data.isOnSale,
                     isAvailable: modal.data.isAvailable,
                 });
@@ -1300,11 +1358,14 @@ function ProductModal({
                 setForm({
                     categoryId: modal.categoryId || '',
                     subcategoryId: modal.subcategoryId || '',
+                    variantGroupId: '',
                     name: '',
                     description: '',
                     price: '',
                     salePrice: '',
                     imageUrl: '',
+                    isOffer: false,
+                    isVariant: false,
                     isOnSale: false,
                     isAvailable: true,
                 });
@@ -1376,10 +1437,12 @@ function ProductModal({
         const input: CreateProductInput | UpdateProductInput = {
             categoryId: form.categoryId,
             subcategoryId: form.subcategoryId || undefined,
+            variantGroupId: form.isVariant ? form.variantGroupId || undefined : undefined,
             name: form.name,
             description: form.description || undefined,
             imageUrl: imageUrl || undefined,
             price: parseFloat(form.price),
+            isOffer: form.isOffer,
             isOnSale: form.isOnSale,
             salePrice: form.isOnSale && form.salePrice ? parseFloat(form.salePrice) : undefined,
             isAvailable: form.isAvailable,
@@ -1517,6 +1580,68 @@ function ProductModal({
                     <div className="flex items-center gap-2">
                         <input
                             type="checkbox"
+                            id="isOffer"
+                            checked={form.isOffer}
+                            onChange={(e) =>
+                                setForm((prev) => ({
+                                    ...prev,
+                                    isOffer: e.target.checked,
+                                    isVariant: e.target.checked ? false : prev.isVariant,
+                                    variantGroupId: e.target.checked ? '' : prev.variantGroupId,
+                                }))
+                            }
+                            className="w-4 h-4"
+                        />
+                        <label htmlFor="isOffer" className="text-sm text-gray-300">
+                            Create as Deal / Offer
+                        </label>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="checkbox"
+                            id="isVariant"
+                            checked={form.isVariant}
+                            onChange={(e) => {
+                                const checked = e.target.checked;
+                                setForm((prev) => ({
+                                    ...prev,
+                                    isVariant: checked,
+                                    isOffer: checked ? false : prev.isOffer,
+                                }));
+                                if (checked) {
+                                    setVariantModalOpen(true);
+                                }
+                            }}
+                            className="w-4 h-4"
+                        />
+                        <label htmlFor="isVariant" className="text-sm text-gray-300">
+                            Add as Variant
+                        </label>
+                    </div>
+                </div>
+
+                {form.isVariant && (
+                    <div className="rounded-lg border border-violet-500/40 bg-violet-500/10 p-3 space-y-2">
+                        <div className="text-sm text-violet-200">
+                            {form.variantGroupId
+                                ? `Variant group selected: ${variantGroups.find((g) => g.id === form.variantGroupId)?.name || form.variantGroupId}`
+                                : "No variant group selected yet."}
+                        </div>
+                        <Button
+                            variant="outline"
+                            onClick={() => setVariantModalOpen(true)}
+                            className="w-full"
+                        >
+                            {form.variantGroupId ? 'Change Variant Group' : 'Choose or Create Variant Group'}
+                        </Button>
+                    </div>
+                )}
+
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="checkbox"
                             id="isOnSale"
                             checked={form.isOnSale}
                             onChange={(e) => setForm({ ...form, isOnSale: e.target.checked })}
@@ -1547,7 +1672,7 @@ function ProductModal({
                     variant="primary"
                     className="w-full"
                     onClick={handleSubmit}
-                    disabled={loading || uploadingImage}
+                    disabled={loading || uploadingImage || (form.isVariant && !form.variantGroupId)}
                 >
                     {uploadingImage
                         ? 'Uploading Image...'
@@ -1558,6 +1683,123 @@ function ProductModal({
                         : 'Save Changes'}
                 </Button>
             </div>
+
+            <VariantGroupModal
+                isOpen={variantModalOpen}
+                existingGroups={variantGroups}
+                selectedGroupId={form.variantGroupId}
+                onClose={() => setVariantModalOpen(false)}
+                onSelect={(groupId) => {
+                    setForm((prev) => ({ ...prev, variantGroupId: groupId, isVariant: true, isOffer: false }));
+                    setVariantModalOpen(false);
+                }}
+                onCreate={async (name) => {
+                    const result = await onCreateVariantGroup(name);
+                    if (!result.success || !result.data?.id) {
+                        return { success: false, error: result.error || 'Failed to create variant group' };
+                    }
+                    setForm((prev) => ({
+                        ...prev,
+                        variantGroupId: result.data.id,
+                        isVariant: true,
+                        isOffer: false,
+                    }));
+                    return { success: true };
+                }}
+            />
+        </Modal>
+    );
+}
+
+interface VariantGroupModalProps {
+    isOpen: boolean;
+    existingGroups: VariantGroupOption[];
+    selectedGroupId: string;
+    onClose: () => void;
+    onSelect: (groupId: string) => void;
+    onCreate: (name: string) => Promise<{ success: boolean; error?: string }>;
+}
+
+function VariantGroupModal({
+    isOpen,
+    existingGroups,
+    selectedGroupId,
+    onClose,
+    onSelect,
+    onCreate,
+}: VariantGroupModalProps) {
+    const [newName, setNewName] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        if (!isOpen) return;
+        setNewName('');
+        setError('');
+        setLoading(false);
+    }, [isOpen]);
+
+    const handleCreate = async () => {
+        if (!newName.trim()) {
+            setError('Variant group name is required');
+            return;
+        }
+
+        setLoading(true);
+        setError('');
+        const result = await onCreate(newName.trim());
+        setLoading(false);
+
+        if (!result.success) {
+            setError(result.error || 'Failed to create variant group');
+            return;
+        }
+
+        setNewName('');
+        onClose();
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Select or Create Variant Group">
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-2">Existing Variant Groups</label>
+                    {existingGroups.length === 0 ? (
+                        <p className="text-sm text-gray-500">No variant groups yet. Create your first one below.</p>
+                    ) : (
+                        <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                            {existingGroups.map((group) => (
+                                <button
+                                    key={group.id}
+                                    type="button"
+                                    onClick={() => onSelect(group.id)}
+                                    className={`w-full text-left rounded-lg border px-3 py-2 text-sm transition-colors ${
+                                        selectedGroupId === group.id
+                                            ? 'border-violet-400 bg-violet-500/20 text-violet-100'
+                                            : 'border-gray-700 bg-gray-800 text-gray-200 hover:border-violet-500/50'
+                                    }`}
+                                >
+                                    {group.name}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="border-t border-gray-700 pt-4 space-y-2">
+                    <label className="block text-sm font-medium text-gray-400">Create New Variant Group</label>
+                    <Input
+                        placeholder="e.g., Coca-Cola Sizes"
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                    />
+                    <Button variant="primary" className="w-full" onClick={handleCreate} disabled={loading}>
+                        {loading ? 'Creating...' : 'Create and Select'}
+                    </Button>
+                </div>
+
+                {error && <p className="text-red-400 text-sm">{error}</p>}
+            </div>
         </Modal>
     );
 }
@@ -1567,20 +1809,35 @@ function ProductModal({
 =============================================== */
 
 interface DeleteModalProps {
-    modal: { type: 'category' | 'subcategory' | 'product'; id: string; name: string } | null;
+    modal: {
+        type: 'category' | 'subcategory' | 'product';
+        id: string;
+        name: string;
+        isOffer?: boolean;
+        variantGroupId?: string;
+        variantGroupName?: string;
+        variantGroupCount?: number;
+    } | null;
     onClose: () => void;
-    onConfirm: () => Promise<{ success: boolean; error?: string }>;
+    onConfirm: (options: { deleteWholeVariantGroup: boolean }) => Promise<{ success: boolean; error?: string }>;
 }
 
 function DeleteModal({ modal, onClose, onConfirm }: DeleteModalProps) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [deleteWholeVariantGroup, setDeleteWholeVariantGroup] = useState(false);
+
+    useEffect(() => {
+        if (!modal) return;
+        setDeleteWholeVariantGroup(false);
+        setError('');
+    }, [modal]);
 
     const handleConfirm = async () => {
         setLoading(true);
         setError('');
 
-        const result = await onConfirm();
+        const result = await onConfirm({ deleteWholeVariantGroup });
 
         setLoading(false);
 
@@ -1606,6 +1863,27 @@ function DeleteModal({ modal, onClose, onConfirm }: DeleteModalProps) {
                     <p className="text-sm text-yellow-400">
                         Warning: This will also delete all products in this subcategory.
                     </p>
+                )}
+                {modal.type === 'product' && modal.isOffer && (
+                    <p className="text-sm text-amber-300">
+                        This item is currently marked as an offer/deal.
+                    </p>
+                )}
+                {modal.type === 'product' && modal.variantGroupId && (
+                    <div className="space-y-2 rounded-lg border border-violet-500/40 bg-violet-500/10 p-3">
+                        <p className="text-sm text-violet-200">
+                            This item belongs to variant group <strong>{modal.variantGroupName || modal.variantGroupId}</strong>
+                            {modal.variantGroupCount ? ` (${modal.variantGroupCount} variant${modal.variantGroupCount === 1 ? '' : 's'})` : ''}.
+                        </p>
+                        <label className="flex items-center gap-2 text-sm text-violet-100">
+                            <input
+                                type="checkbox"
+                                checked={deleteWholeVariantGroup}
+                                onChange={(e) => setDeleteWholeVariantGroup(e.target.checked)}
+                            />
+                            Delete entire variant group instead of just this variant
+                        </label>
+                    </div>
                 )}
 
                 {error && <p className="text-red-400 text-sm">{error}</p>}

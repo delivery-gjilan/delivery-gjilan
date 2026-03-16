@@ -27,3 +27,19 @@ export const UPDATE_PRODUCTS_ORDER = graphql(`
         updateProductsOrder(businessId: $businessId, products: $products)
     }
 `);
+
+export const CREATE_PRODUCT_VARIANT_GROUP = graphql(`
+    mutation CreateProductVariantGroup($input: CreateProductVariantGroupInput!) {
+        createProductVariantGroup(input: $input) {
+            id
+            businessId
+            name
+        }
+    }
+`);
+
+export const DELETE_PRODUCT_VARIANT_GROUP = graphql(`
+    mutation DeleteProductVariantGroup($id: ID!) {
+        deleteProductVariantGroup(id: $id)
+    }
+`);

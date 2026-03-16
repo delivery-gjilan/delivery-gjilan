@@ -12,6 +12,8 @@ import {
     useCreateProduct,
     useUpdateProduct,
     useDeleteProduct,
+    useCreateProductVariantGroup,
+    useDeleteProductVariantGroup,
 } from "@/lib/hooks/useProducts";
 import { useProductSubcategories } from "@/lib/hooks/useProductSubcategories";
 import type { CreateProductInput, UpdateProductInput } from "@/gql/graphql";
@@ -30,10 +32,13 @@ interface Product {
     id: string;
     categoryId: string;
     subcategoryId?: string | null;
+    variantGroupId?: string | null;
+    variantGroupName?: string | null;
     name: string;
     description?: string | null;
     price: number;
     imageUrl?: string | null;
+    isOffer?: boolean;
     isOnSale: boolean;
     salePrice?: number | null;
     isAvailable: boolean;
@@ -49,6 +54,8 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
     const { create: createProduct, loading: createLoading, error: createError } = useCreateProduct();
     const { update: updateProduct, loading: updateLoading, error: updateError } = useUpdateProduct();
     const { delete: deleteProduct, loading: deleteLoading, error: deleteError } = useDeleteProduct();
+    const { createVariantGroup, loading: createVariantGroupLoading } = useCreateProductVariantGroup();
+    const { deleteVariantGroup } = useDeleteProductVariantGroup();
 
     /* ===============================================
      UI STATE
@@ -56,8 +63,22 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
 
     const [createOpen, setCreateOpen] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
-    const [deleteId, setDeleteId] = useState<string | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<{
+        id: string;
+        name: string;
+        isOffer?: boolean;
+        variantGroupId?: string;
+        variantGroupName?: string;
+        variantGroupCount?: number;
+        deleteWholeVariantGroup?: boolean;
+    } | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
+    const [variantModalOpen, setVariantModalOpen] = useState(false);
+    const [newVariantGroupName, setNewVariantGroupName] = useState("");
+    const [variantGroupError, setVariantGroupError] = useState("");
+    const [editVariantModalOpen, setEditVariantModalOpen] = useState(false);
+    const [newEditVariantGroupName, setNewEditVariantGroupName] = useState("");
+    const [editVariantGroupError, setEditVariantGroupError] = useState("");
 
     /* ===============================================
      UPLOAD STATE
@@ -77,6 +98,8 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         businessId,
         categoryId: "",
         subcategoryId: undefined,
+        variantGroupId: undefined,
+        isOffer: false,
         name: "",
         description: "",
         imageUrl: "",
@@ -89,6 +112,8 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         id: "",
         categoryId: "",
         subcategoryId: undefined,
+        variantGroupId: undefined,
+        isOffer: false,
         name: "",
         description: "",
         imageUrl: "",
@@ -127,6 +152,19 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
 
         return groups;
     }, [products, categories, searchQuery, subcategories]);
+
+    const variantGroups = useMemo(() => {
+        const deduped = new Map<string, { id: string; name: string }>();
+        products.forEach((p) => {
+            if (!p.variantGroupId) return;
+            if (deduped.has(p.variantGroupId)) return;
+            deduped.set(p.variantGroupId, {
+                id: p.variantGroupId,
+                name: p.variantGroupName || `Variant Group ${p.variantGroupId.slice(0, 6)}`,
+            });
+        });
+        return Array.from(deduped.values()).sort((a, b) => a.name.localeCompare(b.name));
+    }, [products]);
 
     /* ===============================================
      HANDLERS
@@ -203,6 +241,8 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             businessId,
             categoryId: createForm.categoryId,
             subcategoryId: createForm.subcategoryId || undefined,
+            variantGroupId: createForm.variantGroupId || undefined,
+            isOffer: createForm.isOffer,
             name: createForm.name,
             description: createForm.description || undefined,
             imageUrl: imageUrl || undefined,
@@ -220,6 +260,8 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                 businessId,
                 categoryId: "",
                 subcategoryId: undefined,
+                variantGroupId: undefined,
+                isOffer: false,
                 name: "",
                 description: "",
                 imageUrl: "",
@@ -229,9 +271,66 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             });
             setCreateImageFile(null);
             setCreateImagePreview(null);
+            setVariantModalOpen(false);
+            setNewVariantGroupName("");
+            setVariantGroupError("");
         } else {
             toast.error(`Error creating product: ${error}`);
         }
+    };
+
+    const handleCreateVariantGroup = async () => {
+        if (!newVariantGroupName.trim()) {
+            setVariantGroupError("Variant group name is required");
+            return;
+        }
+
+        setVariantGroupError("");
+        const result = await createVariantGroup({
+            businessId,
+            name: newVariantGroupName.trim(),
+        });
+
+        if (!result.success || !result.data?.id) {
+            setVariantGroupError(result.error || "Failed to create variant group");
+            return;
+        }
+
+        await refetch();
+        setCreateForm((prev) => ({
+            ...prev,
+            variantGroupId: result.data.id,
+            isOffer: false,
+        }));
+        setNewVariantGroupName("");
+        setVariantModalOpen(false);
+    };
+
+    const handleCreateEditVariantGroup = async () => {
+        if (!newEditVariantGroupName.trim()) {
+            setEditVariantGroupError("Variant group name is required");
+            return;
+        }
+
+        setEditVariantGroupError("");
+        const result = await createVariantGroup({
+            businessId,
+            name: newEditVariantGroupName.trim(),
+        });
+
+        if (!result.success || !result.data?.id) {
+            setEditVariantGroupError(result.error || "Failed to create variant group");
+            return;
+        }
+
+        await refetch();
+        setEditForm((prev) => ({
+            ...prev,
+            variantGroupId: result.data.id,
+            isOffer: false,
+        }));
+        setNewEditVariantGroupName("");
+        setEditVariantModalOpen(false);
     };
 
     const openEditModal = (p: Product) => {
@@ -239,6 +338,8 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             id: p.id,
             categoryId: p.categoryId,
             subcategoryId: p.subcategoryId ?? undefined,
+            variantGroupId: p.variantGroupId ?? undefined,
+            isOffer: p.isOffer ?? false,
             name: p.name,
             description: p.description || "",
             imageUrl: p.imageUrl || "",
@@ -275,6 +376,8 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         const updateInput: UpdateProductInput = {
             categoryId: input.categoryId,
             subcategoryId: input.subcategoryId || undefined,
+            variantGroupId: input.variantGroupId || undefined,
+            isOffer: input.isOffer,
             name: input.name,
             description: input.description || undefined,
             imageUrl: imageUrl || undefined,
@@ -294,16 +397,19 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         }
     };
 
-    const handleDelete = async () => {
-        if (!deleteId) return;
+    const handleDelete = async (options?: { deleteWholeVariantGroup?: boolean }) => {
+        if (!deleteTarget) return;
 
-        const { success, error } = await deleteProduct(deleteId);
+        const deleteWholeVariantGroup = Boolean(options?.deleteWholeVariantGroup);
+        const result = deleteWholeVariantGroup && deleteTarget.variantGroupId
+            ? await deleteVariantGroup(deleteTarget.variantGroupId)
+            : await deleteProduct(deleteTarget.id);
 
-        if (success) {
+        if (result.success) {
             await refetch();
-            setDeleteId(null);
+            setDeleteTarget(null);
         } else {
-            toast.error(`Error deleting product: ${error}`);
+            toast.error(`Error deleting product: ${result.error}`);
         }
     };
 
@@ -438,9 +544,20 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                     <Button
                                                         variant="danger"
                                                         className="text-xs px-3"
-                                                        onClick={() =>
-                                                            setDeleteId(p.id)
-                                                        }
+                                                        onClick={() => {
+                                                            const variantGroupCount = p.variantGroupId
+                                                                ? items.filter((item) => item.variantGroupId === p.variantGroupId).length
+                                                                : 0;
+
+                                                            setDeleteTarget({
+                                                                id: p.id,
+                                                                name: p.name,
+                                                                isOffer: p.isOffer,
+                                                                variantGroupId: p.variantGroupId || undefined,
+                                                                variantGroupName: p.variantGroupName || undefined,
+                                                                variantGroupCount,
+                                                            });
+                                                        }}
                                                         disabled={deleteLoading}
                                                     >
                                                         Delete
@@ -588,6 +705,63 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     <div className="flex items-center gap-2">
                         <input
                             type="checkbox"
+                            id="createIsOffer"
+                            checked={createForm.isOffer ?? false}
+                            onChange={(e) =>
+                                setCreateForm({
+                                    ...createForm,
+                                    isOffer: e.target.checked,
+                                    variantGroupId: e.target.checked ? undefined : createForm.variantGroupId,
+                                })
+                            }
+                        />
+                        <label htmlFor="createIsOffer" className="text-gray-300">
+                            Create as Deal / Offer
+                        </label>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="checkbox"
+                            id="createIsVariant"
+                            checked={Boolean(createForm.variantGroupId)}
+                            onChange={(e) => {
+                                const checked = e.target.checked;
+                                if (checked) {
+                                    setVariantModalOpen(true);
+                                    setCreateForm({
+                                        ...createForm,
+                                        isOffer: false,
+                                    });
+                                } else {
+                                    setCreateForm({
+                                        ...createForm,
+                                        variantGroupId: undefined,
+                                    });
+                                }
+                            }}
+                        />
+                        <label htmlFor="createIsVariant" className="text-gray-300">
+                            Add as Variant
+                        </label>
+                    </div>
+
+                    {Boolean(createForm.variantGroupId) && (
+                        <div className="rounded-lg border border-violet-500/40 bg-violet-500/10 p-3 text-sm text-violet-200 w-full">
+                            Variant group: {variantGroups.find((g) => g.id === createForm.variantGroupId)?.name || createForm.variantGroupId}
+                            <Button
+                                variant="outline"
+                                className="w-full mt-2"
+                                onClick={() => setVariantModalOpen(true)}
+                            >
+                                Change Variant Group
+                            </Button>
+                        </div>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="checkbox"
                             checked={createForm.isOnSale ?? false}
                             onChange={(e) =>
                                 setCreateForm({
@@ -627,10 +801,71 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                         variant="primary"
                         className="w-full"
                         onClick={handleCreate}
-                        disabled={createLoading || uploadingImage}
+                        disabled={createLoading || uploadingImage || (Boolean(createForm.variantGroupId) && !createForm.variantGroupId)}
                     >
                         {uploadingImage ? "Uploading..." : createLoading ? "Saving..." : "Save"}
                     </Button>
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={variantModalOpen}
+                onClose={() => {
+                    setVariantModalOpen(false);
+                    setVariantGroupError("");
+                }}
+                title="Select or Create Variant Group"
+            >
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-2">Existing Variant Groups</label>
+                        {variantGroups.length === 0 ? (
+                            <p className="text-sm text-gray-500">No variant groups yet. Create one below.</p>
+                        ) : (
+                            <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                                {variantGroups.map((group) => (
+                                    <button
+                                        key={group.id}
+                                        type="button"
+                                        onClick={() => {
+                                            setCreateForm((prev) => ({
+                                                ...prev,
+                                                variantGroupId: group.id,
+                                                isOffer: false,
+                                            }));
+                                            setVariantModalOpen(false);
+                                        }}
+                                        className={`w-full text-left rounded-lg border px-3 py-2 text-sm transition-colors ${
+                                            createForm.variantGroupId === group.id
+                                                ? 'border-violet-400 bg-violet-500/20 text-violet-100'
+                                                : 'border-gray-700 bg-gray-800 text-gray-200 hover:border-violet-500/50'
+                                        }`}
+                                    >
+                                        {group.name}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="border-t border-gray-700 pt-4 space-y-2">
+                        <label className="block text-sm font-medium text-gray-400">Create New Variant Group</label>
+                        <Input
+                            placeholder="e.g., Burger Sizes"
+                            value={newVariantGroupName}
+                            onChange={(e) => setNewVariantGroupName(e.target.value)}
+                        />
+                        <Button
+                            variant="primary"
+                            className="w-full"
+                            onClick={handleCreateVariantGroup}
+                            disabled={createVariantGroupLoading}
+                        >
+                            {createVariantGroupLoading ? "Creating..." : "Create and Select"}
+                        </Button>
+                    </div>
+
+                    {variantGroupError && <p className="text-red-400 text-sm">{variantGroupError}</p>}
                 </div>
             </Modal>
 
@@ -765,6 +1000,63 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     <div className="flex items-center gap-2">
                         <input
                             type="checkbox"
+                            id="editIsOffer"
+                            checked={editForm.isOffer ?? false}
+                            onChange={(e) =>
+                                setEditForm({
+                                    ...editForm,
+                                    isOffer: e.target.checked,
+                                    variantGroupId: e.target.checked ? undefined : editForm.variantGroupId,
+                                })
+                            }
+                        />
+                        <label htmlFor="editIsOffer" className="text-gray-300">
+                            Mark as Deal / Offer
+                        </label>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="checkbox"
+                            id="editIsVariant"
+                            checked={Boolean(editForm.variantGroupId)}
+                            onChange={(e) => {
+                                const checked = e.target.checked;
+                                if (checked) {
+                                    setEditVariantModalOpen(true);
+                                    setEditForm({
+                                        ...editForm,
+                                        isOffer: false,
+                                    });
+                                } else {
+                                    setEditForm({
+                                        ...editForm,
+                                        variantGroupId: undefined,
+                                    });
+                                }
+                            }}
+                        />
+                        <label htmlFor="editIsVariant" className="text-gray-300">
+                            Part of Variant Group
+                        </label>
+                    </div>
+
+                    {Boolean(editForm.variantGroupId) && (
+                        <div className="rounded-lg border border-violet-500/40 bg-violet-500/10 p-3 text-sm text-violet-200 w-full">
+                            Variant group: {variantGroups.find((g) => g.id === editForm.variantGroupId)?.name || editForm.variantGroupId}
+                            <Button
+                                variant="outline"
+                                className="w-full mt-2"
+                                onClick={() => setEditVariantModalOpen(true)}
+                            >
+                                Change Variant Group
+                            </Button>
+                        </div>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="checkbox"
                             checked={editForm.isOnSale ?? false}
                             onChange={(e) =>
                                 setEditForm({
@@ -825,18 +1117,108 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                 </div>
             </Modal>
 
+            <Modal
+                isOpen={editVariantModalOpen}
+                onClose={() => {
+                    setEditVariantModalOpen(false);
+                    setEditVariantGroupError("");
+                }}
+                title="Select or Create Variant Group"
+            >
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-2">Existing Variant Groups</label>
+                        {variantGroups.length === 0 ? (
+                            <p className="text-sm text-gray-500">No variant groups yet. Create one below.</p>
+                        ) : (
+                            <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                                {variantGroups.map((group) => (
+                                    <button
+                                        key={group.id}
+                                        type="button"
+                                        onClick={() => {
+                                            setEditForm((prev) => ({
+                                                ...prev,
+                                                variantGroupId: group.id,
+                                                isOffer: false,
+                                            }));
+                                            setEditVariantModalOpen(false);
+                                        }}
+                                        className={`w-full text-left rounded-lg border px-3 py-2 text-sm transition-colors ${
+                                            editForm.variantGroupId === group.id
+                                                ? 'border-violet-400 bg-violet-500/20 text-violet-100'
+                                                : 'border-gray-700 bg-gray-800 text-gray-200 hover:border-violet-500/50'
+                                        }`}
+                                    >
+                                        {group.name}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="border-t border-gray-700 pt-4 space-y-2">
+                        <label className="block text-sm font-medium text-gray-400">Create New Variant Group</label>
+                        <Input
+                            placeholder="e.g., Pizza Sizes"
+                            value={newEditVariantGroupName}
+                            onChange={(e) => setNewEditVariantGroupName(e.target.value)}
+                        />
+                        <Button
+                            variant="primary"
+                            className="w-full"
+                            onClick={handleCreateEditVariantGroup}
+                            disabled={createVariantGroupLoading}
+                        >
+                            {createVariantGroupLoading ? "Creating..." : "Create and Select"}
+                        </Button>
+                    </div>
+
+                    {editVariantGroupError && <p className="text-red-400 text-sm">{editVariantGroupError}</p>}
+                </div>
+            </Modal>
+
             {/* ===============================================
              DELETE MODAL
             =============================================== */}
 
             <Modal
-                isOpen={deleteId !== null}
-                onClose={() => setDeleteId(null)}
+                isOpen={deleteTarget !== null}
+                onClose={() => setDeleteTarget(null)}
                 title="Delete Product"
             >
                 <p className="text-gray-300 mb-4">
-                    Are you sure you want to delete this product?
+                    Are you sure you want to delete <strong>{deleteTarget?.name}</strong>?
                 </p>
+
+                {deleteTarget?.isOffer && (
+                    <p className="text-sm text-amber-300 mb-3">This item is currently marked as an offer/deal.</p>
+                )}
+
+                {deleteTarget?.variantGroupId && (
+                    <div className="mb-4 rounded-lg border border-violet-500/40 bg-violet-500/10 p-3">
+                        <p className="text-sm text-violet-200 mb-2">
+                            This item belongs to variant group <strong>{deleteTarget.variantGroupName || deleteTarget.variantGroupId}</strong>
+                            {deleteTarget.variantGroupCount
+                                ? ` (${deleteTarget.variantGroupCount} variant${deleteTarget.variantGroupCount === 1 ? '' : 's'})`
+                                : ''}.
+                        </p>
+                        <label className="flex items-center gap-2 text-sm text-violet-100">
+                            <input
+                                type="checkbox"
+                                checked={Boolean(deleteTarget?.deleteWholeVariantGroup)}
+                                onChange={(e) =>
+                                    setDeleteTarget((prev) =>
+                                        prev
+                                            ? { ...prev, deleteWholeVariantGroup: e.target.checked }
+                                            : prev
+                                    )
+                                }
+                            />
+                            Delete entire variant group instead of only this variant
+                        </label>
+                    </div>
+                )}
 
                 {deleteError && (
                     <p className="text-red-400 text-sm mb-4">{deleteError}</p>
@@ -845,14 +1227,18 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                 <div className="flex justify-end gap-3">
                     <Button 
                         variant="outline" 
-                        onClick={() => setDeleteId(null)}
+                        onClick={() => setDeleteTarget(null)}
                         disabled={deleteLoading}
                     >
                         Cancel
                     </Button>
                     <Button 
                         variant="danger" 
-                        onClick={handleDelete}
+                        onClick={() =>
+                            handleDelete({
+                                deleteWholeVariantGroup: Boolean(deleteTarget?.deleteWholeVariantGroup),
+                            })
+                        }
                         disabled={deleteLoading}
                     >
                         {deleteLoading ? "Deleting..." : "Delete"}

@@ -17,6 +17,7 @@ export const GET_BUSINESS_PRODUCTS_AND_CATEGORIES = graphql(`
                 businessId
                 categoryId
                 subcategoryId
+                variantGroupId
                 name
                 description
                 imageUrl
@@ -25,6 +26,10 @@ export const GET_BUSINESS_PRODUCTS_AND_CATEGORIES = graphql(`
                 salePrice
                 isAvailable
                 sortOrder
+                variantGroup {
+                    id
+                    name
+                }
                 createdAt
                 updatedAt
             }
