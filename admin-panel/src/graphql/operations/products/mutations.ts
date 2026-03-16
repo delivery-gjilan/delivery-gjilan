@@ -43,3 +43,58 @@ export const DELETE_PRODUCT_VARIANT_GROUP = graphql(`
         deleteProductVariantGroup(id: $id)
     }
 `);
+
+export const CREATE_OPTION_GROUP = graphql(`
+    mutation CreateOptionGroup($input: CreateOptionGroupInput!) {
+        createOptionGroup(input: $input) {
+            id
+            name
+        }
+    }
+`);
+
+export const DELETE_OPTION_GROUP = graphql(`
+    mutation DeleteOptionGroup($id: ID!) {
+        deleteOptionGroup(id: $id)
+    }
+`);
+
+export const UPDATE_OPTION_GROUP = graphql(`
+    mutation UpdateOptionGroup($id: ID!, $input: UpdateOptionGroupInput!) {
+        updateOptionGroup(id: $id, input: $input) {
+            id
+            name
+            minSelections
+            maxSelections
+            displayOrder
+        }
+    }
+`);
+
+export const CREATE_OPTION = graphql(`
+    mutation CreateOption($optionGroupId: ID!, $input: CreateOptionInput!) {
+        createOption(optionGroupId: $optionGroupId, input: $input) {
+            id
+            name
+            extraPrice
+            displayOrder
+        }
+    }
+`);
+
+export const UPDATE_OPTION = graphql(`
+    mutation UpdateOption($id: ID!, $input: UpdateOptionInput!) {
+        updateOption(id: $id, input: $input) {
+            id
+            name
+            extraPrice
+            displayOrder
+        }
+    }
+`);
+
+export const DELETE_OPTION = graphql(`
+    mutation DeleteOption($id: ID!) {
+        deleteOption(id: $id)
+    }
+`);

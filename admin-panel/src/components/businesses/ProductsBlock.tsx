@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useState, useMemo } from "react";
+import { useMutation, useQuery } from "@apollo/client/react";
 
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -18,6 +19,15 @@ import {
 import { useProductSubcategories } from "@/lib/hooks/useProductSubcategories";
 import type { CreateProductInput, UpdateProductInput } from "@/gql/graphql";
 import { toast } from 'sonner';
+import {
+    CREATE_OPTION,
+    CREATE_OPTION_GROUP,
+    DELETE_OPTION,
+    DELETE_OPTION_GROUP,
+    GET_PRODUCT_WITH_OPTIONS,
+    UPDATE_OPTION_GROUP,
+    UPDATE_OPTION,
+} from "@/graphql/operations/products";
 
 /* ===============================================
    TYPES
@@ -56,6 +66,12 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
     const { delete: deleteProduct, loading: deleteLoading, error: deleteError } = useDeleteProduct();
     const { createVariantGroup, loading: createVariantGroupLoading } = useCreateProductVariantGroup();
     const { deleteVariantGroup } = useDeleteProductVariantGroup();
+    const [createOptionGroup] = useMutation(CREATE_OPTION_GROUP);
+    const [deleteOptionGroup] = useMutation(DELETE_OPTION_GROUP);
+    const [updateOptionGroup] = useMutation(UPDATE_OPTION_GROUP);
+    const [createOption] = useMutation(CREATE_OPTION);
+    const [updateOption] = useMutation(UPDATE_OPTION);
+    const [deleteOption] = useMutation(DELETE_OPTION);
 
     /* ===============================================
      UI STATE
@@ -79,6 +95,22 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
     const [editVariantModalOpen, setEditVariantModalOpen] = useState(false);
     const [newEditVariantGroupName, setNewEditVariantGroupName] = useState("");
     const [editVariantGroupError, setEditVariantGroupError] = useState("");
+    const [optionsModal, setOptionsModal] = useState<{ open: boolean; productId: string; productName: string }>({
+        open: false,
+        productId: "",
+        productName: "",
+    });
+    const [newOptionGroupName, setNewOptionGroupName] = useState("");
+    const [newOptionGroupMin, setNewOptionGroupMin] = useState(0);
+    const [newOptionGroupMax, setNewOptionGroupMax] = useState(1);
+    const [newOptionItems, setNewOptionItems] = useState<Array<{ name: string; extraPrice: number }>>([
+        { name: "", extraPrice: 0 },
+    ]);
+    const [optionsError, setOptionsError] = useState("");
+    const [optionsLoading, setOptionsLoading] = useState(false);
+    const [newOptionByGroup, setNewOptionByGroup] = useState<Record<string, { name: string; extraPrice: number }>>({});
+    const [optionGroupDrafts, setOptionGroupDrafts] = useState<Record<string, { name: string; min: number; max: number }>>({});
+    const [optionDrafts, setOptionDrafts] = useState<Record<string, { name: string; extraPrice: number }>>({});
 
     /* ===============================================
      UPLOAD STATE
@@ -121,6 +153,12 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         isOnSale: false,
         salePrice: undefined,
         isAvailable: true,
+    });
+
+    const { data: productOptionsData, refetch: refetchProductOptions } = useQuery(GET_PRODUCT_WITH_OPTIONS, {
+        variables: { id: optionsModal.productId },
+        skip: !optionsModal.open || !optionsModal.productId,
+        fetchPolicy: "network-only",
     });
 
     /* ===============================================
@@ -251,7 +289,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             salePrice: createForm.isOnSale ? Number(createForm.salePrice) : undefined,
         };
 
-        const { success, error } = await createProduct(input);
+        const { success, error, data } = await createProduct(input);
 
         if (success) {
             await refetch();
@@ -274,8 +312,223 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             setVariantModalOpen(false);
             setNewVariantGroupName("");
             setVariantGroupError("");
+
+            const createdId = data?.createProduct?.id;
+            if (createForm.isOffer && createdId) {
+                setOptionsModal({
+                    open: true,
+                    productId: createdId,
+                    productName: createForm.name,
+                });
+            }
         } else {
             toast.error(`Error creating product: ${error}`);
+        }
+    };
+
+    const openOptionsModal = (product: Product) => {
+        setOptionsError("");
+        setNewOptionGroupName("");
+        setNewOptionGroupMin(0);
+        setNewOptionGroupMax(1);
+        setNewOptionItems([{ name: "", extraPrice: 0 }]);
+        setNewOptionByGroup({});
+        setOptionGroupDrafts({});
+        setOptionDrafts({});
+        setOptionsModal({
+            open: true,
+            productId: product.id,
+            productName: product.name,
+        });
+    };
+
+    const handleCreateOptionGroup = async () => {
+        if (!optionsModal.productId) return;
+        if (!newOptionGroupName.trim()) {
+            setOptionsError("Option group name is required");
+            return;
+        }
+
+        const cleanedOptions = newOptionItems
+            .map((item, index) => ({
+                name: item.name.trim(),
+                extraPrice: Number(item.extraPrice) || 0,
+                displayOrder: index,
+            }))
+            .filter((item) => item.name.length > 0);
+
+        if (cleanedOptions.length === 0) {
+            setOptionsError("Add at least one option");
+            return;
+        }
+
+        if (newOptionGroupMax < newOptionGroupMin) {
+            setOptionsError("Max selections must be greater than or equal to min selections");
+            return;
+        }
+
+        setOptionsLoading(true);
+        setOptionsError("");
+
+        try {
+            await createOptionGroup({
+                variables: {
+                    input: {
+                        productId: optionsModal.productId,
+                        name: newOptionGroupName.trim(),
+                        minSelections: newOptionGroupMin,
+                        maxSelections: newOptionGroupMax,
+                        displayOrder: (productOptionsData?.product?.optionGroups?.length || 0) + 1,
+                        options: cleanedOptions,
+                    },
+                },
+            });
+
+            setNewOptionGroupName("");
+            setNewOptionGroupMin(0);
+            setNewOptionGroupMax(1);
+            setNewOptionItems([{ name: "", extraPrice: 0 }]);
+            await refetchProductOptions();
+        } catch (error) {
+            setOptionsError((error as Error).message || "Failed to create option group");
+        } finally {
+            setOptionsLoading(false);
+        }
+    };
+
+    const handleDeleteOptionGroup = async (id: string) => {
+        setOptionsLoading(true);
+        setOptionsError("");
+        try {
+            await deleteOptionGroup({ variables: { id } });
+            await refetchProductOptions();
+        } catch (error) {
+            setOptionsError((error as Error).message || "Failed to delete option group");
+        } finally {
+            setOptionsLoading(false);
+        }
+    };
+
+    const handleSaveOptionGroup = async (
+        groupId: string,
+        fallbackName: string,
+        fallbackMin: number,
+        fallbackMax: number
+    ) => {
+        const draft = optionGroupDrafts[groupId] || {
+            name: fallbackName,
+            min: fallbackMin,
+            max: fallbackMax,
+        };
+
+        const name = draft.name.trim();
+        if (!name) {
+            setOptionsError("Question title is required");
+            return;
+        }
+        if (draft.max < draft.min) {
+            setOptionsError("Question max selections must be greater than or equal to min selections");
+            return;
+        }
+
+        setOptionsLoading(true);
+        setOptionsError("");
+        try {
+            await updateOptionGroup({
+                variables: {
+                    id: groupId,
+                    input: {
+                        name,
+                        minSelections: Number(draft.min) || 0,
+                        maxSelections: Number(draft.max) || 0,
+                    },
+                },
+            });
+            await refetchProductOptions();
+        } catch (error) {
+            setOptionsError((error as Error).message || "Failed to update question");
+        } finally {
+            setOptionsLoading(false);
+        }
+    };
+
+    const handleCreateOption = async (optionGroupId: string) => {
+        const draft = newOptionByGroup[optionGroupId] || { name: "", extraPrice: 0 };
+        const name = draft.name.trim();
+
+        if (!name) {
+            setOptionsError("Answer text is required");
+            return;
+        }
+
+        const group = productOptionsData?.product?.optionGroups?.find((g) => g.id === optionGroupId);
+        const displayOrder = group?.options?.length || 0;
+
+        setOptionsLoading(true);
+        setOptionsError("");
+        try {
+            await createOption({
+                variables: {
+                    optionGroupId,
+                    input: {
+                        name,
+                        extraPrice: Number(draft.extraPrice) || 0,
+                        displayOrder,
+                    },
+                },
+            });
+
+            setNewOptionByGroup((prev) => ({
+                ...prev,
+                [optionGroupId]: { name: "", extraPrice: 0 },
+            }));
+            await refetchProductOptions();
+        } catch (error) {
+            setOptionsError((error as Error).message || "Failed to add answer");
+        } finally {
+            setOptionsLoading(false);
+        }
+    };
+
+    const handleSaveOption = async (optionId: string, fallbackName: string, fallbackExtraPrice: number) => {
+        const draft = optionDrafts[optionId] || { name: fallbackName, extraPrice: fallbackExtraPrice };
+        const name = draft.name.trim();
+
+        if (!name) {
+            setOptionsError("Answer text is required");
+            return;
+        }
+
+        setOptionsLoading(true);
+        setOptionsError("");
+        try {
+            await updateOption({
+                variables: {
+                    id: optionId,
+                    input: {
+                        name,
+                        extraPrice: Number(draft.extraPrice) || 0,
+                    },
+                },
+            });
+            await refetchProductOptions();
+        } catch (error) {
+            setOptionsError((error as Error).message || "Failed to update answer");
+        } finally {
+            setOptionsLoading(false);
+        }
+    };
+
+    const handleDeleteOption = async (optionId: string) => {
+        setOptionsLoading(true);
+        setOptionsError("");
+        try {
+            await deleteOption({ variables: { id: optionId } });
+            await refetchProductOptions();
+        } catch (error) {
+            setOptionsError((error as Error).message || "Failed to delete answer");
+        } finally {
+            setOptionsLoading(false);
         }
     };
 
@@ -542,6 +795,14 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                     </Button>
 
                                                     <Button
+                                                        variant="outline"
+                                                        className="text-xs px-3"
+                                                        onClick={() => openOptionsModal(p)}
+                                                    >
+                                                        Questions / Options
+                                                    </Button>
+
+                                                    <Button
                                                         variant="danger"
                                                         className="text-xs px-3"
                                                         onClick={() => {
@@ -805,6 +1066,12 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     >
                         {uploadingImage ? "Uploading..." : createLoading ? "Saving..." : "Save"}
                     </Button>
+
+                    {createForm.isOffer && (
+                        <p className="text-xs text-gray-400">
+                            Tip: after saving this offer, you can configure option groups and choices in the Options modal.
+                        </p>
+                    )}
                 </div>
             </Modal>
 
@@ -1243,6 +1510,327 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     >
                         {deleteLoading ? "Deleting..." : "Delete"}
                     </Button>
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={optionsModal.open}
+                onClose={() => setOptionsModal({ open: false, productId: "", productName: "" })}
+                title={`Manage Questions & Answers - ${optionsModal.productName}`}
+            >
+                <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+                    <p className="text-xs text-gray-400">
+                        Use questions for sections (for example: "Choose Size") and answers for selectable choices (for example: "Large", "+$1.50").
+                    </p>
+
+                    <div className="flex justify-end">
+                        <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => {
+                                const section = document.getElementById("add-new-question-section");
+                                if (section) {
+                                    section.scrollIntoView({ behavior: "smooth", block: "start" });
+                                }
+                            }}
+                        >
+                            Add New Question
+                        </Button>
+                    </div>
+
+                    <div className="rounded-lg border border-gray-700 bg-gray-800/60 p-3">
+                        <p className="text-sm font-medium text-gray-200 mb-2">Current Questions & Answers</p>
+                        {productOptionsData?.product?.optionGroups?.length ? (
+                            <div className="space-y-2">
+                                {productOptionsData.product.optionGroups.map((group) => (
+                                    <div key={group.id} className="rounded border border-gray-700 p-2">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="flex-1 space-y-2">
+                                                <label className="block text-xs text-gray-400">Question title</label>
+                                                <Input
+                                                    value={optionGroupDrafts[group.id]?.name ?? group.name}
+                                                    onChange={(e) =>
+                                                        setOptionGroupDrafts((prev) => ({
+                                                            ...prev,
+                                                            [group.id]: {
+                                                                name: e.target.value,
+                                                                min: prev[group.id]?.min ?? group.minSelections,
+                                                                max: prev[group.id]?.max ?? group.maxSelections,
+                                                            },
+                                                        }))
+                                                    }
+                                                />
+                                                <p className="text-[11px] text-gray-500">Example: Choose Size, Pick a Drink, Select Extra Toppings</p>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <label className="block text-xs text-gray-400 mb-1">Min selections</label>
+                                                    <Input
+                                                        type="number"
+                                                        value={optionGroupDrafts[group.id]?.min ?? group.minSelections}
+                                                        onChange={(e) =>
+                                                            setOptionGroupDrafts((prev) => ({
+                                                                ...prev,
+                                                                [group.id]: {
+                                                                    name: prev[group.id]?.name ?? group.name,
+                                                                    min: Number(e.target.value) || 0,
+                                                                    max: prev[group.id]?.max ?? group.maxSelections,
+                                                                },
+                                                            }))
+                                                        }
+                                                    />
+                                                    <p className="text-[11px] text-gray-500 mt-1">Minimum answers required</p>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs text-gray-400 mb-1">Max selections</label>
+                                                    <Input
+                                                        type="number"
+                                                        value={optionGroupDrafts[group.id]?.max ?? group.maxSelections}
+                                                        onChange={(e) =>
+                                                            setOptionGroupDrafts((prev) => ({
+                                                                ...prev,
+                                                                [group.id]: {
+                                                                    name: prev[group.id]?.name ?? group.name,
+                                                                    min: prev[group.id]?.min ?? group.minSelections,
+                                                                    max: Number(e.target.value) || 0,
+                                                                },
+                                                            }))
+                                                        }
+                                                    />
+                                                    <p className="text-[11px] text-gray-500 mt-1">Maximum answers allowed</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        handleSaveOptionGroup(
+                                                            group.id,
+                                                            group.name,
+                                                            group.minSelections,
+                                                            group.maxSelections
+                                                        )
+                                                    }
+                                                    disabled={optionsLoading}
+                                                >
+                                                    Save Question
+                                                </Button>
+                                                <Button
+                                                    variant="danger"
+                                                    size="sm"
+                                                    onClick={() => handleDeleteOptionGroup(group.id)}
+                                                    disabled={optionsLoading}
+                                                >
+                                                    Delete Group
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <div className="mt-2 space-y-1">
+                                            {group.options.map((opt) => (
+                                                <div key={opt.id} className="grid grid-cols-[1fr_110px_auto_auto] gap-2 items-center">
+                                                    <div>
+                                                        <label className="block text-xs text-gray-400 mb-1">Answer text</label>
+                                                        <Input
+                                                            value={optionDrafts[opt.id]?.name ?? opt.name}
+                                                            onChange={(e) =>
+                                                                setOptionDrafts((prev) => ({
+                                                                    ...prev,
+                                                                    [opt.id]: {
+                                                                        name: e.target.value,
+                                                                        extraPrice: prev[opt.id]?.extraPrice ?? opt.extraPrice,
+                                                                    },
+                                                                }))
+                                                            }
+                                                        />
+                                                        <p className="text-[11px] text-gray-500 mt-1">Example: Large, No Onions, Extra Cheese</p>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs text-gray-400 mb-1">Extra price</label>
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={optionDrafts[opt.id]?.extraPrice ?? opt.extraPrice}
+                                                            onChange={(e) =>
+                                                                setOptionDrafts((prev) => ({
+                                                                    ...prev,
+                                                                    [opt.id]: {
+                                                                        name: prev[opt.id]?.name ?? opt.name,
+                                                                        extraPrice: Number(e.target.value) || 0,
+                                                                    },
+                                                                }))
+                                                            }
+                                                        />
+                                                        <p className="text-[11px] text-gray-500 mt-1">Use 0 for no extra cost</p>
+                                                    </div>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleSaveOption(opt.id, opt.name, opt.extraPrice)}
+                                                        disabled={optionsLoading}
+                                                    >
+                                                        Save
+                                                    </Button>
+                                                    <Button
+                                                        variant="danger"
+                                                        size="sm"
+                                                        onClick={() => handleDeleteOption(opt.id)}
+                                                        disabled={optionsLoading}
+                                                    >
+                                                        Delete
+                                                    </Button>
+                                                </div>
+                                            ))}
+
+                                            <div className="grid grid-cols-[1fr_110px_auto] gap-2 items-center border-t border-gray-700 pt-2 mt-2">
+                                                <div>
+                                                    <label className="block text-xs text-gray-400 mb-1">New answer text</label>
+                                                    <Input
+                                                        placeholder="Add answer"
+                                                        value={newOptionByGroup[group.id]?.name ?? ""}
+                                                        onChange={(e) =>
+                                                            setNewOptionByGroup((prev) => ({
+                                                                ...prev,
+                                                                [group.id]: {
+                                                                    name: e.target.value,
+                                                                    extraPrice: prev[group.id]?.extraPrice ?? 0,
+                                                                },
+                                                            }))
+                                                        }
+                                                    />
+                                                    <p className="text-[11px] text-gray-500 mt-1">Example: Medium, Coke, Add Ketchup</p>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs text-gray-400 mb-1">Extra price</label>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        placeholder="Extra"
+                                                        value={newOptionByGroup[group.id]?.extraPrice ?? 0}
+                                                        onChange={(e) =>
+                                                            setNewOptionByGroup((prev) => ({
+                                                                ...prev,
+                                                                [group.id]: {
+                                                                    name: prev[group.id]?.name ?? "",
+                                                                    extraPrice: Number(e.target.value) || 0,
+                                                                },
+                                                            }))
+                                                        }
+                                                    />
+                                                    <p className="text-[11px] text-gray-500 mt-1">Enter amount added to base price</p>
+                                                </div>
+                                                <Button
+                                                    variant="primary"
+                                                    size="sm"
+                                                    onClick={() => handleCreateOption(group.id)}
+                                                    disabled={optionsLoading}
+                                                >
+                                                    Add Answer
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-gray-500">No option groups yet.</p>
+                        )}
+                    </div>
+
+                    <div id="add-new-question-section" className="rounded-lg border border-violet-500/30 bg-violet-500/10 p-3 space-y-3">
+                        <p className="text-sm font-medium text-violet-100">Add New Question</p>
+                        <label className="block text-xs text-violet-200">Question title</label>
+                        <Input
+                            placeholder="Question title (e.g., Choose Sauce)"
+                            value={newOptionGroupName}
+                            onChange={(e) => setNewOptionGroupName(e.target.value)}
+                        />
+                        <p className="text-[11px] text-violet-200/80">This is what customer sees before choosing answers</p>
+                        <div className="grid grid-cols-2 gap-2">
+                            <div>
+                                <label className="block text-xs text-violet-200 mb-1">Min selections</label>
+                                <Input
+                                    type="number"
+                                    placeholder="Min selections"
+                                    value={newOptionGroupMin}
+                                    onChange={(e) => setNewOptionGroupMin(Number(e.target.value) || 0)}
+                                />
+                                <p className="text-[11px] text-violet-200/80 mt-1">Set 0 if optional</p>
+                            </div>
+                            <div>
+                                <label className="block text-xs text-violet-200 mb-1">Max selections</label>
+                                <Input
+                                    type="number"
+                                    placeholder="Max selections"
+                                    value={newOptionGroupMax}
+                                    onChange={(e) => setNewOptionGroupMax(Number(e.target.value) || 0)}
+                                />
+                                <p className="text-[11px] text-violet-200/80 mt-1">Set 1 for single-choice</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            {newOptionItems.map((item, idx) => (
+                                <div key={idx} className="grid grid-cols-[1fr_120px_auto] gap-2">
+                                    <div>
+                                        <label className="block text-xs text-violet-200 mb-1">Answer {idx + 1}</label>
+                                        <Input
+                                            placeholder={`Answer ${idx + 1} text`}
+                                            value={item.name}
+                                            onChange={(e) => {
+                                                const next = [...newOptionItems];
+                                                next[idx] = { ...next[idx], name: e.target.value };
+                                                setNewOptionItems(next);
+                                            }}
+                                        />
+                                        <p className="text-[11px] text-violet-200/80 mt-1">Visible choice label</p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs text-violet-200 mb-1">Extra price</label>
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="Extra"
+                                            value={item.extraPrice}
+                                            onChange={(e) => {
+                                                const next = [...newOptionItems];
+                                                next[idx] = { ...next[idx], extraPrice: Number(e.target.value) || 0 };
+                                                setNewOptionItems(next);
+                                            }}
+                                        />
+                                        <p className="text-[11px] text-violet-200/80 mt-1">Additional amount for this answer</p>
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => {
+                                            setNewOptionItems((prev) => prev.filter((_, i) => i !== idx));
+                                        }}
+                                        disabled={newOptionItems.length <= 1}
+                                    >
+                                        Remove
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+
+                        <Button
+                            variant="outline"
+                            onClick={() => setNewOptionItems((prev) => [...prev, { name: "", extraPrice: 0 }])}
+                        >
+                            Add Option Row
+                        </Button>
+
+                        <Button
+                            variant="primary"
+                            className="w-full"
+                            onClick={handleCreateOptionGroup}
+                            disabled={optionsLoading}
+                        >
+                            {optionsLoading ? "Saving..." : "Save Option Group"}
+                        </Button>
+
+                        {optionsError && <p className="text-sm text-red-400">{optionsError}</p>}
+                    </div>
                 </div>
             </Modal>
         </div>
