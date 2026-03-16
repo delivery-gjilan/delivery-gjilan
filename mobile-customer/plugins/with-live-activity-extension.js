@@ -17,6 +17,8 @@ struct DeliveryActivityAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable {
         var driverName: String
         var estimatedMinutes: Int
+    var phaseInitialMinutes: Int
+    var phaseStartedAt: Int64
         var status: String
         var orderId: String
         var lastUpdated: Int64  // Unix timestamp ms
@@ -39,6 +41,8 @@ struct DeliveryActivityAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable {
         var driverName: String
         var estimatedMinutes: Int
+    var phaseInitialMinutes: Int
+    var phaseStartedAt: Int64
         var status: String
         var orderId: String
         var lastUpdated: Int64  // Unix timestamp ms
@@ -67,10 +71,19 @@ class DeliveryLiveActivities: NSObject {
         let contentState = DeliveryActivityAttributes.ContentState(
             driverName: stateDict["driverName"] as? String ?? "",
             estimatedMinutes: (stateDict["estimatedMinutes"] as? NSNumber)?.intValue ?? 0,
+          phaseInitialMinutes: (stateDict["phaseInitialMinutes"] as? NSNumber)?.intValue ?? ((stateDict["estimatedMinutes"] as? NSNumber)?.intValue ?? 0),
+          phaseStartedAt: (stateDict["phaseStartedAt"] as? NSNumber)?.int64Value ?? Int64(Date().timeIntervalSince1970 * 1000),
             status: stateDict["status"] as? String ?? "",
             orderId: stateDict["orderId"] as? String ?? "",
             lastUpdated: (stateDict["lastUpdated"] as? NSNumber)?.int64Value ?? Int64(Date().timeIntervalSince1970 * 1000)
         )
+
+        if !contentState.orderId.isEmpty,
+           let existing = Activity<DeliveryActivityAttributes>.activities.first(where: { $0.content.state.orderId == contentState.orderId }) {
+          resolve(existing.id)
+          return
+        }
+
         do {
             let content = ActivityContent(state: contentState, staleDate: nil)
             let activity = try Activity<DeliveryActivityAttributes>.request(
@@ -101,6 +114,8 @@ class DeliveryLiveActivities: NSObject {
         let newState = DeliveryActivityAttributes.ContentState(
             driverName: stateDict["driverName"] as? String ?? "",
             estimatedMinutes: (stateDict["estimatedMinutes"] as? NSNumber)?.intValue ?? 0,
+          phaseInitialMinutes: (stateDict["phaseInitialMinutes"] as? NSNumber)?.intValue ?? ((stateDict["estimatedMinutes"] as? NSNumber)?.intValue ?? 0),
+          phaseStartedAt: (stateDict["phaseStartedAt"] as? NSNumber)?.int64Value ?? Int64(Date().timeIntervalSince1970 * 1000),
             status: stateDict["status"] as? String ?? "",
             orderId: stateDict["orderId"] as? String ?? "",
             lastUpdated: (stateDict["lastUpdated"] as? NSNumber)?.int64Value ?? Int64(Date().timeIntervalSince1970 * 1000)
@@ -157,6 +172,27 @@ class DeliveryLiveActivities: NSObject {
         }
     }
 
+        @objc
+        func findActivityByOrderId(_ orderId: String,
+                       resolver resolve: @escaping RCTPromiseResolveBlock,
+                       rejecter reject: @escaping RCTPromiseRejectBlock) {
+          guard #available(iOS 16.2, *) else {
+            resolve(nil)
+            return
+          }
+          guard !orderId.isEmpty else {
+            resolve(nil)
+            return
+          }
+
+          if let activity = Activity<DeliveryActivityAttributes>.activities.first(where: { $0.content.state.orderId == orderId }) {
+            resolve(activity.id)
+            return
+          }
+
+          resolve(nil)
+        }
+
     @objc
     static func requiresMainQueueSetup() -> Bool { return false }
 }
@@ -185,6 +221,10 @@ RCT_EXTERN_METHOD(getPushToken:(NSString *)activityId
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(findActivityByOrderId:(NSString *)orderId
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
 @end
 `;
 
@@ -200,28 +240,86 @@ struct DeliveryLiveActivityBundle: WidgetBundle {
 }
 
 struct DeliveryLiveActivityWidget: Widget {
+  private func normalizedStatus(_ status: String) -> String {
+    return status.replacingOccurrences(of: "_", with: " ").capitalized
+  }
+
+  private func liveProgress(_ context: ActivityViewContext<DeliveryActivityAttributes>) -> Double {
+    let total = max(1, context.state.phaseInitialMinutes)
+    let startedAtSeconds = Double(context.state.phaseStartedAt) / 1000
+    let elapsed = max(0, Date().timeIntervalSince1970 - startedAtSeconds)
+    let elapsedMinutes = elapsed / 60
+    let inferredRemaining = max(0, Double(total) - elapsedMinutes)
+    let currentRemaining = min(Double(total), max(0, min(Double(context.state.estimatedMinutes), inferredRemaining)))
+    return max(0, min(1, (Double(total) - currentRemaining) / Double(total)))
+  }
+
+  private func etaText(_ context: ActivityViewContext<DeliveryActivityAttributes>) -> String {
+    let total = max(1, context.state.phaseInitialMinutes)
+    let startedAtSeconds = Double(context.state.phaseStartedAt) / 1000
+    let elapsed = max(0, Date().timeIntervalSince1970 - startedAtSeconds)
+    let elapsedMinutes = elapsed / 60
+    let inferredRemaining = max(0, Double(total) - elapsedMinutes)
+    let currentRemaining = Int(max(0, min(Double(context.state.estimatedMinutes), inferredRemaining)).rounded(.up))
+    return "~\\(currentRemaining)m"
+  }
+
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: DeliveryActivityAttributes.self) { context in
-            VStack(alignment: .leading, spacing: 8) {
-                Text(context.attributes.businessName)
-                    .font(.headline)
-                Text("Order #\\(context.attributes.orderDisplayId)")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                HStack {
-                    Text(context.state.status.replacingOccurrences(of: "_", with: " ").capitalized)
-                        .font(.body)
-                    Spacer()
-                    Text("~\\(context.state.estimatedMinutes) min")
-                        .font(.body.weight(.semibold))
+      VStack(alignment: .leading, spacing: 10) {
+        HStack {
+          Text(context.attributes.businessName)
+            .font(.headline)
+            .lineLimit(1)
+          Spacer()
+          Text(etaText(context))
+            .font(.headline.weight(.semibold))
                 }
-                Text(context.state.driverName)
+        Text(normalizedStatus(context.state.status))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+        ProgressView(value: liveProgress(context))
+          .progressViewStyle(.linear)
+
+        HStack {
+          Text("Order #\\(context.attributes.orderDisplayId)")
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+          Spacer()
+          Text(context.state.driverName)
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+        }
             }
             .padding(12)
             .activityBackgroundTint(Color(.systemBackground))
             .activitySystemActionForegroundColor(Color.accentColor)
+    } dynamicIsland: { context in
+      DynamicIsland {
+        DynamicIslandExpandedRegion(.leading) {
+          Text(normalizedStatus(context.state.status))
+            .font(.caption.weight(.semibold))
+            .lineLimit(1)
+        }
+        DynamicIslandExpandedRegion(.trailing) {
+          Text(etaText(context))
+            .font(.caption.weight(.bold))
+        }
+        DynamicIslandExpandedRegion(.bottom) {
+          ProgressView(value: liveProgress(context))
+            .progressViewStyle(.linear)
+        }
+      } compactLeading: {
+        Image(systemName: "shippingbox.fill")
+          .font(.caption2)
+      } compactTrailing: {
+        Text(etaText(context))
+          .font(.caption2.weight(.semibold))
+      } minimal: {
+        Image(systemName: "shippingbox.fill")
+      }
         }
     }
 }

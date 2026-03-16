@@ -35,17 +35,17 @@ The backend and admin panel both expose these capabilities, so documentation sho
 
 ## Live Activity State
 
-Live Activity support is partially implemented.
+Live Activity behavior is now implemented as a server-updated single-activity flow for customer delivery tracking.
 
-- JavaScript hooks and backend token flows exist
-- configuration flags and integration points exist in the customer app
-- the repository has moved toward backend-driven Live Activity updates for delivery state
+- one active activity per order is reused (no status-based duplication)
+- status transitions update the active activity
+- out-for-delivery ETA is refreshed from driver heartbeat updates
+- compact Dynamic Island UI is optimized for default island presentation
+- progress is phase-based and updates as ETA reduces
 
-But the important constraint remains:
+Detailed behavior and payload contract are documented in:
 
-- do not assume the iOS native Widget Extension layer is fully production-complete unless it is verified in the actual app target and build output
-
-In other words, standard push is real today. Live Activity support is advanced but still needs native-layer verification discipline.
+- `docs/MOBILE/LIVE_ACTIVITY_BEHAVIOR.md`
 
 ## Operational Guidance
 
@@ -57,5 +57,5 @@ In other words, standard push is real today. Live Activity support is advanced b
 ## Recommended Next Cleanup
 
 - document which apps officially support which notification features
-- keep Live Activity docs tied to verified native artifacts instead of aspirational notes
-- add one short runbook for debugging token registration, category mismatches, and delivery-alert failures
+- keep APNs topic and extension bundle ID aligned across envs
+- keep the Live Activity behavior runbook (`MOBILE/LIVE_ACTIVITY_BEHAVIOR.md`) updated when payload fields or widget layout change

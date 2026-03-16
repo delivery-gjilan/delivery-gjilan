@@ -1,14 +1,16 @@
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, Platform, Image } from 'react-native';
 import { router } from 'expo-router';
-import { ProductCard as GqlProductCard, BusinessType } from '@/gql/graphql';
+import { GetProductsQuery, BusinessType } from '@/gql/graphql';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { CartControls } from './CartControls';
 
+type ProductCardItem = GetProductsQuery['products'][number];
+
 interface ProductCardProps {
-    productCard: GqlProductCard;
+    productCard: ProductCardItem;
     businessType?: BusinessType;
 }
 
@@ -16,13 +18,14 @@ export function ProductCard({ productCard, businessType }: ProductCardProps) {
     const theme = useTheme();
     const { t } = useTranslations();
 
-    // Use product from card if single product, otherwise use first variant or just base card info
+    // Use product from card if single product, otherwise fallback to first variant.
     const product = productCard.product || productCard.variants[0];
     const hasVariants = productCard.variants.length > 0;
+    const targetProductId = productCard.product?.id || productCard.variants[0]?.id;
 
     const handlePress = () => {
-        if (!productCard.id) return;
-        router.push(`/product/${productCard.id}`);
+        if (!targetProductId) return;
+        router.push(`/product/${targetProductId}`);
     };
 
     const effectivePrice = product?.isOnSale && product?.salePrice ? product.salePrice : (productCard.basePrice ?? 0);
@@ -81,7 +84,7 @@ export function ProductCard({ productCard, businessType }: ProductCardProps) {
                     )}
 
                     {/* Unavailable Overlay */}
-                    {!product.isAvailable && (
+                    {product?.isAvailable === false && (
                         <View className="absolute inset-0 bg-black/60 items-center justify-center">
                             <Text className="text-white text-xs font-semibold">{t.common.unavailable}</Text>
                         </View>
@@ -101,14 +104,14 @@ export function ProductCard({ productCard, businessType }: ProductCardProps) {
                             {productCard.name}
                         </Text>
 
-                        {(productCard.product?.description || product?.description) && (
+                        {productCard.product?.description && (
                             <Text
                                 className="text-xs leading-4"
                                 style={{ color: theme.colors.subtext }}
                                 numberOfLines={2}
                                 ellipsizeMode="tail"
                             >
-                                {productCard.product?.description || product?.description}
+                                {productCard.product.description}
                             </Text>
                         )}
                     </View>

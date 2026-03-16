@@ -297,6 +297,8 @@ export class NotificationService {
             driverName: string;
             estimatedMinutes: number;
             status: 'preparing' | 'ready' | 'out_for_delivery' | 'delivered';
+            phaseInitialMinutes?: number;
+            phaseStartedAt?: number;
         },
     ): Promise<void> {
         const liveActivityTopic =
@@ -323,6 +325,12 @@ export class NotificationService {
                         estimatedMinutes: String(updates.estimatedMinutes),
                         status: updates.status,
                         orderId: orderId,
+                        phaseInitialMinutes: String(
+                            updates.phaseInitialMinutes ?? updates.estimatedMinutes,
+                        ),
+                        phaseStartedAt: String(
+                            updates.phaseStartedAt ?? Date.now(),
+                        ),
                         lastUpdated: String(Date.now()),
                     },
                     apns: {
@@ -340,6 +348,9 @@ export class NotificationService {
                                     estimatedMinutes: updates.estimatedMinutes,
                                     status: updates.status,
                                     orderId: orderId,
+                                    phaseInitialMinutes:
+                                        updates.phaseInitialMinutes ?? updates.estimatedMinutes,
+                                    phaseStartedAt: updates.phaseStartedAt ?? Date.now(),
                                     lastUpdated: Date.now(),
                                 },
                             },

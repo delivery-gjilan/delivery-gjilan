@@ -66,7 +66,9 @@ export const startPreparing: NonNullable<MutationResolvers['startPreparing']> = 
             id,
             'preparing',
             'Your driver', // Driver not assigned yet
-            preparationMinutes
+            preparationMinutes,
+            preparationMinutes,
+            dbOrder.preparingAt ? new Date(dbOrder.preparingAt).getTime() : Date.now(),
         );
 
         const auditLog = createAuditLogger(db, context);

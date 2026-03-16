@@ -935,13 +935,31 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         const etaMinutes = (isDeliveryPhase ? deliveryEta : isPreparingPhase ? preparationEta : null) ?? 0;
         const liveStatus = status === 'OUT_FOR_DELIVERY' ? 'out_for_delivery'
             : 'preparing';
+        const phaseInitialMinutes = status === 'OUT_FOR_DELIVERY'
+            ? Math.max(1, Math.round(etaMinutes || 0))
+            : Math.max(1, Number(order?.preparationMinutes ?? etaMinutes ?? 0));
+        const phaseStartedAt = status === 'OUT_FOR_DELIVERY'
+            ? (order?.outForDeliveryAt ? new Date(order.outForDeliveryAt).getTime() : Date.now())
+            : (order?.preparingAt ? new Date(order.preparingAt).getTime() : Date.now());
         if (status === 'OUT_FOR_DELIVERY') {
-            startLiveActivity({ driverName: driverName || 'Driver', estimatedMinutes: etaMinutes, status: liveStatus });
+            startLiveActivity({
+                driverName: driverName || 'Driver',
+                estimatedMinutes: etaMinutes,
+                phaseInitialMinutes,
+                phaseStartedAt,
+                status: liveStatus,
+            });
         } else if (customerVisibleStatus === 'PREPARING') {
             // Start during preparing as well so updates have an active activity to target.
-            startLiveActivity({ driverName: driverName || 'Driver', estimatedMinutes: etaMinutes, status: liveStatus });
+            startLiveActivity({
+                driverName: driverName || 'Driver',
+                estimatedMinutes: etaMinutes,
+                phaseInitialMinutes,
+                phaseStartedAt,
+                status: liveStatus,
+            });
         }
-    }, [status, customerVisibleStatus, isCompleted, isCancelled, deliveryEta, preparationEta, isDeliveryPhase, isPreparingPhase, driverName, startLiveActivity, endLiveActivity]);
+    }, [status, customerVisibleStatus, isCompleted, isCancelled, deliveryEta, preparationEta, isDeliveryPhase, isPreparingPhase, driverName, order?.preparationMinutes, order?.outForDeliveryAt, order?.preparingAt, startLiveActivity, endLiveActivity]);
 
     // ─── Map Fitting (status-aware) ────────────────────────
     const fitMapToMarkers = useCallback(() => {

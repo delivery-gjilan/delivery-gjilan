@@ -2,6 +2,7 @@ import type { MutationResolvers } from './../../../../generated/types.generated'
 import { createAuditLogger } from '@/services/AuditLogger';
 import logger from '@/lib/logger';
 import { AppError } from '@/lib/errors';
+import { updateLiveActivity } from '@/services/orderNotifications';
 
 export const updatePreparationTime: NonNullable<MutationResolvers['updatePreparationTime']> = async (
     _parent,
@@ -43,6 +44,18 @@ export const updatePreparationTime: NonNullable<MutationResolvers['updatePrepara
     if (dbOrder) {
         await orderService.publishUserOrders(dbOrder.userId);
         await orderService.publishAllOrders();
+
+        if (dbOrder.status === 'PREPARING') {
+            updateLiveActivity(
+                context.notificationService,
+                id,
+                'preparing',
+                'Your driver',
+                preparationMinutes,
+                preparationMinutes,
+                dbOrder.preparingAt ? new Date(dbOrder.preparingAt).getTime() : Date.now(),
+            );
+        }
 
         const auditLog = createAuditLogger(db, context);
         await auditLog.log({

@@ -93,7 +93,9 @@ export default function Restaurants() {
 
             // Insert promotional banner after selected promo restaurant.
             if (promoRestaurant && restaurant.id === promoRestaurant.id && promoProducts.length > 0) {
-                const products = promoProducts.filter((p: any) => p.imageUrl).slice(0, 2);
+                const products = promoProducts
+                    .filter((p: any) => p.imageUrl || p.product?.imageUrl || p.variants?.[0]?.imageUrl)
+                    .slice(0, 2);
                 if (products.length > 0) {
                     items.push({
                         type: 'promo-banner',
@@ -101,8 +103,13 @@ export default function Restaurants() {
                             id: `promo-${restaurant.id}`,
                             title: `${restaurant.name.toUpperCase()} - ${t.restaurants.special_offer}`,
                             subtitle: products.map((p) => p.name).join(', '),
-                            price: `${products[0]?.name} • €${products[0]?.price.toFixed(2)}`,
-                            imageUrl: products[0]?.imageUrl || restaurant.imageUrl || 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&q=80',
+                            price: `${products[0]?.name} • €${products[0]?.basePrice.toFixed(2)}`,
+                            imageUrl:
+                                products[0]?.imageUrl ||
+                                products[0]?.product?.imageUrl ||
+                                products[0]?.variants?.[0]?.imageUrl ||
+                                restaurant.imageUrl ||
+                                'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&q=80',
                             businessLogo: restaurant.imageUrl,
                             businessName: restaurant.name,
                         },
@@ -113,12 +120,18 @@ export default function Restaurants() {
             // Insert featured card after selected featured restaurant.
             if (featuredRestaurant && restaurant.id === featuredRestaurant.id && featuredProducts.length > 0) {
                 const products = featuredProducts
-                    .filter((p) => p.imageUrl && p.isAvailable)
+                    .filter((p) => {
+                        const representative = p.product || p.variants?.[0];
+                        return !!(p.imageUrl || representative?.imageUrl) && representative?.isAvailable !== false;
+                    })
                     .slice(0, 3)
                     .map((p) => ({
                         name: p.name,
-                        price: p.isOnSale && p.salePrice ? `€${p.salePrice.toFixed(2)}` : `€${p.price.toFixed(2)}`,
-                        imageUrl: p.imageUrl || '',
+                        price:
+                            (p.product || p.variants?.[0])?.isOnSale && (p.product || p.variants?.[0])?.salePrice
+                                ? `€${(p.product || p.variants?.[0])?.salePrice?.toFixed(2)}`
+                                : `€${p.basePrice.toFixed(2)}`,
+                        imageUrl: p.imageUrl || p.product?.imageUrl || p.variants?.[0]?.imageUrl || '',
                     }));
 
                 if (products.length > 0) {

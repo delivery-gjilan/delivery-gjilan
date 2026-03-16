@@ -150,13 +150,29 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
         } else if (status === 'OUT_FOR_DELIVERY') {
             estimatedMinutes = 15; // Default 15 min for delivery
         }
+
+        const phaseInitialMinutes =
+            status === 'PREPARING'
+                ? Math.max(1, dbOrder.preparationMinutes ?? estimatedMinutes)
+                : status === 'OUT_FOR_DELIVERY'
+                    ? Math.max(1, estimatedMinutes)
+                    : estimatedMinutes;
+
+        const phaseStartedAt =
+            status === 'PREPARING'
+                ? (dbOrder.preparingAt ? new Date(dbOrder.preparingAt).getTime() : Date.now())
+                : status === 'OUT_FOR_DELIVERY'
+                    ? (dbOrder.outForDeliveryAt ? new Date(dbOrder.outForDeliveryAt).getTime() : Date.now())
+                    : Date.now();
         
         updateLiveActivity(
             context.notificationService,
             id,
             liveActivityStatus,
             driverName,
-            estimatedMinutes
+            estimatedMinutes,
+            phaseInitialMinutes,
+            phaseStartedAt,
         );
     } else if (status === 'DELIVERED' || status === 'CANCELLED') {
         // End Live Activity when order is completed or cancelled

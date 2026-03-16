@@ -1,5 +1,6 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { GraphQLError } from 'graphql';
+import { cache } from '@/lib/cache';
 import {
   DriverCustomerNotificationKind,
   hasDriverCustomerNotificationBeenSent,
@@ -86,6 +87,35 @@ export const driverHeartbeat: NonNullable<MutationResolvers['driverHeartbeat']> 
           Math.max(1, Math.ceil((remainingEtaSeconds as number) / 60)),
           customerPreferredLanguage,
         );
+      }
+    }
+  }
+
+  if (activeOrderId && remainingEtaSeconds != null && Number.isFinite(remainingEtaSeconds)) {
+    const dbOrder = await orderService.orderRepository.findById(activeOrderId);
+    if (
+      dbOrder &&
+      dbOrder.driverId === userData.userId &&
+      dbOrder.status === 'OUT_FOR_DELIVERY'
+    ) {
+      const remainingMinutes = Math.max(0, Math.ceil((remainingEtaSeconds as number) / 60));
+      const outForDeliveryMs = dbOrder.outForDeliveryAt
+        ? new Date(dbOrder.outForDeliveryAt).getTime()
+        : Date.now();
+      const elapsedMinutes = Math.max(0, Math.floor((Date.now() - outForDeliveryMs) / 60000));
+      const phaseInitialMinutes = Math.max(1, remainingMinutes + elapsedMinutes);
+
+      const throttleKey = `cache:live-activity:last-minute:${activeOrderId}`;
+      const lastSentMinute = await cache.get<number>(throttleKey);
+      if (lastSentMinute !== remainingMinutes) {
+        await notificationService.sendLiveActivityUpdate(activeOrderId, {
+          driverName: 'Your driver',
+          estimatedMinutes: remainingMinutes,
+          status: 'out_for_delivery',
+          phaseInitialMinutes,
+          phaseStartedAt: outForDeliveryMs,
+        });
+        await cache.set(throttleKey, remainingMinutes, 60 * 60);
       }
     }
   }

@@ -5,6 +5,9 @@ import { productCategories, NewDbProductCategory } from './schema/productCategor
 import { productSubcategories, NewDbProductSubcategory } from './schema/productSubcategories';
 import { products, NewDbProduct } from './schema/products';
 import { productStocks, NewDbProductStock } from './schema/productStock';
+import { productVariantGroups } from './schema/productVariantGroups';
+import { optionGroups } from './schema/optionGroups';
+import { options } from './schema/options';
 import { orders, NewDbOrder } from './schema/orders';
 import { orderItems, NewDbOrderItem } from './schema/orderItems';
 import { users } from './schema/users';
@@ -12,7 +15,7 @@ import { drivers } from './schema/drivers';
 import { promotions, userPromotions, promotionBusinessEligibility, userPromoMetadata } from './schema/promotions';
 import { settlements } from './schema/settlements';
 import { hashPassword } from '@/lib/utils/authUtils';
-import { sql } from 'drizzle-orm';
+import { sql, eq } from 'drizzle-orm';
 
 // Restaurant data with curated products and realistic images
 const RESTAURANTS_DATA = [
@@ -540,7 +543,7 @@ async function seed() {
     // Seed promotions (compatible with `promotions` schema)
     // ------------------------------
     try {
-        const [exampleBusiness] = await db.select().from(businesses).limit(1).returning();
+        const [exampleBusiness] = await db.select().from(businesses).limit(1);
         const businessId = exampleBusiness?.id ?? null;
 
         // First-order auto-applied free delivery promo (no code)
@@ -550,17 +553,17 @@ async function seed() {
             description: 'Free delivery for users on their first order (auto-applied)',
             type: 'FREE_DELIVERY',
             target: 'FIRST_ORDER',
-            discount_value: null,
-            max_discount_cap: null,
-            min_order_amount: 0,
-            spend_threshold: null,
-            threshold_reward: null,
-            max_global_usage: null,
-            max_usage_per_user: 1,
-            current_global_usage: 0,
-            is_stackable: false,
+            discountValue: null,
+            maxDiscountCap: null,
+            minOrderAmount: 0,
+            spendThreshold: null,
+            thresholdReward: null,
+            maxGlobalUsage: null,
+            maxUsagePerUser: 1,
+            currentGlobalUsage: 0,
+            isStackable: false,
             priority: 100,
-            is_active: true,
+            isActive: true,
         }).returning();
 
         // Global percentage promo
@@ -570,17 +573,17 @@ async function seed() {
             description: '20% off your order (up to 50€)',
             type: 'PERCENTAGE',
             target: 'ALL_USERS',
-            discount_value: 20.0,
-            max_discount_cap: 50.0,
-            min_order_amount: 0,
-            spend_threshold: null,
-            threshold_reward: null,
-            max_global_usage: 10000,
-            max_usage_per_user: 1,
-            current_global_usage: 0,
-            is_stackable: false,
+            discountValue: 20.0,
+            maxDiscountCap: 50.0,
+            minOrderAmount: 0,
+            spendThreshold: null,
+            thresholdReward: null,
+            maxGlobalUsage: 10000,
+            maxUsagePerUser: 1,
+            currentGlobalUsage: 0,
+            isStackable: false,
             priority: 50,
-            is_active: true,
+            isActive: true,
         }).returning();
 
         // Fixed discount promo
@@ -590,17 +593,17 @@ async function seed() {
             description: 'Flat 3€ off on orders over 10€',
             type: 'FIXED_AMOUNT',
             target: 'ALL_USERS',
-            discount_value: 3.0,
-            max_discount_cap: null,
-            min_order_amount: 10.0,
-            spend_threshold: null,
-            threshold_reward: null,
-            max_global_usage: 5000,
-            max_usage_per_user: 3,
-            current_global_usage: 0,
-            is_stackable: true,
+            discountValue: 3.0,
+            maxDiscountCap: null,
+            minOrderAmount: 10.0,
+            spendThreshold: null,
+            thresholdReward: null,
+            maxGlobalUsage: 5000,
+            maxUsagePerUser: 3,
+            currentGlobalUsage: 0,
+            isStackable: true,
             priority: 40,
-            is_active: true,
+            isActive: true,
         }).returning();
 
         // Business-specific promo if a business exists
@@ -611,22 +614,22 @@ async function seed() {
                 description: '10% off for a specific business',
                 type: 'PERCENTAGE',
                 target: 'CONDITIONAL',
-                discount_value: 10.0,
-                max_discount_cap: 20.0,
-                min_order_amount: 0,
-                spend_threshold: null,
-                threshold_reward: null,
-                max_global_usage: 2000,
-                max_usage_per_user: 2,
-                current_global_usage: 0,
-                is_stackable: false,
+                discountValue: 10.0,
+                maxDiscountCap: 20.0,
+                minOrderAmount: 0,
+                spendThreshold: null,
+                thresholdReward: null,
+                maxGlobalUsage: 2000,
+                maxUsagePerUser: 2,
+                currentGlobalUsage: 0,
+                isStackable: false,
                 priority: 60,
-                is_active: true,
+                isActive: true,
             }).returning();
 
             await db.insert(promotionBusinessEligibility).values({
-                promotion_id: bizPromo.id,
-                business_id: businessId,
+                promotionId: bizPromo.id,
+                businessId: businessId,
             }).onConflictDoNothing();
         }
 
@@ -634,25 +637,156 @@ async function seed() {
         const sampleUser = (await db.select().from(users).limit(1)).at(0);
         if (sampleUser) {
             await db.insert(userPromotions).values({
-                user_id: sampleUser.id,
-                promotion_id: fixedPromo.id,
-                assigned_by: sampleUser.id,
-                expires_at: null,
-                usage_count: 0,
-                is_active: true,
+                userId: sampleUser.id,
+                promotionId: fixedPromo.id,
+                assignedBy: sampleUser.id,
+                expiresAt: null,
+                usageCount: 0,
+                isActive: true,
             }).onConflictDoNothing();
 
             await db.insert(userPromoMetadata).values({
-                user_id: sampleUser.id,
-                has_used_first_order_promo: false,
-                total_promotions_used: 0,
-                total_savings: 0,
+                userId: sampleUser.id,
+                hasUsedFirstOrderPromo: false,
+                totalPromotionsUsed: 0,
+                totalSavings: 0,
             }).onConflictDoNothing();
         }
 
         console.log('[SEED] Promotions seeded.');
     } catch (err) {
         console.warn('[SEED] Promotions seed skipped or error:', err);
+    }
+
+    // ------------------------------
+    // Seed product variants and option groups (Casbas Pizza)
+    // ------------------------------
+    try {
+        const casbasBusiness = createdBusinesses[0]; // Casbas Pizza
+        if (casbasBusiness) {
+            const [pizzaCategory] = await db
+                .select()
+                .from(productCategories)
+                .where(eq(productCategories.businessId, casbasBusiness.id))
+                .limit(1);
+
+            if (pizzaCategory) {
+                // --- Variant Group: Pizza Base Type (3 products sharing a groupId) ---
+                const [variantGroup] = await db.insert(productVariantGroups).values({
+                    businessId: casbasBusiness.id,
+                    name: 'Pizza Base Type',
+                }).returning();
+
+                for (const vp of [
+                    { name: 'Pizza Base - Traditional', price: 8.99 },
+                    { name: 'Pizza Base - Thin Crust', price: 8.99 },
+                    { name: 'Pizza Base - Stuffed Crust', price: 10.99 },
+                ]) {
+                    const [p] = await db.insert(products).values({
+                        businessId: casbasBusiness.id,
+                        categoryId: pizzaCategory.id,
+                        groupId: variantGroup.id,
+                        name: vp.name,
+                        description: `${vp.name} – choose your preferred base style`,
+                        imageUrl: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=800&q=80',
+                        price: vp.price,
+                        isAvailable: true,
+                        isOffer: false,
+                        isOnSale: false,
+                        salePrice: null,
+                    }).returning();
+                    await db.insert(productStocks).values({ productId: p.id, stock: 50 });
+                }
+                console.log('  🍕 Added variant group "Pizza Base Type" with 3 variants to Casbas Pizza');
+
+                // --- Build Your Own Pizza (option groups, NOT an offer) ---
+                const [buildYourOwn] = await db.insert(products).values({
+                    businessId: casbasBusiness.id,
+                    categoryId: pizzaCategory.id,
+                    name: 'Build Your Own Pizza',
+                    description: 'Customize your pizza with your choice of sauce and toppings',
+                    imageUrl: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80',
+                    price: 9.99,
+                    isAvailable: true,
+                    isOffer: false,
+                    isOnSale: false,
+                    salePrice: null,
+                }).returning();
+                await db.insert(productStocks).values({ productId: buildYourOwn.id, stock: 50 });
+
+                const [sauceGroup] = await db.insert(optionGroups).values({
+                    productId: buildYourOwn.id,
+                    name: 'Sauce',
+                    minSelections: 1,
+                    maxSelections: 1,
+                    displayOrder: 0,
+                }).returning();
+                await db.insert(options).values([
+                    { optionGroupId: sauceGroup.id, name: 'Tomato Sauce', extraPrice: 0, displayOrder: 0 },
+                    { optionGroupId: sauceGroup.id, name: 'BBQ Sauce', extraPrice: 0.5, displayOrder: 1 },
+                    { optionGroupId: sauceGroup.id, name: 'White Cream Sauce', extraPrice: 0.5, displayOrder: 2 },
+                ]);
+
+                const [toppingsGroup] = await db.insert(optionGroups).values({
+                    productId: buildYourOwn.id,
+                    name: 'Extra Toppings',
+                    minSelections: 0,
+                    maxSelections: 3,
+                    displayOrder: 1,
+                }).returning();
+                await db.insert(options).values([
+                    { optionGroupId: toppingsGroup.id, name: 'Mushrooms', extraPrice: 0.5, displayOrder: 0 },
+                    { optionGroupId: toppingsGroup.id, name: 'Olives', extraPrice: 0.5, displayOrder: 1 },
+                    { optionGroupId: toppingsGroup.id, name: 'Jalapeños', extraPrice: 0.5, displayOrder: 2 },
+                ]);
+                console.log('  🍕 Added "Build Your Own Pizza" with option groups to Casbas Pizza');
+
+                // --- Pizza Meal Deal (option groups, IS an offer) ---
+                const [mealDeal] = await db.insert(products).values({
+                    businessId: casbasBusiness.id,
+                    categoryId: pizzaCategory.id,
+                    name: 'Pizza Meal Deal',
+                    description: 'Pick a pizza and a side – great value combo!',
+                    imageUrl: 'https://images.unsplash.com/photo-1534308983496-4fabb1a015ee?w=800&q=80',
+                    price: 14.99,
+                    isAvailable: true,
+                    isOffer: true,
+                    isOnSale: false,
+                    salePrice: null,
+                }).returning();
+                await db.insert(productStocks).values({ productId: mealDeal.id, stock: 50 });
+
+                const [choosePizzaGroup] = await db.insert(optionGroups).values({
+                    productId: mealDeal.id,
+                    name: 'Choose Your Pizza',
+                    minSelections: 1,
+                    maxSelections: 1,
+                    displayOrder: 0,
+                }).returning();
+                await db.insert(options).values([
+                    { optionGroupId: choosePizzaGroup.id, name: 'Margherita', extraPrice: 0, displayOrder: 0 },
+                    { optionGroupId: choosePizzaGroup.id, name: 'Pepperoni', extraPrice: 2, displayOrder: 1 },
+                    { optionGroupId: choosePizzaGroup.id, name: 'BBQ Chicken', extraPrice: 3, displayOrder: 2 },
+                ]);
+
+                const [chooseSideGroup] = await db.insert(optionGroups).values({
+                    productId: mealDeal.id,
+                    name: 'Choose Your Side',
+                    minSelections: 1,
+                    maxSelections: 1,
+                    displayOrder: 1,
+                }).returning();
+                await db.insert(options).values([
+                    { optionGroupId: chooseSideGroup.id, name: 'Garlic Bread', extraPrice: 0, displayOrder: 0 },
+                    { optionGroupId: chooseSideGroup.id, name: 'Garden Salad', extraPrice: 0, displayOrder: 1 },
+                    { optionGroupId: chooseSideGroup.id, name: 'Coleslaw', extraPrice: 0, displayOrder: 2 },
+                ]);
+                console.log('  🎁 Added "Pizza Meal Deal" (offer) with option groups to Casbas Pizza');
+            }
+        }
+        console.log('[SEED] Product variants and option groups seeded.');
+    } catch (err) {
+        console.warn('[SEED] Variants/options seed skipped or error:', err);
     }
 
     // Create test orders and settlements

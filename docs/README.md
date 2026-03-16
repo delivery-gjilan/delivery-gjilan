@@ -10,6 +10,7 @@ This folder is the curated documentation entrypoint for the monorepo. It sits on
 - [BUSINESS_LOGIC/PRICING_PROMOTIONS.md](BUSINESS_LOGIC/PRICING_PROMOTIONS.md) for customer pricing, markups, dynamic pricing, and promotions
 - [MOBILE/OVERVIEW.md](MOBILE/OVERVIEW.md) for the app split and shared mobile patterns
 - [MOBILE/PUSH_AND_LIVE_ACTIVITY.md](MOBILE/PUSH_AND_LIVE_ACTIVITY.md) for push notification plumbing and the current Live Activity state
+- [MOBILE/LIVE_ACTIVITY_BEHAVIOR.md](MOBILE/LIVE_ACTIVITY_BEHAVIOR.md) for Live Activity status/ETA update behavior, compact Dynamic Island UI, and background update guarantees
 - [BUSINESS_LOGIC/SETTLEMENT.md](BUSINESS_LOGIC/SETTLEMENT.md) for settlement state and refactor status
 - [OPERATIONS/NOTIFICATIONS.md](OPERATIONS/NOTIFICATIONS.md) for notification campaigns, admin send flows, and delivery alerts
 - [OPERATIONS/MONITORING.md](OPERATIONS/MONITORING.md) for what is actually monitored today, what is missing, and the recommended production monitoring path

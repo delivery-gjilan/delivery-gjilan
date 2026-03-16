@@ -21,7 +21,9 @@ import { BusinessHeader, HERO_HEIGHT } from './components/BusinessHeader';
 import { ProductCard } from './components/ProductCard';
 import { ErrorMessage } from './components/ErrorMessage';
 import { BusinessHeaderSkeleton, ProductCardSkeleton } from '@/components/Skeleton';
-import { Product, BusinessType } from '@/gql/graphql';
+import { GetProductsQuery, BusinessType } from '@/gql/graphql';
+
+type ProductCardItem = GetProductsQuery['products'][number];
 
 interface BusinessScreenProps {
     businessId: string;
@@ -142,11 +144,11 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
     }, [categoriesData]);
 
     const productsByCategory = useMemo(() => {
-        const allProducts = (products ?? []) as Partial<Product>[];
-        const grouped = new Map<string, Partial<Product>[]>();
+        const allProductCards = products ?? [];
+        const grouped = new Map<string, ProductCardItem[]>();
 
         categories.forEach((cat) => {
-            const catProducts = allProducts.filter((p) => p.categoryId === cat.id);
+            const catProducts = allProductCards.filter((p) => p.product?.categoryId === cat.id);
             if (catProducts.length > 0) {
                 grouped.set(cat.id, catProducts);
             }
@@ -154,7 +156,10 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
 
         // Uncategorized
         const categorizedIds = new Set(categories.map((c: any) => c.id));
-        const uncategorized = allProducts.filter((p) => !categorizedIds.has(p.categoryId ?? ''));
+        const uncategorized = allProductCards.filter((p) => {
+            const categoryId = p.product?.categoryId;
+            return !categoryId || !categorizedIds.has(categoryId);
+        });
         if (uncategorized.length > 0) {
             grouped.set('__uncategorized', uncategorized);
         }
@@ -169,10 +174,10 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
     const searchResults = useMemo(() => {
         if (!searchQuery.trim()) return [];
         const q = searchQuery.toLowerCase().trim();
-        return ((products ?? []) as Partial<Product>[]).filter(
+        return (products ?? []).filter(
             (p) =>
                 p.name?.toLowerCase().includes(q) ||
-                p.description?.toLowerCase().includes(q)
+                p.product?.description?.toLowerCase().includes(q)
         );
     }, [products, searchQuery]);
 
@@ -621,10 +626,10 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
 
                                         {/* Products in this category */}
                                         <View style={{ paddingHorizontal: 16 }}>
-                                            {catProducts.map((product) => (
+                                            {catProducts.map((productCard) => (
                                                 <ProductCard
-                                                    key={product.id}
-                                                    product={product}
+                                                    key={productCard.id}
+                                                    productCard={productCard}
                                                     businessType={business.businessType}
                                                 />
                                             ))}
@@ -650,10 +655,10 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                     </View>
                                     <View style={{ paddingHorizontal: 16 }}>
                                         {(productsByCategory.get('__uncategorized') ?? []).map(
-                                            (product) => (
+                                            (productCard) => (
                                                 <ProductCard
-                                                    key={product.id}
-                                                    product={product}
+                                                    key={productCard.id}
+                                                    productCard={productCard}
                                                     businessType={business.businessType}
                                                 />
                                             )
@@ -746,10 +751,10 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                             </View>
                         ) : (
                             <View style={{ paddingHorizontal: 16 }}>
-                                {searchResults.map((product) => (
+                                {searchResults.map((productCard) => (
                                     <ProductCard
-                                        key={product.id}
-                                        product={product}
+                                        key={productCard.id}
+                                        productCard={productCard}
                                         businessType={business.businessType}
                                     />
                                 ))}

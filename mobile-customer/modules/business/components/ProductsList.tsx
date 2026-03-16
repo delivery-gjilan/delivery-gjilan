@@ -3,13 +3,15 @@ import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { ProductCard } from './ProductCard';
-import { ProductCard as GqlProductCard, BusinessType } from '@/gql/graphql';
+import { GetProductsQuery, BusinessType } from '@/gql/graphql';
+
+type ProductCardItem = GetProductsQuery['products'][number];
 
 export function ProductsList({
     products,
     businessType,
 }: {
-    products: GqlProductCard[];
+    products: ProductCardItem[];
     businessType?: BusinessType;
 }) {
     const theme = useTheme();

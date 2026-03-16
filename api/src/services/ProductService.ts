@@ -140,13 +140,31 @@ export class ProductService {
 
         const cards: ProductCard[] = [];
 
+        // ProductCard.id intentionally represents the cart/list identity:
+        // - variant sets use variantGroupId (group-level identity)
+        // - standalone products use product.id (product-level identity)
+        const groupNameById = new Map<string, string>();
+        const groupIds = [...variantGroupMap.keys()];
+        if (this.db && groupIds.length > 0) {
+            const groups = await this.db
+                .select({ id: productVariantGroups.id, name: productVariantGroups.name })
+                .from(productVariantGroups)
+                .where(inArray(productVariantGroups.id, groupIds));
+
+            for (const group of groups) {
+                groupNameById.set(group.id, group.name);
+            }
+        }
+
         // Variant group cards
         for (const [groupId, variants] of variantGroupMap) {
             const representative = variants[0];
+            if (!representative) continue;
             const basePrice = Math.min(...variants.map((v) => v.price));
             cards.push({
                 id: groupId,
-                name: representative.name,
+                // Prefer canonical variant group name; fallback to representative product name.
+                name: groupNameById.get(groupId) ?? representative.name,
                 imageUrl: representative.imageUrl,
                 basePrice,
                 isOffer: representative.isOffer,

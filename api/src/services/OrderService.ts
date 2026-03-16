@@ -9,6 +9,8 @@ import {
     products as productsTable,
     businesses as businessesTable,
     businessHours as businessHoursTable,
+    deliveryPricingTiers as deliveryPricingTiersTable,
+    deliveryZones as deliveryZonesTable,
     userBehaviors as userBehaviorsTable,
     productStocks as productStocksTable,
     orderPromotions as orderPromotionsTable,
@@ -17,7 +19,7 @@ import {
     options as optionsDbTable,
 } from '@/database/schema';
 import { userPromoMetadata } from '@/database/schema';
-import { and, eq, gte, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNull, sql } from 'drizzle-orm';
 import type { Order, OrderBusiness, OrderItem, OrderStatus, CreateOrderInput } from '@/generated/types.generated';
 import type { DbOrder } from '@/database/schema/orders';
 import { PubSub, publish, subscribe, topics } from '@/lib/pubsub';
@@ -25,6 +27,8 @@ import { GraphQLError } from 'graphql';
 import { AppError } from '@/lib/errors';
 import { PromotionEngine } from '@/services/PromotionEngine';
 import { FinancialService } from '@/services/FinancialService';
+import { calculateDrivingDistanceKm } from '@/lib/haversine';
+import { isPointInPolygon } from '@/lib/pointInPolygon';
 import logger from '@/lib/logger';
 
 const log = logger.child({ service: 'OrderService' });
@@ -53,6 +57,69 @@ export class OrderService {
             id += chars[bytes[i] % chars.length];
         }
         return `GJ-${id}`;
+    }
+
+    private async calculateExpectedDeliveryPrice(params: {
+        businessId: string;
+        dropoffLat: number;
+        dropoffLng: number;
+    }): Promise<number> {
+        const db = await getDB();
+        const DEFAULT_DELIVERY_PRICE = 2.0;
+
+        const [business] = await db
+            .select()
+            .from(businessesTable)
+            .where(eq(businessesTable.id, params.businessId));
+
+        if (!business) {
+            throw AppError.notFound(`Business with ID ${params.businessId}`);
+        }
+
+        const { distanceKm } = await calculateDrivingDistanceKm(
+            business.locationLat,
+            business.locationLng,
+            params.dropoffLat,
+            params.dropoffLng,
+        );
+
+        const zones = await db
+            .select()
+            .from(deliveryZonesTable)
+            .where(eq(deliveryZonesTable.isActive, true))
+            .orderBy(asc(deliveryZonesTable.sortOrder));
+
+        const dropoffPoint = { lat: params.dropoffLat, lng: params.dropoffLng };
+        const matchedZone = zones.find((zone) => isPointInPolygon(dropoffPoint, zone.polygon));
+        if (matchedZone) {
+            return matchedZone.deliveryFee;
+        }
+
+        const tiers = await db
+            .select()
+            .from(deliveryPricingTiersTable)
+            .where(eq(deliveryPricingTiersTable.isActive, true))
+            .orderBy(asc(deliveryPricingTiersTable.sortOrder), asc(deliveryPricingTiersTable.minDistanceKm));
+
+        if (tiers.length === 0) {
+            return DEFAULT_DELIVERY_PRICE;
+        }
+
+        const matchedTier = tiers.find((tier) => {
+            const min = tier.minDistanceKm;
+            const max = tier.maxDistanceKm;
+            if (max === null || max === undefined) {
+                return distanceKm >= min;
+            }
+            return distanceKm >= min && distanceKm < max;
+        });
+
+        if (!matchedTier) {
+            const lastTier = tiers[tiers.length - 1];
+            return lastTier?.price ?? DEFAULT_DELIVERY_PRICE;
+        }
+
+        return matchedTier.price;
     }
 
     async createOrder(userId: string, input: CreateOrderInput): Promise<Order> {
@@ -253,6 +320,27 @@ export class OrderService {
             }
         }
 
+        // 2c. Validate delivery fee against server pricing rules.
+        // Current order model uses one dropoff and a single delivery fee.
+        // We use the first item's business as the delivery-pricing anchor,
+        // consistent with current mobile checkout behavior.
+        const deliveryBusinessId = cartItems[0]?.businessId;
+        if (!deliveryBusinessId) {
+            throw AppError.badInput('Missing business context for delivery fee calculation');
+        }
+
+        const expectedDeliveryPrice = await this.calculateExpectedDeliveryPrice({
+            businessId: deliveryBusinessId,
+            dropoffLat: input.dropOffLocation.latitude,
+            dropoffLng: input.dropOffLocation.longitude,
+        });
+
+        if (Math.abs(expectedDeliveryPrice - input.deliveryPrice) > 0.01) {
+            throw AppError.badInput(
+                `Delivery price mismatch: Calculated ${expectedDeliveryPrice}, provided ${input.deliveryPrice}`,
+            );
+        }
+
         // 3. Apply PromotionEngine (server-side validation)
         const promotionEngine = new PromotionEngine(await getDB());
         const cartContext = {
@@ -271,10 +359,20 @@ export class OrderService {
         const effectiveOrderPrice = promoResult.finalSubtotal;
         const effectiveDeliveryPrice = promoResult.finalDeliveryPrice;
         const totalOrderPrice = promoResult.finalTotal;
+        const undiscountedTotal = calculatedItemsTotal + input.deliveryPrice;
 
-        // Verify total price matches client input (allow small float error)
-        if (Math.abs(totalOrderPrice - input.totalPrice) > 0.01) {
-            throw AppError.badInput(`Price mismatch: Calculated ${totalOrderPrice}, provided ${input.totalPrice}`);
+        // Verify total price matches client input (allow small float error).
+        // When no explicit promoCode is supplied, we allow either:
+        // 1) effective total (after auto-applied promos), or
+        // 2) undiscounted total (items + delivery) for clients that don't pre-apply auto promos.
+        const matchesEffectiveTotal = Math.abs(totalOrderPrice - input.totalPrice) <= 0.01;
+        const matchesUndiscountedTotal = Math.abs(undiscountedTotal - input.totalPrice) <= 0.01;
+
+        if (!matchesEffectiveTotal) {
+            const allowUndiscountedForAutoPromotions = !input.promoCode && matchesUndiscountedTotal;
+            if (!allowUndiscountedForAutoPromotions) {
+                throw AppError.badInput(`Price mismatch: Calculated ${totalOrderPrice}, provided ${input.totalPrice}`);
+            }
         }
 
         const orderData = {

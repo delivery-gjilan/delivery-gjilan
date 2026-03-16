@@ -20,6 +20,7 @@ import { VALIDATE_PROMOTIONS, GET_PROMOTION_THRESHOLDS } from '@/graphql/operati
 import { GET_MY_ADDRESSES, ADD_USER_ADDRESS, SET_DEFAULT_ADDRESS } from '@/graphql/operations/addresses';
 import { CALCULATE_DELIVERY_PRICE } from '@/graphql/operations/deliveryPricing';
 import type { UserAddress } from '@/gql/graphql';
+import { calculateItemUnitTotal } from '../utils/price';
 
 type CheckoutLocation = SelectedAddress;
 
@@ -81,6 +82,19 @@ export const CartScreen = () => {
     const headerTopPadding = Platform.OS === 'ios' ? 10 : 6;
     const suppressAutoCloseRef = useRef(false);
 
+    const handleEditCartItem = useCallback(
+        (item: (typeof items)[number]) => {
+            router.push({
+                pathname: '/product/[productId]',
+                params: {
+                    productId: item.productId,
+                    cartItemId: item.cartItemId,
+                },
+            });
+        },
+        [router],
+    );
+
     const [validatePromotionsManual, { loading: manualPromoLoading }] = useLazyQuery(VALIDATE_PROMOTIONS, {
         fetchPolicy: 'no-cache',
     });
@@ -96,7 +110,7 @@ export const CartScreen = () => {
                 productId: item.productId,
                 businessId: item.businessId,
                 quantity: item.quantity,
-                price: item.price,
+                price: item.unitPrice,
             })),
             subtotal: total,
             deliveryPrice,
@@ -743,9 +757,11 @@ export const CartScreen = () => {
                     <ScrollView className="flex-1">
                         <View className="p-4 gap-3">
                             {items.map((item) => (
-                                <View
-                                    key={item.productId}
+                                <TouchableOpacity
+                                    key={item.cartItemId}
                                     className="rounded-xl p-4 flex-row items-center border"
+                                    activeOpacity={0.9}
+                                    onPress={() => handleEditCartItem(item)}
                                     style={{
                                         backgroundColor: theme.colors.card,
                                         borderColor: theme.colors.border,
@@ -775,13 +791,34 @@ export const CartScreen = () => {
                                             {item.name}
                                         </Text>
                                         <Text className="font-bold mt-1" style={{ color: theme.colors.primary }}>
-                                            €{item.price.toFixed(2)}
+                                            €{calculateItemUnitTotal(item).toFixed(2)}
                                         </Text>
+
+                                        {item.selectedOptions.length > 0 && (
+                                            <View className="mt-1">
+                                                {item.selectedOptions.map((opt) => (
+                                                    <Text key={`${item.cartItemId}-${opt.optionId}`} className="text-xs" style={{ color: theme.colors.subtext }}>
+                                                        {opt.name}
+                                                        {opt.extraPrice > 0 ? ` (+€${Number(opt.extraPrice).toFixed(2)})` : ''}
+                                                    </Text>
+                                                ))}
+                                            </View>
+                                        )}
+
+                                        {item.childItems && item.childItems.length > 0 && (
+                                            <View className="mt-1">
+                                                {item.childItems.map((child) => (
+                                                    <Text key={`${item.cartItemId}-${child.productId}`} className="text-xs" style={{ color: theme.colors.subtext }}>
+                                                        + {child.name}
+                                                    </Text>
+                                                ))}
+                                            </View>
+                                        )}
 
                                         {/* Quantity Controls */}
                                         <View className="flex-row items-center mt-2 gap-2">
                                             <TouchableOpacity
-                                                onPress={() => updateQuantity(item.productId, item.quantity - 1)}
+                                                onPress={() => updateQuantity(item.cartItemId, item.quantity - 1)}
                                                 className="w-8 h-8 rounded-full items-center justify-center"
                                                 style={{ backgroundColor: theme.colors.border }}
                                             >
@@ -793,7 +830,7 @@ export const CartScreen = () => {
                                             </Text>
 
                                             <TouchableOpacity
-                                                onPress={() => updateQuantity(item.productId, item.quantity + 1)}
+                                                onPress={() => updateQuantity(item.cartItemId, item.quantity + 1)}
                                                 className="w-8 h-8 rounded-full items-center justify-center"
                                                 style={{ backgroundColor: theme.colors.primary }}
                                             >
@@ -805,7 +842,7 @@ export const CartScreen = () => {
                                         <View className="mt-2">
                                             <TextInput
                                                 value={item.notes || ''}
-                                                onChangeText={(text) => updateItemNotes(item.productId, text)}
+                                                onChangeText={(text) => updateItemNotes(item.cartItemId, text)}
                                                 placeholder={t.cart.item_notes_placeholder || "Add special instructions..."}
                                                 placeholderTextColor={theme.colors.subtext}
                                                 className="text-xs px-2 py-1.5 rounded-lg border"
@@ -822,10 +859,10 @@ export const CartScreen = () => {
                                     </View>
 
                                     {/* Remove Button */}
-                                    <TouchableOpacity onPress={() => removeItem(item.productId)} className="ml-2 p-2">
+                                    <TouchableOpacity onPress={() => removeItem(item.cartItemId)} className="ml-2 p-2">
                                         <Ionicons name="trash-outline" size={24} color={theme.colors.expense} />
                                     </TouchableOpacity>
-                                </View>
+                                </TouchableOpacity>
                             ))}
                         </View>
                     </ScrollView>
@@ -923,18 +960,25 @@ export const CartScreen = () => {
                             </Text>
                             {items.map((item, idx) => (
                                 <View
-                                    key={item.productId}
+                                    key={item.cartItemId}
                                     className="flex-row items-center px-4 py-2.5"
                                     style={idx < items.length - 1 ? { borderBottomWidth: 1, borderBottomColor: theme.colors.border } : undefined}
                                 >
-                                    <Text className="text-sm flex-1" numberOfLines={1} style={{ color: theme.colors.text }}>
-                                        {item.name}
-                                    </Text>
+                                    <View className="flex-1">
+                                        <Text className="text-sm" numberOfLines={1} style={{ color: theme.colors.text }}>
+                                            {item.name}
+                                        </Text>
+                                        {item.selectedOptions.length > 0 && (
+                                            <Text className="text-xs" numberOfLines={2} style={{ color: theme.colors.subtext }}>
+                                                {item.selectedOptions.map((opt) => opt.name).join(', ')}
+                                            </Text>
+                                        )}
+                                    </View>
                                     <Text className="text-xs mx-2" style={{ color: theme.colors.subtext }}>
                                         ×{item.quantity}
                                     </Text>
                                     <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
-                                        €{(item.price * item.quantity).toFixed(2)}
+                                        €{(calculateItemUnitTotal(item) * item.quantity).toFixed(2)}
                                     </Text>
                                 </View>
                             ))}

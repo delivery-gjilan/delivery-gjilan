@@ -21,6 +21,15 @@ export function ProductDetails({
     selectedOptions,
     setSelectedOptions,
 }: ProductDetailsProps) {
+        const selectableVariants = [product, ...(product.variants ?? [])].filter(
+            (v: any, idx: number, arr: any[]) => arr.findIndex((x) => x.id === v.id) === idx,
+        );
+
+        const optionGroupsForSelection =
+            activeProduct.optionGroups && activeProduct.optionGroups.length > 0
+                ? activeProduct.optionGroups
+                : (product.optionGroups ?? []);
+
     const { t } = useTranslations();
     const theme = useTheme();
 
@@ -64,11 +73,11 @@ export function ProductDetails({
             </View>
 
             {/* Variants Selector */}
-            {product.variants && product.variants.length > 0 && (
+            {selectableVariants.length > 1 && (
                 <View className="mb-8">
                     <Text className="text-foreground text-lg font-bold mb-4">Select Variant</Text>
                     <View className="flex-row flex-wrap" style={{ gap: 10 }}>
-                        {product.variants.map((v: any) => (
+                        {selectableVariants.map((v: any) => (
                             <TouchableOpacity
                                 key={v.id}
                                 onPress={() => setSelectedVariantId(v.id)}
@@ -88,9 +97,9 @@ export function ProductDetails({
             )}
 
             {/* Option Groups */}
-            {activeProduct.optionGroups?.length > 0 && (
+            {optionGroupsForSelection.length > 0 && (
                 <View>
-                    {activeProduct.optionGroups.map((group: any) => (
+                    {optionGroupsForSelection.map((group: any) => (
                         <View key={group.id} className="mb-8">
                             <View className="flex-row items-baseline justify-between mb-4">
                                 <Text className="text-foreground text-lg font-bold">{group.name}</Text>

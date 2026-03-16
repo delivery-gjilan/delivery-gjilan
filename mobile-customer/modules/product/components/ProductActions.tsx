@@ -13,9 +13,10 @@ interface ProductActionsProps {
     product: any;
     selectedOptions: Record<string, string[]>;
     parentProduct?: any;
+    editingCartItemId?: string;
 }
 
-export function ProductActions({ product, selectedOptions, parentProduct }: ProductActionsProps) {
+export function ProductActions({ product, selectedOptions, parentProduct, editingCartItemId }: ProductActionsProps) {
     const theme = useTheme();
     const { t } = useTranslations();
     const insets = useSafeAreaInsets();
@@ -33,11 +34,14 @@ export function ProductActions({ product, selectedOptions, parentProduct }: Prod
         addToCart,
         updateCart,
         removeFromCart,
-    } = useProductActions(product, selectedOptions, parentProduct);
+    } = useProductActions(product, selectedOptions, parentProduct, editingCartItemId);
 
     // Validation: Check if all mandatory option groups have enough selections
     const isSelectionValid = useMemo(() => {
-        const optionGroups = product.optionGroups || parentProduct?.optionGroups || [];
+        const optionGroups =
+            product.optionGroups && product.optionGroups.length > 0
+                ? product.optionGroups
+                : (parentProduct?.optionGroups ?? []);
         return optionGroups.every((og: any) => {
             const selected = selectedOptions[og.id] || [];
             return selected.length >= og.minSelections;

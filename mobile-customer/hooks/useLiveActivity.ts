@@ -10,6 +10,7 @@ interface DeliveryLiveActivitiesModule {
     updateActivity(activityId: string, state: object): Promise<string>;
     endActivity(activityId: string): Promise<void>;
     getPushToken(activityId: string): Promise<string>;
+    findActivityByOrderId(orderId: string): Promise<string | null>;
 }
 
 const DeliveryLiveActivitiesNative: DeliveryLiveActivitiesModule | undefined =
@@ -18,6 +19,8 @@ const DeliveryLiveActivitiesNative: DeliveryLiveActivitiesModule | undefined =
 interface DeliveryActivityState {
     driverName: string;
     estimatedMinutes: number;
+    phaseInitialMinutes: number;
+    phaseStartedAt: number;
     status: 'preparing' | 'ready' | 'out_for_delivery' | 'delivered';
     orderId: string;
     lastUpdated: number; // Unix timestamp ms
@@ -81,6 +84,13 @@ export function useLiveActivity({ orderId, orderDisplayId, businessName, enabled
         }
 
         try {
+            if (!activityIdRef.current && DeliveryLiveActivitiesNative?.findActivityByOrderId) {
+                const existingActivityId = await DeliveryLiveActivitiesNative.findActivityByOrderId(orderId);
+                if (existingActivityId) {
+                    activityIdRef.current = existingActivityId;
+                }
+            }
+
             // If activity already exists, just update it
             if (activityIdRef.current) {
                 console.log('[LiveActivity] Activity already exists, updating instead');

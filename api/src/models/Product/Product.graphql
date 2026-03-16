@@ -48,6 +48,9 @@ type Product {
 }
 
 type ProductCard {
+    # Storefront identity:
+    # - variant sets: variantGroupId
+    # - standalone products: product.id
     id: ID!
     name: String!
     imageUrl: String

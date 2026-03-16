@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery } from '@apollo/client/react';
@@ -8,7 +8,12 @@ import { Product } from '@/gql/graphql';
 import { GET_BUSINESS } from '@/graphql/operations/businesses';
 import { useTranslations } from '@/hooks/useTranslations';
 
-export function useProductActions(product: any, selectedOptions: Record<string, string[]> = {}, parentProduct?: any) {
+export function useProductActions(
+    product: any,
+    selectedOptions: Record<string, string[]> = {},
+    parentProduct?: any,
+    editingCartItemId?: string,
+) {
     const { items } = useCart();
     const { addItem, updateQuantity, removeItem } = useCartActions();
     const { t } = useTranslations();
@@ -34,6 +39,10 @@ export function useProductActions(product: any, selectedOptions: Record<string, 
 
     // Local quantity state
     const [localQuantity, setLocalQuantity] = useState(cartItem?.quantity || 1);
+
+    useEffect(() => {
+        setLocalQuantity(cartItem?.quantity || 1);
+    }, [cartItem?.quantity]);
 
     const isInCart = !!cartItem;
     const hasQuantityChanged = isInCart && cartItem.quantity !== localQuantity;
@@ -65,7 +74,11 @@ export function useProductActions(product: any, selectedOptions: Record<string, 
         }[] = [];
 
         Object.entries(selectedOptions).forEach(([groupId, optionIds]) => {
-            const group = (product.optionGroups || parentProduct?.optionGroups)?.find((og: any) => og.id === groupId);
+            const sourceOptionGroups =
+                product.optionGroups && product.optionGroups.length > 0
+                    ? product.optionGroups
+                    : (parentProduct?.optionGroups ?? []);
+            const group = sourceOptionGroups.find((og: any) => og.id === groupId);
             if (group) {
                 optionIds.forEach((oid) => {
                     const opt = group.options.find((o: any) => o.id === oid);
@@ -109,6 +122,12 @@ export function useProductActions(product: any, selectedOptions: Record<string, 
         if (error) {
             Alert.alert(t.product.cannot_add_item, error);
             return;
+        }
+
+        // If we came from editing a specific cart item and selection key changed,
+        // remove the previous cart entry so the edit behaves as a replace.
+        if (editingCartItemId && editingCartItemId !== cartItemId) {
+            removeItem(editingCartItemId);
         }
 
         // Navigate back to previous screen

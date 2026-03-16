@@ -91,6 +91,8 @@ export function updateLiveActivity(
     status: 'preparing' | 'ready' | 'out_for_delivery' | 'delivered',
     driverName: string = 'Your driver',
     estimatedMinutes: number = 0,
+    phaseInitialMinutes?: number,
+    phaseStartedAt?: number,
 ): void {
     // Only send Live Activity updates for relevant statuses
     if (!['preparing', 'ready', 'out_for_delivery', 'delivered'].includes(status)) {
@@ -103,6 +105,8 @@ export function updateLiveActivity(
             driverName,
             estimatedMinutes,
             status,
+            phaseInitialMinutes,
+            phaseStartedAt,
         })
         .catch((err) => logger.error({ err, orderId, status }, 'Failed to send Live Activity update'));
 }
