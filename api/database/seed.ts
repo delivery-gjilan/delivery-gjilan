@@ -257,6 +257,10 @@ async function seed() {
     await db.delete(products);
     await db.delete(productSubcategories);
     await db.delete(productCategories);
+    await db.delete(promotionBusinessEligibility);
+    await db.delete(userPromotions);
+    await db.delete(userPromoMetadata);
+    await db.delete(promotions);
     await db.delete(orderItems);
     await db.delete(orders);
     await db.delete(businesses);
@@ -525,7 +529,7 @@ async function seed() {
     // Seed promotions (compatible with `promotions` schema)
     // ------------------------------
     try {
-        const [exampleBusiness] = await db.select().from(businesses).limit(1).returning();
+        const [exampleBusiness] = await db.select().from(businesses).limit(1);
         const businessId = exampleBusiness?.id ?? null;
 
         // First-order auto-applied free delivery promo (no code)
@@ -535,17 +539,17 @@ async function seed() {
             description: 'Free delivery for users on their first order (auto-applied)',
             type: 'FREE_DELIVERY',
             target: 'FIRST_ORDER',
-            discount_value: null,
-            max_discount_cap: null,
-            min_order_amount: 0,
-            spend_threshold: null,
-            threshold_reward: null,
-            max_global_usage: null,
-            max_usage_per_user: 1,
-            current_global_usage: 0,
-            is_stackable: false,
+            discountValue: null,
+            maxDiscountCap: null,
+            minOrderAmount: 0,
+            spendThreshold: null,
+            thresholdReward: null,
+            maxGlobalUsage: null,
+            maxUsagePerUser: 1,
+            currentGlobalUsage: 0,
+            isStackable: false,
             priority: 100,
-            is_active: true,
+            isActive: true,
         }).returning();
 
         // Global percentage promo
@@ -555,17 +559,17 @@ async function seed() {
             description: '20% off your order (up to 50€)',
             type: 'PERCENTAGE',
             target: 'ALL_USERS',
-            discount_value: 20.0,
-            max_discount_cap: 50.0,
-            min_order_amount: 0,
-            spend_threshold: null,
-            threshold_reward: null,
-            max_global_usage: 10000,
-            max_usage_per_user: 1,
-            current_global_usage: 0,
-            is_stackable: false,
+            discountValue: 20.0,
+            maxDiscountCap: 50.0,
+            minOrderAmount: 0,
+            spendThreshold: null,
+            thresholdReward: null,
+            maxGlobalUsage: 10000,
+            maxUsagePerUser: 1,
+            currentGlobalUsage: 0,
+            isStackable: false,
             priority: 50,
-            is_active: true,
+            isActive: true,
         }).returning();
 
         // Fixed discount promo
@@ -575,17 +579,17 @@ async function seed() {
             description: 'Flat 3€ off on orders over 10€',
             type: 'FIXED_AMOUNT',
             target: 'ALL_USERS',
-            discount_value: 3.0,
-            max_discount_cap: null,
-            min_order_amount: 10.0,
-            spend_threshold: null,
-            threshold_reward: null,
-            max_global_usage: 5000,
-            max_usage_per_user: 3,
-            current_global_usage: 0,
-            is_stackable: true,
+            discountValue: 3.0,
+            maxDiscountCap: null,
+            minOrderAmount: 10.0,
+            spendThreshold: null,
+            thresholdReward: null,
+            maxGlobalUsage: 5000,
+            maxUsagePerUser: 3,
+            currentGlobalUsage: 0,
+            isStackable: true,
             priority: 40,
-            is_active: true,
+            isActive: true,
         }).returning();
 
         // Business-specific promo if a business exists
@@ -596,22 +600,22 @@ async function seed() {
                 description: '10% off for a specific business',
                 type: 'PERCENTAGE',
                 target: 'CONDITIONAL',
-                discount_value: 10.0,
-                max_discount_cap: 20.0,
-                min_order_amount: 0,
-                spend_threshold: null,
-                threshold_reward: null,
-                max_global_usage: 2000,
-                max_usage_per_user: 2,
-                current_global_usage: 0,
-                is_stackable: false,
+                discountValue: 10.0,
+                maxDiscountCap: 20.0,
+                minOrderAmount: 0,
+                spendThreshold: null,
+                thresholdReward: null,
+                maxGlobalUsage: 2000,
+                maxUsagePerUser: 2,
+                currentGlobalUsage: 0,
+                isStackable: false,
                 priority: 60,
-                is_active: true,
+                isActive: true,
             }).returning();
 
             await db.insert(promotionBusinessEligibility).values({
-                promotion_id: bizPromo.id,
-                business_id: businessId,
+                promotionId: bizPromo.id,
+                businessId,
             }).onConflictDoNothing();
         }
 
@@ -619,19 +623,19 @@ async function seed() {
         const sampleUser = (await db.select().from(users).limit(1)).at(0);
         if (sampleUser) {
             await db.insert(userPromotions).values({
-                user_id: sampleUser.id,
-                promotion_id: fixedPromo.id,
-                assigned_by: sampleUser.id,
-                expires_at: null,
-                usage_count: 0,
-                is_active: true,
+                userId: sampleUser.id,
+                promotionId: fixedPromo.id,
+                assignedBy: sampleUser.id,
+                expiresAt: null,
+                usageCount: 0,
+                isActive: true,
             }).onConflictDoNothing();
 
             await db.insert(userPromoMetadata).values({
-                user_id: sampleUser.id,
-                has_used_first_order_promo: false,
-                total_promotions_used: 0,
-                total_savings: 0,
+                userId: sampleUser.id,
+                hasUsedFirstOrderPromo: false,
+                totalPromotionsUsed: 0,
+                totalSavings: 0,
             }).onConflictDoNothing();
         }
 

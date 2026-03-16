@@ -180,10 +180,19 @@ export class OrderService {
         const effectiveOrderPrice = promoResult.finalSubtotal;
         const effectiveDeliveryPrice = promoResult.finalDeliveryPrice;
         const totalOrderPrice = promoResult.finalTotal;
+        const undiscountedTotal = calculatedItemsTotal + input.deliveryPrice;
 
-        // Verify total price matches client input (allow small float error)
-        if (Math.abs(totalOrderPrice - input.totalPrice) > 0.01) {
-            throw AppError.badInput(`Price mismatch: Calculated ${totalOrderPrice}, provided ${input.totalPrice}`);
+        // Verify total price matches client input (allow small float error).
+        // If no promo code is provided, tolerate a client total that matches the
+        // undiscounted total because server-side auto-promotions may still apply.
+        const matchesEffectiveTotal = Math.abs(totalOrderPrice - input.totalPrice) <= 0.01;
+        const matchesUndiscountedTotal = Math.abs(undiscountedTotal - input.totalPrice) <= 0.01;
+
+        if (!matchesEffectiveTotal) {
+            const allowUndiscountedForAutoPromotions = !input.promoCode && matchesUndiscountedTotal;
+            if (!allowUndiscountedForAutoPromotions) {
+                throw AppError.badInput(`Price mismatch: Calculated ${totalOrderPrice}, provided ${input.totalPrice}`);
+            }
         }
 
         const orderData = {
