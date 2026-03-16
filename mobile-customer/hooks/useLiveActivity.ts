@@ -178,6 +178,13 @@ export function useLiveActivity({ orderId, orderDisplayId, businessName, enabled
         }
     }, [isSupported]);
 
+    // Safety net: if tracking is disabled (e.g. delivered/cancelled), end active activity.
+    useEffect(() => {
+        if (!enabled || !isSupported) {
+            void endLiveActivity();
+        }
+    }, [enabled, isSupported, endLiveActivity]);
+
     return {
         startLiveActivity,
         updateLiveActivity,

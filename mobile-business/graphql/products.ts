@@ -5,20 +5,26 @@ export const GET_BUSINESS_PRODUCTS = graphql(`
     query GetBusinessProducts($businessId: ID!) {
         products(businessId: $businessId) {
             id
-            businessId
-            categoryId
-            subcategoryId
             name
-            description
             imageUrl
-            price
-            isOnSale
-            salePrice
-            isAvailable
-            sortOrder
-            stock
-            createdAt
-            updatedAt
+            basePrice
+            isOffer
+            product {
+                id
+                businessId
+                categoryId
+                subcategoryId
+                name
+                description
+                imageUrl
+                price
+                isOnSale
+                salePrice
+                isAvailable
+                sortOrder
+                createdAt
+                updatedAt
+            }
         }
         productCategories(businessId: $businessId) {
             id
@@ -39,7 +45,6 @@ export const CREATE_PRODUCT = graphql(`
             imageUrl
             price
             isAvailable
-            stock
         }
     }
 `);
@@ -55,7 +60,6 @@ export const UPDATE_PRODUCT = graphql(`
             isOnSale
             salePrice
             isAvailable
-            stock
         }
     }
 `);

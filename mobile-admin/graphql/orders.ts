@@ -52,7 +52,7 @@ export const GET_ORDERS = gql`
                     name
                     imageUrl
                     quantity
-                    price
+                    unitPrice
                 }
             }
         }
@@ -109,7 +109,7 @@ export const GET_ORDER = gql`
                     name
                     imageUrl
                     quantity
-                    price
+                    unitPrice
                 }
             }
         }
@@ -234,7 +234,7 @@ export const ALL_ORDERS_SUBSCRIPTION = gql`
                     name
                     imageUrl
                     quantity
-                    price
+                    unitPrice
                 }
             }
         }

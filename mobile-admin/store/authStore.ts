@@ -94,11 +94,15 @@ export const useAuthStore = create<AuthState>()(
                 return () => {
                     if (!state) {
                         console.log('[AuthStore] Rehydration failed - no state');
+                        useAuthStore.setState({ hasHydrated: true });
                         return;
                     }
                     // Token will be loaded separately from SecureStore on app startup
                     console.log('[AuthStore] Hydrated with user:', state.user?.email || 'none');
-                    state.hasHydrated = true;
+                    useAuthStore.setState((current) => ({
+                        hasHydrated: true,
+                        isAuthenticated: calculateIsAuthenticated(current.token, current.user),
+                    }));
                 };
             },
         },

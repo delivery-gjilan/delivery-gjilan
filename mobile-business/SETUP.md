@@ -19,21 +19,21 @@ I've created a **comprehensive mobile app** specifically for businesses (restaur
    - Haptic feedback for important actions
 
 2. **🍔 Products Management**
-   - List all products with images, prices, and stock levels
+  - List all products with images, prices, and availability state
    - Quick toggle to mark products as available/unavailable
    - Add new products (form ready to be implemented)
    - Edit existing products
    - Delete products with confirmation
    - Search products by name
    - Filter by category
-   - View stock status (Low Stock, Out of Stock badges)
+  - View product status badges (Unavailable, On Sale)
    - Sale price support
 
 3. **📊 Dashboard & Analytics**
    - Today's orders count and revenue
    - Completion rate percentage
    - Active orders (Pending, Preparing)
-   - Product statistics (Total, Unavailable, Low Stock)
+  - Product statistics (Total, Unavailable)
    - Beautiful gradient stat cards
    - Quick action buttons
 
@@ -143,7 +143,7 @@ Use any business owner account from your database. Example:
 ### Products
 - `GET_BUSINESS_PRODUCTS` - Fetches products and categories
 - `CREATE_PRODUCT` - Adds new product
-- `UPDATE_PRODUCT` - Updates product (price, stock, availability)
+- `UPDATE_PRODUCT` - Updates product (price, availability)
 - `DELETE_PRODUCT` - Removes product
 - `CREATE_CATEGORY` - Adds category
 
@@ -188,10 +188,9 @@ The orders screen subscribes to `allOrdersUpdated` and automatically:
   - Product image (or placeholder)
   - Name, description
   - Price (with sale price if applicable)
-  - Stock level
   - Availability toggle switch
   - Edit and Delete buttons
-  - Status badges (Unavailable, On Sale, Low Stock, Out of Stock)
+  - Status badges (Unavailable, On Sale)
 - FAB button to add new product
 
 ### Dashboard Screen
@@ -203,7 +202,6 @@ The orders screen subscribes to `allOrdersUpdated` and automatically:
   - Preparing orders
   - Total products
   - Unavailable products
-  - Low stock products
 - Quick action buttons for common tasks
 - Pull-to-refresh to update stats
 

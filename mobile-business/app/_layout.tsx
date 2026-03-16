@@ -6,6 +6,7 @@ import { apolloClient } from '@/lib/apollo';
 import { useAuthStore } from '@/store/authStore';
 import { useAuthInitialization } from '@/hooks/useAuthInitialization';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useBusinessDeviceMonitoring } from '@/hooks/useBusinessDeviceMonitoring';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator } from 'react-native';
 import InfoBanner from '@/components/InfoBanner';
@@ -27,17 +28,19 @@ function AppContent() {
     // Initialize authentication
     useAuthInitialization();
     useNotifications();
+    useBusinessDeviceMonitoring();
 
     // Navigation guard
     useEffect(() => {
         if (!hasHydrated) return;
 
         const currentSegment = segments[0];
-        const inTabsGroup = currentSegment === 'dashboard' || currentSegment === 'products' || currentSegment === 'settings';
+        const inTabsGroup = currentSegment === '(tabs)';
+        const onLoginRoute = currentSegment === 'login';
         
         if (!isAuthenticated && inTabsGroup) {
             router.replace('/login');
-        } else if (isAuthenticated && !inTabsGroup) {
+        } else if (isAuthenticated && onLoginRoute) {
             router.replace('/(tabs)');
         }
     }, [isAuthenticated, segments, hasHydrated, router]);

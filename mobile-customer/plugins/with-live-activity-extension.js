@@ -329,12 +329,26 @@ const EXTENSION_INFO_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+  <key>CFBundleDisplayName</key>
+  <string>$(PRODUCT_NAME)</string>
+  <key>CFBundleExecutable</key>
+  <string>$(EXECUTABLE_NAME)</string>
+  <key>CFBundleIdentifier</key>
+  <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>$(PRODUCT_NAME)</string>
+  <key>CFBundlePackageType</key>
+  <string>XPC!</string>
+  <key>CFBundleShortVersionString</key>
+  <string>$(MARKETING_VERSION)</string>
+  <key>CFBundleVersion</key>
+  <string>$(CURRENT_PROJECT_VERSION)</string>
   <key>NSExtension</key>
   <dict>
     <key>NSExtensionPointIdentifier</key>
     <string>com.apple.widgetkit-extension</string>
-    <key>NSExtensionPrincipalClass</key>
-    <string>$(PRODUCT_MODULE_NAME).DeliveryLiveActivityBundle</string>
   </dict>
 </dict>
 </plist>
@@ -484,8 +498,8 @@ function withLiveActivityExtensionTarget(config) {
       return null;
     };
 
-    const setTargetSigning = (targetUuid, developmentTeam) => {
-      if (!targetUuid || !developmentTeam) {
+    const setTargetBuildSettings = (targetUuid, developmentTeam, bundleId, marketingVersion, currentProjectVersion) => {
+      if (!targetUuid) {
         return;
       }
 
@@ -511,29 +525,111 @@ function withLiveActivityExtensionTarget(config) {
           continue;
         }
 
-        buildConfig.buildSettings.DEVELOPMENT_TEAM = developmentTeam;
-        buildConfig.buildSettings.CODE_SIGN_STYLE = 'Automatic';
+        if (developmentTeam) {
+          buildConfig.buildSettings.DEVELOPMENT_TEAM = developmentTeam;
+          buildConfig.buildSettings.CODE_SIGN_STYLE = 'Automatic';
+        }
+
+        buildConfig.buildSettings.PRODUCT_BUNDLE_PACKAGE_TYPE = '"com.apple.package-type.app-extension"';
+        buildConfig.buildSettings.MACH_O_TYPE = 'mh_bundle';
+        buildConfig.buildSettings.INFOPLIST_FILE = `${EXTENSION_TARGET_NAME}/${EXTENSION_TARGET_NAME}-Info.plist`;
+        buildConfig.buildSettings.GENERATE_INFOPLIST_FILE = 'NO';
+        buildConfig.buildSettings.PRODUCT_NAME = EXTENSION_TARGET_NAME;
+        buildConfig.buildSettings.SKIP_INSTALL = 'YES';
+        buildConfig.buildSettings.APPLICATION_EXTENSION_API_ONLY = 'YES';
+        buildConfig.buildSettings.SWIFT_VERSION = '5.0';
+        buildConfig.buildSettings.IPHONEOS_DEPLOYMENT_TARGET = '16.2';
+        buildConfig.buildSettings.ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = 'AccentColor';
+        buildConfig.buildSettings.ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = 'WidgetBackground';
+        buildConfig.buildSettings.LD_RUNPATH_SEARCH_PATHS = '"$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"';
+        if (bundleId) {
+          buildConfig.buildSettings.PRODUCT_BUNDLE_IDENTIFIER = bundleId;
+        }
+
+        if (marketingVersion) {
+          buildConfig.buildSettings.MARKETING_VERSION = marketingVersion;
+        }
+
+        if (currentProjectVersion) {
+          buildConfig.buildSettings.CURRENT_PROJECT_VERSION = currentProjectVersion;
+        }
       }
     };
+
+    const getMainAppBuildSettings = () => {
+      const nativeTargets = project.pbxNativeTargetSection();
+      const buildConfigLists = project.pbxXCConfigurationList();
+      const buildConfigSection = project.pbxXCBuildConfigurationSection();
+
+      const mainAppTargetEntry = Object.values(nativeTargets).find((target) => {
+        return (
+          target &&
+          typeof target === 'object' &&
+          target.productType === '"com.apple.product-type.application"'
+        );
+      });
+
+      if (!mainAppTargetEntry || !mainAppTargetEntry.buildConfigurationList) {
+        return {};
+      }
+
+      const configListId = String(mainAppTargetEntry.buildConfigurationList).split(' ')[0].replace(/"/g, '');
+      const configList = buildConfigLists[configListId];
+      if (!configList || !Array.isArray(configList.buildConfigurations)) {
+        return {};
+      }
+
+      const settings = {};
+
+      for (const configRef of configList.buildConfigurations) {
+        const configId = String(configRef.value || configRef).split(' ')[0].replace(/"/g, '');
+        const buildConfig = buildConfigSection[configId];
+        const buildSettings = buildConfig?.buildSettings;
+        if (!buildSettings) continue;
+
+        if (!settings.DEVELOPMENT_TEAM && buildSettings.DEVELOPMENT_TEAM) {
+          settings.DEVELOPMENT_TEAM = String(buildSettings.DEVELOPMENT_TEAM).replace(/"/g, '');
+        }
+        if (!settings.MARKETING_VERSION && buildSettings.MARKETING_VERSION) {
+          settings.MARKETING_VERSION = buildSettings.MARKETING_VERSION;
+        }
+        if (!settings.CURRENT_PROJECT_VERSION && buildSettings.CURRENT_PROJECT_VERSION) {
+          settings.CURRENT_PROJECT_VERSION = buildSettings.CURRENT_PROJECT_VERSION;
+        }
+      }
+
+      return settings;
+    };
+
+    const mainAppSettings = getMainAppBuildSettings();
 
     const resolvedDevelopmentTeam =
       cfg.ios?.appleTeamId ||
       process.env.EXPO_APPLE_TEAM_ID ||
       process.env.APPLE_TEAM_ID ||
-      getMainAppDevelopmentTeam();
+      mainAppSettings.DEVELOPMENT_TEAM;
 
-    if (project.pbxTargetByName(EXTENSION_TARGET_NAME)) {
-      const existingTarget = project.pbxTargetByName(EXTENSION_TARGET_NAME);
-      if (existingTarget?.uuid && resolvedDevelopmentTeam) {
-        setTargetSigning(existingTarget.uuid, resolvedDevelopmentTeam);
-      }
-      setMainTargetSourceExclusions();
-      console.log('[LiveActivityExtension] Extension target already exists, skipping target creation');
-      return cfg;
-    }
+    const marketingVersion = cfg.version || mainAppSettings.MARKETING_VERSION || '1.0.0';
+    const currentProjectVersion = cfg.ios?.buildNumber || mainAppSettings.CURRENT_PROJECT_VERSION || '1';
 
     const appBundleId = cfg.ios?.bundleIdentifier || 'com.anonymous.mobilecustomer';
     const extensionBundleId = `${appBundleId}.${EXTENSION_TARGET_NAME}`;
+
+    if (project.pbxTargetByName(EXTENSION_TARGET_NAME)) {
+      const existingTarget = project.pbxTargetByName(EXTENSION_TARGET_NAME);
+      if (existingTarget?.uuid) {
+        setTargetBuildSettings(
+          existingTarget.uuid,
+          resolvedDevelopmentTeam,
+          extensionBundleId,
+          marketingVersion,
+          currentProjectVersion
+        );
+      }
+      setMainTargetSourceExclusions();
+      console.log('[LiveActivityExtension] Updated existing extension target build settings');
+      return cfg;
+    }
 
     const target = project.addTarget(
       EXTENSION_TARGET_NAME,
@@ -547,34 +643,116 @@ function withLiveActivityExtensionTarget(config) {
       return cfg;
     }
 
+    console.log('[LiveActivityExtension] Created target:', target.uuid || target);
+    const targetUuid = target.uuid || target;
+
     ensureGroupRecursively(project, EXTENSION_TARGET_NAME);
 
-    addBuildSourceFileToGroup({
-      filepath: `${EXTENSION_TARGET_NAME}/DeliveryActivityAttributes.swift`,
-      groupName: EXTENSION_TARGET_NAME,
-      project,
-      targetUuid: target.uuid,
-      verbose: true,
-    });
-
-    addBuildSourceFileToGroup({
-      filepath: `${EXTENSION_TARGET_NAME}/DeliveryLiveActivityWidget.swift`,
-      groupName: EXTENSION_TARGET_NAME,
-      project,
-      targetUuid: target.uuid,
-      verbose: true,
-    });
-
-    if (resolvedDevelopmentTeam) {
-      setTargetSigning(target.uuid, resolvedDevelopmentTeam);
-      console.log('[LiveActivityExtension] Applied extension signing team', { developmentTeam: resolvedDevelopmentTeam });
-    } else {
-      console.warn('[LiveActivityExtension] Could not resolve development team for extension target');
+    // Ensure the extension target has build phases
+    if (typeof project.addBuildPhase === 'function') {
+      project.addBuildPhase([], 'PBXSourcesBuildPhase', 'Sources', targetUuid);
+      project.addBuildPhase([], 'PBXFrameworksBuildPhase', 'Frameworks', targetUuid);
+      project.addBuildPhase([], 'PBXResourcesBuildPhase', 'Resources', targetUuid);
     }
+
+    // Helper to add file and link to target
+    const linkSourceFile = (filepath, targetUuid) => {
+      const fileRefs = project.pbxFileReferenceSection();
+      const filename = path.basename(filepath);
+      const existingFileKey = Object.keys(fileRefs).find(key => {
+        const ref = fileRefs[key];
+        return typeof ref === 'object' && (ref.path === `"${filepath}"` || ref.path === filepath || ref.name === `"${filename}"` || ref.name === filename);
+      });
+
+      if (existingFileKey) {
+        const pbxFile = {
+          fileRef: existingFileKey,
+          basename: filename
+        };
+        project.addToPbxBuildFileSection(pbxFile);
+        if (typeof project.addToPbxSourcesBuildPhase === 'function') {
+          project.addToPbxSourcesBuildPhase(pbxFile, targetUuid);
+        }
+      } else {
+        addBuildSourceFileToGroup({
+          filepath,
+          groupName: EXTENSION_TARGET_NAME,
+          project,
+          targetUuid,
+          verbose: true,
+        });
+      }
+    };
+
+    linkSourceFile(`${EXTENSION_TARGET_NAME}/DeliveryActivityAttributes.swift`, targetUuid);
+    linkSourceFile(`${EXTENSION_TARGET_NAME}/DeliveryLiveActivityWidget.swift`, targetUuid);
+
+    setTargetBuildSettings(
+      target.uuid,
+      resolvedDevelopmentTeam,
+      extensionBundleId,
+      marketingVersion,
+      currentProjectVersion
+    );
 
     setMainTargetSourceExclusions();
 
-    console.log('[LiveActivityExtension] Created extension target and linked Swift sources');
+    const mainTargetUuid = Object.keys(project.pbxNativeTargetSection()).find((uuid) => {
+      const t = project.pbxNativeTargetSection()[uuid];
+      return typeof t === 'object' && t.productType === '"com.apple.product-type.application"';
+    });
+
+    if (mainTargetUuid) {
+      // 1. Add target dependency
+      project.addTargetDependency(mainTargetUuid, [target.uuid]);
+
+      // 2. Embed the extension (PlugIns)
+      const pbxCopyFilesBuildPhase = project.hash.project.objects['PBXCopyFilesBuildPhase'] || {};
+      let embedPhaseUuid = Object.keys(pbxCopyFilesBuildPhase).find(key => {
+        const phase = pbxCopyFilesBuildPhase[key];
+        return typeof phase === 'object' && (phase.name === '"Embed App Extensions"' || phase.dstSubfolderSpec === '13');
+      });
+
+      if (!embedPhaseUuid) {
+        const newPhase = project.addBuildPhase([], 'PBXCopyFilesBuildPhase', 'Embed App Extensions', mainTargetUuid, 'app_extension');
+        if (newPhase && newPhase.buildPhase) {
+          newPhase.buildPhase.dstSubfolderSpec = 13;
+        }
+        embedPhaseUuid = newPhase.uuid;
+      }
+
+      const productFileRef = target.pbxNativeTarget.productReference;
+      const productFile = project.pbxFileReferenceSection()[productFileRef];
+      if (productFile && embedPhaseUuid) {
+        const file = {
+          fileRef: productFileRef,
+          basename: productFile.path,
+          settings: { ATTRIBUTES: ['RemoveHeadersOnCopy'] }
+        };
+        const buildFile = project.addToPbxBuildFileSection(file);
+        if (buildFile && buildFile.uuid) {
+          if (!project.hash.project.objects['PBXCopyFilesBuildPhase'][embedPhaseUuid].files) {
+            project.hash.project.objects['PBXCopyFilesBuildPhase'][embedPhaseUuid].files = [];
+          }
+          project.hash.project.objects['PBXCopyFilesBuildPhase'][embedPhaseUuid].files.push({
+            value: buildFile.uuid,
+            comment: productFile.path.replace(/"/g, '')
+          });
+        }
+      }
+    }
+
+    if (resolvedDevelopmentTeam) {
+      console.log('[LiveActivityExtension] Applied extension signing team', { developmentTeam: resolvedDevelopmentTeam });
+    }
+
+    // Link frameworks necessary for Live Activities
+    const frameworks = ['ActivityKit.framework', 'WidgetKit.framework', 'SwiftUI.framework'];
+    for (const framework of frameworks) {
+      project.addFramework(framework, { target: target.uuid });
+    }
+
+    console.log('[LiveActivityExtension] Created extension target, added dependency, and linked Swift sources/frameworks');
 
     return cfg;
   });

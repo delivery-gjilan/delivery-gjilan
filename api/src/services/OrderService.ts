@@ -12,14 +12,13 @@ import {
     deliveryPricingTiers as deliveryPricingTiersTable,
     deliveryZones as deliveryZonesTable,
     userBehaviors as userBehaviorsTable,
-    productStocks as productStocksTable,
     orderPromotions as orderPromotionsTable,
     orderItemOptions as orderItemOptionsTable,
     optionGroups as optionGroupsTable,
     options as optionsDbTable,
 } from '@/database/schema';
 import { userPromoMetadata } from '@/database/schema';
-import { and, asc, eq, gte, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Order, OrderBusiness, OrderItem, OrderStatus, CreateOrderInput } from '@/generated/types.generated';
 import type { DbOrder } from '@/database/schema/orders';
 import { PubSub, publish, subscribe, topics } from '@/lib/pubsub';
@@ -365,6 +364,8 @@ export class OrderService {
         // When no explicit promoCode is supplied, we allow either:
         // 1) effective total (after auto-applied promos), or
         // 2) undiscounted total (items + delivery) for clients that don't pre-apply auto promos.
+        // If no promo code is provided, tolerate a client total that matches the
+        // undiscounted total because server-side auto-promotions may still apply.
         const matchesEffectiveTotal = Math.abs(totalOrderPrice - input.totalPrice) <= 0.01;
         const matchesUndiscountedTotal = Math.abs(undiscountedTotal - input.totalPrice) <= 0.01;
 
@@ -510,29 +511,6 @@ export class OrderService {
             }
         }
 
-        // Decrement stock for ordered top-level products only (not child items of offers)
-        for (const item of flatItems) {
-            const updated = await db
-                .update(productStocksTable)
-                .set({ stock: sql`${productStocksTable.stock} - ${item.quantity}` })
-                .where(
-                    and(eq(productStocksTable.productId, item.productId), gte(productStocksTable.stock, item.quantity)),
-                )
-                .returning();
-
-            if (updated.length === 0) {
-                const existingStock = await db
-                    .select()
-                    .from(productStocksTable)
-                    .where(eq(productStocksTable.productId, item.productId))
-                    .then((rows) => rows[0]);
-
-                if (existingStock) {
-                    throw AppError.badInput(`Insufficient stock for product. Only ${existingStock.stock} available.`);
-                }
-            }
-        }
-
         return this.mapToOrder(createdOrder);
     }
 
@@ -585,13 +563,6 @@ export class OrderService {
                 : [];
         const productById = new Map(productsRows.map((p) => [p.id, p]));
 
-        // Batch-fetch all stock records (1 query)
-        const stockRows =
-            productIds.length > 0
-                ? await db.select().from(productStocksTable).where(inArray(productStocksTable.productId, productIds))
-                : [];
-        const stockByProductId = new Map(stockRows.map((s) => [s.productId, s]));
-
         // Separate top-level and child items
         const topLevelItems = allItems.filter((i) => !i.parentOrderItemId);
         const childItemsMap = new Map<string, typeof allItems>();
@@ -606,9 +577,6 @@ export class OrderService {
         // Helper to build an OrderItem from a DB row
         const buildOrderItem = (item: (typeof allItems)[0]): OrderItem => {
             const product = productById.get(item.productId);
-            const stockRecord = stockByProductId.get(item.productId);
-            const currentStock = stockRecord?.stock ?? 0;
-            const originalStock = Math.max(0, currentStock + item.quantity);
 
             const selectedOptions = (itemOptionsMap.get(item.id) ?? []).map((oio) => ({
                 id: oio.id,
@@ -628,8 +596,6 @@ export class OrderService {
                 imageUrl: product?.imageUrl || undefined,
                 quantity: item.quantity,
                 unitPrice: item.unitPrice,
-                quantityInStock: Math.min(item.quantity, originalStock),
-                quantityNeeded: Math.max(0, item.quantity - originalStock),
                 notes: item.notes || undefined,
                 selectedOptions,
                 childItems: children,
@@ -881,36 +847,7 @@ export class OrderService {
             throw AppError.notFound('Order');
         }
 
-        // Get top-level order items only (child items' stock is not tracked separately)
         const db = await getDB();
-        const items = await db
-            .select()
-            .from(orderItemsTable)
-            .where(and(eq(orderItemsTable.orderId, id), isNull(orderItemsTable.parentOrderItemId)));
-
-        // Restore stock for cancelled order items
-        for (const item of items) {
-            const existingStock = await db
-                .select()
-                .from(productStocksTable)
-                .where(eq(productStocksTable.productId, item.productId))
-                .then((rows) => rows[0]);
-
-            if (existingStock) {
-                await db
-                    .update(productStocksTable)
-                    .set({ stock: sql`${productStocksTable.stock} + ${item.quantity}` })
-                    .where(eq(productStocksTable.productId, item.productId));
-            } else {
-                await db
-                    .insert(productStocksTable)
-                    .values({
-                        productId: item.productId,
-                        stock: item.quantity,
-                    })
-                    .onConflictDoNothing();
-            }
-        }
 
         const order = await this.updateOrderStatus(id, 'CANCELLED');
 

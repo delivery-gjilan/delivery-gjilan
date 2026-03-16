@@ -923,7 +923,12 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         orderId: order?.id ?? '',
         orderDisplayId: order?.displayId ?? '',
         businessName: businessName,
-        enabled: !!(order?.id && (status === 'OUT_FOR_DELIVERY' || customerVisibleStatus === 'PREPARING')),
+        enabled: !!(
+            order?.id &&
+            !isCompleted &&
+            !isCancelled &&
+            (status === 'PENDING' || customerVisibleStatus === 'PREPARING' || status === 'OUT_FOR_DELIVERY')
+        ),
     });
 
     // Manage Live Activity: start/update when active, end when done
@@ -1027,7 +1032,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
             Alert.alert('Failed', 'Could not mark this order as delivered.');
             return;
         }
-//qapaasd
+
         Alert.alert('Success', 'Order marked as delivered.');
     }, [order?.id, isMarkingAsDelivered, updateOrderStatus]);
 

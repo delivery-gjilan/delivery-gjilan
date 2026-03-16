@@ -43,7 +43,7 @@ export const GET_BUSINESS_ORDERS = graphql(`
                     name
                     imageUrl
                     quantity
-                    price
+                    unitPrice
                     notes
                 }
             }
@@ -114,7 +114,7 @@ export const ORDERS_SUBSCRIPTION = graphql(`
                     productId
                     name
                     quantity
-                    price
+                    unitPrice
                     notes
                 }
             }

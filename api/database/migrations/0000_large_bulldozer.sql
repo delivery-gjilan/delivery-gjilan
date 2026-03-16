@@ -418,14 +418,6 @@ CREATE TABLE "wallet_transactions" (
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "product_stocks" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"product_id" uuid NOT NULL,
-	"stock" integer NOT NULL,
-	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
-);
---> statement-breakpoint
 CREATE TABLE "order_promotions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"order_id" uuid NOT NULL,
@@ -492,6 +484,27 @@ CREATE TABLE "refresh_token_sessions" (
 	"revoked_at" timestamp with time zone,
 	"expires_at" timestamp with time zone NOT NULL,
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "business_device_health" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"user_id" uuid NOT NULL,
+	"business_id" uuid NOT NULL,
+	"device_id" text NOT NULL,
+	"platform" "device_platform" NOT NULL,
+	"app_version" text,
+	"app_state" text,
+	"network_type" text,
+	"battery_level" integer,
+	"is_charging" boolean,
+	"subscription_alive" boolean DEFAULT false NOT NULL,
+	"last_heartbeat_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	"last_order_signal_at" timestamp with time zone,
+	"last_push_received_at" timestamp with time zone,
+	"last_order_id" uuid,
+	"metadata" jsonb,
+	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "notification_campaigns" (
@@ -633,7 +646,6 @@ ALTER TABLE "wallet_transactions" ADD CONSTRAINT "wallet_transactions_wallet_id_
 ALTER TABLE "wallet_transactions" ADD CONSTRAINT "wallet_transactions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "wallet_transactions" ADD CONSTRAINT "wallet_transactions_order_id_orders_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "wallet_transactions" ADD CONSTRAINT "wallet_transactions_promotion_id_promotions_id_fk" FOREIGN KEY ("promotion_id") REFERENCES "public"."promotions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "product_stocks" ADD CONSTRAINT "product_stocks_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order_promotions" ADD CONSTRAINT "order_promotions_order_id_orders_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order_promotions" ADD CONSTRAINT "order_promotions_promotion_id_promotions_id_fk" FOREIGN KEY ("promotion_id") REFERENCES "public"."promotions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_address" ADD CONSTRAINT "user_address_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -642,6 +654,7 @@ ALTER TABLE "user_referrals" ADD CONSTRAINT "user_referrals_referred_user_id_use
 ALTER TABLE "live_activity_tokens" ADD CONSTRAINT "live_activity_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "live_activity_tokens" ADD CONSTRAINT "live_activity_tokens_order_id_orders_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "refresh_token_sessions" ADD CONSTRAINT "refresh_token_sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "business_device_health" ADD CONSTRAINT "business_device_health_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "notification_campaigns" ADD CONSTRAINT "notification_campaigns_sent_by_users_id_fk" FOREIGN KEY ("sent_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "notifications" ADD CONSTRAINT "notifications_campaign_id_notification_campaigns_id_fk" FOREIGN KEY ("campaign_id") REFERENCES "public"."notification_campaigns"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -696,12 +709,16 @@ CREATE INDEX "idx_user_wallet_user" ON "user_wallet" USING btree ("user_id");-->
 CREATE INDEX "idx_wallet_transactions_wallet" ON "wallet_transactions" USING btree ("wallet_id");--> statement-breakpoint
 CREATE INDEX "idx_wallet_transactions_user" ON "wallet_transactions" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "idx_wallet_transactions_type" ON "wallet_transactions" USING btree ("type");--> statement-breakpoint
-CREATE INDEX "idx_product_stocks_product_id" ON "product_stocks" USING btree ("product_id");--> statement-breakpoint
 CREATE INDEX "idx_order_promotions_order_id" ON "order_promotions" USING btree ("order_id");--> statement-breakpoint
 CREATE INDEX "idx_user_address_user_id" ON "user_address" USING btree ("user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "refresh_token_sessions_token_hash_uq" ON "refresh_token_sessions" USING btree ("token_hash");--> statement-breakpoint
 CREATE INDEX "refresh_token_sessions_user_id_idx" ON "refresh_token_sessions" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "refresh_token_sessions_expires_at_idx" ON "refresh_token_sessions" USING btree ("expires_at");--> statement-breakpoint
+CREATE UNIQUE INDEX "business_device_health_user_device_idx" ON "business_device_health" USING btree ("user_id","device_id");--> statement-breakpoint
+CREATE INDEX "idx_business_device_health_business" ON "business_device_health" USING btree ("business_id");--> statement-breakpoint
+CREATE INDEX "idx_business_device_health_last_heartbeat" ON "business_device_health" USING btree ("last_heartbeat_at");--> statement-breakpoint
+CREATE INDEX "idx_business_device_health_last_order_signal" ON "business_device_health" USING btree ("last_order_signal_at");--> statement-breakpoint
+CREATE INDEX "idx_business_device_health_last_push_received" ON "business_device_health" USING btree ("last_push_received_at");--> statement-breakpoint
 CREATE INDEX "idx_notifications_user_id" ON "notifications" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "idx_push_telemetry_events_created_at" ON "push_telemetry_events" USING btree ("created_at");--> statement-breakpoint
 CREATE INDEX "idx_push_telemetry_events_event_type" ON "push_telemetry_events" USING btree ("event_type");--> statement-breakpoint

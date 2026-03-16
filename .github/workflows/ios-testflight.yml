@@ -328,4 +328,5 @@ jobs:
           path: |
             mobile-customer/ios/buildlogs/*.log
             /Users/runner/Library/Logs/gym/*.log
+            /Users/runner/Library/Developer/Xcode/DerivedData/**/Logs/Build/*.xcresult
           if-no-files-found: ignore

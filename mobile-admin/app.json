@@ -48,6 +48,7 @@
           "enableBackgroundRemoteNotifications": true
         }
       ],
+      "@rnmapbox/maps",
       [
         "expo-splash-screen",
         {

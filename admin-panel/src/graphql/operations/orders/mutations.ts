@@ -31,7 +31,7 @@ export const UPDATE_ORDER_STATUS = graphql(`
                     name
                     imageUrl
                     quantity
-                    price
+                    unitPrice
                 }
             }
         }
@@ -115,7 +115,7 @@ export const CREATE_TEST_ORDER = graphql(`
                     name
                     imageUrl
                     quantity
-                    price
+                    unitPrice
                 }
             }
         }

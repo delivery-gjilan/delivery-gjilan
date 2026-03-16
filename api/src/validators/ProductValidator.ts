@@ -15,7 +15,6 @@ const createProductSchema = z.object({
     isOnSale: z.boolean().optional(),
     salePrice: z.number().min(0, 'Sale price must be positive').optional().nullable(),
     isAvailable: z.boolean().optional(),
-    stock: z.number().int().min(0, 'Stock must be non-negative').optional(),
 });
 
 const updateProductSchema = z.object({
@@ -29,7 +28,6 @@ const updateProductSchema = z.object({
     isOnSale: z.boolean().optional(),
     salePrice: z.number().min(0, 'Sale price must be positive').optional().nullable(),
     isAvailable: z.boolean().optional(),
-    stock: z.number().int().min(0, 'Stock must be non-negative').optional(),
 });
 
 export class ProductValidator {

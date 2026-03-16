@@ -11,7 +11,7 @@ import { users } from './users';
  * 
  * Product Management:
  * - view_products: Can view products and inventory
- * - manage_products: Can create, update, delete products and manage stock
+ * - manage_products: Can create, update, delete products
  * 
  * Financial:
  * - view_finances: Can view settlements and financial reports

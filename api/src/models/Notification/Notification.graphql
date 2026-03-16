@@ -33,6 +33,12 @@ enum PushTelemetryEventType {
     TOKEN_UNREGISTERED
 }
 
+enum BusinessDeviceOnlineStatus {
+    ONLINE
+    STALE
+    OFFLINE
+}
+
 type DeviceToken {
     id: ID!
     userId: ID!
@@ -115,6 +121,29 @@ type PushTelemetrySummary {
     byPlatform: [TelemetryCount!]!
 }
 
+type BusinessDeviceHealth {
+    id: ID!
+    userId: ID!
+    businessId: ID!
+    deviceId: String!
+    platform: DevicePlatform!
+    appVersion: String
+    appState: String
+    networkType: String
+    batteryLevel: Int
+    isCharging: Boolean
+    subscriptionAlive: Boolean!
+    lastHeartbeatAt: DateTime!
+    lastOrderSignalAt: DateTime
+    lastPushReceivedAt: DateTime
+    lastOrderId: ID
+    metadata: JSON
+    createdAt: DateTime!
+    updatedAt: DateTime!
+    onlineStatus: BusinessDeviceOnlineStatus!
+    receivingOrders: Boolean!
+}
+
 # ── Inputs ────────────────────────────────────────────────────────
 
 input RegisterDeviceTokenInput {
@@ -160,6 +189,18 @@ input TrackPushTelemetryInput {
     metadata: JSON
 }
 
+input BusinessDeviceHeartbeatInput {
+    deviceId: String!
+    platform: DevicePlatform!
+    appVersion: String
+    appState: String
+    networkType: String
+    batteryLevel: Int
+    isCharging: Boolean
+    subscriptionAlive: Boolean!
+    metadata: JSON
+}
+
 # ── Operations ────────────────────────────────────────────────────
 
 type Query {
@@ -175,6 +216,7 @@ type Query {
         platform: DevicePlatform
         eventType: PushTelemetryEventType
     ): [PushTelemetryEvent!]!
+    businessDeviceHealth(hours: Int): [BusinessDeviceHealth!]!
 }
 
 type Mutation {
@@ -186,4 +228,6 @@ type Mutation {
     sendCampaign(id: ID!): NotificationCampaign!
     deleteCampaign(id: ID!): Boolean!
     trackPushTelemetry(input: TrackPushTelemetryInput!): Boolean!
+    businessDeviceHeartbeat(input: BusinessDeviceHeartbeatInput!): Boolean!
+    businessDeviceOrderSignal(deviceId: String!, orderId: ID): Boolean!
 }

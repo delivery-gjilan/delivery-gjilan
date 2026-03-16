@@ -170,3 +170,30 @@ export const GET_PUSH_TELEMETRY_EVENTS = gql`
     }
   }
 `;
+
+export const GET_BUSINESS_DEVICE_HEALTH = gql`
+  query GetBusinessDeviceHealth($hours: Int) {
+    businessDeviceHealth(hours: $hours) {
+      id
+      userId
+      businessId
+      deviceId
+      platform
+      appVersion
+      appState
+      networkType
+      batteryLevel
+      isCharging
+      subscriptionAlive
+      lastHeartbeatAt
+      lastOrderSignalAt
+      lastPushReceivedAt
+      lastOrderId
+      metadata
+      createdAt
+      updatedAt
+      onlineStatus
+      receivingOrders
+    }
+  }
+`;

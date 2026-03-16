@@ -53,9 +53,15 @@ const GET_PRICING = gql`
     products(businessId: $businessId) {
       id
       name
-      price
-      description
       imageUrl
+      basePrice
+      product {
+        id
+        name
+        description
+        imageUrl
+        price
+      }
     }
   }
 `;
@@ -118,7 +124,13 @@ export default function ProductPricingPage() {
   });
 
   const pricingRecords = pricingData?.productPricingByBusiness || [];
-  const products = pricingData?.products || [];
+  const products = (pricingData?.products || []).map((card: any) => ({
+    id: card.product?.id ?? card.id,
+    name: card.product?.name ?? card.name,
+    description: card.product?.description ?? null,
+    imageUrl: card.product?.imageUrl ?? card.imageUrl,
+    price: card.product?.price ?? card.basePrice ?? 0,
+  }));
 
   // Merge products with their pricing data
   const productList = products.map((product: any) => {

@@ -118,7 +118,6 @@ const uploadLimiter = rateLimit({
 });
 
 // Exclude high-frequency system operations from rate limiting
-const SYSTEM_OPERATIONS = new Set(['DriverHeartbeat', 'DriverBatteryReport']);
 const AUTH_OPERATIONS = new Set([
     'Login',
     'InitiateSignup',
@@ -126,6 +125,12 @@ const AUTH_OPERATIONS = new Set([
     'VerifyEmail',
     'VerifyPhone',
     'ResendEmailVerification',
+]);
+const SYSTEM_OPERATIONS = new Set([
+    'DriverHeartbeat',
+    'DriverBatteryReport',
+    'BusinessDeviceHeartbeat',
+    'BusinessDeviceOrderSignal',
 ]);
 
 app.use('/graphql', (req, res, next) => {

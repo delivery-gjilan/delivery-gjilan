@@ -213,6 +213,47 @@ export type BusinessDayHoursInput = {
   opensAt: Scalars['String']['input'];
 };
 
+export type BusinessDeviceHealth = {
+  __typename?: 'BusinessDeviceHealth';
+  appState?: Maybe<Scalars['String']['output']>;
+  appVersion?: Maybe<Scalars['String']['output']>;
+  batteryLevel?: Maybe<Scalars['Int']['output']>;
+  businessId: Scalars['ID']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  deviceId: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  isCharging?: Maybe<Scalars['Boolean']['output']>;
+  lastHeartbeatAt: Scalars['DateTime']['output'];
+  lastOrderId?: Maybe<Scalars['ID']['output']>;
+  lastOrderSignalAt?: Maybe<Scalars['DateTime']['output']>;
+  lastPushReceivedAt?: Maybe<Scalars['DateTime']['output']>;
+  metadata?: Maybe<Scalars['JSON']['output']>;
+  networkType?: Maybe<Scalars['String']['output']>;
+  onlineStatus: BusinessDeviceOnlineStatus;
+  platform: DevicePlatform;
+  receivingOrders: Scalars['Boolean']['output'];
+  subscriptionAlive: Scalars['Boolean']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+  userId: Scalars['ID']['output'];
+};
+
+export type BusinessDeviceHeartbeatInput = {
+  appState?: InputMaybe<Scalars['String']['input']>;
+  appVersion?: InputMaybe<Scalars['String']['input']>;
+  batteryLevel?: InputMaybe<Scalars['Int']['input']>;
+  deviceId: Scalars['String']['input'];
+  isCharging?: InputMaybe<Scalars['Boolean']['input']>;
+  metadata?: InputMaybe<Scalars['JSON']['input']>;
+  networkType?: InputMaybe<Scalars['String']['input']>;
+  platform: DevicePlatform;
+  subscriptionAlive: Scalars['Boolean']['input'];
+};
+
+export type BusinessDeviceOnlineStatus =
+  | 'OFFLINE'
+  | 'ONLINE'
+  | 'STALE';
+
 export type BusinessPromotion = {
   __typename?: 'BusinessPromotion';
   description?: Maybe<Scalars['String']['output']>;
@@ -373,7 +414,6 @@ export type CreateProductInput = {
   name: Scalars['String']['input'];
   price: Scalars['Float']['input'];
   salePrice?: InputMaybe<Scalars['Float']['input']>;
-  stock?: InputMaybe<Scalars['Int']['input']>;
   subcategoryId?: InputMaybe<Scalars['ID']['input']>;
   variantGroupId?: InputMaybe<Scalars['ID']['input']>;
 };
@@ -682,6 +722,8 @@ export type Mutation = {
   assignDriverToOrder: Order;
   assignPromotionToUsers: Array<UserPromotion>;
   backfillSettlementsForDeliveredOrders: Scalars['Int']['output'];
+  businessDeviceHeartbeat: Scalars['Boolean']['output'];
+  businessDeviceOrderSignal: Scalars['Boolean']['output'];
   cancelOrder: Order;
   createBanner: Banner;
   createBusiness: Business;
@@ -835,6 +877,17 @@ export type MutationassignDriverToOrderArgs = {
 
 export type MutationassignPromotionToUsersArgs = {
   input: AssignPromotionToUserInput;
+};
+
+
+export type MutationbusinessDeviceHeartbeatArgs = {
+  input: BusinessDeviceHeartbeatInput;
+};
+
+
+export type MutationbusinessDeviceOrderSignalArgs = {
+  deviceId: Scalars['String']['input'];
+  orderId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 
@@ -1431,8 +1484,6 @@ export type OrderItem = {
   parentOrderItemId?: Maybe<Scalars['ID']['output']>;
   productId: Scalars['ID']['output'];
   quantity: Scalars['Int']['output'];
-  quantityInStock: Scalars['Int']['output'];
-  quantityNeeded: Scalars['Int']['output'];
   selectedOptions: Array<OrderItemOption>;
   unitPrice: Scalars['Float']['output'];
 };
@@ -1513,7 +1564,6 @@ export type Product = {
   price: Scalars['Float']['output'];
   salePrice?: Maybe<Scalars['Float']['output']>;
   sortOrder: Scalars['Int']['output'];
-  stock: Scalars['Int']['output'];
   subcategoryId?: Maybe<Scalars['ID']['output']>;
   updatedAt: Scalars['String']['output'];
   variantGroup?: Maybe<ProductVariantGroup>;
@@ -1709,6 +1759,7 @@ export type Query = {
   auditLogs: AuditLogConnection;
   business?: Maybe<Business>;
   businessBalance: SettlementSummary;
+  businessDeviceHealth: Array<BusinessDeviceHealth>;
   businesses: Array<Business>;
   calculateDeliveryPrice: DeliveryPriceResult;
   calculateProductPrice: Scalars['String']['output'];
@@ -1800,6 +1851,11 @@ export type QuerybusinessArgs = {
 
 export type QuerybusinessBalanceArgs = {
   businessId: Scalars['ID']['input'];
+};
+
+
+export type QuerybusinessDeviceHealthArgs = {
+  hours?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -2372,7 +2428,6 @@ export type UpdateProductInput = {
   price?: InputMaybe<Scalars['Float']['input']>;
   salePrice?: InputMaybe<Scalars['Float']['input']>;
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
-  stock?: InputMaybe<Scalars['Int']['input']>;
   subcategoryId?: InputMaybe<Scalars['ID']['input']>;
   variantGroupId?: InputMaybe<Scalars['ID']['input']>;
 };
@@ -2673,6 +2728,9 @@ export type ResolversTypes = {
   Business: ResolverTypeWrapper<Omit<Business, 'activePromotion' | 'businessType'> & { activePromotion?: Maybe<ResolversTypes['BusinessPromotion']>, businessType: ResolversTypes['BusinessType'] }>;
   BusinessDayHours: ResolverTypeWrapper<BusinessDayHours>;
   BusinessDayHoursInput: BusinessDayHoursInput;
+  BusinessDeviceHealth: ResolverTypeWrapper<Omit<BusinessDeviceHealth, 'onlineStatus' | 'platform'> & { onlineStatus: ResolversTypes['BusinessDeviceOnlineStatus'], platform: ResolversTypes['DevicePlatform'] }>;
+  BusinessDeviceHeartbeatInput: BusinessDeviceHeartbeatInput;
+  BusinessDeviceOnlineStatus: ResolverTypeWrapper<'ONLINE' | 'STALE' | 'OFFLINE'>;
   BusinessPromotion: ResolverTypeWrapper<Omit<BusinessPromotion, 'type'> & { type: ResolversTypes['PromotionType'] }>;
   BusinessType: ResolverTypeWrapper<'MARKET' | 'PHARMACY' | 'RESTAURANT'>;
   CalculationDetails: ResolverTypeWrapper<CalculationDetails>;
@@ -2839,6 +2897,8 @@ export type ResolversParentTypes = {
   Business: Omit<Business, 'activePromotion'> & { activePromotion?: Maybe<ResolversParentTypes['BusinessPromotion']> };
   BusinessDayHours: BusinessDayHours;
   BusinessDayHoursInput: BusinessDayHoursInput;
+  BusinessDeviceHealth: BusinessDeviceHealth;
+  BusinessDeviceHeartbeatInput: BusinessDeviceHeartbeatInput;
   BusinessPromotion: BusinessPromotion;
   CalculationDetails: CalculationDetails;
   CartContextInput: CartContextInput;
@@ -3075,6 +3135,32 @@ export type BusinessDayHoursResolvers<ContextType = GraphQLContext, ParentType e
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
+export type BusinessDeviceHealthResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['BusinessDeviceHealth'] = ResolversParentTypes['BusinessDeviceHealth']> = {
+  appState?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  appVersion?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  batteryLevel?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
+  businessId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  createdAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+  deviceId?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  isCharging?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType>;
+  lastHeartbeatAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+  lastOrderId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
+  lastOrderSignalAt?: Resolver<Maybe<ResolversTypes['DateTime']>, ParentType, ContextType>;
+  lastPushReceivedAt?: Resolver<Maybe<ResolversTypes['DateTime']>, ParentType, ContextType>;
+  metadata?: Resolver<Maybe<ResolversTypes['JSON']>, ParentType, ContextType>;
+  networkType?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  onlineStatus?: Resolver<ResolversTypes['BusinessDeviceOnlineStatus'], ParentType, ContextType>;
+  platform?: Resolver<ResolversTypes['DevicePlatform'], ParentType, ContextType>;
+  receivingOrders?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  subscriptionAlive?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  updatedAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+  userId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type BusinessDeviceOnlineStatusResolvers = EnumResolverSignature<{ OFFLINE?: any, ONLINE?: any, STALE?: any }, ResolversTypes['BusinessDeviceOnlineStatus']>;
+
 export type BusinessPromotionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['BusinessPromotion'] = ResolversParentTypes['BusinessPromotion']> = {
   description?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   discountValue?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
@@ -3267,6 +3353,8 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   assignDriverToOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationassignDriverToOrderArgs, 'id'>>;
   assignPromotionToUsers?: Resolver<Array<ResolversTypes['UserPromotion']>, ParentType, ContextType, RequireFields<MutationassignPromotionToUsersArgs, 'input'>>;
   backfillSettlementsForDeliveredOrders?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  businessDeviceHeartbeat?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationbusinessDeviceHeartbeatArgs, 'input'>>;
+  businessDeviceOrderSignal?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationbusinessDeviceOrderSignalArgs, 'deviceId'>>;
   cancelOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationcancelOrderArgs, 'id'>>;
   createBanner?: Resolver<ResolversTypes['Banner'], ParentType, ContextType, RequireFields<MutationcreateBannerArgs, 'input'>>;
   createBusiness?: Resolver<ResolversTypes['Business'], ParentType, ContextType, RequireFields<MutationcreateBusinessArgs, 'input'>>;
@@ -3472,8 +3560,6 @@ export type OrderItemResolvers<ContextType = GraphQLContext, ParentType extends 
   parentOrderItemId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   productId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   quantity?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
-  quantityInStock?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
-  quantityNeeded?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   selectedOptions?: Resolver<Array<ResolversTypes['OrderItemOption']>, ParentType, ContextType>;
   unitPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
@@ -3534,7 +3620,6 @@ export type ProductResolvers<ContextType = GraphQLContext, ParentType extends Re
   price?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   salePrice?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   sortOrder?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
-  stock?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   subcategoryId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   variantGroup?: Resolver<Maybe<ResolversTypes['ProductVariantGroup']>, ParentType, ContextType>;
@@ -3709,6 +3794,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   auditLogs?: Resolver<ResolversTypes['AuditLogConnection'], ParentType, ContextType, Partial<QueryauditLogsArgs>>;
   business?: Resolver<Maybe<ResolversTypes['Business']>, ParentType, ContextType, RequireFields<QuerybusinessArgs, 'id'>>;
   businessBalance?: Resolver<ResolversTypes['SettlementSummary'], ParentType, ContextType, RequireFields<QuerybusinessBalanceArgs, 'businessId'>>;
+  businessDeviceHealth?: Resolver<Array<ResolversTypes['BusinessDeviceHealth']>, ParentType, ContextType, Partial<QuerybusinessDeviceHealthArgs>>;
   businesses?: Resolver<Array<ResolversTypes['Business']>, ParentType, ContextType>;
   calculateDeliveryPrice?: Resolver<ResolversTypes['DeliveryPriceResult'], ParentType, ContextType, RequireFields<QuerycalculateDeliveryPriceArgs, 'businessId' | 'dropoffLat' | 'dropoffLng'>>;
   calculateProductPrice?: Resolver<ResolversTypes['String'], ParentType, ContextType, RequireFields<QuerycalculateProductPriceArgs, 'productId'>>;
@@ -4043,6 +4129,8 @@ export type Resolvers<ContextType = GraphQLContext> = {
   BannerType?: BannerTypeResolvers;
   Business?: BusinessResolvers<ContextType>;
   BusinessDayHours?: BusinessDayHoursResolvers<ContextType>;
+  BusinessDeviceHealth?: BusinessDeviceHealthResolvers<ContextType>;
+  BusinessDeviceOnlineStatus?: BusinessDeviceOnlineStatusResolvers;
   BusinessPromotion?: BusinessPromotionResolvers<ContextType>;
   BusinessType?: BusinessTypeResolvers;
   CalculationDetails?: CalculationDetailsResolvers<ContextType>;

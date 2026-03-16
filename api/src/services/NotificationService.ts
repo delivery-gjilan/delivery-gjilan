@@ -40,6 +40,19 @@ export interface PushTelemetryPayload {
     metadata?: Record<string, unknown>;
 }
 
+export interface BusinessDeviceHeartbeatPayload {
+    businessId: string;
+    deviceId: string;
+    platform: DevicePlatform;
+    appVersion?: string;
+    appState?: string;
+    networkType?: string;
+    batteryLevel?: number;
+    isCharging?: boolean;
+    subscriptionAlive: boolean;
+    metadata?: Record<string, unknown>;
+}
+
 export class NotificationService {
     constructor(public readonly repo: NotificationRepository) {}
 
@@ -70,7 +83,7 @@ export class NotificationService {
     }
 
     async trackPushTelemetry(userId: string, payload: PushTelemetryPayload) {
-        return this.repo.createPushTelemetryEvent({
+        const event = await this.repo.createPushTelemetryEvent({
             userId,
             appType: payload.appType,
             platform: payload.platform,
@@ -83,6 +96,53 @@ export class NotificationService {
             orderId: payload.orderId,
             actionId: payload.actionId,
             metadata: payload.metadata,
+        });
+
+        if (payload.appType === 'BUSINESS' && payload.eventType === 'RECEIVED' && payload.deviceId) {
+            await this.repo.touchBusinessDevicePushReceived(userId, payload.deviceId);
+        }
+
+        return event;
+    }
+
+    async businessDeviceHeartbeat(userId: string, payload: BusinessDeviceHeartbeatPayload) {
+        return this.repo.upsertBusinessDeviceHeartbeat({
+            userId,
+            businessId: payload.businessId,
+            deviceId: payload.deviceId,
+            platform: payload.platform,
+            appVersion: payload.appVersion,
+            appState: payload.appState,
+            networkType: payload.networkType,
+            batteryLevel: payload.batteryLevel,
+            isCharging: payload.isCharging,
+            subscriptionAlive: payload.subscriptionAlive,
+            metadata: payload.metadata,
+        });
+    }
+
+    async businessDeviceOrderSignal(userId: string, deviceId: string, orderId?: string) {
+        await this.repo.touchBusinessDeviceOrderSignal(userId, deviceId, orderId);
+    }
+
+    async getBusinessDeviceHealth(hours = 24) {
+        const rows = await this.repo.getBusinessDeviceHealthRows(hours);
+        const now = Date.now();
+
+        return rows.map((row) => {
+            const lastHeartbeatMs = row.lastHeartbeatAt ? new Date(row.lastHeartbeatAt).getTime() : 0;
+            const heartbeatAgeMs = now - lastHeartbeatMs;
+            const onlineStatus =
+                heartbeatAgeMs <= 90_000 ? 'ONLINE' : heartbeatAgeMs <= 5 * 60_000 ? 'STALE' : 'OFFLINE';
+
+            const lastOrderSignalMs = row.lastOrderSignalAt ? new Date(row.lastOrderSignalAt).getTime() : 0;
+            const receivingOrders = lastOrderSignalMs > 0 && now - lastOrderSignalMs <= 15 * 60_000;
+
+            return {
+                ...row,
+                onlineStatus,
+                receivingOrders,
+            };
         });
     }
 
@@ -118,6 +178,31 @@ export class NotificationService {
         return result;
     }
 
+    async sendToUserByAppType(
+        userId: string,
+        appType: DeviceAppType,
+        payload: NotificationPayload,
+        type: NotificationType,
+    ): Promise<SendResult> {
+        const tokens = await this.repo.getTokensByUserIdAndAppType(userId, appType);
+        if (tokens.length === 0) {
+            return { successCount: 0, failureCount: 0, staleTokens: [] };
+        }
+
+        const tokenStrings = tokens.map((t) => t.token);
+        const result = await this.sendMulticast(tokenStrings, payload);
+
+        await this.repo.createNotification({
+            userId,
+            title: payload.title,
+            body: payload.body,
+            data: payload.data as Record<string, unknown> | undefined,
+            type,
+        });
+
+        return result;
+    }
+
     // ────────────────────────────────────────────────────────────────
     // Send to multiple users
     // ────────────────────────────────────────────────────────────────
@@ -139,6 +224,36 @@ export class NotificationService {
         const result = await this.sendMulticast(tokenStrings, payload);
 
         // Log notifications for all users
+        const notificationRecords = userIds.map((uid) => ({
+            userId: uid,
+            title: payload.title,
+            body: payload.body,
+            data: payload.data as Record<string, unknown> | undefined,
+            type,
+        }));
+        await this.repo.createNotifications(notificationRecords);
+
+        return result;
+    }
+
+    async sendToUsersByAppType(
+        userIds: string[],
+        appType: DeviceAppType,
+        payload: NotificationPayload,
+        type: NotificationType,
+    ): Promise<SendResult> {
+        if (userIds.length === 0) {
+            return { successCount: 0, failureCount: 0, staleTokens: [] };
+        }
+
+        const allTokens = await this.repo.getTokensByUserIdsAndAppType(userIds, appType);
+        if (allTokens.length === 0) {
+            return { successCount: 0, failureCount: 0, staleTokens: [] };
+        }
+
+        const tokenStrings = allTokens.map((t) => t.token);
+        const result = await this.sendMulticast(tokenStrings, payload);
+
         const notificationRecords = userIds.map((uid) => ({
             userId: uid,
             title: payload.title,
@@ -399,8 +514,23 @@ export class NotificationService {
         // Send end event to each Live Activity
         for (const tokenRecord of tokens) {
             try {
+                const finalState = {
+                    driverName: 'Your driver',
+                    estimatedMinutes: 0,
+                    status: 'delivered',
+                    orderId,
+                    lastUpdated: Date.now(),
+                };
+
                 const message: Message = {
                     token: tokenRecord.pushToken,
+                    data: {
+                        driverName: finalState.driverName,
+                        estimatedMinutes: String(finalState.estimatedMinutes),
+                        status: finalState.status,
+                        orderId,
+                        lastUpdated: String(finalState.lastUpdated),
+                    },
                     apns: {
                         headers: {
                             'apns-push-type': 'liveactivity',
@@ -411,6 +541,7 @@ export class NotificationService {
                             aps: {
                                 timestamp: Math.floor(Date.now() / 1000),
                                 event: 'end',
+                                'content-state': finalState,
                                 'dismissal-date': Math.floor(Date.now() / 1000) + 10, // Dismiss after 10 seconds
                             },
                         },

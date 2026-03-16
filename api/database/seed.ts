@@ -4,7 +4,6 @@ import { businessHours } from './schema/businessHours';
 import { productCategories, NewDbProductCategory } from './schema/productCategories';
 import { productSubcategories, NewDbProductSubcategory } from './schema/productSubcategories';
 import { products, NewDbProduct } from './schema/products';
-import { productStocks, NewDbProductStock } from './schema/productStock';
 import { productVariantGroups } from './schema/productVariantGroups';
 import { optionGroups } from './schema/optionGroups';
 import { options } from './schema/options';
@@ -261,6 +260,10 @@ async function seed() {
     await db.delete(products);
     await db.delete(productSubcategories);
     await db.delete(productCategories);
+    await db.delete(promotionBusinessEligibility);
+    await db.delete(userPromotions);
+    await db.delete(userPromoMetadata);
+    await db.delete(promotions);
     await db.delete(orderItems);
     await db.delete(orders);
     await db.delete(businesses);
@@ -421,14 +424,7 @@ async function seed() {
                     salePrice: isOnSale ? productData.price * 0.85 : null,
                 };
                 const [createdProduct] = await db.insert(products).values(product).returning();
-                
-                // Create stock entry for the product
-                const stock = Math.floor(Math.random() * 90) + 10; // Random stock between 10-100
-                await db.insert(productStocks).values({
-                    productId: createdProduct.id,
-                    stock,
-                });
-                
+
                 businessProducts.push({
                     id: createdProduct.id,
                     name: createdProduct.name,
@@ -513,14 +509,7 @@ async function seed() {
                         salePrice: isOnSale ? productData.price * 0.85 : null,
                     };
                     const [createdProduct] = await db.insert(products).values(product).returning();
-                    
-                    // Create stock entry for the product
-                    const stock = Math.floor(Math.random() * 90) + 10; // Random stock between 10-100
-                    await db.insert(productStocks).values({
-                        productId: createdProduct.id,
-                        stock,
-                    });
-                    
+
                     businessProducts.push({
                         id: createdProduct.id,
                         name: createdProduct.name,
@@ -695,7 +684,6 @@ async function seed() {
                         isOnSale: false,
                         salePrice: null,
                     }).returning();
-                    await db.insert(productStocks).values({ productId: p.id, stock: 50 });
                 }
                 console.log('  🍕 Added variant group "Pizza Base Type" with 3 variants to Casbas Pizza');
 
@@ -712,7 +700,6 @@ async function seed() {
                     isOnSale: false,
                     salePrice: null,
                 }).returning();
-                await db.insert(productStocks).values({ productId: buildYourOwn.id, stock: 50 });
 
                 const [sauceGroup] = await db.insert(optionGroups).values({
                     productId: buildYourOwn.id,
@@ -754,7 +741,6 @@ async function seed() {
                     isOnSale: false,
                     salePrice: null,
                 }).returning();
-                await db.insert(productStocks).values({ productId: mealDeal.id, stock: 50 });
 
                 const [choosePizzaGroup] = await db.insert(optionGroups).values({
                     productId: mealDeal.id,

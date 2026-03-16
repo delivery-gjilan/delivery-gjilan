@@ -46,15 +46,13 @@ Use this as a dependency map before refactoring.
 3. Calls `productService.createProduct(input)`
 4. Service validates input (Zod)
 5. Repository inserts into `products`
-6. If `stock` provided and `> 0`, inserts into `product_stocks`
-7. Resolver writes audit log `PRODUCT_CREATED`
+6. Resolver writes audit log `PRODUCT_CREATED`
 
 ### Files
 - Resolver: `api/src/models/Product/resolvers/Mutation/createProduct.ts`
 - Service: `api/src/services/ProductService.ts`
 - Validator: `api/src/validators/ProductValidator.ts`
 - Repository: `api/src/repositories/ProductRepository.ts`
-- Stock table: `api/database/schema/productStock.ts`
 
 ### Notes
 - No explicit cache invalidation is done in product create resolver.
@@ -70,14 +68,12 @@ Use this as a dependency map before refactoring.
 3. For `BUSINESS_EMPLOYEE`, enforces `manage_products` + same business restriction
 4. Calls `productService.deleteProduct(id)`
 5. Repository hard deletes from `products`
-6. `product_stocks` row is deleted via FK cascade (`product_id -> products.id onDelete: cascade`)
-7. Resolver writes audit log `PRODUCT_DELETED` when deletion succeeds
+6. Resolver writes audit log `PRODUCT_DELETED` when deletion succeeds
 
 ### Files
 - Resolver: `api/src/models/Product/resolvers/Mutation/deleteProduct.ts`
 - Service: `api/src/services/ProductService.ts`
 - Repository: `api/src/repositories/ProductRepository.ts`
-- FK behavior: `api/database/schema/productStock.ts`
 
 ---
 
@@ -264,7 +260,6 @@ Files:
 
 ### Product
 - Hard delete
-- Stock rows cascade delete
 
 ---
 
@@ -347,7 +342,7 @@ If you refactor create/delete flows, update these together:
 - Use explicit featured/promo selection strategy (flag, score, campaign) rather than index positions.
 
 6. Add integration tests around create/delete and restaurant menu display
-- Product create with stock
+- Product create with availability state
 - Category delete cascade behavior
 - Subcategory delete set-null behavior
 - Business soft delete visibility rules
@@ -358,10 +353,10 @@ If you refactor create/delete flows, update these together:
 ## 8) Quick Sequence Diagrams (Text)
 
 ### Create Product
-GraphQL Mutation -> Resolver (permission checks) -> ProductService (validate) -> ProductRepository (insert product) -> optional stock insert -> AuditLog
+GraphQL Mutation -> Resolver (permission checks) -> ProductService (validate) -> ProductRepository (insert product) -> AuditLog
 
 ### Delete Product
-GraphQL Mutation -> Resolver (load product + permission checks) -> ProductService -> ProductRepository (hard delete) -> FK cascade stock delete -> AuditLog
+GraphQL Mutation -> Resolver (load product + permission checks) -> ProductService -> ProductRepository (hard delete) -> AuditLog
 
 ### Delete Business
 GraphQL Mutation -> BusinessService -> BusinessRepository (soft delete) -> cache.invalidateBusiness

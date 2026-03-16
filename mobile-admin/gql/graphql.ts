@@ -215,6 +215,48 @@ export type BusinessDayHoursInput = {
   opensAt: Scalars['String']['input'];
 };
 
+export type BusinessDeviceHealth = {
+  __typename?: 'BusinessDeviceHealth';
+  appState?: Maybe<Scalars['String']['output']>;
+  appVersion?: Maybe<Scalars['String']['output']>;
+  batteryLevel?: Maybe<Scalars['Int']['output']>;
+  businessId: Scalars['ID']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  deviceId: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  isCharging?: Maybe<Scalars['Boolean']['output']>;
+  lastHeartbeatAt: Scalars['DateTime']['output'];
+  lastOrderId?: Maybe<Scalars['ID']['output']>;
+  lastOrderSignalAt?: Maybe<Scalars['DateTime']['output']>;
+  lastPushReceivedAt?: Maybe<Scalars['DateTime']['output']>;
+  metadata?: Maybe<Scalars['JSON']['output']>;
+  networkType?: Maybe<Scalars['String']['output']>;
+  onlineStatus: BusinessDeviceOnlineStatus;
+  platform: DevicePlatform;
+  receivingOrders: Scalars['Boolean']['output'];
+  subscriptionAlive: Scalars['Boolean']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+  userId: Scalars['ID']['output'];
+};
+
+export type BusinessDeviceHeartbeatInput = {
+  appState?: InputMaybe<Scalars['String']['input']>;
+  appVersion?: InputMaybe<Scalars['String']['input']>;
+  batteryLevel?: InputMaybe<Scalars['Int']['input']>;
+  deviceId: Scalars['String']['input'];
+  isCharging?: InputMaybe<Scalars['Boolean']['input']>;
+  metadata?: InputMaybe<Scalars['JSON']['input']>;
+  networkType?: InputMaybe<Scalars['String']['input']>;
+  platform: DevicePlatform;
+  subscriptionAlive: Scalars['Boolean']['input'];
+};
+
+export enum BusinessDeviceOnlineStatus {
+  Offline = 'OFFLINE',
+  Online = 'ONLINE',
+  Stale = 'STALE'
+}
+
 export type BusinessPromotion = {
   __typename?: 'BusinessPromotion';
   description?: Maybe<Scalars['String']['output']>;
@@ -317,6 +359,27 @@ export type CreateDynamicPricingRuleInput = {
   validUntil?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type CreateOptionGroupInput = {
+  displayOrder?: InputMaybe<Scalars['Int']['input']>;
+  maxSelections: Scalars['Int']['input'];
+  minSelections: Scalars['Int']['input'];
+  name: Scalars['String']['input'];
+  options: Array<CreateOptionInput>;
+  productId: Scalars['ID']['input'];
+};
+
+export type CreateOptionInput = {
+  displayOrder?: InputMaybe<Scalars['Int']['input']>;
+  extraPrice?: InputMaybe<Scalars['Float']['input']>;
+  linkedProductId?: InputMaybe<Scalars['ID']['input']>;
+  name: Scalars['String']['input'];
+};
+
+export type CreateOrderChildItemInput = {
+  productId: Scalars['ID']['input'];
+  selectedOptions: Array<CreateOrderItemOptionInput>;
+};
+
 export type CreateOrderInput = {
   deliveryPrice: Scalars['Float']['input'];
   driverNotes?: InputMaybe<Scalars['String']['input']>;
@@ -327,10 +390,17 @@ export type CreateOrderInput = {
 };
 
 export type CreateOrderItemInput = {
+  childItems?: InputMaybe<Array<CreateOrderChildItemInput>>;
   notes?: InputMaybe<Scalars['String']['input']>;
   price: Scalars['Float']['input'];
   productId: Scalars['ID']['input'];
   quantity: Scalars['Int']['input'];
+  selectedOptions: Array<CreateOrderItemOptionInput>;
+};
+
+export type CreateOrderItemOptionInput = {
+  optionGroupId: Scalars['ID']['input'];
+  optionId: Scalars['ID']['input'];
 };
 
 export type CreateProductCategoryInput = {
@@ -344,16 +414,22 @@ export type CreateProductInput = {
   description?: InputMaybe<Scalars['String']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   isAvailable?: InputMaybe<Scalars['Boolean']['input']>;
+  isOffer?: InputMaybe<Scalars['Boolean']['input']>;
   isOnSale?: InputMaybe<Scalars['Boolean']['input']>;
   name: Scalars['String']['input'];
   price: Scalars['Float']['input'];
   salePrice?: InputMaybe<Scalars['Float']['input']>;
-  stock?: InputMaybe<Scalars['Int']['input']>;
   subcategoryId?: InputMaybe<Scalars['ID']['input']>;
+  variantGroupId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 export type CreateProductSubcategoryInput = {
   categoryId: Scalars['ID']['input'];
+  name: Scalars['String']['input'];
+};
+
+export type CreateProductVariantGroupInput = {
+  businessId: Scalars['ID']['input'];
   name: Scalars['String']['input'];
 };
 
@@ -657,6 +733,8 @@ export type Mutation = {
   assignDriverToOrder: Order;
   assignPromotionToUsers: Array<UserPromotion>;
   backfillSettlementsForDeliveredOrders: Scalars['Int']['output'];
+  businessDeviceHeartbeat: Scalars['Boolean']['output'];
+  businessDeviceOrderSignal: Scalars['Boolean']['output'];
   cancelOrder: Order;
   createBanner: Banner;
   createBusiness: Business;
@@ -664,10 +742,13 @@ export type Mutation = {
   createDeliveryPricingTier: DeliveryPricingTier;
   createDeliveryZone: DeliveryZone;
   createDynamicPricingRule: DynamicPricingRule;
+  createOption: Option;
+  createOptionGroup: OptionGroup;
   createOrder: Order;
   createProduct: Product;
   createProductCategory: ProductCategory;
   createProductSubcategory: ProductSubcategory;
+  createProductVariantGroup: ProductVariantGroup;
   createPromotion: Promotion;
   createSettlementRule: SettlementRule;
   createTestOrder: Order;
@@ -681,9 +762,12 @@ export type Mutation = {
   deleteDeliveryZone: Scalars['Boolean']['output'];
   deleteDynamicPricingRule: Scalars['Boolean']['output'];
   deleteMyAccount: Scalars['Boolean']['output'];
+  deleteOption: Scalars['Boolean']['output'];
+  deleteOptionGroup: Scalars['Boolean']['output'];
   deleteProduct: Scalars['Boolean']['output'];
   deleteProductCategory: Scalars['Boolean']['output'];
   deleteProductSubcategory: Scalars['Boolean']['output'];
+  deleteProductVariantGroup: Scalars['Boolean']['output'];
   deletePromotion: Scalars['Boolean']['output'];
   deleteSettlementRule: Scalars['Boolean']['output'];
   deleteUser: Scalars['Boolean']['output'];
@@ -733,6 +817,8 @@ export type Mutation = {
   updateDriverLocation: User;
   updateDriverOnlineStatus: User;
   updateDynamicPricingRule: DynamicPricingRule;
+  updateOption: Option;
+  updateOptionGroup: OptionGroup;
   updateOrderStatus: Order;
   updatePreparationTime: Order;
   updateProduct: Product;
@@ -805,6 +891,17 @@ export type MutationAssignPromotionToUsersArgs = {
 };
 
 
+export type MutationBusinessDeviceHeartbeatArgs = {
+  input: BusinessDeviceHeartbeatInput;
+};
+
+
+export type MutationBusinessDeviceOrderSignalArgs = {
+  deviceId: Scalars['String']['input'];
+  orderId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+
 export type MutationCancelOrderArgs = {
   id: Scalars['ID']['input'];
 };
@@ -840,6 +937,17 @@ export type MutationCreateDynamicPricingRuleArgs = {
 };
 
 
+export type MutationCreateOptionArgs = {
+  input: CreateOptionInput;
+  optionGroupId: Scalars['ID']['input'];
+};
+
+
+export type MutationCreateOptionGroupArgs = {
+  input: CreateOptionGroupInput;
+};
+
+
 export type MutationCreateOrderArgs = {
   input: CreateOrderInput;
 };
@@ -857,6 +965,11 @@ export type MutationCreateProductCategoryArgs = {
 
 export type MutationCreateProductSubcategoryArgs = {
   input: CreateProductSubcategoryInput;
+};
+
+
+export type MutationCreateProductVariantGroupArgs = {
+  input: CreateProductVariantGroupInput;
 };
 
 
@@ -917,6 +1030,16 @@ export type MutationDeleteDynamicPricingRuleArgs = {
 };
 
 
+export type MutationDeleteOptionArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type MutationDeleteOptionGroupArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
 export type MutationDeleteProductArgs = {
   id: Scalars['ID']['input'];
 };
@@ -928,6 +1051,11 @@ export type MutationDeleteProductCategoryArgs = {
 
 
 export type MutationDeleteProductSubcategoryArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type MutationDeleteProductVariantGroupArgs = {
   id: Scalars['ID']['input'];
 };
 
@@ -1154,6 +1282,18 @@ export type MutationUpdateDynamicPricingRuleArgs = {
 };
 
 
+export type MutationUpdateOptionArgs = {
+  id: Scalars['ID']['input'];
+  input: UpdateOptionInput;
+};
+
+
+export type MutationUpdateOptionGroupArgs = {
+  id: Scalars['ID']['input'];
+  input: UpdateOptionGroupInput;
+};
+
+
 export type MutationUpdateOrderStatusArgs = {
   id: Scalars['ID']['input'];
   status: OrderStatus;
@@ -1279,6 +1419,28 @@ export enum NotificationType {
   Promotional = 'PROMOTIONAL'
 }
 
+export type Option = {
+  __typename?: 'Option';
+  displayOrder: Scalars['Int']['output'];
+  extraPrice: Scalars['Float']['output'];
+  id: Scalars['ID']['output'];
+  linkedProduct?: Maybe<Product>;
+  linkedProductId?: Maybe<Scalars['ID']['output']>;
+  name: Scalars['String']['output'];
+  optionGroupId: Scalars['ID']['output'];
+};
+
+export type OptionGroup = {
+  __typename?: 'OptionGroup';
+  displayOrder: Scalars['Int']['output'];
+  id: Scalars['ID']['output'];
+  maxSelections: Scalars['Int']['output'];
+  minSelections: Scalars['Int']['output'];
+  name: Scalars['String']['output'];
+  options: Array<Option>;
+  productId: Scalars['ID']['output'];
+};
+
 export type Order = {
   __typename?: 'Order';
   businesses: Array<OrderBusiness>;
@@ -1326,14 +1488,26 @@ export type OrderDriverLiveTracking = {
 
 export type OrderItem = {
   __typename?: 'OrderItem';
+  childItems: Array<OrderItem>;
+  id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
   name: Scalars['String']['output'];
   notes?: Maybe<Scalars['String']['output']>;
-  price: Scalars['Float']['output'];
+  parentOrderItemId?: Maybe<Scalars['ID']['output']>;
   productId: Scalars['ID']['output'];
   quantity: Scalars['Int']['output'];
-  quantityInStock: Scalars['Int']['output'];
-  quantityNeeded: Scalars['Int']['output'];
+  selectedOptions: Array<OrderItemOption>;
+  unitPrice: Scalars['Float']['output'];
+};
+
+export type OrderItemOption = {
+  __typename?: 'OrderItemOption';
+  id: Scalars['ID']['output'];
+  optionGroupId: Scalars['ID']['output'];
+  optionGroupName: Scalars['String']['output'];
+  optionId: Scalars['ID']['output'];
+  optionName: Scalars['String']['output'];
+  priceAtOrder: Scalars['Float']['output'];
 };
 
 export type OrderPromotion = {
@@ -1398,14 +1572,29 @@ export type Product = {
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
   isAvailable: Scalars['Boolean']['output'];
+  isOffer: Scalars['Boolean']['output'];
   isOnSale: Scalars['Boolean']['output'];
   name: Scalars['String']['output'];
+  optionGroups: Array<OptionGroup>;
   price: Scalars['Float']['output'];
   salePrice?: Maybe<Scalars['Float']['output']>;
   sortOrder: Scalars['Int']['output'];
-  stock: Scalars['Int']['output'];
   subcategoryId?: Maybe<Scalars['ID']['output']>;
   updatedAt: Scalars['String']['output'];
+  variantGroup?: Maybe<ProductVariantGroup>;
+  variantGroupId?: Maybe<Scalars['ID']['output']>;
+  variants: Array<Product>;
+};
+
+export type ProductCard = {
+  __typename?: 'ProductCard';
+  basePrice: Scalars['Float']['output'];
+  id: Scalars['ID']['output'];
+  imageUrl?: Maybe<Scalars['String']['output']>;
+  isOffer: Scalars['Boolean']['output'];
+  name: Scalars['String']['output'];
+  product?: Maybe<Product>;
+  variants: Array<Product>;
 };
 
 export type ProductCategory = {
@@ -1443,6 +1632,13 @@ export type ProductSubcategory = {
   id: Scalars['ID']['output'];
   name: Scalars['String']['output'];
   updatedAt: Scalars['String']['output'];
+};
+
+export type ProductVariantGroup = {
+  __typename?: 'ProductVariantGroup';
+  businessId: Scalars['ID']['output'];
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
 };
 
 export type Promotion = {
@@ -1582,6 +1778,7 @@ export type Query = {
   auditLogs: AuditLogConnection;
   business?: Maybe<Business>;
   businessBalance: SettlementSummary;
+  businessDeviceHealth: Array<BusinessDeviceHealth>;
   businesses: Array<Business>;
   calculateDeliveryPrice: DeliveryPriceResult;
   calculateProductPrice: Scalars['String']['output'];
@@ -1615,6 +1812,7 @@ export type Query = {
   myReferralStats: ReferralStats;
   notificationCampaign?: Maybe<NotificationCampaign>;
   notificationCampaigns: Array<NotificationCampaign>;
+  offers: Array<Product>;
   order?: Maybe<Order>;
   orders: Array<Order>;
   ordersByStatus: Array<Order>;
@@ -1626,7 +1824,7 @@ export type Query = {
   productPricingByBusiness: Array<ProductPricing>;
   productSubcategories: Array<ProductSubcategory>;
   productSubcategoriesByBusiness: Array<ProductSubcategory>;
-  products: Array<Product>;
+  products: Array<ProductCard>;
   pushTelemetryEvents: Array<PushTelemetryEvent>;
   pushTelemetrySummary: PushTelemetrySummary;
   settlementRule?: Maybe<SettlementRule>;
@@ -1672,6 +1870,11 @@ export type QueryBusinessArgs = {
 
 export type QueryBusinessBalanceArgs = {
   businessId: Scalars['ID']['input'];
+};
+
+
+export type QueryBusinessDeviceHealthArgs = {
+  hours?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -1771,6 +1974,11 @@ export type QueryGetWalletTransactionsArgs = {
 
 export type QueryNotificationCampaignArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type QueryOffersArgs = {
+  businessId: Scalars['ID']['input'];
 };
 
 
@@ -2217,6 +2425,20 @@ export type UpdateDynamicPricingRuleInput = {
   validUntil?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type UpdateOptionGroupInput = {
+  displayOrder?: InputMaybe<Scalars['Int']['input']>;
+  maxSelections?: InputMaybe<Scalars['Int']['input']>;
+  minSelections?: InputMaybe<Scalars['Int']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type UpdateOptionInput = {
+  displayOrder?: InputMaybe<Scalars['Int']['input']>;
+  extraPrice?: InputMaybe<Scalars['Float']['input']>;
+  linkedProductId?: InputMaybe<Scalars['ID']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+};
+
 export type UpdateProductCategoryInput = {
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
@@ -2232,8 +2454,8 @@ export type UpdateProductInput = {
   price?: InputMaybe<Scalars['Float']['input']>;
   salePrice?: InputMaybe<Scalars['Float']['input']>;
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
-  stock?: InputMaybe<Scalars['Int']['input']>;
   subcategoryId?: InputMaybe<Scalars['ID']['input']>;
+  variantGroupId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 export type UpdateProductPricingInput = {
@@ -2581,14 +2803,14 @@ export type TrackPushTelemetryMutation = { __typename?: 'Mutation', trackPushTel
 export type GetOrdersQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetOrdersQuery = { __typename?: 'Query', orders: Array<{ __typename?: 'Order', id: string, orderPrice: number, deliveryPrice: number, totalPrice: number, orderDate: any, updatedAt: any, status: OrderStatus, preparationMinutes?: number | null, estimatedReadyAt?: any | null, preparingAt?: any | null, user?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, address?: string | null, phoneNumber?: string | null } | null, driver?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, phoneNumber?: string | null } | null, dropOffLocation: { __typename?: 'Location', latitude: number, longitude: number, address: string }, businesses: Array<{ __typename?: 'OrderBusiness', business: { __typename?: 'Business', id: string, name: string, phoneNumber?: string | null, businessType: BusinessType, location: { __typename?: 'Location', latitude: number, longitude: number, address: string } }, items: Array<{ __typename?: 'OrderItem', productId: string, name: string, imageUrl?: string | null, quantity: number, price: number }> }> }> };
+export type GetOrdersQuery = { __typename?: 'Query', orders: Array<{ __typename?: 'Order', id: string, orderPrice: number, deliveryPrice: number, totalPrice: number, orderDate: any, updatedAt: any, status: OrderStatus, preparationMinutes?: number | null, estimatedReadyAt?: any | null, preparingAt?: any | null, user?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, address?: string | null, phoneNumber?: string | null } | null, driver?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, phoneNumber?: string | null } | null, dropOffLocation: { __typename?: 'Location', latitude: number, longitude: number, address: string }, businesses: Array<{ __typename?: 'OrderBusiness', business: { __typename?: 'Business', id: string, name: string, phoneNumber?: string | null, businessType: BusinessType, location: { __typename?: 'Location', latitude: number, longitude: number, address: string } }, items: Array<{ __typename?: 'OrderItem', productId: string, name: string, imageUrl?: string | null, quantity: number, unitPrice: number }> }> }> };
 
 export type GetOrderQueryVariables = Exact<{
   id: Scalars['ID']['input'];
 }>;
 
 
-export type GetOrderQuery = { __typename?: 'Query', order?: { __typename?: 'Order', id: string, orderPrice: number, deliveryPrice: number, totalPrice: number, orderDate: any, updatedAt: any, status: OrderStatus, preparationMinutes?: number | null, estimatedReadyAt?: any | null, preparingAt?: any | null, user?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, address?: string | null, phoneNumber?: string | null } | null, driver?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, phoneNumber?: string | null } | null, dropOffLocation: { __typename?: 'Location', latitude: number, longitude: number, address: string }, businesses: Array<{ __typename?: 'OrderBusiness', business: { __typename?: 'Business', id: string, name: string, phoneNumber?: string | null, businessType: BusinessType, location: { __typename?: 'Location', latitude: number, longitude: number, address: string } }, items: Array<{ __typename?: 'OrderItem', productId: string, name: string, imageUrl?: string | null, quantity: number, price: number }> }> } | null };
+export type GetOrderQuery = { __typename?: 'Query', order?: { __typename?: 'Order', id: string, orderPrice: number, deliveryPrice: number, totalPrice: number, orderDate: any, updatedAt: any, status: OrderStatus, preparationMinutes?: number | null, estimatedReadyAt?: any | null, preparingAt?: any | null, user?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, address?: string | null, phoneNumber?: string | null } | null, driver?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, phoneNumber?: string | null } | null, dropOffLocation: { __typename?: 'Location', latitude: number, longitude: number, address: string }, businesses: Array<{ __typename?: 'OrderBusiness', business: { __typename?: 'Business', id: string, name: string, phoneNumber?: string | null, businessType: BusinessType, location: { __typename?: 'Location', latitude: number, longitude: number, address: string } }, items: Array<{ __typename?: 'OrderItem', productId: string, name: string, imageUrl?: string | null, quantity: number, unitPrice: number }> }> } | null };
 
 export type UpdateOrderStatusMutationVariables = Exact<{
   id: Scalars['ID']['input'];
@@ -2637,7 +2859,7 @@ export type CreateTestOrderMutation = { __typename?: 'Mutation', createTestOrder
 export type AllOrdersUpdatedSubscriptionVariables = Exact<{ [key: string]: never; }>;
 
 
-export type AllOrdersUpdatedSubscription = { __typename?: 'Subscription', allOrdersUpdated: Array<{ __typename?: 'Order', id: string, orderPrice: number, deliveryPrice: number, totalPrice: number, orderDate: any, updatedAt: any, status: OrderStatus, preparationMinutes?: number | null, estimatedReadyAt?: any | null, preparingAt?: any | null, user?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, address?: string | null, phoneNumber?: string | null } | null, driver?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, phoneNumber?: string | null } | null, dropOffLocation: { __typename?: 'Location', latitude: number, longitude: number, address: string }, businesses: Array<{ __typename?: 'OrderBusiness', business: { __typename?: 'Business', id: string, name: string, businessType: BusinessType, phoneNumber?: string | null, location: { __typename?: 'Location', latitude: number, longitude: number, address: string } }, items: Array<{ __typename?: 'OrderItem', productId: string, name: string, imageUrl?: string | null, quantity: number, price: number }> }> }> };
+export type AllOrdersUpdatedSubscription = { __typename?: 'Subscription', allOrdersUpdated: Array<{ __typename?: 'Order', id: string, orderPrice: number, deliveryPrice: number, totalPrice: number, orderDate: any, updatedAt: any, status: OrderStatus, preparationMinutes?: number | null, estimatedReadyAt?: any | null, preparingAt?: any | null, user?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, address?: string | null, phoneNumber?: string | null } | null, driver?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, phoneNumber?: string | null } | null, dropOffLocation: { __typename?: 'Location', latitude: number, longitude: number, address: string }, businesses: Array<{ __typename?: 'OrderBusiness', business: { __typename?: 'Business', id: string, name: string, businessType: BusinessType, phoneNumber?: string | null, location: { __typename?: 'Location', latitude: number, longitude: number, address: string } }, items: Array<{ __typename?: 'OrderItem', productId: string, name: string, imageUrl?: string | null, quantity: number, unitPrice: number }> }> }> };
 
 export type GetUsersQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -2719,15 +2941,15 @@ export const MarkSettlementAsPaidDocument = {"kind":"Document","definitions":[{"
 export const RegisterDeviceTokenDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"RegisterDeviceToken"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"RegisterDeviceTokenInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"registerDeviceToken"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}]}]}}]} as unknown as DocumentNode<RegisterDeviceTokenMutation, RegisterDeviceTokenMutationVariables>;
 export const UnregisterDeviceTokenDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UnregisterDeviceToken"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"token"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"unregisterDeviceToken"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"token"},"value":{"kind":"Variable","name":{"kind":"Name","value":"token"}}}]}]}}]} as unknown as DocumentNode<UnregisterDeviceTokenMutation, UnregisterDeviceTokenMutationVariables>;
 export const TrackPushTelemetryDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"TrackPushTelemetry"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"TrackPushTelemetryInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"trackPushTelemetry"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}]}]}}]} as unknown as DocumentNode<TrackPushTelemetryMutation, TrackPushTelemetryMutationVariables>;
-export const GetOrdersDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetOrders"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"orders"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"orderPrice"}},{"kind":"Field","name":{"kind":"Name","value":"deliveryPrice"}},{"kind":"Field","name":{"kind":"Name","value":"totalPrice"}},{"kind":"Field","name":{"kind":"Name","value":"orderDate"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"preparationMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"estimatedReadyAt"}},{"kind":"Field","name":{"kind":"Name","value":"preparingAt"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"driver"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"dropOffLocation"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}},{"kind":"Field","name":{"kind":"Name","value":"businesses"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"business"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}},{"kind":"Field","name":{"kind":"Name","value":"businessType"}},{"kind":"Field","name":{"kind":"Name","value":"location"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"productId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"imageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"quantity"}},{"kind":"Field","name":{"kind":"Name","value":"price"}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetOrdersQuery, GetOrdersQueryVariables>;
-export const GetOrderDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetOrder"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"order"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"orderPrice"}},{"kind":"Field","name":{"kind":"Name","value":"deliveryPrice"}},{"kind":"Field","name":{"kind":"Name","value":"totalPrice"}},{"kind":"Field","name":{"kind":"Name","value":"orderDate"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"preparationMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"estimatedReadyAt"}},{"kind":"Field","name":{"kind":"Name","value":"preparingAt"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"driver"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"dropOffLocation"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}},{"kind":"Field","name":{"kind":"Name","value":"businesses"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"business"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}},{"kind":"Field","name":{"kind":"Name","value":"businessType"}},{"kind":"Field","name":{"kind":"Name","value":"location"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"productId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"imageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"quantity"}},{"kind":"Field","name":{"kind":"Name","value":"price"}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetOrderQuery, GetOrderQueryVariables>;
+export const GetOrdersDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetOrders"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"orders"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"orderPrice"}},{"kind":"Field","name":{"kind":"Name","value":"deliveryPrice"}},{"kind":"Field","name":{"kind":"Name","value":"totalPrice"}},{"kind":"Field","name":{"kind":"Name","value":"orderDate"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"preparationMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"estimatedReadyAt"}},{"kind":"Field","name":{"kind":"Name","value":"preparingAt"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"driver"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"dropOffLocation"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}},{"kind":"Field","name":{"kind":"Name","value":"businesses"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"business"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}},{"kind":"Field","name":{"kind":"Name","value":"businessType"}},{"kind":"Field","name":{"kind":"Name","value":"location"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"productId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"imageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"quantity"}},{"kind":"Field","name":{"kind":"Name","value":"unitPrice"}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetOrdersQuery, GetOrdersQueryVariables>;
+export const GetOrderDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetOrder"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"order"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"orderPrice"}},{"kind":"Field","name":{"kind":"Name","value":"deliveryPrice"}},{"kind":"Field","name":{"kind":"Name","value":"totalPrice"}},{"kind":"Field","name":{"kind":"Name","value":"orderDate"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"preparationMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"estimatedReadyAt"}},{"kind":"Field","name":{"kind":"Name","value":"preparingAt"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"driver"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"dropOffLocation"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}},{"kind":"Field","name":{"kind":"Name","value":"businesses"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"business"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}},{"kind":"Field","name":{"kind":"Name","value":"businessType"}},{"kind":"Field","name":{"kind":"Name","value":"location"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"productId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"imageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"quantity"}},{"kind":"Field","name":{"kind":"Name","value":"unitPrice"}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetOrderQuery, GetOrderQueryVariables>;
 export const UpdateOrderStatusDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateOrderStatus"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"status"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"OrderStatus"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateOrderStatus"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"status"},"value":{"kind":"Variable","name":{"kind":"Name","value":"status"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}}]}}]}}]} as unknown as DocumentNode<UpdateOrderStatusMutation, UpdateOrderStatusMutationVariables>;
 export const StartPreparingDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"StartPreparing"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"preparationMinutes"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"startPreparing"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"preparationMinutes"},"value":{"kind":"Variable","name":{"kind":"Name","value":"preparationMinutes"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"preparationMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"estimatedReadyAt"}},{"kind":"Field","name":{"kind":"Name","value":"preparingAt"}}]}}]}}]} as unknown as DocumentNode<StartPreparingMutation, StartPreparingMutationVariables>;
 export const UpdatePreparationTimeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdatePreparationTime"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"preparationMinutes"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updatePreparationTime"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"preparationMinutes"},"value":{"kind":"Variable","name":{"kind":"Name","value":"preparationMinutes"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"preparationMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"estimatedReadyAt"}}]}}]}}]} as unknown as DocumentNode<UpdatePreparationTimeMutation, UpdatePreparationTimeMutationVariables>;
 export const CancelOrderDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CancelOrder"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"cancelOrder"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}}]}}]}}]} as unknown as DocumentNode<CancelOrderMutation, CancelOrderMutationVariables>;
 export const AssignDriverToOrderDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"AssignDriverToOrder"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"driverId"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"assignDriverToOrder"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"driverId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"driverId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"driver"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}}]}},{"kind":"Field","name":{"kind":"Name","value":"status"}}]}}]}}]} as unknown as DocumentNode<AssignDriverToOrderMutation, AssignDriverToOrderMutationVariables>;
 export const CreateTestOrderDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateTestOrder"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createTestOrder"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"totalPrice"}}]}}]}}]} as unknown as DocumentNode<CreateTestOrderMutation, CreateTestOrderMutationVariables>;
-export const AllOrdersUpdatedDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"subscription","name":{"kind":"Name","value":"AllOrdersUpdated"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"allOrdersUpdated"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"orderPrice"}},{"kind":"Field","name":{"kind":"Name","value":"deliveryPrice"}},{"kind":"Field","name":{"kind":"Name","value":"totalPrice"}},{"kind":"Field","name":{"kind":"Name","value":"orderDate"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"preparationMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"estimatedReadyAt"}},{"kind":"Field","name":{"kind":"Name","value":"preparingAt"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"driver"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"dropOffLocation"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}},{"kind":"Field","name":{"kind":"Name","value":"businesses"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"business"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"businessType"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}},{"kind":"Field","name":{"kind":"Name","value":"location"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"productId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"imageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"quantity"}},{"kind":"Field","name":{"kind":"Name","value":"price"}}]}}]}}]}}]}}]} as unknown as DocumentNode<AllOrdersUpdatedSubscription, AllOrdersUpdatedSubscriptionVariables>;
+export const AllOrdersUpdatedDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"subscription","name":{"kind":"Name","value":"AllOrdersUpdated"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"allOrdersUpdated"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"orderPrice"}},{"kind":"Field","name":{"kind":"Name","value":"deliveryPrice"}},{"kind":"Field","name":{"kind":"Name","value":"totalPrice"}},{"kind":"Field","name":{"kind":"Name","value":"orderDate"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"preparationMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"estimatedReadyAt"}},{"kind":"Field","name":{"kind":"Name","value":"preparingAt"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"driver"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"dropOffLocation"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}},{"kind":"Field","name":{"kind":"Name","value":"businesses"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"business"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"businessType"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}},{"kind":"Field","name":{"kind":"Name","value":"location"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"productId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"imageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"quantity"}},{"kind":"Field","name":{"kind":"Name","value":"unitPrice"}}]}}]}}]}}]}}]} as unknown as DocumentNode<AllOrdersUpdatedSubscription, AllOrdersUpdatedSubscriptionVariables>;
 export const GetUsersDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetUsers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"users"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"role"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"adminNote"}},{"kind":"Field","name":{"kind":"Name","value":"flagColor"}},{"kind":"Field","name":{"kind":"Name","value":"permissions"}},{"kind":"Field","name":{"kind":"Name","value":"business"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]} as unknown as DocumentNode<GetUsersQuery, GetUsersQueryVariables>;
 export const UserBehaviorDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"UserBehavior"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"userId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"userBehavior"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"userId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"userId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"userId"}},{"kind":"Field","name":{"kind":"Name","value":"totalOrders"}},{"kind":"Field","name":{"kind":"Name","value":"deliveredOrders"}},{"kind":"Field","name":{"kind":"Name","value":"cancelledOrders"}},{"kind":"Field","name":{"kind":"Name","value":"totalSpend"}},{"kind":"Field","name":{"kind":"Name","value":"avgOrderValue"}},{"kind":"Field","name":{"kind":"Name","value":"firstOrderAt"}},{"kind":"Field","name":{"kind":"Name","value":"lastOrderAt"}},{"kind":"Field","name":{"kind":"Name","value":"lastDeliveredAt"}}]}}]}}]} as unknown as DocumentNode<UserBehaviorQuery, UserBehaviorQueryVariables>;
 export const CreateUserDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateUser"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"email"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"password"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"firstName"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"lastName"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"role"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UserRole"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createUser"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"email"},"value":{"kind":"Variable","name":{"kind":"Name","value":"email"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"password"},"value":{"kind":"Variable","name":{"kind":"Name","value":"password"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"firstName"},"value":{"kind":"Variable","name":{"kind":"Name","value":"firstName"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"lastName"},"value":{"kind":"Variable","name":{"kind":"Name","value":"lastName"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"role"},"value":{"kind":"Variable","name":{"kind":"Name","value":"role"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"businessId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"token"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"role"}},{"kind":"Field","name":{"kind":"Name","value":"businessId"}}]}},{"kind":"Field","name":{"kind":"Name","value":"message"}}]}}]}}]} as unknown as DocumentNode<CreateUserMutation, CreateUserMutationVariables>;

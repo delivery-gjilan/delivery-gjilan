@@ -39,8 +39,6 @@ type OrderItem {
     quantity: Int!
     unitPrice: Float!
     notes: String
-    quantityInStock: Int!
-    quantityNeeded: Int!
     selectedOptions: [OrderItemOption!]!
     childItems: [OrderItem!]!
     parentOrderItemId: ID

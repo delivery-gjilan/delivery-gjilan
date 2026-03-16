@@ -29,7 +29,6 @@ export const Product: ProductResolvers = {
                 ...v,
                 variantGroupId: v.groupId ?? undefined,
                 isOffer: v.isOffer ?? false,
-                stock: 0, // resolved via field resolver if needed
                 optionGroups: [],
                 variants: [],
                 createdAt: v.createdAt ?? new Date().toISOString(),

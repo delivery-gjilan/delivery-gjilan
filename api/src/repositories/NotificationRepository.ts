@@ -8,12 +8,14 @@ import {
     notifications,
     notificationCampaigns,
     pushTelemetryEvents,
+    businessDeviceHealth,
     DbNotification,
     NewDbNotification,
     DbNotificationCampaign,
     NewDbNotificationCampaign,
     DbPushTelemetryEvent,
     NewDbPushTelemetryEvent,
+    DbBusinessDeviceHealth,
 } from '@/database/schema/notifications';
 import { eq, inArray, and, sql, gte, desc } from 'drizzle-orm';
 
@@ -78,9 +80,30 @@ export class NotificationRepository {
         return this.db.select().from(deviceTokens).where(eq(deviceTokens.userId, userId));
     }
 
+    async getTokensByUserIdAndAppType(
+        userId: string,
+        appType: DbDeviceToken['appType'],
+    ): Promise<DbDeviceToken[]> {
+        return this.db
+            .select()
+            .from(deviceTokens)
+            .where(and(eq(deviceTokens.userId, userId), eq(deviceTokens.appType, appType)));
+    }
+
     async getTokensByUserIds(userIds: string[]): Promise<DbDeviceToken[]> {
         if (userIds.length === 0) return [];
         return this.db.select().from(deviceTokens).where(inArray(deviceTokens.userId, userIds));
+    }
+
+    async getTokensByUserIdsAndAppType(
+        userIds: string[],
+        appType: DbDeviceToken['appType'],
+    ): Promise<DbDeviceToken[]> {
+        if (userIds.length === 0) return [];
+        return this.db
+            .select()
+            .from(deviceTokens)
+            .where(and(inArray(deviceTokens.userId, userIds), eq(deviceTokens.appType, appType)));
     }
 
     async removeTokensForUser(userId: string): Promise<void> {
@@ -190,6 +213,90 @@ export class NotificationRepository {
             byAppType: byAppTypeRows,
             byPlatform: byPlatformRows,
         };
+    }
+
+    async upsertBusinessDeviceHeartbeat(data: {
+        userId: string;
+        businessId: string;
+        deviceId: string;
+        platform: DbBusinessDeviceHealth['platform'];
+        appVersion?: string | null;
+        appState?: string | null;
+        networkType?: string | null;
+        batteryLevel?: number | null;
+        isCharging?: boolean | null;
+        subscriptionAlive: boolean;
+        metadata?: Record<string, unknown>;
+    }): Promise<DbBusinessDeviceHealth> {
+        const now = new Date().toISOString();
+
+        const [row] = await this.db
+            .insert(businessDeviceHealth)
+            .values({
+                userId: data.userId,
+                businessId: data.businessId,
+                deviceId: data.deviceId,
+                platform: data.platform,
+                appVersion: data.appVersion ?? null,
+                appState: data.appState ?? null,
+                networkType: data.networkType ?? null,
+                batteryLevel: data.batteryLevel ?? null,
+                isCharging: data.isCharging ?? null,
+                subscriptionAlive: data.subscriptionAlive,
+                lastHeartbeatAt: now,
+                metadata: data.metadata,
+            })
+            .onConflictDoUpdate({
+                target: [businessDeviceHealth.userId, businessDeviceHealth.deviceId],
+                set: {
+                    businessId: data.businessId,
+                    platform: data.platform,
+                    appVersion: data.appVersion ?? null,
+                    appState: data.appState ?? null,
+                    networkType: data.networkType ?? null,
+                    batteryLevel: data.batteryLevel ?? null,
+                    isCharging: data.isCharging ?? null,
+                    subscriptionAlive: data.subscriptionAlive,
+                    lastHeartbeatAt: now,
+                    metadata: data.metadata,
+                    updatedAt: sql`CURRENT_TIMESTAMP`,
+                },
+            })
+            .returning();
+
+        return row!;
+    }
+
+    async touchBusinessDeviceOrderSignal(userId: string, deviceId: string, orderId?: string): Promise<void> {
+        const now = new Date().toISOString();
+        await this.db
+            .update(businessDeviceHealth)
+            .set({
+                lastOrderSignalAt: now,
+                lastOrderId: orderId ?? null,
+                updatedAt: sql`CURRENT_TIMESTAMP`,
+            })
+            .where(and(eq(businessDeviceHealth.userId, userId), eq(businessDeviceHealth.deviceId, deviceId)));
+    }
+
+    async touchBusinessDevicePushReceived(userId: string, deviceId: string): Promise<void> {
+        const now = new Date().toISOString();
+        await this.db
+            .update(businessDeviceHealth)
+            .set({
+                lastPushReceivedAt: now,
+                updatedAt: sql`CURRENT_TIMESTAMP`,
+            })
+            .where(and(eq(businessDeviceHealth.userId, userId), eq(businessDeviceHealth.deviceId, deviceId)));
+    }
+
+    async getBusinessDeviceHealthRows(hours = 24): Promise<DbBusinessDeviceHealth[]> {
+        const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+        return this.db
+            .select()
+            .from(businessDeviceHealth)
+            .where(gte(businessDeviceHealth.lastHeartbeatAt, since))
+            .orderBy(desc(businessDeviceHealth.lastHeartbeatAt));
     }
 
     // ── Campaigns ───────────────────────────────────────────────────

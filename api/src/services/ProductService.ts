@@ -3,7 +3,6 @@ import { Product, CreateProductInput, UpdateProductInput, ProductCard } from '@/
 import { productValidator } from '@/validators/ProductValidator';
 import { DbProduct } from '@/database/schema/products';
 import type { DbType } from '@/database';
-import { productStocks } from '@/database/schema/productStock';
 import { businesses } from '@/database/schema/businesses';
 import { productVariantGroups } from '@/database/schema/productVariantGroups';
 import { optionGroups } from '@/database/schema/optionGroups';
@@ -22,12 +21,11 @@ export class ProductService {
         private db?: DbType,
     ) {}
 
-    private mapToProduct(product: DbProduct & { stock?: number }): Product {
+    private mapToProduct(product: DbProduct): Product {
         return {
             ...product,
             variantGroupId: product.groupId ?? undefined,
             isOffer: product.isOffer ?? false,
-            stock: product.stock ?? 0,
             price: product.price,
             salePrice: product.salePrice,
             isOnSale: product.isOnSale ?? false,
@@ -69,20 +67,6 @@ export class ProductService {
             salePrice: validatedInput.salePrice,
             isAvailable: validatedInput.isAvailable ?? true,
         });
-
-        // Handle stock creation if stock is provided and db is available
-        if (validatedInput.stock !== undefined && this.db && validatedInput.stock > 0) {
-            await this.db.insert(productStocks).values({
-                productId: createdProduct.id,
-                stock: validatedInput.stock,
-            });
-
-            // Return product with stock included
-            return this.mapToProduct({
-                ...createdProduct,
-                stock: validatedInput.stock,
-            });
-        }
 
         return this.mapToProduct(createdProduct);
     }
@@ -200,8 +184,8 @@ export class ProductService {
     async updateProduct(id: string, input: UpdateProductInput): Promise<Product> {
         const validatedInput = productValidator.validateUpdateProduct(input);
 
-        // Extract stock and variantGroupId from input
-        const { stock, variantGroupId, ...rest } = validatedInput as any;
+        // Extract variantGroupId from input
+        const { variantGroupId, ...rest } = validatedInput as any;
         const updateData = { ...rest };
         if (variantGroupId !== undefined) {
             updateData.groupId = variantGroupId;
@@ -209,29 +193,6 @@ export class ProductService {
 
         const updatedProduct = await this.productRepository.update(id, updateData);
         if (!updatedProduct) throw AppError.notFound('Product');
-
-        // Handle stock update separately if provided and db is available
-        if (stock !== undefined && this.db) {
-            const existingStock = await this.db
-                .select()
-                .from(productStocks)
-                .where(eq(productStocks.productId, id))
-                .limit(1);
-
-            if (existingStock.length > 0) {
-                await this.db.update(productStocks).set({ stock }).where(eq(productStocks.productId, id));
-            } else {
-                await this.db.insert(productStocks).values({
-                    productId: id,
-                    stock,
-                });
-            }
-
-            return this.mapToProduct({
-                ...updatedProduct,
-                stock,
-            });
-        }
 
         return this.mapToProduct(updatedProduct);
     }

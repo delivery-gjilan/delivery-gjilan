@@ -4,7 +4,6 @@ import { productCategories } from './productCategories';
 import { productSubcategories } from './productSubcategories';
 import { productVariantGroups } from './productVariantGroups';
 import { relations, sql } from 'drizzle-orm';
-import { productStocks } from './productStock';
 import { optionGroups } from './optionGroups';
 
 export const products = pgTable(
@@ -57,7 +56,6 @@ export const productsRelations = relations(products, ({ one, many }) => ({
         fields: [products.subcategoryId],
         references: [productSubcategories.id],
     }),
-    productStock: one(productStocks),
     variantGroup: one(productVariantGroups, {
         fields: [products.groupId],
         references: [productVariantGroups.id],

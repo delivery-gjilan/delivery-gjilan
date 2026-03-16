@@ -64,6 +64,7 @@ const menu: any[] = [
   { name: "Users", href: "/dashboard/users", icon: Users, superAdminOnly: true },
   { name: "Notifications", href: "/dashboard/notifications", icon: Bell, superAdminOnly: true },
   { name: "Push Telemetry", href: "/dashboard/notifications/telemetry", icon: Activity, superAdminOnly: true },
+  { name: "Business Devices", href: "/dashboard/notifications/devices", icon: Activity, superAdminOnly: true },
   { name: "Realtime", href: "/dashboard/realtime", icon: Activity, superAdminOnly: true },
   { name: "Logs", href: "/dashboard/logs", icon: Activity, superAdminOnly: true },
 ];

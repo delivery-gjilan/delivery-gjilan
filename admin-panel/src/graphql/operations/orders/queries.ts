@@ -50,9 +50,7 @@ export const GET_ORDERS = graphql(`
                     name
                     imageUrl
                     quantity
-                    price
-                    quantityInStock
-                    quantityNeeded
+                    unitPrice
                 }
             }
         }
@@ -100,9 +98,7 @@ export const GET_ORDER = graphql(`
                     name
                     imageUrl
                     quantity
-                    price
-                    quantityInStock
-                    quantityNeeded
+                    unitPrice
                 }
             }
         }
@@ -141,7 +137,7 @@ export const GET_ORDERS_BY_STATUS = graphql(`
                     name
                     imageUrl
                     quantity
-                    price
+                    unitPrice
                 }
             }
         }

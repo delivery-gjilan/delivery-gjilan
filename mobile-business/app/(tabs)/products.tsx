@@ -34,7 +34,6 @@ interface Product {
     isOnSale: boolean;
     salePrice?: number | null;
     isAvailable: boolean;
-    stock: number;
     categoryId: string;
 }
 
@@ -68,7 +67,22 @@ export default function ProductsScreen() {
         refetchQueries: ['GetBusinessProducts'],
     });
 
-    const products: Product[] = data?.products || [];
+    const products: Product[] = (data?.products || [])
+        .map((card: any) => {
+            const product = card?.product;
+            return {
+                id: product?.id ?? card?.id,
+                name: product?.name ?? card?.name,
+                description: product?.description ?? null,
+                imageUrl: product?.imageUrl ?? card?.imageUrl ?? null,
+                price: product?.price ?? card?.basePrice ?? 0,
+                isOnSale: product?.isOnSale ?? false,
+                salePrice: product?.salePrice ?? null,
+                isAvailable: product?.isAvailable ?? true,
+                categoryId: product?.categoryId ?? '',
+            };
+        })
+        .filter((product: Product) => Boolean(product.categoryId));
     const categories: Category[] = data?.productCategories || [];
 
     const filteredProducts = products.filter((product) => {
@@ -115,7 +129,14 @@ export default function ProductsScreen() {
         const displayPrice = product.isOnSale && product.salePrice ? product.salePrice : product.price;
 
         return (
-            <View className="bg-card rounded-2xl p-4 mx-4 mb-4">
+            <View
+                className="rounded-2xl p-4 mx-4 mb-4"
+                style={{
+                    backgroundColor: product.isAvailable ? '#1f2937' : '#111827',
+                    borderWidth: 1,
+                    borderColor: product.isAvailable ? 'rgba(55, 65, 81, 0.8)' : 'rgba(239, 68, 68, 0.4)',
+                }}
+            >
                 <View className="flex-row">
                     {/* Product Image */}
                     <View className="w-20 h-20 rounded-xl bg-background overflow-hidden mr-3">
@@ -171,7 +192,12 @@ export default function ProductsScreen() {
                                     </Text>
                                 )}
                             </View>
-                            <Text className="text-subtext text-xs">Stock: {product.stock}</Text>
+                            <Text
+                                className="text-xs font-semibold"
+                                style={{ color: product.isAvailable ? '#10b981' : '#ef4444' }}
+                            >
+                                {product.isAvailable ? 'Available' : 'Unavailable'}
+                            </Text>
                         </View>
                     </View>
                 </View>
@@ -207,16 +233,6 @@ export default function ProductsScreen() {
                     {product.isOnSale && (
                         <View className="bg-warning/20 px-2 py-1 rounded">
                             <Text className="text-warning text-xs font-semibold">On Sale</Text>
-                        </View>
-                    )}
-                    {product.stock < 10 && product.stock > 0 && (
-                        <View className="bg-warning/20 px-2 py-1 rounded">
-                            <Text className="text-warning text-xs font-semibold">Low Stock</Text>
-                        </View>
-                    )}
-                    {product.stock === 0 && (
-                        <View className="bg-danger/20 px-2 py-1 rounded">
-                            <Text className="text-danger text-xs font-semibold">Out of Stock</Text>
                         </View>
                     )}
                 </View>
@@ -335,7 +351,7 @@ export default function ProductsScreen() {
                         <ScrollView className="flex-1 px-4 py-4">
                             <Text className="text-subtext text-center py-8">
                                 Full product form would go here with name, description, price, image upload, category
-                                selection, stock management, etc.
+                                selection, availability toggle, etc.
                             </Text>
                         </ScrollView>
                     </SafeAreaView>

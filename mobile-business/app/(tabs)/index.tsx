@@ -24,6 +24,13 @@ import * as Haptics from 'expo-haptics';
 
 type OrderStatus = 'PENDING' | 'PREPARING' | 'READY' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED';
 
+const UPCOMING_ORDER_STATUSES: ReadonlyArray<OrderStatus> = [
+    'PENDING',
+    'PREPARING',
+    'READY',
+    'OUT_FOR_DELIVERY',
+];
+
 interface OrderItem {
     productId: string;
     name: string;
@@ -76,6 +83,15 @@ const STATUS_BG: Record<OrderStatus, string> = {
     OUT_FOR_DELIVERY: '#8b5cf622',
     DELIVERED: '#6b728022',
     CANCELLED: '#ef444422',
+};
+
+const STATUS_CARD_BG: Record<OrderStatus, string> = {
+    PENDING: '#f59e0b14',
+    PREPARING: '#3b82f614',
+    READY: '#10b98114',
+    OUT_FOR_DELIVERY: '#8b5cf614',
+    DELIVERED: '#6b728012',
+    CANCELLED: '#ef444412',
 };
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
@@ -209,10 +225,12 @@ export default function OrdersScreen() {
     const [updateStatus] = useMutation(UPDATE_ORDER_STATUS);
     const [startPreparing, { loading: startingPrep }] = useMutation(START_PREPARING);
 
-    // Filter orders for this business only
-    const businessOrders = (data?.orders || []).filter((order: any) =>
-        order.businesses.some((b: any) => b.business.id === user?.businessId)
-    ) as Order[];
+    // Show only upcoming orders for this business.
+    const businessOrders = (data?.orders || []).filter((order: any) => {
+        const belongsToBusiness = order.businesses.some((b: any) => b.business.id === user?.businessId);
+        const isUpcoming = UPCOMING_ORDER_STATUSES.includes(order.status as OrderStatus);
+        return belongsToBusiness && isUpcoming;
+    }) as Order[];
 
     // Sort: PENDING first, then PREPARING, then by date desc
     const sortedOrders = [...businessOrders].sort((a, b) => {
@@ -318,7 +336,13 @@ export default function OrdersScreen() {
             >
                 <View
                     className="bg-card rounded-2xl mx-3 mb-3 overflow-hidden"
-                    style={{ borderLeftWidth: 3, borderLeftColor: STATUS_COLORS[order.status] }}
+                    style={{
+                        borderLeftWidth: 4,
+                        borderLeftColor: STATUS_COLORS[order.status],
+                        borderWidth: 1,
+                        borderColor: `${STATUS_COLORS[order.status]}55`,
+                        backgroundColor: STATUS_CARD_BG[order.status],
+                    }}
                 >
                     {/* ── Compact Header ── */}
                     <View className="px-3 pt-3 pb-2">
@@ -492,7 +516,7 @@ export default function OrdersScreen() {
                             </View>
                             <Text className="text-text text-lg font-bold mb-1">No Orders</Text>
                             <Text className="text-subtext text-sm text-center px-12">
-                                No orders found for your business.
+                                No upcoming orders for your business right now.
                             </Text>
                         </View>
                     }

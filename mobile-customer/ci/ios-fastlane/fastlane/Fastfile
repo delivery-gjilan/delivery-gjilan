@@ -137,7 +137,8 @@ platform :ios do
           ext_bundle_id => ext_profile_name
         }
       },
-      export_xcargs: "-allowProvisioningUpdates"
+      export_xcargs: "-allowProvisioningUpdates",
+      result_bundle: true
     }
 
     gym_options[:workspace] = workspace_path unless workspace_path.empty?

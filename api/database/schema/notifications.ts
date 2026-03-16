@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, pgEnum, jsonb, integer, index, boolean, real } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, pgEnum, jsonb, integer, index, boolean, real, uniqueIndex } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import { users } from './users';
 import { deviceAppTypeEnum, devicePlatformEnum } from './deviceTokens';
@@ -118,9 +118,53 @@ export const pushTelemetryEventsRelations = relations(pushTelemetryEvents, ({ on
     }),
 }));
 
+// ── business_device_health table ──────────────────────────────────
+export const businessDeviceHealth = pgTable('business_device_health', {
+    id: uuid('id').primaryKey().defaultRandom().notNull(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    businessId: uuid('business_id').notNull(),
+    deviceId: text('device_id').notNull(),
+    platform: devicePlatformEnum('platform').notNull(),
+    appVersion: text('app_version'),
+    appState: text('app_state'),
+    networkType: text('network_type'),
+    batteryLevel: integer('battery_level'),
+    isCharging: boolean('is_charging'),
+    subscriptionAlive: boolean('subscription_alive').default(false).notNull(),
+    lastHeartbeatAt: timestamp('last_heartbeat_at', { withTimezone: true, mode: 'string' })
+        .default(sql`CURRENT_TIMESTAMP`)
+        .notNull(),
+    lastOrderSignalAt: timestamp('last_order_signal_at', { withTimezone: true, mode: 'string' }),
+    lastPushReceivedAt: timestamp('last_push_received_at', { withTimezone: true, mode: 'string' }),
+    lastOrderId: uuid('last_order_id'),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+        .default(sql`CURRENT_TIMESTAMP`)
+        .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+        .default(sql`CURRENT_TIMESTAMP`)
+        .notNull()
+        .$onUpdate(() => sql`CURRENT_TIMESTAMP`),
+}, (t) => ([
+    uniqueIndex('business_device_health_user_device_idx').on(t.userId, t.deviceId),
+    index('idx_business_device_health_business').on(t.businessId),
+    index('idx_business_device_health_last_heartbeat').on(t.lastHeartbeatAt),
+    index('idx_business_device_health_last_order_signal').on(t.lastOrderSignalAt),
+    index('idx_business_device_health_last_push_received').on(t.lastPushReceivedAt),
+]));
+
+export const businessDeviceHealthRelations = relations(businessDeviceHealth, ({ one }) => ({
+    user: one(users, {
+        fields: [businessDeviceHealth.userId],
+        references: [users.id],
+    }),
+}));
+
 export type DbNotification = typeof notifications.$inferSelect;
 export type NewDbNotification = typeof notifications.$inferInsert;
 export type DbNotificationCampaign = typeof notificationCampaigns.$inferSelect;
 export type NewDbNotificationCampaign = typeof notificationCampaigns.$inferInsert;
 export type DbPushTelemetryEvent = typeof pushTelemetryEvents.$inferSelect;
 export type NewDbPushTelemetryEvent = typeof pushTelemetryEvents.$inferInsert;
+export type DbBusinessDeviceHealth = typeof businessDeviceHealth.$inferSelect;
+export type NewDbBusinessDeviceHealth = typeof businessDeviceHealth.$inferInsert;

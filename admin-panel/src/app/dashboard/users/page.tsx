@@ -65,8 +65,6 @@ interface OrderBusinessItem {
         imageUrl?: string | null;
         quantity: number;
         price: number;
-        quantityInStock: number;
-        quantityNeeded: number;
     }>;
 }
 

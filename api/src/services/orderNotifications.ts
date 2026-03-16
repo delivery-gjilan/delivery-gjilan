@@ -88,14 +88,14 @@ export function notifyCustomerOrderStatus(
 export function updateLiveActivity(
     notificationService: NotificationService,
     orderId: string,
-    status: 'preparing' | 'ready' | 'out_for_delivery' | 'delivered',
+    status: 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered',
     driverName: string = 'Your driver',
     estimatedMinutes: number = 0,
     phaseInitialMinutes?: number,
     phaseStartedAt?: number,
 ): void {
     // Only send Live Activity updates for relevant statuses
-    if (!['preparing', 'ready', 'out_for_delivery', 'delivered'].includes(status)) {
+    if (!['pending', 'preparing', 'ready', 'out_for_delivery', 'delivered'].includes(status)) {
         return;
     }
 
@@ -142,8 +142,48 @@ export function notifyDriverOrderAssigned(
     };
 
     notificationService
-        .sendToUser(driverId, payload, 'ORDER_ASSIGNED')
+        .sendToUserByAppType(driverId, 'DRIVER', payload, 'ORDER_ASSIGNED')
         .catch((err) => logger.error({ err, driverId, orderId }, 'Failed to send driver assignment notification'));
+}
+
+export function notifyAdminsNewOrder(
+    notificationService: NotificationService,
+    adminUserIds: string[],
+    orderId: string,
+): void {
+    if (adminUserIds.length === 0) return;
+
+    const payload: NotificationPayload = {
+        title: 'New Order Received',
+        body: 'A new order was placed. Tap to review it in admin.',
+        data: { orderId, screen: 'orders', type: 'NEW_ORDER_ADMIN' },
+        timeSensitive: true,
+        relevanceScore: 0.9,
+    };
+
+    notificationService
+        .sendToUsersByAppType(adminUserIds, 'ADMIN', payload, 'ADMIN_ALERT')
+        .catch((err) => logger.error({ err, orderId }, 'Failed to send admin new-order notification'));
+}
+
+export function notifyBusinessNewOrder(
+    notificationService: NotificationService,
+    businessUserIds: string[],
+    orderId: string,
+): void {
+    if (businessUserIds.length === 0) return;
+
+    const payload: NotificationPayload = {
+        title: 'New Order for Your Business',
+        body: 'You have a new incoming order. Tap to view details.',
+        data: { orderId, screen: 'orders', type: 'NEW_ORDER_BUSINESS' },
+        timeSensitive: true,
+        relevanceScore: 0.9,
+    };
+
+    notificationService
+        .sendToUsersByAppType(businessUserIds, 'BUSINESS', payload, 'ORDER_STATUS')
+        .catch((err) => logger.error({ err, orderId }, 'Failed to send business new-order notification'));
 }
 
 /**

@@ -214,6 +214,48 @@ export type BusinessDayHoursInput = {
   opensAt: Scalars['String']['input'];
 };
 
+export type BusinessDeviceHealth = {
+  __typename?: 'BusinessDeviceHealth';
+  appState?: Maybe<Scalars['String']['output']>;
+  appVersion?: Maybe<Scalars['String']['output']>;
+  batteryLevel?: Maybe<Scalars['Int']['output']>;
+  businessId: Scalars['ID']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  deviceId: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  isCharging?: Maybe<Scalars['Boolean']['output']>;
+  lastHeartbeatAt: Scalars['DateTime']['output'];
+  lastOrderId?: Maybe<Scalars['ID']['output']>;
+  lastOrderSignalAt?: Maybe<Scalars['DateTime']['output']>;
+  lastPushReceivedAt?: Maybe<Scalars['DateTime']['output']>;
+  metadata?: Maybe<Scalars['JSON']['output']>;
+  networkType?: Maybe<Scalars['String']['output']>;
+  onlineStatus: BusinessDeviceOnlineStatus;
+  platform: DevicePlatform;
+  receivingOrders: Scalars['Boolean']['output'];
+  subscriptionAlive: Scalars['Boolean']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+  userId: Scalars['ID']['output'];
+};
+
+export type BusinessDeviceHeartbeatInput = {
+  appState?: InputMaybe<Scalars['String']['input']>;
+  appVersion?: InputMaybe<Scalars['String']['input']>;
+  batteryLevel?: InputMaybe<Scalars['Int']['input']>;
+  deviceId: Scalars['String']['input'];
+  isCharging?: InputMaybe<Scalars['Boolean']['input']>;
+  metadata?: InputMaybe<Scalars['JSON']['input']>;
+  networkType?: InputMaybe<Scalars['String']['input']>;
+  platform: DevicePlatform;
+  subscriptionAlive: Scalars['Boolean']['input'];
+};
+
+export enum BusinessDeviceOnlineStatus {
+  Offline = 'OFFLINE',
+  Online = 'ONLINE',
+  Stale = 'STALE'
+}
+
 export type BusinessPromotion = {
   __typename?: 'BusinessPromotion';
   description?: Maybe<Scalars['String']['output']>;
@@ -316,6 +358,27 @@ export type CreateDynamicPricingRuleInput = {
   validUntil?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type CreateOptionGroupInput = {
+  displayOrder?: InputMaybe<Scalars['Int']['input']>;
+  maxSelections: Scalars['Int']['input'];
+  minSelections: Scalars['Int']['input'];
+  name: Scalars['String']['input'];
+  options: Array<CreateOptionInput>;
+  productId: Scalars['ID']['input'];
+};
+
+export type CreateOptionInput = {
+  displayOrder?: InputMaybe<Scalars['Int']['input']>;
+  extraPrice?: InputMaybe<Scalars['Float']['input']>;
+  linkedProductId?: InputMaybe<Scalars['ID']['input']>;
+  name: Scalars['String']['input'];
+};
+
+export type CreateOrderChildItemInput = {
+  productId: Scalars['ID']['input'];
+  selectedOptions: Array<CreateOrderItemOptionInput>;
+};
+
 export type CreateOrderInput = {
   deliveryPrice: Scalars['Float']['input'];
   driverNotes?: InputMaybe<Scalars['String']['input']>;
@@ -326,10 +389,17 @@ export type CreateOrderInput = {
 };
 
 export type CreateOrderItemInput = {
+  childItems?: InputMaybe<Array<CreateOrderChildItemInput>>;
   notes?: InputMaybe<Scalars['String']['input']>;
   price: Scalars['Float']['input'];
   productId: Scalars['ID']['input'];
   quantity: Scalars['Int']['input'];
+  selectedOptions: Array<CreateOrderItemOptionInput>;
+};
+
+export type CreateOrderItemOptionInput = {
+  optionGroupId: Scalars['ID']['input'];
+  optionId: Scalars['ID']['input'];
 };
 
 export type CreateProductCategoryInput = {
@@ -343,16 +413,22 @@ export type CreateProductInput = {
   description?: InputMaybe<Scalars['String']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   isAvailable?: InputMaybe<Scalars['Boolean']['input']>;
+  isOffer?: InputMaybe<Scalars['Boolean']['input']>;
   isOnSale?: InputMaybe<Scalars['Boolean']['input']>;
   name: Scalars['String']['input'];
   price: Scalars['Float']['input'];
   salePrice?: InputMaybe<Scalars['Float']['input']>;
-  stock?: InputMaybe<Scalars['Int']['input']>;
   subcategoryId?: InputMaybe<Scalars['ID']['input']>;
+  variantGroupId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 export type CreateProductSubcategoryInput = {
   categoryId: Scalars['ID']['input'];
+  name: Scalars['String']['input'];
+};
+
+export type CreateProductVariantGroupInput = {
+  businessId: Scalars['ID']['input'];
   name: Scalars['String']['input'];
 };
 
@@ -656,6 +732,8 @@ export type Mutation = {
   assignDriverToOrder: Order;
   assignPromotionToUsers: Array<UserPromotion>;
   backfillSettlementsForDeliveredOrders: Scalars['Int']['output'];
+  businessDeviceHeartbeat: Scalars['Boolean']['output'];
+  businessDeviceOrderSignal: Scalars['Boolean']['output'];
   cancelOrder: Order;
   createBanner: Banner;
   createBusiness: Business;
@@ -663,10 +741,13 @@ export type Mutation = {
   createDeliveryPricingTier: DeliveryPricingTier;
   createDeliveryZone: DeliveryZone;
   createDynamicPricingRule: DynamicPricingRule;
+  createOption: Option;
+  createOptionGroup: OptionGroup;
   createOrder: Order;
   createProduct: Product;
   createProductCategory: ProductCategory;
   createProductSubcategory: ProductSubcategory;
+  createProductVariantGroup: ProductVariantGroup;
   createPromotion: Promotion;
   createSettlementRule: SettlementRule;
   createTestOrder: Order;
@@ -680,9 +761,12 @@ export type Mutation = {
   deleteDeliveryZone: Scalars['Boolean']['output'];
   deleteDynamicPricingRule: Scalars['Boolean']['output'];
   deleteMyAccount: Scalars['Boolean']['output'];
+  deleteOption: Scalars['Boolean']['output'];
+  deleteOptionGroup: Scalars['Boolean']['output'];
   deleteProduct: Scalars['Boolean']['output'];
   deleteProductCategory: Scalars['Boolean']['output'];
   deleteProductSubcategory: Scalars['Boolean']['output'];
+  deleteProductVariantGroup: Scalars['Boolean']['output'];
   deletePromotion: Scalars['Boolean']['output'];
   deleteSettlementRule: Scalars['Boolean']['output'];
   deleteUser: Scalars['Boolean']['output'];
@@ -732,6 +816,8 @@ export type Mutation = {
   updateDriverLocation: User;
   updateDriverOnlineStatus: User;
   updateDynamicPricingRule: DynamicPricingRule;
+  updateOption: Option;
+  updateOptionGroup: OptionGroup;
   updateOrderStatus: Order;
   updatePreparationTime: Order;
   updateProduct: Product;
@@ -804,6 +890,17 @@ export type MutationAssignPromotionToUsersArgs = {
 };
 
 
+export type MutationBusinessDeviceHeartbeatArgs = {
+  input: BusinessDeviceHeartbeatInput;
+};
+
+
+export type MutationBusinessDeviceOrderSignalArgs = {
+  deviceId: Scalars['String']['input'];
+  orderId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+
 export type MutationCancelOrderArgs = {
   id: Scalars['ID']['input'];
 };
@@ -839,6 +936,17 @@ export type MutationCreateDynamicPricingRuleArgs = {
 };
 
 
+export type MutationCreateOptionArgs = {
+  input: CreateOptionInput;
+  optionGroupId: Scalars['ID']['input'];
+};
+
+
+export type MutationCreateOptionGroupArgs = {
+  input: CreateOptionGroupInput;
+};
+
+
 export type MutationCreateOrderArgs = {
   input: CreateOrderInput;
 };
@@ -856,6 +964,11 @@ export type MutationCreateProductCategoryArgs = {
 
 export type MutationCreateProductSubcategoryArgs = {
   input: CreateProductSubcategoryInput;
+};
+
+
+export type MutationCreateProductVariantGroupArgs = {
+  input: CreateProductVariantGroupInput;
 };
 
 
@@ -916,6 +1029,16 @@ export type MutationDeleteDynamicPricingRuleArgs = {
 };
 
 
+export type MutationDeleteOptionArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type MutationDeleteOptionGroupArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
 export type MutationDeleteProductArgs = {
   id: Scalars['ID']['input'];
 };
@@ -927,6 +1050,11 @@ export type MutationDeleteProductCategoryArgs = {
 
 
 export type MutationDeleteProductSubcategoryArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type MutationDeleteProductVariantGroupArgs = {
   id: Scalars['ID']['input'];
 };
 
@@ -1153,6 +1281,18 @@ export type MutationUpdateDynamicPricingRuleArgs = {
 };
 
 
+export type MutationUpdateOptionArgs = {
+  id: Scalars['ID']['input'];
+  input: UpdateOptionInput;
+};
+
+
+export type MutationUpdateOptionGroupArgs = {
+  id: Scalars['ID']['input'];
+  input: UpdateOptionGroupInput;
+};
+
+
 export type MutationUpdateOrderStatusArgs = {
   id: Scalars['ID']['input'];
   status: OrderStatus;
@@ -1278,6 +1418,28 @@ export enum NotificationType {
   Promotional = 'PROMOTIONAL'
 }
 
+export type Option = {
+  __typename?: 'Option';
+  displayOrder: Scalars['Int']['output'];
+  extraPrice: Scalars['Float']['output'];
+  id: Scalars['ID']['output'];
+  linkedProduct?: Maybe<Product>;
+  linkedProductId?: Maybe<Scalars['ID']['output']>;
+  name: Scalars['String']['output'];
+  optionGroupId: Scalars['ID']['output'];
+};
+
+export type OptionGroup = {
+  __typename?: 'OptionGroup';
+  displayOrder: Scalars['Int']['output'];
+  id: Scalars['ID']['output'];
+  maxSelections: Scalars['Int']['output'];
+  minSelections: Scalars['Int']['output'];
+  name: Scalars['String']['output'];
+  options: Array<Option>;
+  productId: Scalars['ID']['output'];
+};
+
 export type Order = {
   __typename?: 'Order';
   businesses: Array<OrderBusiness>;
@@ -1325,14 +1487,26 @@ export type OrderDriverLiveTracking = {
 
 export type OrderItem = {
   __typename?: 'OrderItem';
+  childItems: Array<OrderItem>;
+  id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
   name: Scalars['String']['output'];
   notes?: Maybe<Scalars['String']['output']>;
-  price: Scalars['Float']['output'];
+  parentOrderItemId?: Maybe<Scalars['ID']['output']>;
   productId: Scalars['ID']['output'];
   quantity: Scalars['Int']['output'];
-  quantityInStock: Scalars['Int']['output'];
-  quantityNeeded: Scalars['Int']['output'];
+  selectedOptions: Array<OrderItemOption>;
+  unitPrice: Scalars['Float']['output'];
+};
+
+export type OrderItemOption = {
+  __typename?: 'OrderItemOption';
+  id: Scalars['ID']['output'];
+  optionGroupId: Scalars['ID']['output'];
+  optionGroupName: Scalars['String']['output'];
+  optionId: Scalars['ID']['output'];
+  optionName: Scalars['String']['output'];
+  priceAtOrder: Scalars['Float']['output'];
 };
 
 export type OrderPromotion = {
@@ -1397,14 +1571,29 @@ export type Product = {
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
   isAvailable: Scalars['Boolean']['output'];
+  isOffer: Scalars['Boolean']['output'];
   isOnSale: Scalars['Boolean']['output'];
   name: Scalars['String']['output'];
+  optionGroups: Array<OptionGroup>;
   price: Scalars['Float']['output'];
   salePrice?: Maybe<Scalars['Float']['output']>;
   sortOrder: Scalars['Int']['output'];
-  stock: Scalars['Int']['output'];
   subcategoryId?: Maybe<Scalars['ID']['output']>;
   updatedAt: Scalars['String']['output'];
+  variantGroup?: Maybe<ProductVariantGroup>;
+  variantGroupId?: Maybe<Scalars['ID']['output']>;
+  variants: Array<Product>;
+};
+
+export type ProductCard = {
+  __typename?: 'ProductCard';
+  basePrice: Scalars['Float']['output'];
+  id: Scalars['ID']['output'];
+  imageUrl?: Maybe<Scalars['String']['output']>;
+  isOffer: Scalars['Boolean']['output'];
+  name: Scalars['String']['output'];
+  product?: Maybe<Product>;
+  variants: Array<Product>;
 };
 
 export type ProductCategory = {
@@ -1442,6 +1631,13 @@ export type ProductSubcategory = {
   id: Scalars['ID']['output'];
   name: Scalars['String']['output'];
   updatedAt: Scalars['String']['output'];
+};
+
+export type ProductVariantGroup = {
+  __typename?: 'ProductVariantGroup';
+  businessId: Scalars['ID']['output'];
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
 };
 
 export type Promotion = {
@@ -1581,6 +1777,7 @@ export type Query = {
   auditLogs: AuditLogConnection;
   business?: Maybe<Business>;
   businessBalance: SettlementSummary;
+  businessDeviceHealth: Array<BusinessDeviceHealth>;
   businesses: Array<Business>;
   calculateDeliveryPrice: DeliveryPriceResult;
   calculateProductPrice: Scalars['String']['output'];
@@ -1614,6 +1811,7 @@ export type Query = {
   myReferralStats: ReferralStats;
   notificationCampaign?: Maybe<NotificationCampaign>;
   notificationCampaigns: Array<NotificationCampaign>;
+  offers: Array<Product>;
   order?: Maybe<Order>;
   orders: Array<Order>;
   ordersByStatus: Array<Order>;
@@ -1625,7 +1823,7 @@ export type Query = {
   productPricingByBusiness: Array<ProductPricing>;
   productSubcategories: Array<ProductSubcategory>;
   productSubcategoriesByBusiness: Array<ProductSubcategory>;
-  products: Array<Product>;
+  products: Array<ProductCard>;
   pushTelemetryEvents: Array<PushTelemetryEvent>;
   pushTelemetrySummary: PushTelemetrySummary;
   settlementRule?: Maybe<SettlementRule>;
@@ -1671,6 +1869,11 @@ export type QueryBusinessArgs = {
 
 export type QueryBusinessBalanceArgs = {
   businessId: Scalars['ID']['input'];
+};
+
+
+export type QueryBusinessDeviceHealthArgs = {
+  hours?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -1770,6 +1973,11 @@ export type QueryGetWalletTransactionsArgs = {
 
 export type QueryNotificationCampaignArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type QueryOffersArgs = {
+  businessId: Scalars['ID']['input'];
 };
 
 
@@ -2216,6 +2424,20 @@ export type UpdateDynamicPricingRuleInput = {
   validUntil?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type UpdateOptionGroupInput = {
+  displayOrder?: InputMaybe<Scalars['Int']['input']>;
+  maxSelections?: InputMaybe<Scalars['Int']['input']>;
+  minSelections?: InputMaybe<Scalars['Int']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type UpdateOptionInput = {
+  displayOrder?: InputMaybe<Scalars['Int']['input']>;
+  extraPrice?: InputMaybe<Scalars['Float']['input']>;
+  linkedProductId?: InputMaybe<Scalars['ID']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+};
+
 export type UpdateProductCategoryInput = {
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
@@ -2231,8 +2453,8 @@ export type UpdateProductInput = {
   price?: InputMaybe<Scalars['Float']['input']>;
   salePrice?: InputMaybe<Scalars['Float']['input']>;
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
-  stock?: InputMaybe<Scalars['Int']['input']>;
   subcategoryId?: InputMaybe<Scalars['ID']['input']>;
+  variantGroupId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 export type UpdateProductPricingInput = {

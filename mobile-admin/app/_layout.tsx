@@ -1,9 +1,12 @@
 import { Stack } from 'expo-router';
 import '../global.css';
 import { useAppSetup } from '@/hooks/useAppSetup';
+import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import Providers from '@/lib/graphql/providers';
 import { useNotifications } from '@/hooks/useNotifications';
+import Mapbox from '@rnmapbox/maps';
+import { MAPBOX_TOKEN } from '@/utils/mapbox';
 
 function AppContent() {
     useNotifications();
@@ -53,6 +56,12 @@ function AppContent() {
 
 export default function RootLayout() {
     const { ready } = useAppSetup();
+
+    useEffect(() => {
+        if (MAPBOX_TOKEN) {
+            Mapbox.setAccessToken(MAPBOX_TOKEN);
+        }
+    }, []);
 
     if (!ready) {
         return (

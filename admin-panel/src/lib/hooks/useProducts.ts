@@ -62,8 +62,28 @@ export function useProducts(businessId: string): UseProductsResult {
         skip: !businessId,
     });
 
+    const products = (data?.products || [])
+        .map((card: any) => {
+            const product = card?.product;
+            return {
+                id: product?.id ?? card?.id,
+                businessId: product?.businessId ?? businessId,
+                categoryId: product?.categoryId ?? '',
+                subcategoryId: product?.subcategoryId ?? null,
+                name: product?.name ?? card?.name,
+                description: product?.description ?? null,
+                imageUrl: product?.imageUrl ?? card?.imageUrl ?? null,
+                price: product?.price ?? card?.basePrice ?? 0,
+                isOnSale: product?.isOnSale ?? false,
+                salePrice: product?.salePrice ?? null,
+                isAvailable: product?.isAvailable ?? true,
+                sortOrder: product?.sortOrder ?? 0,
+            };
+        })
+        .filter((p: any) => Boolean(p.categoryId));
+
     return {
-        products: data?.products || [],
+        products,
         categories: data?.productCategories || [],
         loading,
         error: error?.message,
