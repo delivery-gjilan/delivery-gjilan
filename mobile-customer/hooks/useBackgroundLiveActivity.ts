@@ -1,11 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { AppState, AppStateStatus } from 'react-native';
+import { AppState, AppStateStatus, NativeModules, Platform } from 'react-native';
 import { useActiveOrdersStore } from '@/modules/orders/store/activeOrdersStore';
 import { useLiveActivity } from '@/hooks/useLiveActivity';
 
 const LIVE_ACTIVITY_ELIGIBLE_STATUSES = new Set(['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY']);
 
 type LiveStatus = 'pending' | 'preparing' | 'out_for_delivery';
+
+interface DeliveryLiveActivitiesCleanupModule {
+    endAllActivities?: () => Promise<void>;
+}
+
+const deliveryLiveActivitiesCleanupNative =
+    (NativeModules as Record<string, unknown>).DeliveryLiveActivities as
+        | DeliveryLiveActivitiesCleanupModule
+        | undefined;
 
 function toMs(dateLike?: string | null): number | null {
     if (!dateLike) return null;
@@ -101,6 +110,7 @@ export function useBackgroundLiveActivity() {
     }, [candidateOrder, mappedStatus]);
 
     const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+    const clearedWhenNoActiveOrderRef = useRef(false);
 
     useEffect(() => {
         const runStart = async () => {
@@ -125,6 +135,28 @@ export function useBackgroundLiveActivity() {
             subscription.remove();
         };
     }, [buildState, startLiveActivity]);
+
+    useEffect(() => {
+        if (Platform.OS !== 'ios') {
+            return;
+        }
+
+        if (candidateOrder?.id) {
+            clearedWhenNoActiveOrderRef.current = false;
+            return;
+        }
+
+        if (clearedWhenNoActiveOrderRef.current) {
+            return;
+        }
+
+        clearedWhenNoActiveOrderRef.current = true;
+        if (deliveryLiveActivitiesCleanupNative?.endAllActivities) {
+            void deliveryLiveActivitiesCleanupNative.endAllActivities().catch(() => {
+                clearedWhenNoActiveOrderRef.current = false;
+            });
+        }
+    }, [candidateOrder?.id]);
 
     useEffect(() => {
         const isForeground = appStateRef.current === 'active';

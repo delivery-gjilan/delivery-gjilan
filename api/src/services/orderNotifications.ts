@@ -81,17 +81,12 @@ export function notifyCustomerOrderStatus(
 export function updateLiveActivity(
     notificationService: NotificationService,
     orderId: string,
-    status: 'pending' | 'preparing' | 'out_for_delivery' | 'delivered',
+    status: 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled',
     driverName: string = 'Your driver',
     estimatedMinutes: number = 0,
     phaseInitialMinutes?: number,
     phaseStartedAt?: number,
 ): void {
-    // Only send Live Activity updates for relevant statuses
-    if (!['pending', 'preparing', 'out_for_delivery', 'delivered'].includes(status)) {
-        return;
-    }
-
     // Fire-and-forget — do not await
     notificationService
         .sendLiveActivityUpdate(orderId, {
@@ -110,9 +105,10 @@ export function updateLiveActivity(
 export function endLiveActivity(
     notificationService: NotificationService,
     orderId: string,
+    finalStatus: 'delivered' | 'cancelled' = 'delivered',
 ): void {
     notificationService
-        .endLiveActivities(orderId)
+        .endLiveActivities(orderId, finalStatus)
         .catch((err) => logger.error({ err, orderId }, 'Failed to end Live Activity'));
 }
 

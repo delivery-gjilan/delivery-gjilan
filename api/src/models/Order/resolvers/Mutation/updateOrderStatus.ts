@@ -129,40 +129,50 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
     // Send push notification to customer
     notifyCustomerOrderStatus(context.notificationService, dbOrder.userId, id, status);
     
-    // Update Live Activity (Dynamic Island) with new status
-    if (status === 'PREPARING' || status === 'OUT_FOR_DELIVERY') {
-        const liveActivityStatus = status === 'OUT_FOR_DELIVERY'
-            ? 'out_for_delivery'
-            : 'preparing';
-        
+    // Update Live Activity (Dynamic Island) on every status transition.
+    const statusToLiveActivityStatus: Record<string, 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled'> = {
+        PENDING: 'pending',
+        PREPARING: 'preparing',
+        READY: 'ready',
+        OUT_FOR_DELIVERY: 'out_for_delivery',
+        DELIVERED: 'delivered',
+        CANCELLED: 'cancelled',
+    };
+    const liveActivityStatus = statusToLiveActivityStatus[status];
+
+    if (liveActivityStatus) {
         // Get driver name if available
         let driverName = 'Your driver';
         if (order.driver?.firstName) {
             driverName = `${order.driver.firstName} ${order.driver.lastName || ''}`.trim();
         }
-        
+
         // Calculate estimated minutes based on status
         let estimatedMinutes = 0;
-        if (status === 'PREPARING' && dbOrder.preparationMinutes) {
+        if ((status === 'PREPARING' || status === 'READY') && dbOrder.preparationMinutes) {
             estimatedMinutes = dbOrder.preparationMinutes;
         } else if (status === 'OUT_FOR_DELIVERY') {
             estimatedMinutes = 15; // Default 15 min for delivery
         }
 
         const phaseInitialMinutes =
-            status === 'PREPARING'
-                ? Math.max(1, dbOrder.preparationMinutes ?? estimatedMinutes)
-                : status === 'OUT_FOR_DELIVERY'
-                    ? Math.max(1, estimatedMinutes)
-                    : estimatedMinutes;
+            status === 'PENDING'
+                ? Math.max(1, dbOrder.preparationMinutes ?? estimatedMinutes || 15)
+                : (status === 'PREPARING' || status === 'READY')
+                    ? Math.max(1, dbOrder.preparationMinutes ?? estimatedMinutes || 15)
+                    : status === 'OUT_FOR_DELIVERY'
+                        ? Math.max(1, estimatedMinutes || 15)
+                        : Math.max(1, estimatedMinutes || 1);
 
         const phaseStartedAt =
-            status === 'PREPARING'
-                ? (dbOrder.preparingAt ? new Date(dbOrder.preparingAt).getTime() : Date.now())
-                : status === 'OUT_FOR_DELIVERY'
-                    ? (dbOrder.outForDeliveryAt ? new Date(dbOrder.outForDeliveryAt).getTime() : Date.now())
-                    : Date.now();
-        
+            status === 'PENDING'
+                ? (dbOrder.orderDate ? new Date(dbOrder.orderDate).getTime() : Date.now())
+                : (status === 'PREPARING' || status === 'READY')
+                    ? (dbOrder.preparingAt ? new Date(dbOrder.preparingAt).getTime() : Date.now())
+                    : status === 'OUT_FOR_DELIVERY'
+                        ? (dbOrder.outForDeliveryAt ? new Date(dbOrder.outForDeliveryAt).getTime() : Date.now())
+                        : Date.now();
+
         updateLiveActivity(
             context.notificationService,
             id,
@@ -172,9 +182,15 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
             phaseInitialMinutes,
             phaseStartedAt,
         );
-    } else if (status === 'DELIVERED' || status === 'CANCELLED') {
-        // End Live Activity when order is completed or cancelled
-        endLiveActivity(context.notificationService, id);
+
+        if (status === 'DELIVERED' || status === 'CANCELLED') {
+            // End Live Activity when order is completed or cancelled.
+            endLiveActivity(
+                context.notificationService,
+                id,
+                status === 'CANCELLED' ? 'cancelled' : 'delivered',
+            );
+        }
     }
     
     // Log the status change

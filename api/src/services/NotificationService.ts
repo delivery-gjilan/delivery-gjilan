@@ -15,7 +15,7 @@ const LIVE_ACTIVITY_MIN_ETA_DELTA_MINUTES = Number(
 );
 
 type LiveActivityUpdateGate = {
-    status: 'pending' | 'preparing' | 'out_for_delivery' | 'delivered';
+    status: 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
     estimatedMinutes: number;
     sentAtMs: number;
 };
@@ -425,7 +425,7 @@ export class NotificationService {
         updates: {
             driverName: string;
             estimatedMinutes: number;
-            status: 'pending' | 'preparing' | 'out_for_delivery' | 'delivered';
+            status: 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
             phaseInitialMinutes?: number;
             phaseStartedAt?: number;
         },
@@ -547,7 +547,10 @@ export class NotificationService {
     /**
      * End all Live Activities for an order (when order is completed/cancelled)
      */
-    async endLiveActivities(orderId: string): Promise<void> {
+    async endLiveActivities(
+        orderId: string,
+        finalStatus: 'delivered' | 'cancelled' = 'delivered',
+    ): Promise<void> {
         const liveActivityTopic =
             process.env.LIVE_ACTIVITY_APNS_TOPIC ||
             process.env.IOS_EXTENSION_BUNDLE_ID ||
@@ -567,7 +570,7 @@ export class NotificationService {
                 const finalState = {
                     driverName: 'Your driver',
                     estimatedMinutes: 0,
-                    status: 'delivered',
+                    status: finalStatus,
                     orderId,
                     lastUpdated: Date.now(),
                 };

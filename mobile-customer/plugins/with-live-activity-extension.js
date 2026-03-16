@@ -146,6 +146,23 @@ class DeliveryLiveActivities: NSObject {
         }
     }
 
+      // MARK: - endAllActivities
+      @objc
+      func endAllActivities(_ resolver: @escaping RCTPromiseResolveBlock,
+                  rejecter reject: @escaping RCTPromiseRejectBlock) {
+        guard #available(iOS 16.2, *) else {
+          resolver(nil)
+          return
+        }
+
+        Task {
+          for activity in Activity<DeliveryActivityAttributes>.activities {
+            await activity.end(nil, dismissalPolicy: .immediate)
+          }
+          resolver(nil)
+        }
+      }
+
     // MARK: - getPushToken
     @objc
     func getPushToken(_ activityId: String,
@@ -217,6 +234,9 @@ RCT_EXTERN_METHOD(endActivity:(NSString *)activityId
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(endAllActivities:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
 RCT_EXTERN_METHOD(getPushToken:(NSString *)activityId
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
@@ -281,7 +301,7 @@ struct DeliveryLiveActivityWidget: Widget {
     case "preparing":
       return .indigo
     case "picked_up", "on_the_way", "out_for_delivery":
-      return .teal
+      return .cyan
     case "delivered":
       return .green
     case "cancelled", "canceled":
@@ -364,9 +384,17 @@ struct DeliveryLiveActivityWidget: Widget {
     }
   }
 
-  private func progressPercentText(_ context: ActivityViewContext<DeliveryActivityAttributes>) -> String {
-    let percent = Int((resolvedProgress(context) * 100).rounded())
-    return "\\(percent)%"
+  private func etaTint(_ context: ActivityViewContext<DeliveryActivityAttributes>) -> Color {
+    switch statusKey(context.state.status) {
+    case "out_for_delivery", "on_the_way", "picked_up":
+      return .cyan
+    default:
+      return .primary
+    }
+  }
+
+  private func pendingMessage() -> String {
+    return "Waiting for restaurant to approve order"
   }
 
     var body: some WidgetConfiguration {
@@ -384,6 +412,7 @@ struct DeliveryLiveActivityWidget: Widget {
           } else {
             Text(resolvedEtaText(context))
               .font(.headline.weight(.semibold))
+              .foregroundStyle(etaTint(context))
           }
                 }
         HStack(spacing: 6) {
@@ -400,9 +429,10 @@ struct DeliveryLiveActivityWidget: Widget {
             .progressViewStyle(.linear)
             .tint(statusTint(context.state.status))
         } else {
-          Text("Waiting\(waitingDots(context))")
+          Text(statusKey(context.state.status) == "pending" ? pendingMessage() : "Waiting\(waitingDots(context))")
             .font(.caption2)
             .foregroundStyle(.secondary)
+            .lineLimit(2)
         }
 
         HStack {
@@ -423,27 +453,37 @@ struct DeliveryLiveActivityWidget: Widget {
     } dynamicIsland: { context in
       DynamicIsland {
         DynamicIslandExpandedRegion(.leading) {
-          HStack(spacing: 4) {
-            Image(systemName: statusIconName(context.state.status))
+          if statusKey(context.state.status) == "pending" {
+            Image(systemName: "clock.badge.questionmark")
               .font(.caption2.weight(.semibold))
-              .foregroundStyle(statusTint(context.state.status))
-            Text(normalizedStatus(context.state.status))
-              .font(.caption.weight(.semibold))
-              .lineLimit(1)
+              .foregroundStyle(.orange)
+          } else {
+            HStack(spacing: 4) {
+              Image(systemName: statusIconName(context.state.status))
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(statusTint(context.state.status))
+              Text(normalizedStatus(context.state.status))
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+            }
           }
         }
         DynamicIslandExpandedRegion(.trailing) {
           if statusKey(context.state.status) == "pending" {
-            Text(phaseStartDate(context), style: .timer)
-              .font(.caption.weight(.bold))
-              .monospacedDigit()
+            EmptyView()
           } else {
             Text(resolvedEtaText(context))
               .font(.caption.weight(.bold))
+              .foregroundStyle(etaTint(context))
           }
         }
         DynamicIslandExpandedRegion(.bottom) {
-          if shouldShowProgress(context) {
+          if statusKey(context.state.status) == "pending" {
+            Text(pendingMessage())
+              .font(.caption2)
+              .foregroundStyle(.secondary)
+              .lineLimit(2)
+          } else if shouldShowProgress(context) {
             ProgressView(value: resolvedProgress(context))
               .progressViewStyle(.linear)
               .tint(statusTint(context.state.status))
@@ -454,51 +494,36 @@ struct DeliveryLiveActivityWidget: Widget {
           }
         }
       } compactLeading: {
-        VStack(spacing: 1) {
-          Image(systemName: statusIconName(context.state.status))
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(statusTint(context.state.status))
-          if shouldShowProgress(context) {
-            ProgressView(value: resolvedProgress(context))
-              .progressViewStyle(.linear)
-              .tint(statusTint(context.state.status))
-              .frame(width: 26)
-          } else {
-            Text(waitingDots(context))
-              .font(.system(size: 8, weight: .semibold))
-              .foregroundStyle(.secondary)
-          }
-        }
+        Image(systemName: statusKey(context.state.status) == "pending" ? "clock.badge.questionmark" : statusIconName(context.state.status))
+          .font(.system(size: 11, weight: .semibold))
+          .foregroundStyle(statusKey(context.state.status) == "pending" ? .orange : statusTint(context.state.status))
       } compactTrailing: {
-        VStack(alignment: .trailing, spacing: -1) {
-          if statusKey(context.state.status) == "pending" {
-            Text(phaseStartDate(context), style: .timer)
-              .font(.system(size: 11, weight: .semibold))
-              .monospacedDigit()
-            Text("Wait")
-              .font(.system(size: 8, weight: .medium))
-              .foregroundStyle(.secondary)
-          } else {
-            Text(resolvedEtaText(context))
-              .font(.system(size: 11, weight: .semibold))
-            Text(progressPercentText(context))
-              .font(.system(size: 8, weight: .medium))
-              .foregroundStyle(statusTint(context.state.status))
-          }
+        if statusKey(context.state.status) == "pending" {
+          EmptyView()
+        } else {
+          Text(resolvedEtaText(context))
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(etaTint(context))
         }
       } minimal: {
-        ZStack {
-          Circle()
-            .stroke(Color.secondary.opacity(0.35), lineWidth: 2)
-          Circle()
-            .trim(from: 0, to: resolvedProgress(context))
-            .stroke(statusTint(context.state.status), style: StrokeStyle(lineWidth: 2, lineCap: .round))
-            .rotationEffect(.degrees(-90))
-          Image(systemName: statusIconName(context.state.status))
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(statusTint(context.state.status))
+        if statusKey(context.state.status) == "pending" {
+          Image(systemName: "clock.badge.questionmark")
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.orange)
+        } else {
+          ZStack {
+            Circle()
+              .stroke(Color.secondary.opacity(0.35), lineWidth: 2)
+            Circle()
+              .trim(from: 0, to: resolvedProgress(context))
+              .stroke(statusTint(context.state.status), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+              .rotationEffect(.degrees(-90))
+            Image(systemName: statusIconName(context.state.status))
+              .font(.system(size: 10, weight: .semibold))
+              .foregroundStyle(statusTint(context.state.status))
+          }
+          .frame(width: 20, height: 20)
         }
-        .frame(width: 20, height: 20)
       }
         }
     }
