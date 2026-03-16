@@ -240,8 +240,55 @@ struct DeliveryLiveActivityBundle: WidgetBundle {
 }
 
 struct DeliveryLiveActivityWidget: Widget {
+  private func statusKey(_ rawStatus: String) -> String {
+    return rawStatus
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .lowercased()
+      .replacingOccurrences(of: " ", with: "_")
+  }
+
   private func normalizedStatus(_ status: String) -> String {
     return status.replacingOccurrences(of: "_", with: " ").capitalized
+  }
+
+  private func statusIconName(_ status: String) -> String {
+    switch statusKey(status) {
+    case "pending":
+      return "clock.badge.questionmark"
+    case "accepted":
+      return "checkmark.seal"
+    case "preparing":
+      return "fork.knife"
+    case "ready", "ready_for_pickup":
+      return "bag.badge.checkmark"
+    case "picked_up", "on_the_way", "out_for_delivery":
+      return "scooter"
+    case "delivered":
+      return "checkmark.circle.fill"
+    case "cancelled", "canceled":
+      return "xmark.circle.fill"
+    default:
+      return "shippingbox.fill"
+    }
+  }
+
+  private func statusTint(_ status: String) -> Color {
+    switch statusKey(status) {
+    case "pending":
+      return .orange
+    case "accepted", "ready", "ready_for_pickup":
+      return .blue
+    case "preparing":
+      return .indigo
+    case "picked_up", "on_the_way", "out_for_delivery":
+      return .teal
+    case "delivered":
+      return .green
+    case "cancelled", "canceled":
+      return .red
+    default:
+      return .accentColor
+    }
   }
 
   private func liveProgress(_ context: ActivityViewContext<DeliveryActivityAttributes>) -> Double {
@@ -254,6 +301,42 @@ struct DeliveryLiveActivityWidget: Widget {
     return max(0, min(1, (Double(total) - currentRemaining) / Double(total)))
   }
 
+  private func resolvedProgress(_ context: ActivityViewContext<DeliveryActivityAttributes>) -> Double {
+    switch statusKey(context.state.status) {
+    case "pending":
+      return 0
+    case "delivered":
+      return 1
+    case "cancelled", "canceled":
+      return 0
+    default:
+      return liveProgress(context)
+    }
+  }
+
+  private func shouldShowProgress(_ context: ActivityViewContext<DeliveryActivityAttributes>) -> Bool {
+    switch statusKey(context.state.status) {
+    case "preparing", "out_for_delivery", "on_the_way", "picked_up", "delivered":
+      return true
+    default:
+      return false
+    }
+  }
+
+  private func phaseStartDate(_ context: ActivityViewContext<DeliveryActivityAttributes>) -> Date {
+    return Date(timeIntervalSince1970: Double(context.state.phaseStartedAt) / 1000)
+  }
+
+  private func waitingDots(_ context: ActivityViewContext<DeliveryActivityAttributes>) -> String {
+    let elapsed = max(0, Int(Date().timeIntervalSince(phaseStartDate(context))))
+    switch elapsed % 4 {
+    case 0: return "."
+    case 1: return ".."
+    case 2: return "..."
+    default: return "...."
+    }
+  }
+
   private func etaText(_ context: ActivityViewContext<DeliveryActivityAttributes>) -> String {
     let total = max(1, context.state.phaseInitialMinutes)
     let startedAtSeconds = Double(context.state.phaseStartedAt) / 1000
@@ -264,6 +347,28 @@ struct DeliveryLiveActivityWidget: Widget {
     return "~\\(currentRemaining)m"
   }
 
+  private func resolvedEtaText(_ context: ActivityViewContext<DeliveryActivityAttributes>) -> String {
+    switch statusKey(context.state.status) {
+    case "delivered":
+      return "Done"
+    case "cancelled", "canceled":
+      return "Canceled"
+    case "pending":
+      return "Waiting"
+    case "accepted":
+      return "Accepted"
+    case "ready", "ready_for_pickup":
+      return "Pickup"
+    default:
+      return etaText(context)
+    }
+  }
+
+  private func progressPercentText(_ context: ActivityViewContext<DeliveryActivityAttributes>) -> String {
+    let percent = Int((resolvedProgress(context) * 100).rounded())
+    return "\\(percent)%"
+  }
+
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: DeliveryActivityAttributes.self) { context in
       VStack(alignment: .leading, spacing: 10) {
@@ -272,15 +377,33 @@ struct DeliveryLiveActivityWidget: Widget {
             .font(.headline)
             .lineLimit(1)
           Spacer()
-          Text(etaText(context))
-            .font(.headline.weight(.semibold))
+          if statusKey(context.state.status) == "pending" {
+            Text(phaseStartDate(context), style: .timer)
+              .font(.headline.weight(.semibold))
+              .monospacedDigit()
+          } else {
+            Text(resolvedEtaText(context))
+              .font(.headline.weight(.semibold))
+          }
                 }
-        Text(normalizedStatus(context.state.status))
+        HStack(spacing: 6) {
+          Image(systemName: statusIconName(context.state.status))
+            .font(.caption)
+            .foregroundStyle(statusTint(context.state.status))
+          Text(normalizedStatus(context.state.status))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+        }
 
-        ProgressView(value: liveProgress(context))
-          .progressViewStyle(.linear)
+        if shouldShowProgress(context) {
+          ProgressView(value: resolvedProgress(context))
+            .progressViewStyle(.linear)
+            .tint(statusTint(context.state.status))
+        } else {
+          Text("Waiting\(waitingDots(context))")
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        }
 
         HStack {
           Text("Order #\\(context.attributes.orderDisplayId)")
@@ -294,31 +417,88 @@ struct DeliveryLiveActivityWidget: Widget {
         }
             }
             .padding(12)
+          .widgetURL(URL(string: "zipp://order/\\(context.state.orderId)"))
             .activityBackgroundTint(Color(.systemBackground))
             .activitySystemActionForegroundColor(Color.accentColor)
     } dynamicIsland: { context in
       DynamicIsland {
         DynamicIslandExpandedRegion(.leading) {
-          Text(normalizedStatus(context.state.status))
-            .font(.caption.weight(.semibold))
-            .lineLimit(1)
+          HStack(spacing: 4) {
+            Image(systemName: statusIconName(context.state.status))
+              .font(.caption2.weight(.semibold))
+              .foregroundStyle(statusTint(context.state.status))
+            Text(normalizedStatus(context.state.status))
+              .font(.caption.weight(.semibold))
+              .lineLimit(1)
+          }
         }
         DynamicIslandExpandedRegion(.trailing) {
-          Text(etaText(context))
-            .font(.caption.weight(.bold))
+          if statusKey(context.state.status) == "pending" {
+            Text(phaseStartDate(context), style: .timer)
+              .font(.caption.weight(.bold))
+              .monospacedDigit()
+          } else {
+            Text(resolvedEtaText(context))
+              .font(.caption.weight(.bold))
+          }
         }
         DynamicIslandExpandedRegion(.bottom) {
-          ProgressView(value: liveProgress(context))
-            .progressViewStyle(.linear)
+          if shouldShowProgress(context) {
+            ProgressView(value: resolvedProgress(context))
+              .progressViewStyle(.linear)
+              .tint(statusTint(context.state.status))
+          } else {
+            Text("Waiting\(waitingDots(context))")
+              .font(.caption2)
+              .foregroundStyle(.secondary)
+          }
         }
       } compactLeading: {
-        Image(systemName: "shippingbox.fill")
-          .font(.caption2)
+        VStack(spacing: 1) {
+          Image(systemName: statusIconName(context.state.status))
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(statusTint(context.state.status))
+          if shouldShowProgress(context) {
+            ProgressView(value: resolvedProgress(context))
+              .progressViewStyle(.linear)
+              .tint(statusTint(context.state.status))
+              .frame(width: 26)
+          } else {
+            Text(waitingDots(context))
+              .font(.system(size: 8, weight: .semibold))
+              .foregroundStyle(.secondary)
+          }
+        }
       } compactTrailing: {
-        Text(etaText(context))
-          .font(.caption2.weight(.semibold))
+        VStack(alignment: .trailing, spacing: -1) {
+          if statusKey(context.state.status) == "pending" {
+            Text(phaseStartDate(context), style: .timer)
+              .font(.system(size: 11, weight: .semibold))
+              .monospacedDigit()
+            Text("Wait")
+              .font(.system(size: 8, weight: .medium))
+              .foregroundStyle(.secondary)
+          } else {
+            Text(resolvedEtaText(context))
+              .font(.system(size: 11, weight: .semibold))
+            Text(progressPercentText(context))
+              .font(.system(size: 8, weight: .medium))
+              .foregroundStyle(statusTint(context.state.status))
+          }
+        }
       } minimal: {
-        Image(systemName: "shippingbox.fill")
+        ZStack {
+          Circle()
+            .stroke(Color.secondary.opacity(0.35), lineWidth: 2)
+          Circle()
+            .trim(from: 0, to: resolvedProgress(context))
+            .stroke(statusTint(context.state.status), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+            .rotationEffect(.degrees(-90))
+          Image(systemName: statusIconName(context.state.status))
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(statusTint(context.state.status))
+        }
+        .frame(width: 20, height: 20)
       }
         }
     }

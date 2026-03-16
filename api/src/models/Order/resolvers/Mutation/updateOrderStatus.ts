@@ -130,9 +130,9 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
     notifyCustomerOrderStatus(context.notificationService, dbOrder.userId, id, status);
     
     // Update Live Activity (Dynamic Island) with new status
-    if (status === 'PREPARING' || status === 'READY' || status === 'OUT_FOR_DELIVERY') {
-        const liveActivityStatus = status === 'OUT_FOR_DELIVERY' ? 'out_for_delivery' 
-            : status === 'READY' ? 'ready' 
+    if (status === 'PREPARING' || status === 'OUT_FOR_DELIVERY') {
+        const liveActivityStatus = status === 'OUT_FOR_DELIVERY'
+            ? 'out_for_delivery'
             : 'preparing';
         
         // Get driver name if available
@@ -145,8 +145,6 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
         let estimatedMinutes = 0;
         if (status === 'PREPARING' && dbOrder.preparationMinutes) {
             estimatedMinutes = dbOrder.preparationMinutes;
-        } else if (status === 'READY') {
-            estimatedMinutes = 10; // Default 10 min for driver pickup
         } else if (status === 'OUT_FOR_DELIVERY') {
             estimatedMinutes = 15; // Default 15 min for delivery
         }

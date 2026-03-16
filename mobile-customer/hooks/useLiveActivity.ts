@@ -21,7 +21,7 @@ interface DeliveryActivityState {
     estimatedMinutes: number;
     phaseInitialMinutes: number;
     phaseStartedAt: number;
-    status: 'preparing' | 'ready' | 'out_for_delivery' | 'delivered';
+    status: 'pending' | 'preparing' | 'out_for_delivery' | 'delivered';
     orderId: string;
     lastUpdated: number; // Unix timestamp ms
 }

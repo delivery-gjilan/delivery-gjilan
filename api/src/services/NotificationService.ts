@@ -411,7 +411,7 @@ export class NotificationService {
         updates: {
             driverName: string;
             estimatedMinutes: number;
-            status: 'preparing' | 'ready' | 'out_for_delivery' | 'delivered';
+            status: 'pending' | 'preparing' | 'out_for_delivery' | 'delivered';
             phaseInitialMinutes?: number;
             phaseStartedAt?: number;
         },

@@ -14,13 +14,6 @@ const customerStatusMessages: Record<string, (orderId: string) => NotificationPa
         timeSensitive: false,
         relevanceScore: 0.6,
     }),
-    READY: (orderId) => ({
-        title: 'Order Ready! 📦',
-        body: 'Your order is ready and waiting for a driver.',
-        data: { orderId, screen: 'orders/active', type: 'ORDER_STATUS' },
-        timeSensitive: false,
-        relevanceScore: 0.7,
-    }),
     OUT_FOR_DELIVERY: (orderId) => ({
         title: 'On the Way! 🚗',
         body: 'Your order is on its way to you!',
@@ -83,19 +76,19 @@ export function notifyCustomerOrderStatus(
  * @param orderId - Order ID
  * @param status - New order status
  * @param driverName - Driver's name (defaults to "Your driver" if not provided)
- * @param estimatedMinutes - Estimated time in minutes until delivery/ready
+ * @param estimatedMinutes - Estimated time in minutes for active phase tracking
  */
 export function updateLiveActivity(
     notificationService: NotificationService,
     orderId: string,
-    status: 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered',
+    status: 'pending' | 'preparing' | 'out_for_delivery' | 'delivered',
     driverName: string = 'Your driver',
     estimatedMinutes: number = 0,
     phaseInitialMinutes?: number,
     phaseStartedAt?: number,
 ): void {
     // Only send Live Activity updates for relevant statuses
-    if (!['pending', 'preparing', 'ready', 'out_for_delivery', 'delivered'].includes(status)) {
+    if (!['pending', 'preparing', 'out_for_delivery', 'delivered'].includes(status)) {
         return;
     }
 
