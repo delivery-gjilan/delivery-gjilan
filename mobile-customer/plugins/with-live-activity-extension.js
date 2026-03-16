@@ -454,9 +454,7 @@ struct DeliveryLiveActivityWidget: Widget {
       DynamicIsland {
         DynamicIslandExpandedRegion(.leading) {
           if statusKey(context.state.status) == "pending" {
-            Image(systemName: "clock.badge.questionmark")
-              .font(.caption2.weight(.semibold))
-              .foregroundStyle(.orange)
+            EmptyView()
           } else {
             HStack(spacing: 4) {
               Image(systemName: statusIconName(context.state.status))
@@ -479,10 +477,7 @@ struct DeliveryLiveActivityWidget: Widget {
         }
         DynamicIslandExpandedRegion(.bottom) {
           if statusKey(context.state.status) == "pending" {
-            Text(pendingMessage())
-              .font(.caption2)
-              .foregroundStyle(.secondary)
-              .lineLimit(2)
+            EmptyView()
           } else if shouldShowProgress(context) {
             ProgressView(value: resolvedProgress(context))
               .progressViewStyle(.linear)

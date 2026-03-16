@@ -9,6 +9,10 @@ import { gql } from '@apollo/client';
 import { REGISTER_DEVICE_TOKEN } from '@/graphql/operations/notifications';
 import { useRouter } from 'expo-router';
 
+function isLikelyRawApnsToken(token: string): boolean {
+    return /^[a-fA-F0-9]{64}$/.test(token);
+}
+
 const GET_MY_DEVICE_TOKENS = gql`
   query GetMyDeviceTokens {
     me {
@@ -50,6 +54,7 @@ export default function DebugNotificationsScreen() {
     const { isAuthenticated, token: authToken, user } = useAuthStore();
     const [permissionStatus, setPermissionStatus] = useState<string>('checking...');
     const [deviceToken, setDeviceToken] = useState<string>('Not obtained yet');
+    const [apnsToken, setApnsToken] = useState<string>('Not available');
     const [registrationStatus, setRegistrationStatus] = useState<string>('Not attempted');
     const [lastError, setLastError] = useState<string>('');
     const [logs, setLogs] = useState<string[]>([]);
@@ -115,10 +120,37 @@ export default function DebugNotificationsScreen() {
                 throw new Error('Must use physical device for push notifications');
             }
 
+            if (Platform.OS === 'ios') {
+                addLog('Registering iOS device for remote messages...');
+                await messaging().registerDeviceForRemoteMessages();
+                const nativeApnsToken = await messaging().getAPNSToken();
+                if (nativeApnsToken) {
+                    setApnsToken(nativeApnsToken);
+                    addLog(`APNs token: ${nativeApnsToken.substring(0, 24)}...`);
+                } else {
+                    setApnsToken('Not available yet');
+                    addLog('APNs token not available yet');
+                }
+            }
+
             // Get FCM token using Firebase Messaging SDK
             const token = await messaging().getToken();
+            if (!token) {
+                throw new Error('Firebase returned empty token');
+            }
+            if (isLikelyRawApnsToken(token)) {
+                addLog('⚠️ Token looks like raw APNs token; retrying in 3s...');
+                await new Promise((resolve) => setTimeout(resolve, 3000));
+                const retryToken = await messaging().getToken();
+                if (!retryToken || isLikelyRawApnsToken(retryToken)) {
+                    throw new Error('FCM token not ready yet (received APNs-like token)');
+                }
+                setDeviceToken(retryToken);
+                addLog(`FCM token (retry): ${retryToken.substring(0, 32)}...`);
+                return;
+            }
             setDeviceToken(token);
-            addLog(`FCM token: ${token}`);
+            addLog(`FCM token: ${token.substring(0, 32)}...`);
         } catch (error) {
             const err = error as Error;
             setLastError(err.message);
@@ -169,7 +201,11 @@ export default function DebugNotificationsScreen() {
                 throw new Error('Not authenticated');
             }
             addLog('Calling /api/debug/test-push on server...');
-            const apiBase = (process.env.EXPO_PUBLIC_API_URL ?? '').replace('/graphql', '');
+            const rawApiUrl = process.env.EXPO_PUBLIC_API_URL ?? '';
+            if (!rawApiUrl) {
+                throw new Error('EXPO_PUBLIC_API_URL is not set');
+            }
+            const apiBase = rawApiUrl.replace('/graphql', '');
             const resp = await fetch(`${apiBase}/api/debug/test-push`, {
                 method: 'POST',
                 headers: {
@@ -251,6 +287,9 @@ export default function DebugNotificationsScreen() {
                     </Text>
                     <InfoRow label="Permission" value={permissionStatus} />
                     <InfoRow label="Device Token" value={deviceToken.substring(0, 50) + (deviceToken.length > 50 ? '...' : '')} />
+                    {Platform.OS === 'ios' && (
+                        <InfoRow label="APNs Token" value={apnsToken.substring(0, 50) + (apnsToken.length > 50 ? '...' : '')} />
+                    )}
                     <InfoRow label="Registration" value={registrationStatus} />
                 </View>
 

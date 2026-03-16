@@ -157,9 +157,9 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
 
         const phaseInitialMinutes =
             status === 'PENDING'
-                ? Math.max(1, dbOrder.preparationMinutes ?? estimatedMinutes || 15)
+                ? Math.max(1, (dbOrder.preparationMinutes ?? estimatedMinutes) || 15)
                 : (status === 'PREPARING' || status === 'READY')
-                    ? Math.max(1, dbOrder.preparationMinutes ?? estimatedMinutes || 15)
+                    ? Math.max(1, (dbOrder.preparationMinutes ?? estimatedMinutes) || 15)
                     : status === 'OUT_FOR_DELIVERY'
                         ? Math.max(1, estimatedMinutes || 15)
                         : Math.max(1, estimatedMinutes || 1);

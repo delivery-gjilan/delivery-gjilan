@@ -9,6 +9,12 @@ import { toast } from '@/store/toastStore';
 import { REGISTER_DEVICE_TOKEN, UNREGISTER_DEVICE_TOKEN, TRACK_PUSH_TELEMETRY } from '@/graphql/operations/notifications';
 import { useRouter } from 'expo-router';
 
+function isLikelyRawApnsToken(token: string): boolean {
+    // APNs device tokens are typically 64-byte hex strings represented as 64 hex chars.
+    // FCM registration tokens are opaque and should not be parsed for delimiters.
+    return /^[a-fA-F0-9]{64}$/.test(token);
+}
+
 // ── Configure foreground notification behavior ─────────────────────
 // Show notifications even when the app is in the foreground
 Notifications.setNotificationHandler({
@@ -210,9 +216,8 @@ export function useNotifications() {
                 tokenLength: newToken.length,
             });
 
-            // Validate it's a real FCM token (not a raw APNs token)
-            if (newToken.length < 100 || !newToken.includes(':')) {
-                console.warn('[Notifications] Token refresh returned non-FCM token, ignoring:', {
+            if (!newToken || isLikelyRawApnsToken(newToken)) {
+                console.warn('[Notifications] Token refresh returned APNs-like token, ignoring:', {
                     length: newToken.length,
                 });
                 return;
@@ -417,6 +422,11 @@ async function registerForPushNotifications(): Promise<string | null> {
 
     console.log('[Notifications] Permissions granted, getting FCM registration token...');
 
+    // Ensure iOS device is registered with APNs before requesting FCM token.
+    if (Platform.OS === 'ios') {
+        await messaging().registerDeviceForRemoteMessages();
+    }
+
     // Use Firebase Messaging to get the FCM registration token.
     // On iOS, @react-native-firebase handles the APNs→FCM exchange automatically.
     // This is required — Notifications.getDevicePushTokenAsync() returns a raw APNs
@@ -425,16 +435,14 @@ async function registerForPushNotifications(): Promise<string | null> {
 
     console.log('[Notifications] FCM token obtained:', token, 'length:', token.length);
 
-    // Validate this is a real FCM token, not a raw APNs device token.
-    // APNs tokens are 64 hex chars; FCM tokens are 100+ chars and contain a colon.
-    if (token.length < 100 || !token.includes(':')) {
-        console.error('[Notifications] Got non-FCM token (likely raw APNs token), retrying after delay...');
+    if (!token || isLikelyRawApnsToken(token)) {
+        console.error('[Notifications] Got APNs-like token, retrying after delay...');
         // Wait for the APNs→FCM exchange to complete and retry
         await new Promise(resolve => setTimeout(resolve, 3000));
         const retryToken = await messaging().getToken();
         console.log('[Notifications] Retry FCM token:', retryToken, 'length:', retryToken.length);
-        if (retryToken.length < 100 || !retryToken.includes(':')) {
-            console.error('[Notifications] Still got non-FCM token after retry, cannot register');
+        if (!retryToken || isLikelyRawApnsToken(retryToken)) {
+            console.error('[Notifications] Still got APNs-like token after retry, cannot register');
             return null;
         }
         return retryToken;
