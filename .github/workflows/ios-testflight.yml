@@ -291,8 +291,6 @@ jobs:
       - name: Build and upload to TestFlight
         working-directory: ${{ env.APP_DIR }}/ios
         env:
-          SENTRY_DISABLE_AUTO_UPLOAD: "true"
-          SENTRY_ALLOW_FAILURE: "true"
           APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}

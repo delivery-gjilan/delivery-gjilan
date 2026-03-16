@@ -9,7 +9,7 @@ The API is a Node.js service built with:
 - `graphql-ws` for websocket subscriptions
 - Drizzle for database access
 - optional Redis-backed pubsub for multi-instance fan-out
-- structured logging and Sentry instrumentation
+- structured logging and monitoring instrumentation
 
 The entrypoint is `api/src/index.ts`.
 

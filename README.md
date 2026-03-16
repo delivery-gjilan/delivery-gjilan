@@ -10,7 +10,7 @@ Delivery Gjilan is a monorepo for the delivery platform: one API, one admin web 
 - `mobile-driver` - driver app with heartbeat, navigation, and delivery execution flows
 - `mobile-business` - business app for order handling and store operations
 - `mobile-admin` - mobile admin companion app
-- `observability` - local Grafana, Loki, Promtail, and Sentry-oriented setup notes
+- `observability` - local Grafana, Loki, Promtail, and monitoring setup notes
 
 ## Quick Start
 

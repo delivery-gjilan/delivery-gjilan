@@ -22,7 +22,6 @@ import { OrderService } from '@/services/OrderService';
 import { pubsub } from '@/lib/pubsub';
 import { decodeJwtToken } from '@/lib/utils/authUtils';
 import { getDriverServices, initializeDriverServices } from '@/services/driverServices.init';
-import { setSentryContext } from '@/lib/sentry';
 import logger from '@/lib/logger';
 import { NotificationRepository } from '@/repositories/NotificationRepository';
 import { NotificationService } from '@/services/NotificationService';
@@ -119,9 +118,6 @@ export async function createContext(initialContext: YogaInitialContext): Promise
 
     // Create a per-request child logger with correlation
     const reqLog = logger.child({ requestId, userId: userData.userId, role: userData.role });
-
-    // Push context to Sentry so every error captured within this request is enriched
-    setSentryContext({ requestId, userId: userData.userId, role: userData.role });
 
     // Initialize database connection
     const db = await getDB();

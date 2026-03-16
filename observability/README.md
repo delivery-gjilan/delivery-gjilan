@@ -26,10 +26,9 @@ npm run dev
 │  Express API │───────────────→│ api/logs/  │←─ read ──│Promtail│
 │  (Pino)      │                └───────────┘          └──┬───┘
 │              │── /metrics ───────────────────────────────┐│ push
-│              │─── Sentry SDK ──→ sentry.io               ││
 └─────────────┘                                        ┌──▼───┐
                                                        │ Loki  │
-┌──────────────┐─── Sentry SDK ──→ sentry.io           └──┬───┘
+┌──────────────┐                                           └──┬───┘
 │ Mobile Apps  │                              ┌──────────▼──────┐
 └──────────────┘                              │  Prometheus      │
                                               └──────────┬──────┘
@@ -43,7 +42,6 @@ npm run dev
 | Component | Purpose | Port |
 |-----------|---------|------|
 | **Pino** | Structured JSON logging (API) | — |
-| **Sentry** | Error tracking + performance (API + mobile) | — |
 | **Loki** | Log aggregation & querying | 3200 |
 | **Promtail** | Log shipping (file → Loki) | 9080 |
 | **Prometheus** | Metrics scraping + alert inputs | 9090 |
@@ -54,14 +52,8 @@ npm run dev
 ### API (`api/.env`)
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SENTRY_DSN` | — | Sentry project DSN (get from sentry.io) |
 | `LOG_LEVEL` | `debug` (dev) / `info` (prod) | Pino log level |
 | `NODE_ENV` | `development` | Controls pretty-print vs JSON output |
-
-### Mobile Apps (`.env`)
-| Variable | Description |
-|----------|-------------|
-| `EXPO_PUBLIC_SENTRY_DSN` | Sentry project DSN for the mobile app |
 
 ## Alert Rules (pre-configured)
 
@@ -108,7 +100,7 @@ npm install @opentelemetry/sdk-node @opentelemetry/auto-instrumentations-node
 ```
 - Distributed traces across API ↔ DB ↔ external services
 - Correlate traces with logs via `traceId`
-- Export to Tempo (add to docker-compose) or Sentry
+- Export to Tempo (add to docker-compose) or your chosen tracing backend
 
 ### Phase 4 — Production Hardening
 - Move Loki storage to S3 (replace filesystem in loki-config.yml)

@@ -26,7 +26,7 @@ export class ErrorBoundary extends Component<Props, State> {
     }
 
     componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-        // Log to console for development — Sentry captures this automatically
+        // Log to console for development.
         console.error('[ErrorBoundary] Uncaught error:', error, errorInfo);
     }
 

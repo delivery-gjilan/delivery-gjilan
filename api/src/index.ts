@@ -15,7 +15,6 @@ import { useServer } from 'graphql-ws/use/ws';
 import { decodeJwtToken } from '@/lib/utils/authUtils';
 import { getDriverServices, initializeDriverServices, shutdownDriverServices } from '@/services/driverServices.init';
 import { initializePubSubRedisBridge, shutdownPubSubRedisBridge } from '@/lib/pubsub';
-import { initSentry, Sentry } from '@/lib/sentry';
 import { requestLogger } from '@/lib/middleware/requestLogger';
 import logger from '@/lib/logger';
 import { initializeFirebase } from '@/lib/firebase';
@@ -27,9 +26,6 @@ import { sql } from 'drizzle-orm';
 import type { GraphQLContext } from './graphql/context';
 
 export type AppContext = GraphQLContext;
-
-// ── Sentry must be initialised before any other middleware ──
-initSentry();
 
 const app = express();
 const port = Number(process.env.PORT) || 4000;
@@ -201,9 +197,6 @@ app.get('/metrics', metricsEndpoint);
 app.get('/health/realtime', (_req, res) => {
     res.status(200).json(realtimeMonitor.getSummary());
 });
-
-// Sentry error handler (must be after routes, before custom error handler)
-Sentry.setupExpressErrorHandler(app);
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -562,17 +555,14 @@ process.on('SIGTERM', async () => {
     const { pool } = await import('../database');
     await pool?.end();
     await cache.disconnect();
-    await Sentry.close(2000);
     process.exit(0);
 });
 
 process.on('unhandledRejection', (error) => {
     logger.error({ err: error }, 'Unhandled promise rejection');
-    Sentry.captureException(error);
 });
 
 process.on('uncaughtException', (error) => {
     logger.fatal({ err: error }, 'Uncaught exception — exiting');
-    Sentry.captureException(error);
-    Sentry.close(2000).then(() => process.exit(1));
+    process.exit(1);
 });

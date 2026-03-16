@@ -12,10 +12,6 @@ import InfoBanner from '@/components/InfoBanner';
 import type { InfoBannerType } from '@/components/InfoBanner';
 import Mapbox from '@rnmapbox/maps';
 import { MAPBOX_TOKEN } from '@/utils/mapbox';
-import { initSentry } from '@/lib/sentry';
-
-// ── Initialise Sentry before anything else renders ──
-initSentry();
 
 function AppContent() {
     // Start heartbeat as soon as auth is established

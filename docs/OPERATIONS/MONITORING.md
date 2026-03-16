@@ -7,7 +7,6 @@ The repository already has the start of a real monitoring story, but it is still
 What exists today:
 
 - API structured logging through Pino and the request logger middleware
-- Sentry wiring for the API and mobile apps through environment variables
 - local Grafana, Loki, and Promtail under `observability/`
 - local Prometheus under `observability/`
 - pre-provisioned Grafana dashboards and alert rules in the local observability stack
@@ -32,7 +31,7 @@ The existing stack is already useful for:
 
 - debugging API request failures
 - investigating driver watchdog and heartbeat incidents
-- tracking fatal errors and runtime crashes through Sentry
+- tracking fatal errors and runtime crashes through structured logs and app-level error boundaries
 - local dashboard exploration while developing and stabilizing features
 
 It is not yet enough for confident go-live operations.
@@ -107,7 +106,6 @@ Do this before public launch:
 
 - enable `/health` and `/ready`
 - enable Prometheus metrics from the existing stub
-- keep Sentry active for API and mobile-customer at minimum
 - run Grafana and Loki in a durable environment, not only locally
 - configure alert delivery to Slack or email
 - add external uptime checks for API GraphQL and a simple health route
@@ -146,7 +144,6 @@ If you want the smallest pragmatic setup:
 
 - keep Grafana + Loki + Promtail
 - keep Prometheus
-- keep Sentry for exceptions and mobile crash visibility
 - optionally add Uptime Kuma or a hosted uptime service for external checks
 
 If you later want deeper traces:

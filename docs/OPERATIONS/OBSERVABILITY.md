@@ -5,7 +5,6 @@
 The repo already has a practical local observability setup centered on logs and dashboards.
 
 - Pino-style structured API logs
-- Sentry for errors and performance signals
 - Loki for log aggregation
 - Promtail for shipping local log files
 - Grafana for dashboards and alerts
@@ -18,7 +17,6 @@ Phase 1 is the real working baseline:
 
 - API logs are written locally and can be scraped into Loki
 - Grafana dashboards can be used for request/error inspection
-- Sentry is the main error-tracking layer across API and mobile
 
 ## Scaling Phases
 

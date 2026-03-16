@@ -17,15 +17,10 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ToastContainer } from '@/components/Toast';
 import SuccessModalContainer from '@/components/SuccessModalContainer';
 import { useBackgroundLiveActivity } from '@/hooks/useBackgroundLiveActivity';
-
-import { initSentry } from '@/lib/sentry';
 import { useEffect } from 'react';
 import Mapbox from '@rnmapbox/maps';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCartDataStore } from '@/modules/cart/store/cartDataStore';
-
-// ── Initialise Sentry before anything else renders ──
-initSentry();
 
 // Inner component that uses Apollo Client (must be inside ApolloProvider)
 function AppContent() {

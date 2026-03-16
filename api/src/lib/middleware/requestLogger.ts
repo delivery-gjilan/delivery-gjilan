@@ -60,7 +60,7 @@ function getGraphQLMeta(req: Request): { operationName: string; operationType: s
  * 2. Creates a per-request child logger available on `req.log`.
  * 3. Logs request start + request finish (status, duration).
  *
- * The `requestId` is propagated to Sentry and to the GraphQL context
+ * The `requestId` is propagated to the GraphQL context
  * so every log line in a single operation is correlated.
  */
 export function requestLogger(req: Request, res: Response, next: NextFunction) {

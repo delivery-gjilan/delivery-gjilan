@@ -28,7 +28,6 @@ mobile apps / admin-panel
 api also integrates with:
 - Redis pubsub when enabled for cross-instance subscription fan-out
 - Firebase / push infrastructure for notifications
-- Sentry for error tracking
 - Loki / Grafana / Promtail in local observability mode
 ```
 

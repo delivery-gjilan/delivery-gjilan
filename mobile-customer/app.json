@@ -62,13 +62,6 @@
     },
     "plugins": [
       "expo-router",
-      [
-        "@sentry/react-native/expo",
-        {
-          "organization": "delivery-gjilan",
-          "project": "mobile-customer"
-        }
-      ],
       "@rnmapbox/maps",
       "@react-native-firebase/app",
       [

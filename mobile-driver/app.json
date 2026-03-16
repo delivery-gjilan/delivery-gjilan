@@ -71,13 +71,6 @@
         }
       ],
       [
-        "@sentry/react-native/expo",
-        {
-          "organization": "delivery-gjilan",
-          "project": "mobile-driver"
-        }
-      ],
-      [
         "@rnmapbox/maps",
         {
           "RNMapboxMapsVersion": "11.11.0"
