@@ -8,13 +8,15 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/1c06f250-74dc-4a5d-855c-f53e97df8c2e"
+      "url": "https://u.expo.dev/1c06f250-74dc-4a5d-855c-f53e97df8c2e",
+      "checkAutomatically": "ON_ERROR_RECOVERY",
+      "fallbackToCacheTimeout": 0
     },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "deliveryapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.zippdelivery.mobiledriver",
@@ -73,7 +75,7 @@
       [
         "@rnmapbox/maps",
         {
-          "RNMapboxMapsVersion": "11.11.0"
+          "RNMapboxMapsVersion": "10.1.39"
         }
       ],
       [
@@ -88,7 +90,7 @@
         "@badatgil/expo-mapbox-navigation",
         {
           "accessToken": "pk.eyJ1IjoiYXJ0c2hhYmFuaTIwMDIiLCJhIjoiY21sZjlkbTNxMDIwOTNkc2F0cTZkYmZoeiJ9.C81uu49ST5NrfHZ58N9EXg",
-          "mapboxMapsVersion": "11.11.0"
+          "mapboxMapsVersion": "10.1.39"
         }
       ],
       [

@@ -8,6 +8,15 @@ import { persistCache, AsyncStorageWrapper } from 'apollo3-cache-persist';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getValidAccessToken } from './authSession';
 
+function getApiUrl(): string | null {
+    const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+    if (!apiUrl) {
+        console.error('[Apollo] EXPO_PUBLIC_API_URL is missing. Network calls are disabled.');
+        return null;
+    }
+    return apiUrl;
+}
+
 /**
  * Exponential backoff configuration for WebSocket reconnection
  * Pattern: 1s → 2s → 5s → 10s (infinite retry)
@@ -58,55 +67,57 @@ const authLink = new SetContextLink(async ({ headers }) => {
 });
 
 const httpLink = new HttpLink({
-    uri: process.env.EXPO_PUBLIC_API_URL,
+    uri: getApiUrl() ?? 'https://invalid.local/graphql',
 });
 
-const httpUrl = process.env.EXPO_PUBLIC_API_URL!;
-const wsUrl = httpUrl.replace(/^http/, 'ws');
+const httpUrl = getApiUrl();
+const wsUrl = httpUrl ? httpUrl.replace(/^http/, 'ws') : null;
 
 // Track reconnection attempts
 let reconnectAttempts = 0;
 
-const wsClient: Client = createClient({
-    url: wsUrl,
-    connectionParams: async () => {
-        const token = await getValidAccessToken();
+const wsClient: Client | null = wsUrl
+    ? createClient({
+          url: wsUrl,
+          connectionParams: async () => {
+              const token = await getValidAccessToken();
 
-        return {
-            Authorization: token ? `Bearer ${token}` : '',
-        };
-    },
-    // Infinite retry with exponential backoff
-    shouldRetry: () => true,
-    retryAttempts: Infinity,
-    retryWait: async (retries) => {
-        reconnectAttempts = retries;
-        const delay = getNextReconnectDelay(retries);
-        console.log(`[WS] Reconnecting in ${delay}ms (attempt ${retries + 1})`);
-        await new Promise((resolve) => setTimeout(resolve, delay));
-    },
-    on: {
-        connected: () => {
-            console.log('[WS] Connected');
-            if (reconnectAttempts > 0) {
-                console.log(`[WS] Reconnected after ${reconnectAttempts} attempts`);
-            }
-            reconnectAttempts = 0;
-        },
-        closed: (event) => {
-            console.log('[WS] Closed', event);
-        },
-        error: (err) => {
-            console.error('[WS] Error', err);
-        },
-    },
-    // Keep-alive ping every 30 seconds
-    keepAlive: 30000,
-    // Lazy connection - only connect when needed
-    lazy: true,
-});
+              return {
+                  Authorization: token ? `Bearer ${token}` : '',
+              };
+          },
+          // Infinite retry with exponential backoff
+          shouldRetry: () => true,
+          retryAttempts: Infinity,
+          retryWait: async (retries) => {
+              reconnectAttempts = retries;
+              const delay = getNextReconnectDelay(retries);
+              console.log(`[WS] Reconnecting in ${delay}ms (attempt ${retries + 1})`);
+              await new Promise((resolve) => setTimeout(resolve, delay));
+          },
+          on: {
+              connected: () => {
+                  console.log('[WS] Connected');
+                  if (reconnectAttempts > 0) {
+                      console.log(`[WS] Reconnected after ${reconnectAttempts} attempts`);
+                  }
+                  reconnectAttempts = 0;
+              },
+              closed: (event) => {
+                  console.log('[WS] Closed', event);
+              },
+              error: (err) => {
+                  console.error('[WS] Error', err);
+              },
+          },
+          // Keep-alive ping every 30 seconds
+          keepAlive: 30000,
+          // Lazy connection - only connect when needed
+          lazy: true,
+      })
+    : null;
 
-const wsLink = new GraphQLWsLink(wsClient);
+const wsLink = wsClient ? new GraphQLWsLink(wsClient) : ApolloLink.empty();
 
 const splitLink = ApolloLink.split(
     ({ query }) => {
