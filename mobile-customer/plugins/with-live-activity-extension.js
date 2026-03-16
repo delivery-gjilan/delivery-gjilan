@@ -711,7 +711,8 @@ function withLiveActivityExtensionTarget(config) {
         }
 
         buildConfig.buildSettings.PRODUCT_BUNDLE_PACKAGE_TYPE = '"com.apple.package-type.app-extension"';
-        buildConfig.buildSettings.MACH_O_TYPE = 'mh_bundle';
+        // App extensions must produce an executable binary inside the .appex bundle.
+        buildConfig.buildSettings.MACH_O_TYPE = 'mh_execute';
         buildConfig.buildSettings.INFOPLIST_FILE = `${EXTENSION_TARGET_NAME}/${EXTENSION_TARGET_NAME}-Info.plist`;
         buildConfig.buildSettings.GENERATE_INFOPLIST_FILE = 'NO';
         buildConfig.buildSettings.PRODUCT_NAME = EXTENSION_TARGET_NAME;
@@ -795,6 +796,138 @@ function withLiveActivityExtensionTarget(config) {
     const appBundleId = cfg.ios?.bundleIdentifier || 'com.artshabani.mobilecustomer';
     const extensionBundleId = `${appBundleId}.${EXTENSION_TARGET_NAME}`;
 
+    const ensureTargetBuildPhases = (targetUuid) => {
+      if (!targetUuid || typeof project.addBuildPhase !== 'function') return;
+      const objects = project.hash.project.objects || {};
+      const sources = objects.PBXSourcesBuildPhase || {};
+      const frameworks = objects.PBXFrameworksBuildPhase || {};
+      const resources = objects.PBXResourcesBuildPhase || {};
+
+      const hasSources = Object.values(sources).some(
+        (phase) => typeof phase === 'object' && phase && phase.target === targetUuid,
+      );
+      const hasFrameworks = Object.values(frameworks).some(
+        (phase) => typeof phase === 'object' && phase && phase.target === targetUuid,
+      );
+      const hasResources = Object.values(resources).some(
+        (phase) => typeof phase === 'object' && phase && phase.target === targetUuid,
+      );
+
+      if (!hasSources) {
+        project.addBuildPhase([], 'PBXSourcesBuildPhase', 'Sources', targetUuid);
+      }
+      if (!hasFrameworks) {
+        project.addBuildPhase([], 'PBXFrameworksBuildPhase', 'Frameworks', targetUuid);
+      }
+      if (!hasResources) {
+        project.addBuildPhase([], 'PBXResourcesBuildPhase', 'Resources', targetUuid);
+      }
+    };
+
+    const linkSourceFile = (filepath, targetUuid) => {
+      const fileRefs = project.pbxFileReferenceSection();
+      const filename = path.basename(filepath);
+      const existingFileKey = Object.keys(fileRefs).find((key) => {
+        const ref = fileRefs[key];
+        return (
+          typeof ref === 'object' &&
+          (ref.path === `"${filepath}"` ||
+            ref.path === filepath ||
+            ref.name === `"${filename}"` ||
+            ref.name === filename)
+        );
+      });
+
+      if (existingFileKey) {
+        const pbxFile = {
+          fileRef: existingFileKey,
+          basename: filename,
+        };
+        project.addToPbxBuildFileSection(pbxFile);
+        if (typeof project.addToPbxSourcesBuildPhase === 'function') {
+          project.addToPbxSourcesBuildPhase(pbxFile, targetUuid);
+        }
+      } else {
+        addBuildSourceFileToGroup({
+          filepath,
+          groupName: EXTENSION_TARGET_NAME,
+          project,
+          targetUuid,
+          verbose: true,
+        });
+      }
+    };
+
+    const ensureDependencyAndEmbedding = (targetUuid, productFileRef) => {
+      const mainTargetUuid = Object.keys(project.pbxNativeTargetSection()).find((uuid) => {
+        const t = project.pbxNativeTargetSection()[uuid];
+        return typeof t === 'object' && t.productType === '"com.apple.product-type.application"';
+      });
+
+      if (!mainTargetUuid) {
+        return;
+      }
+
+      project.addTargetDependency(mainTargetUuid, [targetUuid]);
+
+      const pbxCopyFilesBuildPhase = project.hash.project.objects.PBXCopyFilesBuildPhase || {};
+      let embedPhaseUuid = Object.keys(pbxCopyFilesBuildPhase).find((key) => {
+        const phase = pbxCopyFilesBuildPhase[key];
+        return typeof phase === 'object' && (phase.name === '"Embed App Extensions"' || phase.dstSubfolderSpec === '13');
+      });
+
+      if (!embedPhaseUuid) {
+        const newPhase = project.addBuildPhase([], 'PBXCopyFilesBuildPhase', 'Embed App Extensions', mainTargetUuid, 'app_extension');
+        if (newPhase && newPhase.buildPhase) {
+          newPhase.buildPhase.dstSubfolderSpec = 13;
+        }
+        embedPhaseUuid = newPhase.uuid;
+      }
+
+      const productFile = productFileRef ? project.pbxFileReferenceSection()[productFileRef] : null;
+      if (!productFile || !embedPhaseUuid) {
+        return;
+      }
+
+      const phase = project.hash.project.objects.PBXCopyFilesBuildPhase[embedPhaseUuid];
+      if (!phase.files) {
+        phase.files = [];
+      }
+
+      const alreadyEmbedded = phase.files.some(
+        (entry) => entry && typeof entry === 'object' && entry.comment === String(productFile.path || '').replace(/"/g, ''),
+      );
+      if (alreadyEmbedded) {
+        return;
+      }
+
+      const file = {
+        fileRef: productFileRef,
+        basename: productFile.path,
+        settings: { ATTRIBUTES: ['RemoveHeadersOnCopy'] },
+      };
+      const buildFile = project.addToPbxBuildFileSection(file);
+      if (buildFile && buildFile.uuid) {
+        phase.files.push({
+          value: buildFile.uuid,
+          comment: String(productFile.path || '').replace(/"/g, ''),
+        });
+      }
+    };
+
+    const ensureExtensionTargetWiring = (targetUuid, productFileRef) => {
+      ensureGroupRecursively(project, EXTENSION_TARGET_NAME);
+      ensureTargetBuildPhases(targetUuid);
+      linkSourceFile(`${EXTENSION_TARGET_NAME}/DeliveryActivityAttributes.swift`, targetUuid);
+      linkSourceFile(`${EXTENSION_TARGET_NAME}/DeliveryLiveActivityWidget.swift`, targetUuid);
+      ensureDependencyAndEmbedding(targetUuid, productFileRef);
+
+      const frameworks = ['ActivityKit.framework', 'WidgetKit.framework', 'SwiftUI.framework'];
+      for (const framework of frameworks) {
+        project.addFramework(framework, { target: targetUuid });
+      }
+    };
+
     if (project.pbxTargetByName(EXTENSION_TARGET_NAME)) {
       const existingTarget = project.pbxTargetByName(EXTENSION_TARGET_NAME);
       if (existingTarget?.uuid) {
@@ -805,9 +938,12 @@ function withLiveActivityExtensionTarget(config) {
           marketingVersion,
           currentProjectVersion
         );
+        const nativeTarget = project.pbxNativeTargetSection()[existingTarget.uuid];
+        const productFileRef = existingTarget?.pbxNativeTarget?.productReference || nativeTarget?.productReference;
+        ensureExtensionTargetWiring(existingTarget.uuid, productFileRef);
       }
       setMainTargetSourceExclusions();
-      console.log('[LiveActivityExtension] Updated existing extension target build settings');
+      console.log('[LiveActivityExtension] Updated existing extension target build settings and wiring');
       return cfg;
     }
 
@@ -826,46 +962,7 @@ function withLiveActivityExtensionTarget(config) {
     console.log('[LiveActivityExtension] Created target:', target.uuid || target);
     const targetUuid = target.uuid || target;
 
-    ensureGroupRecursively(project, EXTENSION_TARGET_NAME);
-
-    // Ensure the extension target has build phases
-    if (typeof project.addBuildPhase === 'function') {
-      project.addBuildPhase([], 'PBXSourcesBuildPhase', 'Sources', targetUuid);
-      project.addBuildPhase([], 'PBXFrameworksBuildPhase', 'Frameworks', targetUuid);
-      project.addBuildPhase([], 'PBXResourcesBuildPhase', 'Resources', targetUuid);
-    }
-
-    // Helper to add file and link to target
-    const linkSourceFile = (filepath, targetUuid) => {
-      const fileRefs = project.pbxFileReferenceSection();
-      const filename = path.basename(filepath);
-      const existingFileKey = Object.keys(fileRefs).find(key => {
-        const ref = fileRefs[key];
-        return typeof ref === 'object' && (ref.path === `"${filepath}"` || ref.path === filepath || ref.name === `"${filename}"` || ref.name === filename);
-      });
-
-      if (existingFileKey) {
-        const pbxFile = {
-          fileRef: existingFileKey,
-          basename: filename
-        };
-        project.addToPbxBuildFileSection(pbxFile);
-        if (typeof project.addToPbxSourcesBuildPhase === 'function') {
-          project.addToPbxSourcesBuildPhase(pbxFile, targetUuid);
-        }
-      } else {
-        addBuildSourceFileToGroup({
-          filepath,
-          groupName: EXTENSION_TARGET_NAME,
-          project,
-          targetUuid,
-          verbose: true,
-        });
-      }
-    };
-
-    linkSourceFile(`${EXTENSION_TARGET_NAME}/DeliveryActivityAttributes.swift`, targetUuid);
-    linkSourceFile(`${EXTENSION_TARGET_NAME}/DeliveryLiveActivityWidget.swift`, targetUuid);
+    ensureExtensionTargetWiring(targetUuid, target?.pbxNativeTarget?.productReference);
 
     setTargetBuildSettings(
       target.uuid,
@@ -877,59 +974,8 @@ function withLiveActivityExtensionTarget(config) {
 
     setMainTargetSourceExclusions();
 
-    const mainTargetUuid = Object.keys(project.pbxNativeTargetSection()).find((uuid) => {
-      const t = project.pbxNativeTargetSection()[uuid];
-      return typeof t === 'object' && t.productType === '"com.apple.product-type.application"';
-    });
-
-    if (mainTargetUuid) {
-      // 1. Add target dependency
-      project.addTargetDependency(mainTargetUuid, [target.uuid]);
-
-      // 2. Embed the extension (PlugIns)
-      const pbxCopyFilesBuildPhase = project.hash.project.objects['PBXCopyFilesBuildPhase'] || {};
-      let embedPhaseUuid = Object.keys(pbxCopyFilesBuildPhase).find(key => {
-        const phase = pbxCopyFilesBuildPhase[key];
-        return typeof phase === 'object' && (phase.name === '"Embed App Extensions"' || phase.dstSubfolderSpec === '13');
-      });
-
-      if (!embedPhaseUuid) {
-        const newPhase = project.addBuildPhase([], 'PBXCopyFilesBuildPhase', 'Embed App Extensions', mainTargetUuid, 'app_extension');
-        if (newPhase && newPhase.buildPhase) {
-          newPhase.buildPhase.dstSubfolderSpec = 13;
-        }
-        embedPhaseUuid = newPhase.uuid;
-      }
-
-      const productFileRef = target.pbxNativeTarget.productReference;
-      const productFile = project.pbxFileReferenceSection()[productFileRef];
-      if (productFile && embedPhaseUuid) {
-        const file = {
-          fileRef: productFileRef,
-          basename: productFile.path,
-          settings: { ATTRIBUTES: ['RemoveHeadersOnCopy'] }
-        };
-        const buildFile = project.addToPbxBuildFileSection(file);
-        if (buildFile && buildFile.uuid) {
-          if (!project.hash.project.objects['PBXCopyFilesBuildPhase'][embedPhaseUuid].files) {
-            project.hash.project.objects['PBXCopyFilesBuildPhase'][embedPhaseUuid].files = [];
-          }
-          project.hash.project.objects['PBXCopyFilesBuildPhase'][embedPhaseUuid].files.push({
-            value: buildFile.uuid,
-            comment: productFile.path.replace(/"/g, '')
-          });
-        }
-      }
-    }
-
     if (resolvedDevelopmentTeam) {
       console.log('[LiveActivityExtension] Applied extension signing team', { developmentTeam: resolvedDevelopmentTeam });
-    }
-
-    // Link frameworks necessary for Live Activities
-    const frameworks = ['ActivityKit.framework', 'WidgetKit.framework', 'SwiftUI.framework'];
-    for (const framework of frameworks) {
-      project.addFramework(framework, { target: target.uuid });
     }
 
     console.log('[LiveActivityExtension] Created extension target, added dependency, and linked Swift sources/frameworks');
