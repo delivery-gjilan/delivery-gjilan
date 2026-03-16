@@ -1,4 +1,4 @@
-package com.deliverygjilan.adminn
+package com.zippdelivery.mobileadmin
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

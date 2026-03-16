@@ -612,7 +612,7 @@ function withLiveActivityExtensionTarget(config) {
     const marketingVersion = cfg.version || mainAppSettings.MARKETING_VERSION || '1.0.0';
     const currentProjectVersion = cfg.ios?.buildNumber || mainAppSettings.CURRENT_PROJECT_VERSION || '1';
 
-    const appBundleId = cfg.ios?.bundleIdentifier || 'com.anonymous.mobilecustomer';
+    const appBundleId = cfg.ios?.bundleIdentifier || 'com.artshabani.mobilecustomer';
     const extensionBundleId = `${appBundleId}.${EXTENSION_TARGET_NAME}`;
 
     if (project.pbxTargetByName(EXTENSION_TARGET_NAME)) {

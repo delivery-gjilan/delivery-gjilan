@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.deliverygjilan.admin",
+      "bundleIdentifier": "com.zippdelivery.mobileadmin",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "We use your location to center the map on your position."
@@ -26,7 +26,7 @@
       },
       "edgeToEdgeEnabled": true,
       "googleServicesFile": "./google-services.json",
-      "package": "com.deliverygjilan.adminn"
+      "package": "com.zippdelivery.mobileadmin"
     },
     "web": {
       "output": "static",

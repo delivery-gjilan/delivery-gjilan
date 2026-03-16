@@ -52,7 +52,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.mobilecustomer",
+      "package": "com.artshabani.mobilecustomer",
       "googleServicesFile": "./google-services.json"
     },
     "web": {

@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.deliverygjilan.business",
+      "bundleIdentifier": "com.zippdelivery.mobilebusiness",
       "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
@@ -23,7 +23,7 @@
         "backgroundColor": "#000000"
       },
       "googleServicesFile": "./google-services.json",
-      "package": "com.deliverygjilan.business",
+      "package": "com.zippdelivery.mobilebusiness",
       "edgeToEdgeEnabled": false
     },
     "web": {

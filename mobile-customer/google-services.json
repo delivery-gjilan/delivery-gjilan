@@ -7,12 +7,17 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:283403304701:android:092affaa9a1deca9ca0894",
+        "mobilesdk_app_id": "1:283403304701:android:cf1b03d502502765ca0894",
         "android_client_info": {
-          "package_name": "com.anonymous.mobilecustomer"
+          "package_name": "com.artshabani.mobilecustomer"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "283403304701-omrectv9acrv6qol2k82uvplgjvpjuqv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCeZ3toVyDXjBRqFArqAo8R-f6u_MmP_pE"
@@ -20,7 +25,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "283403304701-omrectv9acrv6qol2k82uvplgjvpjuqv.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

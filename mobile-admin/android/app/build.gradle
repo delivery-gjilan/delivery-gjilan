@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.deliverygjilan.adminn'
+    namespace 'com.zippdelivery.mobileadmin'
     defaultConfig {
-        applicationId 'com.deliverygjilan.adminn'
+        applicationId 'com.zippdelivery.mobileadmin'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

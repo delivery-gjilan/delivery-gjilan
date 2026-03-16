@@ -1,4 +1,4 @@
-package com.deliverygjilan.adminn
+package com.zippdelivery.mobileadmin
 
 import android.app.Application
 import android.content.res.Configuration

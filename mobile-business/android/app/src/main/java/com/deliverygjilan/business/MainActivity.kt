@@ -1,4 +1,4 @@
-package com.deliverygjilan.business
+package com.zippdelivery.mobilebusiness
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

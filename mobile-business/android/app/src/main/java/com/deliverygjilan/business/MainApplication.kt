@@ -1,4 +1,4 @@
-package com.deliverygjilan.business
+package com.zippdelivery.mobilebusiness
 
 import android.app.Application
 import android.content.res.Configuration

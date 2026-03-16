@@ -419,7 +419,7 @@ export class NotificationService {
         const liveActivityTopic =
             process.env.LIVE_ACTIVITY_APNS_TOPIC ||
             process.env.IOS_EXTENSION_BUNDLE_ID ||
-            'com.anonymous.mobilecustomer.DeliveryLiveActivityExtension';
+            'com.artshabani.mobilecustomer.DeliveryLiveActivityExtension';
         const liveActivityRepo = new LiveActivityTokenRepository();
         const tokens = await liveActivityRepo.getTokensByOrderId(orderId);
 
@@ -501,7 +501,7 @@ export class NotificationService {
         const liveActivityTopic =
             process.env.LIVE_ACTIVITY_APNS_TOPIC ||
             process.env.IOS_EXTENSION_BUNDLE_ID ||
-            'com.anonymous.mobilecustomer.DeliveryLiveActivityExtension';
+            'com.artshabani.mobilecustomer.DeliveryLiveActivityExtension';
         const liveActivityRepo = new LiveActivityTokenRepository();
         const tokens = await liveActivityRepo.getTokensByOrderId(orderId);
 

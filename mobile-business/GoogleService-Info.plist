@@ -9,7 +9,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.deliverygjilan.business</string>
+	<string>com.zippdelivery.mobilebusiness</string>
 	<key>PROJECT_ID</key>
 	<string>delivery-gjilan</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true/>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:283403304701:ios:2afcfae3110bfdf4ca0894</string>
+	<string>1:283403304701:ios:4902865ddf80968eca0894</string>
 </dict>
 </plist>

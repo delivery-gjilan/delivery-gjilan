@@ -17,8 +17,8 @@ env:
   APP_DIR: mobile-customer
   NODE_VERSION: "20"
   IOS_TEAM_ID: "87K8YXG5V8"
-  IOS_APP_BUNDLE_ID: "com.anonymous.mobilecustomer"
-  IOS_EXTENSION_BUNDLE_ID: "com.anonymous.mobilecustomer.DeliveryLiveActivityExtension"
+  IOS_APP_BUNDLE_ID: "com.artshabani.mobilecustomer"
+  IOS_EXTENSION_BUNDLE_ID: "com.artshabani.mobilecustomer.DeliveryLiveActivityExtension"
 
 jobs:
   build-and-upload:

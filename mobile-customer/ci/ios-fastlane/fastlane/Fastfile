@@ -44,8 +44,8 @@ platform :ios do
 
     # ── Signing configuration ───────────────────────────────────────────────────
     team_id             = ENV.fetch("IOS_TEAM_ID",             "87K8YXG5V8")
-    app_bundle_id       = ENV.fetch("IOS_APP_BUNDLE_ID",       "com.anonymous.mobilecustomer")
-    ext_bundle_id       = ENV.fetch("IOS_EXTENSION_BUNDLE_ID", "com.anonymous.mobilecustomer.DeliveryLiveActivityExtension")
+    app_bundle_id       = ENV.fetch("IOS_APP_BUNDLE_ID",       "com.artshabani.mobilecustomer")
+    ext_bundle_id       = ENV.fetch("IOS_EXTENSION_BUNDLE_ID", "com.artshabani.mobilecustomer.DeliveryLiveActivityExtension")
     app_profile_name    = ENV.fetch("IOS_MAIN_PROFILE_NAME")
     ext_profile_name    = ENV.fetch("IOS_EXTENSION_PROFILE_NAME")
     app_profile_uuid    = ENV["IOS_MAIN_PROFILE_UUID"].to_s
