@@ -5,6 +5,20 @@ import { DeviceAppType, DevicePlatform } from '@/database/schema/deviceTokens';
 import logger from '@/lib/logger';
 import type { Message, MulticastMessage } from 'firebase-admin/messaging';
 import { LiveActivityTokenRepository } from '@/repositories/LiveActivityTokenRepository';
+import { cache } from '@/lib/cache';
+
+const LIVE_ACTIVITY_MIN_UPDATE_INTERVAL_SECONDS = Number(
+    process.env.LIVE_ACTIVITY_MIN_UPDATE_INTERVAL_SECONDS ?? 15,
+);
+const LIVE_ACTIVITY_MIN_ETA_DELTA_MINUTES = Number(
+    process.env.LIVE_ACTIVITY_MIN_ETA_DELTA_MINUTES ?? 1,
+);
+
+type LiveActivityUpdateGate = {
+    status: 'pending' | 'preparing' | 'out_for_delivery' | 'delivered';
+    estimatedMinutes: number;
+    sentAtMs: number;
+};
 
 export interface NotificationPayload {
     title: string;
@@ -416,6 +430,32 @@ export class NotificationService {
             phaseStartedAt?: number;
         },
     ): Promise<void> {
+        const gateKey = `cache:live-activity:last-update:${orderId}`;
+        const nowMs = Date.now();
+        const lastUpdate = await cache.get<LiveActivityUpdateGate>(gateKey);
+
+        const statusChanged = !lastUpdate || lastUpdate.status !== updates.status;
+        const etaDeltaMinutes = Math.abs((lastUpdate?.estimatedMinutes ?? updates.estimatedMinutes) - updates.estimatedMinutes);
+        const etaChangedEnough = !lastUpdate || etaDeltaMinutes >= LIVE_ACTIVITY_MIN_ETA_DELTA_MINUTES;
+        const intervalElapsed =
+            !lastUpdate ||
+            nowMs - lastUpdate.sentAtMs >= LIVE_ACTIVITY_MIN_UPDATE_INTERVAL_SECONDS * 1000;
+
+        // Always allow status changes immediately. Throttle only repetitive same-status noise.
+        if (!statusChanged && !etaChangedEnough && !intervalElapsed) {
+            logger.debug(
+                {
+                    orderId,
+                    status: updates.status,
+                    estimatedMinutes: updates.estimatedMinutes,
+                    minIntervalSeconds: LIVE_ACTIVITY_MIN_UPDATE_INTERVAL_SECONDS,
+                    minEtaDeltaMinutes: LIVE_ACTIVITY_MIN_ETA_DELTA_MINUTES,
+                },
+                'Skipped redundant Live Activity update (throttled)',
+            );
+            return;
+        }
+
         const liveActivityTopic =
             process.env.LIVE_ACTIVITY_APNS_TOPIC ||
             process.env.IOS_EXTENSION_BUNDLE_ID ||
@@ -492,6 +532,16 @@ export class NotificationService {
                 }
             }
         }
+
+        await cache.set(
+            gateKey,
+            {
+                status: updates.status,
+                estimatedMinutes: updates.estimatedMinutes,
+                sentAtMs: nowMs,
+            } satisfies LiveActivityUpdateGate,
+            60 * 60 * 4,
+        );
     }
 
     /**

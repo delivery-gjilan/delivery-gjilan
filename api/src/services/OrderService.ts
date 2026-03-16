@@ -203,6 +203,71 @@ export class OrderService {
                 : [];
         const optionGroupById = new Map(optionGroupRows.map((og) => [og.id, og]));
 
+        const productOptionGroupRows = await db
+            .select()
+            .from(optionGroupsTable)
+            .where(inArray(optionGroupsTable.productId, [...allProductIds]));
+        const optionGroupsByProductId = new Map<string, typeof productOptionGroupRows>();
+        for (const group of productOptionGroupRows) {
+            const rows = optionGroupsByProductId.get(group.productId) ?? [];
+            rows.push(group);
+            optionGroupsByProductId.set(group.productId, rows);
+        }
+
+        const validateSelectedOptions = (
+            selectedOptions: Array<{ optionGroupId: string; optionId: string }> | undefined,
+            ownerProductId: string,
+            label: string,
+            enforceMinimumSelections: boolean,
+        ) => {
+            const countsByGroup = new Map<string, number>();
+
+            if (selectedOptions) {
+                for (const so of selectedOptions) {
+                    const opt = optionById.get(so.optionId);
+                    if (!opt) throw AppError.badInput(`Option ${so.optionId} not found`);
+
+                    if (opt.optionGroupId !== so.optionGroupId) {
+                        throw AppError.badInput(
+                            `${label} contains option ${so.optionId} that does not belong to group ${so.optionGroupId}`,
+                        );
+                    }
+
+                    const group = optionGroupById.get(so.optionGroupId);
+                    if (!group) {
+                        throw AppError.badInput(`${label} references unknown option group ${so.optionGroupId}`);
+                    }
+
+                    if (group.productId !== ownerProductId) {
+                        throw AppError.badInput(
+                            `${label} contains option group ${so.optionGroupId} that is not valid for product ${ownerProductId}`,
+                        );
+                    }
+
+                    countsByGroup.set(so.optionGroupId, (countsByGroup.get(so.optionGroupId) ?? 0) + 1);
+                }
+            }
+
+            const productGroups = optionGroupsByProductId.get(ownerProductId) ?? [];
+            for (const group of productGroups) {
+                const selectedCount = countsByGroup.get(group.id) ?? 0;
+                const minSelections = Math.max(0, Number(group.minSelections ?? 0));
+                const maxSelections = Number(group.maxSelections ?? 0);
+
+                if (enforceMinimumSelections && selectedCount < minSelections) {
+                    throw AppError.badInput(
+                        `${label} is missing required selections for group ${group.name} (minimum ${minSelections})`,
+                    );
+                }
+
+                if (maxSelections > 0 && selectedCount > maxSelections) {
+                    throw AppError.badInput(
+                        `${label} has too many selections for group ${group.name} (maximum ${maxSelections})`,
+                    );
+                }
+            }
+        };
+
         for (const itemInput of input.items) {
             const product = productMap.get(itemInput.productId);
             if (!product) {
@@ -215,6 +280,8 @@ export class OrderService {
             // Use DB price for security
             const unitPrice = Number(product.isOnSale && product.salePrice ? product.salePrice : product.price);
             log.debug({ unitPrice, quantity: itemInput.quantity, productId: itemInput.productId }, 'order:item:price');
+
+            validateSelectedOptions(itemInput.selectedOptions ?? [], product.id, `Product ${product.id}`, true);
 
             // Calculate options extra price
             let optionsExtra = 0;
@@ -230,11 +297,31 @@ export class OrderService {
 
             // Also calculate child item options extra (child unitPrice is 0, but options may cost extra)
             if (itemInput.childItems) {
+                const linkedChildCounts = new Map<string, number>();
+                for (const so of itemInput.selectedOptions ?? []) {
+                    const opt = optionById.get(so.optionId);
+                    const linkedProductId = opt?.linkedProductId;
+                    if (linkedProductId) {
+                        linkedChildCounts.set(linkedProductId, (linkedChildCounts.get(linkedProductId) ?? 0) + 1);
+                    }
+                }
+
                 for (const child of itemInput.childItems) {
                     const childProduct = productMap.get(child.productId);
                     if (!childProduct) throw AppError.notFound(`Product with ID ${child.productId}`);
                     if (childProduct.isOffer)
                         throw AppError.badInput(`Child product ${child.productId} cannot be an offer`);
+
+                    const remainingLinkedCount = linkedChildCounts.get(child.productId) ?? 0;
+                    if (remainingLinkedCount <= 0) {
+                        throw AppError.badInput(
+                            `Child product ${child.productId} is not linked to a selected offer option on parent product ${product.id}`,
+                        );
+                    }
+                    linkedChildCounts.set(child.productId, remainingLinkedCount - 1);
+
+                    validateSelectedOptions(child.selectedOptions ?? [], childProduct.id, `Child product ${child.productId}`, false);
+
                     let childOptionsExtra = 0;
                     if (child.selectedOptions) {
                         for (const so of child.selectedOptions) {
@@ -413,13 +500,54 @@ export class OrderService {
             .from(orderItemsTable)
             .where(and(eq(orderItemsTable.orderId, createdOrder.id), isNull(orderItemsTable.parentOrderItemId)));
 
-        // Match created items back to input items by productId + unitPrice
+        const buildTopLevelItemKey = (item: {
+            productId: string;
+            unitPrice: number;
+            quantity: number;
+            notes: string | null;
+        }) => {
+            const normalizedNotes = (item.notes ?? '').trim();
+            return `${item.productId}::${item.unitPrice}::${item.quantity}::${normalizedNotes}`;
+        };
+
+        const createdItemsByKey = new Map<string, typeof createdItems>();
+        for (const createdItem of createdItems) {
+            const key = buildTopLevelItemKey({
+                productId: createdItem.productId,
+                unitPrice: Number(createdItem.unitPrice),
+                quantity: createdItem.quantity,
+                notes: createdItem.notes,
+            });
+            const rows = createdItemsByKey.get(key) ?? [];
+            rows.push(createdItem);
+            createdItemsByKey.set(key, rows);
+        }
+
+        // Match created items back to input items using a queue key to avoid reusing the same row.
         for (let i = 0; i < itemsToCreate.length; i++) {
             const inputItem = itemsToCreate[i];
-            const createdItem = createdItems.find(
-                (ci) => ci.productId === inputItem.productId && ci.unitPrice === inputItem.unitPrice,
-            );
-            if (!createdItem) continue;
+            const key = buildTopLevelItemKey({
+                productId: inputItem.productId,
+                unitPrice: inputItem.unitPrice,
+                quantity: inputItem.quantity,
+                notes: inputItem.notes,
+            });
+            const bucket = createdItemsByKey.get(key) ?? [];
+            const createdItem = bucket.shift();
+            createdItemsByKey.set(key, bucket);
+            if (!createdItem) {
+                log.error(
+                    {
+                        orderId: createdOrder.id,
+                        key,
+                        productId: inputItem.productId,
+                        unitPrice: inputItem.unitPrice,
+                        quantity: inputItem.quantity,
+                    },
+                    'order:create:failed_to_match_created_item_for_options_and_children',
+                );
+                continue;
+            }
 
             // Insert order_item_options for this top-level item
             if (inputItem.selectedOptions && inputItem.selectedOptions.length > 0) {
@@ -472,6 +600,12 @@ export class OrderService {
             const appliedPromotionIds = promoResult.promotions.map((promo) => promo.id);
             const orderBusinessId = businessIds.size === 1 ? Array.from(businessIds)[0] : null;
 
+            const perPromotionUsage = promoResult.promotions.map((promo) => ({
+                promotionId: promo.id,
+                discountAmount: promo.freeDelivery ? 0 : Math.max(0, Number(promo.appliedAmount ?? 0)),
+                freeDeliveryApplied: Boolean(promo.freeDelivery && promoResult.freeDeliveryApplied),
+            }));
+
             await promotionEngine.recordUsage(
                 appliedPromotionIds,
                 userId,
@@ -480,17 +614,21 @@ export class OrderService {
                 promoResult.freeDeliveryApplied,
                 promoResult.finalSubtotal,
                 orderBusinessId,
+                perPromotionUsage,
             );
 
             // Store promotions in orderPromotions table
+            let deliveryDiscountRemaining = Math.max(0, Number(input.deliveryPrice) - Number(effectiveDeliveryPrice));
             for (const promo of promoResult.promotions) {
-                const appliesTo = promo.target === 'FIRST_ORDER' || promo.target === 'DISCOUNT' ? 'PRICE' : 'DELIVERY';
-                const discountAmount =
-                    promo.target === 'FIRST_ORDER' || promo.target === 'DISCOUNT'
-                        ? promoResult.totalDiscount
-                        : promoResult.freeDeliveryApplied
-                          ? effectiveDeliveryPrice
-                          : 0;
+                const appliesTo = promo.freeDelivery ? 'DELIVERY' : 'PRICE';
+                const discountAmount = promo.freeDelivery
+                    ? (() => {
+                          if (deliveryDiscountRemaining <= 0) return 0;
+                          const applied = deliveryDiscountRemaining;
+                          deliveryDiscountRemaining = 0;
+                          return applied;
+                      })()
+                    : Math.max(0, Number(promo.appliedAmount ?? 0));
 
                 if (discountAmount > 0) {
                     await db

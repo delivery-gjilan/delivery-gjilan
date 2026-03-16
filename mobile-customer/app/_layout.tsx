@@ -16,6 +16,7 @@ import StoreClosedScreen from '@/components/StoreClosedScreen';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ToastContainer } from '@/components/Toast';
 import SuccessModalContainer from '@/components/SuccessModalContainer';
+import { useBackgroundLiveActivity } from '@/hooks/useBackgroundLiveActivity';
 
 import { initSentry } from '@/lib/sentry';
 import { useEffect } from 'react';
@@ -36,6 +37,9 @@ function AppContent() {
 
     // Track active orders (query + subscription)
     useActiveOrdersTracking();
+
+    // Start/update Live Activity from anywhere in the app when it moves to background.
+    useBackgroundLiveActivity();
 
     // Show store closed screen if store is closed
     if (storeStatusLoading) {

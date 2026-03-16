@@ -53,6 +53,12 @@ export type PromotionResult = {
     walletDeduction: number;
 };
 
+export type PromotionUsageBreakdown = {
+    promotionId: string;
+    discountAmount: number;
+    freeDeliveryApplied: boolean;
+};
+
 export class PromotionEngine {
     constructor(private db: DbType) {}
 
@@ -251,9 +257,13 @@ export class PromotionEngine {
         discountAmount: number,
         freeDeliveryApplied: boolean,
         orderSubtotal: number,
-        businessId: string | null
+        businessId: string | null,
+        usageBreakdown?: PromotionUsageBreakdown[]
     ): Promise<void> {
         await this.db.transaction(async (tx) => {
+            const usageByPromotionId = new Map((usageBreakdown ?? []).map((entry) => [entry.promotionId, entry]));
+            let totalSavingsApplied = 0;
+
             for (const promoId of promotionIds) {
                 // Lock the promotion row to prevent concurrent usage beyond limits
                 const [promo] = await tx
@@ -284,12 +294,17 @@ export class PromotionEngine {
                     }
                 }
 
+                const promoUsage = usageByPromotionId.get(promoId);
+                const promoDiscount = Number(promoUsage?.discountAmount ?? discountAmount);
+                const promoFreeDeliveryApplied = Boolean(promoUsage?.freeDeliveryApplied ?? freeDeliveryApplied);
+                totalSavingsApplied += promoDiscount;
+
                 await tx.insert(promotionUsage).values({
                     promotionId: promoId,
                     userId,
                     orderId,
-                    discountAmount: String(discountAmount),
-                    freeDeliveryApplied,
+                    discountAmount: String(promoDiscount),
+                    freeDeliveryApplied: promoFreeDeliveryApplied,
                     orderSubtotal: String(orderSubtotal),
                     businessId,
                 });
@@ -323,8 +338,8 @@ export class PromotionEngine {
             await tx
                 .update(userPromoMetadata)
                 .set({
-                    totalPromotionsUsed: sql`${userPromoMetadata.totalPromotionsUsed} + 1`,
-                    totalSavings: sql`${userPromoMetadata.totalSavings} + ${discountAmount}`,
+                    totalPromotionsUsed: sql`${userPromoMetadata.totalPromotionsUsed} + ${promotionIds.length}`,
+                    totalSavings: sql`${userPromoMetadata.totalSavings} + ${totalSavingsApplied}`,
                 })
                 .where(eq(userPromoMetadata.userId, userId));
         });
