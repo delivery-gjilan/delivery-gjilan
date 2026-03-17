@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -66,6 +66,33 @@ const CREATE_DYNAMIC_PRICING_RULE = gql`
       id
       name
       isActive
+    }
+  }
+`;
+
+const GET_BUSINESSES = gql`
+  query GetBusinesses {
+    businesses {
+      id
+      name
+    }
+  }
+`;
+
+const GET_PRODUCTS_AND_CATEGORIES = gql`
+  query ProductsAndCategories($businessId: ID!) {
+    productCategories(businessId: $businessId) {
+      id
+      name
+    }
+    products(businessId: $businessId) {
+      id
+      name
+      basePrice
+      product {
+        id
+        name
+      }
     }
   }
 `;
@@ -280,6 +307,8 @@ function CreateDynamicRuleForm({ onSubmit }: { onSubmit: (values: any) => void }
   const [conditionType, setConditionType] = useState('TIME_OF_DAY');
   const [priority, setPriority] = useState('100');
   const [allProducts, setAllProducts] = useState(true);
+  const [businessScope, setBusinessScope] = useState<'ALL' | 'SPECIFIC'>('ALL');
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null);
   
   // Time of Day specific
   const [startHour, setStartHour] = useState('0');
@@ -299,6 +328,18 @@ function CreateDynamicRuleForm({ onSubmit }: { onSubmit: (values: any) => void }
   // Adjustment config
   const [adjustmentType, setAdjustmentType] = useState('PERCENTAGE');
   const [adjustmentValue, setAdjustmentValue] = useState('20');
+  const [usePerProductOverrides, setUsePerProductOverrides] = useState(false);
+  const [overrides, setOverrides] = useState<Array<{ productId: string | null; amount: string }>>([]);
+
+  const { data: businessesData } = useQuery(GET_BUSINESSES);
+  const businesses = businessesData?.businesses || [];
+
+  const { data: productsData } = useQuery(GET_PRODUCTS_AND_CATEGORIES, {
+    variables: { businessId: selectedBusinessId },
+    skip: !selectedBusinessId,
+    fetchPolicy: 'cache-first',
+  });
+  const productsForBusiness = productsData?.products || [];
 
   const dayOptions = [
     { label: 'Monday', value: 1 },
@@ -345,22 +386,38 @@ function CreateDynamicRuleForm({ onSubmit }: { onSubmit: (values: any) => void }
         break;
     }
 
-    const adjustmentConfig = {
+    let adjustmentConfig: any = {
       type: adjustmentType,
-      value: parseFloat(adjustmentValue),
     };
 
+    if (adjustmentType === 'FIXED_AMOUNT') {
+      if (usePerProductOverrides && overrides.length > 0) {
+        adjustmentConfig.overrides = overrides.map(o => ({ productId: o.productId, amount: parseFloat(o.amount) }));
+      } else {
+        adjustmentConfig.value = parseFloat(adjustmentValue);
+      }
+    } else {
+      adjustmentConfig.value = parseFloat(adjustmentValue);
+    }
+
+    const appliesTo: any = {
+      allProducts,
+      categoryIds: [],
+      productIds: [],
+    };
+
+    if (usePerProductOverrides && overrides.length > 0) {
+      appliesTo.productIds = overrides.map(o => o.productId).filter(Boolean);
+    }
+
     onSubmit({
+      businessId: businessScope === 'SPECIFIC' ? selectedBusinessId : null,
       name,
       description: description || null,
       conditionType,
       conditionConfig,
       adjustmentConfig,
-      appliesTo: {
-        allProducts,
-        categoryIds: [],
-        productIds: [],
-      },
+      appliesTo,
       priority: parseInt(priority),
     });
   };
@@ -405,6 +462,40 @@ function CreateDynamicRuleForm({ onSubmit }: { onSubmit: (values: any) => void }
             required
           />
           <p className="text-xs text-muted-foreground">Lower = higher priority</p>
+        </div>
+      </div>
+
+      <div className="border-t pt-4">
+        <h3 className="font-semibold mb-3">Business Scope</h3>
+        <div className="space-y-2">
+          <Label>Apply rule to</Label>
+          <Select value={businessScope} onValueChange={(v: any) => setBusinessScope(v)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All businesses (global)</SelectItem>
+              <SelectItem value="SPECIFIC">Specific business</SelectItem>
+            </SelectContent>
+          </Select>
+          {businessScope === 'SPECIFIC' && (
+            <div className="mt-2">
+              <Label>Business</Label>
+              <Select value={selectedBusinessId || ''} onValueChange={(v: any) => setSelectedBusinessId(v || null)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {businesses.map((b: any) => (
+                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Use a specific business when you want per-business product prices. For global percentage adjustments choose "All businesses".
+          </p>
         </div>
       </div>
 
@@ -613,6 +704,50 @@ function CreateDynamicRuleForm({ onSubmit }: { onSubmit: (values: any) => void }
         <p className="text-xs text-muted-foreground mt-1">
           {allProducts ? 'This rule will apply to all products' : 'Select specific products or categories'}
         </p>
+        {!allProducts && adjustmentType === 'FIXED_AMOUNT' && businessScope === 'SPECIFIC' && (
+          <div className="mt-3 border rounded p-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium">Per-product fixed price overrides (for selected business)</h4>
+              <div className="flex items-center gap-2">
+                <Label className="text-sm">Use overrides</Label>
+                <Switch checked={usePerProductOverrides} onCheckedChange={setUsePerProductOverrides} />
+              </div>
+            </div>
+
+            {usePerProductOverrides && (
+              <div className="space-y-2 mt-3">
+                {overrides.map((o, idx) => (
+                  <div key={idx} className="grid grid-cols-3 gap-2 items-end">
+                    <div>
+                      <Label>Product</Label>
+                      <Select value={o.productId || ''} onValueChange={(v: any) => {
+                        const next = [...overrides]; next[idx].productId = v || null; setOverrides(next);
+                      }}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {productsForBusiness.map((p: any) => (
+                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Fixed price (€)</Label>
+                      <Input type="number" value={o.amount} onChange={(e) => { const next = [...overrides]; next[idx].amount = e.target.value; setOverrides(next); }} />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button type="button" variant="outline" onClick={() => setOverrides(prev => prev.filter((_, i) => i !== idx))}>Remove</Button>
+                    </div>
+                  </div>
+                ))}
+
+                <Button type="button" onClick={() => setOverrides(prev => [...prev, { productId: null, amount: '0' }])}>Add override</Button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <Button type="submit" className="w-full" size="lg">

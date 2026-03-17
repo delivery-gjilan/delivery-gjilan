@@ -13,7 +13,11 @@ export const deleteSettlementRule: NonNullable<MutationResolvers['deleteSettleme
     });
   }
 
-  // TODO: Add authorization check - only admins can delete rules
+  if (userData.role !== 'ADMIN' && userData.role !== 'SUPER_ADMIN') {
+    throw new GraphQLError('Only platform admins can manage settlement rules', {
+      extensions: { code: 'FORBIDDEN' },
+    });
+  }
 
   const repo = new SettlementRuleRepository(db);
   const result = await repo.deleteRule(id);

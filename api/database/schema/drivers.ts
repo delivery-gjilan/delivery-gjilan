@@ -100,6 +100,12 @@ export const drivers = pgTable('drivers', {
   commissionPercentage: numeric('commission_percentage', { precision: 5, scale: 2 }).default('0').notNull(),
 
   /**
+   * Whether the driver uses their own vehicle for deliveries.
+   * Used by settlement engine to evaluate DRIVER_VEHICLE_BONUS rules.
+   */
+  hasOwnVehicle: boolean('has_own_vehicle').default(false).notNull(),
+
+  /**
    * Maximum number of active orders this driver can handle simultaneously
    * Configurable per driver (default: 2)
    * Used to prevent driver overload

@@ -11,6 +11,9 @@ enum SettlementDirection {
 enum SettlementStatus {
     PENDING
     PAID
+    OVERDUE
+    DISPUTED
+    CANCELLED
 }
 
 type RuleSnapshot {

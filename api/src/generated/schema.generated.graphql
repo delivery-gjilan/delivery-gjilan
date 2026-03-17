@@ -719,9 +719,9 @@ type Mutation {
   adminUpdateDriverLocation(driverId: ID!, latitude: Float!, longitude: Float!): User!
 
   """
-  Admin mutation to update per-driver settings (commission %, max active orders)
+  Admin mutation to update per-driver settings (commission %, max active orders, vehicle ownership)
   """
-  adminUpdateDriverSettings(commissionPercentage: Float, driverId: ID!, maxActiveOrders: Int): User!
+  adminUpdateDriverSettings(commissionPercentage: Float, driverId: ID!, hasOwnVehicle: Boolean, maxActiveOrders: Int): User!
   assignDriverToOrder(driverId: ID, id: ID!): Order!
   assignPromotionToUsers(input: AssignPromotionToUserInput!): [UserPromotion!]!
   backfillSettlementsForDeliveredOrders: Int!
@@ -1394,6 +1394,9 @@ enum SettlementRuleType {
 }
 
 enum SettlementStatus {
+  CANCELLED
+  DISPUTED
+  OVERDUE
   PAID
   PENDING
 }
@@ -1645,6 +1648,7 @@ type User {
   emailVerified: Boolean!
   firstName: String!
   flagColor: String
+  hasOwnVehicle: Boolean
   id: ID!
   imageUrl: String
   isOnline: Boolean!

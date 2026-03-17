@@ -13,7 +13,11 @@ export const updateSettlementRule: NonNullable<MutationResolvers['updateSettleme
     });
   }
 
-  // TODO: Add authorization check - only admins or entity owners can update rules
+  if (userData.role !== 'ADMIN' && userData.role !== 'SUPER_ADMIN') {
+    throw new GraphQLError('Only platform admins can manage settlement rules', {
+      extensions: { code: 'FORBIDDEN' },
+    });
+  }
 
   const repo = new SettlementRuleRepository(db);
   

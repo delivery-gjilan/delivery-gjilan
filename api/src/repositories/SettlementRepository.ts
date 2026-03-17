@@ -109,6 +109,8 @@ export class SettlementRepository {
                 totalPending: sql<number>`SUM(CASE WHEN ${settlements.status} = 'PENDING' THEN CAST(${settlements.amount} AS NUMERIC) ELSE 0 END)::FLOAT`,
                 totalPaid: sql<number>`SUM(CASE WHEN ${settlements.status} = 'PAID' THEN CAST(${settlements.amount} AS NUMERIC) ELSE 0 END)::FLOAT`,
                 totalOverdue: sql<number>`SUM(CASE WHEN ${settlements.status} = 'OVERDUE' THEN CAST(${settlements.amount} AS NUMERIC) ELSE 0 END)::FLOAT`,
+                totalReceivable: sql<number>`SUM(CASE WHEN ${settlements.direction} = 'RECEIVABLE' THEN CAST(${settlements.amount} AS NUMERIC) ELSE 0 END)::FLOAT`,
+                totalPayable: sql<number>`SUM(CASE WHEN ${settlements.direction} = 'PAYABLE' THEN CAST(${settlements.amount} AS NUMERIC) ELSE 0 END)::FLOAT`,
                 count: sql<number>`COUNT(*)::INT`,
                 pendingCount: sql<number>`COUNT(CASE WHEN ${settlements.status} = 'PENDING' THEN 1 END)::INT`,
             })
@@ -121,6 +123,8 @@ export class SettlementRepository {
             totalPending: result.totalPending || 0,
             totalPaid: result.totalPaid || 0,
             totalOverdue: result.totalOverdue || 0,
+            totalReceivable: result.totalReceivable || 0,
+            totalPayable: result.totalPayable || 0,
             count: result.count || 0,
             pendingCount: result.pendingCount || 0,
         };
@@ -128,20 +132,20 @@ export class SettlementRepository {
 
     async getDriverBalance(driverId: string): Promise<any> {
         return this.getSettlementSummary({
-            type: 'DRIVER_PAYMENT',
+            type: 'DRIVER',
             driverId,
         });
     }
 
     async getBusinessBalance(businessId: string): Promise<any> {
         return this.getSettlementSummary({
-            type: 'BUSINESS_PAYMENT',
+            type: 'BUSINESS',
             businessId,
         });
     }
 
     async createSettlement(
-        type: 'DRIVER_PAYMENT' | 'BUSINESS_PAYMENT',
+        type: 'DRIVER' | 'BUSINESS',
         driverId: string | null,
         businessId: string | null,
         orderId: string,
@@ -153,13 +157,13 @@ export class SettlementRepository {
         const result = await this.db
             .insert(settlements)
             .values({
-                type: type as any,
-                direction: direction as any,
+                type,
+                direction,
                 driverId,
                 businessId,
                 orderId,
                 amount: amount.toString(),
-                status: 'PENDING' as any,
+                status: 'PENDING',
                 ruleSnapshot: ruleSnapshot || null,
                 calculationDetails: calculationDetails || null,
             })
@@ -173,7 +177,7 @@ export class SettlementRepository {
         const result = await this.db
             .update(settlements)
             .set({
-                status: 'PAID' as any,
+                status: 'PAID',
                 paidAt: now,
                 updatedAt: now,
             })
@@ -191,7 +195,7 @@ export class SettlementRepository {
         await this.db
             .update(settlements)
             .set({
-                status: 'PAID' as any,
+                status: 'PAID',
                 paidAt: now,
                 updatedAt: now,
             })
@@ -238,13 +242,17 @@ export class SettlementRepository {
             await tx
                 .insert(settlements)
                 .values({
-                    type: current.type as any,
+                    type: current.type,
+                    direction: current.direction,
                     driverId: current.driverId,
                     businessId: current.businessId,
                     orderId: current.orderId,
                     amount: amount.toString(),
-                    status: 'PAID' as any,
+                    status: 'PAID',
                     paidAt: now,
+                    ruleSnapshot: current.ruleSnapshot,
+                    calculationDetails: current.calculationDetails,
+                    metadata: current.metadata,
                 })
                 .execute();
 
@@ -258,7 +266,7 @@ export class SettlementRepository {
         const result = await this.db
             .update(settlements)
             .set({
-                status: 'PENDING' as any,
+                status: 'PENDING',
                 paidAt: null,
                 updatedAt: now,
             })
@@ -279,7 +287,7 @@ export class SettlementRepository {
             .where(
                 and(
                     eq(settlements.orderId, orderId),
-                    eq(settlements.status, 'PENDING' as any),
+                    eq(settlements.status, 'PENDING'),
                 ),
             )
             .returning({ id: settlements.id });

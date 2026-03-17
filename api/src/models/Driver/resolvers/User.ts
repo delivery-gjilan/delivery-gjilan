@@ -6,7 +6,16 @@ import { getLiveDriverEta } from '@/lib/driverEtaCache';
  * Driver-related User resolver
  * Resolves the driverConnection field for driver users
  */
-export const User: Pick<UserResolvers, 'commissionPercentage'|'driverConnection'|'maxActiveOrders'|'__isTypeOf'> = {
+export const User: Pick<UserResolvers, 'commissionPercentage'|'driverConnection'|'hasOwnVehicle'|'maxActiveOrders'|'__isTypeOf'> = {
+  hasOwnVehicle: async (parent, _args, { driverService }) => {
+    if (parent.role !== 'DRIVER' || !driverService) return null;
+    try {
+      const driver = await driverService.getDriverWithConnection(String(parent.id));
+      return driver?.hasOwnVehicle ?? false;
+    } catch {
+      return null;
+    }
+  },
   driverConnection: async (parent, _args, { driverService }) => {
     // Only drivers have connection info
     if (parent.role !== 'DRIVER') {

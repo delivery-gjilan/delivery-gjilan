@@ -53,7 +53,7 @@ export class FinancialService {
 
             for (const settlement of calculated) {
                 const isBusiness = settlement.type === 'BUSINESS';
-                const settlementType = isBusiness ? 'BUSINESS_PAYMENT' : 'DRIVER_PAYMENT';
+                const settlementType = isBusiness ? 'BUSINESS' : 'DRIVER';
 
                 await this.settlementRepo.createSettlement(
                     settlementType,

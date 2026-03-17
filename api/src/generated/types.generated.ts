@@ -717,7 +717,7 @@ export type Mutation = {
   /** Admin mutation to manually set connection status (for testing/recovery) */
   adminSetDriverConnectionStatus: User;
   adminUpdateDriverLocation: User;
-  /** Admin mutation to update per-driver settings (commission %, max active orders) */
+  /** Admin mutation to update per-driver settings (commission %, max active orders, vehicle ownership) */
   adminUpdateDriverSettings: User;
   assignDriverToOrder: Order;
   assignPromotionToUsers: Array<UserPromotion>;
@@ -865,6 +865,7 @@ export type MutationadminUpdateDriverLocationArgs = {
 export type MutationadminUpdateDriverSettingsArgs = {
   commissionPercentage?: InputMaybe<Scalars['Float']['input']>;
   driverId: Scalars['ID']['input'];
+  hasOwnVehicle?: InputMaybe<Scalars['Boolean']['input']>;
   maxActiveOrders?: InputMaybe<Scalars['Int']['input']>;
 };
 
@@ -2213,6 +2214,9 @@ export type SettlementRuleType =
   | 'PRODUCT_MARKUP';
 
 export type SettlementStatus =
+  | 'CANCELLED'
+  | 'DISPUTED'
+  | 'OVERDUE'
   | 'PAID'
   | 'PENDING';
 
@@ -2510,6 +2514,7 @@ export type User = {
   emailVerified: Scalars['Boolean']['output'];
   firstName: Scalars['String']['output'];
   flagColor?: Maybe<Scalars['String']['output']>;
+  hasOwnVehicle?: Maybe<Scalars['Boolean']['output']>;
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
   isOnline: Scalars['Boolean']['output'];
@@ -2834,7 +2839,7 @@ export type ResolversTypes = {
   SettlementRuleFilterInput: SettlementRuleFilterInput;
   SettlementRuleSummary: ResolverTypeWrapper<SettlementRuleSummary>;
   SettlementRuleType: ResolverTypeWrapper<'PERCENTAGE' | 'FIXED_PER_ORDER' | 'PRODUCT_MARKUP' | 'DRIVER_VEHICLE_BONUS' | 'CUSTOM'>;
-  SettlementStatus: ResolverTypeWrapper<'PENDING' | 'PAID'>;
+  SettlementStatus: ResolverTypeWrapper<'PENDING' | 'PAID' | 'OVERDUE' | 'DISPUTED' | 'CANCELLED'>;
   SettlementSummary: ResolverTypeWrapper<SettlementSummary>;
   SettlementType: ResolverTypeWrapper<'DRIVER' | 'BUSINESS'>;
   SignupStep: ResolverTypeWrapper<'INITIAL' | 'EMAIL_SENT' | 'EMAIL_VERIFIED' | 'PHONE_SENT' | 'COMPLETED'>;
@@ -3943,7 +3948,7 @@ export type SettlementRuleSummaryResolvers<ContextType = GraphQLContext, ParentT
 
 export type SettlementRuleTypeResolvers = EnumResolverSignature<{ CUSTOM?: any, DRIVER_VEHICLE_BONUS?: any, FIXED_PER_ORDER?: any, PERCENTAGE?: any, PRODUCT_MARKUP?: any }, ResolversTypes['SettlementRuleType']>;
 
-export type SettlementStatusResolvers = EnumResolverSignature<{ PAID?: any, PENDING?: any }, ResolversTypes['SettlementStatus']>;
+export type SettlementStatusResolvers = EnumResolverSignature<{ CANCELLED?: any, DISPUTED?: any, OVERDUE?: any, PAID?: any, PENDING?: any }, ResolversTypes['SettlementStatus']>;
 
 export type SettlementSummaryResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['SettlementSummary'] = ResolversParentTypes['SettlementSummary']> = {
   count?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
@@ -4015,6 +4020,7 @@ export type UserResolvers<ContextType = GraphQLContext, ParentType extends Resol
   emailVerified?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   firstName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   flagColor?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  hasOwnVehicle?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   isOnline?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;

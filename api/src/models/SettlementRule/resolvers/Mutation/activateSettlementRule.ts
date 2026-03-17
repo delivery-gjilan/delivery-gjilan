@@ -13,7 +13,11 @@ export const activateSettlementRule: NonNullable<MutationResolvers['activateSett
     });
   }
 
-  // TODO: Add authorization check - only admins can activate rules
+  if (userData.role !== 'ADMIN' && userData.role !== 'SUPER_ADMIN') {
+    throw new GraphQLError('Only platform admins can manage settlement rules', {
+      extensions: { code: 'FORBIDDEN' },
+    });
+  }
 
   const repo = new SettlementRuleRepository(db);
   const rule = await repo.activateRule(id, userData.userId);

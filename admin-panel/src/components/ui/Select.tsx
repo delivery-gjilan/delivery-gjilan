@@ -1,6 +1,6 @@
 "use client";
 
-import { SelectHTMLAttributes, createContext, useContext } from "react";
+import { SelectHTMLAttributes, createContext, useContext, useEffect, useRef, useState } from "react";
 import React from "react";
 
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
@@ -29,9 +29,18 @@ function SelectComponent({ label, children, className = "", ...props }: SelectPr
 interface SelectContextValue {
   value?: string;
   onValueChange?: (value: string) => void;
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  labels: Record<string, string>;
+  registerLabel: (value: string, label: string) => void;
 }
 
-const SelectContext = createContext<SelectContextValue>({});
+const SelectContext = createContext<SelectContextValue>({
+  open: false,
+  setOpen: () => {},
+  labels: {},
+  registerLabel: () => {},
+});
 
 interface ModernSelectProps {
   value?: string;
@@ -40,9 +49,37 @@ interface ModernSelectProps {
 }
 
 export function Select({ value, onValueChange, children }: ModernSelectProps) {
+  const [open, setOpen] = useState(false);
+  const [labels, setLabels] = useState<Record<string, string>>({});
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  const registerLabel = (optionValue: string, label: string) => {
+    setLabels((prev) => {
+      if (prev[optionValue] === label) {
+        return prev;
+      }
+      return { ...prev, [optionValue]: label };
+    });
+  };
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!rootRef.current) return;
+      const target = event.target as Node;
+      if (!rootRef.current.contains(target)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, []);
+
   return (
-    <SelectContext.Provider value={{ value, onValueChange }}>
-      {children}
+    <SelectContext.Provider value={{ value, onValueChange, open, setOpen, labels, registerLabel }}>
+      <div ref={rootRef} className="relative w-full">
+        {children}
+      </div>
     </SelectContext.Provider>
   );
 }
@@ -52,10 +89,15 @@ export function SelectTrigger({
   children, 
   ...props 
 }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  const { open, setOpen } = useContext(SelectContext);
+
   return (
     <button
       type="button"
+      aria-haspopup="listbox"
+      aria-expanded={open}
       className={`flex h-10 w-full items-center justify-between rounded-md border border-zinc-800 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      onClick={() => setOpen(!open)}
       {...props}
     >
       {children}
@@ -67,8 +109,9 @@ export function SelectTrigger({
 }
 
 export function SelectValue({ placeholder }: { placeholder?: string }) {
-  const { value } = useContext(SelectContext);
-  return <span>{value || placeholder || "Select..."}</span>;
+  const { value, labels } = useContext(SelectContext);
+  const displayValue = value ? labels[value] || value : undefined;
+  return <span>{displayValue || placeholder || "Select..."}</span>;
 }
 
 export function SelectContent({ 
@@ -76,12 +119,19 @@ export function SelectContent({
   children, 
   ...props 
 }: React.HTMLAttributes<HTMLDivElement>) {
+  const { open } = useContext(SelectContext);
+
+  if (!open) {
+    return null;
+  }
+
   return (
     <div
-      className={`relative z-50 min-w-[8rem] overflow-hidden rounded-md border border-zinc-800 bg-zinc-900 text-zinc-100 shadow-md ${className}`}
+      role="listbox"
+      className={`absolute left-0 top-[calc(100%+0.375rem)] z-[120] min-w-[8rem] w-full overflow-hidden rounded-md border border-zinc-800 bg-zinc-900 text-zinc-100 shadow-md ${className}`}
       {...props}
     >
-      <div className="p-1">{children}</div>
+      <div className="max-h-64 overflow-y-auto p-1">{children}</div>
     </div>
   );
 }
@@ -95,12 +145,25 @@ export function SelectItem({
   value: string;
   children: React.ReactNode;
 } & React.HTMLAttributes<HTMLDivElement>) {
-  const { onValueChange, value: selectedValue } = useContext(SelectContext);
+  const { onValueChange, value: selectedValue, setOpen, registerLabel } = useContext(SelectContext);
   const isSelected = value === selectedValue;
+
+  const label = typeof children === "string" ? children : undefined;
+
+  useEffect(() => {
+    if (label) {
+      registerLabel(value, label);
+    }
+  }, [label, registerLabel, value]);
 
   return (
     <div
-      onClick={() => onValueChange?.(value)}
+      role="option"
+      aria-selected={isSelected}
+      onClick={() => {
+        onValueChange?.(value);
+        setOpen(false);
+      }}
       className={`relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 text-sm outline-none hover:bg-zinc-800 focus:bg-zinc-800 ${isSelected ? 'bg-zinc-800' : ''} ${className}`}
       {...props}
     >
