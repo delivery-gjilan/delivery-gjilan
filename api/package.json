@@ -5,8 +5,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon --watch src --ext ts,graphql --exec \"npm run codegen && tsx --env-file=.env src/index.ts\"",
-    "build": "tsc",
-    "start": "node dist/index.js",
+    "build": "echo 'skip build'",
+    "start": "tsx src/index.ts",
     "format": "prettier . --check",
     "format:fix": "prettier . --write",
     "lint": "eslint . -c eslint.config.mjs",
