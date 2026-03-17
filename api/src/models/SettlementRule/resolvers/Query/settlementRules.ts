@@ -11,11 +11,10 @@ export const settlementRules: NonNullable<QueryResolvers['settlementRules']> = a
 
   const repo = new SettlementRuleRepository(db);
   
-  // Convert InputMaybe types to proper undefined
   const cleanFilter = filter ? {
     entityType: filter.entityType || undefined,
-    entityId: filter.entityId || undefined,
-    ruleType: filter.ruleType || undefined,
+    businessId: filter.businessId || undefined,
+    promotionId: filter.promotionId || undefined,
     isActive: filter.isActive ?? undefined,
   } : {};
   

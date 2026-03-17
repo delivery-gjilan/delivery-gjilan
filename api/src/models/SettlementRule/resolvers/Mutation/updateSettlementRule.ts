@@ -21,12 +21,14 @@ export const updateSettlementRule: NonNullable<MutationResolvers['updateSettleme
 
   const repo = new SettlementRuleRepository(db);
   
-  // Convert InputMaybe types to proper undefined
   const cleanInput: Record<string, unknown> = {};
-  if (input.config !== undefined && input.config !== null) cleanInput.config = input.config;
-  if (input.canStackWith !== undefined && input.canStackWith !== null) cleanInput.canStackWith = input.canStackWith;
-  if (input.priority !== undefined && input.priority !== null) cleanInput.priority = input.priority;
-  if (input.notes !== undefined && input.notes !== null) cleanInput.notes = input.notes;
+  if (input.name != null) cleanInput.name = input.name;
+  if (input.direction != null) cleanInput.direction = input.direction;
+  if (input.amountType != null) cleanInput.amountType = input.amountType;
+  if (input.amount != null) cleanInput.amount = input.amount.toString();
+  if (input.appliesTo !== undefined) cleanInput.appliesTo = input.appliesTo || null;
+  if (input.isActive != null) cleanInput.isActive = input.isActive;
+  if (input.notes !== undefined) cleanInput.notes = input.notes || null;
   
   const rule = await repo.updateRule(id, cleanInput);
 

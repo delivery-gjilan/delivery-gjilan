@@ -12,12 +12,11 @@ CREATE TYPE "public"."user_permission" AS ENUM('view_orders', 'manage_orders', '
 CREATE TYPE "public"."settlement_direction" AS ENUM('RECEIVABLE', 'PAYABLE');--> statement-breakpoint
 CREATE TYPE "public"."settlement_status" AS ENUM('PENDING', 'PAID', 'OVERDUE', 'DISPUTED', 'CANCELLED');--> statement-breakpoint
 CREATE TYPE "public"."settlement_type" AS ENUM('DRIVER', 'BUSINESS');--> statement-breakpoint
-CREATE TYPE "public"."settlement_rule_type" AS ENUM('PERCENTAGE', 'FIXED_PER_ORDER', 'PRODUCT_MARKUP', 'DRIVER_VEHICLE_BONUS', 'CUSTOM');--> statement-breakpoint
 CREATE TYPE "public"."settlement_entity_type" AS ENUM('DRIVER', 'BUSINESS');--> statement-breakpoint
-CREATE TYPE "public"."pricing_condition_type" AS ENUM('TIME_OF_DAY', 'DAY_OF_WEEK', 'WEATHER', 'DEMAND', 'SPECIAL_EVENT', 'CUSTOM');--> statement-breakpoint
+CREATE TYPE "public"."settlement_rule_amount_type" AS ENUM('FIXED', 'PERCENT');--> statement-breakpoint
+CREATE TYPE "public"."promotion_creator_type" AS ENUM('PLATFORM', 'BUSINESS');--> statement-breakpoint
 CREATE TYPE "public"."promotion_target" AS ENUM('ALL_USERS', 'SPECIFIC_USERS', 'FIRST_ORDER', 'CONDITIONAL');--> statement-breakpoint
-CREATE TYPE "public"."promotion_type" AS ENUM('FIXED_AMOUNT', 'PERCENTAGE', 'FREE_DELIVERY', 'WALLET_CREDIT');--> statement-breakpoint
-CREATE TYPE "public"."wallet_transaction_type" AS ENUM('CREDIT', 'DEBIT', 'REFUND', 'REFERRAL_REWARD', 'ADMIN_ADJUSTMENT', 'PROMOTION', 'EXPIRATION');--> statement-breakpoint
+CREATE TYPE "public"."promotion_type" AS ENUM('FIXED_AMOUNT', 'PERCENTAGE', 'FREE_DELIVERY', 'SPEND_X_GET_FREE', 'SPEND_X_PERCENT', 'SPEND_X_FIXED');--> statement-breakpoint
 CREATE TYPE "public"."promotion_applies_to" AS ENUM('PRICE', 'DELIVERY');--> statement-breakpoint
 CREATE TYPE "public"."referral_status" AS ENUM('PENDING', 'COMPLETED', 'EXPIRED');--> statement-breakpoint
 CREATE TYPE "public"."campaign_status" AS ENUM('DRAFT', 'SENDING', 'SENT', 'FAILED');--> statement-breakpoint
@@ -128,6 +127,7 @@ CREATE TABLE "drivers" (
 	"battery_updated_at" timestamp with time zone,
 	"is_charging" boolean,
 	"commission_percentage" numeric(5, 2) DEFAULT '0' NOT NULL,
+	"has_own_vehicle" boolean DEFAULT false NOT NULL,
 	"max_active_orders" numeric(3, 0) DEFAULT '2' NOT NULL,
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -165,7 +165,11 @@ CREATE TABLE "order_items" (
 	"product_id" uuid NOT NULL,
 	"parent_order_item_id" uuid,
 	"quantity" integer NOT NULL,
-	"unit_price" numeric(10, 2) NOT NULL,
+	"base_price" numeric(10, 2) NOT NULL,
+	"sale_price" numeric(10, 2),
+	"markup_price" numeric(10, 2),
+	"night_marked_up_price" numeric(10, 2),
+	"final_applied_price" numeric(10, 2) NOT NULL,
 	"notes" varchar(500),
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -181,7 +185,9 @@ CREATE TABLE "products" (
 	"name" varchar(255) NOT NULL,
 	"description" varchar(1000),
 	"image_url" varchar(500),
-	"price" numeric(10, 2) NOT NULL,
+	"base_price" numeric(10, 2) NOT NULL,
+	"markup_price" numeric(10, 2),
+	"night_marked_up_price" numeric(10, 2),
 	"is_on_sale" boolean DEFAULT false,
 	"sale_price" numeric(10, 2),
 	"is_available" boolean DEFAULT true,
@@ -247,66 +253,31 @@ CREATE TABLE "settlements" (
 	"driver_id" uuid,
 	"business_id" uuid,
 	"order_id" uuid NOT NULL,
-	"rule_snapshot" jsonb,
-	"calculation_details" jsonb,
+	"rule_id" uuid,
 	"amount" numeric(10, 2) NOT NULL,
 	"currency" varchar(3) DEFAULT 'EUR' NOT NULL,
 	"status" "settlement_status" DEFAULT 'PENDING' NOT NULL,
 	"paid_at" timestamp with time zone,
-	"paid_by" uuid,
 	"payment_reference" varchar(100),
 	"payment_method" varchar(50),
-	"metadata" jsonb,
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-	"created_by" uuid
+	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "settlement_rules" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"name" varchar(200) NOT NULL,
 	"entity_type" "settlement_entity_type" NOT NULL,
-	"entity_id" uuid NOT NULL,
-	"rule_type" "settlement_rule_type" NOT NULL,
-	"config" jsonb NOT NULL,
-	"can_stack_with" jsonb DEFAULT '[]'::jsonb NOT NULL,
-	"priority" integer DEFAULT 0 NOT NULL,
+	"direction" "settlement_direction" NOT NULL,
+	"amount_type" "settlement_rule_amount_type" NOT NULL,
+	"amount" numeric(10, 2) NOT NULL,
+	"applies_to" varchar(20),
+	"business_id" uuid,
+	"promotion_id" uuid,
 	"is_active" boolean DEFAULT true NOT NULL,
-	"activated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-	"activated_by" uuid,
 	"notes" varchar(500),
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
-);
---> statement-breakpoint
-CREATE TABLE "dynamic_pricing_rules" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"business_id" uuid,
-	"name" varchar(255) NOT NULL,
-	"description" varchar(500),
-	"condition_type" "pricing_condition_type" NOT NULL,
-	"condition_config" jsonb NOT NULL,
-	"adjustment_config" jsonb NOT NULL,
-	"applies_to" jsonb NOT NULL,
-	"is_active" boolean DEFAULT true NOT NULL,
-	"priority" integer DEFAULT 0 NOT NULL,
-	"valid_from" timestamp with time zone,
-	"valid_until" timestamp with time zone,
-	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-	"created_by" uuid,
-	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
-);
---> statement-breakpoint
-CREATE TABLE "product_pricing" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"product_id" uuid NOT NULL,
-	"business_id" uuid NOT NULL,
-	"business_price" numeric(10, 2) NOT NULL,
-	"platform_markup" numeric(10, 2) DEFAULT '0' NOT NULL,
-	"base_customer_price" numeric(10, 2) NOT NULL,
-	"price_history" jsonb DEFAULT '[]'::jsonb NOT NULL,
-	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-	CONSTRAINT "product_pricing_product_id_unique" UNIQUE("product_id")
 );
 --> statement-breakpoint
 CREATE TABLE "user_behaviors" (
@@ -364,6 +335,8 @@ CREATE TABLE "promotions" (
 	"ends_at" timestamp with time zone,
 	"total_revenue" numeric(12, 2) DEFAULT 0,
 	"total_usage_count" integer DEFAULT 0 NOT NULL,
+	"creator_type" "promotion_creator_type" DEFAULT 'PLATFORM' NOT NULL,
+	"creator_id" uuid,
 	"created_by" uuid,
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -392,30 +365,6 @@ CREATE TABLE "user_promotions" (
 	"usage_count" integer DEFAULT 0 NOT NULL,
 	"last_used_at" timestamp with time zone,
 	"is_active" boolean DEFAULT true NOT NULL
-);
---> statement-breakpoint
-CREATE TABLE "user_wallet" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"user_id" uuid NOT NULL,
-	"balance" numeric(10, 2) DEFAULT 0 NOT NULL,
-	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-	CONSTRAINT "user_wallet_user_id_unique" UNIQUE("user_id")
-);
---> statement-breakpoint
-CREATE TABLE "wallet_transactions" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"wallet_id" uuid NOT NULL,
-	"user_id" uuid NOT NULL,
-	"type" "wallet_transaction_type" NOT NULL,
-	"amount" numeric(10, 2) NOT NULL,
-	"balance_before" numeric(10, 2) NOT NULL,
-	"balance_after" numeric(10, 2) NOT NULL,
-	"order_id" uuid,
-	"promotion_id" uuid,
-	"description" text,
-	"expires_at" timestamp with time zone,
-	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "order_promotions" (
@@ -624,11 +573,9 @@ ALTER TABLE "user_permissions" ADD CONSTRAINT "user_permissions_user_id_users_id
 ALTER TABLE "settlements" ADD CONSTRAINT "settlements_driver_id_drivers_id_fk" FOREIGN KEY ("driver_id") REFERENCES "public"."drivers"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "settlements" ADD CONSTRAINT "settlements_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "settlements" ADD CONSTRAINT "settlements_order_id_orders_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "settlements" ADD CONSTRAINT "settlements_paid_by_users_id_fk" FOREIGN KEY ("paid_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "settlements" ADD CONSTRAINT "settlements_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "dynamic_pricing_rules" ADD CONSTRAINT "dynamic_pricing_rules_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "product_pricing" ADD CONSTRAINT "product_pricing_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "product_pricing" ADD CONSTRAINT "product_pricing_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "settlements" ADD CONSTRAINT "settlements_rule_id_settlement_rules_id_fk" FOREIGN KEY ("rule_id") REFERENCES "public"."settlement_rules"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "settlement_rules" ADD CONSTRAINT "settlement_rules_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "settlement_rules" ADD CONSTRAINT "settlement_rules_promotion_id_promotions_id_fk" FOREIGN KEY ("promotion_id") REFERENCES "public"."promotions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_behaviors" ADD CONSTRAINT "user_behaviors_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "promotion_business_eligibility" ADD CONSTRAINT "promotion_business_eligibility_promotion_id_promotions_id_fk" FOREIGN KEY ("promotion_id") REFERENCES "public"."promotions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "promotion_business_eligibility" ADD CONSTRAINT "promotion_business_eligibility_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -636,16 +583,12 @@ ALTER TABLE "promotion_usage" ADD CONSTRAINT "promotion_usage_promotion_id_promo
 ALTER TABLE "promotion_usage" ADD CONSTRAINT "promotion_usage_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "promotion_usage" ADD CONSTRAINT "promotion_usage_order_id_orders_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "promotion_usage" ADD CONSTRAINT "promotion_usage_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "promotions" ADD CONSTRAINT "promotions_creator_id_businesses_id_fk" FOREIGN KEY ("creator_id") REFERENCES "public"."businesses"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "promotions" ADD CONSTRAINT "promotions_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_promo_metadata" ADD CONSTRAINT "user_promo_metadata_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_promotions" ADD CONSTRAINT "user_promotions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_promotions" ADD CONSTRAINT "user_promotions_promotion_id_promotions_id_fk" FOREIGN KEY ("promotion_id") REFERENCES "public"."promotions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_promotions" ADD CONSTRAINT "user_promotions_assigned_by_users_id_fk" FOREIGN KEY ("assigned_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "user_wallet" ADD CONSTRAINT "user_wallet_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "wallet_transactions" ADD CONSTRAINT "wallet_transactions_wallet_id_user_wallet_id_fk" FOREIGN KEY ("wallet_id") REFERENCES "public"."user_wallet"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "wallet_transactions" ADD CONSTRAINT "wallet_transactions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "wallet_transactions" ADD CONSTRAINT "wallet_transactions_order_id_orders_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "wallet_transactions" ADD CONSTRAINT "wallet_transactions_promotion_id_promotions_id_fk" FOREIGN KEY ("promotion_id") REFERENCES "public"."promotions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order_promotions" ADD CONSTRAINT "order_promotions_order_id_orders_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order_promotions" ADD CONSTRAINT "order_promotions_promotion_id_promotions_id_fk" FOREIGN KEY ("promotion_id") REFERENCES "public"."promotions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_address" ADD CONSTRAINT "user_address_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -705,10 +648,6 @@ CREATE INDEX "idx_user_promo_metadata_user" ON "user_promo_metadata" USING btree
 CREATE INDEX "idx_user_promotions_user" ON "user_promotions" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "idx_user_promotions_promo" ON "user_promotions" USING btree ("promotion_id");--> statement-breakpoint
 CREATE INDEX "idx_user_promotions_active" ON "user_promotions" USING btree ("user_id","is_active");--> statement-breakpoint
-CREATE INDEX "idx_user_wallet_user" ON "user_wallet" USING btree ("user_id");--> statement-breakpoint
-CREATE INDEX "idx_wallet_transactions_wallet" ON "wallet_transactions" USING btree ("wallet_id");--> statement-breakpoint
-CREATE INDEX "idx_wallet_transactions_user" ON "wallet_transactions" USING btree ("user_id");--> statement-breakpoint
-CREATE INDEX "idx_wallet_transactions_type" ON "wallet_transactions" USING btree ("type");--> statement-breakpoint
 CREATE INDEX "idx_order_promotions_order_id" ON "order_promotions" USING btree ("order_id");--> statement-breakpoint
 CREATE INDEX "idx_user_address_user_id" ON "user_address" USING btree ("user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "refresh_token_sessions_token_hash_uq" ON "refresh_token_sessions" USING btree ("token_hash");--> statement-breakpoint

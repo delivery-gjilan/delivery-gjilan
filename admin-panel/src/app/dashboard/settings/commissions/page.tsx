@@ -1,10 +1,10 @@
 ﻿'use client';
 
 import { useState } from 'react';
-import { useQuery, useMutation } from '@apollo/client/react';
+import { useQuery } from '@apollo/client/react';
 import { ArrowLeft, DollarSign } from 'lucide-react';
 import Link from 'next/link';
-import { GET_DRIVERS_WITH_BALANCE, GET_BUSINESSES_WITH_BALANCE, UPDATE_COMMISSION } from '@/graphql/operations/settlements/queries';
+import { GET_DRIVERS_WITH_BALANCE, GET_BUSINESSES_WITH_BALANCE } from '@/graphql/operations/settlements/queries';
 
 interface Driver {
     id: string;
@@ -32,44 +32,13 @@ export default function CommissionSettings() {
     // Fetch businesses
     const { data: businessesData, loading: businessesLoading } = useQuery(GET_BUSINESSES_WITH_BALANCE);
 
-    // Update commission mutation
-    const [updateCommission] = useMutation(UPDATE_COMMISSION, {
-        refetchQueries: [
-            { query: GET_DRIVERS_WITH_BALANCE },
-            { query: GET_BUSINESSES_WITH_BALANCE },
-        ],
-    });
-
+    // Commission update removed — use settlement rules instead
     const handleUpdateDriverCommission = async () => {
-        if (!editingDriver) return;
-
-        try {
-            await updateCommission({
-                variables: {
-                    driverId: editingDriver.id,
-                    percentage: editingDriver.percentage,
-                },
-            });
-            setEditingDriver(null);
-        } catch (error) {
-            console.error('Error updating commission:', error);
-        }
+        setEditingDriver(null);
     };
 
     const handleUpdateBusinessCommission = async () => {
-        if (!editingBusiness) return;
-
-        try {
-            await updateCommission({
-                variables: {
-                    businessId: editingBusiness.id,
-                    percentage: editingBusiness.percentage,
-                },
-            });
-            setEditingBusiness(null);
-        } catch (error) {
-            console.error('Error updating commission:', error);
-        }
+        setEditingBusiness(null);
     };
 
     const drivers: Driver[] = ((driversData as any)?.drivers || []) as Driver[];

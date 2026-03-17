@@ -1,62 +1,57 @@
-import { pgTable, uuid, varchar, boolean, timestamp, integer, jsonb, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, boolean, timestamp, pgEnum, numeric } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
-import { drivers } from './drivers';
 import { businesses } from './businesses';
-
-const ruleTypeValues = [
-    'PERCENTAGE',
-    'FIXED_PER_ORDER',
-    'PRODUCT_MARKUP',
-    'DRIVER_VEHICLE_BONUS',
-    'CUSTOM'
-] as const;
-export const ruleType = pgEnum('settlement_rule_type', ruleTypeValues);
+import { promotions } from './promotions';
 
 const entityTypeValues = ['DRIVER', 'BUSINESS'] as const;
 export const settlementEntityType = pgEnum('settlement_entity_type', entityTypeValues);
 
+const settlementDirectionValues = ['RECEIVABLE', 'PAYABLE'] as const;
+export const settlementDirection = pgEnum('settlement_direction', settlementDirectionValues);
+
+export const settlementRuleAmountType = pgEnum('settlement_rule_amount_type', ['FIXED', 'PERCENT']);
+
 /**
- * Settlement Rules - Flexible commission/fee configuration
- * 
- * Supports multiple rule types per entity with stacking capability
- * Complete audit trail with activation history
+ * Settlement Rules - simple commission/fee configuration
+ *
+ * A rule says: "for every order, create a settlement of X (fixed or % of subtotal/delivery fee)
+ * between the platform and a driver/business".
+ *
+ * Scoping:
+ *   - businessId set  → rule only applies to orders from that business
+ *   - promotionId set → rule only applies to orders that used that promotion
+ *   - both null       → global: applies to every order
  */
 export const settlementRules = pgTable('settlement_rules', {
     id: uuid('id').primaryKey().defaultRandom().notNull(),
-    
-    // Entity this rule applies to
+
+    // Human-readable label, e.g. "10% commission on subtotal"
+    name: varchar('name', { length: 200 }).notNull(),
+
+    // Whether this settlement is for a driver or a business
     entityType: settlementEntityType('entity_type').notNull(),
-    entityId: uuid('entity_id').notNull(), // driver.id or business.id
-    
-    // Rule type determines calculation logic
-    ruleType: ruleType('rule_type').notNull(),
-    
-    /**
-     * Flexible configuration for different rule types
-     * 
-     * PERCENTAGE: { percentage: 10.5, appliesTo: 'ORDER_SUBTOTAL' | 'DELIVERY_FEE' }
-     * FIXED_PER_ORDER: { amount: 2.50, description: 'Flat fee' }
-     * PRODUCT_MARKUP: Built-in via products table pricing
-     * DRIVER_VEHICLE_BONUS: { amount: 1.50, condition: 'HAS_OWN_VEHICLE' }
-     * CUSTOM: { formula: 'custom logic', params: {...} }
-     */
-    config: jsonb('config').notNull(),
-    
-    // Stacking and priority
-    canStackWith: jsonb('can_stack_with').$type<string[]>().default(sql`'[]'::jsonb`).notNull(),
-    priority: integer('priority').default(0).notNull(), // Lower = calculated first
-    
-    // Active status and tracking
+
+    // From the platform's point of view:
+    //   RECEIVABLE = the driver/business owes the platform
+    //   PAYABLE    = the platform owes the driver/business
+    direction: settlementDirection('direction').notNull(),
+
+    // FIXED: amount is euros per order
+    // PERCENT: amount is a percentage (0–100) applied to the base
+    amountType: settlementRuleAmountType('amount_type').notNull(),
+    amount: numeric('amount', { precision: 10, scale: 2 }).notNull(),
+
+    // Only used when amountType = PERCENT: which value to apply % to
+    // 'SUBTOTAL' = order item total, 'DELIVERY_FEE' = delivery charge
+    appliesTo: varchar('applies_to', { length: 20 }),
+
+    // Scope (both null = global rule)
+    businessId: uuid('business_id').references(() => businesses.id, { onDelete: 'set null' }),
+    promotionId: uuid('promotion_id').references(() => promotions.id, { onDelete: 'set null' }),
+
     isActive: boolean('is_active').default(true).notNull(),
-    activatedAt: timestamp('activated_at', { withTimezone: true, mode: 'string' })
-        .default(sql`CURRENT_TIMESTAMP`)
-        .notNull(),
-    activatedBy: uuid('activated_by'), // admin user ID
-    
-    // Notes for admin reference
     notes: varchar('notes', { length: 500 }),
-    
-    // Timestamps
+
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull(),
@@ -67,44 +62,15 @@ export const settlementRules = pgTable('settlement_rules', {
 });
 
 export const settlementRulesRelations = relations(settlementRules, ({ one }) => ({
-    driver: one(drivers, {
-        fields: [settlementRules.entityId],
-        references: [drivers.id],
-    }),
     business: one(businesses, {
-        fields: [settlementRules.entityId],
+        fields: [settlementRules.businessId],
         references: [businesses.id],
+    }),
+    promotion: one(promotions, {
+        fields: [settlementRules.promotionId],
+        references: [promotions.id],
     }),
 }));
 
 export type DbSettlementRule = typeof settlementRules.$inferSelect;
 export type NewDbSettlementRule = typeof settlementRules.$inferInsert;
-
-// Type definitions for config JSONB
-export type PercentageRuleConfig = {
-    percentage: number;
-    appliesTo: 'ORDER_SUBTOTAL' | 'DELIVERY_FEE';
-};
-
-export type FixedPerOrderRuleConfig = {
-    amount: number;
-    description?: string;
-};
-
-export type DriverVehicleBonusConfig = {
-    amount: number;
-    condition: 'HAS_OWN_VEHICLE' | 'HAS_MOTORCYCLE' | 'HAS_BICYCLE';
-    description?: string;
-};
-
-export type CustomRuleConfig = {
-    formula: string;
-    params: Record<string, any>;
-    description?: string;
-};
-
-export type RuleConfig = 
-    | PercentageRuleConfig 
-    | FixedPerOrderRuleConfig 
-    | DriverVehicleBonusConfig 
-    | CustomRuleConfig;

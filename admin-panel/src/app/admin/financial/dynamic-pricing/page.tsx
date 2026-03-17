@@ -80,7 +80,7 @@ const GET_BUSINESSES = gql`
 `;
 
 const GET_PRODUCTS_AND_CATEGORIES = gql`
-  query ProductsAndCategories($businessId: ID!) {
+  query DynamicPricingProductsAndCategories($businessId: ID!) {
     productCategories(businessId: $businessId) {
       id
       name

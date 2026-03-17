@@ -151,8 +151,7 @@ export class SettlementRepository {
         orderId: string,
         amount: number,
         direction: 'RECEIVABLE' | 'PAYABLE' = 'RECEIVABLE',
-        ruleSnapshot?: unknown,
-        calculationDetails?: unknown,
+        ruleId?: string,
     ): Promise<DbSettlement> {
         const result = await this.db
             .insert(settlements)
@@ -162,10 +161,9 @@ export class SettlementRepository {
                 driverId,
                 businessId,
                 orderId,
-                amount: amount.toString(),
+                amount,
                 status: 'PENDING',
-                ruleSnapshot: ruleSnapshot || null,
-                calculationDetails: calculationDetails || null,
+                ruleId: ruleId || null,
             })
             .returning();
 
@@ -233,7 +231,7 @@ export class SettlementRepository {
             await tx
                 .update(settlements)
                 .set({
-                    amount: remainingAmount.toString(),
+                    amount: remainingAmount,
                     updatedAt: now,
                 })
                 .where(eq(settlements.id, settlementId))
@@ -247,12 +245,10 @@ export class SettlementRepository {
                     driverId: current.driverId,
                     businessId: current.businessId,
                     orderId: current.orderId,
-                    amount: amount.toString(),
+                    amount: amount,
                     status: 'PAID',
                     paidAt: now,
-                    ruleSnapshot: current.ruleSnapshot,
-                    calculationDetails: current.calculationDetails,
-                    metadata: current.metadata,
+                    ruleId: current.ruleId,
                 })
                 .execute();
 

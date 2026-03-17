@@ -42,7 +42,7 @@ function getPeriodDates(period: Period): { startDate?: string; endDate?: string 
 }
 
 function formatCurrency(amount: number) {
-    return `$${amount.toFixed(2)}`;
+    return `€${amount.toFixed(2)}`;
 }
 
 function formatDate(dateStr?: string | null) {

@@ -10,7 +10,7 @@ export * from './userPermissions';
 export * from './drivers';
 export * from './settlements';
 export * from './settlementRules';
-export * from './productPricing';
+// productPricing removed — pricing lives on the products table (basePrice, markupPrice, nightMarkedupPrice, salePrice)
 export * from './auditLogs';
 export * from './userBehaviors';
 export * from './promotions';

@@ -1,12 +1,8 @@
 import { Database } from '@/database';
 import { SettlementRepository } from '@/repositories/SettlementRepository';
-import { BusinessRepository } from '@/repositories/BusinessRepository';
-import { DriverRepository } from '@/repositories/DriverRepository';
 import { SettlementCalculationEngine } from '@/services/SettlementCalculationEngine';
-import { DbOrder, DbOrderItem, products as productsTable } from '@/database/schema';
-import { inArray } from 'drizzle-orm';
+import { DbOrder, DbOrderItem } from '@/database/schema';
 import logger from '@/lib/logger';
-import { AppError } from '@/lib/errors';
 
 const log = logger.child({ service: 'FinancialService' });
 
@@ -52,18 +48,14 @@ export class FinancialService {
             );
 
             for (const settlement of calculated) {
-                const isBusiness = settlement.type === 'BUSINESS';
-                const settlementType = isBusiness ? 'BUSINESS' : 'DRIVER';
-
                 await this.settlementRepo.createSettlement(
-                    settlementType,
-                    isBusiness ? null : settlement.entityId,
-                    isBusiness ? settlement.entityId : null,
+                    settlement.type,
+                    settlement.driverId,
+                    settlement.businessId,
                     settlement.orderId,
                     settlement.amount,
                     settlement.direction,
-                    settlement.ruleSnapshot,
-                    settlement.calculationDetails,
+                    settlement.ruleId,
                 );
             }
 
@@ -92,59 +84,5 @@ export class FinancialService {
             log.error({ err: error, orderId }, 'settlement:cancel:error');
             throw error;
         }
-    }
-
-    /**
-     * Group order items by business ID
-     */
-    private async groupItemsByBusiness(items: DbOrderItem[]): Promise<Map<string, DbOrderItem[]>> {
-        const grouped = new Map<string, DbOrderItem[]>();
-
-        const productIds = Array.from(new Set(items.map((item) => item.productId)));
-        if (productIds.length === 0) {
-            return grouped;
-        }
-
-        const products = await this.db
-            .select({ id: productsTable.id, businessId: productsTable.businessId })
-            .from(productsTable)
-            .where(inArray(productsTable.id, productIds));
-
-        const businessByProductId = new Map(products.map((product) => [product.id, product.businessId]));
-
-        for (const item of items) {
-            const businessId = businessByProductId.get(item.productId);
-            if (!businessId) {
-                continue;
-            }
-            if (!grouped.has(businessId)) {
-                grouped.set(businessId, []);
-            }
-            grouped.get(businessId)!.push(item);
-        }
-
-        return grouped;
-    }
-
-    /**
-     * Update driver commission percentage
-     */
-    async updateDriverCommission(driverId: string, percentage: number): Promise<void> {
-        if (percentage < 0 || percentage > 100) {
-            throw AppError.badInput('Commission percentage must be between 0 and 100');
-        }
-
-        // Implementation would update driver's commission percentage
-    }
-
-    /**
-     * Update business commission percentage
-     */
-    async updateBusinessCommission(businessId: string, percentage: number): Promise<void> {
-        if (percentage < 0 || percentage > 100) {
-            throw AppError.badInput('Commission percentage must be between 0 and 100');
-        }
-
-        // Implementation would update business's commission percentage
     }
 }

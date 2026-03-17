@@ -16,15 +16,6 @@ enum SettlementStatus {
     CANCELLED
 }
 
-type RuleSnapshot {
-    appliedRules: JSON!
-}
-
-type CalculationDetails {
-    itemsBreakdown: JSON!
-    rulesApplied: JSON!
-}
-
 type Settlement {
     id: ID!
     type: SettlementType!
@@ -32,17 +23,13 @@ type Settlement {
     driver: User
     business: Business
     order: Order!
+    ruleId: ID
     amount: Float!
     currency: String!
     status: SettlementStatus!
-    ruleSnapshot: RuleSnapshot
-    calculationDetails: CalculationDetails
-    metadata: JSON
     paidAt: Date
-    paidBy: String
     paymentReference: String
     paymentMethod: String
-    createdBy: String
     createdAt: Date!
     updatedAt: Date!
 }
@@ -87,7 +74,6 @@ type Mutation {
     markSettlementsAsPaid(ids: [ID!]!, paymentReference: String, paymentMethod: String): [Settlement!]!
     markSettlementAsPartiallyPaid(settlementId: ID!, amount: Float!): Settlement!
     unsettleSettlement(settlementId: ID!): Settlement!
-    updateCommissionPercentage(driverId: ID, businessId: ID, percentage: Float!): Boolean! @deprecated(reason: "Use createSettlementRule instead")
     backfillSettlementsForDeliveredOrders: Int!
 }
 

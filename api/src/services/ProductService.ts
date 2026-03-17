@@ -26,7 +26,7 @@ export class ProductService {
             ...product,
             variantGroupId: product.groupId ?? undefined,
             isOffer: product.isOffer ?? false,
-            price: product.price,
+            price: Number(product.basePrice), // DB: basePrice → GraphQL: price
             salePrice: product.salePrice,
             isOnSale: product.isOnSale ?? false,
             isAvailable: product.isAvailable ?? true,
@@ -62,7 +62,7 @@ export class ProductService {
             name: validatedInput.name,
             description: validatedInput.description,
             imageUrl: validatedInput.imageUrl,
-            price: validatedInput.price,
+            basePrice: validatedInput.price, // GraphQL input 'price' → DB 'basePrice'
             isOnSale: validatedInput.isOnSale,
             salePrice: validatedInput.salePrice,
             isAvailable: validatedInput.isAvailable ?? true,
@@ -163,7 +163,7 @@ export class ProductService {
                 id: product.id,
                 name: product.name,
                 imageUrl: product.imageUrl,
-                basePrice: product.price,
+                basePrice: product.price, // Product.price maps from DB basePrice
                 isOffer: product.isOffer,
                 variants: [],
                 product,
@@ -184,11 +184,14 @@ export class ProductService {
     async updateProduct(id: string, input: UpdateProductInput): Promise<Product> {
         const validatedInput = productValidator.validateUpdateProduct(input);
 
-        // Extract variantGroupId from input
-        const { variantGroupId, ...rest } = validatedInput as any;
-        const updateData = { ...rest };
+        // Extract variantGroupId from input and remap price → basePrice for DB
+        const { variantGroupId, price: graphqlPrice, ...rest } = validatedInput as any;
+        const updateData: Record<string, unknown> = { ...rest };
         if (variantGroupId !== undefined) {
             updateData.groupId = variantGroupId;
+        }
+        if (graphqlPrice !== undefined) {
+            updateData.basePrice = graphqlPrice; // GraphQL 'price' maps to DB 'basePrice'
         }
 
         const updatedProduct = await this.productRepository.update(id, updateData);

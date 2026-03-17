@@ -19,7 +19,12 @@ export const orderItems = pgTable(
             onDelete: 'cascade',
         }),
         quantity: integer('quantity').notNull(),
-        unitPrice: numeric('unit_price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
+        // Price snapshot at time of order
+        basePrice: numeric('base_price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
+        salePrice: numeric('sale_price', { mode: 'number', precision: 10, scale: 2 }),
+        markupPrice: numeric('markup_price', { mode: 'number', precision: 10, scale: 2 }),
+        nightMarkedupPrice: numeric('night_marked_up_price', { mode: 'number', precision: 10, scale: 2 }),
+        finalAppliedPrice: numeric('final_applied_price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
         notes: varchar('notes', { length: 500 }),
         createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
             .default(sql`CURRENT_TIMESTAMP`)

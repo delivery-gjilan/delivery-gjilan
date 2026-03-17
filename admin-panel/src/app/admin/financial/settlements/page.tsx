@@ -49,12 +49,14 @@ type SettlementGroup = {
 };
 
 const MARK_SETTLEMENT_AS_PAID = gql`
-  mutation MarkSettlementAsPaidPage($settlementId: ID!) {
-    markSettlementAsPaid(settlementId: $settlementId) {
+  mutation MarkSettlementAsPaidPage($settlementId: ID!, $paymentReference: String, $paymentMethod: String) {
+    markSettlementAsPaid(settlementId: $settlementId, paymentReference: $paymentReference, paymentMethod: $paymentMethod) {
       id
       status
       amount
       paidAt
+      paymentReference
+      paymentMethod
     }
   }
 `;
@@ -85,6 +87,8 @@ export default function SettlementsPage() {
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [selectedSettlement, setSelectedSettlement] = useState<any>(null);
   const [partialAmount, setPartialAmount] = useState('');
+  const [paymentReference, setPaymentReference] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
 
   // Query for business settlements
   const {
@@ -236,6 +240,8 @@ export default function SettlementsPage() {
         description: 'Settlement marked as paid',
       });
       setSelectedSettlement(null);
+      setPaymentReference('');
+      setPaymentMethod('');
       handleRefresh();
     },
     onError: (error) => {
@@ -362,7 +368,7 @@ export default function SettlementsPage() {
             
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-muted-foreground mr-1">Status:</span>
-              <div className="flex gap-1 rounded-md bg-muted/30 p-1">
+              <div className="flex gap-1 rounded-md bg-muted/30 p-1 flex-wrap">
                 <Button
                   variant={statusFilter === 'all' ? 'default' : 'ghost'}
                   size="sm"
@@ -387,35 +393,29 @@ export default function SettlementsPage() {
                 >
                   Paid
                 </Button>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-muted-foreground mr-1">Direction:</span>
-              <div className="flex gap-1 rounded-md bg-muted/30 p-1">
                 <Button
-                  variant={directionFilter === 'all' ? 'default' : 'ghost'}
+                  variant={statusFilter === ('OVERDUE' as any) ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => setDirectionFilter('all')}
-                  className="h-7 px-3"
+                  onClick={() => setStatusFilter('OVERDUE' as any)}
+                  className="h-7 px-3 text-orange-600"
                 >
-                  All
+                  Overdue
                 </Button>
                 <Button
-                  variant={directionFilter === SettlementDirection.Receivable ? 'default' : 'ghost'}
+                  variant={statusFilter === ('DISPUTED' as any) ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => setDirectionFilter(SettlementDirection.Receivable)}
-                  className="h-7 px-3"
+                  onClick={() => setStatusFilter('DISPUTED' as any)}
+                  className="h-7 px-3 text-red-600"
                 >
-                  Receivable
+                  Disputed
                 </Button>
                 <Button
-                  variant={directionFilter === SettlementDirection.Payable ? 'default' : 'ghost'}
+                  variant={statusFilter === ('CANCELLED' as any) ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => setDirectionFilter(SettlementDirection.Payable)}
+                  onClick={() => setStatusFilter('CANCELLED' as any)}
                   className="h-7 px-3"
                 >
-                  Payable
+                  Cancelled
                 </Button>
               </div>
             </div>
@@ -669,7 +669,14 @@ export default function SettlementsPage() {
       </div>
 
       {/* Settlement Detail Modal */}
-      <Dialog open={!!selectedSettlement} onOpenChange={(open) => !open && setSelectedSettlement(null)}>
+      <Dialog open={!!selectedSettlement} onOpenChange={(open) => {
+        if (!open) {
+          setSelectedSettlement(null);
+          setPaymentReference('');
+          setPaymentMethod('');
+          setPartialAmount('');
+        }
+      }}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-lg">
@@ -743,14 +750,39 @@ export default function SettlementsPage() {
                 )}
               </div>
 
-              {/* Settlement Actions */}
+      {/* Settlement Actions */}
               {selectedSettlement.status === SettlementStatus.Pending && (
                 <div className="space-y-4 pt-4 border-t">
+                  {/* Payment details */}
+                  <div className="space-y-3">
+                    <Label className="text-base font-semibold block">Payment Details (optional)</Label>
+                    <div>
+                      <Label htmlFor="payment-reference" className="text-sm mb-2 block">Payment Reference</Label>
+                      <Input
+                        id="payment-reference"
+                        type="text"
+                        placeholder="e.g. TRF-2024-001, bank ref..."
+                        value={paymentReference}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPaymentReference(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="payment-method" className="text-sm mb-2 block">Payment Method</Label>
+                      <Input
+                        id="payment-method"
+                        type="text"
+                        placeholder="e.g. Bank Transfer, Cash, PayPal..."
+                        value={paymentMethod}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPaymentMethod(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
                   {/* Full Settlement */}
                   <div>
                     <Label className="text-base font-semibold mb-3 block">Mark as Fully Paid</Label>
                     <Button
-                      onClick={() => markAsPaid({ variables: { settlementId: selectedSettlement.id } })}
+                      onClick={() => markAsPaid({ variables: { settlementId: selectedSettlement.id, paymentReference: paymentReference || undefined, paymentMethod: paymentMethod || undefined } })}
                       className="w-full bg-green-600 hover:bg-green-700"
                     >
                       Mark as Fully Paid ({selectedSettlement.currency} {parseFloat(selectedSettlement.amount).toFixed(2)})

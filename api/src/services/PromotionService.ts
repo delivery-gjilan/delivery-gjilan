@@ -10,7 +10,7 @@ export interface CreatePromotionInput {
     name: string;
     description?: string;
     code?: string;
-    type: 'FIXED_AMOUNT' | 'PERCENTAGE' | 'FREE_DELIVERY' | 'WALLET_CREDIT';
+    type: 'FIXED_AMOUNT' | 'PERCENTAGE' | 'FREE_DELIVERY' | 'SPEND_X_GET_FREE' | 'SPEND_X_PERCENT' | 'SPEND_X_FIXED';
     target: 'ALL_USERS' | 'SPECIFIC_USERS' | 'FIRST_ORDER' | 'CONDITIONAL';
     discountValue?: number;
     maxDiscountCap?: number;
@@ -24,6 +24,8 @@ export interface CreatePromotionInput {
     isActive?: boolean;
     startsAt?: Date | string;
     endsAt?: Date | string;
+    creatorType?: 'PLATFORM' | 'BUSINESS';
+    creatorId?: string;
     targetUserIds?: string[];
     eligibleBusinessIds?: string[];
 }

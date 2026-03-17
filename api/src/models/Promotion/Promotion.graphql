@@ -4,7 +4,9 @@ enum PromotionType {
   FIXED_AMOUNT
   PERCENTAGE
   FREE_DELIVERY
-  WALLET_CREDIT
+  SPEND_X_GET_FREE
+  SPEND_X_PERCENT
+  SPEND_X_FIXED
 }
 
 enum PromotionTarget {
@@ -39,6 +41,10 @@ type Promotion {
   # Analytics
   totalUsageCount: Int!
   totalRevenue: Float!
+
+  # Creator
+  creatorType: String!
+  creatorId: ID
   
   # Relations
   assignedUsers: [UserPromotion!]
@@ -106,32 +112,6 @@ type PromotionResult {
   finalTotal: Float!
 }
 
-type UserWallet {
-  id: ID!
-  userId: ID!
-  balance: Float!
-  createdAt: String!
-  updatedAt: String!
-  
-  # Relations
-  transactions: [WalletTransaction!]
-}
-
-type WalletTransaction {
-  id: ID!
-  walletId: ID!
-  type: String!
-  amount: Float!
-  balanceBefore: Float!
-  balanceAfter: Float!
-  orderId: ID
-  description: String
-  createdAt: String!
-  
-  # Relations
-  wallet: UserWallet
-}
-
 type UserPromoMetadata {
   userId: ID!
   hasUsedFirstOrderPromo: Boolean!
@@ -165,6 +145,8 @@ input CreatePromotionInput {
   isActive: Boolean!
   startsAt: String
   endsAt: String
+  creatorType: String
+  creatorId: ID
   
   # Optional: Assign to specific users
   targetUserIds: [ID!]
@@ -192,6 +174,8 @@ input UpdatePromotionInput {
   isActive: Boolean
   startsAt: String
   endsAt: String
+  creatorType: String
+  creatorId: ID
   eligibleBusinessIds: [ID!]
 }
 
@@ -213,13 +197,6 @@ input CartItemInput {
   businessId: ID!
   quantity: Int!
   price: Float!
-}
-
-input AddWalletCreditInput {
-  userId: ID!
-  amount: Float!
-  type: String!
-  description: String
 }
 
 # ============================================
@@ -250,10 +227,6 @@ type Query {
   
   # Get user's promo metadata (first order status, savings)
   getUserPromoMetadata(userId: ID!): UserPromoMetadata
-  
-  # Wallet queries
-  getUserWallet(userId: ID!): UserWallet
-  getWalletTransactions(userId: ID!): [WalletTransaction!]!
   
   # Analytics
   getPromotionAnalytics(promotionId: ID!): PromotionAnalyticsResult!
@@ -288,10 +261,6 @@ type Mutation {
   
   # Remove user assignment
   removeUserFromPromotion(promotionId: ID!, userId: ID!): Boolean!
-  
-  # Wallet mutations
-  addWalletCredit(input: AddWalletCreditInput!): WalletTransaction!
-  deductWalletCredit(userId: ID!, amount: Float!, orderId: ID!): WalletTransaction!
   
   # Mark first order used (called after order created)
   markFirstOrderUsed(userId: ID!): UserPromoMetadata!

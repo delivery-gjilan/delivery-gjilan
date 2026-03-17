@@ -10,8 +10,8 @@ type Database = DbType;
 
 export interface SettlementRuleFilters {
     entityType?: 'DRIVER' | 'BUSINESS';
-    entityId?: string;
-    ruleType?: string;
+    businessId?: string;
+    promotionId?: string;
     isActive?: boolean;
 }
 
@@ -35,12 +35,12 @@ export class SettlementRuleRepository {
             conditions.push(eq(settlementRules.entityType, filters.entityType as any));
         }
 
-        if (filters.entityId) {
-            conditions.push(eq(settlementRules.entityId, filters.entityId));
+        if (filters.businessId) {
+            conditions.push(eq(settlementRules.businessId, filters.businessId));
         }
 
-        if (filters.ruleType) {
-            conditions.push(eq(settlementRules.ruleType, filters.ruleType as any));
+        if (filters.promotionId) {
+            conditions.push(eq(settlementRules.promotionId, filters.promotionId));
         }
 
         if (filters.isActive !== undefined) {
@@ -54,18 +54,7 @@ export class SettlementRuleRepository {
             }
         }
 
-        return query.orderBy(settlementRules.priority, settlementRules.createdAt);
-    }
-
-    async getActiveRulesForEntity(
-        entityType: 'DRIVER' | 'BUSINESS',
-        entityId: string
-    ): Promise<DbSettlementRule[]> {
-        return this.getRules({
-            entityType,
-            entityId,
-            isActive: true
-        });
+        return query.orderBy(settlementRules.createdAt);
     }
 
     async createRule(rule: NewDbSettlementRule): Promise<DbSettlementRule> {
@@ -103,44 +92,8 @@ export class SettlementRuleRepository {
         return updated[0];
     }
 
-    async activateRule(id: string, activatedBy: string): Promise<DbSettlementRule> {
-        const now = new Date().toISOString();
-
-        const updated = await this.db
-            .update(settlementRules)
-            .set({
-                isActive: true,
-                activatedAt: now,
-                activatedBy,
-                updatedAt: now
-            })
-            .where(eq(settlementRules.id, id))
-            .returning();
-
-        if (!updated || updated.length === 0 || !updated[0]) {
-            throw new Error(`Settlement rule ${id} not found`);
-        }
-
-        return updated[0];
-    }
-
-    async deactivateRule(id: string): Promise<DbSettlementRule> {
-        const now = new Date().toISOString();
-
-        const updated = await this.db
-            .update(settlementRules)
-            .set({
-                isActive: false,
-                updatedAt: now
-            })
-            .where(eq(settlementRules.id, id))
-            .returning();
-
-        if (!updated || updated.length === 0 || !updated[0]) {
-            throw new Error(`Settlement rule ${id} not found`);
-        }
-
-        return updated[0];
+    async toggleActive(id: string, isActive: boolean): Promise<DbSettlementRule> {
+        return this.updateRule(id, { isActive });
     }
 
     async deleteRule(id: string): Promise<boolean> {
@@ -150,28 +103,5 @@ export class SettlementRuleRepository {
             .returning({ id: settlementRules.id });
 
         return result.length > 0;
-    }
-
-    /**
-     * Get summary of active rules for an entity
-     */
-    async getRuleSummary(entityType: 'DRIVER' | 'BUSINESS', entityId: string): Promise<{
-        totalRules: number;
-        activeRules: number;
-        rulesByType: Record<string, number>;
-    }> {
-        const allRules = await this.getRules({ entityType, entityId });
-        const activeRules = allRules.filter(r => r.isActive);
-
-        const rulesByType: Record<string, number> = {};
-        for (const rule of activeRules) {
-            rulesByType[rule.ruleType] = (rulesByType[rule.ruleType] || 0) + 1;
-        }
-
-        return {
-            totalRules: allRules.length,
-            activeRules: activeRules.length,
-            rulesByType
-        };
     }
 }
