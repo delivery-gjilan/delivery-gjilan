@@ -40,3 +40,6 @@ export async function getDB() {
 
 // ✅ EXPORT DB (you were missing this before)
 export { db };
+
+export type DbType = typeof db;
+export type Database = NodePgDatabase<typeof dbSchema>;
