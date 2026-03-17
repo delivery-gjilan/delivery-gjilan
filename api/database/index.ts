@@ -19,7 +19,7 @@ export async function getDB() {
 
     const client = postgres(connectionString, {
       prepare: false,
-      ssl: { rejectUnauthorized: false },
+      ssl: "require",
     });
 
     db = drizzle(client, { schema: dbSchema });
