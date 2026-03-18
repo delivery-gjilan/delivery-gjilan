@@ -59,7 +59,7 @@ input UpdateStoreStatusInput {
 }
 
 type Query {
-    getStoreStatus(url: String): StoreStatus! @skipAuth
+    getStoreStatus(url: String): StoreStatus!
 }
 
 type Mutation {

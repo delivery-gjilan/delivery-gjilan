@@ -1,5 +1,5 @@
 import type { QueryResolvers } from './../../../../generated/types.generated';
-import { getDB, getDBWithUrl } from '@/database';
+import { getDB } from '@/database';
 import { storeSettings } from '@/database/schema/storeSettings';
 import { eq } from 'drizzle-orm';
 
@@ -8,19 +8,6 @@ export const getStoreStatus: NonNullable<QueryResolvers['getStoreStatus']> = asy
   _args,
   _ctx
 ) => {
-
-  try {
-    const dbWithUrl = await getDBWithUrl(_args.url);
-    const data = await dbWithUrl.query.businesses.findFirst();
-    console.log('Data from getStoreStatus with URL:', data);
-
-  } catch(e){
-    console.log("errorjere me kriju connection", e)
-  }
-
-
-
-
   const db = await getDB();
 
   // Get the store settings (single row with id 'default')
