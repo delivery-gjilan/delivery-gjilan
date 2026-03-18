@@ -41,6 +41,8 @@ type Product {
     salePrice: Float
     isAvailable: Boolean!
     sortOrder: Int!
+    markupPrice: Float
+    nightMarkedupPrice: Float
     optionGroups: [OptionGroup!]!
     createdAt: String!
     updatedAt: String!
@@ -127,6 +129,8 @@ input UpdateProductInput {
     salePrice: Float
     isAvailable: Boolean
     sortOrder: Int
+    markupPrice: Float
+    nightMarkedupPrice: Float
 }
 
 input ProductOrderInput {

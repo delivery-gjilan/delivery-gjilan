@@ -1,5 +1,10 @@
 # Order Total Price Validation
 
+<!-- MDS:B3 | Domain: Backend | Updated: 2026-03-18 -->
+<!-- Depends-On: B2 -->
+<!-- Depended-By: M4, M5, BL1 -->
+<!-- Nav: Epsilon/rule changes → update M4 (Mobile Audit), M5 (Input Flow). Promo interaction → update BL1 (Settlements). -->
+
 This document describes how `createOrder` validates client totals against server-calculated totals.
 
 Source implementation:

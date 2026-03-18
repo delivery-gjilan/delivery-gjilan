@@ -1,23 +1,31 @@
 # Testing Pipeline
 
+<!-- MDS:O8 | Domain: Operations | Updated: 2026-03-18 -->
+<!-- Depends-On: O7, B2, BL1 -->
+<!-- Depended-By: O9 -->
+<!-- Nav: Preflight changes → update B2 (Order Creation), BL1 (Settlements). CI layers → review O7 (Environments). Load testing → review O9 (Docker). -->
+
 ## Current State In This Repo
 
-Today the repository has quality checks, but not a real automated test strategy.
+The repo now has a practical API preflight test gate, but still lacks full CI and broader automated suites.
 
 What exists:
 
 - lint scripts across API, admin, and mobile apps
 - typecheck scripts across API, admin, and mobile apps
 - GraphQL codegen scripts across packages
-- local manual testing through the running apps and ngrok
+- API preflight gate:
+	- `npm run test:api:preflight` (required gate before `npm run dev` and `npm run start` in `api`)
+	- includes deterministic settlement scenario checks and order-creation checks
+- detailed pass/fail console report with scenario/check IDs and debugging pointers
 
-What is missing:
+What is still missing:
 
-- no real API unit or integration test suite
+- no dedicated unit-test framework (vitest/jest) wired for API yet
 - no frontend browser E2E suite checked in
 - no mobile E2E or device-smoke automation
 - no CI workflow in `.github/workflows`
-- API `npm test` is still a placeholder
+- strict API preflight (`npm run test:api:strict`) currently fails because of existing unrelated type errors
 
 ## Recommended Test Strategy
 
@@ -35,7 +43,7 @@ This gives you cheap confidence that a branch is structurally valid.
 
 ## Layer 2. API Integration Tests
 
-This is the most important real test layer to add first.
+This is still the most important expansion layer.
 
 Recommended stack:
 
@@ -43,7 +51,12 @@ Recommended stack:
 - `supertest` for HTTP-level API verification
 - dedicated test database or disposable Postgres container
 
-What to cover first:
+Current preflight already covers:
+
+- settlement scenario determinism (expected vs actual)
+- order creation validation checks
+
+What to cover next:
 
 - auth flows: login, refresh, logout
 - order creation and order status transitions
@@ -52,7 +65,7 @@ What to cover first:
 - store-status updates
 - driver heartbeat mutation behavior
 
-These tests should validate business behavior, not only resolver signatures.
+Tests should validate business behavior, not only resolver signatures.
 
 ## Layer 3. Admin Frontend E2E
 

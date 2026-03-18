@@ -1,5 +1,10 @@
 # Notifications
 
+<!-- MDS:O3 | Domain: Operations | Updated: 2026-03-18 -->
+<!-- Depends-On: BL1, M2 -->
+<!-- Depended-By: O4 -->
+<!-- Nav: Campaign changes → update O4 (Push Audit). Payload fields → review M2 (Push & Live Activity). Promo scoping → review BL1 (Settlements). -->
+
 ## What Exists Today
 
 Push notifications in this repo are already a real system, not a placeholder.

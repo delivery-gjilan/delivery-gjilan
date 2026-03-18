@@ -28,6 +28,9 @@ const updateProductSchema = z.object({
     isOnSale: z.boolean().optional(),
     salePrice: z.number().min(0, 'Sale price must be positive').optional().nullable(),
     isAvailable: z.boolean().optional(),
+    sortOrder: z.number().int().optional(),
+    markupPrice: z.number().min(0, 'Markup price must be positive').optional().nullable(),
+    nightMarkedupPrice: z.number().min(0, 'Night price must be positive').optional().nullable(),
 });
 
 export class ProductValidator {

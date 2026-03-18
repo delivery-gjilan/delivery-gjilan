@@ -1,5 +1,10 @@
 # Security
 
+<!-- MDS:O5 | Domain: Operations | Updated: 2026-03-18 -->
+<!-- Depends-On: B1 -->
+<!-- Depended-By: O6, B5 -->
+<!-- Nav: Posture changes → update O6 (Audit). Auth changes → review B1 (API). -->
+
 ## Current Security Posture
 
 The repo already has a reasonable baseline for an actively developed delivery product.

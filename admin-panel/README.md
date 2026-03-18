@@ -47,4 +47,4 @@ This is intentional. The admin UI does not try to fully mirror backend state in-
 - [../docs/README.md](../docs/README.md)
 - [../docs/BACKEND/API.md](../docs/BACKEND/API.md)
 - [../docs/BACKEND/WATCHDOG_HEARTBEAT.md](../docs/BACKEND/WATCHDOG_HEARTBEAT.md)
-- [../docs/BUSINESS_LOGIC/SETTLEMENT.md](../docs/BUSINESS_LOGIC/SETTLEMENT.md)
+- [../docs/BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS.md](../docs/BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS.md)

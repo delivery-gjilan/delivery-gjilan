@@ -1,5 +1,18 @@
 # Settlements & Promotions
 
+<!-- MDS:BL1 | Domain: Business Logic | Updated: 2026-03-18 -->
+<!-- Depends-On: B2, B3, B6 -->
+<!-- Depended-By: O3, O8, O11, M4 -->
+<!-- Nav: Rule/promo changes → update O3 (Notifications campaigns), O8 (Testing preflight). Payment collection → update B2 (Order Creation), M4 (Mobile Audit). -->
+
+## Recent Updates
+
+- 2026-03-18: Fixed mobile-admin settlement action wiring to pass `settlementId` (not `id`) to `markSettlementAsPaid`.
+- 2026-03-18: Fixed mobile-admin settlement list metadata line to show `createdAt` instead of undefined `periodStart`/`periodEnd` fields.
+- 2026-03-18: Admin financial settlements page now supports aggregate-only settling from a bottom action row (full or partial across pending settlements in current scope); single-settlement settle actions were intentionally disabled in the details modal.
+- 2026-03-18: Admin settlements aggregate action row is now shown only when viewing a specific business/driver scope (not on all-groups list), and a page-level search input was added in the header.
+- 2026-03-18: Admin settlement details now show date-time (not date-only) and include per-settlement order context with businesses/items and delivery-fee visibility (with explicit driver-context label in driver view).
+
 ## How Settlements Work
 
 Every delivered order creates **settlement records** that say who owes who and how much. There are only two parties that settle with the platform:
@@ -235,6 +248,16 @@ Promotions reduce `order.price` (item discounts) or `order.deliveryPrice` (deliv
 - Run one scenario or all scenarios
 - Shows PASS/FAIL and expected-vs-actual settlement diff
 - Uses seeded data and fixed IDs to keep results reproducible
+- Includes business-sponsored free-delivery variants (full reimburse, split reimburse, prepaid)
+- Includes scenario builder UI to preview expected flows and rule setup guidance
+
+### API Preflight Gate
+
+- Run: `npm run test:api:preflight` in `api/`
+- This gate now runs:
+   - settlement harness scenarios
+   - order-creation checks (payment collection defaults/explicit modes, delivery and total validation, invalid promo rejection)
+- `api` startup commands run this preflight before booting.
 
 ---
 

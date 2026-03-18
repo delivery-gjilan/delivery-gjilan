@@ -1431,7 +1431,9 @@ export type Product = {
   isAvailable: Scalars['Boolean']['output'];
   isOffer: Scalars['Boolean']['output'];
   isOnSale: Scalars['Boolean']['output'];
+  markupPrice?: Maybe<Scalars['Float']['output']>;
   name: Scalars['String']['output'];
+  nightMarkedupPrice?: Maybe<Scalars['Float']['output']>;
   optionGroups: Array<OptionGroup>;
   price: Scalars['Float']['output'];
   salePrice?: Maybe<Scalars['Float']['output']>;
@@ -2238,7 +2240,9 @@ export type UpdateProductInput = {
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   isAvailable?: InputMaybe<Scalars['Boolean']['input']>;
   isOnSale?: InputMaybe<Scalars['Boolean']['input']>;
+  markupPrice?: InputMaybe<Scalars['Float']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
+  nightMarkedupPrice?: InputMaybe<Scalars['Float']['input']>;
   price?: InputMaybe<Scalars['Float']['input']>;
   salePrice?: InputMaybe<Scalars['Float']['input']>;
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
@@ -3330,7 +3334,9 @@ export type ProductResolvers<ContextType = GraphQLContext, ParentType extends Re
   isAvailable?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   isOffer?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   isOnSale?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  markupPrice?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  nightMarkedupPrice?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   optionGroups?: Resolver<Array<ResolversTypes['OptionGroup']>, ParentType, ContextType>;
   price?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   salePrice?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;

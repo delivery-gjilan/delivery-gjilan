@@ -27,6 +27,8 @@ export class ProductService {
             variantGroupId: product.groupId ?? undefined,
             isOffer: product.isOffer ?? false,
             price: Number(product.basePrice), // DB: basePrice → GraphQL: price
+            markupPrice: product.markupPrice ?? null,
+            nightMarkedupPrice: product.nightMarkedupPrice ?? null,
             salePrice: product.salePrice,
             isOnSale: product.isOnSale ?? false,
             isAvailable: product.isAvailable ?? true,
