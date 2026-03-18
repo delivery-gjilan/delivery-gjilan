@@ -10,7 +10,7 @@ export class BusinessService {
     constructor(
         private businessRepository: BusinessRepository,
         private businessHoursRepository: BusinessHoursRepository,
-    ) {}
+    ) { }
 
     private timeStringToMinutes(time: string): number {
         const [hours, minutes] = time.split(':').map(Number);
@@ -96,27 +96,34 @@ export class BusinessService {
 
     async getBusinesses(): Promise<Business[]> {
         // Try cache first
-        const cached = await cache.get<Business[]>(cache.keys.businesses());
-        if (cached) return cached;
 
-        const allBusinesses = await this.businessRepository.findAll();
-        if (allBusinesses.length === 0) return [];
+        try {
 
-        const allIds = allBusinesses.map((b) => b.id);
-        const allHours = await this.businessHoursRepository.findByBusinessIds(allIds);
+            const cached = await cache.get<Business[]>(cache.keys.businesses());
+            if (cached) return cached;
 
-        // Group hours by businessId
-        const hoursByBiz = new Map<string, DbBusinessHours[]>();
-        for (const h of allHours) {
-            const arr = hoursByBiz.get(h.businessId) ?? [];
-            arr.push(h);
-            hoursByBiz.set(h.businessId, arr);
+            const allBusinesses = await this.businessRepository.findAll();
+            if (allBusinesses.length === 0) return [];
+
+            const allIds = allBusinesses.map((b) => b.id);
+            const allHours = await this.businessHoursRepository.findByBusinessIds(allIds);
+
+            // Group hours by businessId
+            const hoursByBiz = new Map<string, DbBusinessHours[]>();
+            for (const h of allHours) {
+                const arr = hoursByBiz.get(h.businessId) ?? [];
+                arr.push(h);
+                hoursByBiz.set(h.businessId, arr);
+            }
+
+            const businesses = allBusinesses.map((b) => this.mapToBusiness(b, hoursByBiz.get(b.id) ?? []));
+
+            await cache.set(cache.keys.businesses(), businesses, cache.TTL.BUSINESSES);
+            return businesses;
+        } catch (error) {
+            console.error('Error fetching businesses:', error);
+            return [];
         }
-
-        const businesses = allBusinesses.map((b) => this.mapToBusiness(b, hoursByBiz.get(b.id) ?? []));
-
-        await cache.set(cache.keys.businesses(), businesses, cache.TTL.BUSINESSES);
-        return businesses;
     }
 
     async updateBusiness(id: string, input: UpdateBusinessInput): Promise<Business> {
