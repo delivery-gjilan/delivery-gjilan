@@ -1135,7 +1135,7 @@ type Query {
   getPromotionAnalytics(promotionId: ID!): PromotionAnalyticsResult!
   getPromotionThresholds(cart: CartContextInput!): [PromotionThreshold!]!
   getPromotionUsage(promotionId: ID!): [PromotionUsage!]!
-  getStoreStatus: StoreStatus!
+  getStoreStatus(url: String): StoreStatus!
   getUserPromoMetadata(userId: ID!): UserPromoMetadata
   getUserPromotions(userId: ID!): [UserPromotion!]!
   me: User

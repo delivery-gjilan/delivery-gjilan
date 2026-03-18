@@ -38,6 +38,40 @@ export async function getDB() {
   return db;
 }
 
+export async function getDBWithUrl(connectionString: string) {
+  if (!connectionString) {
+    throw new Error('Connection string missing');
+  }
+
+  if (connectionString.includes('supabase')) {
+    // ✅ Supabase (postgres-js)
+    const postgres = (await import('postgres')).default;
+    const { drizzle } = await import('drizzle-orm/postgres-js');
+
+    const client = postgres(connectionString, {
+      prepare: false,
+      ssl: {
+        rejectUnauthorized: false,
+      },
+    });
+
+    return drizzle(client, { schema: dbSchema });
+  } else {
+    // ✅ Local / other Postgres (pg)
+    const { Pool } = await import('pg');
+    const { drizzle } = await import('drizzle-orm/node-postgres');
+
+    const pool = new Pool({
+      connectionString,
+      ssl: connectionString.includes('ssl=true')
+        ? { rejectUnauthorized: false }
+        : undefined,
+    });
+
+    return drizzle(pool, { schema: dbSchema });
+  }
+}
+
 // ✅ EXPORT DB (you were missing this before)
 export { db };
 

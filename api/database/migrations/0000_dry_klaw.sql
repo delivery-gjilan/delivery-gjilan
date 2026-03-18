@@ -5,6 +5,7 @@ CREATE TYPE "public"."business_type" AS ENUM('MARKET', 'PHARMACY', 'RESTAURANT')
 CREATE TYPE "public"."device_app_type" AS ENUM('CUSTOMER', 'DRIVER', 'BUSINESS', 'ADMIN');--> statement-breakpoint
 CREATE TYPE "public"."device_platform" AS ENUM('IOS', 'ANDROID');--> statement-breakpoint
 CREATE TYPE "public"."driver_connection_status" AS ENUM('CONNECTED', 'STALE', 'LOST', 'DISCONNECTED');--> statement-breakpoint
+CREATE TYPE "public"."order_payment_collection" AS ENUM('CASH_TO_DRIVER', 'PREPAID_TO_PLATFORM');--> statement-breakpoint
 CREATE TYPE "public"."order_status" AS ENUM('PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED');--> statement-breakpoint
 CREATE TYPE "public"."signup_step" AS ENUM('INITIAL', 'EMAIL_SENT', 'EMAIL_VERIFIED', 'PHONE_SENT', 'COMPLETED');--> statement-breakpoint
 CREATE TYPE "public"."user_role" AS ENUM('CUSTOMER', 'DRIVER', 'SUPER_ADMIN', 'ADMIN', 'BUSINESS_OWNER', 'BUSINESS_EMPLOYEE');--> statement-breakpoint
@@ -22,6 +23,7 @@ CREATE TYPE "public"."referral_status" AS ENUM('PENDING', 'COMPLETED', 'EXPIRED'
 CREATE TYPE "public"."campaign_status" AS ENUM('DRAFT', 'SENDING', 'SENT', 'FAILED');--> statement-breakpoint
 CREATE TYPE "public"."notification_type" AS ENUM('ORDER_STATUS', 'ORDER_ASSIGNED', 'PROMOTIONAL', 'ADMIN_ALERT');--> statement-breakpoint
 CREATE TYPE "public"."push_telemetry_event_type" AS ENUM('RECEIVED', 'OPENED', 'ACTION_TAPPED', 'TOKEN_REGISTERED', 'TOKEN_REFRESHED', 'TOKEN_UNREGISTERED');--> statement-breakpoint
+CREATE TYPE "public"."pricing_condition_type" AS ENUM('TIME_OF_DAY', 'DAY_OF_WEEK', 'WEATHER', 'DEMAND', 'SPECIAL_EVENT', 'CUSTOM');--> statement-breakpoint
 CREATE TABLE "audit_logs" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"actor_id" uuid,
@@ -141,6 +143,7 @@ CREATE TABLE "orders" (
 	"driver_id" uuid,
 	"price" numeric(10, 2) NOT NULL,
 	"delivery_price" numeric(10, 2) NOT NULL,
+	"payment_collection" "order_payment_collection" DEFAULT 'CASH_TO_DRIVER' NOT NULL,
 	"original_price" numeric(10, 2),
 	"original_delivery_price" numeric(10, 2),
 	"status" "order_status" NOT NULL,
@@ -542,6 +545,38 @@ CREATE TABLE "order_item_options" (
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "dynamic_pricing_rules" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"business_id" uuid,
+	"name" varchar(255) NOT NULL,
+	"description" varchar(500),
+	"condition_type" "pricing_condition_type" NOT NULL,
+	"condition_config" jsonb NOT NULL,
+	"adjustment_config" jsonb NOT NULL,
+	"applies_to" jsonb NOT NULL,
+	"is_active" boolean DEFAULT true NOT NULL,
+	"priority" integer DEFAULT 0 NOT NULL,
+	"valid_from" timestamp with time zone,
+	"valid_until" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	"created_by" uuid,
+	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "product_pricing" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"product_id" uuid NOT NULL,
+	"business_id" uuid NOT NULL,
+	"business_price" numeric(10, 2) NOT NULL,
+	"platform_markup" numeric(10, 2) DEFAULT '0' NOT NULL,
+	"base_customer_price" numeric(10, 2) NOT NULL,
+	"night_markup" numeric(10, 2),
+	"price_history" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	CONSTRAINT "product_pricing_product_id_unique" UNIQUE("product_id")
+);
+--> statement-breakpoint
 CREATE TABLE "promotion_redemptions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"promotion_id" uuid NOT NULL,
@@ -610,6 +645,9 @@ ALTER TABLE "options" ADD CONSTRAINT "options_linked_product_id_products_id_fk" 
 ALTER TABLE "order_item_options" ADD CONSTRAINT "order_item_options_order_item_id_order_items_id_fk" FOREIGN KEY ("order_item_id") REFERENCES "public"."order_items"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order_item_options" ADD CONSTRAINT "order_item_options_option_group_id_option_groups_id_fk" FOREIGN KEY ("option_group_id") REFERENCES "public"."option_groups"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order_item_options" ADD CONSTRAINT "order_item_options_option_id_options_id_fk" FOREIGN KEY ("option_id") REFERENCES "public"."options"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "dynamic_pricing_rules" ADD CONSTRAINT "dynamic_pricing_rules_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "product_pricing" ADD CONSTRAINT "product_pricing_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "product_pricing" ADD CONSTRAINT "product_pricing_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "promotion_redemptions" ADD CONSTRAINT "promotion_redemptions_promotion_id_promotions_id_fk" FOREIGN KEY ("promotion_id") REFERENCES "public"."promotions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "promotion_redemptions" ADD CONSTRAINT "promotion_redemptions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "promotion_redemptions" ADD CONSTRAINT "promotion_redemptions_order_id_orders_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

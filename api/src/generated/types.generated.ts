@@ -1773,6 +1773,11 @@ export type QuerygetPromotionUsageArgs = {
 };
 
 
+export type QuerygetStoreStatusArgs = {
+  url?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QuerygetUserPromoMetadataArgs = {
   userId: Scalars['ID']['input'];
 };
@@ -3515,7 +3520,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   getPromotionAnalytics?: Resolver<ResolversTypes['PromotionAnalyticsResult'], ParentType, ContextType, RequireFields<QuerygetPromotionAnalyticsArgs, 'promotionId'>>;
   getPromotionThresholds?: Resolver<Array<ResolversTypes['PromotionThreshold']>, ParentType, ContextType, RequireFields<QuerygetPromotionThresholdsArgs, 'cart'>>;
   getPromotionUsage?: Resolver<Array<ResolversTypes['PromotionUsage']>, ParentType, ContextType, RequireFields<QuerygetPromotionUsageArgs, 'promotionId'>>;
-  getStoreStatus?: Resolver<ResolversTypes['StoreStatus'], ParentType, ContextType>;
+  getStoreStatus?: Resolver<ResolversTypes['StoreStatus'], ParentType, ContextType, Partial<QuerygetStoreStatusArgs>>;
   getUserPromoMetadata?: Resolver<Maybe<ResolversTypes['UserPromoMetadata']>, ParentType, ContextType, RequireFields<QuerygetUserPromoMetadataArgs, 'userId'>>;
   getUserPromotions?: Resolver<Array<ResolversTypes['UserPromotion']>, ParentType, ContextType, RequireFields<QuerygetUserPromotionsArgs, 'userId'>>;
   me?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
