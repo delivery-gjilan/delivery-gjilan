@@ -1,5 +1,10 @@
 # Live Activity Behavior (Customer iOS)
 
+<!-- MDS:M3 | Domain: Mobile | Updated: 2026-03-18 -->
+<!-- Depends-On: M2, B4 -->
+<!-- Depended-By: O4 -->
+<!-- Nav: ETA/progress changes → update B4 (Watchdog heartbeat). Token lifecycle → update O4 (Push Audit). Status mapping → review B2 (Order Creation). -->
+
 This document describes the implemented Live Activity flow for customer order tracking, including background updates, Dynamic Island UI constraints, and ETA-progress behavior.
 
 ## Goals Implemented

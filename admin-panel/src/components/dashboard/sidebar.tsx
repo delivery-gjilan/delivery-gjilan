@@ -53,6 +53,7 @@ const menu: any[] = [
   
   // Configuration (Super Admin)
   { name: "Promotions", href: "/dashboard/promotions", icon: Tag, superAdminOnly: true },
+  { name: "Product Markup", href: "/dashboard/productpricing", icon: Tag, superAdminOnly: true },
   { name: "Delivery Pricing", href: "/dashboard/delivery-pricing", icon: Truck, superAdminOnly: true },
   { name: "Delivery Zones", href: "/dashboard/delivery-zones", icon: Map, superAdminOnly: true },
   

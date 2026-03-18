@@ -1,5 +1,10 @@
 # Observability
 
+<!-- MDS:O2 | Domain: Operations | Updated: 2026-03-18 -->
+<!-- Depends-On: O1 -->
+<!-- Depended-By: PKG6 -->
+<!-- Nav: Stack changes → update PKG6 (observability/README). Signal selection → review O1 (Monitoring). -->
+
 ## Current Stack
 
 The repo already has a practical local observability setup centered on logs and dashboards.

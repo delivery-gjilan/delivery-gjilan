@@ -1,5 +1,10 @@
 # Mobile Overview
 
+<!-- MDS:M1 | Domain: Mobile | Updated: 2026-03-18 -->
+<!-- Depends-On: A1 -->
+<!-- Depended-By: M2, M3, M4, M5, BL2, BL3 -->
+<!-- Nav: App-level architecture changes → update all M* files. Shared pattern changes → review BL2 (Products), BL3 (Cart). -->
+
 ## Apps
 
 This repo contains four React Native / Expo apps with different responsibilities.

@@ -1,5 +1,10 @@
 # Product, Business, Category Flow (Refactor Guide)
 
+<!-- MDS:BL2 | Domain: Business Logic | Updated: 2026-03-18 -->
+<!-- Depends-On: UI1, B1 -->
+<!-- Depended-By: M1 -->
+<!-- Nav: CRUD changes → update UI1 (Admin/Mobile-Business UX). Cache changes → review O1 (Monitoring), O2 (Observability). -->
+
 Date: 2026-03-13
 
 This document maps how products/businesses/categories/subcategories are created and deleted in backend, and how restaurant product data is fetched/rendered in frontend (`mobile-customer`).

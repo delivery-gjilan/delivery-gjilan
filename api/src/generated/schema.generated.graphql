@@ -933,7 +933,9 @@ type Product {
   isAvailable: Boolean!
   isOffer: Boolean!
   isOnSale: Boolean!
+  markupPrice: Float
   name: String!
+  nightMarkedupPrice: Float
   optionGroups: [OptionGroup!]!
   price: Float!
   salePrice: Float
@@ -1466,7 +1468,9 @@ input UpdateProductInput {
   imageUrl: String
   isAvailable: Boolean
   isOnSale: Boolean
+  markupPrice: Float
   name: String
+  nightMarkedupPrice: Float
   price: Float
   salePrice: Float
   sortOrder: Int

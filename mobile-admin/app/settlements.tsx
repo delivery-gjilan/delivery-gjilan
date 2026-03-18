@@ -21,7 +21,7 @@ export default function SettlementsScreen() {
                 text: 'Confirm',
                 onPress: async () => {
                     try {
-                        await markPaid({ variables: { id } });
+                        await markPaid({ variables: { settlementId: id } });
                         refetch();
                     } catch {
                         Alert.alert('Error', 'Failed to mark settlement as paid');
@@ -57,7 +57,7 @@ export default function SettlementsScreen() {
                                     {formatCurrency(item.amount)}
                                 </Text>
                                 <Text className="text-[10px] mt-0.5" style={{ color: theme.colors.subtext }}>
-                                    Period: {formatDate(item.periodStart)} – {formatDate(item.periodEnd)}
+                                    Created: {formatDate(item.createdAt)}
                                 </Text>
                             </View>
                             {!item.paidAt && (

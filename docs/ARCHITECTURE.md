@@ -1,5 +1,10 @@
 # Architecture
 
+<!-- MDS:A1 | Domain: System | Updated: 2026-03-18 -->
+<!-- Depends-On: (none — root document) -->
+<!-- Depended-By: B1, B4, M1, O1, O2 -->
+<!-- Nav: Changes here affect all domain docs. Review B1 (API), B4 (Watchdog), M1 (Mobile Overview). -->
+
 ## Monorepo Shape
 
 The workspace is organized around one backend and multiple clients:

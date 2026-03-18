@@ -1,5 +1,10 @@
 # Backend API
 
+<!-- MDS:B1 | Domain: Backend | Updated: 2026-03-18 -->
+<!-- Depends-On: A1 -->
+<!-- Depended-By: B2, B4, B5, B6, B7, B8, B9, B10, O5 -->
+<!-- Nav: Schema/resolver changes → update B2 (Order Creation), B4 (Watchdog). Auth changes → update O5 (Security), O6 (Audit). -->
+
 ## Stack
 
 The API is a Node.js service built with:

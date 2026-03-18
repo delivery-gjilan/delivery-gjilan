@@ -1,5 +1,10 @@
 # Order Input Variant/Offer Flow Snapshot
 
+<!-- MDS:M5 | Domain: Mobile | Updated: 2026-03-18 -->
+<!-- Depends-On: B2, B3, UI1 -->
+<!-- Depended-By: (none) -->
+<!-- Nav: Input schema changes → update B2 (Order Creation), B3 (Validation). Product type changes → update UI1 (Admin UX). -->
+
 This document explains how `mobile-customer` should shape cart data into `CreateOrderInput` for `createOrder`.
 
 ## Source Schema

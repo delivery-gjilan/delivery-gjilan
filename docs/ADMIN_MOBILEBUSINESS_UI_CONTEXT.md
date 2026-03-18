@@ -1,6 +1,15 @@
 # Admin + Mobile-Business UI Context
 
+<!-- MDS:UI1 | Domain: UI | Updated: 2026-03-18 -->
+<!-- Depends-On: BL2 -->
+<!-- Depended-By: M5 -->
+<!-- Nav: Product type/variant changes → update BL2 (Product Refactor), M5 (Input Flow). Admin panel mutations → review B1 (API). -->
+
 This document is a fast context handoff for future UI changes across `admin-panel` and `mobile-business`.
+
+## Recent Updates
+
+- 2026-03-18: Fixed admin settlements table rendering condition in `admin-panel/src/app/admin/financial/settlements/page.tsx` where selected-business view could show footer counts ("Showing x of x") but render no rows due nested ternary boolean output.
 
 ## Scope
 
@@ -12,6 +21,12 @@ This document is a fast context handoff for future UI changes across `admin-pane
 ## Key Files
 
 ### Admin Panel
+
+- `admin-panel/src/app/dashboard/productpricing/page.tsx`
+  - Business-scoped product markup/night pricing editor
+  - Shows base price, markup price, night price, and delta display
+  - Row highlighting for missing markup/night values
+  - Note: UTF-8 text rendering matters for currency/time labels (avoid mojibake such as `â‚¬`, `â€¦`)
 
 - `admin-panel/src/app/dashboard/market/page.tsx`
   - Rich market management page (categories, subcategories, products, sorting)
@@ -111,6 +126,7 @@ This document is a fast context handoff for future UI changes across `admin-pane
 - Setting both `isOffer` and `variantGroupId` simultaneously
 - Querying stale fields after schema updates
 - Updating UI types but not mutation payloads (or vice versa)
+- Saving files with the wrong encoding, which can corrupt UI symbols (currency sign, ellipsis, dash)
 
 ## Quick Extension Ideas
 

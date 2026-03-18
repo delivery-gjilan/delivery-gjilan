@@ -1,5 +1,10 @@
 # Security Audit Checklist (2026-03-13)
 
+<!-- MDS:O6 | Domain: Operations | Updated: 2026-03-18 -->
+<!-- Depends-On: O5, B1 -->
+<!-- Depended-By: B5, B9 -->
+<!-- Nav: Findings resolved → update O5 (Security posture). Token/auth fixes → review B1 (API). -->
+
 This file tracks the risks found during the code scan and what to fix next.
 
 ## How to use this file

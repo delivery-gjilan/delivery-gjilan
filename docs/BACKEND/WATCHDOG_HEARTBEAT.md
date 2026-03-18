@@ -1,5 +1,10 @@
 # Watchdog And Heartbeat
 
+<!-- MDS:B4 | Domain: Backend | Updated: 2026-03-18 -->
+<!-- Depends-On: A1, B1 -->
+<!-- Depended-By: M3, O1 -->
+<!-- Nav: Timer/state changes → update M3 (Live Activity). Metrics changes → update O1 (Monitoring). -->
+
 ## Why This System Exists
 
 The driver app is the live producer of delivery presence and movement state. The backend must answer two different questions:

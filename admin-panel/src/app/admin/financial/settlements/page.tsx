@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
-import { GET_SETTLEMENTS } from '@/graphql/operations/settlements/queries';
 import {
   Table,
   TableBody,
@@ -48,6 +47,83 @@ type SettlementGroup = {
   paidCount: number;
 };
 
+const GET_SETTLEMENTS_PAGE = gql`
+  query GetSettlementsPage(
+    $type: SettlementType
+    $status: SettlementStatus
+    $direction: SettlementDirection
+    $driverId: ID
+    $businessId: ID
+    $startDate: Date
+    $endDate: Date
+    $limit: Int
+    $offset: Int
+  ) {
+    settlements(
+      type: $type
+      status: $status
+      direction: $direction
+      driverId: $driverId
+      businessId: $businessId
+      startDate: $startDate
+      endDate: $endDate
+      limit: $limit
+      offset: $offset
+    ) {
+      id
+      type
+      direction
+      driver {
+        id
+        firstName
+        lastName
+        phoneNumber
+      }
+      business {
+        id
+        name
+      }
+      order {
+        id
+        displayId
+        orderDate
+        status
+        orderPrice
+        deliveryPrice
+        totalPrice
+        businesses {
+          business {
+            id
+            name
+            businessType
+          }
+          items {
+            id
+            productId
+            name
+            quantity
+            unitPrice
+            notes
+            selectedOptions {
+              id
+              optionName
+              priceAtOrder
+            }
+          }
+        }
+      }
+      amount
+      currency
+      status
+      paidAt
+      paymentReference
+      paymentMethod
+      ruleId
+      createdAt
+    }
+  }
+`;
+
 const MARK_SETTLEMENT_AS_PAID = gql`
   mutation MarkSettlementAsPaidPage($settlementId: ID!, $paymentReference: String, $paymentMethod: String) {
     markSettlementAsPaid(settlementId: $settlementId, paymentReference: $paymentReference, paymentMethod: $paymentMethod) {
@@ -72,6 +148,16 @@ const MARK_SETTLEMENT_AS_PARTIALLY_PAID = gql`
   }
 `;
 
+const MARK_SETTLEMENTS_AS_PAID = gql`
+  mutation MarkSettlementsAsPaidPage($ids: [ID!]!, $paymentReference: String, $paymentMethod: String) {
+    markSettlementsAsPaid(ids: $ids, paymentReference: $paymentReference, paymentMethod: $paymentMethod) {
+      id
+      status
+      paidAt
+    }
+  }
+`;
+
 const BACKFILL_SETTLEMENTS = gql`
   mutation BackfillSettlements {
     backfillSettlementsForDeliveredOrders
@@ -86,16 +172,15 @@ export default function SettlementsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [selectedSettlement, setSelectedSettlement] = useState<any>(null);
-  const [partialAmount, setPartialAmount] = useState('');
-  const [paymentReference, setPaymentReference] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('');
+  const [bulkPartialAmount, setBulkPartialAmount] = useState('');
+  const [bulkProcessing, setBulkProcessing] = useState(false);
 
   // Query for business settlements
   const {
     data: businessData,
     loading: businessLoading,
     refetch: refetchBusiness,
-  } = useQuery(GET_SETTLEMENTS, {
+  } = useQuery(GET_SETTLEMENTS_PAGE, {
     variables: {
       type: SettlementType.Business,
       status: statusFilter === 'all' ? null : statusFilter,
@@ -109,7 +194,7 @@ export default function SettlementsPage() {
     data: driverData,
     loading: driverLoading,
     refetch: refetchDriver,
-  } = useQuery(GET_SETTLEMENTS, {
+  } = useQuery(GET_SETTLEMENTS_PAGE, {
     variables: {
       type: SettlementType.Driver,
       status: statusFilter === 'all' ? null : statusFilter,
@@ -232,46 +317,37 @@ export default function SettlementsPage() {
     ? selectedGroup.settlements.filter(matchesSettlementSearch)
     : [];
 
+  const isEmpty = selectedGroup
+    ? filteredSettlements.length === 0
+    : filteredGroups.length === 0;
+
+  const settlementsInCurrentView = selectedGroup
+    ? filteredSettlements
+    : filteredGroups.flatMap((group) => group.settlements);
+
+  const pendingSettlements = settlementsInCurrentView.filter(
+    (settlement) => settlement.status === SettlementStatus.Pending,
+  );
+
+  const pendingSettlementIds = pendingSettlements.map((settlement) => settlement.id);
+  const pendingTotalAmount = pendingSettlements.reduce(
+    (sum, settlement) => sum + Number(settlement.amount || 0),
+    0,
+  );
+
+  const aggregateScopeLabel = selectedGroup
+    ? selectedGroup.name
+    : activeTab === 'business'
+      ? 'all visible businesses'
+      : 'all visible drivers';
+
   // Mark as paid mutation
-  const [markAsPaid] = useMutation(MARK_SETTLEMENT_AS_PAID, {
-    onCompleted: () => {
-      toast({
-        title: 'Success',
-        description: 'Settlement marked as paid',
-      });
-      setSelectedSettlement(null);
-      setPaymentReference('');
-      setPaymentMethod('');
-      handleRefresh();
-    },
-    onError: (error) => {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to mark settlement as paid',
-        variant: 'destructive',
-      });
-    },
-  });
+  const [markAsPaid] = useMutation(MARK_SETTLEMENT_AS_PAID);
 
   // Mark as partially paid mutation
-  const [markAsPartiallyPaid] = useMutation(MARK_SETTLEMENT_AS_PARTIALLY_PAID, {
-    onCompleted: () => {
-      toast({
-        title: 'Success',
-        description: 'Partial payment recorded',
-      });
-      setSelectedSettlement(null);
-      setPartialAmount('');
-      handleRefresh();
-    },
-    onError: (error) => {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to record partial payment',
-        variant: 'destructive',
-      });
-    },
-  });
+  const [markAsPartiallyPaid] = useMutation(MARK_SETTLEMENT_AS_PARTIALLY_PAID);
+
+  const [markSettlementsAsPaid] = useMutation(MARK_SETTLEMENTS_AS_PAID);
 
   // Backfill settlements mutation
   const [backfillSettlements, { loading: backfillLoading }] = useMutation(BACKFILL_SETTLEMENTS, {
@@ -319,11 +395,133 @@ export default function SettlementsPage() {
     ),
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     if (activeTab === 'business') {
-      refetchBusiness();
+      await refetchBusiness();
     } else {
-      refetchDriver();
+      await refetchDriver();
+    }
+  };
+
+  const handleBulkSettleAll = async () => {
+    if (pendingSettlementIds.length === 0) {
+      toast({
+        title: 'Nothing to settle',
+        description: `No pending settlements found for ${aggregateScopeLabel}.`,
+      });
+      return;
+    }
+
+    setBulkProcessing(true);
+    try {
+      await markSettlementsAsPaid({
+        variables: {
+          ids: pendingSettlementIds,
+        },
+      });
+
+      toast({
+        title: 'Success',
+        description: `Marked ${pendingSettlementIds.length} settlements as paid for ${aggregateScopeLabel}.`,
+      });
+
+      setBulkPartialAmount('');
+      await handleRefresh();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to settle all pending settlements',
+        variant: 'destructive',
+      });
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
+  const handleBulkPartialSettle = async () => {
+    const amountToSettle = Number(bulkPartialAmount);
+
+    if (!Number.isFinite(amountToSettle) || amountToSettle <= 0) {
+      toast({
+        title: 'Invalid amount',
+        description: 'Enter a partial amount greater than 0.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (pendingSettlements.length === 0) {
+      toast({
+        title: 'Nothing to settle',
+        description: `No pending settlements found for ${aggregateScopeLabel}.`,
+      });
+      return;
+    }
+
+    if (amountToSettle - pendingTotalAmount > 0.0001) {
+      toast({
+        title: 'Amount too high',
+        description: `Partial amount cannot exceed pending total (${pendingTotalAmount.toFixed(2)}).`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const orderedPending = [...pendingSettlements].sort(
+      (a, b) => new Date(String(a.createdAt)).getTime() - new Date(String(b.createdAt)).getTime(),
+    );
+
+    let remaining = Math.round(amountToSettle * 100) / 100;
+    let fullySettledCount = 0;
+    let partiallySettledCount = 0;
+
+    setBulkProcessing(true);
+    try {
+      for (const settlement of orderedPending) {
+        if (remaining <= 0) {
+          break;
+        }
+
+        const settlementAmount = Math.round(Number(settlement.amount || 0) * 100) / 100;
+        if (settlementAmount <= 0) {
+          continue;
+        }
+
+        if (remaining + 0.0001 >= settlementAmount) {
+          await markAsPaid({
+            variables: {
+              settlementId: settlement.id,
+            },
+          });
+          remaining = Math.round((remaining - settlementAmount) * 100) / 100;
+          fullySettledCount += 1;
+        } else {
+          await markAsPartiallyPaid({
+            variables: {
+              settlementId: settlement.id,
+              amount: remaining,
+            },
+          });
+          remaining = 0;
+          partiallySettledCount += 1;
+        }
+      }
+
+      toast({
+        title: 'Success',
+        description: `Recorded partial settlement for ${aggregateScopeLabel}: ${amountToSettle.toFixed(2)} applied (${fullySettledCount} full, ${partiallySettledCount} partial).`,
+      });
+
+      setBulkPartialAmount('');
+      await handleRefresh();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to apply partial settlement',
+        variant: 'destructive',
+      });
+    } finally {
+      setBulkProcessing(false);
     }
   };
 
@@ -354,18 +552,6 @@ export default function SettlementsPage() {
 
           {/* Controls Row */}
           <div className="flex items-center gap-3 mb-4">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder={selectedGroup
-                  ? `Search ${activeTab === 'business' ? 'business' : 'driver'} settlements...`
-                  : `Search ${activeTab === 'business' ? 'business' : 'driver'} groups...`}
-                value={searchQuery}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
-                className="pl-9 h-10 bg-background"
-              />
-            </div>
-            
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-muted-foreground mr-1">Status:</span>
               <div className="flex gap-1 rounded-md bg-muted/30 p-1 flex-wrap">
@@ -482,7 +668,7 @@ export default function SettlementsPage() {
                   </TableCell>
                 </TableRow>
               ))
-            ) : selectedGroup ? filteredSettlements.length === 0 : filteredGroups.length === 0 ? (
+            ) : isEmpty ? (
               <TableRow>
                 <TableCell colSpan={selectedGroup ? 8 : 7} className="text-center text-muted-foreground py-20">
                   <div className="flex flex-col items-center gap-2">
@@ -539,19 +725,21 @@ export default function SettlementsPage() {
                     {settlement.paymentReference || '-'}
                   </TableCell>
                   <TableCell className="text-sm text-right text-muted-foreground tabular-nums">
-                    {new Date(settlement.createdAt).toLocaleDateString('en-GB', {
+                    {new Date(settlement.createdAt).toLocaleString('en-GB', {
                       day: '2-digit',
                       month: 'short',
-                      year: 'numeric'
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
                     })}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
                       size="sm"
-                      variant={settlement.status === SettlementStatus.Pending ? 'default' : 'ghost'}
+                      variant="ghost"
                       onClick={() => setSelectedSettlement(settlement)}
                     >
-                      {settlement.status === SettlementStatus.Pending ? 'Settle' : 'View'}
+                      View
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -602,8 +790,8 @@ export default function SettlementsPage() {
         </Table>
       </div>
       
-      {!loading && (selectedGroup ? filteredSettlements.length > 0 : filteredGroups.length > 0) && (
-        <div className="px-4 py-3 bg-muted/30">
+      {!loading && selectedGroup && filteredSettlements.length > 0 && (
+        <div className="px-4 py-3 bg-muted/30 border-t">
           <p className="text-sm text-muted-foreground">
             {selectedGroup ? (
               <>
@@ -615,6 +803,49 @@ export default function SettlementsPage() {
               </>
             )}
           </p>
+
+          <div className="mt-3 flex flex-col gap-3 rounded-lg border bg-background p-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className="text-sm font-semibold text-foreground">Aggregate settlement actions</div>
+              <div className="text-xs text-muted-foreground">
+                Pending in scope ({aggregateScopeLabel}): {pendingSettlements.length} settlements, total EUR {pendingTotalAmount.toFixed(2)}.
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <div className="w-full sm:w-48">
+                <Label htmlFor="bulk-partial-amount" className="mb-1 block text-xs text-muted-foreground">
+                  Partial amount (EUR)
+                </Label>
+                <Input
+                  id="bulk-partial-amount"
+                  type="number"
+                  min="0"
+                  max={pendingTotalAmount}
+                  step="0.01"
+                  placeholder={`Max ${pendingTotalAmount.toFixed(2)}`}
+                  value={bulkPartialAmount}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBulkPartialAmount(e.target.value)}
+                />
+              </div>
+
+              <Button
+                variant="outline"
+                onClick={handleBulkPartialSettle}
+                disabled={bulkProcessing || pendingSettlements.length === 0 || !bulkPartialAmount}
+              >
+                Settle Partially (All)
+              </Button>
+
+              <Button
+                className="bg-green-600 hover:bg-green-700"
+                onClick={handleBulkSettleAll}
+                disabled={bulkProcessing || pendingSettlements.length === 0}
+              >
+                Settle Fully (All Pending)
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </Card>
@@ -653,6 +884,18 @@ export default function SettlementsPage() {
           </Button>
         </div>
 
+        <div className="relative w-full max-w-md mx-4">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder={selectedGroup
+              ? `Search ${activeTab === 'business' ? 'business' : 'driver'} settlements...`
+              : `Search ${activeTab === 'business' ? 'businesses' : 'drivers'}...`}
+            value={searchQuery}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
+            className="pl-9 h-9 bg-background"
+          />
+        </div>
+
         <Button
           onClick={() => backfillSettlements()}
           disabled={backfillLoading}
@@ -672,9 +915,6 @@ export default function SettlementsPage() {
       <Dialog open={!!selectedSettlement} onOpenChange={(open) => {
         if (!open) {
           setSelectedSettlement(null);
-          setPaymentReference('');
-          setPaymentMethod('');
-          setPartialAmount('');
         }
       }}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -699,6 +939,10 @@ export default function SettlementsPage() {
                 <div>
                   <Label className="text-xs text-muted-foreground">Order ID</Label>
                   <div className="font-mono text-sm mt-1">{selectedSettlement.order?.id.slice(0, 12)}...</div>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Created At</Label>
+                  <div className="text-sm mt-1">{new Date(selectedSettlement.createdAt).toLocaleString('en-GB')}</div>
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Direction</Label>
@@ -730,6 +974,12 @@ export default function SettlementsPage() {
                   <span className="font-medium">Settlement Amount</span>
                   <span className="text-2xl font-bold">{selectedSettlement.currency} {parseFloat(selectedSettlement.amount).toFixed(2)}</span>
                 </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">
+                    {activeTab === 'driver' ? 'Delivery Fee (driver context)' : 'Delivery Fee'}
+                  </span>
+                  <span className="font-medium">EUR {Number(selectedSettlement.order?.deliveryPrice || 0).toFixed(2)}</span>
+                </div>
                 {selectedSettlement.paidAt && (
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-muted-foreground">Paid At</span>
@@ -750,81 +1000,81 @@ export default function SettlementsPage() {
                 )}
               </div>
 
-      {/* Settlement Actions */}
-              {selectedSettlement.status === SettlementStatus.Pending && (
-                <div className="space-y-4 pt-4 border-t">
-                  {/* Payment details */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-semibold block">Payment Details (optional)</Label>
-                    <div>
-                      <Label htmlFor="payment-reference" className="text-sm mb-2 block">Payment Reference</Label>
-                      <Input
-                        id="payment-reference"
-                        type="text"
-                        placeholder="e.g. TRF-2024-001, bank ref..."
-                        value={paymentReference}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPaymentReference(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="payment-method" className="text-sm mb-2 block">Payment Method</Label>
-                      <Input
-                        id="payment-method"
-                        type="text"
-                        placeholder="e.g. Bank Transfer, Cash, PayPal..."
-                        value={paymentMethod}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPaymentMethod(e.target.value)}
-                      />
-                    </div>
-                  </div>
+              <div className="rounded-lg border bg-background p-4 space-y-3">
+                <div className="text-sm font-semibold">Order Details</div>
 
-                  {/* Full Settlement */}
+                <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
                   <div>
-                    <Label className="text-base font-semibold mb-3 block">Mark as Fully Paid</Label>
-                    <Button
-                      onClick={() => markAsPaid({ variables: { settlementId: selectedSettlement.id, paymentReference: paymentReference || undefined, paymentMethod: paymentMethod || undefined } })}
-                      className="w-full bg-green-600 hover:bg-green-700"
-                    >
-                      Mark as Fully Paid ({selectedSettlement.currency} {parseFloat(selectedSettlement.amount).toFixed(2)})
-                    </Button>
+                    <span className="text-muted-foreground">Display ID:</span>{' '}
+                    <span className="font-medium">{selectedSettlement.order?.displayId || '-'}</span>
                   </div>
-
-                  {/* Partial Settlement */}
                   <div>
-                    <Label className="text-base font-semibold mb-3 block">Record Partial Payment</Label>
-                    <div className="space-y-3">
-                      <div>
-                        <Label htmlFor="partial-amount" className="text-sm mb-2 block">Amount to Pay</Label>
-                        <Input
-                          id="partial-amount"
-                          type="number"
-                          min="0"
-                          max={parseFloat(selectedSettlement.amount)}
-                          step="0.01"
-                          placeholder={`Max: ${selectedSettlement.currency} ${parseFloat(selectedSettlement.amount).toFixed(2)}`}
-                          value={partialAmount}
-                          onChange={(e) => setPartialAmount(e.target.value)}
-                        />
+                    <span className="text-muted-foreground">Order Date:</span>{' '}
+                    <span className="font-medium">
+                      {selectedSettlement.order?.orderDate
+                        ? new Date(selectedSettlement.order.orderDate).toLocaleString('en-GB')
+                        : '-'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Order Price:</span>{' '}
+                    <span className="font-medium">EUR {Number(selectedSettlement.order?.orderPrice || 0).toFixed(2)}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Total Price:</span>{' '}
+                    <span className="font-medium">EUR {Number(selectedSettlement.order?.totalPrice || 0).toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-2 border-t">
+                  {(selectedSettlement.order?.businesses || []).length === 0 ? (
+                    <div className="text-sm text-muted-foreground">No business/item details available for this order.</div>
+                  ) : (
+                    (selectedSettlement.order?.businesses || []).map((orderBusiness: any, index: number) => (
+                      <div key={`${orderBusiness.business?.id || 'business'}-${index}`} className="rounded-md border p-3">
+                        <div className="text-sm font-medium mb-2">
+                          {orderBusiness.business?.name || 'Business'}
+                          {orderBusiness.business?.businessType ? ` (${orderBusiness.business.businessType})` : ''}
+                        </div>
+
+                        {(orderBusiness.items || []).length === 0 ? (
+                          <div className="text-xs text-muted-foreground">No items found.</div>
+                        ) : (
+                          <div className="space-y-2">
+                            {(orderBusiness.items || []).map((item: any) => (
+                              <div key={item.id} className="rounded bg-muted/40 p-2 text-xs">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div>
+                                    <div className="font-medium">{item.name}</div>
+                                    <div className="text-muted-foreground">Qty {item.quantity}</div>
+                                  </div>
+                                  <div className="font-medium">EUR {Number(item.unitPrice || 0).toFixed(2)}</div>
+                                </div>
+
+                                {item.notes ? (
+                                  <div className="mt-1 text-muted-foreground">Notes: {item.notes}</div>
+                                ) : null}
+
+                                {(item.selectedOptions || []).length > 0 ? (
+                                  <div className="mt-1 text-muted-foreground">
+                                    Options: {(item.selectedOptions || [])
+                                      .map((opt: any) => `${opt.optionName} (+${Number(opt.priceAtOrder || 0).toFixed(2)})`)
+                                      .join(', ')}
+                                  </div>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      <Button
-                        onClick={() => {
-                          if (partialAmount && parseFloat(partialAmount) > 0) {
-                            markAsPartiallyPaid({
-                              variables: {
-                                settlementId: selectedSettlement.id,
-                                amount: parseFloat(partialAmount),
-                              },
-                            });
-                          }
-                        }}
-                        variant="outline"
-                        className="w-full"
-                        disabled={!partialAmount || parseFloat(partialAmount) <= 0||  parseFloat(partialAmount) > parseFloat(selectedSettlement.amount)}
-                      >
-                        Record Partial Payment
-                      </Button>
-                    </div>
-                  </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {selectedSettlement.status === SettlementStatus.Pending && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  Single-settlement settling is disabled. Use the aggregate row at the bottom to settle pending totals fully or partially.
                 </div>
               )}
 

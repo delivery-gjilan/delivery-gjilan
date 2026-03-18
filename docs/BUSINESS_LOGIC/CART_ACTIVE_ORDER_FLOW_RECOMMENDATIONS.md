@@ -1,5 +1,10 @@
 # Cart + Active Order Flow Analysis and Recommendations
 
+<!-- MDS:BL3 | Domain: Business Logic | Updated: 2026-03-18 -->
+<!-- Depends-On: B2, M4 -->
+<!-- Depended-By: M1 -->
+<!-- Nav: Checkout flow changes → update B2 (Order Creation), M4 (Mobile Audit). Payment collection → update BL1 (Settlements). Subscription changes → review A1 (Architecture). -->
+
 Date: 2026-03-13
 Scope: mobile-customer cart add/update/checkout flow, active-order tracking flow, floating banners behavior
 
@@ -101,7 +106,7 @@ Recommendation:
 
 ### Medium: cart product refresh hook is a placeholder
 
-`useCartProductDetails` is scaffolded and returns placeholder data.
+`useCartProductDetails` was scaffolded as a placeholder but has since been removed. No cart reconciliation hook exists yet.
 
 Impact:
 - Cart may not react to product unavailability, disabled items, changed prices, or category updates before checkout.
