@@ -5,6 +5,7 @@ import { SettlementRepository } from '@/repositories/SettlementRepository';
 import { FinancialService } from '@/services/FinancialService';
 import { eq } from 'drizzle-orm';
 import { orderItems as orderItemsTable } from '@/database/schema';
+import { runSettlementScenarioHarness as runSettlementScenarioHarnessResolver } from './Mutation/runSettlementScenarioHarness';
 
 export const Mutation: MutationResolvers<AppContext> = {
     markSettlementAsPaid: async (_, { settlementId }, { db }) => {
@@ -44,4 +45,6 @@ export const Mutation: MutationResolvers<AppContext> = {
         const repo = new SettlementRepository(db);
         return repo.unsettleSettlement(settlementId);
     },
+
+    runSettlementScenarioHarness: runSettlementScenarioHarnessResolver,
 } as any;

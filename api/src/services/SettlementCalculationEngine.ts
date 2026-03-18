@@ -20,7 +20,18 @@ export interface SettlementCalculation {
     businessId: string | null;
     orderId: string;
     amount: number;
-    ruleId: string;
+    ruleId: string | null;
+}
+
+function calculateMarkupEarnings(orderItems: DbOrderItem[]): number {
+    const total = orderItems.reduce((sum, item) => {
+        const basePrice = Number(item.basePrice ?? 0);
+        const finalAppliedPrice = Number(item.finalAppliedPrice ?? 0);
+        const perUnitMarkup = Math.max(0, finalAppliedPrice - basePrice);
+        return sum + perUnitMarkup * item.quantity;
+    }, 0);
+
+    return Number(total.toFixed(2));
 }
 
 export class SettlementCalculationEngine {
@@ -109,11 +120,29 @@ export class SettlementCalculationEngine {
                 }
             }
 
+            // Automatic markup remittance only applies when the driver
+            // physically collects cash from the customer.
+            if (driverId && order.paymentCollection === 'CASH_TO_DRIVER') {
+                const markupEarnings = calculateMarkupEarnings(orderItems);
+                if (markupEarnings > 0) {
+                    results.push({
+                        type: 'DRIVER',
+                        direction: 'RECEIVABLE',
+                        driverId,
+                        businessId: null,
+                        orderId: order.id,
+                        amount: markupEarnings,
+                        ruleId: null,
+                    });
+                }
+            }
+
             log.info(
                 {
                     orderId: order.id,
                     settlementsCount: results.length,
                     rulesMatched: rules.length,
+                    hasAutoMarkupSettlement: results.some((s) => s.ruleId === null && s.type === 'DRIVER'),
                 },
                 'settlement:calculated',
             );

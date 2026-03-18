@@ -132,6 +132,7 @@ export const createTestOrder: NonNullable<MutationResolvers['createTestOrder']> 
             userId: randomCustomer.id,
             price: orderPrice,
             deliveryPrice,
+            paymentCollection: 'CASH_TO_DRIVER',
             status: 'PENDING',
             dropoffLat: 42.4602,
             dropoffLng: 21.4691,

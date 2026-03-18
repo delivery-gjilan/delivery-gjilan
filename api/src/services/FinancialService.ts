@@ -3,6 +3,8 @@ import { SettlementRepository } from '@/repositories/SettlementRepository';
 import { SettlementCalculationEngine } from '@/services/SettlementCalculationEngine';
 import { DbOrder, DbOrderItem } from '@/database/schema';
 import logger from '@/lib/logger';
+import { drivers } from '@/database/schema/drivers';
+import { eq } from 'drizzle-orm';
 
 const log = logger.child({ service: 'FinancialService' });
 
@@ -33,6 +35,8 @@ export class FinancialService {
         driverId: string | null,
     ): Promise<void> {
         try {
+            const normalizedDriverId = await this.normalizeDriverId(driverId);
+
             // Check if settlements already exist for this order
             const existing = await this.settlementRepo.getSettlements({ orderId: order.id });
             if (existing.length > 0) {
@@ -44,7 +48,7 @@ export class FinancialService {
             const calculated = await this.settlementEngine.calculateOrderSettlements(
                 order,
                 normalizedItems,
-                driverId,
+                normalizedDriverId,
             );
 
             for (const settlement of calculated) {
@@ -84,5 +88,29 @@ export class FinancialService {
             log.error({ err: error, orderId }, 'settlement:cancel:error');
             throw error;
         }
+    }
+
+    private async normalizeDriverId(driverId: string | null): Promise<string | null> {
+        if (!driverId) return null;
+
+        // If already a driver profile id, keep as-is.
+        const byDriverId = await this.db
+            .select({ id: drivers.id })
+            .from(drivers)
+            .where(eq(drivers.id, driverId))
+            .limit(1);
+
+        if (byDriverId[0]?.id) {
+            return byDriverId[0].id;
+        }
+
+        // Backward compatibility: caller may pass users.id from orders.driverId.
+        const byUserId = await this.db
+            .select({ id: drivers.id })
+            .from(drivers)
+            .where(eq(drivers.userId, driverId))
+            .limit(1);
+
+        return byUserId[0]?.id ?? null;
     }
 }

@@ -354,6 +354,7 @@ export type CreateOrderInput = {
   driverNotes?: InputMaybe<Scalars['String']['input']>;
   dropOffLocation: LocationInput;
   items: Array<CreateOrderItemInput>;
+  paymentCollection?: InputMaybe<OrderPaymentCollection>;
   promoCode?: InputMaybe<Scalars['String']['input']>;
   totalPrice: Scalars['Float']['input'];
 };
@@ -722,6 +723,7 @@ export type Mutation = {
   registerLiveActivityToken: Scalars['Boolean']['output'];
   removeUserFromPromotion: Scalars['Boolean']['output'];
   resendEmailVerification: SignupStepResponse;
+  runSettlementScenarioHarness: SettlementScenarioHarnessResult;
   sendCampaign: NotificationCampaign;
   sendPushNotification: SendNotificationResult;
   setBusinessSchedule: Array<BusinessDayHours>;
@@ -1057,6 +1059,11 @@ export type MutationremoveUserFromPromotionArgs = {
 };
 
 
+export type MutationrunSettlementScenarioHarnessArgs = {
+  scenarioIds?: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
+
 export type MutationsendCampaignArgs = {
   id: Scalars['ID']['input'];
 };
@@ -1329,6 +1336,7 @@ export type Order = {
   originalDeliveryPrice?: Maybe<Scalars['Float']['output']>;
   originalPrice?: Maybe<Scalars['Float']['output']>;
   outForDeliveryAt?: Maybe<Scalars['Date']['output']>;
+  paymentCollection: OrderPaymentCollection;
   pickupLocations: Array<Location>;
   preparationMinutes?: Maybe<Scalars['Int']['output']>;
   preparingAt?: Maybe<Scalars['Date']['output']>;
@@ -1380,6 +1388,10 @@ export type OrderItemOption = {
   optionName: Scalars['String']['output'];
   priceAtOrder: Scalars['Float']['output'];
 };
+
+export type OrderPaymentCollection =
+  | 'CASH_TO_DRIVER'
+  | 'PREPAID_TO_PLATFORM';
 
 export type OrderPromotion = {
   __typename?: 'OrderPromotion';
@@ -1654,6 +1666,7 @@ export type Query = {
   pushTelemetrySummary: PushTelemetrySummary;
   settlementRule?: Maybe<SettlementRule>;
   settlementRules: Array<SettlementRule>;
+  settlementScenarioDefinitions: Array<SettlementScenarioDefinition>;
   settlementSummary: SettlementSummary;
   settlements: Array<Settlement>;
   uncompletedOrders: Array<Order>;
@@ -1992,6 +2005,34 @@ export type SettlementRuleFilterInput = {
   entityType?: InputMaybe<SettlementEntityType>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
   promotionId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+export type SettlementScenarioDefinition = {
+  __typename?: 'SettlementScenarioDefinition';
+  description: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+};
+
+export type SettlementScenarioHarnessResult = {
+  __typename?: 'SettlementScenarioHarnessResult';
+  failedCount: Scalars['Int']['output'];
+  passed: Scalars['Boolean']['output'];
+  passedCount: Scalars['Int']['output'];
+  results: Array<SettlementScenarioResult>;
+  total: Scalars['Int']['output'];
+};
+
+export type SettlementScenarioResult = {
+  __typename?: 'SettlementScenarioResult';
+  actualCount: Scalars['Int']['output'];
+  actualSettlements: Scalars['JSON']['output'];
+  expectedCount: Scalars['Int']['output'];
+  expectedSettlements: Scalars['JSON']['output'];
+  mismatches: Array<Scalars['String']['output']>;
+  name: Scalars['String']['output'];
+  passed: Scalars['Boolean']['output'];
+  scenarioId: Scalars['String']['output'];
 };
 
 export type SettlementStatus =
@@ -2531,11 +2572,12 @@ export type ResolversTypes = {
   NotificationType: ResolverTypeWrapper<'ORDER_STATUS' | 'ORDER_ASSIGNED' | 'PROMOTIONAL' | 'ADMIN_ALERT'>;
   Option: ResolverTypeWrapper<Option>;
   OptionGroup: ResolverTypeWrapper<OptionGroup>;
-  Order: ResolverTypeWrapper<Omit<Order, 'businesses' | 'driver' | 'orderPromotions' | 'status' | 'user'> & { businesses: Array<ResolversTypes['OrderBusiness']>, driver?: Maybe<ResolversTypes['User']>, orderPromotions?: Maybe<Array<ResolversTypes['OrderPromotion']>>, status: ResolversTypes['OrderStatus'], user?: Maybe<ResolversTypes['User']> }>;
+  Order: ResolverTypeWrapper<Omit<Order, 'businesses' | 'driver' | 'orderPromotions' | 'paymentCollection' | 'status' | 'user'> & { businesses: Array<ResolversTypes['OrderBusiness']>, driver?: Maybe<ResolversTypes['User']>, orderPromotions?: Maybe<Array<ResolversTypes['OrderPromotion']>>, paymentCollection: ResolversTypes['OrderPaymentCollection'], status: ResolversTypes['OrderStatus'], user?: Maybe<ResolversTypes['User']> }>;
   OrderBusiness: ResolverTypeWrapper<Omit<OrderBusiness, 'business'> & { business: ResolversTypes['Business'] }>;
   OrderDriverLiveTracking: ResolverTypeWrapper<OrderDriverLiveTracking>;
   OrderItem: ResolverTypeWrapper<OrderItem>;
   OrderItemOption: ResolverTypeWrapper<OrderItemOption>;
+  OrderPaymentCollection: ResolverTypeWrapper<'CASH_TO_DRIVER' | 'PREPAID_TO_PLATFORM'>;
   OrderPromotion: ResolverTypeWrapper<Omit<OrderPromotion, 'appliesTo'> & { appliesTo: ResolversTypes['PromotionAppliesTo'] }>;
   OrderStatus: ResolverTypeWrapper<'PENDING' | 'PREPARING' | 'READY' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED'>;
   PolygonPoint: ResolverTypeWrapper<PolygonPoint>;
@@ -2571,6 +2613,9 @@ export type ResolversTypes = {
   SettlementEntityType: ResolverTypeWrapper<'DRIVER' | 'BUSINESS'>;
   SettlementRule: ResolverTypeWrapper<Omit<SettlementRule, 'amountType' | 'business' | 'direction' | 'entityType' | 'promotion'> & { amountType: ResolversTypes['SettlementAmountType'], business?: Maybe<ResolversTypes['Business']>, direction: ResolversTypes['SettlementDirection'], entityType: ResolversTypes['SettlementEntityType'], promotion?: Maybe<ResolversTypes['Promotion']> }>;
   SettlementRuleFilterInput: SettlementRuleFilterInput;
+  SettlementScenarioDefinition: ResolverTypeWrapper<SettlementScenarioDefinition>;
+  SettlementScenarioHarnessResult: ResolverTypeWrapper<SettlementScenarioHarnessResult>;
+  SettlementScenarioResult: ResolverTypeWrapper<SettlementScenarioResult>;
   SettlementStatus: ResolverTypeWrapper<'PENDING' | 'PAID' | 'OVERDUE' | 'DISPUTED' | 'CANCELLED'>;
   SettlementSummary: ResolverTypeWrapper<SettlementSummary>;
   SettlementType: ResolverTypeWrapper<'DRIVER' | 'BUSINESS'>;
@@ -2705,6 +2750,9 @@ export type ResolversParentTypes = {
   Settlement: Omit<Settlement, 'business' | 'driver' | 'order'> & { business?: Maybe<ResolversParentTypes['Business']>, driver?: Maybe<ResolversParentTypes['User']>, order: ResolversParentTypes['Order'] };
   SettlementRule: Omit<SettlementRule, 'business' | 'promotion'> & { business?: Maybe<ResolversParentTypes['Business']>, promotion?: Maybe<ResolversParentTypes['Promotion']> };
   SettlementRuleFilterInput: SettlementRuleFilterInput;
+  SettlementScenarioDefinition: SettlementScenarioDefinition;
+  SettlementScenarioHarnessResult: SettlementScenarioHarnessResult;
+  SettlementScenarioResult: SettlementScenarioResult;
   SettlementSummary: SettlementSummary;
   SignupStepResponse: SignupStepResponse;
   StoreStatus: StoreStatus;
@@ -3089,6 +3137,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   registerLiveActivityToken?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationregisterLiveActivityTokenArgs, 'activityId' | 'orderId' | 'token'>>;
   removeUserFromPromotion?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationremoveUserFromPromotionArgs, 'promotionId' | 'userId'>>;
   resendEmailVerification?: Resolver<ResolversTypes['SignupStepResponse'], ParentType, ContextType>;
+  runSettlementScenarioHarness?: Resolver<ResolversTypes['SettlementScenarioHarnessResult'], ParentType, ContextType, Partial<MutationrunSettlementScenarioHarnessArgs>>;
   sendCampaign?: Resolver<ResolversTypes['NotificationCampaign'], ParentType, ContextType, RequireFields<MutationsendCampaignArgs, 'id'>>;
   sendPushNotification?: Resolver<ResolversTypes['SendNotificationResult'], ParentType, ContextType, RequireFields<MutationsendPushNotificationArgs, 'input'>>;
   setBusinessSchedule?: Resolver<Array<ResolversTypes['BusinessDayHours']>, ParentType, ContextType, RequireFields<MutationsetBusinessScheduleArgs, 'businessId' | 'schedule'>>;
@@ -3199,6 +3248,7 @@ export type OrderResolvers<ContextType = GraphQLContext, ParentType extends Reso
   originalDeliveryPrice?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   originalPrice?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   outForDeliveryAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
+  paymentCollection?: Resolver<ResolversTypes['OrderPaymentCollection'], ParentType, ContextType>;
   pickupLocations?: Resolver<Array<ResolversTypes['Location']>, ParentType, ContextType>;
   preparationMinutes?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
   preparingAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
@@ -3251,6 +3301,8 @@ export type OrderItemOptionResolvers<ContextType = GraphQLContext, ParentType ex
   priceAtOrder?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
+
+export type OrderPaymentCollectionResolvers = EnumResolverSignature<{ CASH_TO_DRIVER?: any, PREPAID_TO_PLATFORM?: any }, ResolversTypes['OrderPaymentCollection']>;
 
 export type OrderPromotionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['OrderPromotion'] = ResolversParentTypes['OrderPromotion']> = {
   appliesTo?: Resolver<ResolversTypes['PromotionAppliesTo'], ParentType, ContextType>;
@@ -3488,6 +3540,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   pushTelemetrySummary?: Resolver<ResolversTypes['PushTelemetrySummary'], ParentType, ContextType, Partial<QuerypushTelemetrySummaryArgs>>;
   settlementRule?: Resolver<Maybe<ResolversTypes['SettlementRule']>, ParentType, ContextType, RequireFields<QuerysettlementRuleArgs, 'id'>>;
   settlementRules?: Resolver<Array<ResolversTypes['SettlementRule']>, ParentType, ContextType, Partial<QuerysettlementRulesArgs>>;
+  settlementScenarioDefinitions?: Resolver<Array<ResolversTypes['SettlementScenarioDefinition']>, ParentType, ContextType>;
   settlementSummary?: Resolver<ResolversTypes['SettlementSummary'], ParentType, ContextType, Partial<QuerysettlementSummaryArgs>>;
   settlements?: Resolver<Array<ResolversTypes['Settlement']>, ParentType, ContextType, Partial<QuerysettlementsArgs>>;
   uncompletedOrders?: Resolver<Array<ResolversTypes['Order']>, ParentType, ContextType>;
@@ -3568,6 +3621,34 @@ export type SettlementRuleResolvers<ContextType = GraphQLContext, ParentType ext
   notes?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   promotion?: Resolver<Maybe<ResolversTypes['Promotion']>, ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type SettlementScenarioDefinitionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['SettlementScenarioDefinition'] = ResolversParentTypes['SettlementScenarioDefinition']> = {
+  description?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type SettlementScenarioHarnessResultResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['SettlementScenarioHarnessResult'] = ResolversParentTypes['SettlementScenarioHarnessResult']> = {
+  failedCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  passed?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  passedCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  results?: Resolver<Array<ResolversTypes['SettlementScenarioResult']>, ParentType, ContextType>;
+  total?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type SettlementScenarioResultResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['SettlementScenarioResult'] = ResolversParentTypes['SettlementScenarioResult']> = {
+  actualCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  actualSettlements?: Resolver<ResolversTypes['JSON'], ParentType, ContextType>;
+  expectedCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  expectedSettlements?: Resolver<ResolversTypes['JSON'], ParentType, ContextType>;
+  mismatches?: Resolver<Array<ResolversTypes['String']>, ParentType, ContextType>;
+  name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  passed?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  scenarioId?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -3770,6 +3851,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   OrderDriverLiveTracking?: OrderDriverLiveTrackingResolvers<ContextType>;
   OrderItem?: OrderItemResolvers<ContextType>;
   OrderItemOption?: OrderItemOptionResolvers<ContextType>;
+  OrderPaymentCollection?: OrderPaymentCollectionResolvers;
   OrderPromotion?: OrderPromotionResolvers<ContextType>;
   OrderStatus?: OrderStatusResolvers;
   PolygonPoint?: PolygonPointResolvers<ContextType>;
@@ -3799,6 +3881,9 @@ export type Resolvers<ContextType = GraphQLContext> = {
   SettlementDirection?: SettlementDirectionResolvers;
   SettlementEntityType?: SettlementEntityTypeResolvers;
   SettlementRule?: SettlementRuleResolvers<ContextType>;
+  SettlementScenarioDefinition?: SettlementScenarioDefinitionResolvers<ContextType>;
+  SettlementScenarioHarnessResult?: SettlementScenarioHarnessResultResolvers<ContextType>;
+  SettlementScenarioResult?: SettlementScenarioResultResolvers<ContextType>;
   SettlementStatus?: SettlementStatusResolvers;
   SettlementSummary?: SettlementSummaryResolvers<ContextType>;
   SettlementType?: SettlementTypeResolvers;

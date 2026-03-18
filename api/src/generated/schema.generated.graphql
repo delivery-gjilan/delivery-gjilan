@@ -329,6 +329,7 @@ input CreateOrderInput {
   driverNotes: String
   dropOffLocation: LocationInput!
   items: [CreateOrderItemInput!]!
+  paymentCollection: OrderPaymentCollection
   promoCode: String
   totalPrice: Float!
 }
@@ -730,6 +731,7 @@ type Mutation {
   registerLiveActivityToken(activityId: String!, orderId: ID!, token: String!): Boolean!
   removeUserFromPromotion(promotionId: ID!, userId: ID!): Boolean!
   resendEmailVerification: SignupStepResponse!
+  runSettlementScenarioHarness(scenarioIds: [String!]): SettlementScenarioHarnessResult!
   sendCampaign(id: ID!): NotificationCampaign!
   sendPushNotification(input: SendPushNotificationInput!): SendNotificationResult!
   setBusinessSchedule(businessId: ID!, schedule: [BusinessDayHoursInput!]!): [BusinessDayHours!]!
@@ -841,6 +843,7 @@ type Order {
   originalDeliveryPrice: Float
   originalPrice: Float
   outForDeliveryAt: Date
+  paymentCollection: OrderPaymentCollection!
   pickupLocations: [Location!]!
   preparationMinutes: Int
   preparingAt: Date
@@ -887,6 +890,11 @@ type OrderItemOption {
   optionId: ID!
   optionName: String!
   priceAtOrder: Float!
+}
+
+enum OrderPaymentCollection {
+  CASH_TO_DRIVER
+  PREPAID_TO_PLATFORM
 }
 
 type OrderPromotion {
@@ -1154,6 +1162,7 @@ type Query {
   pushTelemetrySummary(hours: Int): PushTelemetrySummary!
   settlementRule(id: ID!): SettlementRule
   settlementRules(filter: SettlementRuleFilterInput): [SettlementRule!]!
+  settlementScenarioDefinitions: [SettlementScenarioDefinition!]!
   settlementSummary(businessId: ID, driverId: ID, endDate: Date, startDate: Date, type: SettlementType): SettlementSummary!
   settlements(businessId: ID, direction: SettlementDirection, driverId: ID, endDate: Date, limit: Int, offset: Int, startDate: Date, status: SettlementStatus, type: SettlementType): [Settlement!]!
   uncompletedOrders: [Order!]!
@@ -1272,6 +1281,31 @@ input SettlementRuleFilterInput {
   entityType: SettlementEntityType
   isActive: Boolean
   promotionId: ID
+}
+
+type SettlementScenarioDefinition {
+  description: String!
+  id: String!
+  name: String!
+}
+
+type SettlementScenarioHarnessResult {
+  failedCount: Int!
+  passed: Boolean!
+  passedCount: Int!
+  results: [SettlementScenarioResult!]!
+  total: Int!
+}
+
+type SettlementScenarioResult {
+  actualCount: Int!
+  actualSettlements: JSON!
+  expectedCount: Int!
+  expectedSettlements: JSON!
+  mismatches: [String!]!
+  name: String!
+  passed: Boolean!
+  scenarioId: String!
 }
 
 enum SettlementStatus {

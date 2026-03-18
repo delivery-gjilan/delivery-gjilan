@@ -44,6 +44,31 @@ type SettlementSummary {
     pendingCount: Int!
 }
 
+type SettlementScenarioDefinition {
+    id: String!
+    name: String!
+    description: String!
+}
+
+type SettlementScenarioResult {
+    scenarioId: String!
+    name: String!
+    passed: Boolean!
+    expectedCount: Int!
+    actualCount: Int!
+    mismatches: [String!]!
+    expectedSettlements: JSON!
+    actualSettlements: JSON!
+}
+
+type SettlementScenarioHarnessResult {
+    passed: Boolean!
+    total: Int!
+    passedCount: Int!
+    failedCount: Int!
+    results: [SettlementScenarioResult!]!
+}
+
 type Query {
     settlements(
         type: SettlementType
@@ -64,6 +89,8 @@ type Query {
         startDate: Date
         endDate: Date
     ): SettlementSummary!
+
+    settlementScenarioDefinitions: [SettlementScenarioDefinition!]!
     
     driverBalance(driverId: ID!): SettlementSummary!
     businessBalance(businessId: ID!): SettlementSummary!
@@ -75,6 +102,7 @@ type Mutation {
     markSettlementAsPartiallyPaid(settlementId: ID!, amount: Float!): Settlement!
     unsettleSettlement(settlementId: ID!): Settlement!
     backfillSettlementsForDeliveredOrders: Int!
+    runSettlementScenarioHarness(scenarioIds: [String!]): SettlementScenarioHarnessResult!
 }
 
 extend type Subscription {

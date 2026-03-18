@@ -19,7 +19,7 @@ import {
 } from '@/database/schema';
 import { userPromoMetadata } from '@/database/schema';
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
-import type { Order, OrderBusiness, OrderItem, OrderStatus, CreateOrderInput } from '@/generated/types.generated';
+import type { Order, OrderBusiness, OrderItem, OrderStatus, CreateOrderInput, OrderPaymentCollection } from '@/generated/types.generated';
 import type { DbOrder } from '@/database/schema/orders';
 import { PubSub, publish, subscribe, topics } from '@/lib/pubsub';
 import { GraphQLError } from 'graphql';
@@ -485,6 +485,7 @@ export class OrderService {
             price: effectiveOrderPrice,
             userId,
             deliveryPrice: effectiveDeliveryPrice,
+            paymentCollection: input.paymentCollection ?? 'CASH_TO_DRIVER',
             originalPrice: calculatedItemsTotal !== effectiveOrderPrice ? calculatedItemsTotal : undefined,
             originalDeliveryPrice: input.deliveryPrice !== effectiveDeliveryPrice ? input.deliveryPrice : undefined,
             status: 'PENDING' as const,
@@ -832,6 +833,7 @@ export class OrderService {
             orderDate: new Date(dbOrder.orderDate || new Date()),
             updatedAt: new Date(dbOrder.updatedAt),
             status: dbOrder.status as OrderStatus,
+            paymentCollection: dbOrder.paymentCollection as OrderPaymentCollection,
             preparationMinutes: dbOrder.preparationMinutes ?? undefined,
             estimatedReadyAt: dbOrder.estimatedReadyAt ? new Date(dbOrder.estimatedReadyAt) : undefined,
             preparingAt: dbOrder.preparingAt ? new Date(dbOrder.preparingAt) : undefined,

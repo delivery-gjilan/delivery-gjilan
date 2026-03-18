@@ -7,6 +7,11 @@ enum OrderStatus {
     CANCELLED
 }
 
+enum OrderPaymentCollection {
+    CASH_TO_DRIVER
+    PREPAID_TO_PLATFORM
+}
+
 enum PromotionAppliesTo {
     PRICE
     DELIVERY
@@ -79,6 +84,7 @@ type Order {
     orderDate: Date!
     updatedAt: Date!
     status: OrderStatus!
+    paymentCollection: OrderPaymentCollection!
     preparationMinutes: Int
     estimatedReadyAt: Date
     preparingAt: Date
@@ -143,6 +149,7 @@ input CreateOrderInput {
     dropOffLocation: LocationInput!
     deliveryPrice: Float!
     totalPrice: Float!
+    paymentCollection: OrderPaymentCollection
     promoCode: String
     driverNotes: String
 }

@@ -9,6 +9,9 @@ const orderStatusValues = ['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 
 [...orderStatusValues] satisfies OrderStatus[];
 export const orderStatus = pgEnum('order_status', orderStatusValues);
 
+const orderPaymentCollectionValues = ['CASH_TO_DRIVER', 'PREPAID_TO_PLATFORM'] as const;
+export const orderPaymentCollection = pgEnum('order_payment_collection', orderPaymentCollectionValues);
+
 export const orders = pgTable('orders', {
     id: uuid('id').primaryKey().defaultRandom().notNull(),
     displayId: varchar('display_id', { length: 10 }).notNull(),
@@ -18,6 +21,7 @@ export const orders = pgTable('orders', {
     driverId: uuid('driver_id').references(() => users.id, { onDelete: 'set null' }),
     price: numeric('price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
     deliveryPrice: numeric('delivery_price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
+    paymentCollection: orderPaymentCollection('payment_collection').default('CASH_TO_DRIVER').notNull(),
     originalPrice: numeric('original_price', { mode: 'number', precision: 10, scale: 2 }),
     originalDeliveryPrice: numeric('original_delivery_price', { mode: 'number', precision: 10, scale: 2 }),
     status: orderStatus('status').notNull(),

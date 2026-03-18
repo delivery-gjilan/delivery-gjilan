@@ -151,7 +151,7 @@ export class SettlementRepository {
         orderId: string,
         amount: number,
         direction: 'RECEIVABLE' | 'PAYABLE' = 'RECEIVABLE',
-        ruleId?: string,
+        ruleId?: string | null,
     ): Promise<DbSettlement> {
         const result = await this.db
             .insert(settlements)
