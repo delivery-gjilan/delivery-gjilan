@@ -26,7 +26,7 @@
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
-    "@rnmapbox/maps": "10.1.39",
+    "@rnmapbox/maps": "11.11.0",
     "apollo3-cache-persist": "^0.15.0",
     "babel-plugin-inline-import": "^3.0.0",
     "clsx": "^2.1.1",

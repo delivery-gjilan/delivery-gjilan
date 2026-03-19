@@ -1,6 +1,5 @@
 <resources>
   <string name="app_name">delivery-admin</string>
-  <string name="google_maps_api_key">AIzaSyCeZ3toVyDXjBRqFArqAo8R-f6u_MmP_pE</string>
   <string name="expo_system_ui_user_interface_style" translatable="false">automatic</string>
   <string name="expo_splash_screen_resize_mode" translatable="false">contain</string>
   <string name="expo_splash_screen_status_bar_translucent" translatable="false">false</string>
