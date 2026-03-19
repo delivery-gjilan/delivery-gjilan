@@ -34,8 +34,16 @@ export const GET_MY_BUSINESS_SETTLEMENTS = gql`
                 displayId
                 orderPrice
                 deliveryPrice
+                originalPrice
+                originalDeliveryPrice
                 totalPrice
                 orderDate
+                status
+                orderPromotions {
+                    id
+                    appliesTo
+                    discountAmount
+                }
                 businesses {
                     business {
                         id
@@ -46,6 +54,19 @@ export const GET_MY_BUSINESS_SETTLEMENTS = gql`
                         name
                         quantity
                         unitPrice
+                        basePrice
+                        notes
+                        selectedOptions {
+                            optionGroupName
+                            optionName
+                            priceAtOrder
+                        }
+                        childItems {
+                            id
+                            name
+                            quantity
+                            unitPrice
+                        }
                     }
                 }
             }
