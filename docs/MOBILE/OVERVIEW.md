@@ -42,7 +42,12 @@ The apps are separate packages, but they share a set of conventions:
 
 Bottom tab UX now includes an active-tab underline tile using theme primary purple for clearer current-tab state.
 
-`mobile-business` finances now supports business-focused settlement review with filters (period, status, direction, order search) plus per-settlement order item breakdown and commission/net reasoning.
+`mobile-business` finances now supports business-focused settlement review with filters (period, status, direction, order search) and table-style settlement rows.
+
+Settlement semantics in mobile-business are aligned to web UI2 formulas:
+
+- `RECEIVABLE`: settlement amount is platform commission; business net is `gross - commission`.
+- `PAYABLE`: settlement amount is business payout (net); commission is `gross - net`.
 
 Recent backend-driven store status changes are now exposed through subscription updates, which means banner and store availability UI can react faster.
 

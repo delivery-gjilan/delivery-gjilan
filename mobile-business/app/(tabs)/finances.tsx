@@ -27,8 +27,8 @@ const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
 
 const DIRECTION_FILTERS: { key: DirectionFilter; label: string }[] = [
     { key: 'ALL', label: 'All flow' },
-    { key: 'RECEIVABLE', label: 'Incoming' },
-    { key: 'PAYABLE', label: 'Outgoing' },
+    { key: 'RECEIVABLE', label: 'Receivable' },
+    { key: 'PAYABLE', label: 'Payable' },
 ];
 
 function getPeriodDates(period: Period): { startDate?: string; endDate?: string } {
@@ -67,6 +67,14 @@ function formatDate(dateStr?: string | null) {
 function formatDateTime(dateStr?: string | null) {
     if (!dateStr) return '—';
     try { return format(new Date(dateStr), 'MMM d, yyyy HH:mm'); } catch { return '—'; }
+}
+
+function calculateSettlementCommission(direction: 'RECEIVABLE' | 'PAYABLE', gross: number, amount: number) {
+    return direction === 'RECEIVABLE' ? amount : Math.max(0, gross - amount);
+}
+
+function calculateSettlementNet(direction: 'RECEIVABLE' | 'PAYABLE', gross: number, amount: number) {
+    return direction === 'RECEIVABLE' ? Math.max(0, gross - amount) : amount;
 }
 
 export default function FinancesScreen() {
@@ -136,7 +144,7 @@ export default function FinancesScreen() {
                 {/* Header */}
                 <View className="px-4 pt-4 pb-2">
                     <Text className="text-2xl font-bold text-white">Finances</Text>
-                    <Text className="text-sm mt-1 text-gray-400">Your revenue & settlement history</Text>
+                    <Text className="text-sm mt-1 text-gray-400">Business settlements and commission breakdown</Text>
                 </View>
 
                 {/* Period Selector */}
@@ -221,7 +229,7 @@ export default function FinancesScreen() {
                             {/* Net revenue highlight */}
                             <View className="rounded-3xl p-6 mb-3 bg-[#0b89a915] border border-[#0b89a940]">
                                 <Text className="text-xs font-bold uppercase tracking-wide text-[#0b89a9]">
-                                    TOTAL REVENUE
+                                    TOTAL SETTLEMENT FLOW
                                 </Text>
                                 <Text className="text-5xl font-bold mt-2 text-white">
                                     {formatCurrency(summary?.totalAmount ?? 0)}
@@ -273,7 +281,7 @@ export default function FinancesScreen() {
                     )}
                 </View>
 
-                {/* Settlement list */}
+                {/* Settlement table */}
                 <View className="px-4 mt-6">
                     <Text className="text-sm font-bold mb-3 text-white">Settlements</Text>
 
@@ -281,117 +289,82 @@ export default function FinancesScreen() {
                         <ActivityIndicator color="#0b89a9" style={{ marginTop: 16 }} />
                     ) : filteredSettlements.length === 0 ? (
                         <View className="items-center py-12">
-                            <Text className="text-4xl mb-3">💳</Text>
                             <Text className="text-base font-semibold text-white">No settlements yet</Text>
                             <Text className="text-sm mt-1 text-gray-400">Try a different period or filter.</Text>
                         </View>
                     ) : (
-                        <View style={{ gap: 8 }}>
-                            {filteredSettlements.map((s: any) => {
-                                const isPaid = s.status === 'PAID';
-                                const isReceivable = s.direction === 'RECEIVABLE';
-                                const businessOrder = (s.order?.businesses ?? []).find(
-                                    (entry: any) => entry?.business?.id === businessId
-                                );
-                                const businessItems = businessOrder?.items ?? [];
-                                const grossFromItems = businessItems.reduce(
-                                    (sum: number, item: any) => sum + Number(item?.unitPrice ?? 0) * Number(item?.quantity ?? 0),
-                                    0
-                                );
-                                const settlementAmount = Number(s.amount ?? 0);
-                                const estimatedCommission = isReceivable
-                                    ? Math.max(0, grossFromItems - settlementAmount)
-                                    : 0;
-                                return (
-                                    <View
-                                        key={s.id}
-                                        className="rounded-2xl p-4 bg-[#1f2937] border"
-                                        style={{ borderColor: isPaid ? '#22c55e30' : '#f59e0b30' }}
-                                    >
-                                        <View className="flex-row items-start justify-between">
-                                            <View className="flex-1 mr-3">
-                                                <Text className="font-semibold text-sm text-white">
-                                                    Order #{s.order?.displayId ?? s.order?.id?.slice(-6) ?? '—'}
+                        <View className="rounded-2xl border border-[#374151] overflow-hidden bg-[#111827]">
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                <View>
+                                    <View className="flex-row border-b border-[#374151] bg-[#0f172a]">
+                                        <Text className="px-3 py-2 text-[11px] font-semibold text-gray-400" style={{ width: 108 }}>Order</Text>
+                                        <Text className="px-3 py-2 text-[11px] font-semibold text-gray-400" style={{ width: 160 }}>Timestamp</Text>
+                                        <Text className="px-3 py-2 text-[11px] font-semibold text-gray-400 text-right" style={{ width: 110 }}>Gross</Text>
+                                        <Text className="px-3 py-2 text-[11px] font-semibold text-gray-400" style={{ width: 110 }}>Direction</Text>
+                                        <Text className="px-3 py-2 text-[11px] font-semibold text-gray-400 text-right" style={{ width: 120 }}>Commission</Text>
+                                        <Text className="px-3 py-2 text-[11px] font-semibold text-gray-400 text-right" style={{ width: 110 }}>Net</Text>
+                                        <Text className="px-3 py-2 text-[11px] font-semibold text-gray-400" style={{ width: 96 }}>Status</Text>
+                                        <Text className="px-3 py-2 text-[11px] font-semibold text-gray-400" style={{ width: 250 }}>Reason</Text>
+                                    </View>
+
+                                    {filteredSettlements.map((s: any) => {
+                                        const isPaid = s.status === 'PAID';
+                                        const isReceivable = s.direction === 'RECEIVABLE';
+                                        const businessOrder = (s.order?.businesses ?? []).find(
+                                            (entry: any) => entry?.business?.id === businessId
+                                        );
+                                        const businessItems = businessOrder?.items ?? [];
+                                        const grossFromItems = businessItems.reduce(
+                                            (sum: number, item: any) => sum + Number(item?.unitPrice ?? 0) * Number(item?.quantity ?? 0),
+                                            0
+                                        );
+                                        const settlementAmount = Number(s.amount ?? 0);
+                                        const commissionAmount = calculateSettlementCommission(s.direction, grossFromItems, settlementAmount);
+                                        const netAmount = calculateSettlementNet(s.direction, grossFromItems, settlementAmount);
+
+                                        return (
+                                            <View key={s.id} className="flex-row border-b border-[#1f2937]" style={{ backgroundColor: '#111827' }}>
+                                                <Text className="px-3 py-2 text-xs font-semibold text-white" style={{ width: 108 }}>
+                                                    #{s.order?.displayId ?? s.order?.id?.slice(-6) ?? '—'}
                                                 </Text>
-                                                <Text className="text-xs mt-0.5 text-gray-400">
-                                                    Settlement: {formatDateTime(s.createdAt)}
+                                                <Text className="px-3 py-2 text-xs text-gray-400" style={{ width: 160 }}>
+                                                    {formatDateTime(s.order?.orderDate ?? s.createdAt)}
                                                 </Text>
-                                                <Text className="text-xs mt-0.5 text-gray-500">
-                                                    Ordered: {formatDateTime(s.order?.orderDate)}
+                                                <Text className="px-3 py-2 text-xs text-gray-200 text-right" style={{ width: 110 }}>
+                                                    {formatCurrency(grossFromItems)}
                                                 </Text>
-                                                {s.paymentReference && (
-                                                    <Text className="text-xs mt-1 text-gray-500">
-                                                        Ref: {s.paymentReference}
-                                                    </Text>
-                                                )}
-                                            </View>
-                                            <View className="items-end">
-                                                <Text
-                                                    className="text-lg font-bold"
-                                                    style={{ color: isReceivable ? '#22c55e' : '#ef4444' }}
-                                                >
-                                                    {isReceivable ? '+' : '-'}{formatCurrency(Number(s.amount))}
+                                                <Text className="px-3 py-2 text-xs text-gray-300" style={{ width: 110 }}>
+                                                    {s.direction}
                                                 </Text>
-                                                <View
-                                                    className="mt-1 px-2 py-0.5 rounded-full"
-                                                    style={{ backgroundColor: isPaid ? '#22c55e20' : '#f59e0b20' }}
-                                                >
-                                                    <Text
-                                                        className="text-[11px] font-bold"
-                                                        style={{ color: isPaid ? '#22c55e' : '#f59e0b' }}
+                                                <Text className="px-3 py-2 text-xs text-[#f59e0b] text-right" style={{ width: 120 }}>
+                                                    {formatCurrency(commissionAmount)}
+                                                </Text>
+                                                <Text className="px-3 py-2 text-xs font-semibold text-[#22c55e] text-right" style={{ width: 110 }}>
+                                                    {formatCurrency(netAmount)}
+                                                </Text>
+                                                <View className="px-3 py-2" style={{ width: 96 }}>
+                                                    <View
+                                                        className="px-2 py-0.5 rounded-full self-start"
+                                                        style={{ backgroundColor: isPaid ? '#22c55e20' : '#f59e0b20' }}
                                                     >
-                                                        {s.status}
-                                                    </Text>
-                                                </View>
-                                            </View>
-                                        </View>
-
-                                        <View className="mt-3 p-3 rounded-xl bg-[#111827] border border-[#374151]">
-                                            <Text className="text-xs font-semibold text-gray-300">Breakdown</Text>
-                                            <View className="flex-row justify-between mt-2">
-                                                <Text className="text-xs text-gray-400">Gross from your items</Text>
-                                                <Text className="text-xs text-white">{formatCurrency(grossFromItems)}</Text>
-                                            </View>
-                                            <View className="flex-row justify-between mt-1">
-                                                <Text className="text-xs text-gray-400">Platform commission</Text>
-                                                <Text className="text-xs text-[#f59e0b]">-{formatCurrency(estimatedCommission)}</Text>
-                                            </View>
-                                            <View className="flex-row justify-between mt-1">
-                                                <Text className="text-xs text-gray-400">Net settlement</Text>
-                                                <Text className="text-xs text-[#22c55e]">{formatCurrency(settlementAmount)}</Text>
-                                            </View>
-                                            <Text className="text-[11px] mt-2 text-gray-500">
-                                                Reason: {isReceivable ? 'Incoming payout for fulfilled order after commission.' : 'Outgoing adjustment or payable settlement.'}
-                                            </Text>
-                                        </View>
-
-                                        <View className="mt-3" style={{ gap: 6 }}>
-                                            <Text className="text-xs font-semibold text-gray-300">Items ordered</Text>
-                                            {businessItems.length === 0 ? (
-                                                <Text className="text-xs text-gray-500">No item breakdown available.</Text>
-                                            ) : (
-                                                businessItems.map((item: any) => (
-                                                    <View key={item.id} className="flex-row justify-between items-center">
-                                                        <Text className="text-xs text-gray-300" numberOfLines={1} style={{ maxWidth: '68%' }}>
-                                                            {item.quantity}x {item.name}
-                                                        </Text>
-                                                        <Text className="text-xs text-gray-400">
-                                                            {formatCurrency(Number(item.unitPrice) * Number(item.quantity))}
+                                                        <Text
+                                                            className="text-[10px] font-bold"
+                                                            style={{ color: isPaid ? '#22c55e' : '#f59e0b' }}
+                                                        >
+                                                            {s.status}
                                                         </Text>
                                                     </View>
-                                                ))
-                                            )}
-                                        </View>
-
-                                        {s.paidAt && (
-                                            <Text className="text-xs mt-2 text-gray-500">
-                                                Paid on {formatDate(s.paidAt)}
-                                                {s.paymentMethod ? ` via ${s.paymentMethod}` : ''}
-                                            </Text>
-                                        )}
-                                    </View>
-                                );
-                            })}
+                                                </View>
+                                                <Text className="px-3 py-2 text-xs text-gray-400" style={{ width: 250 }}>
+                                                    {isReceivable
+                                                        ? 'Commission due to platform from this order.'
+                                                        : 'Payout due to your business for this order.'}
+                                                </Text>
+                                            </View>
+                                        );
+                                    })}
+                                </View>
+                            </ScrollView>
                         </View>
                     )}
                 </View>

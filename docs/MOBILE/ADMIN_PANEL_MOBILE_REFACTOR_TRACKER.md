@@ -97,6 +97,7 @@ For every mobile parity PR:
 
 ## Change Log
 
+- 2026-03-19: Mobile-business finances now mirror web settlement semantics (`RECEIVABLE` commission vs `PAYABLE` payout net) and use a mobile table-style row layout instead of card rows.
 - 2026-03-19: Admin orders earnings now derive business commission from active settlement rules to match finance configuration (not only business profile percentage).
 - 2026-03-19: Updated admin orders earnings behavior to include delivery commission conditionally (driver assigned/out-for-delivery), with explicit `DEL+` marker and overlay tooltip behavior that does not stretch rows.
 - 2026-03-19: Added admin orders `+earnings` indicator (delivery commission + restaurant commission + markup) to web orders table and order details; mobile-admin parity requirement added.
