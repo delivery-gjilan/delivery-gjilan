@@ -277,6 +277,23 @@ input CreateBusinessInput {
   workingHours: WorkingHoursInput!
 }
 
+input CreateBusinessOwnerInput {
+  email: String!
+  firstName: String!
+  lastName: String!
+  password: String!
+}
+
+input CreateBusinessWithOwnerInput {
+  business: CreateBusinessInput!
+  owner: CreateBusinessOwnerInput!
+}
+
+type CreateBusinessWithOwnerPayload {
+  business: Business!
+  owner: User!
+}
+
 input CreateCampaignInput {
   body: String!
   category: String
@@ -676,6 +693,7 @@ type Mutation {
   cancelOrder(id: ID!): Order!
   createBanner(input: CreateBannerInput!): Banner!
   createBusiness(input: CreateBusinessInput!): Business!
+  createBusinessWithOwner(input: CreateBusinessWithOwnerInput!): CreateBusinessWithOwnerPayload!
   createCampaign(input: CreateCampaignInput!): NotificationCampaign!
   createDeliveryPricingTier(input: CreateDeliveryPricingTierInput!): DeliveryPricingTier!
   createDeliveryZone(input: CreateDeliveryZoneInput!): DeliveryZone!

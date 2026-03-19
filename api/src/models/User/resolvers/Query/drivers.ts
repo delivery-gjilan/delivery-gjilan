@@ -1,5 +1,6 @@
 import type { QueryResolvers } from '@/generated/types.generated';
 import { GraphQLError } from 'graphql';
+import { toUserParent } from '../utils/toUserParent';
 
 export const drivers: NonNullable<QueryResolvers['drivers']> = async (_parent, _arg, { authService, userData }) => {
     if (!userData.userId || !userData.role) {
@@ -11,7 +12,7 @@ export const drivers: NonNullable<QueryResolvers['drivers']> = async (_parent, _
     const driverUsers = await authService.getDrivers();
 
     if (userData.role === 'SUPER_ADMIN' || userData.role === 'ADMIN') {
-        return driverUsers;
+        return driverUsers.map((driver) => toUserParent(driver));
     }
 
     if (userData.role === 'BUSINESS_OWNER' || userData.role === 'BUSINESS_EMPLOYEE') {
@@ -21,7 +22,9 @@ export const drivers: NonNullable<QueryResolvers['drivers']> = async (_parent, _
             });
         }
 
-        return driverUsers.filter((driver) => driver.businessId === userData.businessId);
+        return driverUsers
+            .filter((driver) => driver.businessId === userData.businessId)
+            .map((driver) => toUserParent(driver));
     }
 
     throw new GraphQLError('Forbidden: You do not have access to driver data', {

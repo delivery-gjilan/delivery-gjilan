@@ -243,6 +243,7 @@ ARCHITECTURE (A1)
 | `src/services/S3Service.ts` | B9 |
 | `src/repositories/AuthRepository.ts` | B5 |
 | `src/models/User/resolvers/Mutation/createUser.ts` | B5 |
+| `src/models/User/resolvers/utils/toUserParent.ts` | B5 |
 | `src/models/User/resolvers/Mutation/updateUser.ts` | B5 |
 | `src/models/User/resolvers/Mutation/deleteUser.ts` | B5 |
 | `src/models/User/resolvers/Mutation/updateUserNote.ts` | B5 |
@@ -250,6 +251,7 @@ ARCHITECTURE (A1)
 | `src/models/User/resolvers/Query/users.ts` | B5 |
 | `src/models/User/resolvers/Query/drivers.ts` | B5 |
 | `src/models/Business/resolvers/Mutation/createBusiness.ts` | B5, BL2 |
+| `src/models/Business/resolvers/Mutation/createBusinessWithOwner.ts` | B5, BL2 |
 | `src/models/Business/resolvers/Mutation/updateBusiness.ts` | B5, BL2 |
 | `src/models/Business/resolvers/Mutation/setBusinessSchedule.ts` | B5, BL2 |
 | `src/models/Business/resolvers/Mutation/deleteBusiness.ts` | B5, BL2 |

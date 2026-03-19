@@ -11,11 +11,11 @@ import Modal from "@/components/ui/Modal";
 import { Table, Th, Td } from "@/components/ui/Table";
 import {
     CREATE_BUSINESS,
+    CREATE_BUSINESS_WITH_OWNER,
     DELETE_BUSINESS,
     GET_BUSINESSES,
     UPDATE_BUSINESS,
 } from "@/graphql/operations/businesses";
-import { CREATE_USER_MUTATION } from "@/graphql/operations/users/mutations";
 import ScheduleEditor from "@/components/businesses/ScheduleEditor";
 import { toast } from 'sonner';
 
@@ -65,9 +65,9 @@ export default function BusinessesPage() {
     const { data, loading, refetch } = useQuery<GetBusinessesData>(GET_BUSINESSES);
 
     const [createBusiness] = useMutation(CREATE_BUSINESS);
+    const [createBusinessWithOwner] = useMutation(CREATE_BUSINESS_WITH_OWNER);
     const [updateBusiness] = useMutation(UPDATE_BUSINESS);
     const [deleteBusiness] = useMutation(DELETE_BUSINESS);
-    const [createUser] = useMutation(CREATE_USER_MUTATION);
 
     /* --------------------------
      UI State
@@ -217,46 +217,43 @@ export default function BusinessesPage() {
 
         setUploadingImage(false);
 
-        const createBusinessResult = await createBusiness({
-            variables: {
-                input: {
-                    name: createForm.name,
-                    phoneNumber: createForm.phoneNumber.trim() || null,
-                    businessType: createForm.businessType as any,
-                    imageUrl: imageUrl || null,
-                    location: {
-                        latitude: createForm.location.latitude,
-                        longitude: createForm.location.longitude,
-                        address: createForm.location.address,
-                    },
-                    workingHours: {
-                        opensAt: createForm.workingHours.opensAt,
-                        closesAt: createForm.workingHours.closesAt,
+        const businessInput = {
+            name: createForm.name,
+            phoneNumber: createForm.phoneNumber.trim() || null,
+            businessType: createForm.businessType as any,
+            imageUrl: imageUrl || null,
+            location: {
+                latitude: createForm.location.latitude,
+                longitude: createForm.location.longitude,
+                address: createForm.location.address,
+            },
+            workingHours: {
+                opensAt: createForm.workingHours.opensAt,
+                closesAt: createForm.workingHours.closesAt,
+            },
+        };
+
+        if (createForm.createOwnerNow) {
+            await createBusinessWithOwner({
+                variables: {
+                    input: {
+                        business: businessInput,
+                        owner: {
+                            email: createForm.ownerEmail.trim(),
+                            password: createForm.ownerPassword,
+                            firstName: createForm.ownerFirstName.trim(),
+                            lastName: createForm.ownerLastName.trim(),
+                        },
                     },
                 },
-            },
-        });
-
-        const createdBusinessId = createBusinessResult?.data?.createBusiness?.id as string | undefined;
-
-        if (createForm.createOwnerNow && createdBusinessId) {
-            try {
-                await createUser({
-                    variables: {
-                        email: createForm.ownerEmail.trim(),
-                        password: createForm.ownerPassword,
-                        firstName: createForm.ownerFirstName.trim(),
-                        lastName: createForm.ownerLastName.trim(),
-                        role: "BUSINESS_OWNER" as any,
-                        businessId: createdBusinessId,
-                    },
-                });
-                toast.success("Business and owner created successfully");
-            } catch (ownerErr) {
-                console.error("Owner creation failed after business creation:", ownerErr);
-                toast.error("Business created, but owner creation failed. You can create the owner from Admins page.");
-            }
+            });
+            toast.success("Business and owner created successfully");
         } else {
+            await createBusiness({
+                variables: {
+                    input: businessInput,
+                },
+            });
             toast.success("Business created successfully");
         }
 

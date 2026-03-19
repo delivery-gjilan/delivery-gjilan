@@ -1,6 +1,7 @@
 import type { MutationResolvers } from '@/generated/types.generated';
 import { GraphQLError } from 'graphql';
 import { canManageUsers } from '@/lib/utils/permissions';
+import { toUserParent } from '../utils/toUserParent';
 
 export const updateUser: NonNullable<MutationResolvers['updateUser']> = async (_parent, { input }, { authService, userData }) => {
     const { id, firstName, lastName, role, businessId } = input;
@@ -60,5 +61,5 @@ export const updateUser: NonNullable<MutationResolvers['updateUser']> = async (_
         });
     }
 
-    return updatedUser;
+    return toUserParent(updatedUser);
 };

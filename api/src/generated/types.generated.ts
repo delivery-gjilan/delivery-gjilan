@@ -302,6 +302,24 @@ export type CreateBusinessInput = {
   workingHours: WorkingHoursInput;
 };
 
+export type CreateBusinessOwnerInput = {
+  email: Scalars['String']['input'];
+  firstName: Scalars['String']['input'];
+  lastName: Scalars['String']['input'];
+  password: Scalars['String']['input'];
+};
+
+export type CreateBusinessWithOwnerInput = {
+  business: CreateBusinessInput;
+  owner: CreateBusinessOwnerInput;
+};
+
+export type CreateBusinessWithOwnerPayload = {
+  __typename?: 'CreateBusinessWithOwnerPayload';
+  business: Business;
+  owner: User;
+};
+
 export type CreateCampaignInput = {
   body: Scalars['String']['input'];
   category?: InputMaybe<Scalars['String']['input']>;
@@ -670,6 +688,7 @@ export type Mutation = {
   cancelOrder: Order;
   createBanner: Banner;
   createBusiness: Business;
+  createBusinessWithOwner: CreateBusinessWithOwnerPayload;
   createCampaign: NotificationCampaign;
   createDeliveryPricingTier: DeliveryPricingTier;
   createDeliveryZone: DeliveryZone;
@@ -830,6 +849,11 @@ export type MutationcreateBannerArgs = {
 
 export type MutationcreateBusinessArgs = {
   input: CreateBusinessInput;
+};
+
+
+export type MutationcreateBusinessWithOwnerArgs = {
+  input: CreateBusinessWithOwnerInput;
 };
 
 
@@ -2531,6 +2555,9 @@ export type ResolversTypes = {
   CartItemInput: CartItemInput;
   CreateBannerInput: CreateBannerInput;
   CreateBusinessInput: CreateBusinessInput;
+  CreateBusinessOwnerInput: CreateBusinessOwnerInput;
+  CreateBusinessWithOwnerInput: CreateBusinessWithOwnerInput;
+  CreateBusinessWithOwnerPayload: ResolverTypeWrapper<Omit<CreateBusinessWithOwnerPayload, 'business' | 'owner'> & { business: ResolversTypes['Business'], owner: ResolversTypes['User'] }>;
   CreateCampaignInput: CreateCampaignInput;
   CreateDeliveryPricingTierInput: CreateDeliveryPricingTierInput;
   CreateDeliveryZoneInput: CreateDeliveryZoneInput;
@@ -2685,6 +2712,9 @@ export type ResolversParentTypes = {
   CartItemInput: CartItemInput;
   CreateBannerInput: CreateBannerInput;
   CreateBusinessInput: CreateBusinessInput;
+  CreateBusinessOwnerInput: CreateBusinessOwnerInput;
+  CreateBusinessWithOwnerInput: CreateBusinessWithOwnerInput;
+  CreateBusinessWithOwnerPayload: Omit<CreateBusinessWithOwnerPayload, 'business' | 'owner'> & { business: ResolversParentTypes['Business'], owner: ResolversParentTypes['User'] };
   CreateCampaignInput: CreateCampaignInput;
   CreateDeliveryPricingTierInput: CreateDeliveryPricingTierInput;
   CreateDeliveryZoneInput: CreateDeliveryZoneInput;
@@ -2945,6 +2975,12 @@ export type BusinessTypeResolvers = EnumResolverSignature<{ MARKET?: any, PHARMA
 
 export type CampaignStatusResolvers = EnumResolverSignature<{ DRAFT?: any, FAILED?: any, SENDING?: any, SENT?: any }, ResolversTypes['CampaignStatus']>;
 
+export type CreateBusinessWithOwnerPayloadResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['CreateBusinessWithOwnerPayload'] = ResolversParentTypes['CreateBusinessWithOwnerPayload']> = {
+  business?: Resolver<ResolversTypes['Business'], ParentType, ContextType>;
+  owner?: Resolver<ResolversTypes['User'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
 export interface DateScalarConfig extends GraphQLScalarTypeConfig<ResolversTypes['Date'], any> {
   name: 'Date';
 }
@@ -3094,6 +3130,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   cancelOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationcancelOrderArgs, 'id'>>;
   createBanner?: Resolver<ResolversTypes['Banner'], ParentType, ContextType, RequireFields<MutationcreateBannerArgs, 'input'>>;
   createBusiness?: Resolver<ResolversTypes['Business'], ParentType, ContextType, RequireFields<MutationcreateBusinessArgs, 'input'>>;
+  createBusinessWithOwner?: Resolver<ResolversTypes['CreateBusinessWithOwnerPayload'], ParentType, ContextType, RequireFields<MutationcreateBusinessWithOwnerArgs, 'input'>>;
   createCampaign?: Resolver<ResolversTypes['NotificationCampaign'], ParentType, ContextType, RequireFields<MutationcreateCampaignArgs, 'input'>>;
   createDeliveryPricingTier?: Resolver<ResolversTypes['DeliveryPricingTier'], ParentType, ContextType, RequireFields<MutationcreateDeliveryPricingTierArgs, 'input'>>;
   createDeliveryZone?: Resolver<ResolversTypes['DeliveryZone'], ParentType, ContextType, RequireFields<MutationcreateDeliveryZoneArgs, 'input'>>;
@@ -3826,6 +3863,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   BusinessPromotion?: BusinessPromotionResolvers<ContextType>;
   BusinessType?: BusinessTypeResolvers;
   CampaignStatus?: CampaignStatusResolvers;
+  CreateBusinessWithOwnerPayload?: CreateBusinessWithOwnerPayloadResolvers<ContextType>;
   Date?: GraphQLScalarType;
   DateTime?: GraphQLScalarType;
   DeliveryPriceResult?: DeliveryPriceResultResolvers<ContextType>;

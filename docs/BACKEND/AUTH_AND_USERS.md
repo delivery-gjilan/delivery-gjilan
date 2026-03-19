@@ -200,6 +200,7 @@ Current authorization behavior across API resolvers and admin-panel:
 ### Business and Product Mutation Rules
 
 - `createBusiness`: super-admin only.
+- `createBusinessWithOwner`: super-admin only, creates business + `BUSINESS_OWNER` in one DB transaction.
 - `updateBusiness`, `deleteBusiness`, `setBusinessSchedule`:
   - platform admins: any business.
   - business owner: own business only.
@@ -213,13 +214,20 @@ Current authorization behavior across API resolvers and admin-panel:
 
 Recommended provisioning sequence:
 
-1. Create business.
-2. Create or assign a `BUSINESS_OWNER` with matching `businessId`.
-3. Let the owner create `BUSINESS_EMPLOYEE` users and assign permissions.
+1. Create business and owner atomically via `createBusinessWithOwner` when owner credentials are available.
+2. Use `createBusiness` when owner will be assigned later.
+3. Create or assign a `BUSINESS_OWNER` with matching `businessId`.
+4. Let the owner create `BUSINESS_EMPLOYEE` users and assign permissions.
 
-Admin-panel supports owner credentials during business creation by chaining:
+The admin-panel business creation screen supports both modes:
 
-1. `createBusiness`
-2. `createUser(role: BUSINESS_OWNER, businessId: createdBusiness.id)`
+1. `createBusinessWithOwner` (single atomic mutation)
+2. `createBusiness` only
 
-This flow is client-orchestrated (two mutation calls), so business creation can succeed even if owner creation fails.
+### Resolver User Shape Mapping
+
+User-returning resolvers normalize DB users through a shared mapper:
+
+- `api/src/models/User/resolvers/utils/toUserParent.ts`
+- Ensures required GraphQL `User` parent fields are present (`preferredLanguage`, `permissions`, `isOnline`) without implying database schema changes.
+- Computed fields still resolve through field resolvers (`permissions`, `isOnline`, `driverConnection`, etc.).

@@ -3,6 +3,7 @@ import { GraphQLError } from 'graphql';
 import { createAuditLogger } from '@/services/AuditLogger';
 import logger from '@/lib/logger';
 import { canManageUsers } from '@/lib/utils/permissions';
+import { toUserParent } from '../utils/toUserParent';
 
 export const createUser: NonNullable<MutationResolvers['createUser']> = async (_parent, { input }, context) => {
     const { authService, driverService, userData, db } = context;
@@ -70,7 +71,7 @@ export const createUser: NonNullable<MutationResolvers['createUser']> = async (_
 
     return {
         token: result.token,
-        user: result.user as any,
+        user: toUserParent(result.user),
         message: result.message,
     };
 };

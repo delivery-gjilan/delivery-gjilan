@@ -30,6 +30,46 @@ export const CREATE_BUSINESS = graphql(`
     }
 `);
 
+export const CREATE_BUSINESS_WITH_OWNER = graphql(`
+    mutation CreateBusinessWithOwner($input: CreateBusinessWithOwnerInput!) {
+        createBusinessWithOwner(input: $input) {
+            business {
+                id
+                name
+                phoneNumber
+                businessType
+                imageUrl
+                isActive
+                avgPrepTimeMinutes
+                prepTimeOverrideMinutes
+                location {
+                    latitude
+                    longitude
+                    address
+                }
+                workingHours {
+                    opensAt
+                    closesAt
+                }
+                schedule {
+                    id
+                    dayOfWeek
+                    opensAt
+                    closesAt
+                }
+            }
+            owner {
+                id
+                email
+                firstName
+                lastName
+                role
+                businessId
+            }
+        }
+    }
+`);
+
 export const UPDATE_BUSINESS = graphql(`
     mutation UpdateBusiness($id: ID!, $input: UpdateBusinessInput!) {
         updateBusiness(id: $id, input: $input) {
