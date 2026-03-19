@@ -34,7 +34,7 @@ export function useAuthInitialization() {
                 if (!token) {
                     console.log('[AuthInit] No token found, redirecting to login');
                     await logout();
-                    router.replace('/login');
+                    setTimeout(() => router.replace('/login'), 0);
                     hasInitialized.current = true;
                     return;
                 }
@@ -43,7 +43,7 @@ export function useAuthInitialization() {
                 if (!user) {
                     console.log('[AuthInit] Token found but no user data, logging out');
                     await logout();
-                    router.replace('/login');
+                    setTimeout(() => router.replace('/login'), 0);
                     hasInitialized.current = true;
                     return;
                 }
@@ -52,7 +52,7 @@ export function useAuthInitialization() {
                 if (user.role !== 'BUSINESS_OWNER' && user.role !== 'BUSINESS_EMPLOYEE') {
                     console.log('[AuthInit] Invalid role, logging out');
                     await logout();
-                    router.replace('/login');
+                    setTimeout(() => router.replace('/login'), 0);
                     hasInitialized.current = true;
                     return;
                 }
@@ -61,7 +61,7 @@ export function useAuthInitialization() {
                 if (!user.businessId || !user.business) {
                     console.log('[AuthInit] No business association, logging out');
                     await logout();
-                    router.replace('/login');
+                    setTimeout(() => router.replace('/login'), 0);
                     hasInitialized.current = true;
                     return;
                 }
@@ -69,12 +69,12 @@ export function useAuthInitialization() {
                 // All good - load token into memory and navigate to main app
                 console.log('[AuthInit] Auth valid, user:', user.email, 'business:', user.business.name);
                 setToken(token);
-                router.replace('/(tabs)');
+                setTimeout(() => router.replace('/(tabs)'), 0);
                 hasInitialized.current = true;
             } catch (err) {
                 console.error('[AuthInit] Auth initialization error:', err);
                 await logout();
-                router.replace('/login');
+                setTimeout(() => router.replace('/login'), 0);
                 hasInitialized.current = true;
             }
         };
