@@ -4,6 +4,7 @@ import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-rout
 import { ApolloProvider, useQuery } from '@apollo/client/react';
 import { apolloClient } from '@/lib/apollo';
 import { useAuthStore } from '@/store/authStore';
+import { useLocaleStore } from '@/store/useLocaleStore';
 import { useAuthInitialization } from '@/hooks/useAuthInitialization';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useBusinessDeviceMonitoring } from '@/hooks/useBusinessDeviceMonitoring';
@@ -18,6 +19,7 @@ function AppContent() {
     const segments = useSegments();
     const rootNavigationState = useRootNavigationState();
     const { isAuthenticated, hasHydrated } = useAuthStore();
+    const loadTranslation = useLocaleStore((state) => state.loadTranslation);
     const [bannerDismissed, setBannerDismissed] = useState(false);
     const isMounted = useRef(false);
 
@@ -35,6 +37,10 @@ function AppContent() {
     useAuthInitialization();
     useNotifications();
     useBusinessDeviceMonitoring();
+
+    useEffect(() => {
+        loadTranslation();
+    }, [loadTranslation]);
 
     // Navigation guard
     useEffect(() => {
@@ -55,7 +61,7 @@ function AppContent() {
     if (!hasHydrated) {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
-                <ActivityIndicator size="large" color="#0b89a9" />
+                <ActivityIndicator size="large" color="#7C3AED" />
             </View>
         );
     }

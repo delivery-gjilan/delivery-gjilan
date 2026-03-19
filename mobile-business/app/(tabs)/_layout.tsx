@@ -7,8 +7,10 @@ import { View, Text, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { hasBusinessPermission } from '@/lib/rbac';
 import { UserPermission } from '@/gql/graphql';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export default function TabLayout() {
+    const { t } = useTranslation();
     const { user } = useAuthStore();
     const { data } = useQuery(GET_BUSINESS_ORDERS, { pollInterval: 15000 });
     const insets = useSafeAreaInsets();
@@ -26,11 +28,11 @@ export default function TabLayout() {
         <Tabs
             screenOptions={{
                 headerShown: false,
-                tabBarActiveTintColor: '#0b89a9',
-                tabBarInactiveTintColor: '#9ca3af',
+                tabBarActiveTintColor: '#7C3AED',
+                tabBarInactiveTintColor: '#94A3B8',
                 tabBarStyle: {
-                    backgroundColor: '#1f2937',
-                    borderTopColor: '#374151',
+                    backgroundColor: '#1E293B',
+                    borderTopColor: '#334155',
                     height: (Platform.OS === 'android' ? 62 : 64) + insets.bottom,
                     paddingBottom: Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 10),
                     paddingTop: 10,
@@ -47,7 +49,7 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="index"
                 options={{
-                    title: 'Orders',
+                    title: t('tabs.orders', 'Orders'),
                     tabBarIcon: ({ color }) => (
                         <View>
                             <Ionicons name="receipt" size={26} color={color} />
@@ -79,7 +81,7 @@ export default function TabLayout() {
                 name="products"
                 options={{
                     href: canManageProducts ? undefined : null,
-                    title: 'Products',
+                    title: t('tabs.products', 'Products'),
                     tabBarIcon: ({ color }) => (
                         <Ionicons name="fast-food" size={26} color={color} />
                     ),
@@ -89,7 +91,7 @@ export default function TabLayout() {
                 name="dashboard"
                 options={{
                     href: canViewAnalytics ? undefined : null,
-                    title: 'Dashboard',
+                    title: t('tabs.dashboard', 'Dashboard'),
                     tabBarIcon: ({ color }) => (
                         <Ionicons name="analytics" size={26} color={color} />
                     ),
@@ -99,7 +101,7 @@ export default function TabLayout() {
                 name="finances"
                 options={{
                     href: canViewAnalytics ? undefined : null,
-                    title: 'Finances',
+                    title: t('tabs.finances', 'Finances'),
                     tabBarIcon: ({ color }) => (
                         <Ionicons name="cash-outline" size={26} color={color} />
                     ),
@@ -109,7 +111,7 @@ export default function TabLayout() {
                 name="settings"
                 options={{
                     href: canManageSettings ? undefined : null,
-                    title: 'Settings',
+                    title: t('tabs.settings', 'Settings'),
                     tabBarIcon: ({ color }) => (
                         <Ionicons name="settings" size={26} color={color} />
                     ),

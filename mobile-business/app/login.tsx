@@ -17,8 +17,10 @@ import { LOGIN_MUTATION } from '@/graphql/auth';
 import { useAuthStore } from '@/store/authStore';
 import { saveRefreshToken, saveToken } from '@/utils/secureTokenStore';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export default function LoginScreen() {
+    const { t } = useTranslation();
     const router = useRouter();
     const { login: loginStore } = useAuthStore();
     const [email, setEmail] = useState('');
@@ -29,7 +31,7 @@ export default function LoginScreen() {
 
     const handleLogin = async () => {
         if (!email.trim() || !password.trim()) {
-            Alert.alert('Error', 'Please enter both email and password');
+            Alert.alert(t('login.error_title', 'Error'), t('login.fill_credentials', 'Please enter both email and password'));
             return;
         }
 
@@ -53,12 +55,12 @@ export default function LoginScreen() {
 
             // Validate business user
             if (user.role !== 'BUSINESS_OWNER' && user.role !== 'BUSINESS_EMPLOYEE') {
-                Alert.alert('Access Denied', 'This app is only for business owners and employees.');
+                Alert.alert(t('login.access_denied', 'Access Denied'), t('login.business_only', 'This app is only for business owners and employees.'));
                 return;
             }
 
             if (!user.businessId || !user.business) {
-                Alert.alert('Error', 'No business associated with this account.');
+                Alert.alert(t('login.error_title', 'Error'), t('login.no_business', 'No business associated with this account.'));
                 return;
             }
 
@@ -79,13 +81,13 @@ export default function LoginScreen() {
             const statusCode = error?.networkError?.statusCode;
             if (statusCode === 404) {
                 Alert.alert(
-                    'Login Failed',
+                    t('login.login_failed', 'Login Failed'),
                     'API endpoint not found (404). Check EXPO_PUBLIC_API_URL / ngrok tunnel and ensure it points to the backend GraphQL server.',
                 );
                 return;
             }
 
-            Alert.alert('Login Failed', error.message || 'Invalid email or password');
+            Alert.alert(t('login.login_failed', 'Login Failed'), error.message || t('login.invalid_credentials', 'Invalid email or password'));
         }
     };
 
@@ -103,16 +105,16 @@ export default function LoginScreen() {
                         {/* Logo/Header */}
                         <View className="items-center mb-12">
                             <View className="w-24 h-24 rounded-3xl items-center justify-center mb-6 bg-primary/20">
-                                <Ionicons name="storefront" size={48} color="#0b89a9" />
+                                <Ionicons name="storefront" size={48} color="#7C3AED" />
                             </View>
-                            <Text className="text-3xl font-bold text-text">Business Portal</Text>
-                            <Text className="text-base mt-2 text-subtext">Delivery Gjilan</Text>
+                            <Text className="text-3xl font-bold text-text">{t('login.title', 'Business Portal')}</Text>
+                            <Text className="text-base mt-2 text-subtext">{t('login.subtitle', 'Delivery Gjilan')}</Text>
                         </View>
 
                         {/* Form */}
                         <View className="space-y-4">
                             <View>
-                                <Text className="text-sm font-medium text-text mb-2">Email</Text>
+                                <Text className="text-sm font-medium text-text mb-2">{t('login.email', 'Email')}</Text>
                                 <TextInput
                                     className="bg-card text-text px-4 py-3.5 rounded-xl text-base"
                                     value={email}
@@ -120,14 +122,14 @@ export default function LoginScreen() {
                                     keyboardType="email-address"
                                     autoCapitalize="none"
                                     autoComplete="email"
-                                    placeholder="business@example.com"
+                                    placeholder={t('login.email_placeholder', 'business@example.com')}
                                     placeholderTextColor="#6b7280"
                                     editable={!loading}
                                 />
                             </View>
 
                             <View>
-                                <Text className="text-sm font-medium text-text mb-2">Password</Text>
+                                <Text className="text-sm font-medium text-text mb-2">{t('login.password', 'Password')}</Text>
                                 <View className="relative">
                                     <TextInput
                                         className="bg-card text-text px-4 py-3.5 rounded-xl text-base pr-12"
@@ -161,7 +163,7 @@ export default function LoginScreen() {
                                     <ActivityIndicator color="#fff" />
                                 ) : (
                                     <Text className="text-white text-center font-semibold text-base">
-                                        Sign In
+                                        {t('login.sign_in', 'Sign In')}
                                     </Text>
                                 )}
                             </TouchableOpacity>
@@ -170,9 +172,9 @@ export default function LoginScreen() {
                         {/* Info */}
                         <View className="mt-8 p-4 bg-card/50 rounded-xl">
                             <View className="flex-row items-start">
-                                <Ionicons name="information-circle" size={20} color="#0b89a9" />
+                                <Ionicons name="information-circle" size={20} color="#7C3AED" />
                                 <Text className="text-subtext text-sm ml-2 flex-1">
-                                    This app is for business owners and employees to manage orders and products.
+                                    {t('login.info', 'This app is for business owners and employees to manage orders and products.')}
                                 </Text>
                             </View>
                         </View>

@@ -23,6 +23,7 @@ import {
     RESPOND_TO_SETTLEMENT_REQUEST,
 } from '@/graphql/settlements';
 import { useAuthStore } from '@/store/authStore';
+import { useTranslation } from '@/hooks/useTranslation';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -111,6 +112,7 @@ function formatDateTime(dateStr?: string | null) {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function FinancesScreen() {
+    const { t } = useTranslation();
     const { user } = useAuthStore();
     const [period, setPeriod] = useState<Period>('month');
     const [customStart, setCustomStart] = useState('');
@@ -156,12 +158,12 @@ export default function FinancesScreen() {
         lastPaidRaw?.paidAt ?? lastPaidRaw?.createdAt ?? null;
 
     const PERIODS: { key: Period; label: string; disabled?: boolean }[] = [
-        { key: 'last_settlement', label: 'From Last Settlement', disabled: !lastPaidDate },
-        { key: 'today', label: 'Today' },
-        { key: 'week', label: 'This Week' },
-        { key: 'month', label: 'This Month' },
-        { key: 'custom', label: customStart && customEnd ? `${customStart} – ${customEnd}` : 'Custom Range' },
-        { key: 'all', label: 'All Time' },
+        { key: 'last_settlement', label: t('finances.from_last_settlement', 'From Last Settlement'), disabled: !lastPaidDate },
+        { key: 'today', label: t('finances.today', 'Today') },
+        { key: 'week', label: t('finances.this_week', 'This Week') },
+        { key: 'month', label: t('finances.this_month', 'This Month') },
+        { key: 'custom', label: customStart && customEnd ? `${customStart} – ${customEnd}` : t('finances.custom_range', 'Custom Range') },
+        { key: 'all', label: t('finances.all_time', 'All Time') },
     ];
 
     const { startDate, endDate } = getPeriodDates(period, lastPaidDate, customStart, customEnd);
@@ -264,11 +266,11 @@ export default function FinancesScreen() {
         const s = parseCustomDate(customStartInput);
         const e = parseCustomDate(customEndInput);
         if (!s || !e) {
-            Alert.alert('Invalid date', 'Please enter dates in DD/MM/YYYY format.');
+            Alert.alert(t('finances.invalid_date', 'Invalid date'), t('finances.invalid_date_text', 'Please enter dates in DD/MM/YYYY format.'));
             return;
         }
         if (s > e) {
-            Alert.alert('Invalid range', 'Start date must be before end date.');
+            Alert.alert(t('finances.invalid_range', 'Invalid range'), t('finances.invalid_range_text', 'Start date must be before end date.'));
             return;
         }
         setCustomStart(customStartInput);
@@ -282,14 +284,14 @@ export default function FinancesScreen() {
         const req = pendingRequests.find((r: any) => r.id === requestId);
         const requestedAmount = Number(req?.amount ?? 0);
         Alert.alert(
-            'Accept Settlement',
+            t('finances.accept_request_title', 'Accept Settlement'),
             Number.isFinite(requestedAmount) && requestedAmount > 0
-                ? `Accepting will settle up to ${formatCurrency(requestedAmount)} for this request period. Continue?`
-                : 'Accept this settlement request?',
+                ? t('finances.accept_request_text', 'Accepting will settle up to {{amount}} for this request period. Continue?', { amount: formatCurrency(requestedAmount) })
+                : t('finances.accept_request_fallback', 'Accept this settlement request?'),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: t('common.cancel', 'Cancel'), style: 'cancel' },
                 {
-                    text: 'Accept',
+                    text: t('finances.accept', 'Accept'),
                     style: 'default',
                     onPress: async () => {
                         try {
@@ -346,7 +348,7 @@ export default function FinancesScreen() {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        tintColor="#0b89a9"
+                        tintColor="#7C3AED"
                     />
                 }
             >
@@ -357,7 +359,7 @@ export default function FinancesScreen() {
                             className="rounded-3xl p-8 items-center justify-center"
                             style={{ backgroundColor: '#1a2233' }}
                         >
-                            <ActivityIndicator color="#0b89a9" />
+                            <ActivityIndicator color="#7C3AED" />
                             <Text className="text-xs text-gray-500 mt-2">Loading summary…</Text>
                         </View>
                     ) : (
@@ -368,9 +370,9 @@ export default function FinancesScreen() {
                                     flex: 1,
                                     borderRadius: 20,
                                     padding: 18,
-                                    backgroundColor: '#0b89a910',
+                                    backgroundColor: '#7C3AED10',
                                     borderWidth: 1,
-                                    borderColor: '#0b89a935',
+                                    borderColor: '#7C3AED35',
                                 }}
                             >
                                 <Text
@@ -378,11 +380,11 @@ export default function FinancesScreen() {
                                         fontSize: 10,
                                         fontWeight: '700',
                                         letterSpacing: 1,
-                                        color: '#0b89a9',
+                                        color: '#7C3AED',
                                         textTransform: 'uppercase',
                                     }}
                                 >
-                                    Revenue
+                                    {t('finances.revenue', 'Revenue')}
                                 </Text>
                                 <Text
                                     style={{
@@ -396,7 +398,7 @@ export default function FinancesScreen() {
                                 </Text>
                                 <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
                                     {filteredSettlements.length}{' '}
-                                    {filteredSettlements.length === 1 ? 'order' : 'orders'}
+                                    {filteredSettlements.length === 1 ? t('finances.record', 'record') : t('finances.records', 'records')}
                                 </Text>
                             </View>
 
@@ -420,7 +422,7 @@ export default function FinancesScreen() {
                                         textTransform: 'uppercase',
                                     }}
                                 >
-                                    Owed
+                                    {t('finances.owed', 'Owed')}
                                 </Text>
                                 <Text
                                     style={{
@@ -434,7 +436,7 @@ export default function FinancesScreen() {
                                 </Text>
                                 {computed.hasPartiallyPaid && (
                                     <Text style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>
-                                        Includes partial balance
+                                        {t('finances.includes_partial', 'Includes partial balance')}
                                     </Text>
                                 )}
                             </View>
@@ -461,9 +463,9 @@ export default function FinancesScreen() {
                                         paddingHorizontal: 14,
                                         paddingVertical: 8,
                                         borderRadius: 999,
-                                        backgroundColor: active ? '#0b89a9' : '#1a2233',
+                                        backgroundColor: active ? '#7C3AED' : '#1a2233',
                                         borderWidth: 1,
-                                        borderColor: active ? '#0b89a9' : '#263145',
+                                        borderColor: active ? '#7C3AED' : '#263145',
                                         opacity: disabled ? 0.4 : 1,
                                     }}
                                 >
@@ -508,7 +510,7 @@ export default function FinancesScreen() {
                                     color: '#fff',
                                 }}
                             >
-                                Settlement Requests
+                                {t('finances.settlement_requests', 'Settlement Requests')}
                             </Text>
                             {pendingRequests.length > 0 && (
                                 <View
@@ -528,7 +530,7 @@ export default function FinancesScreen() {
                                             color: '#f59e0b',
                                         }}
                                     >
-                                        {pendingRequests.length} pending
+                                        {pendingRequests.length} {t('finances.pending', 'pending')}
                                     </Text>
                                 </View>
                             )}
@@ -687,7 +689,7 @@ export default function FinancesScreen() {
                                                                 color: '#22c55e',
                                                             }}
                                                         >
-                                                            Accept
+                                                            {t('finances.accept', 'Accept')}
                                                         </Text>
                                                     )}
                                                 </Pressable>
@@ -695,7 +697,6 @@ export default function FinancesScreen() {
                                                     onPress={() =>
                                                         handleOpenDisputeModal(req.id)
                                                     }
-                                                    disabled={isResponding}
                                                     style={{
                                                         flex: 1,
                                                         borderRadius: 12,
@@ -714,7 +715,7 @@ export default function FinancesScreen() {
                                                             color: '#ef4444',
                                                         }}
                                                     >
-                                                        Dispute
+                                                        {t('finances.dispute', 'Dispute')}
                                                     </Text>
                                                 </Pressable>
                                             </View>
@@ -735,14 +736,14 @@ export default function FinancesScreen() {
                                 borderRadius: 12,
                                 paddingHorizontal: 14,
                                 paddingVertical: 10,
-                                backgroundColor: '#0b89a910',
+                                backgroundColor: '#7C3AED10',
                                 borderWidth: 1,
-                                borderColor: '#0b89a930',
+                                borderColor: '#7C3AED30',
                                 marginBottom: 10,
                                 gap: 2,
                             }}
                         >
-                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#0b89a9', textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#7C3AED', textTransform: 'uppercase', letterSpacing: 0.8 }}>
                                 Last Settlement
                             </Text>
                             <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff' }}>
@@ -765,18 +766,18 @@ export default function FinancesScreen() {
                         }}
                     >
                         <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>
-                            Settlements
+                            {t('finances.settlements', 'Settlements')}
                         </Text>
                         {filteredSettlements.length > 0 && (
                             <Text style={{ fontSize: 12, color: '#6b7280' }}>
-                                {filteredSettlements.length} record
-                                {filteredSettlements.length !== 1 ? 's' : ''}
+                                {filteredSettlements.length}{' '}
+                                {filteredSettlements.length === 1 ? t('finances.record', 'record') : t('finances.records', 'records')}
                             </Text>
                         )}
                     </View>
 
                     {settlementsLoading ? (
-                        <ActivityIndicator color="#0b89a9" style={{ marginTop: 16 }} />
+                        <ActivityIndicator color="#7C3AED" style={{ marginTop: 16 }} />
                     ) : filteredSettlements.length === 0 ? (
                         <View
                             style={{
@@ -956,7 +957,7 @@ export default function FinancesScreen() {
                                                         paddingVertical: 12,
                                                         fontSize: 12,
                                                         fontWeight: '700',
-                                                        color: isPayable ? '#22c55e' : '#e2e8f0',
+                                                        color: '#22c55e',
                                                         textAlign: 'right',
                                                     }}
                                                 >
@@ -988,15 +989,15 @@ export default function FinancesScreen() {
                                     paddingHorizontal: 16,
                                     paddingVertical: 8,
                                     borderRadius: 10,
-                                    backgroundColor: currentPage === 1 ? '#1a2233' : '#0b89a9',
+                                    backgroundColor: currentPage === 1 ? '#1a2233' : '#7C3AED',
                                     opacity: currentPage === 1 ? 0.4 : 1,
                                 }}
                             >
-                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>← Prev</Text>
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>← {t('finances.prev', 'Prev')}</Text>
                             </Pressable>
 
                             <Text style={{ fontSize: 12, color: '#6b7280' }}>
-                                Page {currentPage} of {totalPages}
+                                {t('finances.page', 'Page')} {currentPage} {t('finances.of', 'of')} {totalPages}
                             </Text>
 
                             <Pressable
@@ -1006,11 +1007,11 @@ export default function FinancesScreen() {
                                     paddingHorizontal: 16,
                                     paddingVertical: 8,
                                     borderRadius: 10,
-                                    backgroundColor: currentPage === totalPages ? '#1a2233' : '#0b89a9',
+                                    backgroundColor: currentPage === totalPages ? '#1a2233' : '#7C3AED',
                                     opacity: currentPage === totalPages ? 0.4 : 1,
                                 }}
                             >
-                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Next →</Text>
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>{t('finances.next', 'Next')} →</Text>
                             </Pressable>
                         </View>
                     )}
@@ -1045,15 +1046,15 @@ export default function FinancesScreen() {
                         }}
                     >
                         <Text style={{ fontSize: 18, fontWeight: '800', color: '#fff' }}>
-                            Custom Date Range
+                            {t('finances.custom_date_range', 'Custom Date Range')}
                         </Text>
                         <Text style={{ fontSize: 12, color: '#6b7280', marginTop: -8 }}>
-                            Enter dates in DD/MM/YYYY format
+                            {t('finances.date_format_hint', 'Enter dates in DD/MM/YYYY format')}
                         </Text>
 
                         <View style={{ gap: 10 }}>
                             <View>
-                                <Text style={{ fontSize: 11, fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>From</Text>
+                                <Text style={{ fontSize: 11, fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>{t('common.from', 'From')}</Text>
                                 <TextInput
                                     value={customStartInput}
                                     onChangeText={setCustomStartInput}
@@ -1074,7 +1075,7 @@ export default function FinancesScreen() {
                                 />
                             </View>
                             <View>
-                                <Text style={{ fontSize: 11, fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>To</Text>
+                                <Text style={{ fontSize: 11, fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>{t('common.to', 'To')}</Text>
                                 <TextInput
                                     value={customEndInput}
                                     onChangeText={setCustomEndInput}
@@ -1109,7 +1110,7 @@ export default function FinancesScreen() {
                                     borderColor: '#263145',
                                 }}
                             >
-                                <Text style={{ fontSize: 14, fontWeight: '600', color: '#9ca3af' }}>Cancel</Text>
+                                <Text style={{ fontSize: 14, fontWeight: '600', color: '#9ca3af' }}>{t('common.cancel', 'Cancel')}</Text>
                             </Pressable>
                             <Pressable
                                 onPress={handleApplyCustomRange}
@@ -1118,10 +1119,10 @@ export default function FinancesScreen() {
                                     borderRadius: 12,
                                     paddingVertical: 14,
                                     alignItems: 'center',
-                                    backgroundColor: '#0b89a9',
+                                    backgroundColor: '#7C3AED',
                                 }}
                             >
-                                <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>Apply Range</Text>
+                                <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>{t('finances.apply_range', 'Apply Range')}</Text>
                             </Pressable>
                         </View>
                     </View>
@@ -1365,7 +1366,7 @@ export default function FinancesScreen() {
                                             marginTop: 4,
                                         }}
                                     >
-                                        <Text style={{ fontSize: 15, fontWeight: '700', color: '#9ca3af' }}>Close</Text>
+                                        <Text style={{ fontSize: 15, fontWeight: '700', color: '#9ca3af' }}>{t('common.close', 'Close')}</Text>
                                     </Pressable>
                                 </ScrollView>
                             );
@@ -1408,7 +1409,7 @@ export default function FinancesScreen() {
                                 marginBottom: 6,
                             }}
                         >
-                            Dispute Settlement Request
+                            {t('finances.dispute', 'Dispute')} {t('finances.settlement_requests', 'Settlement Requests')}
                         </Text>
                         <Text
                             style={{
@@ -1460,7 +1461,7 @@ export default function FinancesScreen() {
                                         color: '#9ca3af',
                                     }}
                                 >
-                                    Cancel
+                                    {t('common.cancel', 'Cancel')}
                                 </Text>
                             </Pressable>
                             <Pressable
@@ -1488,7 +1489,7 @@ export default function FinancesScreen() {
                                             color: '#ef4444',
                                         }}
                                     >
-                                        Submit Dispute
+                                        {t('finances.dispute', 'Dispute')}
                                     </Text>
                                 )}
                             </Pressable>

@@ -186,6 +186,7 @@ type Mutation {
     updateDriverOnlineStatus(isOnline: Boolean!): User!
     generateReferralCode: String!
     setMyPreferredLanguage(language: AppLanguage!): User!
+    changeMyPassword(currentPassword: String!, newPassword: String!): Boolean!
 }
 
 type Subscription {

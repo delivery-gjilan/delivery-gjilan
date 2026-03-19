@@ -2,7 +2,7 @@ import express from 'express';
 import { randomUUID } from 'crypto';
 import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { createYoga } from 'graphql-yoga';
 import { EnvelopArmorPlugin } from '@escape.tech/graphql-armor';
 import { GraphQLError } from 'graphql';
@@ -77,7 +77,7 @@ function getRateLimitKey(req: express.Request): string {
         return `email:${email.trim().toLowerCase()}`;
     }
 
-    return `ip:${req.ip}`;
+    return `ip:${ipKeyGenerator(req.ip ?? '')}`;
 }
 
 // General API limiter
@@ -87,7 +87,6 @@ const apiLimiter = rateLimit({
     keyGenerator: getRateLimitKey,
     standardHeaders: true,
     legacyHeaders: false,
-    validate: { keyGenerator: false },
     message: { error: 'Too many requests, please try again later.' },
 });
 
@@ -98,7 +97,6 @@ const authLimiter = rateLimit({
     keyGenerator: getRateLimitKey,
     standardHeaders: true,
     legacyHeaders: false,
-    validate: { keyGenerator: false },
     message: { error: 'Too many authentication attempts, please try again later.' },
 });
 
@@ -109,7 +107,6 @@ const uploadLimiter = rateLimit({
     keyGenerator: getRateLimitKey,
     standardHeaders: true,
     legacyHeaders: false,
-    validate: { keyGenerator: false },
     message: { error: 'Too many upload requests, please try again later.' },
 });
 
