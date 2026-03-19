@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { deleteTokens } from '@/utils/secureTokenStore';
+import { UserPermission } from '@/gql/graphql';
 
 /**
  * Authentication Store
@@ -31,6 +32,7 @@ export interface AuthUser {
     firstName: string;
     lastName: string;
     role: string;
+    permissions?: UserPermission[];
     businessId: string | null;
     business?: Business;
 }

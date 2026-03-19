@@ -2,7 +2,7 @@ import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, FlatList, RefreshControl, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useQuery, useSubscription } from '@apollo/client/react';
+import { useApolloClient, useQuery, useSubscription } from '@apollo/client/react';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
@@ -15,6 +15,7 @@ import { formatRelativeTime, formatCurrency } from '@/utils/helpers';
 type StatusTab = 'ALL' | 'PENDING' | 'PREPARING' | 'READY' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED';
 
 export default function OrdersScreen() {
+    const apolloClient = useApolloClient();
     const theme = useTheme();
     const { t } = useTranslations();
     const router = useRouter();
@@ -64,7 +65,28 @@ export default function OrdersScreen() {
     }, [refetch]);
 
     useSubscription(ALL_ORDERS_SUBSCRIPTION, {
-        onData: () => scheduleRefetch(),
+        onData: ({ data: subscriptionData }) => {
+            const incomingOrders = subscriptionData.data?.allOrdersUpdated as any[] | undefined;
+            if (!incomingOrders || incomingOrders.length === 0) {
+                scheduleRefetch();
+                return;
+            }
+
+            apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
+                const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
+                const byId = new Map(currentOrders.map((order: any) => [String(order?.id), order]));
+
+                incomingOrders.forEach((order: any) => {
+                    const existingOrder = byId.get(String(order?.id));
+                    byId.set(String(order?.id), { ...existingOrder, ...order });
+                });
+
+                return {
+                    ...(existing ?? {}),
+                    orders: Array.from(byId.values()),
+                };
+            });
+        },
     });
 
     const orders = data?.orders || [];

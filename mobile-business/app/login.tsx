@@ -76,6 +76,15 @@ export default function LoginScreen() {
             router.replace('/(tabs)');
         } catch (error: any) {
             console.error('[Login] Login error:', error);
+            const statusCode = error?.networkError?.statusCode;
+            if (statusCode === 404) {
+                Alert.alert(
+                    'Login Failed',
+                    'API endpoint not found (404). Check EXPO_PUBLIC_API_URL / ngrok tunnel and ensure it points to the backend GraphQL server.',
+                );
+                return;
+            }
+
             Alert.alert('Login Failed', error.message || 'Invalid email or password');
         }
     };

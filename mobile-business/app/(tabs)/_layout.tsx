@@ -5,11 +5,16 @@ import { GET_BUSINESS_ORDERS } from '@/graphql/orders';
 import { useAuthStore } from '@/store/authStore';
 import { View, Text, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { hasBusinessPermission } from '@/lib/rbac';
+import { UserPermission } from '@/gql/graphql';
 
 export default function TabLayout() {
     const { user } = useAuthStore();
     const { data } = useQuery(GET_BUSINESS_ORDERS, { pollInterval: 15000 });
     const insets = useSafeAreaInsets();
+    const canManageProducts = hasBusinessPermission(user, UserPermission.ManageProducts);
+    const canManageSettings = hasBusinessPermission(user, UserPermission.ManageSettings);
+    const canViewAnalytics = hasBusinessPermission(user, UserPermission.ViewAnalytics);
 
     const pendingCount = (data?.orders || []).filter(
         (o: any) =>
@@ -73,6 +78,7 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="products"
                 options={{
+                    href: canManageProducts ? undefined : null,
                     title: 'Products',
                     tabBarIcon: ({ color }) => (
                         <Ionicons name="fast-food" size={26} color={color} />
@@ -82,6 +88,7 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="dashboard"
                 options={{
+                    href: canViewAnalytics ? undefined : null,
                     title: 'Dashboard',
                     tabBarIcon: ({ color }) => (
                         <Ionicons name="analytics" size={26} color={color} />
@@ -91,6 +98,7 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="finances"
                 options={{
+                    href: canViewAnalytics ? undefined : null,
                     title: 'Finances',
                     tabBarIcon: ({ color }) => (
                         <Ionicons name="cash-outline" size={26} color={color} />
@@ -100,6 +108,7 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="settings"
                 options={{
+                    href: canManageSettings ? undefined : null,
                     title: 'Settings',
                     tabBarIcon: ({ color }) => (
                         <Ionicons name="settings" size={26} color={color} />
