@@ -1,6 +1,6 @@
 # Auth & User Management
 
-<!-- MDS:B5 | Domain: Backend | Updated: 2026-03-18 -->
+<!-- MDS:B5 | Domain: Backend | Updated: 2026-03-19 -->
 <!-- Depends-On: B1 -->
 <!-- Depended-By: O5, O6 -->
 <!-- Nav: Token lifetime changes → update O5 (Security). Signup step changes → review M1 (Mobile Overview). Role changes → review BL1 (Settlements), B2 (Order Creation). -->
@@ -164,3 +164,62 @@ See `docs/BACKEND/API.md` (B1) for the full three-tier rate limiting model.
 - OTP attempt limits not enforced (any number of guesses allowed, only rate limit applies) — flagged in O5 (Security)
 - No account lockout after repeated failed logins
 - Refresh token cleanup job not scheduled (expired sessions accumulate in DB)
+
+---
+
+## RBAC and Tenant Enforcement
+
+Current authorization behavior across API resolvers and admin-panel:
+
+- Login allows `SUPER_ADMIN`, `ADMIN`, `BUSINESS_OWNER`, `BUSINESS_EMPLOYEE` into admin-panel.
+- Admin-panel layouts enforce role-aware route access (not only authentication):
+  - `SUPER_ADMIN` can access all admin-panel routes.
+  - `ADMIN` is blocked from super-admin-only routes.
+  - `BUSINESS_OWNER` is limited to business-facing dashboard routes.
+  - `BUSINESS_EMPLOYEE` is limited to business-facing routes and blocked from finances/settings pages.
+
+### User Management Rules
+
+- `SUPER_ADMIN` can create/update/delete users across the platform.
+- `BUSINESS_OWNER` can create/update/delete only `BUSINESS_EMPLOYEE` users in the owner's own business.
+- `BUSINESS_OWNER` cannot change employee role type or reassign employees to another business.
+- `setUserPermissions` supports platform admins and business owners; owners are restricted to employees in their own business.
+- `updateUserNote` is restricted by tenant scope for business roles (same business only).
+
+### Query Visibility Rules
+
+- `users` query:
+  - `SUPER_ADMIN`/`ADMIN`: full list.
+  - `BUSINESS_OWNER`/`BUSINESS_EMPLOYEE`: users in own business plus self.
+  - other roles: forbidden.
+- `drivers` query:
+  - `SUPER_ADMIN`/`ADMIN`: full list.
+  - `BUSINESS_OWNER`/`BUSINESS_EMPLOYEE`: drivers in own business.
+  - other roles: forbidden.
+
+### Business and Product Mutation Rules
+
+- `createBusiness`: super-admin only.
+- `updateBusiness`, `deleteBusiness`, `setBusinessSchedule`:
+  - platform admins: any business.
+  - business owner: own business only.
+  - business employee: own business only + `manage_settings` permission.
+- Product mutations (`createProduct`, `updateProduct`, `deleteProduct`, `updateProductsOrder`):
+  - platform admins: any business.
+  - business owner: own business only.
+  - business employee: own business only + `manage_products` permission.
+
+### Provisioning Pattern
+
+Recommended provisioning sequence:
+
+1. Create business.
+2. Create or assign a `BUSINESS_OWNER` with matching `businessId`.
+3. Let the owner create `BUSINESS_EMPLOYEE` users and assign permissions.
+
+Admin-panel supports owner credentials during business creation by chaining:
+
+1. `createBusiness`
+2. `createUser(role: BUSINESS_OWNER, businessId: createdBusiness.id)`
+
+This flow is client-orchestrated (two mutation calls), so business creation can succeed even if owner creation fails.

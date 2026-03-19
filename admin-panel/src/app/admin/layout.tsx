@@ -10,13 +10,18 @@ import { ReactNode } from "react";
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, admin } = useAuth();
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       router.push("/login");
+      return;
     }
-  }, [isAuthenticated, loading, router]);
+
+    if (!loading && isAuthenticated && admin?.role !== "SUPER_ADMIN") {
+      router.push("/dashboard");
+    }
+  }, [isAuthenticated, loading, router, admin?.role]);
 
   if (loading) {
     return (
@@ -27,6 +32,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   }
 
   if (!isAuthenticated) {
+    return null;
+  }
+
+  if (admin?.role !== "SUPER_ADMIN") {
     return null;
   }
 

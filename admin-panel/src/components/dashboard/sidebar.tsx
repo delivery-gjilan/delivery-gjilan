@@ -24,45 +24,42 @@ import {
 } from "lucide-react";
 
 const menu: any[] = [
-  // Core Operations
+  // Section 1
+  { sectionHeader: "Operations", superAdminOnly: true },
   { name: "Orders", href: "/dashboard/orders", icon: ClipboardList, businessAdminVisible: true },
-  { name: "Market", href: "/dashboard/market", icon: Store, businessAdminVisible: true },
-  { name: "Products", href: "/dashboard/products", icon: Package, businessAdminVisible: true },
-  { name: "Deals", href: "/dashboard/deals", icon: Percent, businessAdminVisible: true },
-  
-  { divider: true, businessAdminVisible: true },
-  
-  // Business Management
-  { name: "Statistics", href: "/dashboard/statistics", icon: BarChart3, businessAdminVisible: true },
-  { name: "Finances", href: "/dashboard/finances", icon: DollarSign, businessAdminVisible: true },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings, businessAdminVisible: true },
-  
-  { divider: true, superAdminOnly: true },
-  { sectionHeader: "System Management", superAdminOnly: true },
-  
-  // System Management (Super Admin)
-  { name: "Businesses", href: "/dashboard/businesses", icon: Store, superAdminOnly: true },
-  { name: "Drivers", href: "/dashboard/drivers", icon: Truck, superAdminOnly: true },
   { name: "Map", href: "/dashboard/map", icon: Map, superAdminOnly: true },
-  { name: "Banners", href: "/admin/banners", icon: Image, superAdminOnly: true },
-  
-  { name: "Settlements", href: "/admin/financial", icon: DollarSign, superAdminOnly: true },
-  
+  { name: "Businesses", href: "/dashboard/businesses", icon: Store, superAdminOnly: true },
+  { name: "Market", href: "/dashboard/market", icon: Store, businessAdminVisible: true },
+  { name: "Drivers", href: "/dashboard/drivers", icon: Truck, superAdminOnly: true },
+
   { divider: true, superAdminOnly: true },
-  { sectionHeader: "Configuration", superAdminOnly: true },
-  
-  // Configuration (Super Admin)
+
+  // Section 2
+  { sectionHeader: "Pricing & Promotions", superAdminOnly: true },
   { name: "Promotions", href: "/dashboard/promotions", icon: Tag, superAdminOnly: true },
   { name: "Product Markup", href: "/dashboard/productpricing", icon: Tag, superAdminOnly: true },
   { name: "Delivery Pricing", href: "/dashboard/delivery-pricing", icon: Truck, superAdminOnly: true },
   { name: "Delivery Zones", href: "/dashboard/delivery-zones", icon: Map, superAdminOnly: true },
-  
+
   { divider: true, superAdminOnly: true },
-  { sectionHeader: "Administration", superAdminOnly: true },
-  
-  // Administration (Super Admin)
+
+  // Section 3
+  { sectionHeader: "Finance & Admin", superAdminOnly: true },
+  { name: "Settlements", href: "/admin/financial", icon: DollarSign, superAdminOnly: true },
+  { name: "Finances", href: "/dashboard/finances", icon: DollarSign, businessAdminVisible: true },
   { name: "Admins", href: "/dashboard/admins", icon: UserCog, superAdminOnly: true },
   { name: "Users", href: "/dashboard/users", icon: Users, superAdminOnly: true },
+  { name: "Promotions", href: "/dashboard/promotions", icon: Tag, superAdminOnly: true },
+
+  { divider: true, superAdminOnly: true },
+
+  // Remaining items
+  { sectionHeader: "Other", superAdminOnly: true },
+  { name: "Products", href: "/dashboard/products", icon: Package, businessAdminVisible: true },
+  { name: "Deals", href: "/dashboard/deals", icon: Percent, businessAdminVisible: true },
+  { name: "Statistics", href: "/dashboard/statistics", icon: BarChart3, businessAdminVisible: true },
+  { name: "Settings", href: "/dashboard/settings", icon: Settings, businessAdminVisible: true },
+  { name: "Banners", href: "/admin/banners", icon: Image, superAdminOnly: true },
   { name: "Notifications", href: "/dashboard/notifications", icon: Bell, superAdminOnly: true },
   { name: "Push Telemetry", href: "/dashboard/notifications/telemetry", icon: Activity, superAdminOnly: true },
   { name: "Business Devices", href: "/dashboard/notifications/devices", icon: Activity, superAdminOnly: true },
@@ -132,7 +129,7 @@ export default function Sidebar() {
 
           return (
             <Link
-              key={item.href}
+              key={`${item.href}-${index}`}
               href={item.href}
               title={item.name}
               className={`relative px-3 py-2.5 rounded-lg flex items-center gap-3 transition-all duration-150 ${

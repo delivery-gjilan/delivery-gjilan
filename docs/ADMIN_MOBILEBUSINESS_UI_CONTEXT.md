@@ -10,6 +10,7 @@ This document is a fast context handoff for future UI changes across `admin-pane
 ## Recent Updates
 
 - 2026-03-18: Fixed admin settlements table rendering condition in `admin-panel/src/app/admin/financial/settlements/page.tsx` where selected-business view could show footer counts ("Showing x of x") but render no rows due nested ternary boolean output.
+- 2026-03-18: Reorganized `admin-panel` sidebar navigation sections/order in `admin-panel/src/components/dashboard/sidebar.tsx` with requested grouping: Operations first, Pricing & Promotions second, Finance & Admin third, and remaining links under Other.
 
 ## Scope
 

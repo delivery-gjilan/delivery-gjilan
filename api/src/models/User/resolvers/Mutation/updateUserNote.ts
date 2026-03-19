@@ -10,6 +10,27 @@ export const updateUserNote: NonNullable<MutationResolvers['updateUserNote']> = 
         });
     }
 
+    if (userData.role === 'BUSINESS_OWNER' || userData.role === 'BUSINESS_EMPLOYEE') {
+        if (!userData.businessId) {
+            throw new GraphQLError('Business user must be associated with a business', {
+                extensions: { code: 'FORBIDDEN' },
+            });
+        }
+
+        const targetUser = await authService.getUserById(userId);
+        if (!targetUser) {
+            throw new GraphQLError('User not found', {
+                extensions: { code: 'NOT_FOUND' },
+            });
+        }
+
+        if (targetUser.businessId !== userData.businessId) {
+            throw new GraphQLError('You can only update notes for users in your business', {
+                extensions: { code: 'FORBIDDEN' },
+            });
+        }
+    }
+
     // Update the user's admin note
     const updatedUser = await authService.authRepository.updateUser(userId, {
         adminNote: note || null,

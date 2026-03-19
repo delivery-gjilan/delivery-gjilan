@@ -238,9 +238,25 @@ ARCHITECTURE (A1)
 | `src/repositories/SettlementRuleRepository.ts` | BL1 |
 | `src/routes/uploadRoutes.ts` | B9, O6 |
 | `src/services/AuthService.ts` | B5 |
+| `src/lib/utils/permissions.ts` | B5, O5 |
 | `src/services/PricingService.ts` | B6 |
 | `src/services/S3Service.ts` | B9 |
 | `src/repositories/AuthRepository.ts` | B5 |
+| `src/models/User/resolvers/Mutation/createUser.ts` | B5 |
+| `src/models/User/resolvers/Mutation/updateUser.ts` | B5 |
+| `src/models/User/resolvers/Mutation/deleteUser.ts` | B5 |
+| `src/models/User/resolvers/Mutation/updateUserNote.ts` | B5 |
+| `src/models/User/resolvers/Mutation/setUserPermissions.ts` | B5 |
+| `src/models/User/resolvers/Query/users.ts` | B5 |
+| `src/models/User/resolvers/Query/drivers.ts` | B5 |
+| `src/models/Business/resolvers/Mutation/createBusiness.ts` | B5, BL2 |
+| `src/models/Business/resolvers/Mutation/updateBusiness.ts` | B5, BL2 |
+| `src/models/Business/resolvers/Mutation/setBusinessSchedule.ts` | B5, BL2 |
+| `src/models/Business/resolvers/Mutation/deleteBusiness.ts` | B5, BL2 |
+| `src/models/Product/resolvers/Mutation/createProduct.ts` | B5, BL2 |
+| `src/models/Product/resolvers/Mutation/updateProduct.ts` | B5, BL2 |
+| `src/models/Product/resolvers/Mutation/deleteProduct.ts` | B5, BL2 |
+| `src/models/Product/resolvers/Mutation/updateProductsOrder.ts` | B5, BL2 |
 | `src/repositories/AuditLogRepository.ts` | B10 |
 | `src/lib/cache.ts` | B8 |
 | `src/lib/haversine.ts` | B6 |
@@ -261,9 +277,17 @@ ARCHITECTURE (A1)
 | `src/app/dashboard/market/page.tsx` | UI1 |
 | `src/app/dashboard/finances/page.tsx` | BL1 |
 | `src/app/dashboard/notifications/page.tsx` | O3 |
+| `src/app/dashboard/businesses/page.tsx` | B5, BL2, UI1 |
+| `src/app/dashboard/layout.tsx` | B5, UI1 |
+| `src/app/admin/layout.tsx` | B5, UI1 |
 | `src/components/businesses/ProductsBlock.tsx` | UI1 |
+| `src/lib/auth-context.tsx` | B5 |
+| `src/lib/route-access.ts` | B5 |
+| `src/components/dashboard/sidebar.tsx` | UI1, B5 |
 | `src/lib/hooks/useProducts.ts` | UI1 |
 | `src/graphql/operations/products/` | UI1 |
+| `src/graphql/operations/businesses/mutations.ts` | B5, UI1 |
+| `src/graphql/operations/users/mutations.ts` | B5, UI1 |
 | `admin/financial/rules/page.tsx` | BL1 |
 | `admin/financial/testing/page.tsx` | BL1 |
 
