@@ -12,6 +12,9 @@ const WS_URL = process.env.EXPO_PUBLIC_WS_URL || 'ws://localhost:4000';
 // HTTP Link
 const httpLink = new HttpLink({
     uri: `${API_URL}/graphql`,
+    headers: {
+        'ngrok-skip-browser-warning': 'true',
+    },
 });
 
 // Exponential backoff for reconnection: 1s -> 2s -> 5s -> 10s

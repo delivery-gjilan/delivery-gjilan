@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
-import messaging from '@react-native-firebase/messaging';
+import messaging, { firebase } from '@react-native-firebase/messaging';
 import { useMutation } from '@apollo/client/react';
 import { useAuthStore } from '@/store/authStore';
 import { REGISTER_DEVICE_TOKEN, UNREGISTER_DEVICE_TOKEN, TRACK_PUSH_TELEMETRY } from '@/graphql/notifications';
@@ -24,6 +24,12 @@ function resolveDeviceId(): string {
 
 async function registerForPushNotifications(): Promise<string | null> {
     if (!Device.isDevice) return null;
+
+    // Safety check: Don't call messaging() if native Firebase app isn't ready
+    if (!firebase.apps.length) {
+        console.warn('[BusinessNotifications] Firebase not initialized natively');
+        return null;
+    }
 
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
@@ -126,29 +132,33 @@ export function useNotifications() {
 
         setup();
 
-        const unsubscribeTokenRefresh = messaging().onTokenRefresh(async (newToken) => {
-            if (!mounted || newToken === currentPushToken.current) {
-                return;
-            }
+        let unsubscribeTokenRefresh: (() => void) | undefined;
+        
+        if (firebase.apps.length) {
+            unsubscribeTokenRefresh = messaging().onTokenRefresh(async (newToken) => {
+                if (!mounted || newToken === currentPushToken.current) {
+                    return;
+                }
 
-            currentPushToken.current = newToken;
+                currentPushToken.current = newToken;
 
-            try {
-                await registerToken({
-                    variables: {
-                        input: {
-                            token: newToken,
-                            platform: Platform.OS === 'ios' ? 'IOS' : 'ANDROID',
-                            deviceId: resolveDeviceId(),
-                            appType: 'BUSINESS',
+                try {
+                    await registerToken({
+                        variables: {
+                            input: {
+                                token: newToken,
+                                platform: Platform.OS === 'ios' ? 'IOS' : 'ANDROID',
+                                deviceId: resolveDeviceId(),
+                                appType: 'BUSINESS',
+                            },
                         },
-                    },
-                });
-                await sendTelemetry('TOKEN_REFRESHED', { tokenPreview: `${newToken.slice(0, 20)}...` });
-            } catch (err) {
-                console.error('[BusinessNotifications] Failed to register refreshed token:', err);
-            }
-        });
+                    });
+                    await sendTelemetry('TOKEN_REFRESHED', { tokenPreview: `${newToken.slice(0, 20)}...` });
+                } catch (err) {
+                    console.error('[BusinessNotifications] Failed to register refreshed token:', err);
+                }
+            });
+        }
 
         const notificationListener = Notifications.addNotificationReceivedListener((notification) => {
             void sendTelemetry('RECEIVED', {
@@ -176,7 +186,7 @@ export function useNotifications() {
 
         return () => {
             mounted = false;
-            unsubscribeTokenRefresh();
+            unsubscribeTokenRefresh?.();
             notificationListener.remove();
             responseListener.remove();
         };

@@ -1,6 +1,6 @@
 import '../global.css';
-import { useEffect, useState } from 'react';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
 import { ApolloProvider, useQuery } from '@apollo/client/react';
 import { apolloClient } from '@/lib/apollo';
 import { useAuthStore } from '@/store/authStore';
@@ -16,8 +16,14 @@ import { GET_STORE_STATUS } from '@/graphql/store';
 function AppContent() {
     const router = useRouter();
     const segments = useSegments();
+    const rootNavigationState = useRootNavigationState();
     const { isAuthenticated, hasHydrated } = useAuthStore();
     const [bannerDismissed, setBannerDismissed] = useState(false);
+    const isMounted = useRef(false);
+
+    useEffect(() => {
+        isMounted.current = true;
+    }, []);
 
     const { data: storeData } = useQuery(GET_STORE_STATUS, { pollInterval: 30_000 });
     const bannerEnabled = storeData?.getStoreStatus?.bannerEnabled ?? false;
@@ -32,16 +38,16 @@ function AppContent() {
 
     // Navigation guard
     useEffect(() => {
-        if (!hasHydrated) return;
+        if (!hasHydrated || !isMounted.current || !rootNavigationState?.key) return;
 
         const currentSegment = segments[0];
         const inTabsGroup = currentSegment === '(tabs)';
         const onLoginRoute = currentSegment === 'login';
-        
+
         if (!isAuthenticated && inTabsGroup) {
-            router.replace('/login');
+            setTimeout(() => router.replace('/login'), 0);
         } else if (isAuthenticated && onLoginRoute) {
-            router.replace('/(tabs)');
+            setTimeout(() => router.replace('/(tabs)'), 0);
         }
     }, [isAuthenticated, segments, hasHydrated, router]);
 
