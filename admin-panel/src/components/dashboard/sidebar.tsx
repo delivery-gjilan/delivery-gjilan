@@ -44,8 +44,7 @@ const menu: any[] = [
 
   // Section 3
   { sectionHeader: "Finance & Admin", superAdminOnly: true },
-  { name: "Settlements", href: "/admin/financial", icon: DollarSign, superAdminOnly: true },
-  { name: "Finances", href: "/dashboard/finances", icon: DollarSign, superAdminOnly: true },
+  { name: "Financial Ops", href: "/admin/financial", icon: DollarSign, superAdminOnly: true },
   { name: "Admins", href: "/dashboard/admins", icon: UserCog, superAdminOnly: true },
   { name: "Users", href: "/dashboard/users", icon: Users, superAdminOnly: true },
   { name: "Promotions", href: "/dashboard/promotions", icon: Tag, superAdminOnly: true },
@@ -54,6 +53,7 @@ const menu: any[] = [
 
   // Remaining items
   { sectionHeader: "Other", superAdminOnly: true },
+  { name: "Settlements", href: "/dashboard/business-settlements", icon: DollarSign, businessAdminVisible: true },
   { name: "Categories", href: "/dashboard/categories", icon: Tag, businessAdminVisible: true },
   { name: "Products", href: "/dashboard/products", icon: Package, businessAdminVisible: true },
   { name: "Statistics", href: "/dashboard/statistics", icon: BarChart3, businessAdminVisible: true },

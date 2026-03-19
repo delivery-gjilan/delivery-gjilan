@@ -41,6 +41,7 @@
 | O10 | [OPERATIONS/APP_STORE_RELEASE.md](OPERATIONS/APP_STORE_RELEASE.md) | Operations | iOS submission checklist, compliance |
 | O11 | [OPERATIONS/ANALYTICS.md](OPERATIONS/ANALYTICS.md) | Operations | KPIs, dashboards, metric calculations |
 | UI1 | [ADMIN_MOBILEBUSINESS_UI_CONTEXT.md](ADMIN_MOBILEBUSINESS_UI_CONTEXT.md) | UI | Product types, variant groups, admin/mobile-business UX |
+| UI2 | [ADMIN_PANEL_BUSINESS_SETTLEMENTS.md](ADMIN_PANEL_BUSINESS_SETTLEMENTS.md) | UI | Business-facing settlements semantics, filters, lazy order details |
 
 ### Non-docs MDS (project-level)
 

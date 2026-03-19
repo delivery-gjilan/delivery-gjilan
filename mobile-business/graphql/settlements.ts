@@ -1,11 +1,20 @@
 import { gql } from '@apollo/client';
 
 export const GET_MY_BUSINESS_SETTLEMENTS = gql`
-    query GetMyBusinessSettlements($businessId: ID!, $status: SettlementStatus, $startDate: Date, $endDate: Date, $limit: Int, $offset: Int) {
+    query GetMyBusinessSettlements(
+        $businessId: ID!
+        $status: SettlementStatus
+        $direction: SettlementDirection
+        $startDate: Date
+        $endDate: Date
+        $limit: Int
+        $offset: Int
+    ) {
         settlements(
             type: BUSINESS
             businessId: $businessId
             status: $status
+            direction: $direction
             startDate: $startDate
             endDate: $endDate
             limit: $limit
@@ -22,10 +31,23 @@ export const GET_MY_BUSINESS_SETTLEMENTS = gql`
             createdAt
             order {
                 id
+                displayId
                 orderPrice
                 deliveryPrice
                 totalPrice
                 orderDate
+                businesses {
+                    business {
+                        id
+                        name
+                    }
+                    items {
+                        id
+                        name
+                        quantity
+                        unitPrice
+                    }
+                }
             }
         }
     }

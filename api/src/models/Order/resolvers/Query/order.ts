@@ -1,10 +1,12 @@
 import type { QueryResolvers } from './../../../../generated/types.generated';
 import { GraphQLError } from 'graphql';
 import logger from '@/lib/logger';
+import { settlements } from '@/database/schema';
+import { and, eq } from 'drizzle-orm';
 
 const log = logger.child({ resolver: 'orderQuery' });
 
-export const order: NonNullable<QueryResolvers['order']> = async (_parent, { id }, { orderService, userData }) => {
+export const order: NonNullable<QueryResolvers['order']> = async (_parent, { id }, { orderService, userData, db }) => {
     log.info({ orderId: id, requesterId: userData.userId, role: userData.role }, 'order:query:requested');
 
     // Check authentication
@@ -43,15 +45,28 @@ export const order: NonNullable<QueryResolvers['order']> = async (_parent, { id 
 
         case 'BUSINESS_OWNER':
         case 'BUSINESS_EMPLOYEE':
-            // Business users can only see orders that contain items from their business
+            // Business users can only see orders that contain their items, or orders with an explicit settlement for their business.
             if (!userData.businessId) {
                 throw new GraphQLError('Business admin must be associated with a business', {
                     extensions: { code: 'FORBIDDEN' },
                 });
             }
-            // Check if order contains items from the admin's business
+
             const hasBusinessItems = await orderService.orderContainsBusiness(dbOrder.id, userData.businessId);
             if (!hasBusinessItems) {
+                const businessSettlement = await db.query.settlements.findFirst({
+                    columns: { id: true },
+                    where: and(
+                        eq(settlements.orderId, dbOrder.id),
+                        eq(settlements.type, 'BUSINESS'),
+                        eq(settlements.businessId, userData.businessId),
+                    ),
+                });
+
+                if (businessSettlement) {
+                    break;
+                }
+
                 log.warn({ orderId: id, requesterId: userData.userId, businessId: userData.businessId }, 'order:query:forbidden-business');
                 throw new GraphQLError('Forbidden: You can only view orders from your business', {
                     extensions: { code: 'FORBIDDEN' },

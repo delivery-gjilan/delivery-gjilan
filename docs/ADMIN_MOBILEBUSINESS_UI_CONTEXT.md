@@ -9,6 +9,13 @@ This document is a fast context handoff for future UI changes across `admin-pane
 
 ## Recent Updates
 
+- 2026-03-19: `admin-panel` business settlements (`/dashboard/business-settlements`) UI/UX refactor: clearer filter layout, added `This week` and `From last settlement` date modes, improved active-range labeling, and explicit modal error messaging for order-details fetch failures.
+- 2026-03-19: Fixed order-details authorization edge case for business users by allowing access when a matching business settlement exists for the order (fallback in `api/src/models/Order/resolvers/Query/order.ts`).
+- 2026-03-19: Removed duplicate super-admin finance sidebar entries and kept a single `Financial Ops` link to `/admin/financial` for clearer separation from business settlements navigation.
+- 2026-03-19: Separated business settlements into dedicated admin-panel route `/dashboard/business-settlements`; legacy `/dashboard/finances` now redirects by role (business -> dedicated page, non-business -> `/admin/financial/settlements`).
+- 2026-03-19: `admin-panel` business settlements view (`/dashboard/finances`) was simplified to a flat table (removed grouped business dropdown accordion), retained filters, and switched order details to lazy fetch via per-row "View order" action.
+- 2026-03-19: Corrected business settlements math in `admin-panel/src/app/dashboard/finances/page.tsx` to respect settlement direction semantics (`RECEIVABLE` means platform commission receivable from business; `PAYABLE` means payout owed to business), fixing reversed commission/net display.
+- 2026-03-19: Added business-facing settlements in `admin-panel` (`/dashboard/finances`) with order id/time, itemized breakdown, commission/net reasoning, and filters (date/status/direction/search); added business sidebar entry and server-side settlement query scoping/permission checks for business roles.
 - 2026-03-19: Replaced per-item category reorder updates with bulk `updateProductCategoriesOrder` mutation (API GraphQL/service/repository/resolver + admin hook/operation) so drag-save is a single request.
 - 2026-03-19: Category sorting persistence moved from localStorage to backend `sortOrder` updates (`api` schema/service/repository + `admin-panel` category mutations/queries + drag-save in `CategoriesBlock`).
 - 2026-03-19: Switched `admin-panel/src/components/businesses/ProductsBlock.tsx` sorting to market-style drag-and-drop with `dnd-kit` handles per category section; fixed invalid icon imports causing compile failures.

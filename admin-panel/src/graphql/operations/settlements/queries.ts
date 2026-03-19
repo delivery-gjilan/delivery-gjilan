@@ -38,6 +38,8 @@ export const GET_SETTLEMENTS = graphql(`
             }
             order {
                 id
+                displayId
+                orderDate
                 orderPrice
                 deliveryPrice
                 totalPrice
