@@ -18,7 +18,9 @@ function getApiUrl(): string | null {
         console.error('[Auth] EXPO_PUBLIC_API_URL is not configured');
         return null;
     }
-    return `${apiUrl}/graphql`;
+    const trimmed = apiUrl.trim().replace(/\/+$/, '');
+    const normalized = trimmed.endsWith('/graphql') ? trimmed.slice(0, -'/graphql'.length) : trimmed;
+    return `${normalized}/graphql`;
 }
 
 function parseJwtExpiryMs(token: string): number | null {

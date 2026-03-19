@@ -22,6 +22,7 @@ Scope reviewed:
 8. 2026-03-19: Admin Order Details item price cells now fall back to `basePrice` when `unitPrice` is absent, and totals card colors were adjusted (Delivery in amber, Total in green) for clearer visual hierarchy.
 9. 2026-03-19: Mobile active-order tracking now listens for WS reconnect events and force-refetches order queries to recover missed status transitions during temporary real-time disconnects.
 10. 2026-03-19: Mobile `userOrdersUpdated` handling was reconstructed to be subscription-first (direct Apollo cache + Zustand active-order updates from payload), while network refetch remains only as a throttled fallback for reconnect/payload anomalies.
+11. 2026-03-19: Cross-app subscription optimization sweep applied the same subscription-first cache update pattern to admin panel orders, mobile-admin orders/map orders, mobile-business orders, and mobile-driver orders feeds; refetch is now fallback-only in those paths.
 
 ## Current Behavior
 

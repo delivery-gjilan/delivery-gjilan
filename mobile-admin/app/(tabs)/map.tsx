@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, Pressable, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useQuery, useSubscription } from '@apollo/client/react';
+import { useApolloClient, useQuery, useSubscription } from '@apollo/client/react';
 import { Ionicons } from '@expo/vector-icons';
 import Mapbox from '@rnmapbox/maps';
 import { GET_ORDERS, ALL_ORDERS_SUBSCRIPTION } from '@/graphql/orders';
@@ -41,6 +41,7 @@ const toLineFeature = (geometry: Array<[number, number]>) => ({
 });
 
 export default function MapScreen() {
+    const apolloClient = useApolloClient();
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const cameraRef = useRef<Mapbox.Camera>(null);
@@ -115,7 +116,30 @@ export default function MapScreen() {
         });
     }, [refetchDrivers]);
 
-    useSubscription(ALL_ORDERS_SUBSCRIPTION, { onData: () => scheduleOrdersRefetch() });
+    useSubscription(ALL_ORDERS_SUBSCRIPTION, {
+        onData: ({ data: subscriptionData }) => {
+            const incomingOrders = subscriptionData.data?.allOrdersUpdated as any[] | undefined;
+            if (!incomingOrders || incomingOrders.length === 0) {
+                scheduleOrdersRefetch();
+                return;
+            }
+
+            apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
+                const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
+                const byId = new Map(currentOrders.map((order: any) => [String(order?.id), order]));
+
+                incomingOrders.forEach((order: any) => {
+                    const existingOrder = byId.get(String(order?.id));
+                    byId.set(String(order?.id), { ...existingOrder, ...order });
+                });
+
+                return {
+                    ...(existing ?? {}),
+                    orders: Array.from(byId.values()),
+                };
+            });
+        },
+    });
     useSubscription(DRIVERS_UPDATED_SUBSCRIPTION, { onData: () => scheduleDriversRefetch() });
 
     const orders = ordersData?.orders || [];

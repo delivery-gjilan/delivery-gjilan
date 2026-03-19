@@ -4,10 +4,31 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useAuthStore } from '@/store/authStore';
+import { hasBusinessPermission } from '@/lib/rbac';
+import { UserPermission } from '@/gql/graphql';
 
 export default function SettingsScreen() {
     const router = useRouter();
     const { user, logout } = useAuthStore();
+    const canManageSettings = hasBusinessPermission(user, UserPermission.ManageSettings);
+
+    if (!canManageSettings) {
+        return (
+            <SafeAreaView className="flex-1 bg-background items-center justify-center px-6">
+                <Ionicons name="lock-closed" size={42} color="#ef4444" />
+                <Text className="text-text text-xl font-bold mt-4">Access Restricted</Text>
+                <Text className="text-subtext text-center mt-2">
+                    You do not have permission to manage settings.
+                </Text>
+                <TouchableOpacity
+                    className="bg-primary px-4 py-3 rounded-xl mt-5"
+                    onPress={() => router.replace('/(tabs)')}
+                >
+                    <Text className="text-white font-semibold">Back to Orders</Text>
+                </TouchableOpacity>
+            </SafeAreaView>
+        );
+    }
 
     const handleLogout = () => {
         Alert.alert('Logout', 'Are you sure you want to logout?', [

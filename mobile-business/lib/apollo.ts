@@ -6,8 +6,18 @@ import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
 import { getValidAccessToken } from './authSession';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000';
-const WS_URL = process.env.EXPO_PUBLIC_WS_URL || 'ws://localhost:4000';
+function normalizeHttpBaseUrl(url: string): string {
+    const trimmed = url.trim().replace(/\/+$/, '');
+    return trimmed.endsWith('/graphql') ? trimmed.slice(0, -'/graphql'.length) : trimmed;
+}
+
+function normalizeWsBaseUrl(url: string): string {
+    const trimmed = url.trim().replace(/\/+$/, '');
+    return trimmed.endsWith('/graphql') ? trimmed.slice(0, -'/graphql'.length) : trimmed;
+}
+
+const API_URL = normalizeHttpBaseUrl(process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000');
+const WS_URL = normalizeWsBaseUrl(process.env.EXPO_PUBLIC_WS_URL || 'ws://localhost:4000');
 
 // HTTP Link
 const httpLink = new HttpLink({

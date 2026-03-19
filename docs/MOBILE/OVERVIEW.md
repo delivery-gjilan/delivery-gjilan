@@ -67,6 +67,13 @@ Any regression here affects admin maps and customer delivery tracking.
 - they can usually refetch safely on signals instead of animating fine-grained movement
 - they are good candidates for further cleanup because parts of their docs and behaviors are still under-documented
 
+Recent mobile-business RBAC alignment updates:
+
+- login now requests user `permissions` so employee capability checks can be enforced client-side
+- tab visibility is permission-aware (`manage_products`, `manage_settings`, `view_analytics`) with owner override
+- products and settings screens now include explicit access guards for restricted employees
+- API/WS URL normalization strips accidental `/graphql` suffix duplication to prevent `/graphql/graphql` endpoint mistakes that can surface as login/network failures (including 404 in some tunnel setups)
+
 ## Main Documentation Gap
 
 The apps share patterns but not enough explicit documentation. When changing auth, websocket, or generated GraphQL behavior, verify all four apps because schema changes propagate widely.

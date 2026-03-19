@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ActivityIndicator, Pressable } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Mapbox from '@rnmapbox/maps';
-import { useQuery, useSubscription } from '@apollo/client/react';
+import { useApolloClient, useQuery, useSubscription } from '@apollo/client/react';
 import { GET_ORDERS, ALL_ORDERS_UPDATED } from '@/graphql/operations/orders';
 import { useDriverLocation } from '@/hooks/useDriverLocation';
 import { useTheme } from '@/hooks/useTheme';
@@ -42,6 +42,7 @@ const STATUS_ICONS: Record<string, string> = {
 };
 
 export default function MapScreen() {
+    const apolloClient = useApolloClient();
     const theme = useTheme();
     const insets = useSafeAreaInsets();
     const router = useRouter();
@@ -64,7 +65,28 @@ export default function MapScreen() {
     });
 
     useSubscription(ALL_ORDERS_UPDATED, {
-        onData: () => { refetch(); },
+        onData: ({ data }) => {
+            const incomingOrders = data.data?.allOrdersUpdated as any[] | undefined;
+            if (!incomingOrders || incomingOrders.length === 0) {
+                refetch();
+                return;
+            }
+
+            apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
+                const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
+                const byId = new Map(currentOrders.map((order: any) => [String(order?.id), order]));
+
+                incomingOrders.forEach((order: any) => {
+                    const existingOrder = byId.get(String(order?.id));
+                    byId.set(String(order?.id), { ...existingOrder, ...order });
+                });
+
+                return {
+                    ...(existing ?? {}),
+                    orders: Array.from(byId.values()),
+                };
+            });
+        },
     });
 
     // ── Filter orders ──

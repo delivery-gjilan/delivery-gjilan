@@ -13,6 +13,7 @@ import {
     Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -24,6 +25,8 @@ import {
 } from '@/graphql/products';
 import { useAuthStore } from '@/store/authStore';
 import * as Haptics from 'expo-haptics';
+import { hasBusinessPermission } from '@/lib/rbac';
+import { UserPermission } from '@/gql/graphql';
 
 interface Product {
     id: string;
@@ -44,7 +47,9 @@ interface Category {
 }
 
 export default function ProductsScreen() {
+    const router = useRouter();
     const { user } = useAuthStore();
+    const canManageProducts = hasBusinessPermission(user, UserPermission.ManageProducts);
     const [searchQuery, setSearchQuery] = useState('');
     const [showAddModal, setShowAddModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -66,6 +71,24 @@ export default function ProductsScreen() {
     const [deleteProduct] = useMutation(DELETE_PRODUCT, {
         refetchQueries: ['GetBusinessProducts'],
     });
+
+    if (!canManageProducts) {
+        return (
+            <SafeAreaView className="flex-1 bg-background items-center justify-center px-6">
+                <Ionicons name="lock-closed" size={42} color="#ef4444" />
+                <Text className="text-text text-xl font-bold mt-4">Access Restricted</Text>
+                <Text className="text-subtext text-center mt-2">
+                    You do not have permission to manage products.
+                </Text>
+                <TouchableOpacity
+                    className="bg-primary px-4 py-3 rounded-xl mt-5"
+                    onPress={() => router.replace('/(tabs)')}
+                >
+                    <Text className="text-white font-semibold">Back to Orders</Text>
+                </TouchableOpacity>
+            </SafeAreaView>
+        );
+    }
 
     const products: Product[] = (data?.products || [])
         .map((card: any) => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQuery, useSubscription } from '@apollo/client/react';
+import { useApolloClient, useMutation, useQuery, useSubscription } from '@apollo/client/react';
 import { useCallback, useEffect, useRef } from 'react';
 import {
     GET_ORDERS,
@@ -51,6 +51,7 @@ export interface UseCancelOrderResult {
 }
 
 export function useOrders(): UseOrdersResult {
+    const apolloClient = useApolloClient();
     // Initial query to load data - use network-only to avoid stale cache
     const { data, loading, error, refetch } = useQuery(GET_ORDERS, {
         fetchPolicy: 'network-only', // Changed from 'cache-and-network' to always fetch fresh data
@@ -100,8 +101,27 @@ export function useOrders(): UseOrdersResult {
 
     // Real-time subscription for updates — refetch on signal
     useSubscription(ALL_ORDERS_SUBSCRIPTION, {
-        onData: () => {
-            scheduleRefetch();
+        onData: ({ data: subscriptionData }) => {
+            const incomingOrders = (subscriptionData.data as any)?.allOrdersUpdated as any[] | undefined;
+            if (!incomingOrders || incomingOrders.length === 0) {
+                scheduleRefetch();
+                return;
+            }
+
+            apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
+                const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
+                const byId = new Map(currentOrders.map((order: any) => [String(order?.id), order]));
+
+                incomingOrders.forEach((order: any) => {
+                    const existingOrder = byId.get(String(order?.id));
+                    byId.set(String(order?.id), { ...existingOrder, ...order });
+                });
+
+                return {
+                    ...(existing ?? {}),
+                    orders: Array.from(byId.values()),
+                };
+            });
         },
     });
 

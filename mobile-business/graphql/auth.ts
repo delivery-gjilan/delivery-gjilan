@@ -11,6 +11,7 @@ export const LOGIN_MUTATION = gql`
                 firstName
                 lastName
                 role
+                permissions
                 businessId
                 business {
                     id

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState, Fragment, useCallback } from "react";
-import { useQuery, useSubscription, useMutation, useLazyQuery } from "@apollo/client/react";
+import { useApolloClient, useQuery, useSubscription, useMutation, useLazyQuery } from "@apollo/client/react";
 import Map, { Marker, Source, Layer } from "react-map-gl/mapbox";
 import {
   MapPin, X, Filter, Clock, Package, Phone,
@@ -295,6 +295,7 @@ function getOrderEtaMinutes(
 // ║                    MAP PAGE                             ║
 // ╚══════════════════════════════════════════════════════════╝
 export default function MapPage() {
+  const apolloClient = useApolloClient();
   // == DATA ==
   const { data: businessData } = useQuery(GET_BUSINESSES);
   const { data: driverData } = useQuery(DRIVERS_QUERY, { pollInterval: 10000 });
@@ -311,7 +312,25 @@ export default function MapPage() {
   // Cooldown avoids bursts when multiple events arrive in quick succession.
   const lastSubscriptionRefetchMsRef = useRef({ orders: 0, drivers: 0 });
   useSubscription(ALL_ORDERS_SUBSCRIPTION, {
-    onData: () => {
+    onData: ({ data: subscriptionData }) => {
+      const incomingOrders = (subscriptionData.data as any)?.allOrdersUpdated as any[] | undefined;
+      if (incomingOrders && incomingOrders.length > 0) {
+        apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
+          const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
+          const byId = new globalThis.Map<string, any>(currentOrders.map((order: any) => [String(order?.id), order]));
+          incomingOrders.forEach((order: any) => {
+            const existingOrder = byId.get(String(order?.id));
+            byId.set(String(order?.id), { ...existingOrder, ...order });
+          });
+
+          return {
+            ...(existing ?? {}),
+            orders: Array.from(byId.values()),
+          };
+        });
+        return;
+      }
+
       lastSubscriptionRefetchMsRef.current.orders = Date.now();
       refetchOrders();
     },

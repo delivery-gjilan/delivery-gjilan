@@ -11,7 +11,7 @@ import {
     Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery, useMutation, useSubscription } from '@apollo/client/react';
+import { useApolloClient, useQuery, useMutation, useSubscription } from '@apollo/client/react';
 import { Ionicons } from '@expo/vector-icons';
 import {
     GET_BUSINESS_ORDERS,
@@ -36,7 +36,7 @@ interface OrderItem {
     name: string;
     imageUrl?: string | null;
     quantity: number;
-    price: number;
+    unitPrice: number;
     notes?: string | null;
 }
 
@@ -157,6 +157,7 @@ function getElapsedTime(statusChangeDate: string): string {
 }
 
 export default function OrdersScreen() {
+    const apolloClient = useApolloClient();
     const { user } = useAuthStore();
     const [etaModalVisible, setEtaModalVisible] = useState(false);
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -215,10 +216,33 @@ export default function OrdersScreen() {
 
     useSubscription(ORDERS_SUBSCRIPTION, {
         onData: ({ data: subscriptionData }) => {
-            if (subscriptionData.data?.allOrdersUpdated) {
+            const incomingOrders = subscriptionData.data?.allOrdersUpdated as any[] | undefined;
+            if (incomingOrders && incomingOrders.length > 0) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                scheduleRefetch();
+                apolloClient.cache.updateQuery({ query: GET_BUSINESS_ORDERS }, (existing: any) => {
+                    const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
+                    const byId = new Map(currentOrders.map((order: any) => [String(order?.id), order]));
+
+                    incomingOrders.forEach((order: any) => {
+                        const existingOrder = byId.get(String(order?.id));
+                        byId.set(
+                            String(order?.id),
+                            {
+                                ...(existingOrder && typeof existingOrder === 'object' ? existingOrder : {}),
+                                ...order,
+                            },
+                        );
+                    });
+
+                    return {
+                        ...(existing ?? {}),
+                        orders: Array.from(byId.values()),
+                    };
+                });
+                return;
             }
+
+            scheduleRefetch();
         },
     });
 
@@ -226,11 +250,11 @@ export default function OrdersScreen() {
     const [startPreparing, { loading: startingPrep }] = useMutation(START_PREPARING);
 
     // Show only upcoming orders for this business.
-    const businessOrders = (data?.orders || []).filter((order: any) => {
+    const businessOrders = ((data?.orders as unknown as Order[]) || []).filter((order: any) => {
         const belongsToBusiness = order.businesses.some((b: any) => b.business.id === user?.businessId);
         const isUpcoming = UPCOMING_ORDER_STATUSES.includes(order.status as OrderStatus);
         return belongsToBusiness && isUpcoming;
-    }) as Order[];
+    });
 
     // Sort: PENDING first, then PREPARING, then by date desc
     const sortedOrders = [...businessOrders].sort((a, b) => {
@@ -316,7 +340,7 @@ export default function OrdersScreen() {
         if (!businessOrder) return null;
 
         const totalItems = businessOrder.items.reduce((sum, i) => sum + i.quantity, 0);
-        const businessSubtotal = businessOrder.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+        const businessSubtotal = businessOrder.items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
         const isPending = order.status === 'PENDING';
         const isPreparing = order.status === 'PREPARING';
         const canAct = isPending || isPreparing;
@@ -443,7 +467,7 @@ export default function OrdersScreen() {
                                     )}
                                 </View>
                                 <Text className="text-text font-semibold text-sm ml-2">
-                                    €{(item.price * item.quantity).toFixed(2)}
+                                    €{(item.unitPrice * item.quantity).toFixed(2)}
                                 </Text>
                             </View>
                         ))}
