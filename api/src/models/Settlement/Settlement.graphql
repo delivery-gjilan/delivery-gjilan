@@ -103,6 +103,67 @@ type Mutation {
     unsettleSettlement(settlementId: ID!): Settlement!
     backfillSettlementsForDeliveredOrders: Int!
     runSettlementScenarioHarness(scenarioIds: [String!]): SettlementScenarioHarnessResult!
+
+    """Admin creates a settlement request, notifying the business via push."""
+    createSettlementRequest(
+        businessId: ID!
+        amount: Float!
+        periodStart: Date!
+        periodEnd: Date!
+        note: String
+    ): SettlementRequest!
+
+    """Business owner accepts or disputes a pending settlement request."""
+    respondToSettlementRequest(
+        requestId: ID!
+        action: SettlementRequestAction!
+        disputeReason: String
+    ): SettlementRequest!
+
+    """Admin cancels an outstanding settlement request."""
+    cancelSettlementRequest(requestId: ID!): SettlementRequest!
+}
+
+# ─── Settlement Requests ─────────────────────────────────────────────────────
+
+enum SettlementRequestStatus {
+    PENDING_APPROVAL
+    ACCEPTED
+    DISPUTED
+    EXPIRED
+    CANCELLED
+}
+
+enum SettlementRequestAction {
+    ACCEPT
+    DISPUTE
+}
+
+type SettlementRequest {
+    id: ID!
+    business: Business!
+    requestedBy: User
+    amount: Float!
+    currency: String!
+    periodStart: Date!
+    periodEnd: Date!
+    note: String
+    status: SettlementRequestStatus!
+    respondedAt: Date
+    respondedBy: User
+    disputeReason: String
+    expiresAt: Date!
+    createdAt: Date!
+    updatedAt: Date!
+}
+
+extend type Query {
+    settlementRequests(
+        businessId: ID
+        status: SettlementRequestStatus
+        limit: Int
+        offset: Int
+    ): [SettlementRequest!]!
 }
 
 extend type Subscription {

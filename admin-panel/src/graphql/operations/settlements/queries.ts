@@ -175,3 +175,68 @@ export const UNSETTLE_SETTLEMENT = graphql(`
         }
     }
 `);
+
+export const CREATE_SETTLEMENT_REQUEST = graphql(`
+    mutation CreateSettlementRequest(
+        $businessId: ID!
+        $amount: Float!
+        $periodStart: Date!
+        $periodEnd: Date!
+        $note: String
+    ) {
+        createSettlementRequest(
+            businessId: $businessId
+            amount: $amount
+            periodStart: $periodStart
+            periodEnd: $periodEnd
+            note: $note
+        ) {
+            id
+            status
+            amount
+            currency
+            periodStart
+            periodEnd
+            note
+            expiresAt
+            createdAt
+        }
+    }
+`);
+
+export const CANCEL_SETTLEMENT_REQUEST = graphql(`
+    mutation CancelSettlementRequest($requestId: ID!) {
+        cancelSettlementRequest(requestId: $requestId) {
+            id
+            status
+        }
+    }
+`);
+
+export const GET_SETTLEMENT_REQUESTS = graphql(`
+    query GetSettlementRequests($businessId: ID, $status: SettlementRequestStatus, $limit: Int) {
+        settlementRequests(businessId: $businessId, status: $status, limit: $limit) {
+            id
+            amount
+            currency
+            periodStart
+            periodEnd
+            note
+            status
+            expiresAt
+            createdAt
+            respondedAt
+            disputeReason
+            requestedBy {
+                id
+                firstName
+                lastName
+            }
+            respondedBy {
+                id
+                firstName
+                lastName
+            }
+        }
+    }
+`);

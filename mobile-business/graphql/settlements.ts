@@ -71,3 +71,60 @@ export const GET_MY_BUSINESS_SETTLEMENT_SUMMARY = gql`
         }
     }
 `;
+
+export const GET_LAST_BUSINESS_PAID_SETTLEMENT = gql`
+    query GetLastBusinessPaidSettlement($businessId: ID!) {
+        settlements(
+            type: BUSINESS
+            businessId: $businessId
+            status: PAID
+            limit: 1
+        ) {
+            id
+            paidAt
+            createdAt
+        }
+    }
+`;
+
+export const GET_MY_SETTLEMENT_REQUESTS = gql`
+    query GetMySettlementRequests($businessId: ID, $status: SettlementRequestStatus, $limit: Int) {
+        settlementRequests(businessId: $businessId, status: $status, limit: $limit) {
+            id
+            amount
+            currency
+            periodStart
+            periodEnd
+            note
+            status
+            expiresAt
+            createdAt
+            requestedBy {
+                id
+                firstName
+                lastName
+            }
+            respondedAt
+            disputeReason
+        }
+    }
+`;
+
+export const RESPOND_TO_SETTLEMENT_REQUEST = gql`
+    mutation RespondToSettlementRequest(
+        $requestId: ID!
+        $action: SettlementRequestAction!
+        $disputeReason: String
+    ) {
+        respondToSettlementRequest(
+            requestId: $requestId
+            action: $action
+            disputeReason: $disputeReason
+        ) {
+            id
+            status
+            respondedAt
+            disputeReason
+        }
+    }
+`;

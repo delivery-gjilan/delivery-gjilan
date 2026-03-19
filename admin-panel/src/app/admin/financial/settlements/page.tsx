@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Building2, ChevronRight, RefreshCw, Search, User } from 'lucide-react';
+import { ArrowLeft, Building2, ChevronRight, RefreshCw, Search, Send, User, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   SettlementType,
@@ -164,6 +164,71 @@ const BACKFILL_SETTLEMENTS = gql`
   }
 `;
 
+const CREATE_SETTLEMENT_REQUEST_MUTATION = gql`
+  mutation AdminCreateSettlementRequest(
+    $businessId: ID!
+    $amount: Float!
+    $periodStart: Date!
+    $periodEnd: Date!
+    $note: String
+  ) {
+    createSettlementRequest(
+      businessId: $businessId
+      amount: $amount
+      periodStart: $periodStart
+      periodEnd: $periodEnd
+      note: $note
+    ) {
+      id
+      status
+      amount
+      currency
+      periodStart
+      periodEnd
+      note
+      expiresAt
+      createdAt
+    }
+  }
+`;
+
+const CANCEL_SETTLEMENT_REQUEST_MUTATION = gql`
+  mutation AdminCancelSettlementRequest($requestId: ID!) {
+    cancelSettlementRequest(requestId: $requestId) {
+      id
+      status
+    }
+  }
+`;
+
+const GET_SETTLEMENT_REQUESTS_QUERY = gql`
+  query AdminGetSettlementRequests($businessId: ID, $limit: Int) {
+    settlementRequests(businessId: $businessId, limit: $limit) {
+      id
+      amount
+      currency
+      periodStart
+      periodEnd
+      note
+      status
+      expiresAt
+      createdAt
+      respondedAt
+      disputeReason
+      requestedBy {
+        id
+        firstName
+        lastName
+      }
+      respondedBy {
+        id
+        firstName
+        lastName
+      }
+    }
+  }
+`;
+
 export default function SettlementsPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'business' | 'driver'>('business');
@@ -174,6 +239,18 @@ export default function SettlementsPage() {
   const [selectedSettlement, setSelectedSettlement] = useState<any>(null);
   const [bulkPartialAmount, setBulkPartialAmount] = useState('');
   const [bulkProcessing, setBulkProcessing] = useState(false);
+
+  // Request settlement dialog state
+  const [requestDialogOpen, setRequestDialogOpen] = useState(false);
+  const [reqAmount, setReqAmount] = useState('');
+  const [reqPeriodStart, setReqPeriodStart] = useState(() =>
+    new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+  );
+  const [reqPeriodEnd, setReqPeriodEnd] = useState(() =>
+    new Date().toISOString().split('T')[0],
+  );
+  const [reqNote, setReqNote] = useState('');
+  const [reqSubmitting, setReqSubmitting] = useState(false);
 
   // Query for business settlements
   const {
@@ -349,6 +426,23 @@ export default function SettlementsPage() {
 
   const [markSettlementsAsPaid] = useMutation(MARK_SETTLEMENTS_AS_PAID);
 
+  // Settlement request mutations
+  const [createSettlementRequest] = useMutation(CREATE_SETTLEMENT_REQUEST_MUTATION);
+  const [cancelSettlementRequest] = useMutation(CANCEL_SETTLEMENT_REQUEST_MUTATION);
+
+  // Fetch settlement requests for selected business
+  const {
+    data: settlementRequestsData,
+    loading: settlementRequestsLoading,
+    refetch: refetchSettlementRequests,
+  } = useQuery(GET_SETTLEMENT_REQUESTS_QUERY, {
+    variables: { businessId: selectedEntityId, limit: 20 },
+    skip: !selectedEntityId || activeTab !== 'business',
+    fetchPolicy: 'network-only',
+  });
+
+  const settlementRequests: any[] = (settlementRequestsData as any)?.settlementRequests ?? [];
+
   // Backfill settlements mutation
   const [backfillSettlements, { loading: backfillLoading }] = useMutation(BACKFILL_SETTLEMENTS, {
     onCompleted: (data) => {
@@ -398,6 +492,7 @@ export default function SettlementsPage() {
   const handleRefresh = async () => {
     if (activeTab === 'business') {
       await refetchBusiness();
+      if (selectedEntityId) await refetchSettlementRequests();
     } else {
       await refetchDriver();
     }
@@ -530,6 +625,60 @@ export default function SettlementsPage() {
     setSearchQuery('');
   };
 
+  const openRequestDialog = () => {
+    if (!selectedGroup) return;
+    const pending = selectedGroup.pendingAmount;
+    setReqAmount(pending > 0 ? pending.toFixed(2) : '');
+    setReqPeriodStart(
+      new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+    );
+    setReqPeriodEnd(new Date().toISOString().split('T')[0]);
+    setReqNote('');
+    setRequestDialogOpen(true);
+  };
+
+  const handleSubmitSettlementRequest = async () => {
+    if (!selectedEntityId) return;
+    const amount = parseFloat(reqAmount);
+    if (!reqAmount || !Number.isFinite(amount) || amount <= 0) {
+      toast({ title: 'Invalid amount', description: 'Enter a valid amount greater than 0.', variant: 'destructive' });
+      return;
+    }
+    if (!reqPeriodStart || !reqPeriodEnd) {
+      toast({ title: 'Missing dates', description: 'Period start and end are required.', variant: 'destructive' });
+      return;
+    }
+    setReqSubmitting(true);
+    try {
+      await createSettlementRequest({
+        variables: {
+          businessId: selectedEntityId,
+          amount,
+          periodStart: new Date(reqPeriodStart).toISOString(),
+          periodEnd: new Date(reqPeriodEnd + 'T23:59:59').toISOString(),
+          note: reqNote.trim() || undefined,
+        },
+      });
+      toast({ title: 'Request sent', description: `Settlement request of €${amount.toFixed(2)} sent to ${selectedGroup?.name}.` });
+      setRequestDialogOpen(false);
+      await refetchSettlementRequests();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message ?? 'Failed to create request', variant: 'destructive' });
+    } finally {
+      setReqSubmitting(false);
+    }
+  };
+
+  const handleCancelSettlementRequest = async (requestId: string) => {
+    try {
+      await cancelSettlementRequest({ variables: { requestId } });
+      toast({ title: 'Cancelled', description: 'Settlement request cancelled.' });
+      await refetchSettlementRequests();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message ?? 'Failed to cancel', variant: 'destructive' });
+    }
+  };
+
   const renderContent = () => (
     <Card className="shadow-sm">
       {/* Filters and Stats Bar */}
@@ -543,10 +692,22 @@ export default function SettlementsPage() {
                   {selectedGroup.subtitle} • {selectedGroup.settlements.length} settlements
                 </div>
               </div>
-              <Button variant="ghost" size="sm" onClick={resetGroupSelection} className="gap-2">
-                <ArrowLeft className="h-4 w-4" />
-                Back to {activeTab === 'business' ? 'businesses' : 'drivers'}
-              </Button>
+              <div className="flex items-center gap-2">
+                {activeTab === 'business' && (
+                  <Button
+                    size="sm"
+                    onClick={openRequestDialog}
+                    className="gap-2 bg-amber-600 hover:bg-amber-700 text-white"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    Request Settlement
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" onClick={resetGroupSelection} className="gap-2">
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to {activeTab === 'business' ? 'businesses' : 'drivers'}
+                </Button>
+              </div>
             </div>
           )}
 
@@ -857,6 +1018,78 @@ export default function SettlementsPage() {
           </div>
         </div>
       )}
+
+      {/* Settlement Requests History */}
+      {selectedGroup && activeTab === 'business' && (
+        <div className="px-4 py-4 border-t">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm font-semibold text-foreground">Settlement Requests</div>
+            {settlementRequestsLoading && (
+              <span className="text-xs text-muted-foreground">Loading…</span>
+            )}
+          </div>
+          {!settlementRequestsLoading && settlementRequests.length === 0 ? (
+            <div className="text-xs text-zinc-500 py-3">No settlement requests for this business.</div>
+          ) : (
+            <div className="space-y-2">
+              {settlementRequests.map((req: any) => {
+                const statusColors: Record<string, string> = {
+                  PENDING_APPROVAL: 'bg-amber-500/20 text-amber-300',
+                  ACCEPTED: 'bg-green-500/20 text-green-300',
+                  DISPUTED: 'bg-red-500/20 text-red-300',
+                  EXPIRED: 'bg-zinc-600/30 text-zinc-300',
+                  CANCELLED: 'bg-zinc-600/30 text-zinc-300',
+                };
+                const colorClass = statusColors[req.status] ?? 'bg-zinc-600/30 text-zinc-300';
+                const requestedBy = req.requestedBy
+                  ? `${req.requestedBy.firstName ?? ''} ${req.requestedBy.lastName ?? ''}`.trim()
+                  : 'Admin';
+                const periodLabel = req.periodStart && req.periodEnd
+                  ? `${new Date(req.periodStart).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} – ${new Date(req.periodEnd).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`
+                  : null;
+
+                return (
+                  <div
+                    key={req.id}
+                    className="flex items-start justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-2 text-xs"
+                  >
+                    <div className="space-y-0.5 flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-white">€{Number(req.amount).toFixed(2)}</span>
+                        <span className={`inline-block px-2 py-0.5 rounded font-bold ${colorClass}`}>
+                          {req.status}
+                        </span>
+                      </div>
+                      {periodLabel && (
+                        <div className="text-zinc-400">{periodLabel}</div>
+                      )}
+                      {req.note && (
+                        <div className="text-zinc-500 italic truncate">"{req.note}"</div>
+                      )}
+                      <div className="text-zinc-600">
+                        By {requestedBy} ·{' '}
+                        {new Date(req.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        {req.disputeReason && (
+                          <span className="ml-2 text-red-400">Dispute: {req.disputeReason}</span>
+                        )}
+                      </div>
+                    </div>
+                    {req.status === 'PENDING_APPROVAL' && (
+                      <button
+                        onClick={() => handleCancelSettlementRequest(req.id)}
+                        className="shrink-0 text-zinc-500 hover:text-red-400 transition-colors p-1"
+                        title="Cancel request"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </Card>
   );
 
@@ -1097,6 +1330,91 @@ export default function SettlementsPage() {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Request Settlement Dialog */}
+      <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Request Settlement — {selectedGroup?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              The business will receive a push notification and must accept or dispute this request within 48 hours.
+            </p>
+
+            <div>
+              <Label htmlFor="req-amount" className="text-xs text-muted-foreground mb-1 block">
+                Amount (EUR) *
+              </Label>
+              <Input
+                id="req-amount"
+                type="number"
+                min="0.01"
+                step="0.01"
+                placeholder="0.00"
+                value={reqAmount}
+                onChange={(e) => setReqAmount(e.target.value)}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="req-period-start" className="text-xs text-muted-foreground mb-1 block">
+                  Period Start *
+                </Label>
+                <Input
+                  id="req-period-start"
+                  type="date"
+                  value={reqPeriodStart}
+                  onChange={(e) => setReqPeriodStart(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="req-period-end" className="text-xs text-muted-foreground mb-1 block">
+                  Period End *
+                </Label>
+                <Input
+                  id="req-period-end"
+                  type="date"
+                  value={reqPeriodEnd}
+                  onChange={(e) => setReqPeriodEnd(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="req-note" className="text-xs text-muted-foreground mb-1 block">
+                Note (optional)
+              </Label>
+              <textarea
+                id="req-note"
+                rows={3}
+                placeholder="E.g. Settlement for March commissions…"
+                value={reqNote}
+                onChange={(e) => setReqNote(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="ghost"
+                onClick={() => setRequestDialogOpen(false)}
+                disabled={reqSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="bg-amber-600 hover:bg-amber-700"
+                onClick={handleSubmitSettlementRequest}
+                disabled={reqSubmitting}
+              >
+                {reqSubmitting ? 'Sending…' : 'Send Request'}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

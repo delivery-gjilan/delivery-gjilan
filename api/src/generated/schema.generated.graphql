@@ -692,6 +692,9 @@ type Mutation {
   businessDeviceHeartbeat(input: BusinessDeviceHeartbeatInput!): Boolean!
   businessDeviceOrderSignal(deviceId: String!, orderId: ID): Boolean!
   cancelOrder(id: ID!): Order!
+
+  """Admin cancels an outstanding settlement request."""
+  cancelSettlementRequest(requestId: ID!): SettlementRequest!
   createBanner(input: CreateBannerInput!): Banner!
   createBusiness(input: CreateBusinessInput!): Business!
   createBusinessWithOwner(input: CreateBusinessWithOwnerInput!): CreateBusinessWithOwnerPayload!
@@ -706,6 +709,9 @@ type Mutation {
   createProductSubcategory(input: CreateProductSubcategoryInput!): ProductSubcategory!
   createProductVariantGroup(input: CreateProductVariantGroupInput!): ProductVariantGroup!
   createPromotion(input: CreatePromotionInput!): Promotion!
+
+  """Admin creates a settlement request, notifying the business via push."""
+  createSettlementRequest(amount: Float!, businessId: ID!, note: String, periodEnd: Date!, periodStart: Date!): SettlementRequest!
   createSettlementRule(input: CreateSettlementRuleInput!): SettlementRule!
   createTestOrder: Order!
   createUser(input: CreateUserInput!): AuthResponse!
@@ -750,6 +756,9 @@ type Mutation {
   registerLiveActivityToken(activityId: String!, orderId: ID!, token: String!): Boolean!
   removeUserFromPromotion(promotionId: ID!, userId: ID!): Boolean!
   resendEmailVerification: SignupStepResponse!
+
+  """Business owner accepts or disputes a pending settlement request."""
+  respondToSettlementRequest(action: SettlementRequestAction!, disputeReason: String, requestId: ID!): SettlementRequest!
   runSettlementScenarioHarness(scenarioIds: [String!]): SettlementScenarioHarnessResult!
   sendCampaign(id: ID!): NotificationCampaign!
   sendPushNotification(input: SendPushNotificationInput!): SendNotificationResult!
@@ -1189,6 +1198,7 @@ type Query {
   products(businessId: ID!): [ProductCard!]!
   pushTelemetryEvents(appType: DeviceAppType, eventType: PushTelemetryEventType, hours: Int, limit: Int, platform: DevicePlatform): [PushTelemetryEvent!]!
   pushTelemetrySummary(hours: Int): PushTelemetrySummary!
+  settlementRequests(businessId: ID, limit: Int, offset: Int, status: SettlementRequestStatus): [SettlementRequest!]!
   settlementRule(id: ID!): SettlementRule
   settlementRules(filter: SettlementRuleFilterInput): [SettlementRule!]!
   settlementScenarioDefinitions: [SettlementScenarioDefinition!]!
@@ -1287,6 +1297,37 @@ enum SettlementDirection {
 enum SettlementEntityType {
   BUSINESS
   DRIVER
+}
+
+type SettlementRequest {
+  amount: Float!
+  business: Business!
+  createdAt: Date!
+  currency: String!
+  disputeReason: String
+  expiresAt: Date!
+  id: ID!
+  note: String
+  periodEnd: Date!
+  periodStart: Date!
+  requestedBy: User
+  respondedAt: Date
+  respondedBy: User
+  status: SettlementRequestStatus!
+  updatedAt: Date!
+}
+
+enum SettlementRequestAction {
+  ACCEPT
+  DISPUTE
+}
+
+enum SettlementRequestStatus {
+  ACCEPTED
+  CANCELLED
+  DISPUTED
+  EXPIRED
+  PENDING_APPROVAL
 }
 
 type SettlementRule {
