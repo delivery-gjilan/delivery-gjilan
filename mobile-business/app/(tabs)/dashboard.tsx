@@ -7,6 +7,7 @@ import { GET_BUSINESS_ORDERS } from '@/graphql/orders';
 import { GET_BUSINESS_PRODUCTS } from '@/graphql/products';
 import { useAuthStore } from '@/store/authStore';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface DashboardStats {
     todayOrders: number;
@@ -19,6 +20,7 @@ interface DashboardStats {
 }
 
 export default function DashboardScreen() {
+    const { t } = useTranslation();
     const { user } = useAuthStore();
     const [stats, setStats] = useState<DashboardStats>({
         todayOrders: 0,
@@ -120,37 +122,37 @@ export default function DashboardScreen() {
         <SafeAreaView className="flex-1 bg-background">
             {/* Header */}
             <View className="px-4 py-3 border-b border-gray-800">
-                <Text className="text-text text-2xl font-bold mb-1">Dashboard</Text>
+                <Text className="text-text text-2xl font-bold mb-1">{t('dashboard.title', 'Dashboard')}</Text>
                 <Text className="text-subtext">{user?.business?.name}</Text>
             </View>
 
             <ScrollView
                 contentContainerStyle={{ padding: 8 }}
                 refreshControl={
-                    <RefreshControl refreshing={ordersLoading || productsLoading} onRefresh={handleRefresh} tintColor="#0b89a9" />
+                    <RefreshControl refreshing={ordersLoading || productsLoading} onRefresh={handleRefresh} tintColor="#7C3AED" />
                 }
             >
                 {/* Today's Overview */}
                 <View className="px-2 mb-4">
-                    <Text className="text-text font-bold text-lg mb-2">Today's Overview</Text>
+                    <Text className="text-text font-bold text-lg mb-2">{t('dashboard.today_overview', "Today's Overview")}</Text>
                     <View className="flex-row flex-wrap">
                         <StatCard
                             icon="receipt"
-                            label="Total Orders"
+                            label={t('dashboard.total_orders', 'Total Orders')}
                             value={stats.todayOrders}
-                            color="#0b89a9"
-                            gradientColors={['#0b89a9', '#0ea5e9']}
+                            color="#7C3AED"
+                            gradientColors={['#7C3AED', '#A78BFA']}
                         />
                         <StatCard
                             icon="cash"
-                            label="Revenue"
+                            label={t('dashboard.revenue', 'Revenue')}
                             value={`$${stats.todayRevenue.toFixed(2)}`}
                             color="#10b981"
                             gradientColors={['#10b981', '#34d399']}
                         />
                         <StatCard
                             icon="checkmark-circle"
-                            label="Completed"
+                            label={t('dashboard.completed', 'Completed')}
                             value={stats.completedToday}
                             subtitle={stats.todayOrders > 0 ? `${Math.round((stats.completedToday / stats.todayOrders) * 100)}% completion` : undefined}
                             color="#8b5cf6"
@@ -161,11 +163,11 @@ export default function DashboardScreen() {
 
                 {/* Active Orders */}
                 <View className="px-2 mb-4">
-                    <Text className="text-text font-bold text-lg mb-2">Active Orders</Text>
+                    <Text className="text-text font-bold text-lg mb-2">{t('dashboard.active_orders', 'Active Orders')}</Text>
                     <View className="flex-row flex-wrap">
                         <StatCard
                             icon="alert-circle"
-                            label="Pending"
+                            label={t('dashboard.pending', 'Pending')}
                             value={stats.pendingOrders}
                             subtitle="Awaiting acceptance"
                             color="#f59e0b"
@@ -173,7 +175,7 @@ export default function DashboardScreen() {
                         />
                         <StatCard
                             icon="flame"
-                            label="Preparing"
+                            label={t('dashboard.preparing', 'Preparing')}
                             value={stats.preparingOrders}
                             subtitle="In progress"
                             color="#3b82f6"
@@ -184,18 +186,18 @@ export default function DashboardScreen() {
 
                 {/* Products Status */}
                 <View className="px-2 mb-4">
-                    <Text className="text-text font-bold text-lg mb-2">Products</Text>
+                    <Text className="text-text font-bold text-lg mb-2">{t('dashboard.products', 'Products')}</Text>
                     <View className="flex-row flex-wrap">
                         <StatCard
                             icon="fast-food"
-                            label="Total Products"
+                            label={t('dashboard.total_products', 'Total Products')}
                             value={stats.totalProducts}
                             color="#06b6d4"
                             gradientColors={['#06b6d4', '#22d3ee']}
                         />
                         <StatCard
                             icon="eye-off"
-                            label="Unavailable"
+                            label={t('dashboard.unavailable', 'Unavailable')}
                             value={stats.unavailableProducts}
                             color="#ef4444"
                             gradientColors={['#ef4444', '#f87171']}
@@ -205,15 +207,15 @@ export default function DashboardScreen() {
 
                 {/* Quick Actions */}
                 <View className="px-2 mb-4">
-                    <Text className="text-text font-bold text-lg mb-2">Quick Actions</Text>
+                    <Text className="text-text font-bold text-lg mb-2">{t('dashboard.quick_actions', 'Quick Actions')}</Text>
                     <View className="bg-card rounded-2xl p-4">
                         <TouchableOpacity className="flex-row items-center py-3 border-b border-gray-700">
                             <View className="w-10 h-10 rounded-full bg-primary/20 items-center justify-center mr-3">
-                                <Ionicons name="notifications" size={20} color="#0b89a9" />
+                                <Ionicons name="notifications" size={20} color="#7C3AED" />
                             </View>
                             <View className="flex-1">
-                                <Text className="text-text font-semibold">Notifications</Text>
-                                <Text className="text-subtext text-xs">Manage notification settings</Text>
+                                <Text className="text-text font-semibold">{t('dashboard.notifications', 'Notifications')}</Text>
+                                <Text className="text-subtext text-xs">{t('dashboard.manage_notifications', 'Manage notification settings')}</Text>
                             </View>
                             <Ionicons name="chevron-forward" size={20} color="#6b7280" />
                         </TouchableOpacity>
@@ -223,8 +225,8 @@ export default function DashboardScreen() {
                                 <Ionicons name="time" size={20} color="#10b981" />
                             </View>
                             <View className="flex-1">
-                                <Text className="text-text font-semibold">Business Hours</Text>
-                                <Text className="text-subtext text-xs">Update opening hours</Text>
+                                <Text className="text-text font-semibold">{t('dashboard.business_hours', 'Business Hours')}</Text>
+                                <Text className="text-subtext text-xs">{t('dashboard.update_hours', 'Update opening hours')}</Text>
                             </View>
                             <Ionicons name="chevron-forward" size={20} color="#6b7280" />
                         </TouchableOpacity>
@@ -234,8 +236,8 @@ export default function DashboardScreen() {
                                 <Ionicons name="document-text" size={20} color="#f59e0b" />
                             </View>
                             <View className="flex-1">
-                                <Text className="text-text font-semibold">Reports</Text>
-                                <Text className="text-subtext text-xs">View detailed analytics</Text>
+                                <Text className="text-text font-semibold">{t('dashboard.reports', 'Reports')}</Text>
+                                <Text className="text-subtext text-xs">{t('dashboard.view_analytics', 'View detailed analytics')}</Text>
                             </View>
                             <Ionicons name="chevron-forward" size={20} color="#6b7280" />
                         </TouchableOpacity>

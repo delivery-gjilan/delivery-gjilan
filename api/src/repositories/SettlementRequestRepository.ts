@@ -8,6 +8,12 @@ import {
 import { eq, and, gte, lte, inArray, sql } from 'drizzle-orm';
 import type { DbSettlementRequest } from '@/database/schema/settlementRequests';
 
+export interface SettlementRequestAcceptanceResult {
+    settledCount: number;
+    settledAmount: number;
+    remainingAmount: number;
+}
+
 export interface CreateSettlementRequestInput {
     businessId: string;
     requestedByUserId?: string | null;
@@ -134,30 +140,106 @@ export class SettlementRequestRepository {
     }
 
     /**
-     * Mark all PENDING RECEIVABLE settlements for a business within the given
-     * period as PAID — called automatically when a business accepts a request.
+     * Settle only the requested amount, walking oldest receivable settlements first.
+     * Full rows are marked PAID; a partial row is split into a paid row plus remaining pending row.
      */
     async settlePendingReceivableForPeriod(
         businessId: string,
         periodStart: string,
         periodEnd: string,
-    ): Promise<number> {
-        const now = new Date().toISOString();
-        const result = await this.db
-            .update(settlements)
-            .set({ status: 'PAID', paidAt: now, updatedAt: now })
-            .where(
-                and(
-                    eq(settlements.businessId, businessId),
-                    eq(settlements.type, 'BUSINESS'),
-                    eq(settlements.direction, 'RECEIVABLE'),
-                    eq(settlements.status, 'PENDING'),
-                    gte(settlements.createdAt, periodStart),
-                    lte(settlements.createdAt, periodEnd),
-                ),
-            )
-            .returning();
-        return result.length;
+        requestedAmount: number,
+    ): Promise<SettlementRequestAcceptanceResult> {
+        const requestedCents = Math.round(Number(requestedAmount) * 100);
+        if (!Number.isFinite(requestedCents) || requestedCents <= 0) {
+            return { settledCount: 0, settledAmount: 0, remainingAmount: 0 };
+        }
+
+        return this.db.transaction(async (tx) => {
+            const now = new Date().toISOString();
+            let remainingCents = requestedCents;
+            let settledCents = 0;
+            let settledCount = 0;
+
+            const candidates = await tx
+                .select()
+                .from(settlements)
+                .where(
+                    and(
+                        eq(settlements.businessId, businessId),
+                        eq(settlements.type, 'BUSINESS'),
+                        eq(settlements.direction, 'RECEIVABLE'),
+                        inArray(settlements.status, ['PENDING', 'OVERDUE']),
+                        gte(settlements.createdAt, periodStart),
+                        lte(settlements.createdAt, periodEnd),
+                    ),
+                )
+                .orderBy(sql`${settlements.createdAt} ASC, ${settlements.id} ASC`);
+
+            for (const candidate of candidates) {
+                if (remainingCents <= 0) break;
+
+                const candidateCents = Math.round(Number(candidate.amount ?? 0) * 100);
+                if (!Number.isFinite(candidateCents) || candidateCents <= 0) continue;
+
+                if (remainingCents >= candidateCents) {
+                    await tx
+                        .update(settlements)
+                        .set({
+                            status: 'PAID',
+                            paidAt: now,
+                            updatedAt: now,
+                        })
+                        .where(eq(settlements.id, candidate.id))
+                        .execute();
+
+                    remainingCents -= candidateCents;
+                    settledCents += candidateCents;
+                    settledCount += 1;
+                    continue;
+                }
+
+                const partialCents = remainingCents;
+                const leftoverCents = candidateCents - partialCents;
+                const partialAmount = Number((partialCents / 100).toFixed(2));
+                const leftoverAmount = Number((leftoverCents / 100).toFixed(2));
+
+                await tx
+                    .update(settlements)
+                    .set({
+                        amount: leftoverAmount,
+                        updatedAt: now,
+                    })
+                    .where(eq(settlements.id, candidate.id))
+                    .execute();
+
+                await tx
+                    .insert(settlements)
+                    .values({
+                        type: candidate.type,
+                        direction: candidate.direction,
+                        driverId: candidate.driverId,
+                        businessId: candidate.businessId,
+                        orderId: candidate.orderId,
+                        ruleId: candidate.ruleId,
+                        amount: partialAmount,
+                        currency: candidate.currency,
+                        status: 'PAID',
+                        paidAt: now,
+                        paymentMethod: 'SETTLEMENT_REQUEST_ACCEPTED',
+                    })
+                    .execute();
+
+                settledCount += 1;
+                settledCents += partialCents;
+                remainingCents = 0;
+            }
+
+            return {
+                settledCount,
+                settledAmount: Number((settledCents / 100).toFixed(2)),
+                remainingAmount: Number((remainingCents / 100).toFixed(2)),
+            };
+        });
     }
 
     /** Find all users with BUSINESS_OWNER role for a given businessId */

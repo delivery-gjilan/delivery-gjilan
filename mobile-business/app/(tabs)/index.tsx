@@ -20,6 +20,7 @@ import {
     ORDERS_SUBSCRIPTION,
 } from '@/graphql/orders';
 import { useAuthStore } from '@/store/authStore';
+import { useTranslation } from '@/hooks/useTranslation';
 import * as Haptics from 'expo-haptics';
 
 type OrderStatus = 'PENDING' | 'PREPARING' | 'READY' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED';
@@ -28,7 +29,6 @@ const UPCOMING_ORDER_STATUSES: ReadonlyArray<OrderStatus> = [
     'PENDING',
     'PREPARING',
     'READY',
-    'OUT_FOR_DELIVERY',
 ];
 
 interface OrderItem {
@@ -157,6 +157,7 @@ function getElapsedTime(statusChangeDate: string): string {
 }
 
 export default function OrdersScreen() {
+    const { t } = useTranslation();
     const apolloClient = useApolloClient();
     const { user } = useAuthStore();
     const [etaModalVisible, setEtaModalVisible] = useState(false);
@@ -295,7 +296,7 @@ export default function OrdersScreen() {
             setSelectedOrderId(null);
             refetch();
         } catch (error: any) {
-            Alert.alert('Error', error.message);
+            Alert.alert(t('common.error', 'Error'), error.message);
         }
     };
 
@@ -305,15 +306,15 @@ export default function OrdersScreen() {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             refetch();
         } catch (error: any) {
-            Alert.alert('Error', error.message);
+            Alert.alert(t('common.error', 'Error'), error.message);
         }
     };
 
     const handleRejectOrder = (orderId: string) => {
-        Alert.alert('Reject Order', 'Are you sure you want to reject this order?', [
-            { text: 'No', style: 'cancel' },
+        Alert.alert(t('orders.cancel_order_title', 'Reject Order'), t('orders.cancel_order_prompt', 'Are you sure you want to reject this order?'), [
+            { text: t('common.cancel', 'Cancel'), style: 'cancel' },
             {
-                text: 'Yes, Reject',
+                text: t('orders.yes_reject', 'Yes, Reject'),
                 style: 'destructive',
                 onPress: async () => {
                     try {
@@ -321,11 +322,20 @@ export default function OrdersScreen() {
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
                         refetch();
                     } catch (error: any) {
-                        Alert.alert('Error', error.message);
+                        Alert.alert(t('common.error', 'Error'), error.message);
                     }
                 },
             },
         ]);
+    };
+
+    const statusLabels: Record<OrderStatus, string> = {
+        PENDING: t('orders.new_order', 'New Order'),
+        PREPARING: t('orders.preparing', 'Preparing'),
+        READY: t('orders.ready_pickup', 'Ready for Pickup'),
+        OUT_FOR_DELIVERY: t('orders.out_for_delivery', 'Out for Delivery'),
+        DELIVERED: t('orders.delivered', 'Delivered'),
+        CANCELLED: t('orders.cancelled', 'Cancelled'),
     };
 
     const handleAcceptTap = (orderId: string) => {
@@ -392,21 +402,21 @@ export default function OrdersScreen() {
                                 style={{ backgroundColor: STATUS_BG[order.status] }}
                             >
                                 <Text className="font-bold text-xs" style={{ color: STATUS_COLORS[order.status] }}>
-                                    {STATUS_LABELS[order.status]}
+                                    {statusLabels[order.status]}
                                 </Text>
                             </View>
                         </View>
 
                         {/* Elapsed Time Counter */}
                         <View className="flex-row items-center bg-background/40 rounded-xl px-2.5 py-2 mt-2">
-                            <Ionicons name="time-outline" size={16} color="#0b89a9" />
+                            <Ionicons name="time-outline" size={16} color="#7C3AED" />
                             <Text className="text-primary font-bold text-sm ml-2">
                                 {order.status === 'PENDING' && getElapsedTime(order.orderDate)}
                                 {order.status === 'PREPARING' && order.preparingAt && getElapsedTime(order.preparingAt)}
                                 {order.status === 'READY' && order.readyAt && getElapsedTime(order.readyAt)}
                                 {order.status === 'OUT_FOR_DELIVERY' && order.readyAt && getElapsedTime(order.readyAt)}
                             </Text>
-                            <Text className="text-subtext text-xs ml-1">elapsed</Text>
+                            <Text className="text-subtext text-xs ml-1">{t('orders.elapsed', 'elapsed')}</Text>
                         </View>
 
                         {/* Prep Time Countdown - Compact */}
@@ -440,7 +450,7 @@ export default function OrdersScreen() {
                     {/* ── Items - Compact ── */}
                     <View className="px-3 pb-2">
                         <Text className="text-subtext font-semibold text-xs mb-1.5 uppercase tracking-wider">
-                            {totalItems} {totalItems === 1 ? 'Item' : 'Items'}
+                            {totalItems} {totalItems === 1 ? t('orders.item', 'Item') : t('orders.items', 'Items')}
                         </Text>
 
                         {businessOrder.items.map((item, index) => (
@@ -475,7 +485,7 @@ export default function OrdersScreen() {
 
                     {/* ── Total - Compact ── */}
                     <View className="mx-3 pt-2 pb-2.5 border-t border-gray-700 flex-row items-center justify-between">
-                        <Text className="text-subtext font-semibold text-sm">Total</Text>
+                        <Text className="text-subtext font-semibold text-sm">{t('orders.total', 'Total')}</Text>
                         <Text className="text-text font-bold text-lg">€{businessSubtotal.toFixed(2)}</Text>
                     </View>
 
@@ -488,7 +498,7 @@ export default function OrdersScreen() {
                                 onPress={() => handleRejectOrder(order.id)}
                             >
                                 <Ionicons name="close" size={18} color="#ef4444" />
-                                <Text className="text-danger font-bold text-sm ml-1.5">Reject</Text>
+                                <Text className="text-danger font-bold text-sm ml-1.5">{t('orders.reject', 'Reject')}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 className="flex-[2] py-3 flex-row items-center justify-center"
@@ -496,7 +506,7 @@ export default function OrdersScreen() {
                                 onPress={() => handleAcceptTap(order.id)}
                             >
                                 <Ionicons name="checkmark-circle" size={18} color="#10b981" />
-                                <Text className="text-success font-bold text-sm ml-1.5">Accept</Text>
+                                <Text className="text-success font-bold text-sm ml-1.5">{t('orders.accept', 'Accept')}</Text>
                             </TouchableOpacity>
                         </View>
                     )}
@@ -508,7 +518,7 @@ export default function OrdersScreen() {
                             onPress={() => handleMarkReady(order.id)}
                         >
                             <Ionicons name="checkmark-done-circle" size={18} color="#10b981" />
-                            <Text className="text-success font-bold text-sm ml-1.5">Mark Ready</Text>
+                            <Text className="text-success font-bold text-sm ml-1.5">{t('orders.mark_ready', 'Mark Ready')}</Text>
                         </TouchableOpacity>
                     )}
                 </View>
@@ -522,8 +532,8 @@ export default function OrdersScreen() {
             {/* ── Orders List ── */}
             {loading && !data ? (
                 <View className="flex-1 items-center justify-center">
-                    <ActivityIndicator size="large" color="#0b89a9" />
-                    <Text className="text-subtext mt-4">Loading orders...</Text>
+                    <ActivityIndicator size="large" color="#7C3AED" />
+                    <Text className="text-subtext mt-4">{t('orders.loading_orders', 'Loading orders...')}</Text>
                 </View>
             ) : (
                 <FlatList
@@ -531,20 +541,31 @@ export default function OrdersScreen() {
                     keyExtractor={(item) => item.id}
                     renderItem={renderOrderCard}
                     refreshControl={
-                        <RefreshControl refreshing={false} onRefresh={refetch} tintColor="#0b89a9" />
+                        <RefreshControl refreshing={false} onRefresh={refetch} tintColor="#7C3AED" />
                     }
                     ListEmptyComponent={
-                        <View className="items-center justify-center py-16">
-                            <View className="w-20 h-20 rounded-full bg-card items-center justify-center mb-4">
-                                <Ionicons name="receipt-outline" size={40} color="#6b7280" />
+                        <View className="items-center justify-center">
+                            <View
+                                className="w-24 h-24 rounded-2xl items-center justify-center mb-4"
+                                style={{
+                                    borderWidth: 2,
+                                    borderStyle: 'dashed',
+                                    borderColor: '#475569',
+                                    backgroundColor: '#1E293B',
+                                }}
+                            >
+                                <Ionicons name="image-outline" size={36} color="#94A3B8" />
                             </View>
-                            <Text className="text-text text-lg font-bold mb-1">No Orders</Text>
-                            <Text className="text-subtext text-sm text-center px-12">
-                                No upcoming orders for your business right now.
+                            <Text className="text-text text-lg font-bold mb-1">
+                                {t('orders.no_orders_now', 'No orders for now')}
                             </Text>
                         </View>
                     }
-                    contentContainerStyle={{ paddingTop: 6, paddingBottom: 20 }}
+                    contentContainerStyle={
+                        sortedOrders.length === 0
+                            ? { flexGrow: 1, justifyContent: 'center', paddingBottom: 20 }
+                            : { paddingTop: 6, paddingBottom: 20 }
+                    }
                 />
             )}
 
@@ -570,9 +591,9 @@ export default function OrdersScreen() {
                             <View className="w-16 h-16 rounded-full bg-success/20 items-center justify-center mb-4">
                                 <Ionicons name="time" size={32} color="#10b981" />
                             </View>
-                            <Text className="text-text font-bold text-2xl mb-1">Preparation Time</Text>
+                            <Text className="text-text font-bold text-2xl mb-1">{t('orders.prep_time', 'Preparation Time')}</Text>
                             <Text className="text-subtext text-base text-center">
-                                How long will it take to prepare this order?
+                                {t('orders.prep_time_question', 'How long will it take to prepare this order?')}
                             </Text>
                         </View>
 
@@ -585,7 +606,7 @@ export default function OrdersScreen() {
                                     style={{
                                         minWidth: 100,
                                         backgroundColor:
-                                            selectedEta === option.value ? '#0b89a9' : '#374151',
+                                            selectedEta === option.value ? '#7C3AED' : '#374151',
                                     }}
                                     onPress={() => {
                                         setSelectedEta(option.value);
@@ -606,7 +627,7 @@ export default function OrdersScreen() {
                                             color: selectedEta === option.value ? '#fff' : '#6b7280',
                                         }}
                                     >
-                                        minutes
+                                        {t('orders.minutes', 'minutes')}
                                     </Text>
                                 </TouchableOpacity>
                             ))}
@@ -618,7 +639,7 @@ export default function OrdersScreen() {
                                 className="flex-1 py-4 rounded-2xl bg-gray-700 items-center"
                                 onPress={() => setEtaModalVisible(false)}
                             >
-                                <Text className="text-subtext font-bold text-base">Cancel</Text>
+                                <Text className="text-subtext font-bold text-base">{t('common.cancel', 'Cancel')}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 className="flex-[2] py-4 rounded-2xl bg-success items-center flex-row justify-center"

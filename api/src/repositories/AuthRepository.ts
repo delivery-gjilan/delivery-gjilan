@@ -106,6 +106,15 @@ export class AuthRepository {
         return user;
     }
 
+    async updatePassword(userId: string, hashedPassword: string): Promise<DbUser | undefined> {
+        const [user] = await this.db
+            .update(users)
+            .set({ password: hashedPassword, updatedAt: sql`CURRENT_TIMESTAMP` })
+            .where(eq(users.id, userId))
+            .returning();
+        return user;
+    }
+
     async createUserWithRole(
         firstName: string,
         lastName: string,

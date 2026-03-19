@@ -44,16 +44,24 @@ export const respondToSettlementRequest: NonNullable<
     }
 
     if (action === 'ACCEPT') {
-        // Auto-settle all pending RECEIVABLE settlements in the period
-        const settledCount = await repo.settlePendingReceivableForPeriod(
+        const requestedAmount = Number(existing.amount ?? 0);
+        const settlementResult = await repo.settlePendingReceivableForPeriod(
             existing.businessId,
             existing.periodStart,
             existing.periodEnd,
+            requestedAmount,
         );
 
         logger.info(
-            { requestId, businessId: existing.businessId, settledCount },
-            'settlementRequest:accept — marked settlements as PAID',
+            {
+                requestId,
+                businessId: existing.businessId,
+                requestedAmount,
+                settledCount: settlementResult.settledCount,
+                settledAmount: settlementResult.settledAmount,
+                remainingAmount: settlementResult.remainingAmount,
+            },
+            'settlementRequest:accept — settled requested amount oldest-first',
         );
 
         const updated = await repo.accept(requestId, userData.userId);
@@ -63,7 +71,7 @@ export const respondToSettlementRequest: NonNullable<
             if (notificationService) {
                 await notificationService.sendToTopic('admins', {
                     title: '✅ Settlement Accepted',
-                    body: `Business accepted settlement of €${Number(existing.amount).toFixed(2)}. ${settledCount} settlement(s) marked as paid.`,
+                    body: `Business accepted settlement of €${requestedAmount.toFixed(2)}. €${settlementResult.settledAmount.toFixed(2)} applied across ${settlementResult.settledCount} settlement(s).`,
                     data: {
                         type: 'SETTLEMENT_REQUEST_ACCEPTED',
                         requestId,

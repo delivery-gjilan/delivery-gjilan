@@ -7,6 +7,7 @@ import messaging, { firebase } from '@react-native-firebase/messaging';
 import { useMutation } from '@apollo/client/react';
 import { useAuthStore } from '@/store/authStore';
 import { REGISTER_DEVICE_TOKEN, UNREGISTER_DEVICE_TOKEN, TRACK_PUSH_TELEMETRY } from '@/graphql/notifications';
+import { useNotificationSettingsStore } from '@/store/useNotificationSettingsStore';
 
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -69,6 +70,7 @@ async function registerForPushNotifications(): Promise<string | null> {
 
 export function useNotifications() {
     const { isAuthenticated, token: authToken } = useAuthStore();
+    const pushEnabled = useNotificationSettingsStore((state) => state.pushEnabled);
     const currentPushToken = useRef<string | null>(null);
 
     const [registerToken] = useMutation(REGISTER_DEVICE_TOKEN);
@@ -109,6 +111,15 @@ export function useNotifications() {
 
         async function setup() {
             try {
+                if (!pushEnabled) {
+                    if (currentPushToken.current) {
+                        await unregisterToken({ variables: { token: currentPushToken.current } }).catch(() => null);
+                        await sendTelemetry('TOKEN_UNREGISTERED').catch(() => null);
+                        currentPushToken.current = null;
+                    }
+                    return;
+                }
+
                 const pushToken = await registerForPushNotifications();
                 if (!pushToken || !mounted) return;
 
@@ -134,7 +145,7 @@ export function useNotifications() {
 
         let unsubscribeTokenRefresh: (() => void) | undefined;
         
-        if (firebase.apps.length) {
+        if (firebase.apps.length && pushEnabled) {
             unsubscribeTokenRefresh = messaging().onTokenRefresh(async (newToken) => {
                 if (!mounted || newToken === currentPushToken.current) {
                     return;
@@ -190,7 +201,7 @@ export function useNotifications() {
             notificationListener.remove();
             responseListener.remove();
         };
-    }, [isAuthenticated, authToken, registerToken]);
+    }, [isAuthenticated, authToken, pushEnabled, registerToken, unregisterToken, trackPushTelemetry]);
 
     useEffect(() => {
         if (!isAuthenticated && currentPushToken.current) {

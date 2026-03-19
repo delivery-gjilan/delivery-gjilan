@@ -25,3 +25,9 @@ export const LOGIN_MUTATION = gql`
         }
     }
 `;
+
+export const CHANGE_MY_PASSWORD = gql`
+    mutation ChangeMyPassword($currentPassword: String!, $newPassword: String!) {
+        changeMyPassword(currentPassword: $currentPassword, newPassword: $newPassword)
+    }
+`;

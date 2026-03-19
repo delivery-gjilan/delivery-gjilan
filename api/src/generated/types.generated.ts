@@ -689,6 +689,7 @@ export type Mutation = {
   cancelOrder: Order;
   /** Admin cancels an outstanding settlement request. */
   cancelSettlementRequest: SettlementRequest;
+  changeMyPassword: Scalars['Boolean']['output'];
   createBanner: Banner;
   createBusiness: Business;
   createBusinessWithOwner: CreateBusinessWithOwnerPayload;
@@ -852,6 +853,12 @@ export type MutationcancelOrderArgs = {
 
 export type MutationcancelSettlementRequestArgs = {
   requestId: Scalars['ID']['input'];
+};
+
+
+export type MutationchangeMyPasswordArgs = {
+  currentPassword: Scalars['String']['input'];
+  newPassword: Scalars['String']['input'];
 };
 
 
@@ -3222,6 +3229,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   businessDeviceOrderSignal?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationbusinessDeviceOrderSignalArgs, 'deviceId'>>;
   cancelOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationcancelOrderArgs, 'id'>>;
   cancelSettlementRequest?: Resolver<ResolversTypes['SettlementRequest'], ParentType, ContextType, RequireFields<MutationcancelSettlementRequestArgs, 'requestId'>>;
+  changeMyPassword?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationchangeMyPasswordArgs, 'currentPassword' | 'newPassword'>>;
   createBanner?: Resolver<ResolversTypes['Banner'], ParentType, ContextType, RequireFields<MutationcreateBannerArgs, 'input'>>;
   createBusiness?: Resolver<ResolversTypes['Business'], ParentType, ContextType, RequireFields<MutationcreateBusinessArgs, 'input'>>;
   createBusinessWithOwner?: Resolver<ResolversTypes['CreateBusinessWithOwnerPayload'], ParentType, ContextType, RequireFields<MutationcreateBusinessWithOwnerArgs, 'input'>>;
