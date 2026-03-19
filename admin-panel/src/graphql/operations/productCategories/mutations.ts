@@ -5,6 +5,7 @@ export const CREATE_CATEGORY = graphql(`
         createProductCategory(input: $input) {
             id
             name
+            sortOrder
             isActive
         }
     }
@@ -18,6 +19,7 @@ export const UPDATE_CATEGORY = graphql(`
         updateProductCategory(id: $id, input: $input) {
             id
             name
+            sortOrder
             isActive
         }
     }

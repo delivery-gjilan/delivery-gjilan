@@ -368,6 +368,7 @@ input CreateOrderItemOptionInput {
 input CreateProductCategoryInput {
   businessId: ID!
   name: String!
+  sortOrder: Int
 }
 
 input CreateProductInput {
@@ -981,6 +982,7 @@ type ProductCategory {
   id: ID!
   isActive: Boolean!
   name: String!
+  sortOrder: Int!
   updatedAt: String!
 }
 
@@ -1478,6 +1480,7 @@ input UpdateOptionInput {
 input UpdateProductCategoryInput {
   isActive: Boolean
   name: String
+  sortOrder: Int
 }
 
 input UpdateProductInput {

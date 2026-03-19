@@ -1,6 +1,6 @@
 import { DbType } from '@/database';
 import { DbProductCategory, NewDbProductCategory, productCategories } from '@/database/schema/productCategories';
-import { eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 
 export class ProductCategoryRepository {
     constructor(private db: DbType) {}
@@ -16,7 +16,11 @@ export class ProductCategoryRepository {
     }
 
     async findByBusinessId(businessId: string): Promise<DbProductCategory[]> {
-        return this.db.select().from(productCategories).where(eq(productCategories.businessId, businessId));
+        return this.db
+            .select()
+            .from(productCategories)
+            .where(eq(productCategories.businessId, businessId))
+            .orderBy(asc(productCategories.sortOrder), asc(productCategories.name));
     }
 
     async update(id: string, data: Partial<NewDbProductCategory>): Promise<DbProductCategory | undefined> {

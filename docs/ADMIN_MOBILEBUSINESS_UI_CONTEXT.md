@@ -9,6 +9,11 @@ This document is a fast context handoff for future UI changes across `admin-pane
 
 ## Recent Updates
 
+- 2026-03-19: Category sorting persistence moved from localStorage to backend `sortOrder` updates (`api` schema/service/repository + `admin-panel` category mutations/queries + drag-save in `CategoriesBlock`).
+- 2026-03-19: Switched `admin-panel/src/components/businesses/ProductsBlock.tsx` sorting to market-style drag-and-drop with `dnd-kit` handles per category section; fixed invalid icon imports causing compile failures.
+- 2026-03-19: Added drag-and-drop category sorting to `admin-panel/src/components/businesses/CategoriesBlock.tsx` with per-business persisted order in localStorage.
+- 2026-03-19: Added business-facing product sorting controls in `admin-panel/src/components/businesses/ProductsBlock.tsx` (`Sort Items` mode with per-category up/down reordering persisted via `updateProductsOrder`).
+- 2026-03-19: Suppressed noisy empty WebSocket error logs (`{}`) in `admin-panel/src/lib/graphql/apollo-client.ts` by ignoring empty normalized WS error payloads during reconnect cycles.
 - 2026-03-19: In `admin-panel/src/components/businesses/ProductsBlock.tsx`, `Questions / Options` action is now shown only for deal/offer products; delete actions for questions/answers now use an explicit confirmation modal.
 - 2026-03-19: Deal creation/editing in product forms is now admin-only in UI (`SUPER_ADMIN`/`ADMIN`); business roles no longer see deal toggles.
 - 2026-03-19: Business-role dashboard landing now redirects to statistics via `admin-panel/src/app/dashboard/page.tsx`.

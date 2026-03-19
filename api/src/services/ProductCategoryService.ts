@@ -11,6 +11,7 @@ export class ProductCategoryService {
     private mapToProductCategory(category: DbProductCategory): ProductCategory {
         return {
             ...category,
+            sortOrder: category.sortOrder ?? 0,
             isActive: true,
             createdAt: category.createdAt ?? new Date().toISOString(),
             updatedAt: category.updatedAt ?? new Date().toISOString(),
@@ -20,9 +21,16 @@ export class ProductCategoryService {
     async createProductCategory(input: CreateProductCategoryInput): Promise<ProductCategory> {
         const validatedInput = productCategoryValidator.validateCreateProductCategory(input);
 
+        const existingCategories = await this.productCategoryRepository.findByBusinessId(validatedInput.businessId);
+        const maxSortOrder = existingCategories.reduce(
+            (max, category) => Math.max(max, category.sortOrder ?? 0),
+            0,
+        );
+
         const createdCategory = await this.productCategoryRepository.create({
             businessId: validatedInput.businessId,
             name: validatedInput.name,
+            sortOrder: validatedInput.sortOrder ?? maxSortOrder + 1,
         });
 
         return this.mapToProductCategory(createdCategory);

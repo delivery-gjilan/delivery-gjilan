@@ -394,6 +394,7 @@ export type CreateOrderItemOptionInput = {
 export type CreateProductCategoryInput = {
   businessId: Scalars['ID']['input'];
   name: Scalars['String']['input'];
+  sortOrder?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type CreateProductInput = {
@@ -1487,6 +1488,7 @@ export type ProductCategory = {
   id: Scalars['ID']['output'];
   isActive: Scalars['Boolean']['output'];
   name: Scalars['String']['output'];
+  sortOrder: Scalars['Int']['output'];
   updatedAt: Scalars['String']['output'];
 };
 
@@ -2256,6 +2258,7 @@ export type UpdateOptionInput = {
 export type UpdateProductCategoryInput = {
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
+  sortOrder?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type UpdateProductInput = {
@@ -3403,6 +3406,7 @@ export type ProductCategoryResolvers<ContextType = GraphQLContext, ParentType ex
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   isActive?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  sortOrder?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
