@@ -19,16 +19,13 @@ const superAdminOnlyPrefixes = [
 const businessUserAllowedPrefixes = [
     "/dashboard",
     "/dashboard/orders",
-    "/dashboard/market",
-    "/dashboard/finances",
+    "/dashboard/categories",
     "/dashboard/products",
-    "/dashboard/deals",
     "/dashboard/statistics",
     "/dashboard/settings",
 ];
 
 const businessEmployeeDeniedPrefixes = [
-    "/dashboard/finances",
     "/dashboard/settings",
 ];
 

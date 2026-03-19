@@ -11,7 +11,6 @@ import {
   Truck,
   Map,
   Tag,
-  Percent,
   Users,
   UserCog,
   BarChart3,
@@ -29,7 +28,7 @@ const menu: any[] = [
   { name: "Orders", href: "/dashboard/orders", icon: ClipboardList, businessAdminVisible: true },
   { name: "Map", href: "/dashboard/map", icon: Map, superAdminOnly: true },
   { name: "Businesses", href: "/dashboard/businesses", icon: Store, superAdminOnly: true },
-  { name: "Market", href: "/dashboard/market", icon: Store, businessAdminVisible: true },
+  { name: "Market", href: "/dashboard/market", icon: Store, superAdminOnly: true },
   { name: "Drivers", href: "/dashboard/drivers", icon: Truck, superAdminOnly: true },
 
   { divider: true, superAdminOnly: true },
@@ -46,7 +45,7 @@ const menu: any[] = [
   // Section 3
   { sectionHeader: "Finance & Admin", superAdminOnly: true },
   { name: "Settlements", href: "/admin/financial", icon: DollarSign, superAdminOnly: true },
-  { name: "Finances", href: "/dashboard/finances", icon: DollarSign, businessAdminVisible: true },
+  { name: "Finances", href: "/dashboard/finances", icon: DollarSign, superAdminOnly: true },
   { name: "Admins", href: "/dashboard/admins", icon: UserCog, superAdminOnly: true },
   { name: "Users", href: "/dashboard/users", icon: Users, superAdminOnly: true },
   { name: "Promotions", href: "/dashboard/promotions", icon: Tag, superAdminOnly: true },
@@ -55,8 +54,8 @@ const menu: any[] = [
 
   // Remaining items
   { sectionHeader: "Other", superAdminOnly: true },
+  { name: "Categories", href: "/dashboard/categories", icon: Tag, businessAdminVisible: true },
   { name: "Products", href: "/dashboard/products", icon: Package, businessAdminVisible: true },
-  { name: "Deals", href: "/dashboard/deals", icon: Percent, businessAdminVisible: true },
   { name: "Statistics", href: "/dashboard/statistics", icon: BarChart3, businessAdminVisible: true },
   { name: "Settings", href: "/dashboard/settings", icon: Settings, businessAdminVisible: true },
   { name: "Banners", href: "/admin/banners", icon: Image, superAdminOnly: true },
@@ -87,7 +86,7 @@ export default function Sidebar() {
     if (isSuperAdmin) return true;
     if (isAdmin && !item.superAdminOnly) return true;
     if (isBusinessUser && item.businessAdminVisible) {
-      if (isBusinessEmployee && (item.href === '/dashboard/finances' || item.href === '/dashboard/settings')) {
+      if (isBusinessEmployee && item.href === '/dashboard/settings') {
         return false;
       }
       return true;

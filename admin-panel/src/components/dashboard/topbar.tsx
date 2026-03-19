@@ -33,6 +33,7 @@ export default function Topbar() {
   const storeStatus = storeStatusData?.getStoreStatus;
   const isStoreClosed = storeStatus?.isStoreClosed ?? false;
   const bannerEnabled = storeStatus?.bannerEnabled ?? false;
+  const isSuperAdmin = admin?.role === "SUPER_ADMIN";
 
   const handleToggleStore = async (close: boolean) => {
     if (close) {
@@ -99,50 +100,51 @@ export default function Topbar() {
     router.push("/login");
   };
 
-  // TODO: Replace with actual role from auth context
-  const role = "SUPER_ADMIN"; // or "BUSINESS_ADMIN"
-
   return (
     <>
       <header className="h-12 bg-[#09090b] border-b border-[#1e1e22] flex items-center justify-between px-5">
         <div className="flex items-center gap-2">
-          <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium ${
-            isStoreClosed 
-              ? 'bg-red-500/10 text-red-400 border border-red-500/20' 
-              : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-          }`}>
-            <div className={`w-1.5 h-1.5 rounded-full ${isStoreClosed ? 'bg-red-400' : 'bg-emerald-400'}`} />
-            {isStoreClosed ? 'Closed' : 'Live'}
-          </div>
-          <button
-            onClick={() => handleToggleStore(!isStoreClosed)}
-            disabled={updating}
-            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
-          >
-            {isStoreClosed ? 'Open store' : 'Close'}
-          </button>
+          {isSuperAdmin && (
+            <>
+              <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium ${
+                isStoreClosed
+                  ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                  : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+              }`}>
+                <div className={`w-1.5 h-1.5 rounded-full ${isStoreClosed ? 'bg-red-400' : 'bg-emerald-400'}`} />
+                {isStoreClosed ? 'Closed' : 'Live'}
+              </div>
+              <button
+                onClick={() => handleToggleStore(!isStoreClosed)}
+                disabled={updating}
+                className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+              >
+                {isStoreClosed ? 'Open store' : 'Close'}
+              </button>
 
-          <div className="w-px h-4 bg-zinc-800" />
+              <div className="w-px h-4 bg-zinc-800" />
 
-          <button
-            onClick={bannerEnabled ? handleDisableBanner : handleOpenBannerModal}
-            disabled={updating}
-            className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
-              bannerEnabled 
-                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20' 
-                : 'text-zinc-500 hover:text-zinc-300'
-            }`}
-          >
-            <Megaphone size={12} />
-            {bannerEnabled ? 'Banner active' : 'Set banner'}
-          </button>
-          {bannerEnabled && (
-            <button
-              onClick={handleOpenBannerModal}
-              className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
-            >
-              Edit
-            </button>
+              <button
+                onClick={bannerEnabled ? handleDisableBanner : handleOpenBannerModal}
+                disabled={updating}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                  bannerEnabled
+                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                <Megaphone size={12} />
+                {bannerEnabled ? 'Banner active' : 'Set banner'}
+              </button>
+              {bannerEnabled && (
+                <button
+                  onClick={handleOpenBannerModal}
+                  className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                >
+                  Edit
+                </button>
+              )}
+            </>
           )}
         </div>
 

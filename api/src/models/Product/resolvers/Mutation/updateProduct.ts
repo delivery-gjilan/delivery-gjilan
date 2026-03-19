@@ -53,6 +53,12 @@ export const updateProduct: NonNullable<MutationResolvers['updateProduct']> = as
         });
     }
 
+    if (input.isOffer === true && !isPlatformAdmin(role)) {
+        throw new GraphQLError('Only admins can mark products as deals/offers', {
+            extensions: { code: 'FORBIDDEN' },
+        });
+    }
+
     const result = await productService.updateProduct(id, input);
     await cache.invalidateProducts(result.businessId, result.id);
     

@@ -45,6 +45,12 @@ export const createProduct: NonNullable<MutationResolvers['createProduct']> = as
             extensions: { code: 'FORBIDDEN' },
         });
     }
+
+    if (input.isOffer && !isPlatformAdmin(role)) {
+        throw new GraphQLError('Only admins can create deals/offers', {
+            extensions: { code: 'FORBIDDEN' },
+        });
+    }
     
     const result = await productService.createProduct(input);
     await cache.invalidateProducts(input.businessId, result.id);

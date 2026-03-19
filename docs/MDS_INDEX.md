@@ -279,6 +279,7 @@ ARCHITECTURE (A1)
 | `src/app/dashboard/market/page.tsx` | UI1 |
 | `src/app/dashboard/finances/page.tsx` | BL1 |
 | `src/app/dashboard/notifications/page.tsx` | O3 |
+| `src/app/dashboard/categories/page.tsx` | UI1, B5 |
 | `src/app/dashboard/businesses/page.tsx` | B5, BL2, UI1 |
 | `src/app/dashboard/layout.tsx` | B5, UI1 |
 | `src/app/admin/layout.tsx` | B5, UI1 |

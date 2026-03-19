@@ -175,8 +175,8 @@ Current authorization behavior across API resolvers and admin-panel:
 - Admin-panel layouts enforce role-aware route access (not only authentication):
   - `SUPER_ADMIN` can access all admin-panel routes.
   - `ADMIN` is blocked from super-admin-only routes.
-  - `BUSINESS_OWNER` is limited to business-facing dashboard routes.
-  - `BUSINESS_EMPLOYEE` is limited to business-facing routes and blocked from finances/settings pages.
+  - `BUSINESS_OWNER` is limited to business-facing routes (`orders`, `categories`, `products`, `statistics`, `settings`).
+  - `BUSINESS_EMPLOYEE` is limited to business-facing routes and blocked from `settings`.
 
 ### User Management Rules
 
@@ -209,6 +209,11 @@ Current authorization behavior across API resolvers and admin-panel:
   - platform admins: any business.
   - business owner: own business only.
   - business employee: own business only + `manage_products` permission.
+- Deal enforcement (`isOffer`):
+  - only platform admins can create or mark products as deals/offers.
+  - business roles cannot set `isOffer: true`.
+- Global store status mutation (`updateStoreStatus`):
+  - super-admin only (controls store live/close and global banner state).
 
 ### Provisioning Pattern
 

@@ -28,6 +28,7 @@ import {
     UPDATE_OPTION_GROUP,
     UPDATE_OPTION,
 } from "@/graphql/operations/products";
+import { useAuth } from "@/lib/auth-context";
 
 /* ===============================================
    TYPES
@@ -59,6 +60,8 @@ interface Product {
 =============================================== */
 
 export default function ProductsBlock({ businessId }: { businessId: string }) {
+    const { admin } = useAuth();
+    const isPlatformAdminRole = admin?.role === "SUPER_ADMIN" || admin?.role === "ADMIN";
     const { products, categories, loading, error, refetch } = useProducts(businessId);
     const { subcategories } = useProductSubcategories(businessId);
     const { create: createProduct, loading: createLoading, error: createError } = useCreateProduct();
@@ -111,6 +114,11 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
     const [newOptionByGroup, setNewOptionByGroup] = useState<Record<string, { name: string; extraPrice: number }>>({});
     const [optionGroupDrafts, setOptionGroupDrafts] = useState<Record<string, { name: string; min: number; max: number }>>({});
     const [optionDrafts, setOptionDrafts] = useState<Record<string, { name: string; extraPrice: number }>>({});
+    const [optionsDeleteTarget, setOptionsDeleteTarget] = useState<
+        | { kind: "group"; id: string; name: string }
+        | { kind: "option"; id: string; name: string }
+        | null
+    >(null);
 
     /* ===============================================
      UPLOAD STATE
@@ -280,7 +288,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             categoryId: createForm.categoryId,
             subcategoryId: createForm.subcategoryId || undefined,
             variantGroupId: createForm.variantGroupId || undefined,
-            isOffer: createForm.isOffer,
+            isOffer: isPlatformAdminRole ? createForm.isOffer : false,
             name: createForm.name,
             description: createForm.description || undefined,
             imageUrl: imageUrl || undefined,
@@ -327,6 +335,11 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
     };
 
     const openOptionsModal = (product: Product) => {
+        if (!product.isOffer) {
+            toast.warning("Questions / options are available only for deals/offers.");
+            return;
+        }
+
         setOptionsError("");
         setNewOptionGroupName("");
         setNewOptionGroupMin(0);
@@ -532,6 +545,26 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         }
     };
 
+    const requestDeleteOptionGroup = (id: string, name: string) => {
+        setOptionsDeleteTarget({ kind: "group", id, name });
+    };
+
+    const requestDeleteOption = (id: string, name: string) => {
+        setOptionsDeleteTarget({ kind: "option", id, name });
+    };
+
+    const confirmDeleteOptionEntity = async () => {
+        if (!optionsDeleteTarget) return;
+
+        if (optionsDeleteTarget.kind === "group") {
+            await handleDeleteOptionGroup(optionsDeleteTarget.id);
+        } else {
+            await handleDeleteOption(optionsDeleteTarget.id);
+        }
+
+        setOptionsDeleteTarget(null);
+    };
+
     const handleCreateVariantGroup = async () => {
         if (!newVariantGroupName.trim()) {
             setVariantGroupError("Variant group name is required");
@@ -630,7 +663,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             categoryId: input.categoryId,
             subcategoryId: input.subcategoryId || undefined,
             variantGroupId: input.variantGroupId || undefined,
-            isOffer: input.isOffer,
+            isOffer: isPlatformAdminRole ? input.isOffer : undefined,
             name: input.name,
             description: input.description || undefined,
             imageUrl: imageUrl || undefined,
@@ -794,13 +827,15 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                         Edit
                                                     </Button>
 
-                                                    <Button
-                                                        variant="outline"
-                                                        className="text-xs px-3"
-                                                        onClick={() => openOptionsModal(p)}
-                                                    >
-                                                        Questions / Options
-                                                    </Button>
+                                                    {p.isOffer && (
+                                                        <Button
+                                                            variant="outline"
+                                                            className="text-xs px-3"
+                                                            onClick={() => openOptionsModal(p)}
+                                                        >
+                                                            Questions / Options
+                                                        </Button>
+                                                    )}
 
                                                     <Button
                                                         variant="danger"
@@ -963,23 +998,25 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                         />
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            id="createIsOffer"
-                            checked={createForm.isOffer ?? false}
-                            onChange={(e) =>
-                                setCreateForm({
-                                    ...createForm,
-                                    isOffer: e.target.checked,
-                                    variantGroupId: e.target.checked ? undefined : createForm.variantGroupId,
-                                })
-                            }
-                        />
-                        <label htmlFor="createIsOffer" className="text-gray-300">
-                            Create as Deal / Offer
-                        </label>
-                    </div>
+                    {isPlatformAdminRole && (
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id="createIsOffer"
+                                checked={createForm.isOffer ?? false}
+                                onChange={(e) =>
+                                    setCreateForm({
+                                        ...createForm,
+                                        isOffer: e.target.checked,
+                                        variantGroupId: e.target.checked ? undefined : createForm.variantGroupId,
+                                    })
+                                }
+                            />
+                            <label htmlFor="createIsOffer" className="text-gray-300">
+                                Create as Deal / Offer
+                            </label>
+                        </div>
+                    )}
 
                     <div className="flex items-center gap-2">
                         <input
@@ -1067,7 +1104,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                         {uploadingImage ? "Uploading..." : createLoading ? "Saving..." : "Save"}
                     </Button>
 
-                    {createForm.isOffer && (
+                    {isPlatformAdminRole && createForm.isOffer && (
                         <p className="text-xs text-gray-400">
                             Tip: after saving this offer, you can configure option groups and choices in the Options modal.
                         </p>
@@ -1264,23 +1301,25 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                         />
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            id="editIsOffer"
-                            checked={editForm.isOffer ?? false}
-                            onChange={(e) =>
-                                setEditForm({
-                                    ...editForm,
-                                    isOffer: e.target.checked,
-                                    variantGroupId: e.target.checked ? undefined : editForm.variantGroupId,
-                                })
-                            }
-                        />
-                        <label htmlFor="editIsOffer" className="text-gray-300">
-                            Mark as Deal / Offer
-                        </label>
-                    </div>
+                    {isPlatformAdminRole && (
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id="editIsOffer"
+                                checked={editForm.isOffer ?? false}
+                                onChange={(e) =>
+                                    setEditForm({
+                                        ...editForm,
+                                        isOffer: e.target.checked,
+                                        variantGroupId: e.target.checked ? undefined : editForm.variantGroupId,
+                                    })
+                                }
+                            />
+                            <label htmlFor="editIsOffer" className="text-gray-300">
+                                Mark as Deal / Offer
+                            </label>
+                        </div>
+                    )}
 
                     <div className="flex items-center gap-2">
                         <input
@@ -1619,7 +1658,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                 <Button
                                                     variant="danger"
                                                     size="sm"
-                                                    onClick={() => handleDeleteOptionGroup(group.id)}
+                                                    onClick={() => requestDeleteOptionGroup(group.id, group.name)}
                                                     disabled={optionsLoading}
                                                 >
                                                     Delete Group
@@ -1674,7 +1713,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                     <Button
                                                         variant="danger"
                                                         size="sm"
-                                                        onClick={() => handleDeleteOption(opt.id)}
+                                                        onClick={() => requestDeleteOption(opt.id, opt.name)}
                                                         disabled={optionsLoading}
                                                     >
                                                         Delete
@@ -1831,6 +1870,33 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
 
                         {optionsError && <p className="text-sm text-red-400">{optionsError}</p>}
                     </div>
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={optionsDeleteTarget !== null}
+                onClose={() => setOptionsDeleteTarget(null)}
+                title={optionsDeleteTarget?.kind === "group" ? "Delete Question" : "Delete Answer"}
+            >
+                <p className="text-gray-300 mb-4">
+                    Are you sure you want to delete <strong>{optionsDeleteTarget?.name}</strong>?
+                </p>
+
+                <div className="flex justify-end gap-3">
+                    <Button
+                        variant="outline"
+                        onClick={() => setOptionsDeleteTarget(null)}
+                        disabled={optionsLoading}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="danger"
+                        onClick={confirmDeleteOptionEntity}
+                        disabled={optionsLoading}
+                    >
+                        {optionsLoading ? "Deleting..." : "Delete"}
+                    </Button>
                 </div>
             </Modal>
         </div>

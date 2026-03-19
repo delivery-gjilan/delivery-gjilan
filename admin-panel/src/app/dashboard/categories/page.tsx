@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@apollo/client/react";
 import Select from "@/components/ui/Select";
 import { GET_BUSINESSES } from "@/graphql/operations/businesses";
 import CategoriesBlock from "@/components/businesses/CategoriesBlock";
+import { useAuth } from "@/lib/auth-context";
 
 interface Business {
     id: string;
@@ -17,10 +18,25 @@ interface GetBusinessesData {
 }
 
 export default function CategoriesPage() {
+    const { admin } = useAuth();
     const [selectedBusinessId, setSelectedBusinessId] = useState<string>("");
     const { data, loading } = useQuery<GetBusinessesData>(GET_BUSINESSES);
 
     const businesses = data?.businesses || [];
+    const isBusinessUser = admin?.role === "BUSINESS_OWNER" || admin?.role === "BUSINESS_EMPLOYEE";
+
+    const effectiveBusinessId = useMemo(() => {
+        if (isBusinessUser) {
+            return admin?.businessId || "";
+        }
+        return selectedBusinessId;
+    }, [admin?.businessId, isBusinessUser, selectedBusinessId]);
+
+    useEffect(() => {
+        if (isBusinessUser && admin?.businessId) {
+            setSelectedBusinessId(admin.businessId);
+        }
+    }, [admin?.businessId, isBusinessUser]);
 
     if (loading) {
         return <p className="text-gray-400">Loading businesses...</p>;
@@ -32,32 +48,35 @@ export default function CategoriesPage() {
                 <h1 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Product Categories</h1>
             </div>
 
-            {/* Business Selector */}
-            <div className="mb-6 bg-gray-900 border border-gray-800 rounded-xl p-6">
-                <label className="block text-sm font-medium text-gray-400 mb-2">
-                    Select a Business
-                </label>
-                <Select
-                    value={selectedBusinessId}
-                    onChange={(e) => setSelectedBusinessId(e.target.value)}
-                    className="max-w-md"
-                >
-                    <option value="">-- Choose a business --</option>
-                    {businesses.map((business) => (
-                        <option key={business.id} value={business.id}>
-                            {business.name} ({business.businessType})
-                        </option>
-                    ))}
-                </Select>
-            </div>
+            {!isBusinessUser && (
+                <div className="mb-6 bg-gray-900 border border-gray-800 rounded-xl p-6">
+                    <label className="block text-sm font-medium text-gray-400 mb-2">
+                        Select a Business
+                    </label>
+                    <Select
+                        value={selectedBusinessId}
+                        onChange={(e) => setSelectedBusinessId(e.target.value)}
+                        className="max-w-md"
+                    >
+                        <option value="">-- Choose a business --</option>
+                        {businesses.map((business) => (
+                            <option key={business.id} value={business.id}>
+                                {business.name} ({business.businessType})
+                            </option>
+                        ))}
+                    </Select>
+                </div>
+            )}
 
             {/* Categories Display */}
-            {selectedBusinessId ? (
-                <CategoriesBlock businessId={selectedBusinessId} />
+            {effectiveBusinessId ? (
+                <CategoriesBlock businessId={effectiveBusinessId} />
             ) : (
                 <div className="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center">
                     <p className="text-gray-400">
-                        Please select a business to view and manage its product categories
+                        {isBusinessUser
+                            ? "No business is assigned to your account. Ask a super admin to assign your business first."
+                            : "Please select a business to view and manage its product categories"}
                     </p>
                 </div>
             )}

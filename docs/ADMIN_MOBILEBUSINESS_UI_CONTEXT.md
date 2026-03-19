@@ -1,6 +1,6 @@
 # Admin + Mobile-Business UI Context
 
-<!-- MDS:UI1 | Domain: UI | Updated: 2026-03-18 -->
+<!-- MDS:UI1 | Domain: UI | Updated: 2026-03-19 -->
 <!-- Depends-On: BL2 -->
 <!-- Depended-By: M5 -->
 <!-- Nav: Product type/variant changes → update BL2 (Product Refactor), M5 (Input Flow). Admin panel mutations → review B1 (API). -->
@@ -9,6 +9,10 @@ This document is a fast context handoff for future UI changes across `admin-pane
 
 ## Recent Updates
 
+- 2026-03-19: In `admin-panel/src/components/businesses/ProductsBlock.tsx`, `Questions / Options` action is now shown only for deal/offer products; delete actions for questions/answers now use an explicit confirmation modal.
+- 2026-03-19: Deal creation/editing in product forms is now admin-only in UI (`SUPER_ADMIN`/`ADMIN`); business roles no longer see deal toggles.
+- 2026-03-19: Business-role dashboard landing now redirects to statistics via `admin-panel/src/app/dashboard/page.tsx`.
+- 2026-03-19: Topbar controls for store live/close and global banner are now super-admin-only in UI and API (`admin-panel/src/components/dashboard/topbar.tsx`, `api/src/models/General/resolvers/Mutation/updateStoreStatus.ts`).
 - 2026-03-18: Fixed admin settlements table rendering condition in `admin-panel/src/app/admin/financial/settlements/page.tsx` where selected-business view could show footer counts ("Showing x of x") but render no rows due nested ternary boolean output.
 - 2026-03-18: Reorganized `admin-panel` sidebar navigation sections/order in `admin-panel/src/components/dashboard/sidebar.tsx` with requested grouping: Operations first, Pricing & Promotions second, Finance & Admin third, and remaining links under Other.
 
