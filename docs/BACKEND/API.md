@@ -92,6 +92,7 @@ That means:
 ## Operational Notes
 
 - websocket subscriptions now include rate-limiting controls in `api/src/index.ts` to reduce per-socket abuse
+- HTTP/upload/auth rate limiting in `api/src/index.ts` uses `express-rate-limit` v8-compatible keys and `ipKeyGenerator` fallback for IPv6-safe client keying
 - store open/closed state is now broadcast through `storeStatusUpdated`
 - generated schema and type files are large and should not be manually edited
 

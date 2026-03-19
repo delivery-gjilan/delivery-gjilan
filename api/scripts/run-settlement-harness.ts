@@ -54,6 +54,33 @@ type CheckResult = {
     lookHere?: string;
 };
 
+function getEffectiveProductPrice(product: {
+    basePrice: string | number;
+    isOnSale?: boolean | null;
+    salePrice?: string | number | null;
+    markupPrice?: string | number | null;
+    nightMarkedupPrice?: string | number | null;
+}) {
+    const nowHour = new Date().getHours();
+    const isNightHours = nowHour >= 20 || nowHour < 6;
+
+    const basePrice = Number(product.basePrice ?? 0);
+    const salePrice = product.salePrice != null ? Number(product.salePrice) : null;
+    const markupPrice = product.markupPrice != null ? Number(product.markupPrice) : null;
+    const nightMarkedupPrice = product.nightMarkedupPrice != null ? Number(product.nightMarkedupPrice) : null;
+
+    if (product.isOnSale && salePrice != null) {
+        return salePrice;
+    }
+    if (isNightHours && nightMarkedupPrice != null) {
+        return nightMarkedupPrice;
+    }
+    if (markupPrice != null) {
+        return markupPrice;
+    }
+    return basePrice;
+}
+
 function countMismatchCategories(mismatches: string[]) {
     let missingExpected = 0;
     let unexpected = 0;
@@ -96,7 +123,7 @@ async function runOrderCreationChecks(): Promise<CheckResult[]> {
         dropoffLng: 21.469,
     });
 
-    const subtotal = Number(productA.basePrice);
+    const subtotal = getEffectiveProductPrice(productA as any);
     const createdOrderIds: string[] = [];
     const results: CheckResult[] = [];
 

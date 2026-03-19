@@ -1,12 +1,13 @@
 # Settlements & Promotions
 
-<!-- MDS:BL1 | Domain: Business Logic | Updated: 2026-03-18 -->
+<!-- MDS:BL1 | Domain: Business Logic | Updated: 2026-03-19 -->
 <!-- Depends-On: B2, B3, B6 -->
 <!-- Depended-By: O3, O8, O11, M4 -->
 <!-- Nav: Rule/promo changes → update O3 (Notifications campaigns), O8 (Testing preflight). Payment collection → update B2 (Order Creation), M4 (Mobile Audit). -->
 
 ## Recent Updates
 
+- 2026-03-19: Settlement creation is now protected by an order-scoped Postgres advisory transaction lock in `FinancialService.createOrderSettlements()` to prevent duplicate settlements during concurrent delivery/backfill triggers.
 - 2026-03-18: Fixed mobile-admin settlement action wiring to pass `settlementId` (not `id`) to `markSettlementAsPaid`.
 - 2026-03-18: Fixed mobile-admin settlement list metadata line to show `createdAt` instead of undefined `periodStart`/`periodEnd` fields.
 - 2026-03-18: Admin financial settlements page now supports aggregate-only settling from a bottom action row (full or partial across pending settlements in current scope); single-settlement settle actions were intentionally disabled in the details modal.
@@ -133,7 +134,8 @@ This keeps platform markup earnings explicit in settlements without requiring an
 When an order is delivered, the `FinancialService.createOrderSettlements()` method runs:
 
 ```
-1. Check if settlements already exist for this order (idempotent guard)
+1. Acquire an order-scoped advisory transaction lock (`pg_advisory_xact_lock(hashtext(orderId))`)
+2. Check if settlements already exist for this order (idempotent guard under lock)
 2. SettlementCalculationEngine runs:
    a. Collect business IDs from the order's products
    b. Collect promotion IDs from the order_promotions table
@@ -149,7 +151,7 @@ When an order is delivered, the `FinancialService.createOrderSettlements()` meth
       - Create automatic `DRIVER / RECEIVABLE` settlement for markup remittance
       - Set `rule_id` to null (system-generated entry)
    f. Return SettlementCalculation[]
-3. For each calculation, persist a settlement record (status = PENDING)
+3. For each calculation, persist a settlement record (status = PENDING) in the same transaction
 ```
 
 ### Payment Collection Modes
@@ -251,13 +253,14 @@ Promotions reduce `order.price` (item discounts) or `order.deliveryPrice` (deliv
 - Includes business-sponsored free-delivery variants (full reimburse, split reimburse, prepaid)
 - Includes scenario builder UI to preview expected flows and rule setup guidance
 
-### API Preflight Gate
+### API Preflight Suite
 
 - Run: `npm run test:api:preflight` in `api/`
 - This gate now runs:
    - settlement harness scenarios
    - order-creation checks (payment collection defaults/explicit modes, delivery and total validation, invalid promo rejection)
-- `api` startup commands run this preflight before booting.
+- Use `npm run dev:preflight` to run preflight before API boot.
+- Use `npm run dev` for fast startup without preflight.
 
 ---
 

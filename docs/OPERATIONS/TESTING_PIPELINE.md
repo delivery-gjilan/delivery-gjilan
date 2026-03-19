@@ -14,9 +14,10 @@ What exists:
 - lint scripts across API, admin, and mobile apps
 - typecheck scripts across API, admin, and mobile apps
 - GraphQL codegen scripts across packages
-- API preflight gate:
-	- `npm run test:api:preflight` (required gate before `npm run dev` and `npm run start` in `api`)
-	- includes deterministic settlement scenario checks and order-creation checks
+- API preflight suite:
+	- `npm run test:api:preflight` for deterministic settlement scenarios and order-creation checks
+	- `npm run dev` starts API directly for fast local iteration
+	- `npm run dev:preflight` runs preflight first, then starts API
 - detailed pass/fail console report with scenario/check IDs and debugging pointers
 
 What is still missing:

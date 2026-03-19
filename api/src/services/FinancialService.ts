@@ -4,7 +4,8 @@ import { SettlementCalculationEngine } from '@/services/SettlementCalculationEng
 import { DbOrder, DbOrderItem } from '@/database/schema';
 import logger from '@/lib/logger';
 import { drivers } from '@/database/schema/drivers';
-import { eq } from 'drizzle-orm';
+import { settlements } from '@/database/schema/settlements';
+import { eq, sql } from 'drizzle-orm';
 
 const log = logger.child({ service: 'FinancialService' });
 
@@ -36,37 +37,54 @@ export class FinancialService {
     ): Promise<void> {
         try {
             const normalizedDriverId = await this.normalizeDriverId(driverId);
-
-            // Check if settlements already exist for this order
-            const existing = await this.settlementRepo.getSettlements({ orderId: order.id });
-            if (existing.length > 0) {
-                log.info({ orderId: order.id }, 'settlements already exist for order');
-                return;
-            }
-
             const normalizedItems = Array.isArray(orderItems) ? orderItems : [];
-            const calculated = await this.settlementEngine.calculateOrderSettlements(
-                order,
-                normalizedItems,
-                normalizedDriverId,
-            );
 
-            for (const settlement of calculated) {
-                await this.settlementRepo.createSettlement(
-                    settlement.type,
-                    settlement.driverId,
-                    settlement.businessId,
-                    settlement.orderId,
-                    settlement.amount,
-                    settlement.direction,
-                    settlement.ruleId,
+            await this.db.transaction(async (tx) => {
+                // Order-scoped advisory transaction lock prevents concurrent settlement creation
+                // from duplicate status updates/backfill overlap on the same order.
+                await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${order.id}))`);
+
+                const existing = await tx
+                    .select({ id: settlements.id })
+                    .from(settlements)
+                    .where(eq(settlements.orderId, order.id))
+                    .limit(1);
+
+                if (existing.length > 0) {
+                    log.info({ orderId: order.id }, 'settlements already exist for order');
+                    return;
+                }
+
+                const calculated = await this.settlementEngine.calculateOrderSettlements(
+                    order,
+                    normalizedItems,
+                    normalizedDriverId,
                 );
-            }
 
-            log.info({
-                orderId: order.id,
-                settlementCount: calculated.length,
-            }, 'all order settlements created');
+                for (const settlement of calculated) {
+                    await tx
+                        .insert(settlements)
+                        .values({
+                            type: settlement.type,
+                            direction: settlement.direction,
+                            driverId: settlement.driverId,
+                            businessId: settlement.businessId,
+                            orderId: settlement.orderId,
+                            amount: settlement.amount,
+                            status: 'PENDING',
+                            ruleId: settlement.ruleId,
+                        })
+                        .execute();
+                }
+
+                log.info(
+                    {
+                        orderId: order.id,
+                        settlementCount: calculated.length,
+                    },
+                    'all order settlements created',
+                );
+            });
         } catch (error) {
             log.error({ err: error, orderId: order.id }, 'settlement:create:error');
             throw error;
