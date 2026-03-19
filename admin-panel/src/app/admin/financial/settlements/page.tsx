@@ -631,30 +631,30 @@ export default function SettlementsPage() {
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto">
-        <Table>
+      <div className="overflow-x-auto border border-zinc-800 rounded-lg">
+        <Table className="w-full text-xs">
           <TableHeader>
-            <TableRow className="hover:bg-transparent">
+            <TableRow className="hover:bg-transparent border-b border-zinc-800 bg-[#09090b]">
               {selectedGroup ? (
                 <>
-                  <TableHead className="font-semibold">{activeTab === 'business' ? 'Business' : 'Driver'}</TableHead>
-                  <TableHead className="font-semibold">Direction</TableHead>
-                  <TableHead className="font-semibold text-right">Amount</TableHead>
-                  <TableHead className="font-semibold">Status</TableHead>
-                  <TableHead className="font-semibold">Order ID</TableHead>
-                  <TableHead className="font-semibold">Payment Ref</TableHead>
-                  <TableHead className="font-semibold text-right">Date</TableHead>
-                  <TableHead className="font-semibold text-right">Actions</TableHead>
+                  <TableHead className="font-semibold text-zinc-500">{activeTab === 'business' ? 'Business' : 'Driver'}</TableHead>
+                  <TableHead className="font-semibold text-zinc-500">Direction</TableHead>
+                  <TableHead className="font-semibold text-right text-zinc-500">Amount</TableHead>
+                  <TableHead className="font-semibold text-zinc-500">Status</TableHead>
+                  <TableHead className="font-semibold text-zinc-500">Order ID</TableHead>
+                  <TableHead className="font-semibold text-zinc-500">Payment Ref</TableHead>
+                  <TableHead className="font-semibold text-right text-zinc-500">Date</TableHead>
+                  <TableHead className="font-semibold text-right text-zinc-500">Actions</TableHead>
                 </>
               ) : (
                 <>
-                  <TableHead className="font-semibold">{activeTab === 'business' ? 'Business' : 'Driver'}</TableHead>
-                  <TableHead className="font-semibold">Reference</TableHead>
-                  <TableHead className="font-semibold text-right">Settlements</TableHead>
-                  <TableHead className="font-semibold text-right">Pending</TableHead>
-                  <TableHead className="font-semibold text-right">Paid</TableHead>
-                  <TableHead className="font-semibold text-right">Total</TableHead>
-                  <TableHead className="font-semibold text-right">Actions</TableHead>
+                  <TableHead className="font-semibold text-zinc-500">{activeTab === 'business' ? 'Business' : 'Driver'}</TableHead>
+                  <TableHead className="font-semibold text-zinc-500">Reference</TableHead>
+                  <TableHead className="font-semibold text-right text-zinc-500">Settlements</TableHead>
+                  <TableHead className="font-semibold text-right text-zinc-500">Pending</TableHead>
+                  <TableHead className="font-semibold text-right text-zinc-500">Paid</TableHead>
+                  <TableHead className="font-semibold text-right text-zinc-500">Total</TableHead>
+                  <TableHead className="font-semibold text-right text-zinc-500">Actions</TableHead>
                 </>
               )}
             </TableRow>
@@ -662,7 +662,7 @@ export default function SettlementsPage() {
           <TableBody>
             {loading ? (
               Array.from({ length: 10 }).map((_, i) => (
-                <TableRow key={i}>
+                <TableRow key={i} className="border-b border-zinc-800">
                   <TableCell colSpan={selectedGroup ? 8 : 7}>
                     <Skeleton className="h-9 w-full" />
                   </TableCell>
@@ -670,12 +670,12 @@ export default function SettlementsPage() {
               ))
             ) : isEmpty ? (
               <TableRow>
-                <TableCell colSpan={selectedGroup ? 8 : 7} className="text-center text-muted-foreground py-20">
+                <TableCell colSpan={selectedGroup ? 8 : 7} className="text-center text-zinc-500 py-20">
                   <div className="flex flex-col items-center gap-2">
                     <div className="text-lg font-medium">
                       {selectedGroup ? 'No settlements found' : `No ${activeTab === 'business' ? 'businesses' : 'drivers'} found`}
                     </div>
-                    <div className="text-sm">Try adjusting your filters or search query</div>
+                    <div className="text-sm text-zinc-600">Try adjusting your filters or search query</div>
                   </div>
                 </TableCell>
               </TableRow>
@@ -683,10 +683,10 @@ export default function SettlementsPage() {
               filteredSettlements.map((settlement: SettlementRecord) => (
                 <TableRow 
                   key={settlement.id}
-                  className="hover:bg-muted/40"
+                  className="border-b border-zinc-800 hover:bg-[#131313] transition-colors"
                 >
                   <TableCell 
-                    className="font-medium cursor-pointer"
+                    className="font-medium cursor-pointer text-zinc-300"
                     onClick={() => setSelectedSettlement(settlement)}
                   >
                     {activeTab === 'business' && settlement.business
@@ -698,12 +698,17 @@ export default function SettlementsPage() {
                   <TableCell>
                     <Badge
                       variant={settlement.direction === SettlementDirection.Receivable ? 'default' : 'secondary'}
-                      className="font-medium"
+                      className={cn(
+                        'font-medium',
+                        settlement.direction === SettlementDirection.Receivable
+                          ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30'
+                          : 'bg-violet-500/20 text-violet-300 hover:bg-violet-500/30'
+                      )}
                     >
                       {settlement.direction}
                     </Badge>
                   </TableCell>
-                  <TableCell className="font-bold text-right tabular-nums">
+                  <TableCell className="font-bold text-right tabular-nums text-zinc-300">
                     {settlement.currency} {Number(settlement.amount).toFixed(2)}
                   </TableCell>
                   <TableCell>
@@ -711,20 +716,23 @@ export default function SettlementsPage() {
                       variant={settlement.status === SettlementStatus.Paid ? 'default' : 'secondary'}
                       className={cn(
                         'font-medium',
-                        settlement.status === SettlementStatus.Paid && 'bg-green-600',
-                        settlement.status === SettlementStatus.Pending && 'bg-orange-500'
+                        settlement.status === SettlementStatus.Paid && 'bg-green-500/20 text-green-300 hover:bg-green-500/30',
+                        settlement.status === SettlementStatus.Pending && 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30',
+                        settlement.status === SettlementStatus.Overdue && 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30',
+                        settlement.status === SettlementStatus.Disputed && 'bg-red-500/20 text-red-300 hover:bg-red-500/30',
+                        settlement.status === SettlementStatus.Cancelled && 'bg-zinc-700/30 text-zinc-300 hover:bg-zinc-700/40'
                       )}
                     >
                       {settlement.status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    {settlement.order?.id?.slice(0, 8)}...
+                  <TableCell className="font-mono text-xs text-zinc-400">
+                    #{settlement.order?.displayId || settlement.order?.id?.slice(-6)}
                   </TableCell>
-                  <TableCell className="text-sm">
+                  <TableCell className="text-sm text-zinc-400">
                     {settlement.paymentReference || '-'}
                   </TableCell>
-                  <TableCell className="text-sm text-right text-muted-foreground tabular-nums">
+                  <TableCell className="text-sm text-right text-zinc-500 tabular-nums">
                     {new Date(settlement.createdAt).toLocaleString('en-GB', {
                       day: '2-digit',
                       month: 'short',
@@ -737,6 +745,7 @@ export default function SettlementsPage() {
                     <Button
                       size="sm"
                       variant="ghost"
+                      className="h-7 bg-zinc-800 hover:bg-zinc-700 text-white"
                       onClick={() => setSelectedSettlement(settlement)}
                     >
                       View
@@ -748,25 +757,25 @@ export default function SettlementsPage() {
               filteredGroups.map((group) => (
                 <TableRow 
                   key={group.id}
-                  className="hover:bg-muted/40"
+                  className="border-b border-zinc-800 hover:bg-[#131313] transition-colors"
                 >
-                  <TableCell className="font-medium">
+                  <TableCell className="font-medium text-zinc-300">
                     <div>{group.name}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{group.id}</div>
+                    <div className="text-xs text-zinc-500 mt-1">{group.id}</div>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell className="text-sm text-zinc-500">
                     {group.subtitle}
                   </TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">
+                  <TableCell className="text-right font-medium tabular-nums text-zinc-300">
                     {group.settlements.length}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums text-orange-600 font-medium">
+                  <TableCell className="text-right tabular-nums text-amber-300 font-medium">
                     €{group.pendingAmount.toFixed(2)}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums text-green-600 font-medium">
+                  <TableCell className="text-right tabular-nums text-green-300 font-medium">
                     €{group.paidAmount.toFixed(2)}
                   </TableCell>
-                  <TableCell className="text-right font-bold tabular-nums">
+                  <TableCell className="text-right font-bold tabular-nums text-violet-300">
                     €{group.totalAmount.toFixed(2)}
                   </TableCell>
                   <TableCell className="text-right">
@@ -777,7 +786,7 @@ export default function SettlementsPage() {
                         setSelectedEntityId(group.id);
                         setSearchQuery('');
                       }}
-                      className="gap-2"
+                      className="gap-2 border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800"
                     >
                       View settlements
                       <ChevronRight className="h-4 w-4" />

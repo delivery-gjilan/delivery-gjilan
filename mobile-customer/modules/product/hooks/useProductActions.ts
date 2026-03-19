@@ -7,6 +7,7 @@ import { useCartActions } from '@/modules/cart/hooks/useCartActions';
 import { Product } from '@/gql/graphql';
 import { GET_BUSINESS } from '@/graphql/operations/businesses';
 import { useTranslations } from '@/hooks/useTranslations';
+import { getEffectiveProductPrice } from '@/modules/product/utils/pricing';
 
 export function useProductActions(
     product: any,
@@ -103,7 +104,7 @@ export function useProductActions(
             }
         });
 
-        const unitPrice = product.isOnSale && product.salePrice ? product.salePrice : (product.price ?? 0);
+        const unitPrice = getEffectiveProductPrice(product);
 
         const error = addItem({
             cartItemId,

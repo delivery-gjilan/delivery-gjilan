@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useMutation, useQuery } from "@apollo/client/react";
+import { gql } from "@apollo/client";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import { Table, Th, Td } from "@/components/ui/Table";
@@ -25,7 +26,7 @@ interface OrderItem {
     name: string;
     imageUrl?: string;
     quantity: number;
-    price: number;
+    unitPrice?: number;
     notes?: string;
 }
 
@@ -34,6 +35,7 @@ interface OrderBusiness {
         id: string;
         name: string;
         businessType: string;
+        commissionPercentage?: number;
     };
     items: OrderItem[];
 }
@@ -70,8 +72,47 @@ interface Order {
         firstName: string;
         lastName: string;
         email: string;
+        commissionPercentage?: number;
     } | null;
 }
+
+interface OrderEarningsBreakdown {
+    total: number;
+    deliveryCommission: number;
+    deliveryCommissionPotential: number;
+    restaurantCommission: number;
+    markup: number;
+    deliveryIncluded: boolean;
+    driverCommissionRate: number;
+}
+
+interface BusinessSettlementRule {
+    id: string;
+    entityType: 'BUSINESS' | 'DRIVER';
+    direction: 'RECEIVABLE' | 'PAYABLE';
+    amountType: 'FIXED' | 'PERCENT';
+    amount: number;
+    appliesTo?: string | null;
+    isActive: boolean;
+    business?: { id: string } | null;
+}
+
+const GET_BUSINESS_SETTLEMENT_RULES = gql`
+    query OrdersBusinessSettlementRules($filter: SettlementRuleFilterInput) {
+        settlementRules(filter: $filter) {
+            id
+            entityType
+            direction
+            amountType
+            amount
+            appliesTo
+            isActive
+            business {
+                id
+            }
+        }
+    }
+`;
 
 const normalizeOrderBusinesses = (order: any): OrderBusiness[] => {
     if (!Array.isArray(order?.businesses)) return [];
@@ -87,6 +128,73 @@ const getOrderBusinessesSafe = (order: any): OrderBusiness[] => {
 
 const getBusinessItemsSafe = (business: any): OrderItem[] => {
     return Array.isArray(business?.items) ? business.items : [];
+};
+
+const roundMoney = (value: number) => Math.round(value * 100) / 100;
+
+const computeOrderEarnings = (order: Order, rules: BusinessSettlementRule[]): OrderEarningsBreakdown => {
+    const deliveryPrice = Number(order.deliveryPrice || 0);
+    const driverCommissionRate = Number(order.driver?.commissionPercentage || 0);
+    const deliveryCommissionPotential = roundMoney((deliveryPrice * driverCommissionRate) / 100);
+
+    const deliveryIncluded =
+        Boolean(order.driver?.id) ||
+        order.status === 'OUT_FOR_DELIVERY' ||
+        order.status === 'DELIVERED';
+
+    const deliveryCommission = deliveryIncluded ? deliveryCommissionPotential : 0;
+
+    let restaurantCommission = 0;
+    let grossItemValue = 0;
+
+    const activeBusinessRules = (rules || []).filter((rule) => rule.isActive && rule.entityType === 'BUSINESS');
+
+    getOrderBusinessesSafe(order).forEach((biz) => {
+        const businessItems = getBusinessItemsSafe(biz);
+        const businessGross = businessItems.reduce((sum, item) => sum + Number(item.unitPrice || 0) * Number(item.quantity || 0), 0);
+        grossItemValue += businessGross;
+
+        const scopedRules = activeBusinessRules.filter((rule) => !rule.business?.id || rule.business.id === biz.business.id);
+
+        if (scopedRules.length > 0) {
+            scopedRules.forEach((rule) => {
+                const base = rule.appliesTo === 'DELIVERY_FEE' ? deliveryPrice : Number(order.orderPrice || 0);
+                const amount = rule.amountType === 'FIXED'
+                    ? Number(rule.amount || 0)
+                    : (base * Number(rule.amount || 0)) / 100;
+
+                if (amount <= 0) return;
+
+                if (rule.direction === 'RECEIVABLE') {
+                    restaurantCommission += amount;
+                }
+            });
+            return;
+        }
+
+        const pctFallback = Number(biz.business?.commissionPercentage || 0);
+        if (pctFallback > 0) {
+            restaurantCommission += (businessGross * pctFallback) / 100;
+        }
+    });
+
+    restaurantCommission = roundMoney(restaurantCommission);
+
+    const subtotal = Number(order.orderPrice || 0);
+    // Only derive markup when we have item-level baseline values.
+    const hasItemBaseline = grossItemValue > 0;
+    const markup = hasItemBaseline ? roundMoney(Math.max(0, subtotal - grossItemValue)) : 0;
+    const total = roundMoney(deliveryCommission + restaurantCommission + markup);
+
+    return {
+        total,
+        deliveryCommission,
+        deliveryCommissionPotential,
+        restaurantCommission,
+        markup,
+        deliveryIncluded,
+        driverCommissionRate,
+    };
 };
 
 /* ---------------------------------------------------------
@@ -202,6 +310,15 @@ export default function OrdersPage() {
     const [editPrepTimeOrder, setEditPrepTimeOrder] = useState<Order | null>(null);
     const [editPrepTimeMinutes, setEditPrepTimeMinutes] = useState<string>("");
 
+    const { data: settlementRulesData } = useQuery(GET_BUSINESS_SETTLEMENT_RULES, {
+        variables: { filter: { entityType: 'BUSINESS' } },
+        fetchPolicy: 'cache-and-network',
+    });
+
+    const businessSettlementRules = useMemo(() => {
+        return ((settlementRulesData as any)?.settlementRules || []) as BusinessSettlementRule[];
+    }, [settlementRulesData]);
+
     const drivers = useMemo(() => driversData?.drivers ?? [], [driversData]);
     const driverOptions = useMemo(() => [
         { value: "", label: "Unassigned" },
@@ -247,6 +364,11 @@ export default function OrdersPage() {
         filteredOrders.filter(o => o.status === 'DELIVERED' || o.status === 'CANCELLED'),
         [filteredOrders]
     );
+
+    const selectedOrderEarnings = useMemo(() => {
+        if (!selectedOrder) return null;
+        return computeOrderEarnings(selectedOrder, businessSettlementRules);
+    }, [businessSettlementRules, selectedOrder]);
 
     /* ---- Handlers ---- */
 
@@ -543,6 +665,7 @@ export default function OrdersPage() {
                                 activeOrders.map((order) => {
                                     const nextStatus = STATUS_FLOW[order.status];
                                     const businessNames = getOrderBusinessesSafe(order).map(b => b.business.name).join(", ");
+                                    const earnings = computeOrderEarnings(order, businessSettlementRules);
                                     return (
                                         <tr key={order.id} className="hover:bg-zinc-900/30 transition-colors">
                                             <Td><CopyableId displayId={order.displayId} /></Td>
@@ -595,7 +718,31 @@ export default function OrdersPage() {
                                                 </div>
                                             </Td>
                                             <Td className="text-right">
-                                                <span className="font-semibold text-white">${order.totalPrice.toFixed(2)}</span>
+                                                <div className="flex flex-col items-end gap-1">
+                                                    <span className="font-semibold text-white">${order.totalPrice.toFixed(2)}</span>
+                                                    <div className="group relative overflow-visible">
+                                                        <span className="inline-flex items-center rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
+                                                            +${earnings.total.toFixed(2)}
+                                                        </span>
+                                                        {earnings.deliveryIncluded && earnings.deliveryCommission > 0 && (
+                                                            <span className="ml-1 inline-flex items-center rounded-full bg-cyan-500/15 border border-cyan-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300 align-middle">
+                                                                DEL+
+                                                            </span>
+                                                        )}
+                                                        <div className="pointer-events-none absolute right-0 bottom-full z-[120] mb-2 w-64 rounded-md border border-zinc-700 bg-[#0a0a0d] p-2 text-left text-[11px] text-zinc-300 opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+                                                            <div className="font-semibold text-zinc-200 mb-1">Earnings breakdown</div>
+                                                            <div className="flex justify-between"><span className="text-zinc-500">Delivery commission</span><span className={earnings.deliveryIncluded ? 'text-cyan-300' : 'text-zinc-500'}>+${(earnings.deliveryIncluded ? earnings.deliveryCommission : earnings.deliveryCommissionPotential).toFixed(2)}</span></div>
+                                                            {!earnings.deliveryIncluded && (
+                                                                <div className="text-[10px] text-zinc-500 mt-0.5">Pending: added when driver is assigned/out for delivery.</div>
+                                                            )}
+                                                            {earnings.deliveryIncluded && (
+                                                                <div className="text-[10px] text-cyan-300 mt-0.5">Delivery commission is now included.</div>
+                                                            )}
+                                                            <div className="flex justify-between"><span className="text-zinc-500">Restaurant commission</span><span>+${earnings.restaurantCommission.toFixed(2)}</span></div>
+                                                            <div className="flex justify-between"><span className="text-zinc-500">Markup</span><span>+${earnings.markup.toFixed(2)}</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </Td>
                                             <Td>
                                                 <Button variant="ghost" size="sm" onClick={() => openDetails(order)}>Details</Button>
@@ -638,6 +785,7 @@ export default function OrdersPage() {
                             ) : (
                                 completedOrders.map((order) => {
                                     const businessNames = getOrderBusinessesSafe(order).map(b => b.business.name).join(", ");
+                                    const earnings = computeOrderEarnings(order, businessSettlementRules);
                                     return (
                                         <tr key={order.id} className="hover:bg-zinc-900/30 transition-colors">
                                             <Td><CopyableId displayId={order.displayId} /></Td>
@@ -666,7 +814,31 @@ export default function OrdersPage() {
                                             </Td>
                                             <Td><StatusBadge status={order.status} /></Td>
                                             <Td className="text-right">
-                                                <span className="font-semibold text-white">${order.totalPrice.toFixed(2)}</span>
+                                                <div className="flex flex-col items-end gap-1">
+                                                    <span className="font-semibold text-white">${order.totalPrice.toFixed(2)}</span>
+                                                    <div className="group relative overflow-visible">
+                                                        <span className="inline-flex items-center rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
+                                                            +${earnings.total.toFixed(2)}
+                                                        </span>
+                                                        {earnings.deliveryIncluded && earnings.deliveryCommission > 0 && (
+                                                            <span className="ml-1 inline-flex items-center rounded-full bg-cyan-500/15 border border-cyan-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300 align-middle">
+                                                                DEL+
+                                                            </span>
+                                                        )}
+                                                        <div className="pointer-events-none absolute right-0 bottom-full z-[120] mb-2 w-64 rounded-md border border-zinc-700 bg-[#0a0a0d] p-2 text-left text-[11px] text-zinc-300 opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+                                                            <div className="font-semibold text-zinc-200 mb-1">Earnings breakdown</div>
+                                                            <div className="flex justify-between"><span className="text-zinc-500">Delivery commission</span><span className={earnings.deliveryIncluded ? 'text-cyan-300' : 'text-zinc-500'}>+${(earnings.deliveryIncluded ? earnings.deliveryCommission : earnings.deliveryCommissionPotential).toFixed(2)}</span></div>
+                                                            {!earnings.deliveryIncluded && (
+                                                                <div className="text-[10px] text-zinc-500 mt-0.5">Pending: added when driver is assigned/out for delivery.</div>
+                                                            )}
+                                                            {earnings.deliveryIncluded && (
+                                                                <div className="text-[10px] text-cyan-300 mt-0.5">Delivery commission is now included.</div>
+                                                            )}
+                                                            <div className="flex justify-between"><span className="text-zinc-500">Restaurant commission</span><span>+${earnings.restaurantCommission.toFixed(2)}</span></div>
+                                                            <div className="flex justify-between"><span className="text-zinc-500">Markup</span><span>+${earnings.markup.toFixed(2)}</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </Td>
                                             <Td>
                                                 <Button variant="ghost" size="sm" onClick={() => openDetails(order)}>Details</Button>
@@ -788,9 +960,9 @@ export default function OrdersPage() {
                                                                     </div>
                                                                 </div>
                                                             </td>
-                                                            <td className="px-3 py-2.5 text-right text-sm text-zinc-300">${item.price.toFixed(2)}</td>
+                                                            <td className="px-3 py-2.5 text-right text-sm text-zinc-300">${Number(item.unitPrice || 0).toFixed(2)}</td>
                                                             <td className="px-3 py-2.5 text-right text-sm font-medium text-white">
-                                                                ${(item.quantity * item.price).toFixed(2)}
+                                                                ${(Number(item.quantity || 0) * Number(item.unitPrice || 0)).toFixed(2)}
                                                             </td>
                                                         </tr>
                                                     );
@@ -817,6 +989,45 @@ export default function OrdersPage() {
                                 <span className="text-violet-400">${selectedOrder.totalPrice.toFixed(2)}</span>
                             </div>
                         </div>
+
+                        {!isBusinessUser && selectedOrderEarnings && (
+                            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] text-emerald-300 uppercase tracking-wider">Platform Earnings</span>
+                                    <div className="flex items-center gap-2">
+                                        {selectedOrderEarnings.deliveryIncluded && selectedOrderEarnings.deliveryCommission > 0 && (
+                                            <span className="inline-flex items-center rounded-full bg-cyan-500/15 border border-cyan-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300">
+                                                DEL+
+                                            </span>
+                                        )}
+                                        <span className="text-lg font-bold text-emerald-300">+${selectedOrderEarnings.total.toFixed(2)}</span>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+                                    <div className="rounded-lg border border-emerald-500/20 bg-[#09090b]/70 p-2">
+                                        <div className="text-zinc-500">Delivery commission</div>
+                                        <div className={`font-semibold mt-1 ${selectedOrderEarnings.deliveryIncluded ? 'text-cyan-300' : 'text-zinc-400'}`}>
+                                            +${(selectedOrderEarnings.deliveryIncluded
+                                                ? selectedOrderEarnings.deliveryCommission
+                                                : selectedOrderEarnings.deliveryCommissionPotential).toFixed(2)}
+                                        </div>
+                                        <div className="text-[10px] mt-1 text-zinc-500">
+                                            {selectedOrderEarnings.deliveryIncluded
+                                                ? 'Included now (driver assigned / out for delivery).'
+                                                : 'Pending until driver assignment / out for delivery.'}
+                                        </div>
+                                    </div>
+                                    <div className="rounded-lg border border-emerald-500/20 bg-[#09090b]/70 p-2">
+                                        <div className="text-zinc-500">Restaurant commission</div>
+                                        <div className="text-emerald-200 font-semibold mt-1">+${selectedOrderEarnings.restaurantCommission.toFixed(2)}</div>
+                                    </div>
+                                    <div className="rounded-lg border border-emerald-500/20 bg-[#09090b]/70 p-2">
+                                        <div className="text-zinc-500">Markup</div>
+                                        <div className="text-emerald-200 font-semibold mt-1">+${selectedOrderEarnings.markup.toFixed(2)}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </Modal>

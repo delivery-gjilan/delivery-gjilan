@@ -2,7 +2,8 @@ import type { QueryResolvers } from './../../../../generated/types.generated';
 import { GraphQLError } from 'graphql';
 import logger from '@/lib/logger';
 import { settlements } from '@/database/schema';
-import { and, eq } from 'drizzle-orm';
+import { businesses, orderItems, products } from '@/database/schema';
+import { and, eq, inArray } from 'drizzle-orm';
 
 const log = logger.child({ resolver: 'orderQuery' });
 
@@ -25,6 +26,8 @@ export const order: NonNullable<QueryResolvers['order']> = async (_parent, { id 
             extensions: { code: 'NOT_FOUND' },
         });
     }
+
+    let settlementFallbackUsed = false;
 
     // Check authorization based on role BEFORE mapping (using dbOrder.userId)
     switch (userData.role) {
@@ -64,6 +67,7 @@ export const order: NonNullable<QueryResolvers['order']> = async (_parent, { id 
                 });
 
                 if (businessSettlement) {
+                    settlementFallbackUsed = true;
                     break;
                 }
 
@@ -84,5 +88,92 @@ export const order: NonNullable<QueryResolvers['order']> = async (_parent, { id 
     log.info({ orderId: id, requesterId: userData.userId, role: userData.role, status: dbOrder.status }, 'order:query:success');
 
     // Authorization passed, now map and return the order
-    return orderService.mapToOrderPublic(dbOrder);
+    const mappedOrder: any = await orderService.mapToOrderPublic(dbOrder);
+
+    if (userData.role === 'BUSINESS_OWNER' || userData.role === 'BUSINESS_EMPLOYEE') {
+        const scopedBusinesses = (mappedOrder.businesses || []).filter((entry: any) => entry?.business?.id === userData.businessId);
+
+        if (scopedBusinesses.length > 0) {
+            mappedOrder.businesses = scopedBusinesses;
+            return mappedOrder;
+        }
+
+        // Historical edge-case: product-to-business ownership changed after settlement generation.
+        // If access was granted through settlement fallback, construct a business-scoped item view from order_items.
+        if (settlementFallbackUsed && userData.businessId) {
+            const dbOrderItems = await db.query.orderItems.findMany({
+                where: eq(orderItems.orderId, dbOrder.id),
+            });
+
+            const productIds = [...new Set(dbOrderItems.map((item: any) => item.productId))];
+            const productRows =
+                productIds.length > 0
+                    ? await db
+                          .select({ id: products.id, name: products.name, imageUrl: products.imageUrl })
+                          .from(products)
+                          .where(inArray(products.id, productIds))
+                    : [];
+
+            const productById = new Map(productRows.map((p: any) => [p.id, p]));
+            const topLevelItems = dbOrderItems.filter((item: any) => !item.parentOrderItemId);
+
+            const fallbackItems = topLevelItems.map((item: any) => {
+                const productRow = productById.get(item.productId);
+                return {
+                    id: item.id,
+                    productId: item.productId,
+                    name: productRow?.name ?? 'Order item',
+                    imageUrl: productRow?.imageUrl || undefined,
+                    quantity: item.quantity,
+                    unitPrice: Number(item.finalAppliedPrice),
+                    notes: item.notes || undefined,
+                    selectedOptions: [],
+                    childItems: [],
+                    parentOrderItemId: item.parentOrderItemId || undefined,
+                };
+            });
+
+            const businessRow = await db.query.businesses.findFirst({
+                where: eq(businesses.id, userData.businessId),
+            });
+
+            if (businessRow) {
+                mappedOrder.businesses = [
+                    {
+                        business: {
+                            id: businessRow.id,
+                            name: businessRow.name,
+                            businessType: businessRow.businessType,
+                            imageUrl: businessRow.imageUrl || undefined,
+                            isActive: businessRow.isActive ?? true,
+                            location: {
+                                latitude: businessRow.locationLat,
+                                longitude: businessRow.locationLng,
+                                address: businessRow.locationAddress,
+                            },
+                            workingHours: {
+                                opensAt: `${Math.floor(businessRow.opensAt / 60)
+                                    .toString()
+                                    .padStart(2, '0')}:${(businessRow.opensAt % 60).toString().padStart(2, '0')}`,
+                                closesAt: `${Math.floor(businessRow.closesAt / 60)
+                                    .toString()
+                                    .padStart(2, '0')}:${(businessRow.closesAt % 60).toString().padStart(2, '0')}`,
+                            },
+                            avgPrepTimeMinutes: businessRow.avgPrepTimeMinutes,
+                            commissionPercentage: Number(businessRow.commissionPercentage),
+                            createdAt: new Date(businessRow.createdAt),
+                            updatedAt: new Date(businessRow.updatedAt),
+                            isOpen: true,
+                        },
+                        items: fallbackItems,
+                    },
+                ];
+                return mappedOrder;
+            }
+        }
+
+        mappedOrder.businesses = [];
+    }
+
+    return mappedOrder;
 };

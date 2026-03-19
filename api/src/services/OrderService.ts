@@ -291,7 +291,9 @@ export class OrderService {
                 ? salePrice
                 : (isNightHours && nightMarkedupPrice != null)
                     ? nightMarkedupPrice
-                    : basePrice;
+                    : (markupPrice != null)
+                        ? markupPrice
+                        : basePrice;
             log.debug({ finalAppliedPrice, quantity: itemInput.quantity, productId: itemInput.productId }, 'order:item:price');
 
             validateSelectedOptions(itemInput.selectedOptions ?? [], product.id, `Product ${product.id}`, true);

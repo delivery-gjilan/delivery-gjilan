@@ -9,6 +9,11 @@ This document is a fast context handoff for future UI changes across `admin-pane
 
 ## Recent Updates
 
+- 2026-03-19: Admin orders earnings calculation now derives business commission from active business settlement rules (same finance-rule source) instead of only business profile percentage, so `+earnings` matches configured `Settlement Rules` behavior.
+- 2026-03-19: Refined admin orders earnings indicator behavior: delivery commission is now conditionally included only after driver assignment/out-for-delivery, marked with `DEL+`, and earnings tooltip now overlays above rows to avoid table layout/scroll expansion.
+- 2026-03-19: Added admin orders earnings indicator in `admin-panel/src/app/dashboard/orders/page.tsx` for non-business admin views: each order now shows `+earnings` with breakdown (delivery commission, restaurant commission, markup) in table rows and order details modal.
+- 2026-03-19: Restyled admin financial settlements tables (`/admin/financial/settlements`) to match business settlements table language (dark grid, compact header, status/direction chips, row hover, and action button styling) for cross-surface consistency.
+- 2026-03-19: Added mobile parity tracker `docs/MOBILE/ADMIN_PANEL_MOBILE_REFACTOR_TRACKER.md` to keep business/admin mobile refactor aligned with admin-panel changes as a living backlog.
 - 2026-03-19: `admin-panel` business settlements (`/dashboard/business-settlements`) UI/UX refactor: clearer filter layout, added `This week` and `From last settlement` date modes, improved active-range labeling, and explicit modal error messaging for order-details fetch failures.
 - 2026-03-19: Fixed order-details authorization edge case for business users by allowing access when a matching business settlement exists for the order (fallback in `api/src/models/Order/resolvers/Query/order.ts`).
 - 2026-03-19: Removed duplicate super-admin finance sidebar entries and kept a single `Financial Ops` link to `/admin/financial` for clearer separation from business settlements navigation.

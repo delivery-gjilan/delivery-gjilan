@@ -79,6 +79,7 @@ Implementation pattern:
 - Order details resolver allows business access when either:
   - order currently contains that business items, or
   - a business settlement exists for that order and business
+- If historical product ownership changed and the order cannot be mapped back to that business via current product ownership, API constructs a business-scoped fallback item list from order snapshots so modal breakdown still renders.
 
 ## Files
 

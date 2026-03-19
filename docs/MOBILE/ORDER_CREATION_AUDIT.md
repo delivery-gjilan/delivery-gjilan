@@ -1,6 +1,6 @@
 # Mobile Customer Order Creation Audit
 
-<!-- MDS:M4 | Domain: Mobile | Updated: 2026-03-18 -->
+<!-- MDS:M4 | Domain: Mobile | Updated: 2026-03-19 -->
 <!-- Depends-On: B2, B3, BL1 -->
 <!-- Depended-By: BL3 -->
 <!-- Nav: Payment collection UI changes → update BL1 (Settlements). Checkout flow → update BL3 (Cart Flow). Price validation → review B3 (Validation). -->
@@ -9,6 +9,11 @@ Scope reviewed:
 - `mobile-customer/modules/cart/components/CartScreen.tsx`
 - `mobile-customer/modules/cart/hooks/useCreateOrder.ts`
 - `mobile-customer/graphql/operations/orders/mutations.ts`
+
+## Recent Updates
+
+1. 2026-03-19: Mobile-customer now computes product unit price with effective precedence `salePrice -> nightMarkedupPrice (night hours) -> markupPrice -> base price` when adding to cart.
+2. 2026-03-19: Backend `OrderService` and `PricingService` now use the same precedence for server-side recalculation/validation, so client-visible pricing and persisted `finalAppliedPrice` stay aligned.
 
 ## Current Behavior
 

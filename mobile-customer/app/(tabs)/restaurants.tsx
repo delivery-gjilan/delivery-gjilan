@@ -14,6 +14,7 @@ import { FeaturedRestaurantCard } from '@/modules/business/components/FeaturedRe
 import { Skeleton } from '@/components/Skeleton';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useProducts } from '@/modules/product/hooks/useProducts';
+import { getEffectiveProductPrice } from '@/modules/product/utils/pricing';
 
 type FilterOption = 'all' | 'open' | 'promo';
 
@@ -97,13 +98,16 @@ export default function Restaurants() {
                     .filter((p: any) => p.imageUrl || p.product?.imageUrl || p.variants?.[0]?.imageUrl)
                     .slice(0, 2);
                 if (products.length > 0) {
+                    const promoPriceValue = getEffectiveProductPrice(
+                        (products[0]?.product || products[0]?.variants?.[0]) ?? { price: products[0]?.basePrice ?? 0 },
+                    );
                     items.push({
                         type: 'promo-banner',
                         data: {
                             id: `promo-${restaurant.id}`,
                             title: `${restaurant.name.toUpperCase()} - ${t.restaurants.special_offer}`,
                             subtitle: products.map((p) => p.name).join(', '),
-                            price: `${products[0]?.name} • €${products[0]?.basePrice.toFixed(2)}`,
+                            price: `${products[0]?.name} • €${promoPriceValue.toFixed(2)}`,
                             imageUrl:
                                 products[0]?.imageUrl ||
                                 products[0]?.product?.imageUrl ||
@@ -127,10 +131,7 @@ export default function Restaurants() {
                     .slice(0, 3)
                     .map((p) => ({
                         name: p.name,
-                        price:
-                            (p.product || p.variants?.[0])?.isOnSale && (p.product || p.variants?.[0])?.salePrice
-                                ? `€${(p.product || p.variants?.[0])?.salePrice?.toFixed(2)}`
-                                : `€${p.basePrice.toFixed(2)}`,
+                        price: `€${getEffectiveProductPrice((p.product || p.variants?.[0]) ?? { price: p.basePrice }).toFixed(2)}`,
                         imageUrl: p.imageUrl || p.product?.imageUrl || p.variants?.[0]?.imageUrl || '',
                     }));
 

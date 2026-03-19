@@ -13,6 +13,8 @@ export const GET_PRODUCTS = graphql(`
                 name
                 imageUrl
                 price
+                markupPrice
+                nightMarkedupPrice
                 isOnSale
                 salePrice
                 isAvailable
@@ -26,6 +28,8 @@ export const GET_PRODUCTS = graphql(`
                 description
                 imageUrl
                 price
+                markupPrice
+                nightMarkedupPrice
                 isOnSale
                 salePrice
                 isAvailable
@@ -49,6 +53,8 @@ export const GET_PRODUCT = graphql(`
             description
             imageUrl
             price
+            markupPrice
+            nightMarkedupPrice
             isOnSale
             salePrice
             isAvailable
@@ -59,6 +65,8 @@ export const GET_PRODUCT = graphql(`
                 id
                 name
                 price
+                markupPrice
+                nightMarkedupPrice
                 isOnSale
                 salePrice
                 isAvailable
@@ -82,6 +90,8 @@ export const GET_PRODUCT = graphql(`
                         name
                         imageUrl
                         price
+                        markupPrice
+                        nightMarkedupPrice
                         optionGroups {
                             id
                             name

@@ -32,7 +32,8 @@ function isNightHours(timestamp: Date = new Date()): boolean {
  * Price precedence:
  *   1. salePrice  – when isOnSale is true and salePrice is set
  *   2. nightMarkedupPrice – when current time is in the night window and nightMarkedupPrice is set
- *   3. basePrice  – fallback (markupPrice is informational / used by settlements)
+ *   3. markupPrice – when set outside night window
+ *   4. basePrice   – fallback
  */
 export class PricingService {
     constructor(private db: Database) {}
@@ -68,6 +69,8 @@ export class PricingService {
             finalAppliedPrice = salePrice;
         } else if (nightHours && nightMarkedupPrice != null) {
             finalAppliedPrice = nightMarkedupPrice;
+        } else if (markupPrice != null) {
+            finalAppliedPrice = markupPrice;
         } else {
             finalAppliedPrice = basePrice;
         }

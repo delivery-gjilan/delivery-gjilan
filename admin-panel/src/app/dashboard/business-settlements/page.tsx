@@ -179,6 +179,15 @@ export default function BusinessSettlementsPage() {
         }
     };
 
+    const modalBusinessEntries = useMemo(() => {
+        const entries = ((orderData as any)?.order?.businesses || []) as any[];
+        if (!entries.length) return [];
+        if (!businessId) return entries;
+
+        const ownBusinessEntries = entries.filter((entry) => entry?.business?.id === businessId);
+        return ownBusinessEntries.length > 0 ? ownBusinessEntries : entries;
+    }, [businessId, orderData]);
+
     const activeDateLabel = useMemo(() => {
         if (dateMode === 'all') return 'All time';
         if (dateMode === 'today') return 'Today';
@@ -490,19 +499,29 @@ export default function BusinessSettlementsPage() {
                         </div>
 
                         <div className="space-y-3">
-                            {((orderData as any).order.businesses || []).map((entry: any) => (
-                                <div key={entry.business?.id || entry.business?.name} className="border border-zinc-800 rounded p-3">
-                                    <div className="font-semibold mb-2">{entry.business?.name}</div>
-                                    <div className="space-y-1">
-                                        {(entry.items || []).map((item: any) => (
-                                            <div key={`${item.productId}-${item.name}`} className="flex items-center justify-between text-xs">
-                                                <span>{item.quantity}x {item.name}</span>
-                                                <span>€{(Number(item.unitPrice || 0) * Number(item.quantity || 0)).toFixed(2)}</span>
-                                            </div>
-                                        ))}
-                                    </div>
+                            {modalBusinessEntries.length === 0 ? (
+                                <div className="border border-zinc-800 rounded p-3 text-xs text-zinc-400">
+                                    No item breakdown is available for this order. This can happen on historical orders if product ownership changed after settlement creation.
                                 </div>
-                            ))}
+                            ) : (
+                                modalBusinessEntries.map((entry: any) => (
+                                    <div key={entry.business?.id || entry.business?.name} className="border border-zinc-800 rounded p-3">
+                                        <div className="font-semibold mb-2">{entry.business?.name}</div>
+                                        {(entry.items || []).length === 0 ? (
+                                            <div className="text-xs text-zinc-400">No items found for this business in this order.</div>
+                                        ) : (
+                                            <div className="space-y-1">
+                                                {(entry.items || []).map((item: any) => (
+                                                    <div key={`${item.productId}-${item.name}`} className="flex items-center justify-between text-xs">
+                                                        <span>{item.quantity}x {item.name}</span>
+                                                        <span>€{(Number(item.unitPrice || 0) * Number(item.quantity || 0)).toFixed(2)}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
                 )}

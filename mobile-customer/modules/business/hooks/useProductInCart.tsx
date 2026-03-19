@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import { Product, BusinessType } from '@/gql/graphql';
 import { useCart } from '@/modules/cart/hooks/useCart';
 import { useCartActions } from '@/modules/cart/hooks/useCartActions';
+import { getEffectiveProductPrice } from '@/modules/product/utils/pricing';
 
 export function useProductInCart(product: Partial<Product>, businessType?: BusinessType) {
     const { items } = useCart();
@@ -14,7 +15,7 @@ export function useProductInCart(product: Partial<Product>, businessType?: Busin
     const quantity = useMemo(() => items.filter((item) => item.productId === id).reduce((sum, item) => sum + item.quantity, 0), [items, id]);
     const addToCart = () => {
         if (!id) return;
-        const unitPrice = product.isOnSale && product.salePrice ? product.salePrice : (product.price ?? 0);
+        const unitPrice = getEffectiveProductPrice(product);
 
         const error = addItem({
             cartItemId: id, // Simple product (no options) uses productId as cartItemId
