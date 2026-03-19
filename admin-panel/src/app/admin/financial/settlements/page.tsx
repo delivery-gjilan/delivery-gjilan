@@ -976,9 +976,10 @@ export default function SettlementsPage() {
 
           <div className="mt-3 flex flex-col gap-3 rounded-lg border bg-background p-3 md:flex-row md:items-end md:justify-between">
             <div>
-              <div className="text-sm font-semibold text-foreground">Aggregate settlement actions</div>
+              <div className="text-sm font-semibold text-foreground">Settlement actions</div>
               <div className="text-xs text-muted-foreground">
-                Pending in scope ({aggregateScopeLabel}): {pendingSettlements.length} settlements, total EUR {pendingTotalAmount.toFixed(2)}.
+                Pending for {aggregateScopeLabel}: {pendingSettlements.length} settlements · EUR {pendingTotalAmount.toFixed(2)}.
+                Use <span className="font-semibold text-amber-400">Request Settlement</span> to send a request to the business — they must accept before anything is marked paid.
               </div>
             </div>
 
@@ -1003,16 +1004,18 @@ export default function SettlementsPage() {
                 variant="outline"
                 onClick={handleBulkPartialSettle}
                 disabled={bulkProcessing || pendingSettlements.length === 0 || !bulkPartialAmount}
+                title="Admin override — bypasses the request flow. Use only for exceptional cases."
               >
-                Settle Partially (All)
+                Force Partial (Admin Override)
               </Button>
 
               <Button
-                className="bg-green-600 hover:bg-green-700"
-                onClick={handleBulkSettleAll}
-                disabled={bulkProcessing || pendingSettlements.length === 0}
+                className="bg-amber-600 hover:bg-amber-700"
+                onClick={openRequestDialog}
+                disabled={!selectedGroup}
               >
-                Settle Fully (All Pending)
+                <Send className="h-3.5 w-3.5 mr-2" />
+                Request Settlement
               </Button>
             </div>
           </div>
