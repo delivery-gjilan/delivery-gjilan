@@ -375,10 +375,20 @@ export class OrderService {
         log.debug({ itemsTotal: calculatedItemsTotal, deliveryPrice: input.deliveryPrice }, 'order:totals');
 
         // 2a. Validate multi-restaurant restriction
+        const businessIdList = Array.from(businessIds);
+
         const orderBusinesses = await db
-            .select({ id: businessesTable.id, businessType: businessesTable.businessType })
+            .select({
+                id: businessesTable.id,
+                name: businessesTable.name,
+                businessType: businessesTable.businessType,
+                opensAt: businessesTable.opensAt,
+                closesAt: businessesTable.closesAt,
+            })
             .from(businessesTable)
-            .where(inArray(businessesTable.id, [...businessIds]));
+            .where(inArray(businessesTable.id, businessIdList));
+
+        const businessesById = new Map(orderBusinesses.map((business) => [business.id, business]));
 
         const restaurantCount = orderBusinesses.filter((b) => b.businessType === 'RESTAURANT').length;
         if (restaurantCount > 1) {
@@ -392,24 +402,44 @@ export class OrderService {
         const currentDay = now.getDay();
         const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-        for (const bizId of businessIds) {
-            const hoursRows = await db
-                .select()
-                .from(businessHoursTable)
-                .where(
-                    sql`${businessHoursTable.businessId} = ${bizId} AND ${businessHoursTable.dayOfWeek} = ${currentDay}`,
-                );
+        const todayBusinessHours =
+            businessIdList.length > 0
+                ? await db
+                      .select()
+                      .from(businessHoursTable)
+                      .where(
+                          and(
+                              inArray(businessHoursTable.businessId, businessIdList),
+                              eq(businessHoursTable.dayOfWeek, currentDay),
+                          ),
+                      )
+                : [];
+
+        const hoursByBusinessId = new Map<string, typeof todayBusinessHours>();
+        for (const row of todayBusinessHours) {
+            const rows = hoursByBusinessId.get(row.businessId);
+            if (rows) {
+                rows.push(row);
+            } else {
+                hoursByBusinessId.set(row.businessId, [row]);
+            }
+        }
+
+        for (const bizId of businessIdList) {
+            const biz = businessesById.get(bizId);
+            if (!biz) {
+                throw AppError.notFound(`Business with ID ${bizId}`);
+            }
+
+            const hoursRows = hoursByBusinessId.get(bizId) ?? [];
 
             if (hoursRows.length === 0) {
-                const [biz] = await db.select().from(businessesTable).where(eq(businessesTable.id, bizId));
-                if (biz) {
-                    const isOpenLegacy =
-                        biz.closesAt <= biz.opensAt
-                            ? currentMinutes >= biz.opensAt || currentMinutes < biz.closesAt
-                            : currentMinutes >= biz.opensAt && currentMinutes < biz.closesAt;
-                    if (!isOpenLegacy) {
-                        throw AppError.businessRule(`Business "${biz.name}" is currently closed.`);
-                    }
+                const isOpenLegacy =
+                    biz.closesAt <= biz.opensAt
+                        ? currentMinutes >= biz.opensAt || currentMinutes < biz.closesAt
+                        : currentMinutes >= biz.opensAt && currentMinutes < biz.closesAt;
+                if (!isOpenLegacy) {
+                    throw AppError.businessRule(`Business "${biz.name}" is currently closed.`);
                 }
             } else {
                 const isOpenNow = hoursRows.some((slot) => {
@@ -419,8 +449,7 @@ export class OrderService {
                     return currentMinutes >= slot.opensAt && currentMinutes < slot.closesAt;
                 });
                 if (!isOpenNow) {
-                    const [biz] = await db.select().from(businessesTable).where(eq(businessesTable.id, bizId));
-                    throw AppError.businessRule(`Business "${biz?.name ?? bizId}" is currently closed.`);
+                    throw AppError.businessRule(`Business "${biz.name}" is currently closed.`);
                 }
             }
         }
@@ -488,8 +517,14 @@ export class OrderService {
             userId,
             deliveryPrice: effectiveDeliveryPrice,
             paymentCollection: input.paymentCollection ?? 'CASH_TO_DRIVER',
-            originalPrice: calculatedItemsTotal !== effectiveOrderPrice ? calculatedItemsTotal : undefined,
-            originalDeliveryPrice: input.deliveryPrice !== effectiveDeliveryPrice ? input.deliveryPrice : undefined,
+            originalPrice:
+                Math.abs(calculatedItemsTotal - effectiveOrderPrice) > 0.01
+                    ? Number(calculatedItemsTotal.toFixed(2))
+                    : undefined,
+            originalDeliveryPrice:
+                Math.abs(input.deliveryPrice - effectiveDeliveryPrice) > 0.01
+                    ? Number(input.deliveryPrice.toFixed(2))
+                    : undefined,
             status: 'PENDING' as const,
             dropoffLat: input.dropOffLocation.latitude,
             dropoffLng: input.dropOffLocation.longitude,
@@ -761,6 +796,7 @@ export class OrderService {
                 name: product?.name ?? '',
                 imageUrl: product?.imageUrl || undefined,
                 quantity: item.quantity,
+                basePrice: Number(item.basePrice),
                 unitPrice: Number(item.finalAppliedPrice), // DB: finalAppliedPrice → GraphQL: unitPrice
                 notes: item.notes || undefined,
                 selectedOptions,
@@ -831,6 +867,8 @@ export class OrderService {
             userId: dbOrder.userId,
             orderPrice: dbOrder.price,
             deliveryPrice: dbOrder.deliveryPrice,
+            originalPrice: dbOrder.originalPrice ?? undefined,
+            originalDeliveryPrice: dbOrder.originalDeliveryPrice ?? undefined,
             totalPrice: dbOrder.price + dbOrder.deliveryPrice,
             orderDate: new Date(dbOrder.orderDate || new Date()),
             updatedAt: new Date(dbOrder.updatedAt),

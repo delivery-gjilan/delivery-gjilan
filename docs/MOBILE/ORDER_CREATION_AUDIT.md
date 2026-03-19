@@ -14,6 +14,12 @@ Scope reviewed:
 
 1. 2026-03-19: Mobile-customer now computes product unit price with effective precedence `salePrice -> nightMarkedupPrice (night hours) -> markupPrice -> base price` when adding to cart.
 2. 2026-03-19: Backend `OrderService` and `PricingService` now use the same precedence for server-side recalculation/validation, so client-visible pricing and persisted `finalAppliedPrice` stay aligned.
+3. 2026-03-19: Mobile product presentation surfaces were further aligned to the same shared helper (`ProductDetails`, `MarketProductCard`) to reduce pricing drift across cart vs. UI.
+4. 2026-03-19: Backend N+1 reductions applied: order open-hours validation now batches business-hours/business fetches, and pricing batch calculation now fetches all products in one query.
+5. 2026-03-19: Admin Orders UI now receives `OrderItem.basePrice` snapshots and computes markup badge/details from `(unitPrice - basePrice) * quantity` instead of fallback subtotal math.
+6. 2026-03-19: Admin Order Details totals now use `originalPrice` / `originalDeliveryPrice` when present and render explicit discount lines, preventing subtotal confusion on promo-discounted orders.
+7. 2026-03-19: Admin wording updated to `Promotions` / `Delivery Promotion` and backend original-price snapshot persistence now uses `> 0.01` tolerance to avoid false discount indicators from floating precision.
+8. 2026-03-19: Admin Order Details item price cells now fall back to `basePrice` when `unitPrice` is absent, and totals card colors were adjusted (Delivery in amber, Total in green) for clearer visual hierarchy.
 
 ## Current Behavior
 

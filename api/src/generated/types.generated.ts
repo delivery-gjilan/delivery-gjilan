@@ -1399,6 +1399,7 @@ export type OrderDriverLiveTracking = {
 
 export type OrderItem = {
   __typename?: 'OrderItem';
+  basePrice?: Maybe<Scalars['Float']['output']>;
   childItems: Array<OrderItem>;
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
@@ -3343,6 +3344,7 @@ export type OrderDriverLiveTrackingResolvers<ContextType = GraphQLContext, Paren
 };
 
 export type OrderItemResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['OrderItem'] = ResolversParentTypes['OrderItem']> = {
+  basePrice?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   childItems?: Resolver<Array<ResolversTypes['OrderItem']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;

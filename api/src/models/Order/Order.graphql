@@ -42,6 +42,7 @@ type OrderItem {
     name: String!
     imageUrl: String
     quantity: Int!
+    basePrice: Float
     unitPrice: Float!
     notes: String
     selectedOptions: [OrderItemOption!]!

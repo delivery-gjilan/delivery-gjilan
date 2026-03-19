@@ -1,6 +1,6 @@
 import { type DbType } from '@/database';
 import { products } from '@/database/schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import logger from '@/lib/logger';
 
 const log = logger.child({ service: 'PricingService' });
@@ -21,6 +21,15 @@ export interface PriceCalculationResult {
     finalAppliedPrice: number;
 }
 
+type ProductPricingRow = {
+    id: string;
+    basePrice: number;
+    markupPrice: number | null;
+    nightMarkedupPrice: number | null;
+    salePrice: number | null;
+    isOnSale: boolean;
+};
+
 function isNightHours(timestamp: Date = new Date()): boolean {
     const hour = timestamp.getHours();
     return hour >= NIGHT_START_HOUR || hour < NIGHT_END_HOUR;
@@ -37,6 +46,38 @@ function isNightHours(timestamp: Date = new Date()): boolean {
  */
 export class PricingService {
     constructor(private db: Database) {}
+
+    private buildPriceResult(
+        product: ProductPricingRow,
+        context: { timestamp?: Date } = {}
+    ): PriceCalculationResult {
+        const basePrice = Number(product.basePrice);
+        const markupPrice = product.markupPrice != null ? Number(product.markupPrice) : null;
+        const nightMarkedupPrice = product.nightMarkedupPrice != null ? Number(product.nightMarkedupPrice) : null;
+        const salePrice = product.salePrice != null ? Number(product.salePrice) : null;
+        const nightHours = isNightHours(context.timestamp);
+
+        let finalAppliedPrice: number;
+        if (product.isOnSale && salePrice != null) {
+            finalAppliedPrice = salePrice;
+        } else if (nightHours && nightMarkedupPrice != null) {
+            finalAppliedPrice = nightMarkedupPrice;
+        } else if (markupPrice != null) {
+            finalAppliedPrice = markupPrice;
+        } else {
+            finalAppliedPrice = basePrice;
+        }
+
+        return {
+            productId: product.id,
+            basePrice,
+            markupPrice,
+            nightMarkedupPrice,
+            salePrice,
+            isNightHours: nightHours,
+            finalAppliedPrice: Number(finalAppliedPrice.toFixed(2)),
+        };
+    }
 
     async calculateProductPrice(
         productId: string,
@@ -58,34 +99,9 @@ export class PricingService {
             throw new Error(`Product not found: ${productId}`);
         }
 
-        const basePrice = Number(product.basePrice);
-        const markupPrice = product.markupPrice != null ? Number(product.markupPrice) : null;
-        const nightMarkedupPrice = product.nightMarkedupPrice != null ? Number(product.nightMarkedupPrice) : null;
-        const salePrice = product.salePrice != null ? Number(product.salePrice) : null;
-        const nightHours = isNightHours(context.timestamp);
-
-        let finalAppliedPrice: number;
-        if (product.isOnSale && salePrice != null) {
-            finalAppliedPrice = salePrice;
-        } else if (nightHours && nightMarkedupPrice != null) {
-            finalAppliedPrice = nightMarkedupPrice;
-        } else if (markupPrice != null) {
-            finalAppliedPrice = markupPrice;
-        } else {
-            finalAppliedPrice = basePrice;
-        }
-
-        log.debug({ productId, basePrice, markupPrice, nightMarkedupPrice, salePrice, nightHours, finalAppliedPrice }, 'pricing:calculated');
-
-        return {
-            productId,
-            basePrice,
-            markupPrice,
-            nightMarkedupPrice,
-            salePrice,
-            isNightHours: nightHours,
-            finalAppliedPrice: Number(finalAppliedPrice.toFixed(2)),
-        };
+        const result = this.buildPriceResult(product, context);
+        log.debug({ ...result, productId }, 'pricing:calculated');
+        return result;
     }
 
     async calculateProductPrices(
@@ -93,13 +109,38 @@ export class PricingService {
         context: { timestamp?: Date } = {}
     ): Promise<Map<string, PriceCalculationResult>> {
         const results = new Map<string, PriceCalculationResult>();
-        for (const productId of productIds) {
-            try {
-                results.set(productId, await this.calculateProductPrice(productId, context));
-            } catch (error) {
-                log.error({ err: error, productId }, 'pricing:calculate:error');
-            }
+
+        const uniqueProductIds = Array.from(new Set(productIds));
+        if (uniqueProductIds.length === 0) {
+            return results;
         }
+
+        const rows = await this.db.query.products.findMany({
+            where: inArray(products.id, uniqueProductIds),
+            columns: {
+                id: true,
+                basePrice: true,
+                markupPrice: true,
+                nightMarkedupPrice: true,
+                salePrice: true,
+                isOnSale: true,
+            },
+        });
+
+        const rowsById = new Map(rows.map((row) => [row.id, row]));
+
+        for (const productId of uniqueProductIds) {
+            const row = rowsById.get(productId);
+            if (!row) {
+                log.error({ productId }, 'pricing:calculate:error:product-not-found');
+                continue;
+            }
+
+            const result = this.buildPriceResult(row, context);
+            log.debug({ ...result, productId }, 'pricing:calculated');
+            results.set(productId, result);
+        }
+
         return results;
     }
 }

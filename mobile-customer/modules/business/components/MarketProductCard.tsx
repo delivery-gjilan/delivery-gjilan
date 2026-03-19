@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Product, BusinessType } from '@/gql/graphql';
 import { useTheme } from '@/hooks/useTheme';
 import { useProductInCart } from '../hooks/useProductInCart';
+import { getEffectiveProductPrice } from '@/modules/product/utils/pricing';
 
 interface MarketProductCardProps {
     product: Partial<Product>;
@@ -22,7 +23,7 @@ export function MarketProductCard({ product, businessType, onPress, descriptionO
         }
     };
 
-    const effectivePrice = product.isOnSale && product.salePrice ? product.salePrice : product.price;
+    const effectivePrice = getEffectiveProductPrice(product);
     const hasDiscount = product.isOnSale && product.salePrice;
     const discountPercent = hasDiscount
         ? Math.round(((product.price - product.salePrice!) / product.price) * 100)

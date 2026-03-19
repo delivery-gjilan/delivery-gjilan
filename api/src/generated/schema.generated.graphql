@@ -891,6 +891,7 @@ type OrderDriverLiveTracking {
 }
 
 type OrderItem {
+  basePrice: Float
   childItems: [OrderItem!]!
   id: ID!
   imageUrl: String

@@ -3,6 +3,7 @@ import { Product, OptionGroup, Option, BusinessType } from '@/gql/graphql';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useTheme } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
+import { getEffectiveProductPrice } from '@/modules/product/utils/pricing';
 
 interface ProductDetailsProps {
     product: any; // Using any for simplicity with complex GQL types
@@ -32,6 +33,7 @@ export function ProductDetails({
 
     const { t } = useTranslations();
     const theme = useTheme();
+    const effectivePrice = getEffectiveProductPrice(activeProduct);
 
     const handleOptionToggle = (groupId: string, optionId: string, maxSelections: number) => {
         const current = selectedOptions[groupId] || [];
@@ -68,7 +70,7 @@ export function ProductDetails({
                         <Text className="text-subtext text-xl line-through">€{activeProduct.price.toFixed(2)}</Text>
                     </>
                 ) : (
-                    <Text className="text-primary text-3xl font-bold">€{activeProduct.price.toFixed(2)}</Text>
+                    <Text className="text-primary text-3xl font-bold">€{effectivePrice.toFixed(2)}</Text>
                 )}
             </View>
 

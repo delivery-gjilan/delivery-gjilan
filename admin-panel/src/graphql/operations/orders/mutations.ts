@@ -6,6 +6,8 @@ export const UPDATE_ORDER_STATUS = graphql(`
             id
             orderPrice
             deliveryPrice
+            originalPrice
+            originalDeliveryPrice
             totalPrice
             orderDate
             status
@@ -31,6 +33,7 @@ export const UPDATE_ORDER_STATUS = graphql(`
                     name
                     imageUrl
                     quantity
+                    basePrice
                     unitPrice
                 }
             }
@@ -90,6 +93,8 @@ export const CREATE_TEST_ORDER = graphql(`
             id
             orderPrice
             deliveryPrice
+            originalPrice
+            originalDeliveryPrice
             totalPrice
             orderDate
             status
@@ -115,6 +120,7 @@ export const CREATE_TEST_ORDER = graphql(`
                     name
                     imageUrl
                     quantity
+                    basePrice
                     unitPrice
                 }
             }

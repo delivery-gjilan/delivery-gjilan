@@ -7,6 +7,8 @@ export const ORDERS_SUBSCRIPTION = gql(`
             displayId
             orderPrice
             deliveryPrice
+            originalPrice
+            originalDeliveryPrice
             totalPrice
             orderDate
             updatedAt
@@ -47,6 +49,7 @@ export const ORDERS_SUBSCRIPTION = gql(`
                     name
                     imageUrl
                     quantity
+                    basePrice
                     unitPrice
                 }
             }
@@ -61,6 +64,8 @@ export const ALL_ORDERS_SUBSCRIPTION = gql(`
             displayId
             orderPrice
             deliveryPrice
+            originalPrice
+            originalDeliveryPrice
             totalPrice
             orderDate
             updatedAt
@@ -101,6 +106,7 @@ export const ALL_ORDERS_SUBSCRIPTION = gql(`
                     name
                     imageUrl
                     quantity
+                    basePrice
                     unitPrice
                 }
             }

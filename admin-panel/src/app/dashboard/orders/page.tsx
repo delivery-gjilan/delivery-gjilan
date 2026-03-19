@@ -26,6 +26,7 @@ interface OrderItem {
     name: string;
     imageUrl?: string;
     quantity: number;
+    basePrice?: number;
     unitPrice?: number;
     notes?: string;
 }
@@ -51,6 +52,8 @@ interface Order {
     displayId: string;
     orderPrice: number;
     deliveryPrice: number;
+    originalPrice?: number;
+    originalDeliveryPrice?: number;
     totalPrice: number;
     orderDate: string;
     status: OrderStatus;
@@ -146,6 +149,8 @@ const computeOrderEarnings = (order: Order, rules: BusinessSettlementRule[]): Or
 
     let restaurantCommission = 0;
     let grossItemValue = 0;
+    let markupFromSnapshots = 0;
+    let hasBasePriceSnapshots = false;
 
     const activeBusinessRules = (rules || []).filter((rule) => rule.isActive && rule.entityType === 'BUSINESS');
 
@@ -153,6 +158,17 @@ const computeOrderEarnings = (order: Order, rules: BusinessSettlementRule[]): Or
         const businessItems = getBusinessItemsSafe(biz);
         const businessGross = businessItems.reduce((sum, item) => sum + Number(item.unitPrice || 0) * Number(item.quantity || 0), 0);
         grossItemValue += businessGross;
+
+        businessItems.forEach((item) => {
+            const quantity = Number(item.quantity || 0);
+            const finalUnitPrice = Number(item.unitPrice || 0);
+            const baseUnitPrice = item.basePrice != null ? Number(item.basePrice) : null;
+
+            if (baseUnitPrice != null) {
+                hasBasePriceSnapshots = true;
+                markupFromSnapshots += Math.max(0, finalUnitPrice - baseUnitPrice) * quantity;
+            }
+        });
 
         const scopedRules = activeBusinessRules.filter((rule) => !rule.business?.id || rule.business.id === biz.business.id);
 
@@ -181,9 +197,8 @@ const computeOrderEarnings = (order: Order, rules: BusinessSettlementRule[]): Or
     restaurantCommission = roundMoney(restaurantCommission);
 
     const subtotal = Number(order.orderPrice || 0);
-    // Only derive markup when we have item-level baseline values.
-    const hasItemBaseline = grossItemValue > 0;
-    const markup = hasItemBaseline ? roundMoney(Math.max(0, subtotal - grossItemValue)) : 0;
+    const fallbackMarkup = grossItemValue > 0 ? roundMoney(Math.max(0, subtotal - grossItemValue)) : 0;
+    const markup = hasBasePriceSnapshots ? roundMoney(markupFromSnapshots) : fallbackMarkup;
     const total = roundMoney(deliveryCommission + restaurantCommission + markup);
 
     return {
@@ -369,6 +384,24 @@ export default function OrdersPage() {
         if (!selectedOrder) return null;
         return computeOrderEarnings(selectedOrder, businessSettlementRules);
     }, [businessSettlementRules, selectedOrder]);
+
+    const selectedOrderTotals = useMemo(() => {
+        if (!selectedOrder) {
+            return null;
+        }
+
+        const itemsSubtotal = Number(selectedOrder.originalPrice ?? selectedOrder.orderPrice ?? 0);
+        const itemsDiscount = roundMoney(Math.max(0, itemsSubtotal - Number(selectedOrder.orderPrice ?? 0)));
+        const deliveryBase = Number(selectedOrder.originalDeliveryPrice ?? selectedOrder.deliveryPrice ?? 0);
+        const deliveryDiscount = roundMoney(Math.max(0, deliveryBase - Number(selectedOrder.deliveryPrice ?? 0)));
+
+        return {
+            itemsSubtotal,
+            itemsDiscount,
+            deliveryBase,
+            deliveryDiscount,
+        };
+    }, [selectedOrder]);
 
     /* ---- Handlers ---- */
 
@@ -942,6 +975,8 @@ export default function OrdersPage() {
                                             </thead>
                                             <tbody>
                                                 {getBusinessItemsSafe(biz).map((item, itemIdx) => {
+                                                    const displayUnitPrice = Number(item.unitPrice ?? item.basePrice ?? 0);
+                                                    const displayLineTotal = Number(item.quantity || 0) * displayUnitPrice;
                                                     return (
                                                         <tr key={itemIdx} className="border-b border-zinc-800/60 hover:bg-zinc-900/30">
                                                             <td className="px-3 py-2.5">
@@ -960,9 +995,9 @@ export default function OrdersPage() {
                                                                     </div>
                                                                 </div>
                                                             </td>
-                                                            <td className="px-3 py-2.5 text-right text-sm text-zinc-300">${Number(item.unitPrice || 0).toFixed(2)}</td>
+                                                            <td className="px-3 py-2.5 text-right text-sm text-zinc-300">${displayUnitPrice.toFixed(2)}</td>
                                                             <td className="px-3 py-2.5 text-right text-sm font-medium text-white">
-                                                                ${(Number(item.quantity || 0) * Number(item.unitPrice || 0)).toFixed(2)}
+                                                                ${displayLineTotal.toFixed(2)}
                                                             </td>
                                                         </tr>
                                                     );
@@ -978,15 +1013,27 @@ export default function OrdersPage() {
                         <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-3 space-y-1.5">
                             <div className="flex justify-between text-sm">
                                 <span className="text-zinc-500">Subtotal</span>
-                                <span className="text-zinc-300">${selectedOrder.orderPrice.toFixed(2)}</span>
+                                <span className="text-zinc-300">${Number(selectedOrderTotals?.itemsSubtotal ?? selectedOrder.orderPrice).toFixed(2)}</span>
                             </div>
+                            {(selectedOrderTotals?.itemsDiscount ?? 0) > 0 && (
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-zinc-500">Promotions</span>
+                                    <span className="text-emerald-300">-${Number(selectedOrderTotals?.itemsDiscount ?? 0).toFixed(2)}</span>
+                                </div>
+                            )}
                             <div className="flex justify-between text-sm">
-                                <span className="text-zinc-500">Delivery</span>
-                                <span className="text-zinc-300">${selectedOrder.deliveryPrice.toFixed(2)}</span>
+                                <span className="text-amber-300">Delivery</span>
+                                <span className="text-amber-300">${Number(selectedOrderTotals?.deliveryBase ?? selectedOrder.deliveryPrice).toFixed(2)}</span>
                             </div>
+                            {(selectedOrderTotals?.deliveryDiscount ?? 0) > 0 && (
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-zinc-500">Delivery Promotion</span>
+                                    <span className="text-emerald-300">-${Number(selectedOrderTotals?.deliveryDiscount ?? 0).toFixed(2)}</span>
+                                </div>
+                            )}
                             <div className="flex justify-between text-base font-bold pt-1.5 border-t border-zinc-800">
-                                <span className="text-white">Total</span>
-                                <span className="text-violet-400">${selectedOrder.totalPrice.toFixed(2)}</span>
+                                <span className="text-emerald-300">Total</span>
+                                <span className="text-emerald-300">${selectedOrder.totalPrice.toFixed(2)}</span>
                             </div>
                         </div>
 
