@@ -102,6 +102,7 @@ extend type User {
     driverConnection: DriverConnection
     commissionPercentage: Float
     maxActiveOrders: Int
+    hasOwnVehicle: Boolean
 }
 
 type DriverDailyMetrics {
@@ -155,11 +156,12 @@ extend type Mutation {
     """Admin mutation to manually set connection status (for testing/recovery)"""
     adminSetDriverConnectionStatus(driverId: ID!, status: DriverConnectionStatus!): User!
 
-    """Admin mutation to update per-driver settings (commission %, max active orders)"""
+    """Admin mutation to update per-driver settings (commission %, max active orders, vehicle ownership)"""
     adminUpdateDriverSettings(
         driverId: ID!
         commissionPercentage: Float
         maxActiveOrders: Int
+        hasOwnVehicle: Boolean
     ): User!
 
     """Driver battery telemetry update (recommended every 5-10 minutes)"""

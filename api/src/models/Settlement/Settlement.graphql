@@ -11,15 +11,9 @@ enum SettlementDirection {
 enum SettlementStatus {
     PENDING
     PAID
-}
-
-type RuleSnapshot {
-    appliedRules: JSON!
-}
-
-type CalculationDetails {
-    itemsBreakdown: JSON!
-    rulesApplied: JSON!
+    OVERDUE
+    DISPUTED
+    CANCELLED
 }
 
 type Settlement {
@@ -29,17 +23,13 @@ type Settlement {
     driver: User
     business: Business
     order: Order!
+    ruleId: ID
     amount: Float!
     currency: String!
     status: SettlementStatus!
-    ruleSnapshot: RuleSnapshot
-    calculationDetails: CalculationDetails
-    metadata: JSON
     paidAt: Date
-    paidBy: String
     paymentReference: String
     paymentMethod: String
-    createdBy: String
     createdAt: Date!
     updatedAt: Date!
 }
@@ -52,6 +42,31 @@ type SettlementSummary {
     totalPayable: Float!
     count: Int!
     pendingCount: Int!
+}
+
+type SettlementScenarioDefinition {
+    id: String!
+    name: String!
+    description: String!
+}
+
+type SettlementScenarioResult {
+    scenarioId: String!
+    name: String!
+    passed: Boolean!
+    expectedCount: Int!
+    actualCount: Int!
+    mismatches: [String!]!
+    expectedSettlements: JSON!
+    actualSettlements: JSON!
+}
+
+type SettlementScenarioHarnessResult {
+    passed: Boolean!
+    total: Int!
+    passedCount: Int!
+    failedCount: Int!
+    results: [SettlementScenarioResult!]!
 }
 
 type Query {
@@ -74,6 +89,8 @@ type Query {
         startDate: Date
         endDate: Date
     ): SettlementSummary!
+
+    settlementScenarioDefinitions: [SettlementScenarioDefinition!]!
     
     driverBalance(driverId: ID!): SettlementSummary!
     businessBalance(businessId: ID!): SettlementSummary!
@@ -84,8 +101,8 @@ type Mutation {
     markSettlementsAsPaid(ids: [ID!]!, paymentReference: String, paymentMethod: String): [Settlement!]!
     markSettlementAsPartiallyPaid(settlementId: ID!, amount: Float!): Settlement!
     unsettleSettlement(settlementId: ID!): Settlement!
-    updateCommissionPercentage(driverId: ID, businessId: ID, percentage: Float!): Boolean! @deprecated(reason: "Use createSettlementRule instead")
     backfillSettlementsForDeliveredOrders: Int!
+    runSettlementScenarioHarness(scenarioIds: [String!]): SettlementScenarioHarnessResult!
 }
 
 extend type Subscription {

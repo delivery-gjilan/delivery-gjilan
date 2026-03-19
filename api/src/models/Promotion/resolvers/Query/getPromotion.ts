@@ -47,5 +47,7 @@ export const getPromotion: NonNullable<QueryResolvers['getPromotion']> = async (
         createdAt: toISOString(promo.createdAt)!,
         totalUsageCount: promo.totalUsageCount,
         totalRevenue: promo.totalRevenue || 0,
+        creatorType: promo.creatorType,
+        creatorId: promo.creatorId,
     };
 };

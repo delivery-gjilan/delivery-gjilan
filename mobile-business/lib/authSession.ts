@@ -12,10 +12,11 @@ const REFRESH_TOKEN_MUTATION = `
 
 let refreshInFlight: Promise<string | null> | null = null;
 
-function getApiUrl(): string {
+function getApiUrl(): string | null {
     const apiUrl = process.env.EXPO_PUBLIC_API_URL;
     if (!apiUrl) {
-        throw new Error('EXPO_PUBLIC_API_URL is not configured');
+        console.error('[Auth] EXPO_PUBLIC_API_URL is not configured');
+        return null;
     }
     return `${apiUrl}/graphql`;
 }
@@ -73,12 +74,17 @@ export async function refreshAccessToken(currentToken?: string | null): Promise<
     }
 
     refreshInFlight = (async () => {
+        const apiUrl = getApiUrl();
+        if (!apiUrl) {
+            return currentToken ?? null;
+        }
+
         const refreshToken = await getRefreshToken();
         if (!refreshToken) {
             return currentToken ?? null;
         }
 
-        const response = await fetch(getApiUrl(), {
+        const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
                 'content-type': 'application/json',

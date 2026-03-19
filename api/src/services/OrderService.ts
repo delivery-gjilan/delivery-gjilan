@@ -19,7 +19,7 @@ import {
 } from '@/database/schema';
 import { userPromoMetadata } from '@/database/schema';
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
-import type { Order, OrderBusiness, OrderItem, OrderStatus, CreateOrderInput } from '@/generated/types.generated';
+import type { Order, OrderBusiness, OrderItem, OrderStatus, CreateOrderInput, OrderPaymentCollection } from '@/generated/types.generated';
 import type { DbOrder } from '@/database/schema/orders';
 import { PubSub, publish, subscribe, topics } from '@/lib/pubsub';
 import { GraphQLError } from 'graphql';
@@ -150,7 +150,11 @@ export class OrderService {
         const itemsToCreate: Array<{
             productId: string;
             quantity: number;
-            unitPrice: number;
+            finalAppliedPrice: number;
+            basePrice: number;
+            salePrice: number | null;
+            markupPrice: number | null;
+            nightMarkedupPrice: number | null;
             notes: string | null;
             selectedOptions?: Array<{ optionGroupId: string; optionId: string }>;
             childItems?: Array<{
@@ -277,9 +281,20 @@ export class OrderService {
                 throw AppError.badInput(`Product ${product.name} is currently unavailable`);
             }
 
-            // Use DB price for security
-            const unitPrice = Number(product.isOnSale && product.salePrice ? product.salePrice : product.price);
-            log.debug({ unitPrice, quantity: itemInput.quantity, productId: itemInput.productId }, 'order:item:price');
+            // Use DB price for security — snapshot all price fields at order time
+            const basePrice = Number(product.basePrice);
+            const markupPrice = product.markupPrice != null ? Number(product.markupPrice) : null;
+            const nightMarkedupPrice = product.nightMarkedupPrice != null ? Number(product.nightMarkedupPrice) : null;
+            const salePrice = product.salePrice != null ? Number(product.salePrice) : null;
+            const isNightHours = (() => { const h = new Date().getHours(); return h >= 23 || h < 6; })();
+            const finalAppliedPrice = (product.isOnSale && salePrice != null)
+                ? salePrice
+                : (isNightHours && nightMarkedupPrice != null)
+                    ? nightMarkedupPrice
+                    : (markupPrice != null)
+                        ? markupPrice
+                        : basePrice;
+            log.debug({ finalAppliedPrice, quantity: itemInput.quantity, productId: itemInput.productId }, 'order:item:price');
 
             validateSelectedOptions(itemInput.selectedOptions ?? [], product.id, `Product ${product.id}`, true);
 
@@ -293,9 +308,9 @@ export class OrderService {
                 }
             }
 
-            calculatedItemsTotal += (unitPrice + optionsExtra) * itemInput.quantity;
+            calculatedItemsTotal += (finalAppliedPrice + optionsExtra) * itemInput.quantity;
 
-            // Also calculate child item options extra (child unitPrice is 0, but options may cost extra)
+            // Also calculate child item options extra (child finalAppliedPrice is 0, but options may cost extra)
             if (itemInput.childItems) {
                 const linkedChildCounts = new Map<string, number>();
                 for (const so of itemInput.selectedOptions ?? []) {
@@ -337,7 +352,11 @@ export class OrderService {
             itemsToCreate.push({
                 productId: itemInput.productId,
                 quantity: itemInput.quantity,
-                unitPrice,
+                finalAppliedPrice,
+                basePrice,
+                salePrice,
+                markupPrice,
+                nightMarkedupPrice,
                 notes: itemInput.notes || null,
                 selectedOptions: itemInput.selectedOptions ?? [],
                 childItems: itemInput.childItems ?? undefined,
@@ -347,7 +366,7 @@ export class OrderService {
                 productId: itemInput.productId,
                 businessId: product.businessId,
                 quantity: itemInput.quantity,
-                price: unitPrice,
+                price: finalAppliedPrice,
             });
 
             businessIds.add(product.businessId);
@@ -468,6 +487,7 @@ export class OrderService {
             price: effectiveOrderPrice,
             userId,
             deliveryPrice: effectiveDeliveryPrice,
+            paymentCollection: input.paymentCollection ?? 'CASH_TO_DRIVER',
             originalPrice: calculatedItemsTotal !== effectiveOrderPrice ? calculatedItemsTotal : undefined,
             originalDeliveryPrice: input.deliveryPrice !== effectiveDeliveryPrice ? input.deliveryPrice : undefined,
             status: 'PENDING' as const,
@@ -481,7 +501,11 @@ export class OrderService {
         const flatItems = itemsToCreate.map((item) => ({
             productId: item.productId,
             quantity: item.quantity,
-            unitPrice: item.unitPrice,
+            finalAppliedPrice: item.finalAppliedPrice,
+            basePrice: item.basePrice,
+            salePrice: item.salePrice,
+            markupPrice: item.markupPrice,
+            nightMarkedupPrice: item.nightMarkedupPrice,
             notes: item.notes,
         }));
 
@@ -502,19 +526,19 @@ export class OrderService {
 
         const buildTopLevelItemKey = (item: {
             productId: string;
-            unitPrice: number;
+            finalAppliedPrice: number;
             quantity: number;
             notes: string | null;
         }) => {
             const normalizedNotes = (item.notes ?? '').trim();
-            return `${item.productId}::${item.unitPrice}::${item.quantity}::${normalizedNotes}`;
+            return `${item.productId}::${item.finalAppliedPrice}::${item.quantity}::${normalizedNotes}`;
         };
 
         const createdItemsByKey = new Map<string, typeof createdItems>();
         for (const createdItem of createdItems) {
             const key = buildTopLevelItemKey({
                 productId: createdItem.productId,
-                unitPrice: Number(createdItem.unitPrice),
+                finalAppliedPrice: Number(createdItem.finalAppliedPrice),
                 quantity: createdItem.quantity,
                 notes: createdItem.notes,
             });
@@ -528,7 +552,7 @@ export class OrderService {
             const inputItem = itemsToCreate[i];
             const key = buildTopLevelItemKey({
                 productId: inputItem.productId,
-                unitPrice: inputItem.unitPrice,
+                finalAppliedPrice: inputItem.finalAppliedPrice,
                 quantity: inputItem.quantity,
                 notes: inputItem.notes,
             });
@@ -541,7 +565,7 @@ export class OrderService {
                         orderId: createdOrder.id,
                         key,
                         productId: inputItem.productId,
-                        unitPrice: inputItem.unitPrice,
+                        finalAppliedPrice: inputItem.finalAppliedPrice,
                         quantity: inputItem.quantity,
                     },
                     'order:create:failed_to_match_created_item_for_options_and_children',
@@ -571,7 +595,11 @@ export class OrderService {
                             productId: childInput.productId,
                             parentOrderItemId: createdItem.id,
                             quantity: inputItem.quantity,
-                            unitPrice: 0, // child items are covered by the offer price
+                            finalAppliedPrice: 0, // child items are covered by the offer price
+                            basePrice: 0,
+                            salePrice: null,
+                            markupPrice: null,
+                            nightMarkedupPrice: null,
                             notes: null,
                         })
                         .returning();
@@ -733,7 +761,7 @@ export class OrderService {
                 name: product?.name ?? '',
                 imageUrl: product?.imageUrl || undefined,
                 quantity: item.quantity,
-                unitPrice: item.unitPrice,
+                unitPrice: Number(item.finalAppliedPrice), // DB: finalAppliedPrice → GraphQL: unitPrice
                 notes: item.notes || undefined,
                 selectedOptions,
                 childItems: children,
@@ -807,6 +835,7 @@ export class OrderService {
             orderDate: new Date(dbOrder.orderDate || new Date()),
             updatedAt: new Date(dbOrder.updatedAt),
             status: dbOrder.status as OrderStatus,
+            paymentCollection: dbOrder.paymentCollection as OrderPaymentCollection,
             preparationMinutes: dbOrder.preparationMinutes ?? undefined,
             estimatedReadyAt: dbOrder.estimatedReadyAt ? new Date(dbOrder.estimatedReadyAt) : undefined,
             preparingAt: dbOrder.preparingAt ? new Date(dbOrder.preparingAt) : undefined,

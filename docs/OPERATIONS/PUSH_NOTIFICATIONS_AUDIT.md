@@ -1,5 +1,10 @@
 # Push Notifications Audit
 
+<!-- MDS:O4 | Domain: Operations | Updated: 2026-03-18 -->
+<!-- Depends-On: O3, M2, M3 -->
+<!-- Depended-By: (none) -->
+<!-- Nav: Token lifecycle changes → update M2 (Push), M3 (Live Activity). App type coverage → review O3 (Notifications). -->
+
 Date: 2026-03-13
 
 ## Scope

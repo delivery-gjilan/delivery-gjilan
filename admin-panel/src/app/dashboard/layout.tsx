@@ -3,20 +3,28 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import Sidebar from "@/components/dashboard/sidebar";
 import Topbar from "@/components/dashboard/topbar";
 import { useAuth } from "@/lib/auth-context";
 import { ReactNode } from "react";
+import { canAccessAdminPanelPath } from "@/lib/route-access";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const { isAuthenticated, loading } = useAuth();
+  const pathname = usePathname();
+  const { isAuthenticated, loading, admin } = useAuth();
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       router.push("/login");
+      return;
     }
-  }, [isAuthenticated, loading, router]);
+
+    if (!loading && isAuthenticated && !canAccessAdminPanelPath(admin?.role, pathname)) {
+      router.push("/dashboard");
+    }
+  }, [isAuthenticated, loading, router, admin?.role, pathname]);
 
   if (loading) {
     return (
@@ -27,6 +35,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   if (!isAuthenticated) {
+    return null;
+  }
+
+  if (!canAccessAdminPanelPath(admin?.role, pathname)) {
     return null;
   }
 

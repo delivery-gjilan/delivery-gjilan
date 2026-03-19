@@ -7,27 +7,24 @@ import { orders } from './orders';
 // ==================== ENUMS ====================
 
 export const promotionTypeEnum = pgEnum('promotion_type', [
-    'FIXED_AMOUNT',      // $5 off
-    'PERCENTAGE',        // 20% off
-    'FREE_DELIVERY',     // Free delivery
-    'WALLET_CREDIT',     // Add to wallet
+    'FIXED_AMOUNT',       // Fixed € off
+    'PERCENTAGE',         // % off
+    'FREE_DELIVERY',      // Free delivery
+    'SPEND_X_GET_FREE',   // Spend X → free item/delivery
+    'SPEND_X_PERCENT',    // Spend X → % discount
+    'SPEND_X_FIXED',      // Spend X → fixed € discount
 ]);
 
 export const promotionTargetEnum = pgEnum('promotion_target', [
     'ALL_USERS',         // Public promo code
     'SPECIFIC_USERS',    // Assigned to specific users
     'FIRST_ORDER',       // Auto-applied to first orders
-    'CONDITIONAL',       // Spend X get Y
+    'CONDITIONAL',       // Spend X get Y (legacy; prefer SPEND_X_* types)
 ]);
 
-export const walletTransactionTypeEnum = pgEnum('wallet_transaction_type', [
-    'CREDIT',            // Money added
-    'DEBIT',             // Money spent
-    'REFUND',            // Refund from cancelled order
-    'REFERRAL_REWARD',   // Earned from referral
-    'ADMIN_ADJUSTMENT',  // Manual admin change
-    'PROMOTION',         // From promotion
-    'EXPIRATION',        // Credit expired
+export const promotionCreatorTypeEnum = pgEnum('promotion_creator_type', [
+    'PLATFORM',   // Created by platform admin
+    'BUSINESS',   // Created by (or on behalf of) a business
 ]);
 
 // ==================== PROMOTIONS ====================
@@ -77,7 +74,11 @@ export const promotions = pgTable('promotions', {
     // Analytics
     totalRevenue: numeric('total_revenue', { mode: 'number', precision: 12, scale: 2 }).default(0),
     totalUsageCount: integer('total_usage_count').default(0).notNull(),
-    
+
+    // Creator tracking
+    creatorType: promotionCreatorTypeEnum('creator_type').default('PLATFORM').notNull(),
+    creatorId: uuid('creator_id').references(() => businesses.id, { onDelete: 'set null' }), // null = platform
+
     // Metadata
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
@@ -171,60 +172,6 @@ export const promotionBusinessEligibility = pgTable('promotion_business_eligibil
     promoBusinessIdx: index('idx_promo_business').on(table.promotionId, table.businessId),
 }));
 
-// ==================== USER WALLET ====================
-
-export const userWallet = pgTable('user_wallet', {
-    id: uuid('id').primaryKey().defaultRandom().notNull(),
-    userId: uuid('user_id')
-        .references(() => users.id, { onDelete: 'cascade' })
-        .notNull()
-        .unique(),
-    
-    balance: numeric('balance', { mode: 'number', precision: 10, scale: 2 }).default(0).notNull(),
-    
-    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
-        .default(sql`CURRENT_TIMESTAMP`)
-        .notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
-        .default(sql`CURRENT_TIMESTAMP`)
-        .notNull()
-        .$onUpdate(() => sql`CURRENT_TIMESTAMP`),
-}, (table) => ({
-    userIdx: index('idx_user_wallet_user').on(table.userId),
-}));
-
-// ==================== WALLET TRANSACTIONS ====================
-
-export const walletTransactions = pgTable('wallet_transactions', {
-    id: uuid('id').primaryKey().defaultRandom().notNull(),
-    walletId: uuid('wallet_id')
-        .references(() => userWallet.id, { onDelete: 'cascade' })
-        .notNull(),
-    userId: uuid('user_id')
-        .references(() => users.id, { onDelete: 'cascade' })
-        .notNull(),
-    
-    type: walletTransactionTypeEnum('type').notNull(),
-    amount: numeric('amount', { mode: 'number', precision: 10, scale: 2 }).notNull(),
-    balanceBefore: numeric('balance_before', { mode: 'number', precision: 10, scale: 2 }).notNull(),
-    balanceAfter: numeric('balance_after', { mode: 'number', precision: 10, scale: 2 }).notNull(),
-    
-    // References
-    orderId: uuid('order_id').references(() => orders.id, { onDelete: 'set null' }),
-    promotionId: uuid('promotion_id').references(() => promotions.id, { onDelete: 'set null' }),
-    
-    description: text('description'),
-    expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'string' }),
-    
-    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
-        .default(sql`CURRENT_TIMESTAMP`)
-        .notNull(),
-}, (table) => ({
-    walletIdx: index('idx_wallet_transactions_wallet').on(table.walletId),
-    userIdx: index('idx_wallet_transactions_user').on(table.userId),
-    typeIdx: index('idx_wallet_transactions_type').on(table.type),
-}));
-
 // ==================== USER METADATA ====================
 
 export const userPromoMetadata = pgTable('user_promo_metadata', {
@@ -257,7 +204,10 @@ export const promotionsRelations = relations(promotions, ({ many, one }) => ({
     userAssignments: many(userPromotions),
     usage: many(promotionUsage),
     businessEligibility: many(promotionBusinessEligibility),
-    walletTransactions: many(walletTransactions),
+    creatorBusiness: one(businesses, {
+        fields: [promotions.creatorId],
+        references: [businesses.id],
+    }),
     creator: one(users, {
         fields: [promotions.createdBy],
         references: [users.id],
@@ -298,33 +248,6 @@ export const promotionUsageRelations = relations(promotionUsage, ({ one }) => ({
     }),
 }));
 
-export const userWalletRelations = relations(userWallet, ({ one, many }) => ({
-    user: one(users, {
-        fields: [userWallet.userId],
-        references: [users.id],
-    }),
-    transactions: many(walletTransactions),
-}));
-
-export const walletTransactionsRelations = relations(walletTransactions, ({ one }) => ({
-    wallet: one(userWallet, {
-        fields: [walletTransactions.walletId],
-        references: [userWallet.id],
-    }),
-    user: one(users, {
-        fields: [walletTransactions.userId],
-        references: [users.id],
-    }),
-    order: one(orders, {
-        fields: [walletTransactions.orderId],
-        references: [orders.id],
-    }),
-    promotion: one(promotions, {
-        fields: [walletTransactions.promotionId],
-        references: [promotions.id],
-    }),
-}));
-
 export const userPromoMetadataRelations = relations(userPromoMetadata, ({ one }) => ({
     user: one(users, {
         fields: [userPromoMetadata.userId],
@@ -340,9 +263,5 @@ export type DbUserPromotion = typeof userPromotions.$inferSelect;
 export type NewDbUserPromotion = typeof userPromotions.$inferInsert;
 export type DbPromotionUsage = typeof promotionUsage.$inferSelect;
 export type NewDbPromotionUsage = typeof promotionUsage.$inferInsert;
-export type DbUserWallet = typeof userWallet.$inferSelect;
-export type NewDbUserWallet = typeof userWallet.$inferInsert;
-export type DbWalletTransaction = typeof walletTransactions.$inferSelect;
-export type NewDbWalletTransaction = typeof walletTransactions.$inferInsert;
 export type DbUserPromoMetadata = typeof userPromoMetadata.$inferSelect;
 export type NewDbUserPromoMetadata = typeof userPromoMetadata.$inferInsert;

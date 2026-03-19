@@ -5,9 +5,14 @@ import {
     GET_CATEGORIES,
     CREATE_CATEGORY,
     UPDATE_CATEGORY,
+    UPDATE_CATEGORIES_ORDER,
     DELETE_CATEGORY,
 } from '@/graphql/operations/productCategories';
-import type { CreateProductCategoryInput, UpdateProductCategoryInput } from '@/gql/graphql';
+import type {
+    CreateProductCategoryInput,
+    UpdateProductCategoryInput,
+    ProductCategoryOrderInput,
+} from '@/gql/graphql';
 
 export interface UseCategoriesResult {
     categories: any[];
@@ -38,6 +43,15 @@ export interface UseUpdateCategoryResult {
 
 export interface UseDeleteCategoryResult {
     delete: (id: string) => Promise<{
+        success: boolean;
+        error?: string;
+    }>;
+    loading: boolean;
+    error?: string;
+}
+
+export interface UseUpdateCategoriesOrderResult {
+    updateOrder: (businessId: string, categories: ProductCategoryOrderInput[]) => Promise<{
         success: boolean;
         error?: string;
     }>;
@@ -100,6 +114,23 @@ export function useDeleteCategory(): UseDeleteCategoryResult {
         delete: async (id) => {
             try {
                 await mutate({ variables: { id } });
+                return { success: true };
+            } catch (err) {
+                return { success: false, error: (err as Error).message };
+            }
+        },
+        loading,
+        error: error?.message,
+    };
+}
+
+export function useUpdateCategoriesOrder(): UseUpdateCategoriesOrderResult {
+    const [mutate, { loading, error }] = useMutation(UPDATE_CATEGORIES_ORDER);
+
+    return {
+        updateOrder: async (businessId, categories) => {
+            try {
+                await mutate({ variables: { businessId, categories } });
                 return { success: true };
             } catch (err) {
                 return { success: false, error: (err as Error).message };

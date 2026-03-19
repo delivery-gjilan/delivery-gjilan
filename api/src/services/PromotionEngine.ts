@@ -4,8 +4,6 @@ import {
     userPromotions, 
     promotionUsage, 
     userPromoMetadata,
-    userWallet,
-    walletTransactions,
     promotionBusinessEligibility
 } from '@/database/schema/promotions';
 import { orders } from '@/database/schema';
@@ -33,7 +31,7 @@ export type ApplicablePromotion = {
     id: string;
     code: string | null;
     name: string;
-    type: 'FIXED_AMOUNT' | 'PERCENTAGE' | 'FREE_DELIVERY' | 'WALLET_CREDIT';
+    type: 'FIXED_AMOUNT' | 'PERCENTAGE' | 'FREE_DELIVERY' | 'SPEND_X_GET_FREE' | 'SPEND_X_PERCENT' | 'SPEND_X_FIXED';
     target: 'ALL_USERS' | 'SPECIFIC_USERS' | 'FIRST_ORDER' | 'CONDITIONAL';
     discountValue?: number | null;
     maxDiscountCap?: number | null;
@@ -50,7 +48,6 @@ export type PromotionResult = {
     finalSubtotal: number;
     finalDeliveryPrice: number;
     finalTotal: number;
-    walletDeduction: number;
 };
 
 export type PromotionUsageBreakdown = {
@@ -205,7 +202,6 @@ export class PromotionEngine {
                 finalSubtotal: cart.subtotal,
                 finalDeliveryPrice: cart.deliveryPrice,
                 finalTotal: cart.subtotal + cart.deliveryPrice,
-                walletDeduction: 0,
             };
         }
 
@@ -243,7 +239,6 @@ export class PromotionEngine {
             finalSubtotal,
             finalDeliveryPrice,
             finalTotal,
-            walletDeduction: 0, // Wallet handled separately
         };
     }
 
@@ -380,8 +375,19 @@ export class PromotionEngine {
                 discount = 0; // Handled separately
                 break;
 
-            case 'WALLET_CREDIT':
-                discount = 0; // Wallet credits don't reduce order price directly
+            case 'SPEND_X_GET_FREE':
+                discount = 0; // Free item/delivery granted via freeDelivery flag
+                break;
+
+            case 'SPEND_X_PERCENT': {
+                const pct = Number(promo.discountValue || 0);
+                discount = (subtotal * pct) / 100;
+                if (promo.maxDiscountCap) discount = Math.min(discount, Number(promo.maxDiscountCap));
+                break;
+            }
+
+            case 'SPEND_X_FIXED':
+                discount = Number(promo.discountValue || 0);
                 break;
         }
 

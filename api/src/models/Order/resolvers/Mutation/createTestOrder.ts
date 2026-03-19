@@ -83,7 +83,7 @@ export const createTestOrder: NonNullable<MutationResolvers['createTestOrder']> 
     const itemsData = selectedProducts.map((product) => ({
         productId: product.id,
         quantity: Math.floor(Math.random() * 2) + 1,
-        price: Number(product.isOnSale && product.salePrice ? product.salePrice : product.price),
+        price: Number(product.isOnSale && product.salePrice ? product.salePrice : product.basePrice),
     }));
 
     const orderPrice = itemsData.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -132,6 +132,7 @@ export const createTestOrder: NonNullable<MutationResolvers['createTestOrder']> 
             userId: randomCustomer.id,
             price: orderPrice,
             deliveryPrice,
+            paymentCollection: 'CASH_TO_DRIVER',
             status: 'PENDING',
             dropoffLat: 42.4602,
             dropoffLng: 21.4691,
@@ -145,7 +146,11 @@ export const createTestOrder: NonNullable<MutationResolvers['createTestOrder']> 
             orderId: createdOrder.id,
             productId: item.productId,
             quantity: item.quantity,
-            price: item.price,
+            finalAppliedPrice: item.price,
+            basePrice: item.price,
+            salePrice: null,
+            markupPrice: null,
+            nightMarkedupPrice: null,
         })),
     );
 

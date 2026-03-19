@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { DollarSign, Scale, Tag, TrendingUp } from 'lucide-react';
+import { DollarSign, Scale, Tag, TestTube2, TrendingUp } from 'lucide-react';
 
 const tabs = [
   { name: 'Settlements', href: '/admin/financial/settlements', icon: DollarSign },
   { name: 'Settlement Rules', href: '/admin/financial/rules', icon: Scale },
+  { name: 'Testing', href: '/admin/financial/testing', icon: TestTube2 },
   { name: 'Product Pricing', href: '/admin/financial/pricing', icon: Tag },
   { name: 'Dynamic Pricing', href: '/admin/financial/dynamic-pricing', icon: TrendingUp },
 ];

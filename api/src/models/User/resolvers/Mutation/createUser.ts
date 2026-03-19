@@ -3,15 +3,37 @@ import { GraphQLError } from 'graphql';
 import { createAuditLogger } from '@/services/AuditLogger';
 import logger from '@/lib/logger';
 import { canManageUsers } from '@/lib/utils/permissions';
+import { toUserParent } from '../utils/toUserParent';
 
 export const createUser: NonNullable<MutationResolvers['createUser']> = async (_parent, { input }, context) => {
     const { authService, driverService, userData, db } = context;
-    
-    // Only users with user management permissions can create users
+
+    // SUPER_ADMIN can create any role.
+    // BUSINESS_OWNER can only create BUSINESS_EMPLOYEE in their own business.
     if (!canManageUsers(userData)) {
-        throw new GraphQLError('Unauthorized: Only super admins can create users', {
-            extensions: { code: 'FORBIDDEN' },
-        });
+        if (userData.role !== 'BUSINESS_OWNER') {
+            throw new GraphQLError('Unauthorized: Only super admins and business owners can create users', {
+                extensions: { code: 'FORBIDDEN' },
+            });
+        }
+
+        if (!userData.businessId) {
+            throw new GraphQLError('Business owner must be associated with a business', {
+                extensions: { code: 'FORBIDDEN' },
+            });
+        }
+
+        if (input.role !== 'BUSINESS_EMPLOYEE') {
+            throw new GraphQLError('Business owners can only create business employees', {
+                extensions: { code: 'FORBIDDEN' },
+            });
+        }
+
+        if (!input.businessId || input.businessId !== userData.businessId) {
+            throw new GraphQLError('Business owners can only create employees in their own business', {
+                extensions: { code: 'FORBIDDEN' },
+            });
+        }
     }
 
     const result = await authService.createUser(
@@ -49,7 +71,7 @@ export const createUser: NonNullable<MutationResolvers['createUser']> = async (_
 
     return {
         token: result.token,
-        user: result.user as any,
+        user: toUserParent(result.user),
         message: result.message,
     };
 };

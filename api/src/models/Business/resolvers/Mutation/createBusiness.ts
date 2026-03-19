@@ -1,13 +1,22 @@
 import type { MutationResolvers } from '@/generated/types.generated';
 import { createAuditLogger } from '@/services/AuditLogger';
 import { cache } from '@/lib/cache';
+import { GraphQLError } from 'graphql';
+import { canManageBusinesses } from '@/lib/utils/permissions';
 
 export const createBusiness: NonNullable<MutationResolvers['createBusiness']> = async (
     _parent,
     { input },
     context,
 ) => {
-    const { businessService, db } = context;
+    const { businessService, db, userData } = context;
+
+    if (!canManageBusinesses(userData)) {
+        throw new GraphQLError('Unauthorized: Only super admins can create businesses', {
+            extensions: { code: 'FORBIDDEN' },
+        });
+    }
+
     const result = await businessService.createBusiness(input);
     
     // Invalidate businesses list cache
@@ -21,7 +30,7 @@ export const createBusiness: NonNullable<MutationResolvers['createBusiness']> = 
         entityId: result.id,
         metadata: {
             name: input.name,
-            category: input.category,
+            businessType: input.businessType,
             phoneNumber: input.phoneNumber,
         },
     });

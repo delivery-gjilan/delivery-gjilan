@@ -38,6 +38,8 @@ export const GET_SETTLEMENTS = graphql(`
             }
             order {
                 id
+                displayId
+                orderDate
                 orderPrice
                 deliveryPrice
                 totalPrice
@@ -48,10 +50,7 @@ export const GET_SETTLEMENTS = graphql(`
             paidAt
             paymentReference
             paymentMethod
-            calculationDetails {
-                itemsBreakdown
-                rulesApplied
-            }
+            ruleId
             createdAt
         }
     }
@@ -125,16 +124,6 @@ export const GET_BUSINESSES_WITH_BALANCE = graphql(`
             businessType
             commissionPercentage
         }
-    }
-`);
-
-export const UPDATE_COMMISSION = graphql(`
-    mutation UpdateCommissionPercentage($driverId: ID, $businessId: ID, $percentage: Float!) {
-        updateCommissionPercentage(
-            driverId: $driverId
-            businessId: $businessId
-            percentage: $percentage
-        )
     }
 `);
 

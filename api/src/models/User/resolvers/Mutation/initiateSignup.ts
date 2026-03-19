@@ -1,4 +1,5 @@
 import type { MutationResolvers } from '@/generated/types.generated';
+import { toUserParent } from '../utils/toUserParent';
 
 export const initiateSignup: NonNullable<MutationResolvers['initiateSignup']> = async (
     _parent,
@@ -14,7 +15,7 @@ export const initiateSignup: NonNullable<MutationResolvers['initiateSignup']> = 
     );
     return {
         token: result.token,
-        user: result.user,
+        user: toUserParent(result.user),
         message: result.message,
     };
 };

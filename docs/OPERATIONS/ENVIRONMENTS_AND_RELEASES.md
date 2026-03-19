@@ -1,5 +1,10 @@
 # Environments And Releases
 
+<!-- MDS:O7 | Domain: Operations | Updated: 2026-03-18 -->
+<!-- Depends-On: (none) -->
+<!-- Depended-By: O8, O10 -->
+<!-- Nav: Environment changes → update O8 (Testing), O10 (App Store). CI/CD pipeline → review O9 (Docker). -->
+
 ## Current State In This Repo
 
 The repo already has the beginnings of a release model, but it is not production-safe yet.

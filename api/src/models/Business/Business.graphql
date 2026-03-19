@@ -48,6 +48,23 @@ input CreateBusinessInput {
     avgPrepTimeMinutes: Int
 }
 
+input CreateBusinessOwnerInput {
+    email: String!
+    password: String!
+    firstName: String!
+    lastName: String!
+}
+
+input CreateBusinessWithOwnerInput {
+    business: CreateBusinessInput!
+    owner: CreateBusinessOwnerInput!
+}
+
+type CreateBusinessWithOwnerPayload {
+    business: Business!
+    owner: User!
+}
+
 input UpdateBusinessInput {
     name: String
     description: String
@@ -64,6 +81,7 @@ input UpdateBusinessInput {
 
 type Mutation {
     createBusiness(input: CreateBusinessInput!): Business!
+    createBusinessWithOwner(input: CreateBusinessWithOwnerInput!): CreateBusinessWithOwnerPayload!
     updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
     deleteBusiness(id: ID!): Boolean!
     setBusinessSchedule(businessId: ID!, schedule: [BusinessDayHoursInput!]!): [BusinessDayHours!]!

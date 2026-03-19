@@ -1,5 +1,10 @@
 # App Store Release
 
+<!-- MDS:O10 | Domain: Operations | Updated: 2026-03-18 -->
+<!-- Depends-On: O7 -->
+<!-- Depended-By: (none) -->
+<!-- Nav: Compliance changes → review O5 (Security). Production validation → review O7 (Environments). -->
+
 ## Current Readiness Theme
 
 The biggest iOS release risks are not deep technical blockers. They are compliance, completeness, and production-readiness details.

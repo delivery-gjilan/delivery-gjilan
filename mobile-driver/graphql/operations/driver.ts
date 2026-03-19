@@ -18,7 +18,7 @@ export const GET_MY_DRIVER_METRICS = gql`
 export const GET_MY_SETTLEMENTS = gql`
     query GetMySettlements($status: SettlementStatus, $startDate: Date, $endDate: Date, $limit: Int, $offset: Int) {
         settlements(
-            type: DRIVER_PAYMENT
+            type: DRIVER
             status: $status
             startDate: $startDate
             endDate: $endDate
@@ -50,7 +50,7 @@ export const GET_MY_SETTLEMENTS = gql`
 export const GET_MY_SETTLEMENT_SUMMARY = gql`
     query GetMySettlementSummary($startDate: Date, $endDate: Date) {
         settlementSummary(
-            type: DRIVER_PAYMENT
+            type: DRIVER
             startDate: $startDate
             endDate: $endDate
         ) {

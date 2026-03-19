@@ -418,7 +418,7 @@ async function seed() {
                     name: productData.name,
                     description: productData.desc,
                     imageUrl: productData.image,
-                    price: productData.price,
+                    basePrice: productData.price,
                     isAvailable: Math.random() > 0.1, // 90% available
                     isOnSale: isOnSale,
                     salePrice: isOnSale ? productData.price * 0.85 : null,
@@ -428,7 +428,7 @@ async function seed() {
                 businessProducts.push({
                     id: createdProduct.id,
                     name: createdProduct.name,
-                    price: createdProduct.price,
+                    price: createdProduct.basePrice,
                 });
             }
 
@@ -503,7 +503,7 @@ async function seed() {
                         name: productData.name,
                         description: productData.desc,
                         imageUrl: productData.image,
-                        price: productData.price,
+                        basePrice: productData.price,
                         isAvailable: Math.random() > 0.05,
                         isOnSale: isOnSale,
                         salePrice: isOnSale ? productData.price * 0.85 : null,
@@ -513,7 +513,7 @@ async function seed() {
                     businessProducts.push({
                         id: createdProduct.id,
                         name: createdProduct.name,
-                        price: createdProduct.price,
+                        price: createdProduct.basePrice,
                     });
                 }
 
@@ -553,6 +553,8 @@ async function seed() {
             isStackable: false,
             priority: 100,
             isActive: true,
+            creatorType: 'PLATFORM',
+            creatorId: null,
         }).returning();
 
         // Global percentage promo
@@ -573,6 +575,8 @@ async function seed() {
             isStackable: false,
             priority: 50,
             isActive: true,
+            creatorType: 'PLATFORM',
+            creatorId: null,
         }).returning();
 
         // Fixed discount promo
@@ -593,6 +597,8 @@ async function seed() {
             isStackable: true,
             priority: 40,
             isActive: true,
+            creatorType: 'PLATFORM',
+            creatorId: null,
         }).returning();
 
         // Business-specific promo if a business exists
@@ -614,6 +620,8 @@ async function seed() {
                 isStackable: false,
                 priority: 60,
                 isActive: true,
+                creatorType: 'PLATFORM',
+                creatorId: null,
             }).returning();
 
             await db.insert(promotionBusinessEligibility).values({
@@ -678,7 +686,7 @@ async function seed() {
                         name: vp.name,
                         description: `${vp.name} – choose your preferred base style`,
                         imageUrl: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=800&q=80',
-                        price: vp.price,
+                        basePrice: vp.price,
                         isAvailable: true,
                         isOffer: false,
                         isOnSale: false,
@@ -694,7 +702,7 @@ async function seed() {
                     name: 'Build Your Own Pizza',
                     description: 'Customize your pizza with your choice of sauce and toppings',
                     imageUrl: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80',
-                    price: 9.99,
+                    basePrice: 9.99,
                     isAvailable: true,
                     isOffer: false,
                     isOnSale: false,
@@ -735,7 +743,7 @@ async function seed() {
                     name: 'Pizza Meal Deal',
                     description: 'Pick a pizza and a side – great value combo!',
                     imageUrl: 'https://images.unsplash.com/photo-1534308983496-4fabb1a015ee?w=800&q=80',
-                    price: 14.99,
+                    basePrice: 14.99,
                     isAvailable: true,
                     isOffer: true,
                     isOnSale: false,

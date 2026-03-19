@@ -1,5 +1,10 @@
 # Docker And Stress Testing
 
+<!-- MDS:O9 | Domain: Operations | Updated: 2026-03-18 -->
+<!-- Depends-On: O8 -->
+<!-- Depended-By: (none) -->
+<!-- Nav: Container changes → review O7 (Environments). Scenario design → review B4 (Watchdog heartbeat). -->
+
 ## Current State In This Repo
 
 You already have partial containerization, but not application containerization.

@@ -60,13 +60,6 @@ input AddUserAddressInput {
   priority: Int
 }
 
-input AddWalletCreditInput {
-  amount: Float!
-  description: String
-  type: String!
-  userId: ID!
-}
-
 type AgoraRtcCredentials {
   appId: String!
   channelName: String!
@@ -242,11 +235,6 @@ enum BusinessType {
   RESTAURANT
 }
 
-type CalculationDetails {
-  itemsBreakdown: JSON!
-  rulesApplied: JSON!
-}
-
 enum CampaignStatus {
   DRAFT
   FAILED
@@ -289,6 +277,23 @@ input CreateBusinessInput {
   workingHours: WorkingHoursInput!
 }
 
+input CreateBusinessOwnerInput {
+  email: String!
+  firstName: String!
+  lastName: String!
+  password: String!
+}
+
+input CreateBusinessWithOwnerInput {
+  business: CreateBusinessInput!
+  owner: CreateBusinessOwnerInput!
+}
+
+type CreateBusinessWithOwnerPayload {
+  business: Business!
+  owner: User!
+}
+
 input CreateCampaignInput {
   body: String!
   category: String
@@ -313,19 +318,6 @@ input CreateDeliveryZoneInput {
   name: String!
   polygon: [PolygonPointInput!]!
   sortOrder: Int
-}
-
-input CreateDynamicPricingRuleInput {
-  adjustmentConfig: JSON!
-  appliesTo: DynamicPricingRuleAppliesToInput!
-  businessId: String
-  conditionConfig: JSON!
-  conditionType: PricingConditionType!
-  description: String
-  name: String!
-  priority: Int
-  validFrom: String
-  validUntil: String
 }
 
 input CreateOptionGroupInput {
@@ -354,6 +346,7 @@ input CreateOrderInput {
   driverNotes: String
   dropOffLocation: LocationInput!
   items: [CreateOrderItemInput!]!
+  paymentCollection: OrderPaymentCollection
   promoCode: String
   totalPrice: Float!
 }
@@ -375,6 +368,7 @@ input CreateOrderItemOptionInput {
 input CreateProductCategoryInput {
   businessId: ID!
   name: String!
+  sortOrder: Int
 }
 
 input CreateProductInput {
@@ -404,6 +398,8 @@ input CreateProductVariantGroupInput {
 
 input CreatePromotionInput {
   code: String
+  creatorId: ID
+  creatorType: String
   description: String
   discountValue: Float
   eligibleBusinessIds: [ID!]
@@ -425,13 +421,15 @@ input CreatePromotionInput {
 }
 
 input CreateSettlementRuleInput {
-  canStackWith: [String!]
-  config: JSON!
-  entityId: String!
+  amount: Float!
+  amountType: SettlementAmountType!
+  appliesTo: String
+  businessId: ID
+  direction: SettlementDirection!
   entityType: SettlementEntityType!
+  name: String!
   notes: String
-  priority: Int
-  ruleType: SettlementRuleType!
+  promotionId: ID
 }
 
 input CreateUserInput {
@@ -633,38 +631,6 @@ enum DriverPttSignalAction {
   UNMUTE
 }
 
-type DynamicPricingRule {
-  adjustmentConfig: JSON!
-  appliesTo: DynamicPricingRuleAppliesTo!
-  businessId: String
-  conditionConfig: JSON!
-  conditionType: PricingConditionType!
-  createdAt: String!
-  createdBy: String
-  description: String
-  id: ID!
-  isActive: Boolean!
-  name: String!
-  priority: Int!
-  updatedAt: String!
-  validFrom: String
-  validUntil: String
-}
-
-type DynamicPricingRuleAppliesTo {
-  allProducts: Boolean
-  categoryIds: [String!]
-  productIds: [String!]
-  subcategoryIds: [String!]
-}
-
-input DynamicPricingRuleAppliesToInput {
-  allProducts: Boolean
-  categoryIds: [String!]
-  productIds: [String!]
-  subcategoryIds: [String!]
-}
-
 enum EntityType {
   BUSINESS
   CATEGORY
@@ -705,9 +671,7 @@ input LoginInput {
 }
 
 type Mutation {
-  activateSettlementRule(id: ID!): SettlementRule!
   addUserAddress(input: AddUserAddressInput!): UserAddress!
-  addWalletCredit(input: AddWalletCreditInput!): WalletTransaction!
 
   """Admin sends push-to-talk signaling state to one or multiple drivers"""
   adminSendPttSignal(action: DriverPttSignalAction!, channelName: String!, driverIds: [ID!]!, muted: Boolean): Boolean!
@@ -719,9 +683,9 @@ type Mutation {
   adminUpdateDriverLocation(driverId: ID!, latitude: Float!, longitude: Float!): User!
 
   """
-  Admin mutation to update per-driver settings (commission %, max active orders)
+  Admin mutation to update per-driver settings (commission %, max active orders, vehicle ownership)
   """
-  adminUpdateDriverSettings(commissionPercentage: Float, driverId: ID!, maxActiveOrders: Int): User!
+  adminUpdateDriverSettings(commissionPercentage: Float, driverId: ID!, hasOwnVehicle: Boolean, maxActiveOrders: Int): User!
   assignDriverToOrder(driverId: ID, id: ID!): Order!
   assignPromotionToUsers(input: AssignPromotionToUserInput!): [UserPromotion!]!
   backfillSettlementsForDeliveredOrders: Int!
@@ -730,10 +694,10 @@ type Mutation {
   cancelOrder(id: ID!): Order!
   createBanner(input: CreateBannerInput!): Banner!
   createBusiness(input: CreateBusinessInput!): Business!
+  createBusinessWithOwner(input: CreateBusinessWithOwnerInput!): CreateBusinessWithOwnerPayload!
   createCampaign(input: CreateCampaignInput!): NotificationCampaign!
   createDeliveryPricingTier(input: CreateDeliveryPricingTierInput!): DeliveryPricingTier!
   createDeliveryZone(input: CreateDeliveryZoneInput!): DeliveryZone!
-  createDynamicPricingRule(input: CreateDynamicPricingRuleInput!): DynamicPricingRule!
   createOption(input: CreateOptionInput!, optionGroupId: ID!): Option!
   createOptionGroup(input: CreateOptionGroupInput!): OptionGroup!
   createOrder(input: CreateOrderInput!): Order!
@@ -745,14 +709,11 @@ type Mutation {
   createSettlementRule(input: CreateSettlementRuleInput!): SettlementRule!
   createTestOrder: Order!
   createUser(input: CreateUserInput!): AuthResponse!
-  deactivateSettlementRule(id: ID!): SettlementRule!
-  deductWalletCredit(amount: Float!, orderId: ID!, userId: ID!): WalletTransaction!
   deleteBanner(id: ID!): Boolean!
   deleteBusiness(id: ID!): Boolean!
   deleteCampaign(id: ID!): Boolean!
   deleteDeliveryPricingTier(id: ID!): Boolean!
   deleteDeliveryZone(id: ID!): Boolean!
-  deleteDynamicPricingRule(id: ID!): Boolean!
   deleteMyAccount: Boolean!
   deleteOption(id: ID!): Boolean!
   deleteOptionGroup(id: ID!): Boolean!
@@ -789,6 +750,7 @@ type Mutation {
   registerLiveActivityToken(activityId: String!, orderId: ID!, token: String!): Boolean!
   removeUserFromPromotion(promotionId: ID!, userId: ID!): Boolean!
   resendEmailVerification: SignupStepResponse!
+  runSettlementScenarioHarness(scenarioIds: [String!]): SettlementScenarioHarnessResult!
   sendCampaign(id: ID!): NotificationCampaign!
   sendPushNotification(input: SendPushNotificationInput!): SendNotificationResult!
   setBusinessSchedule(businessId: ID!, schedule: [BusinessDayHoursInput!]!): [BusinessDayHours!]!
@@ -804,19 +766,17 @@ type Mutation {
   updateBanner(id: ID!, input: UpdateBannerInput!): Banner!
   updateBannerOrder(bannerId: ID!, newSortOrder: Int!): Banner!
   updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
-  updateCommissionPercentage(businessId: ID, driverId: ID, percentage: Float!): Boolean! @deprecated(reason: "Use createSettlementRule instead")
   updateDeliveryPricingTier(id: ID!, input: UpdateDeliveryPricingTierInput!): DeliveryPricingTier!
   updateDeliveryZone(id: ID!, input: UpdateDeliveryZoneInput!): DeliveryZone!
   updateDriverLocation(latitude: Float!, longitude: Float!): User!
   updateDriverOnlineStatus(isOnline: Boolean!): User!
-  updateDynamicPricingRule(id: ID!, input: UpdateDynamicPricingRuleInput!): DynamicPricingRule!
   updateOption(id: ID!, input: UpdateOptionInput!): Option!
   updateOptionGroup(id: ID!, input: UpdateOptionGroupInput!): OptionGroup!
   updateOrderStatus(id: ID!, status: OrderStatus!): Order!
   updatePreparationTime(id: ID!, preparationMinutes: Int!): Order!
   updateProduct(id: ID!, input: UpdateProductInput!): Product!
+  updateProductCategoriesOrder(businessId: ID!, categories: [ProductCategoryOrderInput!]!): Boolean!
   updateProductCategory(id: ID!, input: UpdateProductCategoryInput!): ProductCategory!
-  updateProductPricing(businessId: ID!, input: UpdateProductPricingInput!, productId: ID!): ProductPricing!
   updateProductSubcategory(id: ID!, input: UpdateProductSubcategoryInput!): ProductSubcategory!
   updateProductsOrder(businessId: ID!, products: [ProductOrderInput!]!): Boolean!
   updatePromotion(input: UpdatePromotionInput!): Promotion!
@@ -903,6 +863,7 @@ type Order {
   originalDeliveryPrice: Float
   originalPrice: Float
   outForDeliveryAt: Date
+  paymentCollection: OrderPaymentCollection!
   pickupLocations: [Location!]!
   preparationMinutes: Int
   preparingAt: Date
@@ -951,6 +912,11 @@ type OrderItemOption {
   priceAtOrder: Float!
 }
 
+enum OrderPaymentCollection {
+  CASH_TO_DRIVER
+  PREPAID_TO_PLATFORM
+}
+
 type OrderPromotion {
   appliesTo: PromotionAppliesTo!
   discountAmount: Float!
@@ -977,30 +943,6 @@ input PolygonPointInput {
   lng: Float!
 }
 
-enum PriceAdjustmentType {
-  FIXED_AMOUNT
-  MULTIPLIER
-  PERCENTAGE
-}
-
-type PriceHistoryEntry {
-  baseCustomerPrice: String!
-  businessPrice: String!
-  changedAt: String!
-  changedBy: String
-  platformMarkup: String!
-  reason: String
-}
-
-enum PricingConditionType {
-  CUSTOM
-  DAY_OF_WEEK
-  DEMAND
-  SPECIAL_EVENT
-  TIME_OF_DAY
-  WEATHER
-}
-
 type Product {
   businessId: ID!
   categoryId: ID!
@@ -1011,7 +953,9 @@ type Product {
   isAvailable: Boolean!
   isOffer: Boolean!
   isOnSale: Boolean!
+  markupPrice: Float
   name: String!
+  nightMarkedupPrice: Float
   optionGroups: [OptionGroup!]!
   price: Float!
   salePrice: Float
@@ -1039,24 +983,18 @@ type ProductCategory {
   id: ID!
   isActive: Boolean!
   name: String!
+  sortOrder: Int!
   updatedAt: String!
+}
+
+input ProductCategoryOrderInput {
+  id: ID!
+  sortOrder: Int!
 }
 
 input ProductOrderInput {
   id: ID!
   sortOrder: Int!
-}
-
-type ProductPricing {
-  baseCustomerPrice: String!
-  businessId: String!
-  businessPrice: String!
-  createdAt: String!
-  id: ID!
-  platformMarkup: String!
-  priceHistory: [PriceHistoryEntry!]!
-  productId: String!
-  updatedAt: String!
 }
 
 type ProductSubcategory {
@@ -1077,6 +1015,8 @@ type Promotion {
   assignedUsers: [UserPromotion!]
   code: String
   createdAt: String!
+  creatorId: ID
+  creatorType: String!
   currentGlobalUsage: Int!
   description: String
   discountValue: Float
@@ -1145,7 +1085,9 @@ enum PromotionType {
   FIXED_AMOUNT
   FREE_DELIVERY
   PERCENTAGE
-  WALLET_CREDIT
+  SPEND_X_FIXED
+  SPEND_X_GET_FREE
+  SPEND_X_PERCENT
 }
 
 type PromotionUsage {
@@ -1197,7 +1139,6 @@ type PushTelemetrySummary {
 }
 
 type Query {
-  activeRulesForEntity(entityId: String!, entityType: SettlementEntityType!): [SettlementRule!]!
   auditLog(id: ID!): AuditLog
   auditLogs(action: ActionType, actorId: ID, actorType: ActorType, endDate: DateTime, entityId: ID, entityType: EntityType, limit: Int, offset: Int, startDate: DateTime): AuditLogConnection!
   business(id: ID!): Business
@@ -1205,14 +1146,12 @@ type Query {
   businessDeviceHealth(hours: Int): [BusinessDeviceHealth!]!
   businesses: [Business!]!
   calculateDeliveryPrice(businessId: ID!, dropoffLat: Float!, dropoffLng: Float!): DeliveryPriceResult!
-  calculateProductPrice(productId: ID!): String!
   deliveryPricingConfig: DeliveryPricingConfig!
   deliveryPricingTiers: [DeliveryPricingTier!]!
   deliveryZones: [DeliveryZone!]!
   deviceTokens(userId: ID): [DeviceToken!]!
   driverBalance(driverId: ID!): SettlementSummary!
   drivers: [User!]!
-  dynamicPricingRules(businessId: ID): [DynamicPricingRule!]!
 
   """Get Agora RTC credentials for the current authenticated user"""
   getAgoraRtcCredentials(channelName: String!, role: AgoraRtcRole!): AgoraRtcCredentials!
@@ -1224,11 +1163,9 @@ type Query {
   getPromotionAnalytics(promotionId: ID!): PromotionAnalyticsResult!
   getPromotionThresholds(cart: CartContextInput!): [PromotionThreshold!]!
   getPromotionUsage(promotionId: ID!): [PromotionUsage!]!
-  getStoreStatus: StoreStatus!
+  getStoreStatus(url: String): StoreStatus!
   getUserPromoMetadata(userId: ID!): UserPromoMetadata
   getUserPromotions(userId: ID!): [UserPromotion!]!
-  getUserWallet(userId: ID!): UserWallet
-  getWalletTransactions(userId: ID!): [WalletTransaction!]!
   me: User
   myAddresses: [UserAddress!]!
   myBehavior: UserBehavior
@@ -1246,16 +1183,14 @@ type Query {
   product(id: ID!): Product
   productCategories(businessId: ID!): [ProductCategory!]!
   productCategory(id: ID!): ProductCategory
-  productPricing(productId: ID!): ProductPricing
-  productPricingByBusiness(businessId: ID!): [ProductPricing!]!
   productSubcategories(categoryId: ID!): [ProductSubcategory!]!
   productSubcategoriesByBusiness(businessId: ID!): [ProductSubcategory!]!
   products(businessId: ID!): [ProductCard!]!
   pushTelemetryEvents(appType: DeviceAppType, eventType: PushTelemetryEventType, hours: Int, limit: Int, platform: DevicePlatform): [PushTelemetryEvent!]!
   pushTelemetrySummary(hours: Int): PushTelemetrySummary!
   settlementRule(id: ID!): SettlementRule
-  settlementRuleSummary(entityId: String!, entityType: SettlementEntityType!): SettlementRuleSummary!
   settlementRules(filter: SettlementRuleFilterInput): [SettlementRule!]!
+  settlementScenarioDefinitions: [SettlementScenarioDefinition!]!
   settlementSummary(businessId: ID, driverId: ID, endDate: Date, startDate: Date, type: SettlementType): SettlementSummary!
   settlements(businessId: ID, direction: SettlementDirection, driverId: ID, endDate: Date, limit: Int, offset: Int, startDate: Date, status: SettlementStatus, type: SettlementType): [Settlement!]!
   uncompletedOrders: [Order!]!
@@ -1299,10 +1234,6 @@ input RegisterDeviceTokenInput {
   token: String!
 }
 
-type RuleSnapshot {
-  appliedRules: JSON!
-}
-
 type SendNotificationResult {
   failureCount: Int!
   success: Boolean!
@@ -1327,23 +1258,24 @@ input SetDeliveryPricingTiersInput {
 type Settlement {
   amount: Float!
   business: Business
-  calculationDetails: CalculationDetails
   createdAt: Date!
-  createdBy: String
   currency: String!
   direction: SettlementDirection!
   driver: User
   id: ID!
-  metadata: JSON
   order: Order!
   paidAt: Date
-  paidBy: String
   paymentMethod: String
   paymentReference: String
-  ruleSnapshot: RuleSnapshot
+  ruleId: ID
   status: SettlementStatus!
   type: SettlementType!
   updatedAt: Date!
+}
+
+enum SettlementAmountType {
+  FIXED
+  PERCENT
 }
 
 enum SettlementDirection {
@@ -1357,43 +1289,57 @@ enum SettlementEntityType {
 }
 
 type SettlementRule {
-  activatedAt: String
-  activatedBy: String
-  canStackWith: [String!]!
-  config: JSON!
+  amount: Float!
+  amountType: SettlementAmountType!
+  appliesTo: String
+  business: Business
   createdAt: String!
-  entityId: String!
+  direction: SettlementDirection!
   entityType: SettlementEntityType!
   id: ID!
   isActive: Boolean!
+  name: String!
   notes: String
-  priority: Int!
-  ruleType: SettlementRuleType!
+  promotion: Promotion
   updatedAt: String!
 }
 
 input SettlementRuleFilterInput {
-  entityId: String
+  businessId: ID
   entityType: SettlementEntityType
   isActive: Boolean
-  ruleType: SettlementRuleType
+  promotionId: ID
 }
 
-type SettlementRuleSummary {
-  activeRules: Int!
-  rulesByType: JSON!
-  totalRules: Int!
+type SettlementScenarioDefinition {
+  description: String!
+  id: String!
+  name: String!
 }
 
-enum SettlementRuleType {
-  CUSTOM
-  DRIVER_VEHICLE_BONUS
-  FIXED_PER_ORDER
-  PERCENTAGE
-  PRODUCT_MARKUP
+type SettlementScenarioHarnessResult {
+  failedCount: Int!
+  passed: Boolean!
+  passedCount: Int!
+  results: [SettlementScenarioResult!]!
+  total: Int!
+}
+
+type SettlementScenarioResult {
+  actualCount: Int!
+  actualSettlements: JSON!
+  expectedCount: Int!
+  expectedSettlements: JSON!
+  mismatches: [String!]!
+  name: String!
+  passed: Boolean!
+  scenarioId: String!
 }
 
 enum SettlementStatus {
+  CANCELLED
+  DISPUTED
+  OVERDUE
   PAID
   PENDING
 }
@@ -1523,18 +1469,6 @@ input UpdateDeliveryZoneInput {
   sortOrder: Int
 }
 
-input UpdateDynamicPricingRuleInput {
-  adjustmentConfig: JSON
-  appliesTo: DynamicPricingRuleAppliesToInput
-  conditionConfig: JSON
-  description: String
-  isActive: Boolean
-  name: String
-  priority: Int
-  validFrom: String
-  validUntil: String
-}
-
 input UpdateOptionGroupInput {
   displayOrder: Int
   maxSelections: Int
@@ -1552,6 +1486,7 @@ input UpdateOptionInput {
 input UpdateProductCategoryInput {
   isActive: Boolean
   name: String
+  sortOrder: Int
 }
 
 input UpdateProductInput {
@@ -1560,18 +1495,14 @@ input UpdateProductInput {
   imageUrl: String
   isAvailable: Boolean
   isOnSale: Boolean
+  markupPrice: Float
   name: String
+  nightMarkedupPrice: Float
   price: Float
   salePrice: Float
   sortOrder: Int
   subcategoryId: ID
   variantGroupId: ID
-}
-
-input UpdateProductPricingInput {
-  businessPrice: String
-  platformMarkup: String
-  reason: String
 }
 
 input UpdateProductSubcategoryInput {
@@ -1580,6 +1511,8 @@ input UpdateProductSubcategoryInput {
 
 input UpdatePromotionInput {
   code: String
+  creatorId: ID
+  creatorType: String
   description: String
   discountValue: Float
   eligibleBusinessIds: [ID!]
@@ -1601,10 +1534,13 @@ input UpdatePromotionInput {
 }
 
 input UpdateSettlementRuleInput {
-  canStackWith: [String!]
-  config: JSON
+  amount: Float
+  amountType: SettlementAmountType
+  appliesTo: String
+  direction: SettlementDirection
+  isActive: Boolean
+  name: String
   notes: String
-  priority: Int
 }
 
 input UpdateStoreStatusInput {
@@ -1645,6 +1581,7 @@ type User {
   emailVerified: Boolean!
   firstName: String!
   flagColor: String
+  hasOwnVehicle: Boolean
   id: ID!
   imageUrl: String
   isOnline: Boolean!
@@ -1724,34 +1661,12 @@ enum UserRole {
   SUPER_ADMIN
 }
 
-type UserWallet {
-  balance: Float!
-  createdAt: String!
-  id: ID!
-  transactions: [WalletTransaction!]
-  updatedAt: String!
-  userId: ID!
-}
-
 input VerifyEmailInput {
   code: String!
 }
 
 input VerifyPhoneInput {
   code: String!
-}
-
-type WalletTransaction {
-  amount: Float!
-  balanceAfter: Float!
-  balanceBefore: Float!
-  createdAt: String!
-  description: String
-  id: ID!
-  orderId: ID
-  type: String!
-  wallet: UserWallet
-  walletId: ID!
 }
 
 type WorkingHours {

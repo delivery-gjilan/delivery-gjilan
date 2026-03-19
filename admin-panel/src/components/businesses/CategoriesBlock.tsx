@@ -1,6 +1,23 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+    DndContext,
+    closestCenter,
+    type DragEndEvent,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+} from "@dnd-kit/core";
+import {
+    SortableContext,
+    useSortable,
+    verticalListSortingStrategy,
+    arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical } from "lucide-react";
 
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -11,6 +28,7 @@ import {
     useCreateCategory,
     useUpdateCategory,
     useDeleteCategory,
+    useUpdateCategoriesOrder,
 } from "@/lib/hooks/useProductCategories";
 import { toast } from 'sonner';
 
@@ -21,6 +39,7 @@ import { toast } from 'sonner';
 interface ProductCategory {
     id: string;
     name: string;
+    sortOrder?: number;
     isActive: boolean;
 }
 
@@ -37,6 +56,7 @@ export default function CategoriesBlock({
     const { create: createCategory, loading: createLoading, error: createError } = useCreateCategory();
     const { update: updateCategory, loading: updateLoading, error: updateError } = useUpdateCategory();
     const { delete: deleteCategory, loading: deleteLoading, error: deleteError } = useDeleteCategory();
+    const { updateOrder: updateCategoriesOrder } = useUpdateCategoriesOrder();
 
     /* =============================================
      Local UI State
@@ -45,6 +65,8 @@ export default function CategoriesBlock({
     const [createOpen, setCreateOpen] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [deleteId, setDeleteId] = useState<string | null>(null);
+    const [sortMode, setSortMode] = useState(false);
+    const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
 
     const [createForm, setCreateForm] = useState({ name: "" });
     const [editForm, setEditForm] = useState({
@@ -52,6 +74,28 @@ export default function CategoriesBlock({
         name: "",
         isActive: true,
     });
+
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor)
+    );
+
+    useEffect(() => {
+        const initial = [...categories]
+            .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+            .map((c) => c.id);
+        setCategoryOrder(initial);
+    }, [categories]);
+
+    const orderedCategories = useMemo(() => {
+        if (categoryOrder.length === 0) return categories;
+        const orderMap = new Map(categoryOrder.map((id, index) => [id, index]));
+        return [...categories].sort((a, b) => {
+            const aIndex = orderMap.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+            const bIndex = orderMap.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+            return aIndex - bIndex;
+        });
+    }, [categories, categoryOrder]);
 
     /* =============================================
      Handlers
@@ -118,6 +162,34 @@ export default function CategoriesBlock({
         }
     };
 
+    const handleCategoryDragEnd = async (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+
+        const oldIndex = categoryOrder.indexOf(String(active.id));
+        const newIndex = categoryOrder.indexOf(String(over.id));
+        if (oldIndex < 0 || newIndex < 0) return;
+
+        const nextOrder = arrayMove(categoryOrder, oldIndex, newIndex);
+        setCategoryOrder(nextOrder);
+
+        const { success, error } = await updateCategoriesOrder(
+            businessId,
+            nextOrder.map((id, index) => ({
+                id,
+                sortOrder: index,
+            }))
+        );
+
+        if (!success) {
+            toast.error(error || "Failed to save category order");
+            await refetch();
+            return;
+        }
+
+        await refetch();
+    };
+
     /* =============================================
      Render
     ============================================== */
@@ -129,28 +201,47 @@ export default function CategoriesBlock({
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-semibold">Categories</h2>
-                <Button 
-                    variant="primary" 
-                    onClick={() => setCreateOpen(true)}
-                    disabled={createLoading}
-                >
-                    {createLoading ? "Adding..." : "+ Add Category"}
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant={sortMode ? "primary" : "outline"}
+                        onClick={() => setSortMode((prev) => !prev)}
+                    >
+                        {sortMode ? "Done Sorting" : "Sort Categories"}
+                    </Button>
+                    <Button
+                        variant="primary"
+                        onClick={() => setCreateOpen(true)}
+                        disabled={createLoading}
+                    >
+                        {createLoading ? "Adding..." : "+ Add Category"}
+                    </Button>
+                </div>
             </div>
 
             {/* Table */}
-            <Table>
-                <thead>
-                    <tr>
-                        <Th>Name</Th>
-                        <Th>Status</Th>
-                        <Th>Actions</Th>
-                    </tr>
-                </thead>
+            <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleCategoryDragEnd}
+            >
+                <Table>
+                    <thead>
+                        <tr>
+                            {sortMode && <Th></Th>}
+                            <Th>Name</Th>
+                            <Th>Status</Th>
+                            <Th>Actions</Th>
+                        </tr>
+                    </thead>
 
-                <tbody>
-                    {categories.map((c) => (
-                        <tr key={c.id}>
+                    <SortableContext
+                        items={orderedCategories.map((c) => c.id)}
+                        strategy={verticalListSortingStrategy}
+                        disabled={!sortMode}
+                    >
+                    <tbody>
+                    {orderedCategories.map((c) => (
+                        <SortableCategoryRow key={c.id} id={c.id} sortMode={sortMode}>
                             <Td>{c.name}</Td>
                             <Td>
                                 {c.isActive ? (
@@ -182,12 +273,14 @@ export default function CategoriesBlock({
                                     </Button>
                                 </div>
                             </Td>
-                        </tr>
+                        </SortableCategoryRow>
                     ))}
-                </tbody>
-            </Table>
+                    </tbody>
+                    </SortableContext>
+                </Table>
+            </DndContext>
 
-            {categories.length === 0 && (
+            {orderedCategories.length === 0 && (
                 <p className="text-gray-500 text-center py-4">
                     No categories yet.
                 </p>
@@ -302,5 +395,48 @@ export default function CategoriesBlock({
                 </div>
             </Modal>
         </div>
+    );
+}
+
+function SortableCategoryRow({
+    id,
+    sortMode,
+    children,
+}: {
+    id: string;
+    sortMode: boolean;
+    children: React.ReactNode;
+}) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+    };
+
+    return (
+        <tr ref={setNodeRef} style={style} className={isDragging ? "opacity-60" : ""}>
+            {sortMode && (
+                <Td>
+                    <button
+                        type="button"
+                        {...attributes}
+                        {...listeners}
+                        className="inline-flex items-center justify-center rounded border border-violet-500/30 bg-violet-500/10 p-1 text-violet-300 hover:bg-violet-500/20"
+                        aria-label="Reorder category"
+                    >
+                        <GripVertical size={14} />
+                    </button>
+                </Td>
+            )}
+            {children}
+        </tr>
     );
 }

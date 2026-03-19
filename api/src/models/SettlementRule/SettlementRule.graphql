@@ -1,73 +1,65 @@
-enum SettlementRuleType {
-  PERCENTAGE
-  FIXED_PER_ORDER
-  PRODUCT_MARKUP
-  DRIVER_VEHICLE_BONUS
-  CUSTOM
-}
-
 enum SettlementEntityType {
   DRIVER
   BUSINESS
 }
 
+enum SettlementAmountType {
+  FIXED
+  PERCENT
+}
+
 type SettlementRule {
   id: ID!
+  name: String!
   entityType: SettlementEntityType!
-  entityId: String!
-  ruleType: SettlementRuleType!
-  config: JSON!
-  canStackWith: [String!]!
-  priority: Int!
+  direction: SettlementDirection!
+  amountType: SettlementAmountType!
+  amount: Float!
+  appliesTo: String
+  business: Business
+  promotion: Promotion
   isActive: Boolean!
   notes: String
-  activatedAt: String
-  activatedBy: String
   createdAt: String!
   updatedAt: String!
 }
 
-type SettlementRuleSummary {
-  totalRules: Int!
-  activeRules: Int!
-  rulesByType: JSON!
-}
-
 input CreateSettlementRuleInput {
+  name: String!
   entityType: SettlementEntityType!
-  entityId: String!
-  ruleType: SettlementRuleType!
-  config: JSON!
-  canStackWith: [String!]
-  priority: Int
+  direction: SettlementDirection!
+  amountType: SettlementAmountType!
+  amount: Float!
+  appliesTo: String
+  businessId: ID
+  promotionId: ID
   notes: String
 }
 
 input UpdateSettlementRuleInput {
-  config: JSON
-  canStackWith: [String!]
-  priority: Int
+  name: String
+  direction: SettlementDirection
+  amountType: SettlementAmountType
+  amount: Float
+  appliesTo: String
+  isActive: Boolean
   notes: String
 }
 
 input SettlementRuleFilterInput {
   entityType: SettlementEntityType
-  entityId: String
-  ruleType: SettlementRuleType
+  businessId: ID
+  promotionId: ID
   isActive: Boolean
 }
 
 extend type Query {
   settlementRule(id: ID!): SettlementRule
   settlementRules(filter: SettlementRuleFilterInput): [SettlementRule!]!
-  activeRulesForEntity(entityType: SettlementEntityType!, entityId: String!): [SettlementRule!]!
-  settlementRuleSummary(entityType: SettlementEntityType!, entityId: String!): SettlementRuleSummary!
 }
 
 extend type Mutation {
   createSettlementRule(input: CreateSettlementRuleInput!): SettlementRule!
   updateSettlementRule(id: ID!, input: UpdateSettlementRuleInput!): SettlementRule!
-  activateSettlementRule(id: ID!): SettlementRule!
-  deactivateSettlementRule(id: ID!): SettlementRule!
   deleteSettlementRule(id: ID!): Boolean!
 }

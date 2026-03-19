@@ -1,5 +1,10 @@
 # Mobile Overview
 
+<!-- MDS:M1 | Domain: Mobile | Updated: 2026-03-19 -->
+<!-- Depends-On: A1 -->
+<!-- Depended-By: M2, M3, M4, M5, BL2, BL3 -->
+<!-- Nav: App-level architecture changes → update all M* files. Shared pattern changes → review BL2 (Products), BL3 (Cart). -->
+
 ## Apps
 
 This repo contains four React Native / Expo apps with different responsibilities.
@@ -34,6 +39,10 @@ The apps are separate packages, but they share a set of conventions:
 - address management
 - order history and active order tracking
 - store-status banner and store-closed handling
+
+Bottom tab UX now includes an active-tab underline tile using theme primary purple for clearer current-tab state.
+
+`mobile-business` finances now supports business-focused settlement review with filters (period, status, direction, order search) plus per-settlement order item breakdown and commission/net reasoning.
 
 Recent backend-driven store status changes are now exposed through subscription updates, which means banner and store availability UI can react faster.
 

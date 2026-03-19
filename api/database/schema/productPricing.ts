@@ -33,6 +33,7 @@ export const productPricing = pgTable('product_pricing', {
     businessPrice: numeric('business_price', { precision: 10, scale: 2 }).notNull(),
     platformMarkup: numeric('platform_markup', { precision: 10, scale: 2 }).default('0').notNull(),
     baseCustomerPrice: numeric('base_customer_price', { precision: 10, scale: 2 }).notNull(),
+    nightMarkup: numeric('night_markup', { precision: 10, scale: 2 }), // extra markup applied during night hours
     
     // Pricing history for audit trail
     priceHistory: jsonb('price_history').$type<PriceHistoryEntry[]>().default(sql`'[]'::jsonb`).notNull(),

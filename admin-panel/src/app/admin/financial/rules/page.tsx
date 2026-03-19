@@ -1,423 +1,533 @@
-'use client';
+﻿'use client';
 
-import { useState } from 'react';
-import { useQuery, useMutation, gql } from '@apollo/client';
+import { useMemo, useState } from 'react';
+import { gql, useMutation, useQuery } from '@apollo/client';
 import { Button } from '@/components/ui/Button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/Table';
-import { Badge } from '@/components/ui/badge';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/Select';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { useToast } from '@/hooks/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
 
 const GET_SETTLEMENT_RULES = gql`
-  query GetSettlementRules($filter: SettlementRuleFilterInput) {
-    settlementRules(filter: $filter) {
-      id
-      entityType
-      entityId
-      ruleType
-      config
-      canStackWith
-      priority
-      isActive
-      activatedAt
-      activatedBy
-      notes
-      createdAt
-      updatedAt
+    query SettlementRules($filter: SettlementRuleFilterInput) {
+        settlementRules(filter: $filter) {
+            id
+            name
+            entityType
+            direction
+            amountType
+            amount
+            appliesTo
+            business { id name }
+            promotion { id name }
+            isActive
+            notes
+            updatedAt
+        }
     }
-  }
+`;
+
+const GET_BUSINESSES = gql`
+    query BusinessesForSettlementRules {
+        businesses {
+            id
+            name
+        }
+    }
+`;
+
+const GET_PROMOTIONS = gql`
+    query PromotionsForSettlementRules {
+        getAllPromotions(isActive: true) {
+            id
+            name
+            code
+        }
+    }
 `;
 
 const CREATE_SETTLEMENT_RULE = gql`
-  mutation CreateSettlementRule($input: CreateSettlementRuleInput!) {
-    createSettlementRule(input: $input) {
-      id
-      entityType
-      isActive
+    mutation CreateSettlementRule($input: CreateSettlementRuleInput!) {
+        createSettlementRule(input: $input) {
+            id
+        }
     }
-  }
 `;
 
-const ACTIVATE_RULE = gql`
-  mutation ActivateSettlementRule($id: ID!) {
-    activateSettlementRule(id: $id) {
-      id
-      isActive
-      activatedAt
+const UPDATE_SETTLEMENT_RULE = gql`
+    mutation UpdateSettlementRule($id: ID!, $input: UpdateSettlementRuleInput!) {
+        updateSettlementRule(id: $id, input: $input) {
+            id
+            isActive
+        }
     }
-  }
-`;
-
-const DEACTIVATE_RULE = gql`
-  mutation DeactivateSettlementRule($id: ID!) {
-    deactivateSettlementRule(id: $id) {
-      id
-      isActive
-    }
-  }
 `;
 
 const DELETE_RULE = gql`
-  mutation DeleteSettlementRule($id: ID!) {
-    deleteSettlementRule(id: $id)
-  }
+    mutation DeleteSettlementRule($id: ID!) {
+        deleteSettlementRule(id: $id)
+    }
 `;
 
-export default function SettlementRulesPage() {
-  const { toast } = useToast();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [filterType, setFilterType] = useState<string>('all');
-  const [filterActive, setFilterActive] = useState<boolean | null>(null);
+type EntityType = 'BUSINESS' | 'DRIVER';
+type AmountType = 'FIXED' | 'PERCENT';
+type Direction = 'RECEIVABLE' | 'PAYABLE';
 
-  const { data, loading, refetch } = useQuery(GET_SETTLEMENT_RULES, {
-    variables: {
-      filter: {
-        entityType: filterType === 'all' ? null : filterType,
-        isActive: filterActive,
-      },
-    },
-    fetchPolicy: 'cache-and-network',
-  });
+type BusinessOption = { id: string; name: string };
+type PromotionOption = { id: string; name: string; code?: string | null };
 
-  const [createRule] = useMutation(CREATE_SETTLEMENT_RULE, {
-    onCompleted: () => {
-      toast({ title: 'Rule created successfully' });
-      setIsDialogOpen(false);
-      refetch();
-    },
-    onError: (error) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    },
-  });
+type SettlementRule = {
+    id: string;
+    name: string;
+    entityType: EntityType;
+    direction: Direction;
+    amountType: AmountType;
+    amount: number;
+    appliesTo?: string | null;
+    business?: { id: string; name: string } | null;
+    promotion?: { id: string; name: string } | null;
+    isActive: boolean;
+    notes?: string | null;
+    updatedAt: string;
+};
 
-  const [activateRule] = useMutation(ACTIVATE_RULE, {
-    onCompleted: () => {
-      toast({ title: 'Rule activated' });
-      refetch();
-    },
-  });
-
-  const [deactivateRule] = useMutation(DEACTIVATE_RULE, {
-    onCompleted: () => {
-      toast({ title: 'Rule deactivated' });
-      refetch();
-    },
-  });
-
-  const [deleteRule] = useMutation(DELETE_RULE, {
-    onCompleted: () => {
-      toast({ title: 'Rule deleted' });
-      refetch();
-    },
-  });
-
-  const rules = data?.settlementRules || [];
-
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Settlement Rules</CardTitle>
-              <CardDescription>Define commission and payment rules for businesses and drivers</CardDescription>
-            </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>Create Rule</Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Create Settlement Rule</DialogTitle>
-                  <DialogDescription>
-                    Define a new settlement rule for commission calculations
-                  </DialogDescription>
-                </DialogHeader>
-                <CreateRuleForm onSubmit={(values) => createRule({ variables: { input: values } })} />
-              </DialogContent>
-            </Dialog>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {/* Filters */}
-          <div className="flex gap-4 mb-4">
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Entity Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Entities</SelectItem>
-                <SelectItem value="BUSINESS">Business</SelectItem>
-                <SelectItem value="DRIVER">Driver</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={filterActive === null ? 'all' : filterActive ? 'active' : 'inactive'}
-              onValueChange={(v: string) => setFilterActive(v === 'all' ? null : v === 'active')}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" onClick={() => refetch()}>
-              Refresh
-            </Button>
-          </div>
-
-          {/* Table */}
-          <div className="border rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Entity</TableHead>
-                  <TableHead>Rule Type</TableHead>
-                  <TableHead>Configuration</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell colSpan={6}>
-                        <Skeleton className="h-10 w-full" />
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : rules.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
-                      No settlement rules found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  rules.map((rule: any) => (
-                    <TableRow key={rule.id}>
-                      <TableCell>
-                        <div>
-                          <Badge variant="outline">{rule.entityType}</Badge>
-                          <div className="text-xs text-muted-foreground mt-1 font-mono">
-                            {rule.entityId.slice(0, 8)}...
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge>{rule.ruleType}</Badge>
-                      </TableCell>
-                      <TableCell className="max-w-sm">
-                        <div className="text-xs font-mono truncate">
-                          {JSON.stringify(rule.config)}
-                        </div>
-                        {rule.notes && (
-                          <div className="text-xs text-muted-foreground mt-1">{rule.notes}</div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{rule.priority}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {rule.isActive ? (
-                          <Badge variant="default">Active</Badge>
-                        ) : (
-                          <Badge variant="secondary">Inactive</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          {rule.isActive ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => deactivateRule({ variables: { id: rule.id } })}
-                            >
-                              Deactivate
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              onClick={() => activateRule({ variables: { id: rule.id } })}
-                            >
-                              Activate
-                            </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => {
-                              if (confirm('Are you sure you want to delete this rule?')) {
-                                deleteRule({ variables: { id: rule.id } });
-                              }
-                            }}
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
+function formatAmount(rule: SettlementRule): string {
+    if (rule.amountType === 'FIXED') {
+        return `â‚¬${Number(rule.amount).toFixed(2)}`;
+    }
+    const base = rule.appliesTo === 'DELIVERY_FEE' ? 'delivery fee' : 'subtotal';
+    return `${Number(rule.amount)}% of ${base}`;
 }
 
-function CreateRuleForm({ onSubmit }: { onSubmit: (values: any) => void }) {
-  const [entityType, setEntityType] = useState('BUSINESS');
-  const [ruleType, setRuleType] = useState('PERCENTAGE');
-  const [entityId, setEntityId] = useState('');
-  const [priority, setPriority] = useState('100');
-  const [notes, setNotes] = useState('');
-  const [configJson, setConfigJson] = useState('{\n  "percentage": 15,\n  "description": "Platform commission"\n}');
+function formatScope(rule: SettlementRule): string {
+    const parts: string[] = [];
+    if (rule.business) parts.push(rule.business.name);
+    if (rule.promotion) parts.push(`promo: ${rule.promotion.name}`);
+    return parts.length > 0 ? parts.join(', ') : 'Global';
+}
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const config = JSON.parse(configJson);
-      onSubmit({
-        entityType,
-        entityId,
-        ruleType,
-        config,
-        priority: parseInt(priority),
-        notes: notes || null,
-        canStackWith: [],
-      });
-    } catch (error) {
-      alert('Invalid JSON configuration');
-    }
-  };
+export default function SettlementRulesPage() {
+    const { toast } = useToast();
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [activeTab, setActiveTab] = useState<EntityType>('BUSINESS');
 
-  const ruleTemplates: Record<string, string> = {
-    PERCENTAGE: '{\n  "percentage": 15,\n  "description": "15% commission"\n}',
-    FIXED_PER_ORDER: '{\n  "fixedAmount": 5.00,\n  "description": "€5 per order"\n}',
-    PRODUCT_MARKUP: '{\n  "markupPercentage": 20,\n  "categoryIds": []\n}',
-    DRIVER_VEHICLE_BONUS: '{\n  "vehicleType": "MOTORCYCLE",\n  "bonusPerOrder": 2.50\n}',
-    CUSTOM: '{\n  "formula": "custom calculation"\n}',
-  };
+    const { data, loading, refetch } = useQuery(GET_SETTLEMENT_RULES, {
+        variables: { filter: { entityType: activeTab } },
+        fetchPolicy: 'cache-and-network',
+    });
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Entity Type</Label>
-          <Select value={entityType} onValueChange={setEntityType}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="BUSINESS">Business</SelectItem>
-              <SelectItem value="DRIVER">Driver</SelectItem>
-            </SelectContent>
-          </Select>
+    const { data: businessesData } = useQuery(GET_BUSINESSES, { fetchPolicy: 'cache-and-network' });
+    const { data: promotionsData } = useQuery(GET_PROMOTIONS, { fetchPolicy: 'cache-and-network' });
+
+    const [createRule] = useMutation(CREATE_SETTLEMENT_RULE, {
+        onCompleted: () => {
+            toast({ title: 'Settlement rule created' });
+            setIsDialogOpen(false);
+            refetch();
+        },
+        onError: (error) => {
+            toast({ title: 'Failed to create rule', description: error.message, variant: 'destructive' });
+        },
+    });
+
+    const [updateRule] = useMutation(UPDATE_SETTLEMENT_RULE, {
+        onCompleted: () => {
+            toast({ title: 'Rule updated' });
+            refetch();
+        },
+    });
+
+    const [deleteRule] = useMutation(DELETE_RULE, {
+        onCompleted: () => {
+            toast({ title: 'Rule deleted' });
+            refetch();
+        },
+    });
+
+    const rules: SettlementRule[] = useMemo(() => data?.settlementRules ?? [], [data?.settlementRules]);
+    const businesses: BusinessOption[] = useMemo(() => businessesData?.businesses ?? [], [businessesData]);
+    const promotions: PromotionOption[] = useMemo(
+        () => (promotionsData?.getAllPromotions || []).map((p: any) => ({ id: p.id, name: p.name, code: p.code })),
+        [promotionsData],
+    );
+
+    return (
+        <div className="space-y-6 pb-10">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h1 className="text-2xl font-semibold tracking-tight">Settlement Rules</h1>
+                    <p className="text-sm text-muted-foreground">
+                        Configure how settlements are created for each order â€” who owes who and how much.
+                    </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" onClick={() => refetch()}>
+                        Refresh
+                    </Button>
+
+                    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button>Create Rule</Button>
+                        </DialogTrigger>
+                        <DialogContent className="z-[70] max-h-[92vh] max-w-lg overflow-y-auto">
+                            <DialogHeader>
+                                <DialogTitle>Create Settlement Rule</DialogTitle>
+                                <DialogDescription>Define who owes who and how much per order.</DialogDescription>
+                            </DialogHeader>
+
+                            <CreateRuleForm
+                                businesses={businesses}
+                                promotions={promotions}
+                                defaultEntityType={activeTab}
+                                onSubmit={(values) => createRule({ variables: { input: values } })}
+                            />
+                        </DialogContent>
+                    </Dialog>
+                </div>
+            </div>
+
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as EntityType)} className="w-full">
+                <TabsList className="grid w-full max-w-[340px] grid-cols-2">
+                    <TabsTrigger value="BUSINESS">Business</TabsTrigger>
+                    <TabsTrigger value="DRIVER">Driver</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="BUSINESS" className="mt-4">
+                    <RulesTable
+                        loading={loading}
+                        rules={rules}
+                        onToggleActive={(id, isActive) => updateRule({ variables: { id, input: { isActive } } })}
+                        onDelete={(id) => deleteRule({ variables: { id } })}
+                    />
+                </TabsContent>
+
+                <TabsContent value="DRIVER" className="mt-4">
+                    <RulesTable
+                        loading={loading}
+                        rules={rules}
+                        onToggleActive={(id, isActive) => updateRule({ variables: { id, input: { isActive } } })}
+                        onDelete={(id) => deleteRule({ variables: { id } })}
+                    />
+                </TabsContent>
+            </Tabs>
         </div>
-        <div className="space-y-2">
-          <Label>Rule Type</Label>
-          <Select
-            value={ruleType}
-            onValueChange={(v) => {
-              setRuleType(v);
-              setConfigJson(ruleTemplates[v] || ruleTemplates.PERCENTAGE);
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="PERCENTAGE">Percentage</SelectItem>
-              <SelectItem value="FIXED_PER_ORDER">Fixed Per Order</SelectItem>
-              <SelectItem value="PRODUCT_MARKUP">Product Markup</SelectItem>
-              <SelectItem value="DRIVER_VEHICLE_BONUS">Driver Vehicle Bonus</SelectItem>
-              <SelectItem value="CUSTOM">Custom</SelectItem>
-            </SelectContent>
-          </Select>
+    );
+}
+
+function RulesTable({
+    loading,
+    rules,
+    onToggleActive,
+    onDelete,
+}: {
+    loading: boolean;
+    rules: SettlementRule[];
+    onToggleActive: (id: string, isActive: boolean) => void;
+    onDelete: (id: string) => void;
+}) {
+    return (
+        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+            <Table>
+                <TableHeader className="bg-muted/40">
+                    <TableRow>
+                        <TableHead className="w-[22%]">Name</TableHead>
+                        <TableHead className="w-[14%]">Direction</TableHead>
+                        <TableHead className="w-[20%]">Amount</TableHead>
+                        <TableHead className="w-[22%]">Scope</TableHead>
+                        <TableHead className="w-[10%] text-center">Status</TableHead>
+                        <TableHead className="w-[12%] text-right">Actions</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {loading ? (
+                        Array.from({ length: 3 }).map((_, idx) => (
+                            <TableRow key={idx}>
+                                <TableCell colSpan={6}>
+                                    <Skeleton className="h-10 w-full" />
+                                </TableCell>
+                            </TableRow>
+                        ))
+                    ) : rules.length === 0 ? (
+                        <TableRow>
+                            <TableCell colSpan={6} className="text-center text-muted-foreground">
+                                No settlement rules found.
+                            </TableCell>
+                        </TableRow>
+                    ) : (
+                        rules.map((rule) => (
+                            <TableRow key={rule.id}>
+                                <TableCell>
+                                    <div className="font-medium">{rule.name}</div>
+                                    {rule.notes && (
+                                        <div className="mt-0.5 text-xs text-muted-foreground">{rule.notes}</div>
+                                    )}
+                                </TableCell>
+                                <TableCell>
+                                    <span
+                                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                                            rule.direction === 'RECEIVABLE'
+                                                ? 'bg-green-100 text-green-800'
+                                                : 'bg-red-100 text-red-800'
+                                        }`}
+                                    >
+                                        {rule.direction}
+                                    </span>
+                                </TableCell>
+                                <TableCell>{formatAmount(rule)}</TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                    {formatScope(rule)}
+                                </TableCell>
+                                <TableCell className="text-center">
+                                    <span
+                                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                                            rule.isActive
+                                                ? 'bg-green-100 text-green-800'
+                                                : 'bg-gray-100 text-gray-600'
+                                        }`}
+                                    >
+                                        {rule.isActive ? 'Active' : 'Inactive'}
+                                    </span>
+                                </TableCell>
+                                <TableCell>
+                                    <div className="flex justify-end gap-2">
+                                        {rule.isActive ? (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => onToggleActive(rule.id, false)}
+                                            >
+                                                Deactivate
+                                            </Button>
+                                        ) : (
+                                            <Button
+                                                size="sm"
+                                                onClick={() => onToggleActive(rule.id, true)}
+                                            >
+                                                Activate
+                                            </Button>
+                                        )}
+                                        <Button
+                                            size="sm"
+                                            variant="destructive"
+                                            onClick={() => {
+                                                if (confirm('Delete this settlement rule?')) {
+                                                    onDelete(rule.id);
+                                                }
+                                            }}
+                                        >
+                                            Delete
+                                        </Button>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        ))
+                    )}
+                </TableBody>
+            </Table>
         </div>
-      </div>
+    );
+}
 
-      <div className="space-y-2">
-        <Label>Entity ID</Label>
-        <Input
-          placeholder="UUID of business or driver"
-          value={entityId}
-          onChange={(e) => setEntityId(e.target.value)}
-          required
-        />
-      </div>
+function CreateRuleForm({
+    businesses,
+    promotions,
+    defaultEntityType,
+    onSubmit,
+}: {
+    businesses: BusinessOption[];
+    promotions: PromotionOption[];
+    defaultEntityType: EntityType;
+    onSubmit: (values: {
+        name: string;
+        entityType: EntityType;
+        direction: Direction;
+        amountType: AmountType;
+        amount: number;
+        appliesTo?: string | null;
+        businessId?: string | null;
+        promotionId?: string | null;
+        notes?: string | null;
+    }) => void;
+}) {
+    const [name, setName] = useState('');
+    const [entityType, setEntityType] = useState<EntityType>(defaultEntityType);
+    const [direction, setDirection] = useState<Direction>('RECEIVABLE');
+    const [amountType, setAmountType] = useState<AmountType>('PERCENT');
+    const [amount, setAmount] = useState('');
+    const [appliesTo, setAppliesTo] = useState('SUBTOTAL');
+    const [businessId, setBusinessId] = useState('none');
+    const [promotionId, setPromotionId] = useState('none');
+    const [notes, setNotes] = useState('');
 
-      <div className="space-y-2">
-        <Label>Priority</Label>
-        <Input
-          type="number"
-          placeholder="100"
-          value={priority}
-          onChange={(e) => setPriority(e.target.value)}
-          required
-        />
-        <p className="text-xs text-muted-foreground">Higher priority rules execute first</p>
-      </div>
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
 
-      <div className="space-y-2">
-        <Label>Configuration (JSON)</Label>
-        <Textarea
-          placeholder="Rule configuration"
-          value={configJson}
-          onChange={(e) => setConfigJson(e.target.value)}
-          className="font-mono text-sm"
-          rows={8}
-          required
-        />
-      </div>
+        if (!name.trim()) {
+            alert('Name is required.');
+            return;
+        }
 
-      <div className="space-y-2">
-        <Label>Notes (Optional)</Label>
-        <Textarea
-          placeholder="Additional notes about this rule..."
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={2}
-        />
-      </div>
+        const parsedAmount = Number(amount);
+        if (isNaN(parsedAmount) || parsedAmount < 0) {
+            alert('Amount must be a non-negative number.');
+            return;
+        }
 
-      <Button type="submit" className="w-full">
-        Create Rule
-      </Button>
-    </form>
-  );
+        onSubmit({
+            name: name.trim(),
+            entityType,
+            direction,
+            amountType,
+            amount: parsedAmount,
+            appliesTo: amountType === 'PERCENT' ? appliesTo : null,
+            businessId: businessId !== 'none' ? businessId : null,
+            promotionId: promotionId !== 'none' ? promotionId : null,
+            notes: notes || null,
+        });
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+                <Label>Name</Label>
+                <Input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. 10% commission on subtotal"
+                />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                    <Label>Entity Type</Label>
+                    <Select value={entityType} onValueChange={(v) => setEntityType(v as EntityType)}>
+                        <SelectTrigger>
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="z-[80]">
+                            <SelectItem value="BUSINESS">Business</SelectItem>
+                            <SelectItem value="DRIVER">Driver</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                <div className="space-y-2">
+                    <Label>Direction</Label>
+                    <Select value={direction} onValueChange={(v) => setDirection(v as Direction)}>
+                        <SelectTrigger>
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="z-[80]">
+                            <SelectItem value="RECEIVABLE">Receivable (they owe us)</SelectItem>
+                            <SelectItem value="PAYABLE">Payable (we owe them)</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                    <Label>Amount Type</Label>
+                    <Select value={amountType} onValueChange={(v) => setAmountType(v as AmountType)}>
+                        <SelectTrigger>
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="z-[80]">
+                            <SelectItem value="FIXED">Fixed (EUR per order)</SelectItem>
+                            <SelectItem value="PERCENT">Percentage</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                <div className="space-y-2">
+                    <Label>{amountType === 'FIXED' ? 'Amount (EUR)' : 'Percentage (0-100)'}</Label>
+                    <Input
+                        type="number"
+                        step="0.01"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        placeholder={amountType === 'FIXED' ? '2.50' : '10'}
+                    />
+                </div>
+            </div>
+
+            {amountType === 'PERCENT' && (
+                <div className="space-y-2">
+                    <Label>Applies To</Label>
+                    <Select value={appliesTo} onValueChange={setAppliesTo}>
+                        <SelectTrigger>
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="z-[80]">
+                            <SelectItem value="SUBTOTAL">Subtotal (order items total)</SelectItem>
+                            <SelectItem value="DELIVERY_FEE">Delivery Fee</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
+
+            <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                    <Label>Business Scope (Optional)</Label>
+                    <Select value={businessId} onValueChange={setBusinessId}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="All businesses" />
+                        </SelectTrigger>
+                        <SelectContent className="z-[80]">
+                            <SelectItem value="none">All businesses (global)</SelectItem>
+                            {businesses.map((b) => (
+                                <SelectItem key={b.id} value={b.id}>
+                                    {b.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                <div className="space-y-2">
+                    <Label>Promotion Scope (Optional)</Label>
+                    <Select value={promotionId} onValueChange={setPromotionId}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="All promotions" />
+                        </SelectTrigger>
+                        <SelectContent className="z-[80]">
+                            <SelectItem value="none">All promotions (global)</SelectItem>
+                            {promotions.map((p) => (
+                                <SelectItem key={p.id} value={p.id}>
+                                    {p.code ? `${p.name} (${p.code})` : p.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+
+            <div className="space-y-2">
+                <Label>Notes (Optional)</Label>
+                <Textarea
+                    rows={2}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Reason for this rule, contract note, or operational context"
+                />
+            </div>
+
+            <div className="flex justify-end">
+                <Button type="submit">Save Rule</Button>
+            </div>
+        </form>
+    );
 }

@@ -165,6 +165,17 @@ const wsLink = typeof window !== "undefined" ? new GraphQLWsLink(
                         }
                     })();
 
+                // graphql-ws may emit empty error payloads ({}) on reconnect cycles.
+                // Skip logging those to avoid noisy console spam.
+                if (
+                    normalized &&
+                    typeof normalized === 'object' &&
+                    !Array.isArray(normalized) &&
+                    Object.keys(normalized).length === 0
+                ) {
+                    return;
+                }
+
                 console.error('[WS] WebSocket error:', normalized);
             },
         },

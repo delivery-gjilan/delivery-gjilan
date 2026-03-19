@@ -1,6 +1,7 @@
 
 import type { MutationResolvers } from '@/generated/types.generated';
 import { GraphQLError } from 'graphql';
+import { toUserParent } from '../utils/toUserParent';
 
 export const setMyPreferredLanguage: NonNullable<MutationResolvers['setMyPreferredLanguage']> = async (
         _parent,
@@ -25,5 +26,5 @@ export const setMyPreferredLanguage: NonNullable<MutationResolvers['setMyPreferr
                 });
         }
 
-        return updatedUser as any;
+        return toUserParent(updatedUser);
 };

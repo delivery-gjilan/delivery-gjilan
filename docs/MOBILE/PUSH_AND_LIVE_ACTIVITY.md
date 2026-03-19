@@ -1,5 +1,10 @@
 # Push And Live Activity
 
+<!-- MDS:M2 | Domain: Mobile | Updated: 2026-03-18 -->
+<!-- Depends-On: M1, O3, O4 -->
+<!-- Depended-By: M3 -->
+<!-- Nav: Push infra changes → update O3 (Notifications), O4 (Push Audit). Live Activity changes → update M3 (Live Activity Behavior). -->
+
 ## What Exists Today
 
 The repo has one production-shaped push implementation and several partial consumers.

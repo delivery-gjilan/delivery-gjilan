@@ -3,12 +3,19 @@ import { getDB } from '@/database';
 import { storeSettings } from '@/database/schema/storeSettings';
 import { eq } from 'drizzle-orm';
 import { publish, pubsub, topics } from '@/lib/pubsub';
+import { GraphQLError } from 'graphql';
 
 export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus']> = async (
   _parent,
   { input },
-  _ctx
+  ctx
 ) => {
+  if (ctx.role !== 'SUPER_ADMIN') {
+    throw new GraphQLError('Only super admins can update store status', {
+      extensions: { code: 'FORBIDDEN' },
+    });
+  }
+
   const db = await getDB();
 
   // Check if settings row exists

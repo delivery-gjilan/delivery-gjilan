@@ -1,5 +1,10 @@
 # Analytics
 
+<!-- MDS:O11 | Domain: Operations | Updated: 2026-03-18 -->
+<!-- Depends-On: BL1, B2 -->
+<!-- Depended-By: (none) -->
+<!-- Nav: KPI definition changes → review BL1 (Settlements financials), B2 (Order data model). Dashboard phases → review O1 (Monitoring). -->
+
 ## Current State
 
 Most of the KPI backlog is not blocked by missing product ideas. It is blocked by prioritization and packaging.

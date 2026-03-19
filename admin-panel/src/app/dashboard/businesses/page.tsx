@@ -11,6 +11,7 @@ import Modal from "@/components/ui/Modal";
 import { Table, Th, Td } from "@/components/ui/Table";
 import {
     CREATE_BUSINESS,
+    CREATE_BUSINESS_WITH_OWNER,
     DELETE_BUSINESS,
     GET_BUSINESSES,
     UPDATE_BUSINESS,
@@ -64,6 +65,7 @@ export default function BusinessesPage() {
     const { data, loading, refetch } = useQuery<GetBusinessesData>(GET_BUSINESSES);
 
     const [createBusiness] = useMutation(CREATE_BUSINESS);
+    const [createBusinessWithOwner] = useMutation(CREATE_BUSINESS_WITH_OWNER);
     const [updateBusiness] = useMutation(UPDATE_BUSINESS);
     const [deleteBusiness] = useMutation(DELETE_BUSINESS);
 
@@ -95,6 +97,11 @@ export default function BusinessesPage() {
         phoneNumber: "",
         businessType: "RESTAURANT" as BusinessType,
         imageUrl: "",
+        createOwnerNow: true,
+        ownerFirstName: "",
+        ownerLastName: "",
+        ownerEmail: "",
+        ownerPassword: "",
         location: {
             latitude: 0,
             longitude: 0,
@@ -180,6 +187,23 @@ export default function BusinessesPage() {
             return;
         }
 
+        if (createForm.createOwnerNow) {
+            if (
+                !createForm.ownerFirstName.trim() ||
+                !createForm.ownerLastName.trim() ||
+                !createForm.ownerEmail.trim() ||
+                !createForm.ownerPassword
+            ) {
+                toast.warning("Please fill in all owner credential fields");
+                return;
+            }
+
+            if (createForm.ownerPassword.length < 8) {
+                toast.warning("Owner password must be at least 8 characters");
+                return;
+            }
+        }
+
         setUploadingImage(true);
         let imageUrl = createForm.imageUrl;
 
@@ -193,25 +217,45 @@ export default function BusinessesPage() {
 
         setUploadingImage(false);
 
-        await createBusiness({
-            variables: {
-                input: {
-                    name: createForm.name,
-                    phoneNumber: createForm.phoneNumber.trim() || null,
-                    businessType: createForm.businessType as any,
-                    imageUrl: imageUrl || null,
-                    location: {
-                        latitude: createForm.location.latitude,
-                        longitude: createForm.location.longitude,
-                        address: createForm.location.address,
-                    },
-                    workingHours: {
-                        opensAt: createForm.workingHours.opensAt,
-                        closesAt: createForm.workingHours.closesAt,
+        const businessInput = {
+            name: createForm.name,
+            phoneNumber: createForm.phoneNumber.trim() || null,
+            businessType: createForm.businessType as any,
+            imageUrl: imageUrl || null,
+            location: {
+                latitude: createForm.location.latitude,
+                longitude: createForm.location.longitude,
+                address: createForm.location.address,
+            },
+            workingHours: {
+                opensAt: createForm.workingHours.opensAt,
+                closesAt: createForm.workingHours.closesAt,
+            },
+        };
+
+        if (createForm.createOwnerNow) {
+            await createBusinessWithOwner({
+                variables: {
+                    input: {
+                        business: businessInput,
+                        owner: {
+                            email: createForm.ownerEmail.trim(),
+                            password: createForm.ownerPassword,
+                            firstName: createForm.ownerFirstName.trim(),
+                            lastName: createForm.ownerLastName.trim(),
+                        },
                     },
                 },
-            },
-        });
+            });
+            toast.success("Business and owner created successfully");
+        } else {
+            await createBusiness({
+                variables: {
+                    input: businessInput,
+                },
+            });
+            toast.success("Business created successfully");
+        }
 
         await refetch();
         setCreateOpen(false);
@@ -221,6 +265,11 @@ export default function BusinessesPage() {
             phoneNumber: "",
             businessType: "RESTAURANT",
             imageUrl: "",
+            createOwnerNow: true,
+            ownerFirstName: "",
+            ownerLastName: "",
+            ownerEmail: "",
+            ownerPassword: "",
             location: {
                 latitude: 0,
                 longitude: 0,
@@ -493,22 +542,6 @@ export default function BusinessesPage() {
 
                     <div>
                         <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Phone Number
-                        </label>
-                        <Input
-                            placeholder="e.g., +383 44 123 456"
-                            value={createForm.phoneNumber}
-                            onChange={(e) =>
-                                setCreateForm({
-                                    ...createForm,
-                                    phoneNumber: e.target.value,
-                                })
-                            }
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
                             Business Type *
                         </label>
                         <Select
@@ -521,25 +554,78 @@ export default function BusinessesPage() {
                             }
                         >
                             <option value="RESTAURANT">Restaurant</option>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Phone Number
-                        </label>
-                        <Input
-                            placeholder="e.g., +383 44 123 456"
-                            value={editForm.phoneNumber}
-                            onChange={(e) =>
-                                setEditForm({
-                                    ...editForm,
-                                    phoneNumber: e.target.value,
-                                })
-                            }
-                        />
-                    </div>
                             <option value="MARKET">Market</option>
                             <option value="PHARMACY">Pharmacy</option>
                         </Select>
+                    </div>
+
+                    <div className="border-t border-gray-700 pt-4 space-y-3">
+                        <label className="flex items-center gap-2 text-sm text-gray-300">
+                            <input
+                                type="checkbox"
+                                checked={createForm.createOwnerNow}
+                                onChange={(e) =>
+                                    setCreateForm({
+                                        ...createForm,
+                                        createOwnerNow: e.target.checked,
+                                    })
+                                }
+                                className="h-4 w-4"
+                            />
+                            Create business owner now
+                        </label>
+
+                        {createForm.createOwnerNow && (
+                            <div className="space-y-3 rounded-md border border-gray-700 bg-gray-900/40 p-3">
+                                <p className="text-xs text-gray-400">
+                                    Owner account will be created as BUSINESS_OWNER and linked to this business.
+                                </p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Input
+                                        placeholder="Owner first name *"
+                                        value={createForm.ownerFirstName}
+                                        onChange={(e) =>
+                                            setCreateForm({
+                                                ...createForm,
+                                                ownerFirstName: e.target.value,
+                                            })
+                                        }
+                                    />
+                                    <Input
+                                        placeholder="Owner last name *"
+                                        value={createForm.ownerLastName}
+                                        onChange={(e) =>
+                                            setCreateForm({
+                                                ...createForm,
+                                                ownerLastName: e.target.value,
+                                            })
+                                        }
+                                    />
+                                </div>
+                                <Input
+                                    type="email"
+                                    placeholder="Owner email *"
+                                    value={createForm.ownerEmail}
+                                    onChange={(e) =>
+                                        setCreateForm({
+                                            ...createForm,
+                                            ownerEmail: e.target.value,
+                                        })
+                                    }
+                                />
+                                <Input
+                                    type="password"
+                                    placeholder="Owner password * (min 8 chars)"
+                                    value={createForm.ownerPassword}
+                                    onChange={(e) =>
+                                        setCreateForm({
+                                            ...createForm,
+                                            ownerPassword: e.target.value,
+                                        })
+                                    }
+                                />
+                            </div>
+                        )}
                     </div>
 
                     <div>
@@ -680,7 +766,11 @@ export default function BusinessesPage() {
                         onClick={handleCreate}
                         disabled={uploadingImage}
                     >
-                        {uploadingImage ? "Uploading..." : "Create Business"}
+                        {uploadingImage
+                            ? "Uploading..."
+                            : createForm.createOwnerNow
+                                ? "Create Business + Owner"
+                                : "Create Business"}
                     </Button>
                 </div>
             </Modal>

@@ -1,7 +1,7 @@
 export function Table({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-[#111113] border border-[#1e1e22] rounded-xl">
-      <div className="overflow-x-auto">
+    <div className="bg-[#111113] border border-[#1e1e22] rounded-xl overflow-visible">
+      <div className="overflow-x-auto overflow-y-visible">
         <table className="w-full text-left border-collapse">{children}</table>
       </div>
     </div>

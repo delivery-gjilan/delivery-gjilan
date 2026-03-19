@@ -26,7 +26,9 @@ export const products = pgTable(
 
         imageUrl: varchar('image_url', { length: 500 }),
 
-        price: numeric('price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
+        basePrice: numeric('base_price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
+        markupPrice: numeric('markup_price', { mode: 'number', precision: 10, scale: 2 }),
+        nightMarkedupPrice: numeric('night_marked_up_price', { mode: 'number', precision: 10, scale: 2 }),
         isOnSale: boolean('is_on_sale').default(false),
         salePrice: numeric('sale_price', { mode: 'number', precision: 10, scale: 2 }),
 

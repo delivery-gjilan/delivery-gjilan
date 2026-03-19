@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { CartControls } from './CartControls';
+import { getEffectiveProductPrice } from '@/modules/product/utils/pricing';
 
 type ProductCardItem = GetProductsQuery['products'][number];
 
@@ -28,7 +29,7 @@ export function ProductCard({ productCard, businessType }: ProductCardProps) {
         router.push(`/product/${targetProductId}`);
     };
 
-    const effectivePrice = product?.isOnSale && product?.salePrice ? product.salePrice : (productCard.basePrice ?? 0);
+    const effectivePrice = product ? getEffectiveProductPrice(product) : (productCard.basePrice ?? 0);
     const hasDiscount = !!(product?.isOnSale && product?.salePrice);
     const discountPercent =
         hasDiscount && product ? Math.round(((product.price - (product.salePrice ?? 0)) / product.price) * 100) : 0;

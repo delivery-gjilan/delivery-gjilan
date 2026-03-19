@@ -1,7 +1,24 @@
 ﻿"use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useMutation, useQuery } from "@apollo/client/react";
+import {
+    DndContext,
+    closestCenter,
+    type DragEndEvent,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+} from "@dnd-kit/core";
+import {
+    SortableContext,
+    useSortable,
+    verticalListSortingStrategy,
+    arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical } from "lucide-react";
 
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -13,6 +30,7 @@ import {
     useCreateProduct,
     useUpdateProduct,
     useDeleteProduct,
+    useUpdateProductsOrder,
     useCreateProductVariantGroup,
     useDeleteProductVariantGroup,
 } from "@/lib/hooks/useProducts";
@@ -28,6 +46,7 @@ import {
     UPDATE_OPTION_GROUP,
     UPDATE_OPTION,
 } from "@/graphql/operations/products";
+import { useAuth } from "@/lib/auth-context";
 
 /* ===============================================
    TYPES
@@ -52,6 +71,7 @@ interface Product {
     isOnSale: boolean;
     salePrice?: number | null;
     isAvailable: boolean;
+    sortOrder: number;
 }
 
 /* ===============================================
@@ -59,11 +79,14 @@ interface Product {
 =============================================== */
 
 export default function ProductsBlock({ businessId }: { businessId: string }) {
+    const { admin } = useAuth();
+    const isPlatformAdminRole = admin?.role === "SUPER_ADMIN" || admin?.role === "ADMIN";
     const { products, categories, loading, error, refetch } = useProducts(businessId);
     const { subcategories } = useProductSubcategories(businessId);
     const { create: createProduct, loading: createLoading, error: createError } = useCreateProduct();
     const { update: updateProduct, loading: updateLoading, error: updateError } = useUpdateProduct();
     const { delete: deleteProduct, loading: deleteLoading, error: deleteError } = useDeleteProduct();
+    const { updateOrder: updateProductsOrder, loading: updateOrderLoading } = useUpdateProductsOrder();
     const { createVariantGroup, loading: createVariantGroupLoading } = useCreateProductVariantGroup();
     const { deleteVariantGroup } = useDeleteProductVariantGroup();
     const [createOptionGroup] = useMutation(CREATE_OPTION_GROUP);
@@ -89,6 +112,8 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         deleteWholeVariantGroup?: boolean;
     } | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
+    const [sortMode, setSortMode] = useState(false);
+    const [orderByCategory, setOrderByCategory] = useState<Record<string, string[]>>({});
     const [variantModalOpen, setVariantModalOpen] = useState(false);
     const [newVariantGroupName, setNewVariantGroupName] = useState("");
     const [variantGroupError, setVariantGroupError] = useState("");
@@ -111,6 +136,11 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
     const [newOptionByGroup, setNewOptionByGroup] = useState<Record<string, { name: string; extraPrice: number }>>({});
     const [optionGroupDrafts, setOptionGroupDrafts] = useState<Record<string, { name: string; min: number; max: number }>>({});
     const [optionDrafts, setOptionDrafts] = useState<Record<string, { name: string; extraPrice: number }>>({});
+    const [optionsDeleteTarget, setOptionsDeleteTarget] = useState<
+        | { kind: "group"; id: string; name: string }
+        | { kind: "option"; id: string; name: string }
+        | null
+    >(null);
 
     /* ===============================================
      UPLOAD STATE
@@ -204,6 +234,26 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         return Array.from(deduped.values()).sort((a, b) => a.name.localeCompare(b.name));
     }, [products]);
 
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor)
+    );
+
+    useEffect(() => {
+        if (!sortMode) return;
+
+        const nextOrders: Record<string, string[]> = {};
+        categories.forEach((category) => {
+            const items = (grouped[category.id] || [])
+                .slice()
+                .sort((a, b) => a.sortOrder - b.sortOrder)
+                .map((item) => item.id);
+            nextOrders[category.id] = items;
+        });
+
+        setOrderByCategory(nextOrders);
+    }, [categories, grouped, sortMode]);
+
     /* ===============================================
      HANDLERS
     =============================================== */
@@ -280,7 +330,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             categoryId: createForm.categoryId,
             subcategoryId: createForm.subcategoryId || undefined,
             variantGroupId: createForm.variantGroupId || undefined,
-            isOffer: createForm.isOffer,
+            isOffer: isPlatformAdminRole ? createForm.isOffer : false,
             name: createForm.name,
             description: createForm.description || undefined,
             imageUrl: imageUrl || undefined,
@@ -327,6 +377,11 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
     };
 
     const openOptionsModal = (product: Product) => {
+        if (!product.isOffer) {
+            toast.warning("Questions / options are available only for deals/offers.");
+            return;
+        }
+
         setOptionsError("");
         setNewOptionGroupName("");
         setNewOptionGroupMin(0);
@@ -532,6 +587,26 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         }
     };
 
+    const requestDeleteOptionGroup = (id: string, name: string) => {
+        setOptionsDeleteTarget({ kind: "group", id, name });
+    };
+
+    const requestDeleteOption = (id: string, name: string) => {
+        setOptionsDeleteTarget({ kind: "option", id, name });
+    };
+
+    const confirmDeleteOptionEntity = async () => {
+        if (!optionsDeleteTarget) return;
+
+        if (optionsDeleteTarget.kind === "group") {
+            await handleDeleteOptionGroup(optionsDeleteTarget.id);
+        } else {
+            await handleDeleteOption(optionsDeleteTarget.id);
+        }
+
+        setOptionsDeleteTarget(null);
+    };
+
     const handleCreateVariantGroup = async () => {
         if (!newVariantGroupName.trim()) {
             setVariantGroupError("Variant group name is required");
@@ -630,7 +705,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             categoryId: input.categoryId,
             subcategoryId: input.subcategoryId || undefined,
             variantGroupId: input.variantGroupId || undefined,
-            isOffer: input.isOffer,
+            isOffer: isPlatformAdminRole ? input.isOffer : undefined,
             name: input.name,
             description: input.description || undefined,
             imageUrl: imageUrl || undefined,
@@ -666,6 +741,48 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         }
     };
 
+    const toggleSortMode = () => {
+        if (!sortMode) {
+            const initialOrders: Record<string, string[]> = {};
+            categories.forEach((category) => {
+                const items = (grouped[category.id] || [])
+                    .slice()
+                    .sort((a, b) => a.sortOrder - b.sortOrder)
+                    .map((item) => item.id);
+                initialOrders[category.id] = items;
+            });
+            setOrderByCategory(initialOrders);
+        }
+
+        setSortMode((prev) => !prev);
+    };
+
+    const handleDragEnd = async (categoryId: string, event: DragEndEvent) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+
+        const currentOrder = orderByCategory[categoryId] || [];
+        const oldIndex = currentOrder.indexOf(String(active.id));
+        const newIndex = currentOrder.indexOf(String(over.id));
+        if (oldIndex < 0 || newIndex < 0) return;
+
+        const nextOrder = arrayMove(currentOrder, oldIndex, newIndex);
+        setOrderByCategory((prev) => ({
+            ...prev,
+            [categoryId]: nextOrder,
+        }));
+
+        const payload = nextOrder.map((id, index) => ({ id, sortOrder: index }));
+        const result = await updateProductsOrder(businessId, payload);
+        if (!result.success) {
+            toast.error(result.error || "Failed to update product order.");
+            await refetch();
+            return;
+        }
+
+        await refetch();
+    };
+
     /* ===============================================
      RENDER
     =============================================== */
@@ -682,15 +799,29 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-semibold">Products</h2>
-
-                <Button 
-                    variant="primary" 
-                    onClick={() => setCreateOpen(true)}
-                    disabled={createLoading}
-                >
-                    {createLoading ? "Adding..." : "+ Add Product"}
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant={sortMode ? "primary" : "outline"}
+                        onClick={toggleSortMode}
+                        disabled={updateOrderLoading}
+                    >
+                        {sortMode ? "Done Sorting" : "Sort Items"}
+                    </Button>
+                    <Button
+                        variant="primary"
+                        onClick={() => setCreateOpen(true)}
+                        disabled={createLoading}
+                    >
+                        {createLoading ? "Adding..." : "+ Add Product"}
+                    </Button>
+                </div>
             </div>
+
+            {sortMode && (
+                <p className="text-xs text-gray-400 mb-4">
+                    Sorting is applied inside each category. Use arrow controls to move items up or down.
+                </p>
+            )}
 
             {/* SEARCH BAR */}
             <div className="mb-6">
@@ -707,6 +838,17 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
 
             {categories.map((cat) => {
                 const items = grouped[cat.id] || [];
+                const sortedItems = (() => {
+                    if (!sortMode) return items;
+                    const order = orderByCategory[cat.id] || [];
+                    if (order.length === 0) return items;
+                    const orderMap = new Map(order.map((id, index) => [id, index]));
+                    return [...items].sort((a, b) => {
+                        const aOrder = orderMap.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+                        const bOrder = orderMap.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+                        return aOrder - bOrder;
+                    });
+                })();
 
                 return (
                     <div key={cat.id} className="mb-10">
@@ -714,27 +856,38 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                             {cat.name}
                         </h3>
 
-                        {items.length === 0 ? (
+                        {sortedItems.length === 0 ? (
                             <p className="text-gray-500 text-sm">
                                 No products here.
                             </p>
                         ) : (
-                            <Table>
-                                <thead>
-                                    <tr>
-                                        <Th>Image</Th>
-                                        <Th>Name</Th>
-                                        <Th>Subcategory</Th>
-                                        <Th>Price</Th>
-                                        <Th>Sale</Th>
-                                        <Th>Status</Th>
-                                        <Th>Actions</Th>
-                                    </tr>
-                                </thead>
+                            <DndContext
+                                sensors={sensors}
+                                collisionDetection={closestCenter}
+                                onDragEnd={(event) => handleDragEnd(cat.id, event)}
+                            >
+                                <Table>
+                                    <thead>
+                                        <tr>
+                                            {sortMode && <Th></Th>}
+                                            <Th>Image</Th>
+                                            <Th>Name</Th>
+                                            <Th>Subcategory</Th>
+                                            <Th>Price</Th>
+                                            <Th>Sale</Th>
+                                            <Th>Status</Th>
+                                            <Th>Actions</Th>
+                                        </tr>
+                                    </thead>
 
-                                <tbody>
-                                    {items.map((p) => (
-                                        <tr key={p.id}>
+                                    <SortableContext
+                                        items={sortedItems.map((p) => p.id)}
+                                        strategy={verticalListSortingStrategy}
+                                        disabled={!sortMode}
+                                    >
+                                        <tbody>
+                                    {sortedItems.map((p) => (
+                                        <SortableProductRow key={p.id} id={p.id} sortMode={sortMode}>
                                             <Td>
                                                 {p.imageUrl ? (
                                                     <img
@@ -794,13 +947,15 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                         Edit
                                                     </Button>
 
-                                                    <Button
-                                                        variant="outline"
-                                                        className="text-xs px-3"
-                                                        onClick={() => openOptionsModal(p)}
-                                                    >
-                                                        Questions / Options
-                                                    </Button>
+                                                    {p.isOffer && (
+                                                        <Button
+                                                            variant="outline"
+                                                            className="text-xs px-3"
+                                                            onClick={() => openOptionsModal(p)}
+                                                        >
+                                                            Questions / Options
+                                                        </Button>
+                                                    )}
 
                                                     <Button
                                                         variant="danger"
@@ -825,10 +980,12 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                     </Button>
                                                 </div>
                                             </Td>
-                                        </tr>
+                                        </SortableProductRow>
                                     ))}
                                 </tbody>
-                            </Table>
+                                    </SortableContext>
+                                </Table>
+                            </DndContext>
                         )}
                     </div>
                 );
@@ -963,23 +1120,25 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                         />
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            id="createIsOffer"
-                            checked={createForm.isOffer ?? false}
-                            onChange={(e) =>
-                                setCreateForm({
-                                    ...createForm,
-                                    isOffer: e.target.checked,
-                                    variantGroupId: e.target.checked ? undefined : createForm.variantGroupId,
-                                })
-                            }
-                        />
-                        <label htmlFor="createIsOffer" className="text-gray-300">
-                            Create as Deal / Offer
-                        </label>
-                    </div>
+                    {isPlatformAdminRole && (
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id="createIsOffer"
+                                checked={createForm.isOffer ?? false}
+                                onChange={(e) =>
+                                    setCreateForm({
+                                        ...createForm,
+                                        isOffer: e.target.checked,
+                                        variantGroupId: e.target.checked ? undefined : createForm.variantGroupId,
+                                    })
+                                }
+                            />
+                            <label htmlFor="createIsOffer" className="text-gray-300">
+                                Create as Deal / Offer
+                            </label>
+                        </div>
+                    )}
 
                     <div className="flex items-center gap-2">
                         <input
@@ -1067,7 +1226,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                         {uploadingImage ? "Uploading..." : createLoading ? "Saving..." : "Save"}
                     </Button>
 
-                    {createForm.isOffer && (
+                    {isPlatformAdminRole && createForm.isOffer && (
                         <p className="text-xs text-gray-400">
                             Tip: after saving this offer, you can configure option groups and choices in the Options modal.
                         </p>
@@ -1264,23 +1423,25 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                         />
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            id="editIsOffer"
-                            checked={editForm.isOffer ?? false}
-                            onChange={(e) =>
-                                setEditForm({
-                                    ...editForm,
-                                    isOffer: e.target.checked,
-                                    variantGroupId: e.target.checked ? undefined : editForm.variantGroupId,
-                                })
-                            }
-                        />
-                        <label htmlFor="editIsOffer" className="text-gray-300">
-                            Mark as Deal / Offer
-                        </label>
-                    </div>
+                    {isPlatformAdminRole && (
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id="editIsOffer"
+                                checked={editForm.isOffer ?? false}
+                                onChange={(e) =>
+                                    setEditForm({
+                                        ...editForm,
+                                        isOffer: e.target.checked,
+                                        variantGroupId: e.target.checked ? undefined : editForm.variantGroupId,
+                                    })
+                                }
+                            />
+                            <label htmlFor="editIsOffer" className="text-gray-300">
+                                Mark as Deal / Offer
+                            </label>
+                        </div>
+                    )}
 
                     <div className="flex items-center gap-2">
                         <input
@@ -1619,7 +1780,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                 <Button
                                                     variant="danger"
                                                     size="sm"
-                                                    onClick={() => handleDeleteOptionGroup(group.id)}
+                                                    onClick={() => requestDeleteOptionGroup(group.id, group.name)}
                                                     disabled={optionsLoading}
                                                 >
                                                     Delete Group
@@ -1674,7 +1835,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                     <Button
                                                         variant="danger"
                                                         size="sm"
-                                                        onClick={() => handleDeleteOption(opt.id)}
+                                                        onClick={() => requestDeleteOption(opt.id, opt.name)}
                                                         disabled={optionsLoading}
                                                     >
                                                         Delete
@@ -1833,6 +1994,80 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     </div>
                 </div>
             </Modal>
+
+            <Modal
+                isOpen={optionsDeleteTarget !== null}
+                onClose={() => setOptionsDeleteTarget(null)}
+                title={optionsDeleteTarget?.kind === "group" ? "Delete Question" : "Delete Answer"}
+            >
+                <p className="text-gray-300 mb-4">
+                    Are you sure you want to delete <strong>{optionsDeleteTarget?.name}</strong>?
+                </p>
+
+                <div className="flex justify-end gap-3">
+                    <Button
+                        variant="outline"
+                        onClick={() => setOptionsDeleteTarget(null)}
+                        disabled={optionsLoading}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="danger"
+                        onClick={confirmDeleteOptionEntity}
+                        disabled={optionsLoading}
+                    >
+                        {optionsLoading ? "Deleting..." : "Delete"}
+                    </Button>
+                </div>
+            </Modal>
         </div>
+    );
+}
+
+function SortableProductRow({
+    id,
+    sortMode,
+    children,
+}: {
+    id: string;
+    sortMode: boolean;
+    children: React.ReactNode;
+}) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+    };
+
+    return (
+        <tr
+            ref={setNodeRef}
+            style={style}
+            className={isDragging ? "opacity-60" : ""}
+        >
+            {sortMode && (
+                <Td>
+                    <button
+                        type="button"
+                        {...attributes}
+                        {...listeners}
+                        className="inline-flex items-center justify-center rounded border border-violet-500/30 bg-violet-500/10 p-1 text-violet-300 hover:bg-violet-500/20"
+                        aria-label="Reorder product"
+                    >
+                        <GripVertical size={14} />
+                    </button>
+                </Td>
+            )}
+            {children}
+        </tr>
     );
 }

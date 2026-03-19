@@ -27,6 +27,8 @@ export const GET_ORDERS = graphql(`
                 firstName
                 lastName
                 email
+                commissionPercentage
+                commissionPercentage
             }
             dropOffLocation {
                 latitude
@@ -39,6 +41,7 @@ export const GET_ORDERS = graphql(`
                     name
                     phoneNumber
                     businessType
+                    commissionPercentage
                     location {
                         latitude
                         longitude
@@ -87,6 +90,7 @@ export const GET_ORDER = graphql(`
                     name
                     phoneNumber
                     businessType
+                    commissionPercentage
                     location {
                         latitude
                         longitude
@@ -126,6 +130,7 @@ export const GET_ORDERS_BY_STATUS = graphql(`
                     name
                     phoneNumber
                     businessType
+                    commissionPercentage
                     location {
                         latitude
                         longitude

@@ -1,5 +1,10 @@
 # Monitoring
 
+<!-- MDS:O1 | Domain: Operations | Updated: 2026-03-18 -->
+<!-- Depends-On: A1, B4 -->
+<!-- Depended-By: O2 -->
+<!-- Nav: Metrics changes → update O2 (Observability). Watchdog counters → review B4 (Watchdog). Dashboard phases → review O11 (Analytics). -->
+
 ## Current State In This Repo
 
 The repository already has the start of a real monitoring story, but it is still mostly local-development grade.
