@@ -19,6 +19,7 @@ export const USER_ORDERS_UPDATED = graphql(`
             deliveryPrice
             totalPrice
             orderDate
+            updatedAt
             status
             preparationMinutes
             estimatedReadyAt

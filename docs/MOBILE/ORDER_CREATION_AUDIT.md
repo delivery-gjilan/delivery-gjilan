@@ -20,6 +20,8 @@ Scope reviewed:
 6. 2026-03-19: Admin Order Details totals now use `originalPrice` / `originalDeliveryPrice` when present and render explicit discount lines, preventing subtotal confusion on promo-discounted orders.
 7. 2026-03-19: Admin wording updated to `Promotions` / `Delivery Promotion` and backend original-price snapshot persistence now uses `> 0.01` tolerance to avoid false discount indicators from floating precision.
 8. 2026-03-19: Admin Order Details item price cells now fall back to `basePrice` when `unitPrice` is absent, and totals card colors were adjusted (Delivery in amber, Total in green) for clearer visual hierarchy.
+9. 2026-03-19: Mobile active-order tracking now listens for WS reconnect events and force-refetches order queries to recover missed status transitions during temporary real-time disconnects.
+10. 2026-03-19: Mobile `userOrdersUpdated` handling was reconstructed to be subscription-first (direct Apollo cache + Zustand active-order updates from payload), while network refetch remains only as a throttled fallback for reconnect/payload anomalies.
 
 ## Current Behavior
 

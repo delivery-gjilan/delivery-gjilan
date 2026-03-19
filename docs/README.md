@@ -19,6 +19,7 @@ This folder is the curated documentation entrypoint for the monorepo. It sits on
 - [MOBILE/ORDER_CREATION_AUDIT.md](MOBILE/ORDER_CREATION_AUDIT.md) for current mobile checkout/create-order integration gaps
 - [MOBILE/PUSH_AND_LIVE_ACTIVITY.md](MOBILE/PUSH_AND_LIVE_ACTIVITY.md) for push notification plumbing and the current Live Activity state
 - [MOBILE/LIVE_ACTIVITY_BEHAVIOR.md](MOBILE/LIVE_ACTIVITY_BEHAVIOR.md) for Live Activity status/ETA update behavior, compact Dynamic Island UI, and background update guarantees
+- [MOBILE/ORDER_SUBSCRIPTION_SYNC_MB.md](MOBILE/ORDER_SUBSCRIPTION_SYNC_MB.md) for subscription-first active-order syncing rules, cache/store update contract, and fallback refetch triggers
 - [BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS.md](BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS.md) for settlement state, promotion linkage, and financial testing harness
 - [OPERATIONS/NOTIFICATIONS.md](OPERATIONS/NOTIFICATIONS.md) for notification campaigns, admin send flows, and delivery alerts
 - [OPERATIONS/MONITORING.md](OPERATIONS/MONITORING.md) for what is actually monitored today, what is missing, and the recommended production monitoring path

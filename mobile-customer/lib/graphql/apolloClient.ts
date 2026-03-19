@@ -101,6 +101,14 @@ const wsUrl = httpUrl ? httpUrl.replace(/^http/, 'ws') : '';
 // Exponential backoff for reconnection: 1s -> 2s -> 5s -> 10s
 const RECONNECT_DELAYS = [1000, 2000, 5000, 10000];
 let reconnectAttempts = 0;
+const wsReconnectListeners = new Set<() => void>();
+
+export function addWsReconnectListener(listener: () => void): () => void {
+    wsReconnectListeners.add(listener);
+    return () => {
+        wsReconnectListeners.delete(listener);
+    };
+}
 
 const wsLink = wsUrl
     ? new GraphQLWsLink(
@@ -128,6 +136,13 @@ const wsLink = wsUrl
                       if (reconnectAttempts > 0) {
                           console.log(`[WS] Reconnected after ${reconnectAttempts} attempts`);
                           toast.success('Connected', 'Real-time updates restored.');
+                          wsReconnectListeners.forEach((listener) => {
+                              try {
+                                  listener();
+                              } catch (error) {
+                                  console.warn('[WS] Reconnect listener failed', error);
+                              }
+                          });
                       }
                       reconnectAttempts = 0;
                   },

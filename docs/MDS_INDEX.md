@@ -30,6 +30,7 @@
 | M4 | [MOBILE/ORDER_CREATION_AUDIT.md](MOBILE/ORDER_CREATION_AUDIT.md) | Mobile | Checkout gaps, payment collection missing in UI |
 | M5 | [MOBILE/ORDER_INPUT_VARIANT_OFFER_FLOW_SNAPSHOT.md](MOBILE/ORDER_INPUT_VARIANT_OFFER_FLOW_SNAPSHOT.md) | Mobile | CreateOrderInput, variants, offers, options |
 | M6 | [MOBILE/ADMIN_PANEL_MOBILE_REFACTOR_TRACKER.md](MOBILE/ADMIN_PANEL_MOBILE_REFACTOR_TRACKER.md) | Mobile | Admin-panel to mobile parity tracker (business/admin flows) |
+| M7 | [MOBILE/ORDER_SUBSCRIPTION_SYNC_MB.md](MOBILE/ORDER_SUBSCRIPTION_SYNC_MB.md) | Mobile | Subscription-first order sync, cache/store update contract, fallback refetch rules |
 | O1 | [OPERATIONS/MONITORING.md](OPERATIONS/MONITORING.md) | Operations | Health endpoints, Prometheus, Grafana phases |
 | O2 | [OPERATIONS/OBSERVABILITY.md](OPERATIONS/OBSERVABILITY.md) | Operations | Loki, Promtail, structured logging, runbooks |
 | O3 | [OPERATIONS/NOTIFICATIONS.md](OPERATIONS/NOTIFICATIONS.md) | Operations | Query builder, campaigns, payload fields |
@@ -86,6 +87,7 @@ ARCHITECTURE (A1)
 │   │   └── MOBILE/LIVE_ACTIVITY_BEHAVIOR (M3)
 │   ├── MOBILE/ORDER_CREATION_AUDIT (M4) → B2, B6
 │   ├── MOBILE/ORDER_INPUT_VARIANT_OFFER_FLOW_SNAPSHOT (M5)
+│   ├── MOBILE/ORDER_SUBSCRIPTION_SYNC_MB (M7) → A1, BL3
 │   └── BUSINESS_LOGIC/CART_ACTIVE_ORDER_FLOW_RECOMMENDATIONS (BL3)
 │       └── BACKEND/ORDER_CREATION (B2)
 │
@@ -116,7 +118,7 @@ ARCHITECTURE (A1)
 | Order creation flow | B2, B3, BL1 |
 | Cart → checkout → order | BL3, M4, M5 |
 | Payment collection modes | B2, M4, BL1 |
-| Order tracking (realtime) | A1, B4, M3 |
+| Order tracking (realtime) | A1, B4, M3, M7 |
 | Order analytics | O11 |
 
 ### Driver Domain

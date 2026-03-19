@@ -1,9 +1,10 @@
-import { useSubscription } from '@apollo/client/react';
+import { useApolloClient, useSubscription } from '@apollo/client/react';
 import { useEffect, useRef } from 'react';
 import { GET_ORDERS, GET_ORDER } from '@/graphql/operations/orders';
 import { USER_ORDERS_UPDATED } from '@/graphql/operations/orders/subscriptions';
 import { useActiveOrdersStore } from '../store/activeOrdersStore';
 import { useAuthStore } from '@/store/authStore';
+import { addWsReconnectListener } from '@/lib/graphql/apolloClient';
 
 /**
  * Single authoritative subscription for order updates.
@@ -12,78 +13,157 @@ import { useAuthStore } from '@/store/authStore';
  * Subscribes whenever a user is authenticated to avoid stale local state gaps.
  */
 export function useOrdersSubscription() {
+    const apolloClient = useApolloClient();
     const userId = useAuthStore((state) => state.user?.id);
     const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
     const setActiveOrders = useActiveOrdersStore((state) => state.setActiveOrders);
+    const updateOrder = useActiveOrdersStore((state) => state.updateOrder);
+    const removeOrder = useActiveOrdersStore((state) => state.removeOrder);
     const refetchInFlightRef = useRef(false);
     const refetchCooldownRef = useRef(0);
-    const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Always subscribe while authenticated so we can recover from temporary empty
     // local state right after order creation/status transitions.
     const shouldSubscribe = isAuthenticated && Boolean(userId);
 
-    useEffect(() => {
-        return () => {
-            if (pendingTimerRef.current) {
-                clearTimeout(pendingTimerRef.current);
-                pendingTimerRef.current = null;
+    const isActiveStatus = (status?: string | null) => status !== 'DELIVERED' && status !== 'CANCELLED';
+
+    const isActiveOrderForUser = (order: any) =>
+        Boolean(userId) &&
+        String(order?.userId) === String(userId) &&
+        typeof order?.status === 'string' &&
+        isActiveStatus(order.status);
+
+    const runRefetch = async (client: any) => {
+        if (!userId) return;
+        const { data } = await client.query({
+            query: GET_ORDERS,
+            fetchPolicy: 'network-only',
+        });
+        const orders = (data as any)?.orders ?? [];
+        const activeOrders = orders.filter(
+            (order: any) =>
+                order.userId === userId &&
+                order.status !== 'DELIVERED' &&
+                order.status !== 'CANCELLED',
+        );
+        setActiveOrders(activeOrders as unknown as any);
+    };
+
+    const scheduleFallbackRefetch = (client: any, force = false) => {
+        if (!userId) return;
+        if (refetchInFlightRef.current) return;
+
+        const now = Date.now();
+        if (!force && now - refetchCooldownRef.current < 1000) {
+            return;
+        }
+
+        refetchInFlightRef.current = true;
+        refetchCooldownRef.current = now;
+        void runRefetch(client).finally(() => {
+            refetchInFlightRef.current = false;
+        });
+    };
+
+    const applyRealtimeOrderUpdate = (client: any, nextOrder: any) => {
+        if (!nextOrder?.id) {
+            return false;
+        }
+
+        client.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
+            const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
+            const existingIndex = currentOrders.findIndex(
+                (order: any) => String(order?.id) === String(nextOrder.id),
+            );
+
+            let updatedOrders = currentOrders;
+            if (existingIndex >= 0) {
+                updatedOrders = [...currentOrders];
+                updatedOrders[existingIndex] = nextOrder;
+            } else {
+                updatedOrders = [nextOrder, ...currentOrders];
             }
-        };
-    }, []);
+
+            return {
+                ...(existing ?? {}),
+                orders: updatedOrders,
+            };
+        });
+
+        client.cache.writeQuery({
+            query: GET_ORDER,
+            variables: { id: String(nextOrder.id) },
+            data: { order: nextOrder },
+        });
+
+        if (isActiveOrderForUser(nextOrder)) {
+            updateOrder(nextOrder as unknown as any);
+        } else if (String(nextOrder?.userId) === String(userId)) {
+            removeOrder(String(nextOrder.id));
+        }
+
+        return true;
+    };
+
+    const applyRealtimeOrdersSnapshot = (client: any, nextOrders: any[]) => {
+        if (!Array.isArray(nextOrders) || nextOrders.length === 0) {
+            return false;
+        }
+
+        client.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => ({
+            ...(existing ?? {}),
+            orders: nextOrders,
+        }));
+
+        nextOrders.forEach((order) => {
+            if (!order?.id) {
+                return;
+            }
+            client.cache.writeQuery({
+                query: GET_ORDER,
+                variables: { id: String(order.id) },
+                data: { order },
+            });
+        });
+
+        const activeOrders = nextOrders.filter((order) => isActiveOrderForUser(order));
+        setActiveOrders(activeOrders as unknown as any);
+
+        return true;
+    };
 
     const { loading, error } = useSubscription(USER_ORDERS_UPDATED, {
         skip: !shouldSubscribe,
-        onData: ({ client }) => {
-            const now = Date.now();
-            const canRunNow = now - refetchCooldownRef.current >= 1000 && !refetchInFlightRef.current;
+        onData: ({ client, data }) => {
+            const payload = (data?.data as any)?.userOrdersUpdated;
 
-            if (!canRunNow) {
-                if (pendingTimerRef.current) {
-                    return;
+            try {
+                const didApply = Array.isArray(payload)
+                    ? applyRealtimeOrdersSnapshot(client, payload)
+                    : applyRealtimeOrderUpdate(client, payload);
+                if (!didApply) {
+                    scheduleFallbackRefetch(client);
                 }
-                pendingTimerRef.current = setTimeout(() => {
-                    pendingTimerRef.current = null;
-                    if (refetchInFlightRef.current) {
-                        return;
-                    }
-                    refetchInFlightRef.current = true;
-                    refetchCooldownRef.current = Date.now();
-                    client.refetchQueries({ include: [GET_ORDERS, GET_ORDER] }).then((results) => {
-                        const orders = (results[0]?.data as any)?.orders ?? [];
-                        const activeOrders = orders.filter(
-                            (order: any) =>
-                                order.userId === userId &&
-                                order.status !== 'DELIVERED' &&
-                                order.status !== 'CANCELLED',
-                        );
-                        setActiveOrders(activeOrders as unknown as any);
-                    }).finally(() => {
-                        refetchInFlightRef.current = false;
-                    });
-                }, 350);
-                return;
+            } catch (err) {
+                console.warn('[OrdersSubscription] payload apply failed, using fallback refetch', err);
+                scheduleFallbackRefetch(client);
             }
-
-            refetchInFlightRef.current = true;
-            refetchCooldownRef.current = now;
-            client.refetchQueries({ include: [GET_ORDERS, GET_ORDER] }).then((results) => {
-                const orders = (results[0]?.data as any)?.orders ?? [];
-                const activeOrders = orders.filter(
-                    (order: any) => 
-                        order.userId === userId && 
-                        order.status !== 'DELIVERED' && 
-                        order.status !== 'CANCELLED',
-                );
-                setActiveOrders(activeOrders as unknown as any);
-            }).finally(() => {
-                refetchInFlightRef.current = false;
-            });
         },
         onError: (err) => {
             console.error('[OrdersSubscription] error:', err);
         },
     });
+
+    useEffect(() => {
+        if (!shouldSubscribe) {
+            return;
+        }
+
+        return addWsReconnectListener(() => {
+            scheduleFallbackRefetch(apolloClient, true);
+        });
+    }, [apolloClient, shouldSubscribe, userId]);
 
     return {
         subscriptionActive: shouldSubscribe && !loading,
