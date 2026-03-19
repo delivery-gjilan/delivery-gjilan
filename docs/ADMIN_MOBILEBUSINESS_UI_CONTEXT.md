@@ -9,6 +9,7 @@ This document is a fast context handoff for future UI changes across `admin-pane
 
 ## Recent Updates
 
+- 2026-03-19: Replaced per-item category reorder updates with bulk `updateProductCategoriesOrder` mutation (API GraphQL/service/repository/resolver + admin hook/operation) so drag-save is a single request.
 - 2026-03-19: Category sorting persistence moved from localStorage to backend `sortOrder` updates (`api` schema/service/repository + `admin-panel` category mutations/queries + drag-save in `CategoriesBlock`).
 - 2026-03-19: Switched `admin-panel/src/components/businesses/ProductsBlock.tsx` sorting to market-style drag-and-drop with `dnd-kit` handles per category section; fixed invalid icon imports causing compile failures.
 - 2026-03-19: Added drag-and-drop category sorting to `admin-panel/src/components/businesses/CategoriesBlock.tsx` with per-business persisted order in localStorage.

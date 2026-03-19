@@ -24,8 +24,14 @@ input UpdateProductCategoryInput {
     sortOrder: Int
 }
 
+input ProductCategoryOrderInput {
+    id: ID!
+    sortOrder: Int!
+}
+
 type Mutation {
     createProductCategory(input: CreateProductCategoryInput!): ProductCategory!
     updateProductCategory(id: ID!, input: UpdateProductCategoryInput!): ProductCategory!
+    updateProductCategoriesOrder(businessId: ID!, categories: [ProductCategoryOrderInput!]!): Boolean!
     deleteProductCategory(id: ID!): Boolean!
 }

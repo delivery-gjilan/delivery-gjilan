@@ -768,6 +768,7 @@ export type Mutation = {
   updateOrderStatus: Order;
   updatePreparationTime: Order;
   updateProduct: Product;
+  updateProductCategoriesOrder: Scalars['Boolean']['output'];
   updateProductCategory: ProductCategory;
   updateProductSubcategory: ProductSubcategory;
   updateProductsOrder: Scalars['Boolean']['output'];
@@ -1223,6 +1224,12 @@ export type MutationupdateProductArgs = {
 };
 
 
+export type MutationupdateProductCategoriesOrderArgs = {
+  businessId: Scalars['ID']['input'];
+  categories: Array<ProductCategoryOrderInput>;
+};
+
+
 export type MutationupdateProductCategoryArgs = {
   id: Scalars['ID']['input'];
   input: UpdateProductCategoryInput;
@@ -1490,6 +1497,11 @@ export type ProductCategory = {
   name: Scalars['String']['output'];
   sortOrder: Scalars['Int']['output'];
   updatedAt: Scalars['String']['output'];
+};
+
+export type ProductCategoryOrderInput = {
+  id: Scalars['ID']['input'];
+  sortOrder: Scalars['Int']['input'];
 };
 
 export type ProductOrderInput = {
@@ -2619,6 +2631,7 @@ export type ResolversTypes = {
   Product: ResolverTypeWrapper<Product>;
   ProductCard: ResolverTypeWrapper<ProductCard>;
   ProductCategory: ResolverTypeWrapper<ProductCategory>;
+  ProductCategoryOrderInput: ProductCategoryOrderInput;
   ProductOrderInput: ProductOrderInput;
   ProductSubcategory: ResolverTypeWrapper<ProductSubcategory>;
   ProductVariantGroup: ResolverTypeWrapper<ProductVariantGroup>;
@@ -2767,6 +2780,7 @@ export type ResolversParentTypes = {
   Product: Product;
   ProductCard: ProductCard;
   ProductCategory: ProductCategory;
+  ProductCategoryOrderInput: ProductCategoryOrderInput;
   ProductOrderInput: ProductOrderInput;
   ProductSubcategory: ProductSubcategory;
   ProductVariantGroup: ProductVariantGroup;
@@ -3206,6 +3220,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   updateOrderStatus?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationupdateOrderStatusArgs, 'id' | 'status'>>;
   updatePreparationTime?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationupdatePreparationTimeArgs, 'id' | 'preparationMinutes'>>;
   updateProduct?: Resolver<ResolversTypes['Product'], ParentType, ContextType, RequireFields<MutationupdateProductArgs, 'id' | 'input'>>;
+  updateProductCategoriesOrder?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationupdateProductCategoriesOrderArgs, 'businessId' | 'categories'>>;
   updateProductCategory?: Resolver<ResolversTypes['ProductCategory'], ParentType, ContextType, RequireFields<MutationupdateProductCategoryArgs, 'id' | 'input'>>;
   updateProductSubcategory?: Resolver<ResolversTypes['ProductSubcategory'], ParentType, ContextType, RequireFields<MutationupdateProductSubcategoryArgs, 'id' | 'input'>>;
   updateProductsOrder?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationupdateProductsOrderArgs, 'businessId' | 'products'>>;

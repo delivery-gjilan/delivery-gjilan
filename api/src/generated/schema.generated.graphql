@@ -775,6 +775,7 @@ type Mutation {
   updateOrderStatus(id: ID!, status: OrderStatus!): Order!
   updatePreparationTime(id: ID!, preparationMinutes: Int!): Order!
   updateProduct(id: ID!, input: UpdateProductInput!): Product!
+  updateProductCategoriesOrder(businessId: ID!, categories: [ProductCategoryOrderInput!]!): Boolean!
   updateProductCategory(id: ID!, input: UpdateProductCategoryInput!): ProductCategory!
   updateProductSubcategory(id: ID!, input: UpdateProductSubcategoryInput!): ProductSubcategory!
   updateProductsOrder(businessId: ID!, products: [ProductOrderInput!]!): Boolean!
@@ -984,6 +985,11 @@ type ProductCategory {
   name: String!
   sortOrder: Int!
   updatedAt: String!
+}
+
+input ProductCategoryOrderInput {
+  id: ID!
+  sortOrder: Int!
 }
 
 input ProductOrderInput {

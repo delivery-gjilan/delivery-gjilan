@@ -1,9 +1,17 @@
 import { ProductCategoryRepository } from '@/repositories/ProductCategoryRepository';
-import { ProductCategory, CreateProductCategoryInput, UpdateProductCategoryInput } from '@/generated/types.generated';
+import {
+    ProductCategory,
+    CreateProductCategoryInput,
+    UpdateProductCategoryInput,
+    ProductCategoryOrderInput,
+} from '@/generated/types.generated';
 import { productCategoryValidator } from '@/validators/ProductCategoryValidator';
 import { DbProductCategory } from '@/database/schema/productCategories';
 import { AppError } from '@/lib/errors';
 import { cache } from '@/lib/cache';
+import logger from '@/lib/logger';
+
+const log = logger.child({ service: 'ProductCategoryService' });
 
 export class ProductCategoryService {
     constructor(private productCategoryRepository: ProductCategoryRepository) {}
@@ -64,5 +72,19 @@ export class ProductCategoryService {
 
     async deleteProductCategory(id: string): Promise<boolean> {
         return this.productCategoryRepository.delete(id);
+    }
+
+    async updateProductCategoriesOrder(
+        businessId: string,
+        categories: ProductCategoryOrderInput[],
+    ): Promise<boolean> {
+        try {
+            const validatedCategories = productCategoryValidator.validateCategoryOrderList(categories);
+            await this.productCategoryRepository.updateCategoriesOrder(businessId, validatedCategories);
+            return true;
+        } catch (error) {
+            log.error({ err: error, businessId }, 'productCategory:updateOrder:error');
+            return false;
+        }
     }
 }

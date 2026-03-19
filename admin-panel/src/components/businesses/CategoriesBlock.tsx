@@ -28,6 +28,7 @@ import {
     useCreateCategory,
     useUpdateCategory,
     useDeleteCategory,
+    useUpdateCategoriesOrder,
 } from "@/lib/hooks/useProductCategories";
 import { toast } from 'sonner';
 
@@ -55,6 +56,7 @@ export default function CategoriesBlock({
     const { create: createCategory, loading: createLoading, error: createError } = useCreateCategory();
     const { update: updateCategory, loading: updateLoading, error: updateError } = useUpdateCategory();
     const { delete: deleteCategory, loading: deleteLoading, error: deleteError } = useDeleteCategory();
+    const { updateOrder: updateCategoriesOrder } = useUpdateCategoriesOrder();
 
     /* =============================================
      Local UI State
@@ -171,17 +173,16 @@ export default function CategoriesBlock({
         const nextOrder = arrayMove(categoryOrder, oldIndex, newIndex);
         setCategoryOrder(nextOrder);
 
-        const updates = await Promise.all(
-            nextOrder.map((id, index) =>
-                updateCategory(id, {
-                    sortOrder: index,
-                })
-            )
+        const { success, error } = await updateCategoriesOrder(
+            businessId,
+            nextOrder.map((id, index) => ({
+                id,
+                sortOrder: index,
+            }))
         );
 
-        const failed = updates.find((result) => !result.success);
-        if (failed) {
-            toast.error(failed.error || "Failed to save category order");
+        if (!success) {
+            toast.error(error || "Failed to save category order");
             await refetch();
             return;
         }

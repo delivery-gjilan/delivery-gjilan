@@ -25,6 +25,15 @@ export const UPDATE_CATEGORY = graphql(`
     }
 `);
 
+export const UPDATE_CATEGORIES_ORDER = graphql(`
+    mutation UpdateProductCategoriesOrder(
+        $businessId: ID!
+        $categories: [ProductCategoryOrderInput!]!
+    ) {
+        updateProductCategoriesOrder(businessId: $businessId, categories: $categories)
+    }
+`);
+
 export const DELETE_CATEGORY = graphql(`
     mutation DeleteProductCategory($id: ID!) {
         deleteProductCategory(id: $id)

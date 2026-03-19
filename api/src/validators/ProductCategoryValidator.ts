@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { CreateProductCategoryInput, UpdateProductCategoryInput } from '@/generated/types.generated';
+import {
+    CreateProductCategoryInput,
+    UpdateProductCategoryInput,
+    ProductCategoryOrderInput,
+} from '@/generated/types.generated';
 import { AppError } from '@/lib/errors';
 
 const createProductCategorySchema = z.object({
@@ -14,6 +18,13 @@ const updateProductCategorySchema = z.object({
     sortOrder: z.number().int().min(0).optional(),
 });
 
+const productCategoryOrderSchema = z.object({
+    id: z.string().uuid('Invalid Category ID'),
+    sortOrder: z.number().int().min(0),
+});
+
+const categoryOrderListSchema = z.array(productCategoryOrderSchema).min(1, 'At least one category is required');
+
 export class ProductCategoryValidator {
     validateCreateProductCategory(input: CreateProductCategoryInput) {
         const result = createProductCategorySchema.safeParse(input);
@@ -25,6 +36,14 @@ export class ProductCategoryValidator {
 
     validateUpdateProductCategory(input: UpdateProductCategoryInput) {
         const result = updateProductCategorySchema.safeParse(input);
+        if (!result.success) {
+            throw AppError.fromZodError(result.error);
+        }
+        return result.data;
+    }
+
+    validateCategoryOrderList(input: ProductCategoryOrderInput[]) {
+        const result = categoryOrderListSchema.safeParse(input);
         if (!result.success) {
             throw AppError.fromZodError(result.error);
         }
