@@ -16,7 +16,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "deliveryapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.zippdelivery.mobiledriver",
@@ -75,7 +75,7 @@
       [
         "@rnmapbox/maps",
         {
-          "RNMapboxMapsVersion": "10.1.39"
+          "RNMapboxMapsVersion": "11.11.0"
         }
       ],
       [
@@ -90,7 +90,7 @@
         "@badatgil/expo-mapbox-navigation",
         {
           "accessToken": "pk.eyJ1IjoiYXJ0c2hhYmFuaTIwMDIiLCJhIjoiY21sZjlkbTNxMDIwOTNkc2F0cTZkYmZoeiJ9.C81uu49ST5NrfHZ58N9EXg",
-          "mapboxMapsVersion": "10.1.39"
+          "mapboxMapsVersion": "11.11.0"
         }
       ],
       [

@@ -60,7 +60,8 @@
             "backgroundColor": "#0f172a"
           }
         }
-      ]
+      ],
+      "./plugins/with-modular-headers"
     ],
     "experiments": {
       "typedRoutes": true,

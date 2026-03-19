@@ -38,7 +38,8 @@
         {
           "color": "#0b89a9"
         }
-      ]
+      ],
+      "./plugins/with-modular-headers"
     ],
     "experiments": {
       "typedRoutes": true
