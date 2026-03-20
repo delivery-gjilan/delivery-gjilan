@@ -17,6 +17,8 @@ type Business {
     schedule: [BusinessDayHours!]!
     avgPrepTimeMinutes: Int!
     prepTimeOverrideMinutes: Int
+    isTemporarilyClosed: Boolean!
+    temporaryClosureReason: String
     commissionPercentage: Float!
     isOpen: Boolean!
     activePromotion: BusinessPromotion
@@ -76,6 +78,8 @@ input UpdateBusinessInput {
     isActive: Boolean
     avgPrepTimeMinutes: Int
     prepTimeOverrideMinutes: Int
+    isTemporarilyClosed: Boolean
+    temporaryClosureReason: String
     commissionPercentage: Float
 }
 

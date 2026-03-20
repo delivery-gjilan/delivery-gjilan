@@ -183,11 +183,13 @@ export type Business = {
   imageUrl?: Maybe<Scalars['String']['output']>;
   isActive: Scalars['Boolean']['output'];
   isOpen: Scalars['Boolean']['output'];
+  isTemporarilyClosed: Scalars['Boolean']['output'];
   location: Location;
   name: Scalars['String']['output'];
   phoneNumber?: Maybe<Scalars['String']['output']>;
   prepTimeOverrideMinutes?: Maybe<Scalars['Int']['output']>;
   schedule: Array<BusinessDayHours>;
+  temporaryClosureReason?: Maybe<Scalars['String']['output']>;
   updatedAt: Scalars['Date']['output'];
   workingHours: WorkingHours;
 };
@@ -2309,10 +2311,12 @@ export type UpdateBusinessInput = {
   description?: InputMaybe<Scalars['String']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  isTemporarilyClosed?: InputMaybe<Scalars['Boolean']['input']>;
   location?: InputMaybe<LocationInput>;
   name?: InputMaybe<Scalars['String']['input']>;
   phoneNumber?: InputMaybe<Scalars['String']['input']>;
   prepTimeOverrideMinutes?: InputMaybe<Scalars['Int']['input']>;
+  temporaryClosureReason?: InputMaybe<Scalars['String']['input']>;
   workingHours?: InputMaybe<WorkingHoursInput>;
 };
 
@@ -3018,11 +3022,13 @@ export type BusinessResolvers<ContextType = GraphQLContext, ParentType extends R
   imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   isActive?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   isOpen?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  isTemporarilyClosed?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   location?: Resolver<ResolversTypes['Location'], ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   phoneNumber?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   prepTimeOverrideMinutes?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
   schedule?: Resolver<Array<ResolversTypes['BusinessDayHours']>, ParentType, ContextType>;
+  temporaryClosureReason?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
   workingHours?: Resolver<ResolversTypes['WorkingHours'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;

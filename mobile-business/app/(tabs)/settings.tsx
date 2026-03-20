@@ -291,6 +291,15 @@ export default function SettingsScreen() {
                     />
                 </SettingSection>
 
+                <SettingSection title={t('finances.settlements', 'Settlements')}>
+                    <SettingRow
+                        icon="document-text"
+                        label={t('finances.settlement_request_history', 'Settlement Request History')}
+                        value={t('settings.settlement_history_hint', 'Business ↔ platform settlement records')}
+                        onPress={() => router.push('/(tabs)/settlement-history' as any)}
+                    />
+                </SettingSection>
+
                 <SettingSection title={t('settings.notifications', 'Notifications')}>
                     <SettingRow
                         icon="notifications"

@@ -24,6 +24,8 @@ export const businesses = pgTable('businesses', {
     closesAt: integer('closes_at').notNull(),
     avgPrepTimeMinutes: integer('avg_prep_time_minutes').notNull().default(20),
     prepTimeOverrideMinutes: integer('prep_time_override_minutes'),
+    isTemporarilyClosed: boolean('is_temporarily_closed').notNull().default(false),
+    temporaryClosureReason: varchar('temporary_closure_reason', { length: 500 }),
     commissionPercentage: numeric('commission_percentage', { precision: 5, scale: 2 }).default('0').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
         .default(sql`CURRENT_TIMESTAMP`)

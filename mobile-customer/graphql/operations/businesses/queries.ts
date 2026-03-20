@@ -11,6 +11,8 @@ export const GET_BUSINESSES = graphql(`
             isActive
             avgPrepTimeMinutes
             prepTimeOverrideMinutes
+            isTemporarilyClosed
+            temporaryClosureReason
             location {
                 latitude
                 longitude
@@ -51,6 +53,8 @@ export const GET_BUSINESS = graphql(`
             isActive
             avgPrepTimeMinutes
             prepTimeOverrideMinutes
+            isTemporarilyClosed
+            temporaryClosureReason
             location {
                 latitude
                 longitude

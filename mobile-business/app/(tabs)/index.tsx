@@ -21,6 +21,10 @@ import {
     START_PREPARING,
     ORDERS_SUBSCRIPTION,
 } from '@/graphql/orders';
+import {
+    GET_BUSINESS_OPERATIONS,
+    UPDATE_BUSINESS_OPERATIONS,
+} from '@/graphql/business';
 import { useAuthStore } from '@/store/authStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import * as Haptics from 'expo-haptics';
@@ -128,6 +132,8 @@ const ETA_OPTIONS = [
     { label: '45 min', value: 45 },
 ];
 
+const PREP_PRESET_OPTIONS = [10, 15, 20, 25, 30, 45];
+
 function timeAgo(dateStr: string): string {
     const now = new Date();
     const date = new Date(dateStr);
@@ -172,10 +178,17 @@ export default function OrdersScreen() {
     const [selectedEta, setSelectedEta] = useState(10);
     const [customEta, setCustomEta] = useState('');
     const [tick, setTick] = useState(0);
+    const [expandedOrderIds, setExpandedOrderIds] = useState<Set<string>>(new Set());
+    const [storeCloseModalVisible, setStoreCloseModalVisible] = useState(false);
+    const [closingReason, setClosingReason] = useState('');
+    const [prepModalVisible, setPrepModalVisible] = useState(false);
+    const [selectedPrepTime, setSelectedPrepTime] = useState(20);
+    const [customPrepTime, setCustomPrepTime] = useState('');
     const lastTapRef = useRef<Record<string, number>>({});
     const pendingOrderIdsRef = useRef<Set<string>>(new Set());
     const { width } = useWindowDimensions();
     const isTablet = width >= 768;
+    const businessId = user?.businessId ?? '';
 
     // Tick every 1s to keep elapsed timers fresh
     useEffect(() => {
@@ -184,6 +197,11 @@ export default function OrdersScreen() {
     }, []);
 
     const { data, loading, refetch } = useQuery(GET_BUSINESS_ORDERS);
+    const { data: businessData, refetch: refetchBusinessOperations } = useQuery(GET_BUSINESS_OPERATIONS, {
+        variables: { id: businessId },
+        skip: !businessId,
+        fetchPolicy: 'network-only',
+    });
     const refetchCooldownRef = useRef(0);
     const refetchInFlightRef = useRef(false);
     const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -260,6 +278,12 @@ export default function OrdersScreen() {
 
     const [updateStatus] = useMutation(UPDATE_ORDER_STATUS);
     const [startPreparing, { loading: startingPrep }] = useMutation(START_PREPARING);
+    const [updateBusinessOperations, { loading: updatingBusinessOps }] = useMutation(UPDATE_BUSINESS_OPERATIONS);
+
+    const businessOps = businessData?.business;
+    const isStoreClosed = Boolean(businessOps?.isTemporarilyClosed);
+    const storeCloseReason = businessOps?.temporaryClosureReason ?? '';
+    const avgPrepTime = businessOps?.avgPrepTimeMinutes ?? 20;
 
     // Show only upcoming orders for this business.
     const businessOrders = ((data?.orders as unknown as Order[]) || []).filter((order: any) => {
@@ -406,11 +430,93 @@ export default function OrdersScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     };
 
+    const handleOpenStore = async () => {
+        if (!businessId) return;
+        try {
+            await updateBusinessOperations({
+                variables: {
+                    id: businessId,
+                    input: {
+                        isTemporarilyClosed: false,
+                        temporaryClosureReason: null,
+                    },
+                },
+            });
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            await refetchBusinessOperations();
+        } catch (error: any) {
+            Alert.alert(t('common.error', 'Error'), error?.message ?? 'Failed to open store');
+        }
+    };
+
+    const handleCloseStore = async () => {
+        if (!businessId) return;
+        const reason = closingReason.trim();
+        if (!reason) {
+            Alert.alert(t('common.error', 'Error'), t('orders.close_reason_required', 'Please enter a closure reason.'));
+            return;
+        }
+        try {
+            await updateBusinessOperations({
+                variables: {
+                    id: businessId,
+                    input: {
+                        isTemporarilyClosed: true,
+                        temporaryClosureReason: reason,
+                    },
+                },
+            });
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            setStoreCloseModalVisible(false);
+            setClosingReason('');
+            await refetchBusinessOperations();
+        } catch (error: any) {
+            Alert.alert(t('common.error', 'Error'), error?.message ?? 'Failed to close store');
+        }
+    };
+
+    const handleSaveAvgPrepTime = async () => {
+        if (!businessId) return;
+        const customValue = customPrepTime.trim() ? Number(customPrepTime.trim()) : NaN;
+        const finalValue = Number.isFinite(customValue) && customValue > 0 ? customValue : selectedPrepTime;
+        if (!Number.isFinite(finalValue) || finalValue < 1 || finalValue > 240) {
+            Alert.alert(t('common.error', 'Error'), t('orders.invalid_prep_time', 'Preparation time must be between 1 and 240 minutes.'));
+            return;
+        }
+        try {
+            await updateBusinessOperations({
+                variables: {
+                    id: businessId,
+                    input: {
+                        avgPrepTimeMinutes: Math.round(finalValue),
+                    },
+                },
+            });
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            setPrepModalVisible(false);
+            setCustomPrepTime('');
+            await refetchBusinessOperations();
+        } catch (error: any) {
+            Alert.alert(t('common.error', 'Error'), error?.message ?? 'Failed to update prep time');
+        }
+    };
+
+    const toggleExpandedItems = (orderId: string) => {
+        setExpandedOrderIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(orderId)) {
+                next.delete(orderId);
+            } else {
+                next.add(orderId);
+            }
+            return next;
+        });
+    };
+
     const renderOrderCard = ({ item: order }: { item: Order }) => {
         const businessOrder = order.businesses.find((b) => b.business.id === user?.businessId);
         if (!businessOrder) return null;
 
-        const totalItems = businessOrder.items.reduce((sum, i) => sum + i.quantity, 0);
         const businessSubtotal = businessOrder.items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
         const isPending = order.status === 'PENDING';
         const isPreparing = order.status === 'PREPARING';
@@ -418,6 +524,13 @@ export default function OrdersScreen() {
         const showHeaderTimer = isPending || isReady;
         const canAct = isPending || isPreparing;
         const pendingBlinkOn = isPending && tick % 2 === 0;
+        const maxCollapsedItems = 5;
+        const isExpanded = expandedOrderIds.has(order.id);
+        const shouldCollapseItems = businessOrder.items.length > maxCollapsedItems;
+        const visibleItems = shouldCollapseItems && !isExpanded
+            ? businessOrder.items.slice(0, maxCollapsedItems)
+            : businessOrder.items;
+        const hiddenItemsCount = businessOrder.items.length - visibleItems.length;
 
         const elapsedText =
             (order.status === 'PENDING' && getElapsedTime(order.orderDate)) ||
@@ -544,7 +657,7 @@ export default function OrdersScreen() {
 
                     {/* ── Items - Compact ── */}
                     <View className="px-3 pb-2">
-                        {businessOrder.items.map((item, index) => (
+                        {visibleItems.map((item, index) => (
                             <View key={index} className="py-2">
                                 <View className="flex-row items-start">
                                     <View
@@ -585,7 +698,7 @@ export default function OrdersScreen() {
                                     </View>
                                 </View>
 
-                                {index < businessOrder.items.length - 1 && (
+                                {index < visibleItems.length - 1 && (
                                     <View
                                         className="mt-2 h-px w-full"
                                         style={{ backgroundColor: 'rgba(255,255,255,0.45)' }}
@@ -593,6 +706,26 @@ export default function OrdersScreen() {
                                 )}
                             </View>
                         ))}
+
+                        {shouldCollapseItems && (
+                            <TouchableOpacity
+                                className="mt-1 mb-1 self-start flex-row items-center"
+                                onPress={() => toggleExpandedItems(order.id)}
+                                activeOpacity={0.8}
+                            >
+                                <Text className="text-white font-bold text-sm">
+                                    {isExpanded
+                                        ? t('orders.show_less_items', 'Show less')
+                                        : t('orders.show_all_items', 'Show all')} {hiddenItemsCount > 0 ? `(${hiddenItemsCount} ${t('orders.more_items', 'more')})` : ''}
+                                </Text>
+                                <Ionicons
+                                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                                    size={16}
+                                    color="#ffffff"
+                                    style={{ marginLeft: 4 }}
+                                />
+                            </TouchableOpacity>
+                        )}
                     </View>
 
                     {/* ── Total - Compact ── */}
@@ -640,6 +773,74 @@ export default function OrdersScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+
+            {/* ── Operations Bar (Option A) ── */}
+            <View className="px-3 pt-2 pb-1">
+                <View className="flex-row items-center gap-2">
+                    <TouchableOpacity
+                        className="flex-1 rounded-xl px-3 py-2.5 border"
+                        style={{
+                            backgroundColor: isStoreClosed ? '#ef444420' : '#10b98120',
+                            borderColor: isStoreClosed ? '#ef444455' : '#10b98155',
+                        }}
+                        onPress={() => {
+                            if (isStoreClosed) {
+                                handleOpenStore();
+                            } else {
+                                setClosingReason(storeCloseReason);
+                                setStoreCloseModalVisible(true);
+                            }
+                        }}
+                        disabled={updatingBusinessOps}
+                    >
+                        <View className="flex-row items-center justify-between">
+                            <View className="flex-row items-center">
+                                <Ionicons
+                                    name={isStoreClosed ? 'close-circle' : 'checkmark-circle'}
+                                    size={16}
+                                    color={isStoreClosed ? '#ef4444' : '#10b981'}
+                                />
+                                <Text
+                                    className="font-bold text-sm ml-1.5"
+                                    style={{ color: isStoreClosed ? '#ef4444' : '#10b981' }}
+                                >
+                                    {isStoreClosed
+                                        ? t('orders.store_closed', 'Store Closed')
+                                        : t('orders.store_open', 'Store Open')}
+                                </Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={15} color="#cbd5e1" />
+                        </View>
+                        {isStoreClosed && storeCloseReason ? (
+                            <Text className="text-xs text-white/85 mt-1" numberOfLines={1}>
+                                {storeCloseReason}
+                            </Text>
+                        ) : null}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        className="rounded-xl px-3 py-2.5 border"
+                        style={{
+                            minWidth: 132,
+                            backgroundColor: '#3b82f620',
+                            borderColor: '#3b82f655',
+                        }}
+                        onPress={() => {
+                            setSelectedPrepTime(avgPrepTime);
+                            setCustomPrepTime('');
+                            setPrepModalVisible(true);
+                        }}
+                        disabled={updatingBusinessOps}
+                    >
+                        <View className="flex-row items-center justify-center">
+                            <Ionicons name="timer-outline" size={15} color="#60a5fa" />
+                            <Text className="text-[#60a5fa] font-bold text-sm ml-1.5">
+                                {t('orders.avg_prep', 'Avg Prep')} {avgPrepTime}m
+                            </Text>
+                        </View>
+                    </TouchableOpacity>
+                </View>
+            </View>
 
             {/* ── Orders List ── */}
             {loading && !data ? (
@@ -785,6 +986,160 @@ export default function OrdersScreen() {
                                             Accept — {(customEta.trim() ? customEta : String(selectedEta))} min
                                         </Text>
                                     </>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </Pressable>
+                </Pressable>
+            </Modal>
+
+            {/* ── Close Store Modal ── */}
+            <Modal
+                visible={storeCloseModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setStoreCloseModalVisible(false)}
+            >
+                <Pressable
+                    className="flex-1 items-center justify-center"
+                    style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
+                    onPress={() => setStoreCloseModalVisible(false)}
+                >
+                    <Pressable
+                        className="bg-card rounded-3xl overflow-hidden"
+                        style={{ width: '92%', maxWidth: 560 }}
+                        onPress={(e) => e.stopPropagation()}
+                    >
+                        <View className="p-5 border-b border-gray-700">
+                            <Text className="text-text font-bold text-xl">
+                                {t('orders.close_store', 'Close Store')}
+                            </Text>
+                            <Text className="text-subtext mt-1">
+                                {t('orders.close_store_hint', 'Customers will see your store as closed until you reopen it.')}
+                            </Text>
+                        </View>
+
+                        <View className="p-5">
+                            <Text className="text-subtext text-sm mb-2">
+                                {t('orders.close_reason', 'Reason')}
+                            </Text>
+                            <TextInput
+                                value={closingReason}
+                                onChangeText={setClosingReason}
+                                placeholder={t('orders.close_reason_placeholder', 'e.g. High load, kitchen maintenance...')}
+                                placeholderTextColor="#6b7280"
+                                className="bg-background text-text rounded-xl px-4 py-3 border border-gray-700"
+                                multiline
+                            />
+                        </View>
+
+                        <View className="p-5 pt-0 flex-row gap-3">
+                            <TouchableOpacity
+                                className="flex-1 py-3 rounded-xl bg-gray-700 items-center"
+                                onPress={() => setStoreCloseModalVisible(false)}
+                            >
+                                <Text className="text-subtext font-bold">{t('common.cancel', 'Cancel')}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                className="flex-1 py-3 rounded-xl bg-danger items-center"
+                                onPress={handleCloseStore}
+                                disabled={updatingBusinessOps}
+                            >
+                                {updatingBusinessOps ? (
+                                    <ActivityIndicator color="#fff" />
+                                ) : (
+                                    <Text className="text-white font-bold">{t('orders.close_store', 'Close Store')}</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </Pressable>
+                </Pressable>
+            </Modal>
+
+            {/* ── Avg Prep Time Modal ── */}
+            <Modal
+                visible={prepModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setPrepModalVisible(false)}
+            >
+                <Pressable
+                    className="flex-1 items-center justify-center"
+                    style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
+                    onPress={() => setPrepModalVisible(false)}
+                >
+                    <Pressable
+                        className="bg-card rounded-3xl overflow-hidden"
+                        style={{ width: '92%', maxWidth: 560 }}
+                        onPress={(e) => e.stopPropagation()}
+                    >
+                        <View className="p-5 border-b border-gray-700">
+                            <Text className="text-text font-bold text-xl">
+                                {t('orders.avg_prep_time', 'Average Preparation Time')}
+                            </Text>
+                            <Text className="text-subtext mt-1">
+                                {t('orders.avg_prep_hint', 'Used as default when accepting new orders.')}
+                            </Text>
+                        </View>
+
+                        <View className="p-5 pt-4 flex-row flex-wrap justify-center gap-2">
+                            {PREP_PRESET_OPTIONS.map((option) => (
+                                <TouchableOpacity
+                                    key={option}
+                                    className="px-4 py-2.5 rounded-xl"
+                                    style={{
+                                        backgroundColor: selectedPrepTime === option ? '#3b82f6' : '#374151',
+                                        minWidth: 72,
+                                        alignItems: 'center',
+                                    }}
+                                    onPress={() => {
+                                        setSelectedPrepTime(option);
+                                        setCustomPrepTime('');
+                                    }}
+                                >
+                                    <Text
+                                        className="font-bold"
+                                        style={{ color: selectedPrepTime === option ? '#fff' : '#9ca3af' }}
+                                    >
+                                        {option}m
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+
+                            <View className="w-full mt-2">
+                                <Text className="text-subtext text-sm mb-2">
+                                    {t('orders.custom_minutes', 'Custom minutes')}
+                                </Text>
+                                <TextInput
+                                    value={customPrepTime}
+                                    onChangeText={(value) => {
+                                        const sanitized = value.replace(/[^0-9]/g, '');
+                                        setCustomPrepTime(sanitized);
+                                    }}
+                                    keyboardType="number-pad"
+                                    placeholder={t('orders.write_minutes', 'Write minutes...')}
+                                    placeholderTextColor="#6b7280"
+                                    className="bg-background text-text rounded-xl px-4 py-3 border border-gray-700"
+                                />
+                            </View>
+                        </View>
+
+                        <View className="p-5 pt-2 flex-row gap-3">
+                            <TouchableOpacity
+                                className="flex-1 py-3 rounded-xl bg-gray-700 items-center"
+                                onPress={() => setPrepModalVisible(false)}
+                            >
+                                <Text className="text-subtext font-bold">{t('common.cancel', 'Cancel')}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                className="flex-1 py-3 rounded-xl bg-primary items-center"
+                                onPress={handleSaveAvgPrepTime}
+                                disabled={updatingBusinessOps}
+                            >
+                                {updatingBusinessOps ? (
+                                    <ActivityIndicator color="#fff" />
+                                ) : (
+                                    <Text className="text-white font-bold">{t('common.save', 'Save')}</Text>
                                 )}
                             </TouchableOpacity>
                         </View>

@@ -495,45 +495,47 @@ export default function FinancesScreen() {
                                 gap: 8,
                             }}
                         >
-                            <View
-                                style={{
-                                    width: 8,
-                                    height: 8,
-                                    borderRadius: 4,
-                                    backgroundColor: '#f59e0b',
-                                }}
-                            />
-                            <Text
-                                style={{
-                                    fontSize: 14,
-                                    fontWeight: '700',
-                                    color: '#fff',
-                                }}
-                            >
-                                {t('finances.settlement_requests', 'Settlement Requests')}
-                            </Text>
-                            {pendingRequests.length > 0 && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                 <View
                                     style={{
-                                        backgroundColor: '#f59e0b20',
-                                        borderRadius: 999,
-                                        paddingHorizontal: 8,
-                                        paddingVertical: 2,
-                                        borderWidth: 1,
-                                        borderColor: '#f59e0b40',
+                                        width: 8,
+                                        height: 8,
+                                        borderRadius: 4,
+                                        backgroundColor: '#f59e0b',
+                                    }}
+                                />
+                                <Text
+                                    style={{
+                                        fontSize: 14,
+                                        fontWeight: '700',
+                                        color: '#fff',
                                     }}
                                 >
-                                    <Text
+                                    {t('finances.settlement_requests', 'Settlement Requests')}
+                                </Text>
+                                {pendingRequests.length > 0 && (
+                                    <View
                                         style={{
-                                            fontSize: 11,
-                                            fontWeight: '700',
-                                            color: '#f59e0b',
+                                            backgroundColor: '#f59e0b20',
+                                            borderRadius: 999,
+                                            paddingHorizontal: 8,
+                                            paddingVertical: 2,
+                                            borderWidth: 1,
+                                            borderColor: '#f59e0b40',
                                         }}
                                     >
-                                        {pendingRequests.length} {t('finances.pending', 'pending')}
-                                    </Text>
-                                </View>
-                            )}
+                                        <Text
+                                            style={{
+                                                fontSize: 11,
+                                                fontWeight: '700',
+                                                color: '#f59e0b',
+                                            }}
+                                        >
+                                            {pendingRequests.length} {t('finances.pending', 'pending')}
+                                        </Text>
+                                    </View>
+                                )}
+                            </View>
                         </View>
 
                         {requestsLoading ? (

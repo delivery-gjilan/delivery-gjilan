@@ -158,11 +158,13 @@ type Business {
   imageUrl: String
   isActive: Boolean!
   isOpen: Boolean!
+  isTemporarilyClosed: Boolean!
   location: Location!
   name: String!
   phoneNumber: String
   prepTimeOverrideMinutes: Int
   schedule: [BusinessDayHours!]!
+  temporaryClosureReason: String
   updatedAt: Date!
   workingHours: WorkingHours!
 }
@@ -1489,10 +1491,12 @@ input UpdateBusinessInput {
   description: String
   imageUrl: String
   isActive: Boolean
+  isTemporarilyClosed: Boolean
   location: LocationInput
   name: String
   phoneNumber: String
   prepTimeOverrideMinutes: Int
+  temporaryClosureReason: String
   workingHours: WorkingHoursInput
 }
 

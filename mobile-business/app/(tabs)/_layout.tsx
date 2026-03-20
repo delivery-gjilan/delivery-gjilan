@@ -117,6 +117,13 @@ export default function TabLayout() {
                     ),
                 }}
             />
+            <Tabs.Screen
+                name="settlement-history"
+                options={{
+                    href: null,
+                    title: t('finances.settlement_request_history', 'Settlement Request History'),
+                }}
+            />
         </Tabs>
     );
 }
