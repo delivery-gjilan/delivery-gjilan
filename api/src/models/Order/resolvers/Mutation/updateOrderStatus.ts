@@ -7,6 +7,7 @@ import { createAuditLogger } from '@/services/AuditLogger';
 import logger from '@/lib/logger';
 import { notifyCustomerOrderStatus, updateLiveActivity, endLiveActivity } from '@/services/orderNotifications';
 import { AppError } from '@/lib/errors';
+import { parseDbTimestamp } from '@/lib/dateTime';
 
 export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus']> = async (
     _parent,
@@ -166,11 +167,11 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
 
         const phaseStartedAt =
             status === 'PENDING'
-                ? (dbOrder.orderDate ? new Date(dbOrder.orderDate).getTime() : Date.now())
+                ? (parseDbTimestamp(dbOrder.orderDate)?.getTime() ?? Date.now())
                 : (status === 'PREPARING' || status === 'READY')
-                    ? (dbOrder.preparingAt ? new Date(dbOrder.preparingAt).getTime() : Date.now())
+                    ? (parseDbTimestamp(dbOrder.preparingAt)?.getTime() ?? Date.now())
                     : status === 'OUT_FOR_DELIVERY'
-                        ? (dbOrder.outForDeliveryAt ? new Date(dbOrder.outForDeliveryAt).getTime() : Date.now())
+                        ? (parseDbTimestamp(dbOrder.outForDeliveryAt)?.getTime() ?? Date.now())
                         : Date.now();
 
         updateLiveActivity(

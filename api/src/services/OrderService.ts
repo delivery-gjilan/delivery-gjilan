@@ -28,6 +28,7 @@ import { PromotionEngine } from '@/services/PromotionEngine';
 import { FinancialService } from '@/services/FinancialService';
 import { calculateDrivingDistanceKm } from '@/lib/haversine';
 import { isPointInPolygon } from '@/lib/pointInPolygon';
+import { parseDbTimestamp } from '@/lib/dateTime';
 import logger from '@/lib/logger';
 
 const log = logger.child({ service: 'OrderService' });
@@ -870,16 +871,16 @@ export class OrderService {
             originalPrice: dbOrder.originalPrice ?? undefined,
             originalDeliveryPrice: dbOrder.originalDeliveryPrice ?? undefined,
             totalPrice: dbOrder.price + dbOrder.deliveryPrice,
-            orderDate: new Date(dbOrder.orderDate || new Date()),
-            updatedAt: new Date(dbOrder.updatedAt),
+            orderDate: parseDbTimestamp(dbOrder.orderDate) ?? new Date(),
+            updatedAt: parseDbTimestamp(dbOrder.updatedAt) ?? new Date(),
             status: dbOrder.status as OrderStatus,
             paymentCollection: dbOrder.paymentCollection as OrderPaymentCollection,
             preparationMinutes: dbOrder.preparationMinutes ?? undefined,
-            estimatedReadyAt: dbOrder.estimatedReadyAt ? new Date(dbOrder.estimatedReadyAt) : undefined,
-            preparingAt: dbOrder.preparingAt ? new Date(dbOrder.preparingAt) : undefined,
-            readyAt: dbOrder.readyAt ? new Date(dbOrder.readyAt) : undefined,
-            outForDeliveryAt: dbOrder.outForDeliveryAt ? new Date(dbOrder.outForDeliveryAt) : undefined,
-            deliveredAt: dbOrder.deliveredAt ? new Date(dbOrder.deliveredAt) : undefined,
+            estimatedReadyAt: parseDbTimestamp(dbOrder.estimatedReadyAt) ?? undefined,
+            preparingAt: parseDbTimestamp(dbOrder.preparingAt) ?? undefined,
+            readyAt: parseDbTimestamp(dbOrder.readyAt) ?? undefined,
+            outForDeliveryAt: parseDbTimestamp(dbOrder.outForDeliveryAt) ?? undefined,
+            deliveredAt: parseDbTimestamp(dbOrder.deliveredAt) ?? undefined,
             driver: driverUser
                 ? {
                       id: driverUser.id,

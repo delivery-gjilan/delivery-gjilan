@@ -21,10 +21,12 @@ interface AuthState {
     isLoading: boolean;
     hasHydrated: boolean;
     isAuthenticated: boolean;
+    authInitComplete: boolean;
 
     setToken: (token: string | null) => void;
     setUser: (user: AuthUser | null) => void;
     setLoading: (loading: boolean) => void;
+    setAuthInitComplete: (value: boolean) => void;
     login: (token: string, user: AuthUser) => void;
     logout: () => void;
 }
@@ -43,6 +45,9 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
             hasHydrated: false,
             isAuthenticated: false,
+            authInitComplete: false,
+
+            setAuthInitComplete: (value) => set({ authInitComplete: value }),
 
             setToken: (token) => {
                 console.log('[AuthStore] Setting token:', token ? 'present' : 'null');
@@ -78,6 +83,7 @@ export const useAuthStore = create<AuthState>()(
                     token: null,
                     user: null,
                     isAuthenticated: false,
+                    authInitComplete: true,
                 });
                 console.log('[AuthStore] Logged out successfully');
             },

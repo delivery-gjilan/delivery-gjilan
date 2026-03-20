@@ -15,6 +15,7 @@ interface Admin {
 interface AuthContextType {
     admin: Admin | null;
     loading: boolean;
+    authCheckComplete: boolean;
     login: (email: string, password: string) => Promise<void>;
     logout: () => void;
     isAuthenticated: boolean;
@@ -25,6 +26,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [admin, setAdmin] = useState<Admin | null>(null);
     const [loading, setLoading] = useState(true);
+    const [authCheckComplete, setAuthCheckComplete] = useState(false);
     const [loginMutation] = useMutation(LOGIN_MUTATION);
 
     // Check if user is already logged in on mount
@@ -44,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 localStorage.removeItem("adminData");
             } finally {
                 setLoading(false);
+                setAuthCheckComplete(true);
             }
         };
 
@@ -101,6 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             value={{
                 admin,
                 loading,
+                authCheckComplete,
                 login,
                 logout,
                 isAuthenticated: !!admin,

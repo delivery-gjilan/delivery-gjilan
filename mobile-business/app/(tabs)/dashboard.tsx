@@ -1,248 +1,217 @@
-import { useEffect, useState } from 'react';
-import { View, Text, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
+import { useMemo, useState } from 'react';
+import { View, Text, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@apollo/client/react';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { GET_BUSINESS_ORDERS } from '@/graphql/orders';
 import { GET_BUSINESS_PRODUCTS } from '@/graphql/products';
 import { useAuthStore } from '@/store/authStore';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from '@/hooks/useTranslation';
 
-interface DashboardStats {
-    todayOrders: number;
-    todayRevenue: number;
-    pendingOrders: number;
-    preparingOrders: number;
-    completedToday: number;
-    totalProducts: number;
-    unavailableProducts: number;
+type ProductSale = {
+    productId: string;
+    name: string;
+    quantity: number;
+    revenue: number;
+    imageUrl?: string | null;
+};
+
+function getStartOfToday(): Date {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+function getStartOfWeek(): Date {
+    const now = new Date();
+    const day = now.getDay();
+    const diff = now.getDate() - day;
+    return new Date(now.getFullYear(), now.getMonth(), diff);
+}
+
+function getStartOfMonth(): Date {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
 }
 
 export default function DashboardScreen() {
     const { t } = useTranslation();
-    const { user } = useAuthStore();
-    const [stats, setStats] = useState<DashboardStats>({
-        todayOrders: 0,
-        todayRevenue: 0,
-        pendingOrders: 0,
-        preparingOrders: 0,
-        completedToday: 0,
-        totalProducts: 0,
-        unavailableProducts: 0,
-    });
+    const [refreshing, setRefreshing] = useState(false);
+    const businessId = useAuthStore((state) => state.user?.businessId);
 
     const { data: ordersData, loading: ordersLoading, refetch: refetchOrders } = useQuery(GET_BUSINESS_ORDERS, {
-        pollInterval: 15000,
+        pollInterval: 30000,
     });
 
-    const { data: productsData, loading: productsLoading, refetch: refetchProducts } = useQuery(
-        GET_BUSINESS_PRODUCTS,
-        {
-            variables: { businessId: user?.businessId || '' },
-            skip: !user?.businessId,
+    const { data: productsData, loading: productsLoading, refetch: refetchProducts } = useQuery(GET_BUSINESS_PRODUCTS, {
+        variables: { businessId: businessId || '' },
+        skip: !businessId,
+    });
+
+    const businessOrders = useMemo(() => {
+        if (!businessId) {
+            return [];
         }
+        return (ordersData?.orders || []).filter((order: any) =>
+            (order.businesses || []).some((b: any) => b.business?.id === businessId),
+        );
+    }, [ordersData?.orders, businessId]);
+
+    const deliveredOrders = useMemo(
+        () => businessOrders.filter((order: any) => order.status === 'DELIVERED'),
+        [businessOrders],
     );
 
-    useEffect(() => {
-        if (ordersData && productsData) {
-            calculateStats();
-        }
-    }, [ordersData, productsData]);
+    const todayStats = useMemo(() => {
+        const start = getStartOfToday();
+        const todayOrders = businessOrders.filter((order: any) => new Date(order.orderDate) >= start);
+        const deliveredToday = todayOrders.filter((order: any) => order.status === 'DELIVERED');
 
-    const calculateStats = () => {
-        const orders = (ordersData?.orders || []).filter((order: any) =>
-            order.businesses.some((b: any) => b.business.id === user?.businessId)
-        );
-
-        const products = (productsData?.products || []).map((card: any) => ({
-            isAvailable: card?.product?.isAvailable ?? true,
-        }));
-
-        // Today's date (start of day)
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const todayOrders = orders.filter((order: any) => new Date(order.orderDate) >= today);
-
-        const newStats: DashboardStats = {
+        return {
             todayOrders: todayOrders.length,
-            todayRevenue: todayOrders.reduce((sum: number, order: any) => sum + order.totalPrice, 0),
-            pendingOrders: orders.filter((order: any) => order.status === 'PENDING').length,
-            preparingOrders: orders.filter((order: any) => order.status === 'PREPARING').length,
-            completedToday: todayOrders.filter((order: any) => order.status === 'DELIVERED').length,
-            totalProducts: products.length,
-            unavailableProducts: products.filter((p: any) => !p.isAvailable).length,
+            deliveredToday: deliveredToday.length,
+            todayRevenue: deliveredToday.reduce((sum: number, order: any) => sum + Number(order.totalPrice || 0), 0),
         };
+    }, [businessOrders]);
 
-        setStats(newStats);
+    const weekRevenue = useMemo(() => {
+        const start = getStartOfWeek();
+        return deliveredOrders
+            .filter((order: any) => new Date(order.orderDate) >= start)
+            .reduce((sum: number, order: any) => sum + Number(order.totalPrice || 0), 0);
+    }, [deliveredOrders]);
+
+    const activeOrders = useMemo(
+        () =>
+            businessOrders.filter((order: any) =>
+                ['PENDING', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'].includes(order.status),
+            ).length,
+        [businessOrders],
+    );
+
+    const topProducts = useMemo<ProductSale[]>(() => {
+        if (!businessId) {
+            return [];
+        }
+
+        const aggregate = new Map<string, ProductSale>();
+
+        deliveredOrders.forEach((order: any) => {
+            (order.businesses || [])
+                .filter((b: any) => b.business?.id === businessId)
+                .forEach((businessChunk: any) => {
+                    (businessChunk.items || []).forEach((item: any) => {
+                        const key = item.productId || item.name;
+                        const existing = aggregate.get(key) || {
+                            productId: key,
+                            name: item.name || t('dashboard.unknown_product', 'Unknown product'),
+                            quantity: 0,
+                            revenue: 0,
+                            imageUrl: item.imageUrl ?? null,
+                        };
+                        const quantity = Number(item.quantity || 0);
+                        const unitPrice = Number(item.unitPrice || 0);
+
+                        existing.quantity += quantity;
+                        existing.revenue += quantity * unitPrice;
+                        if (!existing.imageUrl && item.imageUrl) {
+                            existing.imageUrl = item.imageUrl;
+                        }
+                        aggregate.set(key, existing);
+                    });
+                });
+        });
+
+        return Array.from(aggregate.values())
+            .sort((a, b) => b.quantity - a.quantity)
+            .slice(0, 5);
+    }, [deliveredOrders, businessId, t]);
+
+    const handleRefresh = async () => {
+        setRefreshing(true);
+        try {
+            await Promise.all([refetchOrders(), refetchProducts()]);
+        } finally {
+            setRefreshing(false);
+        }
     };
 
-    const handleRefresh = () => {
-        refetchOrders();
-        refetchProducts();
-    };
+    const loading = ordersLoading || productsLoading;
 
-    const StatCard = ({
-        icon,
+    const StatBox = ({
         label,
         value,
-        subtitle,
-        color,
-        gradientColors,
+        icon,
     }: {
-        icon: keyof typeof Ionicons.glyphMap;
         label: string;
         value: string | number;
-        subtitle?: string;
-        color: string;
-        gradientColors: string[];
+        icon: keyof typeof Ionicons.glyphMap;
     }) => (
-        <View className="flex-1 min-w-[160px] m-2">
-            <LinearGradient
-                colors={gradientColors as [string, string, ...string[]]}
-                className="rounded-2xl p-4"
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-            >
-                <View
-                    className="w-12 h-12 rounded-full items-center justify-center mb-3"
-                    style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
-                >
-                    <Ionicons name={icon} size={24} color="white" />
-                </View>
-                <Text className="text-white/80 text-sm mb-1">{label}</Text>
-                <Text className="text-white text-2xl font-bold">{value}</Text>
-                {subtitle && <Text className="text-white/70 text-xs mt-1">{subtitle}</Text>}
-            </LinearGradient>
+        <View className="w-[48%] bg-card rounded-2xl p-3.5 mb-3">
+            <View className="w-8 h-8 rounded-full bg-primary/15 items-center justify-center mb-2.5">
+                <Ionicons name={icon} size={15} color="#7C3AED" />
+            </View>
+            <Text className="text-subtext text-xs mb-1">{label}</Text>
+            <Text className="text-text text-xl font-bold">{value}</Text>
         </View>
     );
 
     return (
         <SafeAreaView className="flex-1 bg-background">
-            {/* Header */}
-            <View className="px-4 py-3 border-b border-gray-800">
-                <Text className="text-text text-2xl font-bold mb-1">{t('dashboard.title', 'Dashboard')}</Text>
-                <Text className="text-subtext">{user?.business?.name}</Text>
-            </View>
-
             <ScrollView
-                contentContainerStyle={{ padding: 8 }}
+                contentContainerStyle={{ padding: 12, paddingBottom: 24 }}
                 refreshControl={
-                    <RefreshControl refreshing={ordersLoading || productsLoading} onRefresh={handleRefresh} tintColor="#7C3AED" />
+                    <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7C3AED" />
                 }
             >
-                {/* Today's Overview */}
-                <View className="px-2 mb-4">
-                    <Text className="text-text font-bold text-lg mb-2">{t('dashboard.today_overview', "Today's Overview")}</Text>
-                    <View className="flex-row flex-wrap">
-                        <StatCard
-                            icon="receipt"
-                            label={t('dashboard.total_orders', 'Total Orders')}
-                            value={stats.todayOrders}
-                            color="#7C3AED"
-                            gradientColors={['#7C3AED', '#A78BFA']}
-                        />
-                        <StatCard
-                            icon="cash"
-                            label={t('dashboard.revenue', 'Revenue')}
-                            value={`$${stats.todayRevenue.toFixed(2)}`}
-                            color="#10b981"
-                            gradientColors={['#10b981', '#34d399']}
-                        />
-                        <StatCard
-                            icon="checkmark-circle"
-                            label={t('dashboard.completed', 'Completed')}
-                            value={stats.completedToday}
-                            subtitle={stats.todayOrders > 0 ? `${Math.round((stats.completedToday / stats.todayOrders) * 100)}% completion` : undefined}
-                            color="#8b5cf6"
-                            gradientColors={['#8b5cf6', '#a78bfa']}
-                        />
+                {loading ? (
+                    <View className="py-20 items-center justify-center">
+                        <ActivityIndicator size="large" color="#7C3AED" />
                     </View>
-                </View>
+                ) : (
+                    <>
+                        <View className="mb-4">
+                            <View className="flex-row flex-wrap justify-between">
+                                <StatBox icon="receipt-outline" label={t('dashboard.today_orders', 'Today Orders')} value={todayStats.todayOrders} />
+                                <StatBox icon="pulse-outline" label={t('dashboard.active_orders', 'Active Orders')} value={activeOrders} />
+                                <StatBox icon="cash-outline" label={t('dashboard.today_revenue', 'Today Revenue')} value={`€${todayStats.todayRevenue.toFixed(2)}`} />
+                                <StatBox icon="calendar-outline" label={t('dashboard.week_revenue', 'Week Revenue')} value={`€${weekRevenue.toFixed(2)}`} />
+                            </View>
+                        </View>
 
-                {/* Active Orders */}
-                <View className="px-2 mb-4">
-                    <Text className="text-text font-bold text-lg mb-2">{t('dashboard.active_orders', 'Active Orders')}</Text>
-                    <View className="flex-row flex-wrap">
-                        <StatCard
-                            icon="alert-circle"
-                            label={t('dashboard.pending', 'Pending')}
-                            value={stats.pendingOrders}
-                            subtitle="Awaiting acceptance"
-                            color="#f59e0b"
-                            gradientColors={['#f59e0b', '#fbbf24']}
-                        />
-                        <StatCard
-                            icon="flame"
-                            label={t('dashboard.preparing', 'Preparing')}
-                            value={stats.preparingOrders}
-                            subtitle="In progress"
-                            color="#3b82f6"
-                            gradientColors={['#3b82f6', '#60a5fa']}
-                        />
-                    </View>
-                </View>
-
-                {/* Products Status */}
-                <View className="px-2 mb-4">
-                    <Text className="text-text font-bold text-lg mb-2">{t('dashboard.products', 'Products')}</Text>
-                    <View className="flex-row flex-wrap">
-                        <StatCard
-                            icon="fast-food"
-                            label={t('dashboard.total_products', 'Total Products')}
-                            value={stats.totalProducts}
-                            color="#06b6d4"
-                            gradientColors={['#06b6d4', '#22d3ee']}
-                        />
-                        <StatCard
-                            icon="eye-off"
-                            label={t('dashboard.unavailable', 'Unavailable')}
-                            value={stats.unavailableProducts}
-                            color="#ef4444"
-                            gradientColors={['#ef4444', '#f87171']}
-                        />
-                    </View>
-                </View>
-
-                {/* Quick Actions */}
-                <View className="px-2 mb-4">
-                    <Text className="text-text font-bold text-lg mb-2">{t('dashboard.quick_actions', 'Quick Actions')}</Text>
-                    <View className="bg-card rounded-2xl p-4">
-                        <TouchableOpacity className="flex-row items-center py-3 border-b border-gray-700">
-                            <View className="w-10 h-10 rounded-full bg-primary/20 items-center justify-center mr-3">
-                                <Ionicons name="notifications" size={20} color="#7C3AED" />
+                        <View className="mb-4">
+                            <Text className="text-text font-bold text-lg mb-3">{t('dashboard.top_products', 'Top Products')}</Text>
+                            <View className="overflow-hidden bg-card rounded-2xl p-2">
+                                {topProducts.length === 0 ? (
+                                    <View className="py-4">
+                                        <Text className="text-subtext">{t('dashboard.no_sales_yet', 'No delivered sales yet.')}</Text>
+                                    </View>
+                                ) : (
+                                    topProducts.map((product, index) => (
+                                        <View key={product.productId} className="my-1 py-2.5 px-2.5 bg-background rounded-xl flex-row items-center">
+                                            <View className="w-10 h-10 rounded-xl overflow-hidden bg-primary/10 items-center justify-center mr-3">
+                                                {product.imageUrl ? (
+                                                    <Image source={{ uri: product.imageUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+                                                ) : (
+                                                    <Ionicons name="image-outline" size={18} color="#94A3B8" />
+                                                )}
+                                            </View>
+                                            <View className="flex-1">
+                                                <Text className="text-text font-semibold" numberOfLines={1}>
+                                                    {index + 1}. {product.name}
+                                                </Text>
+                                                <Text className="text-subtext text-xs">
+                                                    {product.quantity} {t('dashboard.sold_units', 'sold')}
+                                                </Text>
+                                            </View>
+                                            <Text className="text-success font-semibold">€{product.revenue.toFixed(2)}</Text>
+                                        </View>
+                                    ))
+                                )}
                             </View>
-                            <View className="flex-1">
-                                <Text className="text-text font-semibold">{t('dashboard.notifications', 'Notifications')}</Text>
-                                <Text className="text-subtext text-xs">{t('dashboard.manage_notifications', 'Manage notification settings')}</Text>
-                            </View>
-                            <Ionicons name="chevron-forward" size={20} color="#6b7280" />
-                        </TouchableOpacity>
-
-                        <TouchableOpacity className="flex-row items-center py-3 border-b border-gray-700">
-                            <View className="w-10 h-10 rounded-full bg-success/20 items-center justify-center mr-3">
-                                <Ionicons name="time" size={20} color="#10b981" />
-                            </View>
-                            <View className="flex-1">
-                                <Text className="text-text font-semibold">{t('dashboard.business_hours', 'Business Hours')}</Text>
-                                <Text className="text-subtext text-xs">{t('dashboard.update_hours', 'Update opening hours')}</Text>
-                            </View>
-                            <Ionicons name="chevron-forward" size={20} color="#6b7280" />
-                        </TouchableOpacity>
-
-                        <TouchableOpacity className="flex-row items-center py-3">
-                            <View className="w-10 h-10 rounded-full bg-warning/20 items-center justify-center mr-3">
-                                <Ionicons name="document-text" size={20} color="#f59e0b" />
-                            </View>
-                            <View className="flex-1">
-                                <Text className="text-text font-semibold">{t('dashboard.reports', 'Reports')}</Text>
-                                <Text className="text-subtext text-xs">{t('dashboard.view_analytics', 'View detailed analytics')}</Text>
-                            </View>
-                            <Ionicons name="chevron-forward" size={20} color="#6b7280" />
-                        </TouchableOpacity>
-                    </View>
-                </View>
+                        </View>
+                    </>
+                )}
             </ScrollView>
         </SafeAreaView>
     );

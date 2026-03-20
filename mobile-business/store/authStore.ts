@@ -42,10 +42,12 @@ interface AuthStore {
     token: string | null;
     isAuthenticated: boolean;
     hasHydrated: boolean;
+    authInitComplete: boolean;
     login: (user: AuthUser, token: string) => void;
     logout: () => Promise<void>;
     updateUser: (user: Partial<AuthUser>) => void;
     setToken: (token: string | null) => void;
+    setAuthInitComplete: (value: boolean) => void;
 }
 
 const calculateIsAuthenticated = (token: string | null, user: AuthUser | null): boolean => {
@@ -64,6 +66,11 @@ export const useAuthStore = create<AuthStore>()(
             token: null,
             isAuthenticated: false,
             hasHydrated: false,
+            authInitComplete: false,
+
+            setAuthInitComplete: (value) => {
+                set({ authInitComplete: value });
+            },
 
             setToken: (token) => {
                 set((state) => ({
@@ -92,6 +99,7 @@ export const useAuthStore = create<AuthStore>()(
                     user: null,
                     token: null,
                     isAuthenticated: false,
+                    authInitComplete: true,
                 });
             },
 

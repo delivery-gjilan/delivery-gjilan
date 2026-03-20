@@ -5,8 +5,9 @@ import { ActivityIndicator, View } from 'react-native';
 export default function Index() {
     const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
     const hasHydrated = useAuthStore((state) => state.hasHydrated);
+    const authInitComplete = useAuthStore((state) => state.authInitComplete);
 
-    if (!hasHydrated) {
+    if (!hasHydrated || !authInitComplete) {
         return (
             <View className="flex-1 items-center justify-center bg-background">
                 <ActivityIndicator size="large" />

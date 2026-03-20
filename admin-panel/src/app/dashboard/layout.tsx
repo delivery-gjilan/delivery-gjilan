@@ -13,20 +13,22 @@ import { canAccessAdminPanelPath } from "@/lib/route-access";
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isAuthenticated, loading, admin } = useAuth();
+  const { isAuthenticated, loading, authCheckComplete, admin } = useAuth();
 
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
+    if (!authCheckComplete || loading) return;
+
+    if (!isAuthenticated) {
       router.push("/login");
       return;
     }
 
-    if (!loading && isAuthenticated && !canAccessAdminPanelPath(admin?.role, pathname)) {
+    if (isAuthenticated && !canAccessAdminPanelPath(admin?.role, pathname)) {
       router.push("/dashboard");
     }
-  }, [isAuthenticated, loading, router, admin?.role, pathname]);
+  }, [isAuthenticated, loading, authCheckComplete, router, admin?.role, pathname]);
 
-  if (loading) {
+  if (loading || !authCheckComplete) {
     return (
       <div className="flex items-center justify-center h-screen bg-[#09090b]">
         <div className="text-white">Loading...</div>

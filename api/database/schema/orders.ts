@@ -35,7 +35,7 @@ export const orders = pgTable('orders', {
     readyAt: timestamp('ready_at', { withTimezone: true, mode: 'string' }),
     outForDeliveryAt: timestamp('out_for_delivery_at', { withTimezone: true, mode: 'string' }),
     deliveredAt: timestamp('delivered_at', { withTimezone: true, mode: 'string' }),
-    orderDate: timestamp('order_date', { mode: 'string' }).defaultNow(),
+    orderDate: timestamp('order_date', { withTimezone: true, mode: 'string' }).defaultNow(),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull(),

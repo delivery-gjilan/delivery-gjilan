@@ -10,7 +10,7 @@ import { getValidAccessToken } from '@/lib/graphql/authSession';
 export function useAuthInitialization() {
     const router = useRouter();
     const hasInitialized = useRef(false);
-    const { setToken, logout, hasHydrated, user } = useAuthStore();
+    const { setToken, logout, hasHydrated, user, setAuthInitComplete } = useAuthStore();
 
     useEffect(() => {
         if (hasHydrated) return;
@@ -49,6 +49,7 @@ export function useAuthInitialization() {
                     console.log('[AuthInit] No token found, redirecting to login');
                     await logout();
                     router.replace('/login');
+                    setAuthInitComplete(true);
                     hasInitialized.current = true;
                     return;
                 }
@@ -58,6 +59,7 @@ export function useAuthInitialization() {
                     console.log('[AuthInit] Token found but no user data, logging out');
                     await logout();
                     router.replace('/login');
+                    setAuthInitComplete(true);
                     hasInitialized.current = true;
                     return;
                 }
@@ -68,6 +70,7 @@ export function useAuthInitialization() {
                     console.log('[AuthInit] Invalid role for admin app, logging out');
                     await logout();
                     router.replace('/login');
+                    setAuthInitComplete(true);
                     hasInitialized.current = true;
                     return;
                 }
@@ -76,15 +79,17 @@ export function useAuthInitialization() {
                 console.log('[AuthInit] Auth valid, admin user:', user.email, 'role:', user.role);
                 setToken(token);
                 router.replace('/(tabs)/map');
+                setAuthInitComplete(true);
                 hasInitialized.current = true;
             } catch (err) {
                 console.error('[AuthInit] Auth initialization error:', err);
                 await logout();
                 router.replace('/login');
+                setAuthInitComplete(true);
                 hasInitialized.current = true;
             }
         };
 
         initializeAuth();
-    }, [hasHydrated, logout, router, setToken, user]);
+    }, [hasHydrated, logout, router, setToken, setAuthInitComplete, user]);
 }

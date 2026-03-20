@@ -3,6 +3,7 @@ import { createAuditLogger } from '@/services/AuditLogger';
 import logger from '@/lib/logger';
 import { notifyCustomerOrderStatus, updateLiveActivity } from '@/services/orderNotifications';
 import { AppError } from '@/lib/errors';
+import { parseDbTimestamp } from '@/lib/dateTime';
 
 export const startPreparing: NonNullable<MutationResolvers['startPreparing']> = async (
     _parent,
@@ -68,7 +69,7 @@ export const startPreparing: NonNullable<MutationResolvers['startPreparing']> = 
             'Your driver', // Driver not assigned yet
             preparationMinutes,
             preparationMinutes,
-            dbOrder.preparingAt ? new Date(dbOrder.preparingAt).getTime() : Date.now(),
+            parseDbTimestamp(dbOrder.preparingAt)?.getTime() ?? Date.now(),
         );
 
         const auditLog = createAuditLogger(db, context);

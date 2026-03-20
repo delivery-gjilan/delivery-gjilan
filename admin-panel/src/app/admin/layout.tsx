@@ -10,20 +10,22 @@ import { ReactNode } from "react";
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const { isAuthenticated, loading, admin } = useAuth();
+  const { isAuthenticated, loading, authCheckComplete, admin } = useAuth();
 
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
+    if (!authCheckComplete || loading) return;
+
+    if (!isAuthenticated) {
       router.push("/login");
       return;
     }
 
-    if (!loading && isAuthenticated && admin?.role !== "SUPER_ADMIN") {
+    if (isAuthenticated && admin?.role !== "SUPER_ADMIN") {
       router.push("/dashboard");
     }
-  }, [isAuthenticated, loading, router, admin?.role]);
+  }, [isAuthenticated, loading, authCheckComplete, router, admin?.role]);
 
-  if (loading) {
+  if (loading || !authCheckComplete) {
     return (
       <div className="flex items-center justify-center h-screen bg-[#09090b]">
         <div className="text-white">Loading...</div>

@@ -18,7 +18,7 @@ function AppContent() {
     const router = useRouter();
     const segments = useSegments();
     const rootNavigationState = useRootNavigationState();
-    const { isAuthenticated, hasHydrated } = useAuthStore();
+    const { isAuthenticated, hasHydrated, authInitComplete } = useAuthStore();
     const loadTranslation = useLocaleStore((state) => state.loadTranslation);
     const [bannerDismissed, setBannerDismissed] = useState(false);
     const isMounted = useRef(false);
@@ -44,7 +44,7 @@ function AppContent() {
 
     // Navigation guard
     useEffect(() => {
-        if (!hasHydrated || !isMounted.current || !rootNavigationState?.key) return;
+        if (!hasHydrated || !authInitComplete || !isMounted.current || !rootNavigationState?.key) return;
 
         const currentSegment = segments[0];
         const inTabsGroup = currentSegment === '(tabs)';
@@ -55,10 +55,10 @@ function AppContent() {
         } else if (isAuthenticated && onLoginRoute) {
             setTimeout(() => router.replace('/(tabs)'), 0);
         }
-    }, [isAuthenticated, segments, hasHydrated, router]);
+    }, [isAuthenticated, segments, hasHydrated, authInitComplete, router]);
 
     // Show loading screen while hydrating
-    if (!hasHydrated) {
+    if (!hasHydrated || !authInitComplete) {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
                 <ActivityIndicator size="large" color="#7C3AED" />

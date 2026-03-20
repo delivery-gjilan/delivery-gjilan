@@ -4,11 +4,13 @@ import {
     Text,
     FlatList,
     TouchableOpacity,
+    TextInput,
     RefreshControl,
     ActivityIndicator,
     Alert,
     Modal,
     Pressable,
+    useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApolloClient, useQuery, useMutation, useSubscription } from '@apollo/client/react';
@@ -57,6 +59,11 @@ interface Order {
         firstName: string;
         lastName: string;
         phoneNumber?: string | null;
+    } | null;
+    driver?: {
+        id: string;
+        firstName: string;
+        lastName: string;
     } | null;
     dropOffLocation?: {
         address: string;
@@ -116,7 +123,7 @@ const ETA_OPTIONS = [
     { label: '5 min', value: 5 },
     { label: '10 min', value: 10 },
     { label: '15 min', value: 15 },
-    { label: '20 min', value: 20 },
+    { label: '25 min', value: 25 },
     { label: '30 min', value: 30 },
     { label: '45 min', value: 45 },
 ];
@@ -150,7 +157,7 @@ function getElapsedTime(statusChangeDate: string): string {
     const now = new Date();
     const changed = new Date(statusChangeDate);
     const diffMs = now.getTime() - changed.getTime();
-    const diffSec = Math.floor(diffMs / 1000);
+    const diffSec = Math.max(0, Math.floor(diffMs / 1000));
     const minutes = Math.floor(diffSec / 60);
     const seconds = diffSec % 60;
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
@@ -162,9 +169,13 @@ export default function OrdersScreen() {
     const { user } = useAuthStore();
     const [etaModalVisible, setEtaModalVisible] = useState(false);
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-    const [selectedEta, setSelectedEta] = useState(15);
-    const [, setTick] = useState(0);
+    const [selectedEta, setSelectedEta] = useState(10);
+    const [customEta, setCustomEta] = useState('');
+    const [tick, setTick] = useState(0);
     const lastTapRef = useRef<Record<string, number>>({});
+    const pendingOrderIdsRef = useRef<Set<string>>(new Set());
+    const { width } = useWindowDimensions();
+    const isTablet = width >= 768;
 
     // Tick every 1s to keep elapsed timers fresh
     useEffect(() => {
@@ -258,14 +269,52 @@ export default function OrdersScreen() {
     });
 
     // Sort: PENDING first, then PREPARING, then by date desc
+    const STATUS_PRIORITY: Record<OrderStatus, number> = {
+        PENDING: 0,
+        PREPARING: 1,
+        READY: 2,
+        OUT_FOR_DELIVERY: 3,
+        DELIVERED: 4,
+        CANCELLED: 5,
+    };
+
     const sortedOrders = [...businessOrders].sort((a, b) => {
-        const priority: Record<string, number> = {
-            PENDING: 0, PREPARING: 1, READY: 2, OUT_FOR_DELIVERY: 3, DELIVERED: 4, CANCELLED: 5,
-        };
-        const pDiff = (priority[a.status] ?? 99) - (priority[b.status] ?? 99);
+        const pDiff = (STATUS_PRIORITY[a.status] ?? 99) - (STATUS_PRIORITY[b.status] ?? 99);
         if (pDiff !== 0) return pDiff;
         return new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime();
     });
+
+    const hasPendingOrders = sortedOrders.some((order) => order.status === 'PENDING');
+
+    useEffect(() => {
+        const pendingIds = new Set(sortedOrders.filter((order) => order.status === 'PENDING').map((order) => order.id));
+        const hadPendingBefore = pendingOrderIdsRef.current;
+
+        const hasNewPending = Array.from(pendingIds).some((id) => !hadPendingBefore.has(id));
+        pendingOrderIdsRef.current = pendingIds;
+
+        if (hasNewPending) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            setTimeout(() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+            }, 220);
+        }
+    }, [sortedOrders]);
+
+    useEffect(() => {
+        if (!hasPendingOrders) {
+            return;
+        }
+
+        const interval = setInterval(() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            setTimeout(() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }, 320);
+        }, 20000);
+
+        return () => clearInterval(interval);
+    }, [hasPendingOrders]);
 
     const handleDoubleTap = useCallback((order: Order) => {
         const now = Date.now();
@@ -273,7 +322,8 @@ export default function OrdersScreen() {
         if (now - lastTap < 400) {
             if (order.status === 'PENDING') {
                 setSelectedOrderId(order.id);
-                setSelectedEta(15);
+                setSelectedEta(10);
+                setCustomEta('');
                 setEtaModalVisible(true);
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             } else if (order.status === 'PREPARING') {
@@ -287,13 +337,23 @@ export default function OrdersScreen() {
 
     const handleAcceptWithEta = async () => {
         if (!selectedOrderId) return;
+
+        const customEtaNumber = customEta.trim() ? Number(customEta.trim()) : NaN;
+        const finalEta = Number.isFinite(customEtaNumber) && customEtaNumber > 0 ? customEtaNumber : selectedEta;
+
+        if (!Number.isFinite(finalEta) || finalEta <= 0) {
+            Alert.alert(t('common.error', 'Error'), t('orders.invalid_minutes', 'Please enter valid minutes.'));
+            return;
+        }
+
         try {
             await startPreparing({
-                variables: { id: selectedOrderId, preparationMinutes: selectedEta },
+                variables: { id: selectedOrderId, preparationMinutes: Math.round(finalEta) },
             });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             setEtaModalVisible(false);
             setSelectedOrderId(null);
+            setCustomEta('');
             refetch();
         } catch (error: any) {
             Alert.alert(t('common.error', 'Error'), error.message);
@@ -340,7 +400,8 @@ export default function OrdersScreen() {
 
     const handleAcceptTap = (orderId: string) => {
         setSelectedOrderId(orderId);
-        setSelectedEta(15);
+        setSelectedEta(10);
+        setCustomEta('');
         setEtaModalVisible(true);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     };
@@ -353,7 +414,17 @@ export default function OrdersScreen() {
         const businessSubtotal = businessOrder.items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
         const isPending = order.status === 'PENDING';
         const isPreparing = order.status === 'PREPARING';
+        const isReady = order.status === 'READY';
+        const showHeaderTimer = isPending || isReady;
         const canAct = isPending || isPreparing;
+        const pendingBlinkOn = isPending && tick % 2 === 0;
+
+        const elapsedText =
+            (order.status === 'PENDING' && getElapsedTime(order.orderDate)) ||
+            (order.status === 'PREPARING' && order.preparingAt && getElapsedTime(order.preparingAt)) ||
+            (order.status === 'READY' && order.readyAt && getElapsedTime(order.readyAt)) ||
+            (order.status === 'OUT_FOR_DELIVERY' && order.readyAt && getElapsedTime(order.readyAt)) ||
+            '--:--';
 
         let timeRemaining: { text: string; isOverdue: boolean } | null = null;
         if (isPreparing && order.estimatedReadyAt) {
@@ -369,18 +440,22 @@ export default function OrdersScreen() {
                 })}
             >
                 <View
-                    className="bg-card rounded-2xl mx-3 mb-3 overflow-hidden"
+                    className="bg-card rounded-2xl mb-3 overflow-hidden"
                     style={{
+                        marginHorizontal: isTablet ? 16 : 12,
+                        maxWidth: isTablet ? 980 : undefined,
+                        alignSelf: 'center',
+                        width: '100%',
                         borderLeftWidth: 4,
-                        borderLeftColor: STATUS_COLORS[order.status],
+                        borderLeftColor: pendingBlinkOn ? '#ef4444' : STATUS_COLORS[order.status],
                         borderWidth: 1,
-                        borderColor: `${STATUS_COLORS[order.status]}55`,
-                        backgroundColor: STATUS_CARD_BG[order.status],
+                        borderColor: pendingBlinkOn ? 'rgba(239,68,68,0.95)' : `${STATUS_COLORS[order.status]}55`,
+                        backgroundColor: pendingBlinkOn ? 'rgba(239,68,68,0.18)' : STATUS_CARD_BG[order.status],
                     }}
                 >
                     {/* ── Compact Header ── */}
                     <View className="px-3 pt-3 pb-2">
-                        <View className="flex-row items-center justify-between mb-2">
+                        <View className="flex-row items-start justify-between mb-2">
                             <View className="flex-row items-center flex-1">
                                 <View
                                     className="w-9 h-9 rounded-xl items-center justify-center mr-2"
@@ -397,96 +472,133 @@ export default function OrdersScreen() {
                                     <Text className="text-subtext text-xs">{timeAgo(order.orderDate)}</Text>
                                 </View>
                             </View>
-                            <View
-                                className="px-2.5 py-1 rounded-full"
-                                style={{ backgroundColor: STATUS_BG[order.status] }}
-                            >
-                                <Text className="font-bold text-xs" style={{ color: STATUS_COLORS[order.status] }}>
-                                    {statusLabels[order.status]}
-                                </Text>
+
+                            {showHeaderTimer && (
+                                <View className="mx-2 mt-0.5 px-2.5 py-1 rounded-full bg-white/15">
+                                    <View className="flex-row items-center">
+                                        <Ionicons name="time-outline" size={isTablet ? 13 : 12} color="#fff" />
+                                        <Text className={`text-white font-bold ml-1.5 ${isTablet ? 'text-sm' : 'text-xs'}`}>
+                                            {elapsedText}
+                                        </Text>
+                                    </View>
+                                </View>
+                            )}
+
+                            <View className="items-end">
+                                <View
+                                    className="px-2.5 py-1 rounded-full"
+                                    style={{ backgroundColor: STATUS_BG[order.status] }}
+                                >
+                                    <Text className="font-bold text-xs" style={{ color: STATUS_COLORS[order.status] }}>
+                                        {statusLabels[order.status]}
+                                    </Text>
+                                </View>
+                                {isPreparing && (
+                                    <Text className="text-subtext text-[10px] mt-1">
+                                        {t('orders.tap_twice_mark_ready', 'Tap twice to mark ready')}
+                                    </Text>
+                                )}
+                                {order.driver && (
+                                    <Text className="text-white/85 text-[10px] mt-1 font-bold" numberOfLines={1}>
+                                        {order.driver.firstName} {order.driver.lastName}
+                                    </Text>
+                                )}
                             </View>
                         </View>
 
                         {/* Elapsed Time Counter */}
-                        <View className="flex-row items-center bg-background/40 rounded-xl px-2.5 py-2 mt-2">
-                            <Ionicons name="time-outline" size={16} color="#7C3AED" />
-                            <Text className="text-primary font-bold text-sm ml-2">
-                                {order.status === 'PENDING' && getElapsedTime(order.orderDate)}
-                                {order.status === 'PREPARING' && order.preparingAt && getElapsedTime(order.preparingAt)}
-                                {order.status === 'READY' && order.readyAt && getElapsedTime(order.readyAt)}
-                                {order.status === 'OUT_FOR_DELIVERY' && order.readyAt && getElapsedTime(order.readyAt)}
-                            </Text>
-                            <Text className="text-subtext text-xs ml-1">{t('orders.elapsed', 'elapsed')}</Text>
-                        </View>
-
-                        {/* Prep Time Countdown - Compact */}
-                        {isPreparing && timeRemaining && (
+                        {!showHeaderTimer && (
                             <View
-                                className="flex-row items-center rounded-lg px-2.5 py-1.5 mt-2"
-                                style={{
-                                    backgroundColor: timeRemaining.isOverdue ? '#ef444420' : '#3b82f620',
-                                }}
+                                className="flex-row items-center rounded-xl px-3 py-2.5 mt-2"
+                                style={{ backgroundColor: STATUS_BG[order.status] }}
                             >
-                                <Ionicons
-                                    name={timeRemaining.isOverdue ? 'warning' : 'timer'}
-                                    size={14}
-                                    color={timeRemaining.isOverdue ? '#ef4444' : '#3b82f6'}
-                                />
+                                <Ionicons name="time-outline" size={isTablet ? 18 : 17} color="#fff" />
                                 <Text
-                                    className="font-bold text-xs ml-1.5 flex-1"
-                                    style={{ color: timeRemaining.isOverdue ? '#ef4444' : '#3b82f6' }}
+                                    className={`font-extrabold ml-2 ${isTablet ? 'text-xl' : 'text-lg'}`}
+                                    style={{ color: '#fff' }}
                                 >
-                                    {timeRemaining.text}
+                                    {elapsedText}
                                 </Text>
-                                {order.preparationMinutes && (
-                                    <Text className="text-subtext text-xs">
-                                        {order.preparationMinutes}min
-                                    </Text>
+                                <Text className={`text-white/80 ml-1 ${isTablet ? 'text-sm' : 'text-xs'}`}>{t('orders.elapsed', 'elapsed')}</Text>
+
+                                {isPreparing && timeRemaining && (
+                                    <View className="ml-auto flex-row items-center">
+                                        <View className="w-px h-5 bg-white/35 mr-2" />
+                                        <Ionicons
+                                            name={timeRemaining.isOverdue ? 'warning' : 'timer-outline'}
+                                            size={isTablet ? 16 : 15}
+                                            color="#fff"
+                                        />
+                                        <Text
+                                            className={`font-bold ml-1 ${isTablet ? 'text-base' : 'text-sm'}`}
+                                            style={{ color: '#fff' }}
+                                        >
+                                            {timeRemaining.text}
+                                        </Text>
+                                    </View>
                                 )}
                             </View>
                         )}
+
                     </View>
 
                     {/* ── Items - Compact ── */}
                     <View className="px-3 pb-2">
-                        <Text className="text-subtext font-semibold text-xs mb-1.5 uppercase tracking-wider">
-                            {totalItems} {totalItems === 1 ? t('orders.item', 'Item') : t('orders.items', 'Items')}
-                        </Text>
-
                         {businessOrder.items.map((item, index) => (
-                            <View
-                                key={index}
-                                className="flex-row items-center py-1.5"
-                                style={
-                                    index < businessOrder.items.length - 1
-                                        ? { borderBottomWidth: 1, borderBottomColor: 'rgba(55,65,81,0.3)' }
-                                        : {}
-                                }
-                            >
-                                <View className="w-7 h-7 rounded-lg bg-primary/20 items-center justify-center mr-2">
-                                    <Text className="text-primary font-bold text-xs">{item.quantity}×</Text>
-                                </View>
-                                <View className="flex-1">
-                                    <Text className="text-text font-semibold text-sm" numberOfLines={1}>
-                                        {item.name}
-                                    </Text>
-                                    {item.notes && (
-                                        <Text className="text-warning text-xs mt-0.5 italic" numberOfLines={1}>
-                                            💬 {item.notes}
+                            <View key={index} className="py-2">
+                                <View className="flex-row items-start">
+                                    <View
+                                        className="rounded-full items-center justify-center self-start mt-0.5 mr-2.5 px-2.5 py-1.5"
+                                        style={{
+                                            backgroundColor: STATUS_COLORS[order.status],
+                                            borderWidth: 1,
+                                            borderColor: 'rgba(255,255,255,0.45)',
+                                        }}
+                                    >
+                                        <Text
+                                            className={`text-white font-extrabold leading-none ${isTablet ? 'text-2xl' : 'text-xl'}`}
+                                        >
+                                            {item.quantity}×
                                         </Text>
-                                    )}
+                                    </View>
+
+                                    <View className="flex-1">
+                                        <View className="flex-row items-center justify-between">
+                                            <View className="flex-1 pr-2">
+                                                <Text className={`text-text font-semibold ${isTablet ? 'text-base' : 'text-sm'}`} numberOfLines={2}>
+                                                    {item.name}
+                                                </Text>
+                                            </View>
+
+                                            <Text className={`text-text font-bold ml-2 ${isTablet ? 'text-base' : 'text-sm'}`}>
+                                                €{(item.unitPrice * item.quantity).toFixed(2)}
+                                            </Text>
+                                        </View>
+
+                                        {item.notes && (
+                                            <View className="mt-2 bg-warning/10 rounded-lg px-2.5 py-2">
+                                                <Text className={`text-warning mt-0.5 ${isTablet ? 'text-sm' : 'text-xs'}`}>
+                                                    {item.notes}
+                                                </Text>
+                                            </View>
+                                        )}
+                                    </View>
                                 </View>
-                                <Text className="text-text font-semibold text-sm ml-2">
-                                    €{(item.unitPrice * item.quantity).toFixed(2)}
-                                </Text>
+
+                                {index < businessOrder.items.length - 1 && (
+                                    <View
+                                        className="mt-2 h-px w-full"
+                                        style={{ backgroundColor: 'rgba(255,255,255,0.45)' }}
+                                    />
+                                )}
                             </View>
                         ))}
                     </View>
 
                     {/* ── Total - Compact ── */}
                     <View className="mx-3 pt-2 pb-2.5 border-t border-gray-700 flex-row items-center justify-between">
-                        <Text className="text-subtext font-semibold text-sm">{t('orders.total', 'Total')}</Text>
-                        <Text className="text-text font-bold text-lg">€{businessSubtotal.toFixed(2)}</Text>
+                        <Text className={`text-subtext font-semibold ${isTablet ? 'text-base' : 'text-sm'}`}>{t('orders.total', 'Total')}</Text>
+                        <Text className={`text-success font-extrabold ${isTablet ? 'text-3xl' : 'text-2xl'}`}>€{businessSubtotal.toFixed(2)}</Text>
                     </View>
 
                     {/* ── Actions - Compact ── */}
@@ -583,7 +695,7 @@ export default function OrdersScreen() {
                 >
                     <Pressable
                         className="bg-card rounded-3xl overflow-hidden"
-                        style={{ width: '90%', maxWidth: 480 }}
+                        style={{ width: '95%', maxWidth: 680 }}
                         onPress={(e) => e.stopPropagation()}
                     >
                         {/* Modal Header */}
@@ -598,7 +710,7 @@ export default function OrdersScreen() {
                         </View>
 
                         {/* ETA Options */}
-                        <View className="p-6 flex-row flex-wrap justify-center gap-3">
+                        <View className="p-6 pt-5 flex-row flex-wrap justify-center gap-3">
                             {ETA_OPTIONS.map((option) => (
                                 <TouchableOpacity
                                     key={option.value}
@@ -610,6 +722,7 @@ export default function OrdersScreen() {
                                     }}
                                     onPress={() => {
                                         setSelectedEta(option.value);
+                                        setCustomEta('');
                                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                     }}
                                 >
@@ -631,6 +744,23 @@ export default function OrdersScreen() {
                                     </Text>
                                 </TouchableOpacity>
                             ))}
+
+                            <View className="w-full mt-2">
+                                <Text className="text-subtext text-sm mb-2">
+                                    {t('orders.custom_minutes', 'Custom minutes')}
+                                </Text>
+                                <TextInput
+                                    value={customEta}
+                                    onChangeText={(value) => {
+                                        const sanitized = value.replace(/[^0-9]/g, '');
+                                        setCustomEta(sanitized);
+                                    }}
+                                    keyboardType="number-pad"
+                                    placeholder={t('orders.write_minutes', 'Write minutes...')}
+                                    placeholderTextColor="#6b7280"
+                                    className="bg-background text-text rounded-xl px-4 py-3 border border-gray-700"
+                                />
+                            </View>
                         </View>
 
                         {/* Modal Actions */}
@@ -652,7 +782,7 @@ export default function OrdersScreen() {
                                     <>
                                         <Ionicons name="checkmark-circle" size={20} color="#fff" />
                                         <Text className="text-white font-bold text-base ml-2">
-                                            Accept — {selectedEta} min
+                                            Accept — {(customEta.trim() ? customEta : String(selectedEta))} min
                                         </Text>
                                     </>
                                 )}

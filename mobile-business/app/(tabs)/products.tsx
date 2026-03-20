@@ -53,11 +53,11 @@ export default function ProductsScreen() {
     const { user } = useAuthStore();
     const canManageProducts = hasBusinessPermission(user, UserPermission.ManageProducts);
 
-    const [searchQuery, setSearchQuery] = useState('');
     const [showFormModal, setShowFormModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
 
     const [formName, setFormName] = useState('');
     const [formDescription, setFormDescription] = useState('');
@@ -112,13 +112,8 @@ export default function ProductsScreen() {
     const categories: Category[] = data?.productCategories || [];
 
     const filteredProducts = useMemo(
-        () =>
-            products.filter((product) => {
-                const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
-                const matchesCategory = !selectedCategory || product.categoryId === selectedCategory;
-                return matchesSearch && matchesCategory;
-            }),
-        [products, searchQuery, selectedCategory],
+        () => products.filter((product) => !selectedCategory || product.categoryId === selectedCategory),
+        [products, selectedCategory],
     );
 
     const resetForm = () => {
@@ -251,61 +246,86 @@ export default function ProductsScreen() {
         }
     };
 
+    const handleRefresh = async () => {
+        setRefreshing(true);
+        try {
+            await refetch();
+        } finally {
+            setRefreshing(false);
+        }
+    };
+
     const renderProductCard = ({ item: product }: { item: Product }) => {
         const displayPrice = product.isOnSale && product.salePrice ? product.salePrice : product.price;
+        const categoryName = categories.find((category) => category.id === product.categoryId)?.name;
 
         return (
-            <View
-                className="rounded-2xl p-4 mx-4 mb-4"
-                style={{
-                    backgroundColor: product.isAvailable ? '#1f2937' : '#111827',
-                    borderWidth: 1,
-                    borderColor: product.isAvailable ? 'rgba(55, 65, 81, 0.8)' : 'rgba(239, 68, 68, 0.4)',
-                }}
-            >
-                <View className="flex-row">
-                    <View className="w-20 h-20 rounded-xl bg-background overflow-hidden mr-3">
+            <View className="rounded-2xl p-4 mb-3 bg-card border border-border">
+                <View className="flex-row items-start">
+                    <View className="w-20 h-20 rounded-xl bg-background overflow-hidden mr-3 border border-border">
                         {product.imageUrl ? (
                             <Image source={{ uri: product.imageUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
                         ) : (
                             <View className="flex-1 items-center justify-center">
-                                <Ionicons name="image-outline" size={32} color="#6b7280" />
+                                <Ionicons name="image-outline" size={30} color="#94A3B8" />
                             </View>
                         )}
                     </View>
 
                     <View className="flex-1">
-                        <View className="flex-row items-start justify-between mb-1">
-                            <Text className="text-text font-semibold text-base flex-1" numberOfLines={2}>
+                        <View className="flex-row items-start justify-between mb-1.5">
+                            <Text className="text-text font-semibold text-base flex-1 pr-2" numberOfLines={2}>
                                 {product.name}
                             </Text>
-                            <TouchableOpacity className="ml-2" onPress={() => handleToggleAvailability(product)}>
-                                <View className={`w-12 h-6 rounded-full justify-center ${product.isAvailable ? 'bg-success' : 'bg-gray-600'}`}>
-                                    <View className={`w-5 h-5 bg-white rounded-full ${product.isAvailable ? 'ml-6' : 'ml-0.5'}`} />
-                                </View>
-                            </TouchableOpacity>
+                            <Switch
+                                value={product.isAvailable}
+                                onValueChange={() => handleToggleAvailability(product)}
+                                trackColor={{ false: '#64748B', true: '#7C3AED' }}
+                                thumbColor="#fff"
+                            />
                         </View>
 
-                        {product.description && <Text className="text-subtext text-xs mb-1" numberOfLines={2}>{product.description}</Text>}
+                        <View className="flex-row items-center gap-2 mb-2">
+                            {categoryName ? (
+                                <View className="px-2.5 py-1 rounded-full bg-primary/15">
+                                    <Text className="text-primary text-xs font-semibold">{categoryName}</Text>
+                                </View>
+                            ) : null}
+                            {product.isOnSale ? (
+                                <View className="px-2.5 py-1 rounded-full bg-success/15">
+                                    <Text className="text-success text-xs font-semibold">{t('products.on_sale', 'On sale')}</Text>
+                                </View>
+                            ) : null}
+                            <View className={`px-2.5 py-1 rounded-full ${product.isAvailable ? 'bg-success/15' : 'bg-danger/15'}`}>
+                                <Text className={`text-xs font-semibold ${product.isAvailable ? 'text-success' : 'text-danger'}`}>
+                                    {product.isAvailable ? t('products.available', 'Available') : t('products.unavailable', 'Unavailable')}
+                                </Text>
+                            </View>
+                        </View>
 
-                        <View className="flex-row items-center justify-between mt-1">
+                        {product.description && (
+                            <Text className="text-subtext text-xs mb-2" numberOfLines={2}>
+                                {product.description}
+                            </Text>
+                        )}
+
+                        <View className="flex-row items-end justify-between">
                             <View className="flex-row items-center">
                                 <Text className="text-success font-bold text-lg">€{displayPrice.toFixed(2)}</Text>
-                                {product.isOnSale && <Text className="text-subtext line-through ml-2 text-sm">€{product.price.toFixed(2)}</Text>}
+                                {product.isOnSale && (
+                                    <Text className="text-subtext line-through ml-2 text-sm">€{product.price.toFixed(2)}</Text>
+                                )}
                             </View>
-                            <Text className="text-xs font-semibold" style={{ color: product.isAvailable ? '#10b981' : '#ef4444' }}>
-                                {product.isAvailable ? t('products.available', 'Available') : t('products.unavailable', 'Unavailable')}
-                            </Text>
                         </View>
                     </View>
                 </View>
 
-                <View className="flex-row gap-2 mt-3 pt-3 border-t border-gray-700">
-                    <TouchableOpacity className="flex-1 bg-primary/20 py-2 rounded-lg flex-row items-center justify-center" onPress={() => openEditForm(product)}>
+                <View className="flex-row gap-2 mt-3 pt-3 border-t border-border">
+                    <TouchableOpacity className="flex-1 bg-primary/15 py-2.5 rounded-xl flex-row items-center justify-center" onPress={() => openEditForm(product)}>
                         <Ionicons name="pencil" size={16} color="#7C3AED" />
                         <Text className="text-primary font-semibold ml-1 text-sm">{t('products.edit', 'Edit')}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity className="flex-1 bg-danger/20 py-2 rounded-lg flex-row items-center justify-center" onPress={() => handleDeleteProduct(product.id, product.name)}>
+                    <TouchableOpacity className="flex-1 bg-danger/15 py-2.5 rounded-xl flex-row items-center justify-center" onPress={() => handleDeleteProduct(product.id, product.name)}>
                         <Ionicons name="trash" size={16} color="#ef4444" />
                         <Text className="text-danger font-semibold ml-1 text-sm">{t('products.delete', 'Delete')}</Text>
                     </TouchableOpacity>
@@ -316,54 +336,36 @@ export default function ProductsScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-background">
-            <View className="px-4 py-3 border-b border-gray-800">
-                <View className="flex-row items-center justify-between mb-3">
-                    <View>
-                        <Text className="text-text text-2xl font-bold">{t('products.title', 'Products')}</Text>
-                        <Text className="text-subtext">{filteredProducts.length} {t('products.items', 'items')}</Text>
+            <View className="px-4 py-3">
+                <View className="flex-row items-center gap-3">
+                    <View className="flex-1">
+                        <FlatList
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            data={[{ id: null, name: t('products.all', 'All') }, ...categories]}
+                            keyExtractor={(item) => item.id || 'all'}
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    className={`px-4 py-2 rounded-full mr-2 border ${selectedCategory === item.id ? 'bg-primary border-primary' : 'bg-card border-border'}`}
+                                    onPress={() => setSelectedCategory(item.id)}
+                                >
+                                    <Text className={`font-semibold text-sm ${selectedCategory === item.id ? 'text-white' : 'text-subtext'}`}>
+                                        {item.name}
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
+                        />
                     </View>
-                    <TouchableOpacity className="bg-primary w-12 h-12 rounded-full items-center justify-center" onPress={openAddForm}>
-                        <Ionicons name="add" size={28} color="white" />
+
+                    <TouchableOpacity
+                        className="bg-primary w-10 h-10 rounded-xl items-center justify-center"
+                        onPress={openAddForm}
+                        accessibilityLabel={t('products.add', 'Add')}
+                    >
+                        <Ionicons name="add" size={22} color="white" />
                     </TouchableOpacity>
                 </View>
-
-                <View className="bg-card rounded-xl flex-row items-center px-4 py-3">
-                    <Ionicons name="search" size={20} color="#9ca3af" />
-                    <TextInput
-                        className="flex-1 ml-2 text-text"
-                        placeholder={t('products.search_placeholder', 'Search products...')}
-                        placeholderTextColor="#6b7280"
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                    />
-                    {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => setSearchQuery('')}>
-                            <Ionicons name="close-circle" size={20} color="#6b7280" />
-                        </TouchableOpacity>
-                    )}
-                </View>
             </View>
-
-            {categories.length > 0 && (
-                <View className="px-4 py-3">
-                    <FlatList
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        data={[{ id: null, name: t('products.all', 'All') }, ...categories]}
-                        keyExtractor={(item) => item.id || 'all'}
-                        renderItem={({ item }) => (
-                            <TouchableOpacity
-                                className={`px-4 py-2 rounded-full mr-2 ${selectedCategory === item.id ? 'bg-primary' : 'bg-card'}`}
-                                onPress={() => setSelectedCategory(item.id)}
-                            >
-                                <Text className={`font-semibold text-sm ${selectedCategory === item.id ? 'text-white' : 'text-subtext'}`}>
-                                    {item.name}
-                                </Text>
-                            </TouchableOpacity>
-                        )}
-                    />
-                </View>
-            )}
 
             {loading ? (
                 <View className="flex-1 items-center justify-center">
@@ -374,17 +376,18 @@ export default function ProductsScreen() {
                     data={filteredProducts}
                     keyExtractor={(item) => item.id}
                     renderItem={renderProductCard}
-                    refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} tintColor="#7C3AED" />}
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7C3AED" />}
                     ListEmptyComponent={
-                        <View className="items-center justify-center py-12">
+                        <View className="items-center justify-center py-16 px-6">
                             <Ionicons name="fast-food-outline" size={64} color="#6b7280" />
-                            <Text className="text-subtext text-center mt-4">No products found</Text>
-                            <TouchableOpacity className="bg-primary px-6 py-3 rounded-xl mt-4" onPress={openAddForm}>
-                                <Text className="text-white font-semibold">Add Your First Product</Text>
+                            <Text className="text-text text-lg font-semibold text-center mt-4">{t('products.no_products', 'No products found')}</Text>
+                            <Text className="text-subtext text-center mt-1">{t('products.no_products_hint', 'Try adding a new product or changing filters.')}</Text>
+                            <TouchableOpacity className="bg-primary px-6 py-3 rounded-xl mt-5" onPress={openAddForm}>
+                                <Text className="text-white font-semibold">{t('products.add_first', 'Add Your First Product')}</Text>
                             </TouchableOpacity>
                         </View>
                     }
-                    contentContainerStyle={{ paddingTop: 8, paddingBottom: 16 }}
+                    contentContainerStyle={{ paddingTop: 8, paddingBottom: 20, paddingHorizontal: 16 }}
                 />
             )}
 
