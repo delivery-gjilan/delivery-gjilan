@@ -15,6 +15,14 @@ function parseTimeToMinutes(t: string): number {
 
 export const Business: BusinessResolvers = {
     isOpen: (parent) => {
+        if (parent.isActive === false) {
+            return false;
+        }
+
+        if (parent.isTemporarilyClosed) {
+            return false;
+        }
+
         const now = new Date();
         const currentMinutes = now.getHours() * 60 + now.getMinutes();
         const currentDay = now.getDay(); // 0 = Sunday

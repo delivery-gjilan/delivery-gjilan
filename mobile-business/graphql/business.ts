@@ -24,3 +24,27 @@ export const SET_BUSINESS_SCHEDULE = gql`
         }
     }
 `;
+
+export const GET_BUSINESS_OPERATIONS = gql`
+    query GetBusinessOperations($id: ID!) {
+        business(id: $id) {
+            id
+            avgPrepTimeMinutes
+            isTemporarilyClosed
+            temporaryClosureReason
+            isOpen
+        }
+    }
+`;
+
+export const UPDATE_BUSINESS_OPERATIONS = gql`
+    mutation UpdateBusinessOperations($id: ID!, $input: UpdateBusinessInput!) {
+        updateBusiness(id: $id, input: $input) {
+            id
+            avgPrepTimeMinutes
+            isTemporarilyClosed
+            temporaryClosureReason
+            isOpen
+        }
+    }
+`;

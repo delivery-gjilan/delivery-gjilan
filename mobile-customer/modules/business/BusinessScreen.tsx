@@ -448,6 +448,31 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                             )}
                         </View>
 
+                        {!business.isOpen && business.temporaryClosureReason && (
+                            <View
+                                style={{
+                                    marginTop: 8,
+                                    paddingHorizontal: 10,
+                                    paddingVertical: 6,
+                                    borderRadius: 8,
+                                    backgroundColor: '#D32F2F20',
+                                    borderWidth: 1,
+                                    borderColor: '#D32F2F45',
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        color: '#D32F2F',
+                                        fontSize: 12,
+                                        fontWeight: '600',
+                                        textAlign: 'center',
+                                    }}
+                                >
+                                    {business.temporaryClosureReason}
+                                </Text>
+                            </View>
+                        )}
+
                         {/* Delivery info card */}
                         <TouchableOpacity
                             activeOpacity={0.85}

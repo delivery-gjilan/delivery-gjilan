@@ -49,6 +49,8 @@ export class BusinessService {
             schedule: schedule.map((r) => this.mapHoursRow(r)),
             avgPrepTimeMinutes: business.avgPrepTimeMinutes,
             prepTimeOverrideMinutes: business.prepTimeOverrideMinutes ?? null,
+            isTemporarilyClosed: business.isTemporarilyClosed,
+            temporaryClosureReason: business.temporaryClosureReason ?? null,
             isActive: business.isActive ?? true,
             createdAt: new Date(business.createdAt),
             updatedAt: new Date(business.updatedAt),
@@ -74,6 +76,8 @@ export class BusinessService {
             opensAt: open,
             closesAt: close,
             avgPrepTimeMinutes: validatedInput.avgPrepTimeMinutes ?? 20,
+            isTemporarilyClosed: false,
+            temporaryClosureReason: null,
             isActive: true,
         });
 
@@ -144,6 +148,18 @@ export class BusinessService {
             updateData.locationLng = validatedInput.location.longitude;
             updateData.locationAddress = validatedInput.location.address;
             delete updateData.location;
+        }
+
+        if (validatedInput.isTemporarilyClosed === true) {
+            const reason = (validatedInput.temporaryClosureReason ?? '').trim();
+            if (!reason) {
+                throw AppError.badInput('A closure reason is required when closing the store');
+            }
+            updateData.temporaryClosureReason = reason;
+        }
+
+        if (validatedInput.isTemporarilyClosed === false) {
+            updateData.temporaryClosureReason = null;
         }
 
         const updatedBusiness = await this.businessRepository.update(id, updateData);
