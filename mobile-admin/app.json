@@ -3,7 +3,9 @@
     "name": "delivery-admin",
     "slug": "delivery-admin",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "icon": "./assets/images/icon.png",
     "scheme": "deliveryadmin",
     "userInterfaceStyle": "automatic",
