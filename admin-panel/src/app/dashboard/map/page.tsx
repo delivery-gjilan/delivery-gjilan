@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState, Fragment, useCallback } from "react";
-import { useApolloClient, useQuery, useSubscription, useMutation, useLazyQuery } from "@apollo/client/react";
+import { useMutation, useLazyQuery } from "@apollo/client/react";
 import Map, { Marker, Source, Layer } from "react-map-gl/mapbox";
 import {
   MapPin, X, Filter, Clock, Package, Phone,
@@ -9,17 +9,14 @@ import {
   SignalLow, SignalZero, ChevronDown, ChevronUp, Eye, EyeOff,
   Zap, Route, ExternalLink, Crosshair, LocateFixed, Mic, Radio
 } from "lucide-react";
-import { GET_BUSINESSES } from "@/graphql/operations/businesses/queries";
-import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
-import { DRIVERS_UPDATED_SUBSCRIPTION } from "@/graphql/operations/users/subscriptions";
-import { GET_ORDERS } from "@/graphql/operations/orders/queries";
-import { ALL_ORDERS_SUBSCRIPTION } from "@/graphql/operations/orders/subscriptions";
 import { ASSIGN_DRIVER_TO_ORDER, UPDATE_ORDER_STATUS } from "@/graphql/operations/orders";
 import { ADMIN_UPDATE_DRIVER_LOCATION } from "@/graphql/operations/users/mutations";
-import { calculateRouteDistance, getDirectionsTelemetry } from "@/lib/utils/mapbox";
+import { getDirectionsTelemetry } from "@/lib/utils/mapbox";
 import { ADMIN_SEND_PTT_SIGNAL, GET_AGORA_RTC_CREDENTIALS } from "@/graphql/operations/users/ptt";
 import AgoraRTC, { IAgoraRTCClient, IMicrophoneAudioTrack } from 'agora-rtc-sdk-ng';
 import { getInitials, getAvatarColor } from "@/lib/avatarUtils";
+import { useMapRealtimeData } from "@/lib/hooks/useMapRealtimeData";
+import { useOrderRouteDistances } from "@/lib/hooks/useOrderRouteDistances";
 import { toast } from 'sonner';
 
 // ╔══════════════════════════════════════════════════════════╗
@@ -33,7 +30,6 @@ const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 const MAP_STYLE = process.env.NEXT_PUBLIC_MAP_STYLE_URL || "mapbox://styles/mapbox/streets-v12";
 
 const PENDING_WARNING_MS = 2 * 60 * 1000; // 2 minutes
-const SUBSCRIPTION_REFETCH_COOLDOWN_MS = 1500;
 const ANIMATION_COMMIT_INTERVAL_MS = 66; // ~15 FPS UI commits
 const DRIVER_GAP_DEFAULT_MS = 5000;
 const DRIVER_GAP_MIN_MS = 500;
@@ -295,72 +291,18 @@ function getOrderEtaMinutes(
 // ║                    MAP PAGE                             ║
 // ╚══════════════════════════════════════════════════════════╝
 export default function MapPage() {
-  const apolloClient = useApolloClient();
-  // == DATA ==
-  const { data: businessData } = useQuery(GET_BUSINESSES);
-  const { data: driverData } = useQuery(DRIVERS_QUERY, { pollInterval: 10000 });
-  const { data: orderData, refetch: refetchOrders } = useQuery(GET_ORDERS);
-  const [driversLive, setDriversLive] = useState<any[]>([]);
-
-  useEffect(() => {
-    if ((driverData as any)?.drivers) {
-      setDriversLive((driverData as any).drivers);
-    }
-  }, [driverData]);
-  
-  // Refetch when subscriptions fire (backend sends lightweight signal)
-  // Cooldown avoids bursts when multiple events arrive in quick succession.
-  const lastSubscriptionRefetchMsRef = useRef({ orders: 0, drivers: 0 });
-  useSubscription(ALL_ORDERS_SUBSCRIPTION, {
-    onData: ({ data: subscriptionData }) => {
-      const incomingOrders = (subscriptionData.data as any)?.allOrdersUpdated as any[] | undefined;
-      if (incomingOrders && incomingOrders.length > 0) {
-        apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
-          const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
-          const byId = new globalThis.Map<string, any>(currentOrders.map((order: any) => [String(order?.id), order]));
-          incomingOrders.forEach((order: any) => {
-            const existingOrder = byId.get(String(order?.id));
-            byId.set(String(order?.id), { ...existingOrder, ...order });
-          });
-
-          return {
-            ...(existing ?? {}),
-            orders: Array.from(byId.values()),
-          };
-        });
-        return;
-      }
-
-      lastSubscriptionRefetchMsRef.current.orders = Date.now();
-      refetchOrders();
-    },
-  });
-  useSubscription(DRIVERS_UPDATED_SUBSCRIPTION, {
-    onData: ({ data: subscriptionData }) => {
-      const incoming = (subscriptionData.data as any)?.driversUpdated as any[] | undefined;
-      if (!incoming || incoming.length === 0) return;
-
-      setDriversLive((prev) => {
-        const byId = new globalThis.Map<string, any>((prev || []).map((d: any) => [d.id, d]));
-        incoming.forEach((driver: any) => {
-          byId.set(driver.id, { ...byId.get(driver.id), ...driver });
-        });
-        return Array.from(byId.values());
-      });
-    },
-  });
+  // Realtime data sync is encapsulated in a dedicated hook to keep page logic UI-focused.
+  const { businesses, orders: rawOrders, drivers } = useMapRealtimeData();
   
   const [assignDriver] = useMutation(ASSIGN_DRIVER_TO_ORDER);
   const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS, { fetchPolicy: "no-cache" });
   const [sendPttSignal] = useMutation(ADMIN_SEND_PTT_SIGNAL);
   const [getAgoraCredentials] = useLazyQuery(GET_AGORA_RTC_CREDENTIALS, { fetchPolicy: 'no-cache' });
 
-  const businesses = useMemo(() => (businessData as any)?.businesses ?? [], [businessData]);
   const orders = useMemo(
-    () => (((orderData as any)?.orders ?? []) as any[]).map(normalizeOrderShape),
-    [orderData],
+    () => (rawOrders as any[]).map(normalizeOrderShape),
+    [rawOrders],
   );
-  const drivers = useMemo(() => driversLive ?? [], [driversLive]);
 
   const activeOrders = useMemo(
     () => orders.filter((o: any) => o.status !== "DELIVERED" && o.status !== "CANCELLED"),
@@ -385,7 +327,6 @@ export default function MapPage() {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [filters, setFilters] = useState({ status: "ALL", driver: "ALL", business: "ALL", unassignedOnly: false });
   const [driverFilter, setDriverFilter] = useState<string>("ALL");
-  const [orderDistances, setOrderDistances] = useState<Record<string, any>>({});
   const [showPolylines, setShowPolylines] = useState<Record<string, boolean>>({});
   const [showBothRoutes, setShowBothRoutes] = useState<Record<string, boolean>>({});
   const [driverTracks, setDriverTracks] = useState<Record<string, any>>({});
@@ -458,6 +399,8 @@ export default function MapPage() {
     drivers.forEach((d: any) => { map[d.id] = d; });
     return map;
   }, [drivers]);
+
+  const { orderDistances } = useOrderRouteDistances(activeOrders, driverMap);
 
   const filteredDrivers = useMemo(() => {
     let result = [...drivers];
@@ -767,122 +710,6 @@ export default function MapPage() {
       lastAnimationCommitTsRef.current = 0;
     };
   }, []);
-
-  // Route calculation
-  const ROUTE_RECALC_MIN_MS = 60000;
-  const ROUTE_RECALC_MIN_METERS = 80;
-  const lastRouteCalcRef = useRef<Record<string, { timestamp: number; latitude: number; longitude: number }>>({});
-
-  const haversineMeters = (a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) => {
-    const R = 6371000;
-    const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
-    const dLon = ((b.longitude - a.longitude) * Math.PI) / 180;
-    const lat1 = (a.latitude * Math.PI) / 180;
-    const lat2 = (b.latitude * Math.PI) / 180;
-    const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
-    return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
-  };
-
-  const shouldRecalculateRoute = (orderId: string, driverPos: { latitude: number; longitude: number }) => {
-    const prev = lastRouteCalcRef.current[orderId];
-    const n = Date.now();
-    if (!prev) { lastRouteCalcRef.current[orderId] = { timestamp: n, latitude: driverPos.latitude, longitude: driverPos.longitude }; return true; }
-    const elapsed = n - prev.timestamp;
-    const moved = haversineMeters(prev, driverPos);
-    if (elapsed < ROUTE_RECALC_MIN_MS && moved < ROUTE_RECALC_MIN_METERS) return false;
-    lastRouteCalcRef.current[orderId] = { timestamp: n, latitude: driverPos.latitude, longitude: driverPos.longitude };
-    return true;
-  };
-
-  useEffect(() => {
-    const abortController = new AbortController();
-    let cancelled = false;
-
-    const calculateDistances = async () => {
-      const nextDistances: Record<string, any> = {};
-      for (const order of activeOrders) {
-        const cacheKey = `${order.id}-${order.driver?.id || "none"}-${order.status}`;
-        const existingKey = orderDistances[order.id]
-          ? `${order.id}-${orderDistances[order.id].driverId || "none"}-${orderDistances[order.id].status}`
-          : null;
-
-        const firstBusiness = order.businesses?.[0]?.business;
-        if (!firstBusiness?.location || !order.dropOffLocation) continue;
-        const pickup = { longitude: firstBusiness.location.longitude, latitude: firstBusiness.location.latitude };
-        const dropoff = { longitude: order.dropOffLocation.longitude, latitude: order.dropOffLocation.latitude };
-
-        try {
-          if ((order.status === "READY" || order.status === "PENDING") && order.driver) {
-            const driver = driverMap[order.driver.id];
-            const driverLocation = driver?.driverLocation || order.driver?.driverLocation;
-            if (!driverLocation) continue;
-            const driverPos = { longitude: driverLocation.longitude, latitude: driverLocation.latitude };
-
-            const shouldRecalc = shouldRecalculateRoute(order.id, driverPos);
-            if (existingKey === cacheKey && !shouldRecalc) continue;
-            if (!shouldRecalc) continue;
-
-            const [toPickupRoute, toDropoffRoute] = await Promise.all([
-              calculateRouteDistance(driverPos, pickup, abortController.signal),
-              calculateRouteDistance(pickup, dropoff, abortController.signal),
-            ]);
-            if (toPickupRoute && toDropoffRoute) {
-              nextDistances[order.id] = {
-                toPickup: toPickupRoute,
-                toDropoff: toDropoffRoute,
-                driverId: order.driver.id,
-                status: order.status,
-                calculatedAtMs: Date.now(),
-              };
-            }
-          } else if (order.status === "OUT_FOR_DELIVERY" && order.driver) {
-            const driver = driverMap[order.driver.id];
-            const driverLocation = driver?.driverLocation || order.driver?.driverLocation;
-            if (!driverLocation) continue;
-            const driverPos = { longitude: driverLocation.longitude, latitude: driverLocation.latitude };
-
-            const shouldRecalc = shouldRecalculateRoute(order.id, driverPos);
-            if (existingKey === cacheKey && !shouldRecalc) continue;
-            if (!shouldRecalc) continue;
-
-            const toDropoffRoute = await calculateRouteDistance(driverPos, dropoff, abortController.signal);
-            if (toDropoffRoute) {
-              nextDistances[order.id] = {
-                toDropoff: toDropoffRoute,
-                driverId: order.driver.id,
-                status: order.status,
-                calculatedAtMs: Date.now(),
-              };
-            }
-          } else if (!order.driver) {
-            if (existingKey === cacheKey && orderDistances[order.id]) continue;
-            const route = await calculateRouteDistance(pickup, dropoff, abortController.signal);
-            if (route) {
-              nextDistances[order.id] = {
-                toDropoff: route,
-                driverId: null,
-                status: order.status,
-                calculatedAtMs: Date.now(),
-              };
-            }
-          }
-        } catch (error) {
-          console.error("Error calculating distance for order:", order.id, error);
-        }
-      }
-
-      if (!cancelled && Object.keys(nextDistances).length > 0) {
-        setOrderDistances((prev) => ({ ...prev, ...nextDistances }));
-      }
-    };
-
-    calculateDistances();
-
-    return () => {
-      cancelled = true;
-      abortController.abort();
-    };
-  }, [activeOrders.map((o: any) => `${o.id}-${o.driver?.id || "none"}-${o.status}`).join(","), driverMap]);
 
   // Auto-show route
   useEffect(() => {
