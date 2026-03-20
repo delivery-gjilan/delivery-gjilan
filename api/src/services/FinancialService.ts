@@ -74,6 +74,9 @@ export class FinancialService {
                             status: 'PENDING',
                             ruleId: settlement.ruleId,
                         })
+                        // Defensive idempotency: if another path already inserted the same
+                        // pending settlement fingerprint, keep this operation as a no-op.
+                        .onConflictDoNothing()
                         .execute();
                 }
 

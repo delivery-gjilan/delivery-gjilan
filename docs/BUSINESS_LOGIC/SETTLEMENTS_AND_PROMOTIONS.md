@@ -7,6 +7,7 @@
 
 ## Recent Updates
 
+- 2026-03-20: Added DB-level pending-settlement uniqueness guard (`uq_settlements_pending_fingerprint`) plus conflict-safe inserts in `FinancialService.createOrderSettlements()` to hard-stop occasional duplicate pending rows under concurrent triggers.
 - 2026-03-19: Settlement creation is now protected by an order-scoped Postgres advisory transaction lock in `FinancialService.createOrderSettlements()` to prevent duplicate settlements during concurrent delivery/backfill triggers.
 - 2026-03-18: Fixed mobile-admin settlement action wiring to pass `settlementId` (not `id`) to `markSettlementAsPaid`.
 - 2026-03-18: Fixed mobile-admin settlement list metadata line to show `createdAt` instead of undefined `periodStart`/`periodEnd` fields.
