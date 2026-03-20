@@ -97,6 +97,7 @@ For every mobile parity PR:
 
 ## Change Log
 
+- 2026-03-20: Business settlements `from last settlement` date mode now starts from the exact `lastPaidSettlementAt` timestamp (time preserved) instead of day start truncation, and the active filter label now shows time (`HH:mm:ss`) for clarity.
 - 2026-03-19: Phase-2 admin map optimization: extracted route-distance recalculation into `admin-panel/src/lib/hooks/useOrderRouteDistances.ts` and enabled adaptive driver polling in `useMapRealtimeData` (pause polling while driver subscription is fresh; resume after staleness threshold).
 - 2026-03-19: Extracted admin-panel map realtime data-sync logic into `admin-panel/src/lib/hooks/useMapRealtimeData.ts` (orders subscription payload-first cache updates, fallback refetch cooldown, drivers subscription merge + 10s polling safety net) to improve maintainability without changing runtime behavior.
 - 2026-03-19: Audited admin-panel map realtime flow: current model is hybrid (orders subscription payload-first with fallback refetch; drivers subscription merge with 10s poll safety net). Added refetch cooldown enforcement on fallback path in `admin-panel/src/app/dashboard/map/page.tsx` and documented sync intent inline.

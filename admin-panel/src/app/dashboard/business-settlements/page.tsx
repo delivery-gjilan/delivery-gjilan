@@ -99,7 +99,7 @@ export default function BusinessSettlementsPage() {
                 if (!lastPaidSettlementAt) {
                     return { start: '', end: '' };
                 }
-                const start = startOfDay(new Date(lastPaidSettlementAt));
+                const start = new Date(lastPaidSettlementAt);
                 const end = new Date(now);
                 end.setHours(23, 59, 59, 999);
                 return { start: start.toISOString(), end: end.toISOString() };
@@ -195,7 +195,7 @@ export default function BusinessSettlementsPage() {
         if (dateMode === 'month') return 'This month';
         if (dateMode === 'last_settlement') {
             return lastPaidSettlementAt
-                ? `From last settlement (${format(new Date(lastPaidSettlementAt), 'MMM dd, yyyy')})`
+                ? `From last settlement (${format(new Date(lastPaidSettlementAt), 'MMM dd, yyyy HH:mm:ss')})`
                 : 'From last settlement (no previous paid settlement)';
         }
         if (dateRange.startDate && dateRange.endDate) {

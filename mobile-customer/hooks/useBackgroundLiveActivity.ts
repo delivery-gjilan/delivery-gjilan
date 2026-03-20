@@ -111,14 +111,39 @@ export function useBackgroundLiveActivity() {
 
     const appStateRef = useRef<AppStateStatus>(AppState.currentState);
     const clearedWhenNoActiveOrderRef = useRef(false);
+    const lastSyncedSignatureRef = useRef<string | null>(null);
+
+    const syncLiveActivity = useCallback(
+        (force = false) => {
+            if (!candidateOrder?.id) {
+                lastSyncedSignatureRef.current = null;
+                return;
+            }
+
+            const state = buildState();
+            if (!state) {
+                return;
+            }
+
+            const signature = [
+                candidateOrder.id,
+                mappedStatus ?? '',
+                String(state.estimatedMinutes),
+                String(state.phaseInitialMinutes),
+                String(state.phaseStartedAt),
+            ].join(':');
+
+            if (!force && lastSyncedSignatureRef.current === signature) {
+                return;
+            }
+
+            lastSyncedSignatureRef.current = signature;
+            void startLiveActivity(state);
+        },
+        [buildState, candidateOrder?.id, mappedStatus, startLiveActivity],
+    );
 
     useEffect(() => {
-        const runStart = async () => {
-            const state = buildState();
-            if (!state) return;
-            await startLiveActivity(state);
-        };
-
         const subscription = AppState.addEventListener('change', (nextState) => {
             const previous = appStateRef.current;
             appStateRef.current = nextState;
@@ -127,14 +152,19 @@ export function useBackgroundLiveActivity() {
                 previous === 'active' && (nextState === 'background' || nextState === 'inactive');
 
             if (movedToBackground) {
-                void runStart();
+                syncLiveActivity(true);
             }
         });
 
         return () => {
             subscription.remove();
         };
-    }, [buildState, startLiveActivity]);
+    }, [syncLiveActivity]);
+
+    useEffect(() => {
+        // Keep Live Activity synchronized in real-time whenever active-order data changes.
+        syncLiveActivity();
+    }, [syncLiveActivity]);
 
     useEffect(() => {
         if (Platform.OS !== 'ios') {
@@ -158,13 +188,4 @@ export function useBackgroundLiveActivity() {
         }
     }, [candidateOrder?.id]);
 
-    useEffect(() => {
-        const isForeground = appStateRef.current === 'active';
-        if (!isForeground) {
-            const state = buildState();
-            if (state) {
-                void startLiveActivity(state);
-            }
-        }
-    }, [buildState, startLiveActivity]);
 }
