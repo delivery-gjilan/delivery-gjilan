@@ -242,6 +242,27 @@ export function useNotifications() {
             }
         });
 
+        // Listen to direct Firebase foreground messages (including data-only payloads).
+        // This complements expo-notifications listeners and improves real-time handling.
+        const unsubscribeOnMessage = messaging().onMessage(async (remoteMessage) => {
+            const data = (remoteMessage?.data || {}) as Record<string, string>;
+            const notificationTitle = remoteMessage?.notification?.title;
+            const notificationBody = remoteMessage?.notification?.body;
+
+            if (notificationTitle) {
+                toast.info(notificationTitle, notificationBody || '');
+            }
+
+            void sendTelemetry('RECEIVED', {
+                source: 'fcm_on_message',
+                notificationTitle,
+                notificationBody,
+                orderId: data.orderId,
+                type: data.type,
+                status: data.status,
+            });
+        });
+
         // Listen for notifications received while app is in foreground
         notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
             const { title, body } = notification.request.content;
@@ -292,6 +313,7 @@ export function useNotifications() {
         return () => {
             mounted = false;
             unsubscribeTokenRefresh();
+            unsubscribeOnMessage();
             if (notificationListener.current) {
                 notificationListener.current.remove();
             }

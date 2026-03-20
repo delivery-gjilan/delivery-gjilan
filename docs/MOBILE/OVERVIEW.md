@@ -1,6 +1,6 @@
 # Mobile Overview
 
-<!-- MDS:M1 | Domain: Mobile | Updated: 2026-03-19 -->
+<!-- MDS:M1 | Domain: Mobile | Updated: 2026-03-20 -->
 <!-- Depends-On: A1 -->
 <!-- Depended-By: M2, M3, M4, M5, BL2, BL3 -->
 <!-- Nav: App-level architecture changes → update all M* files. Shared pattern changes → review BL2 (Products), BL3 (Cart). -->
@@ -50,6 +50,8 @@ Settlement semantics in mobile-business are aligned to web UI2 formulas:
 - `PAYABLE`: settlement amount is business payout (net); commission is `gross - net`.
 
 Recent backend-driven store status changes are now exposed through subscription updates, which means banner and store availability UI can react faster.
+
+`mobile-customer` Live Activities (Dynamic Island / Lock Screen) now synchronize in real-time from active-order state updates (status/ETA/phase transitions) instead of only starting on app background transitions, and Firebase Messaging listeners are wired for both foreground (`onMessage`) and background (`setBackgroundMessageHandler`) event intake.
 
 ## Driver App Notes
 
