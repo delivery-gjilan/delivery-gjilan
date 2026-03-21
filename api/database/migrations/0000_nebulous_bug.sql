@@ -15,6 +15,7 @@ CREATE TYPE "public"."settlement_status" AS ENUM('PENDING', 'PAID', 'OVERDUE', '
 CREATE TYPE "public"."settlement_type" AS ENUM('DRIVER', 'BUSINESS');--> statement-breakpoint
 CREATE TYPE "public"."settlement_entity_type" AS ENUM('DRIVER', 'BUSINESS');--> statement-breakpoint
 CREATE TYPE "public"."settlement_rule_amount_type" AS ENUM('FIXED', 'PERCENT');--> statement-breakpoint
+CREATE TYPE "public"."settlement_request_status" AS ENUM('PENDING_APPROVAL', 'ACCEPTED', 'DISPUTED', 'EXPIRED', 'CANCELLED');--> statement-breakpoint
 CREATE TYPE "public"."promotion_creator_type" AS ENUM('PLATFORM', 'BUSINESS');--> statement-breakpoint
 CREATE TYPE "public"."promotion_target" AS ENUM('ALL_USERS', 'SPECIFIC_USERS', 'FIRST_ORDER', 'CONDITIONAL');--> statement-breakpoint
 CREATE TYPE "public"."promotion_type" AS ENUM('FIXED_AMOUNT', 'PERCENTAGE', 'FREE_DELIVERY', 'SPEND_X_GET_FREE', 'SPEND_X_PERCENT', 'SPEND_X_FIXED');--> statement-breakpoint
@@ -65,6 +66,8 @@ CREATE TABLE "businesses" (
 	"closes_at" integer NOT NULL,
 	"avg_prep_time_minutes" integer DEFAULT 20 NOT NULL,
 	"prep_time_override_minutes" integer,
+	"is_temporarily_closed" boolean DEFAULT false NOT NULL,
+	"temporary_closure_reason" varchar(500),
 	"commission_percentage" numeric(5, 2) DEFAULT '0' NOT NULL,
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -157,7 +160,7 @@ CREATE TABLE "orders" (
 	"ready_at" timestamp with time zone,
 	"out_for_delivery_at" timestamp with time zone,
 	"delivered_at" timestamp with time zone,
-	"order_date" timestamp DEFAULT now(),
+	"order_date" timestamp with time zone DEFAULT now(),
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -280,6 +283,24 @@ CREATE TABLE "settlement_rules" (
 	"promotion_id" uuid,
 	"is_active" boolean DEFAULT true NOT NULL,
 	"notes" varchar(500),
+	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "settlement_requests" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"business_id" uuid NOT NULL,
+	"requested_by_user_id" uuid,
+	"amount" numeric(10, 2) NOT NULL,
+	"currency" varchar(3) DEFAULT 'EUR' NOT NULL,
+	"period_start" timestamp with time zone NOT NULL,
+	"period_end" timestamp with time zone NOT NULL,
+	"note" text,
+	"status" "settlement_request_status" DEFAULT 'PENDING_APPROVAL' NOT NULL,
+	"responded_at" timestamp with time zone,
+	"responded_by_user_id" uuid,
+	"dispute_reason" text,
+	"expires_at" timestamp with time zone NOT NULL,
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -612,6 +633,9 @@ ALTER TABLE "settlements" ADD CONSTRAINT "settlements_order_id_orders_id_fk" FOR
 ALTER TABLE "settlements" ADD CONSTRAINT "settlements_rule_id_settlement_rules_id_fk" FOREIGN KEY ("rule_id") REFERENCES "public"."settlement_rules"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "settlement_rules" ADD CONSTRAINT "settlement_rules_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "settlement_rules" ADD CONSTRAINT "settlement_rules_promotion_id_promotions_id_fk" FOREIGN KEY ("promotion_id") REFERENCES "public"."promotions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "settlement_requests" ADD CONSTRAINT "settlement_requests_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "settlement_requests" ADD CONSTRAINT "settlement_requests_requested_by_user_id_users_id_fk" FOREIGN KEY ("requested_by_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "settlement_requests" ADD CONSTRAINT "settlement_requests_responded_by_user_id_users_id_fk" FOREIGN KEY ("responded_by_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_behaviors" ADD CONSTRAINT "user_behaviors_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "promotion_business_eligibility" ADD CONSTRAINT "promotion_business_eligibility_promotion_id_promotions_id_fk" FOREIGN KEY ("promotion_id") REFERENCES "public"."promotions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "promotion_business_eligibility" ADD CONSTRAINT "promotion_business_eligibility_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -676,6 +700,9 @@ CREATE INDEX "idx_settlements_driver_id" ON "settlements" USING btree ("driver_i
 CREATE INDEX "idx_settlements_business_id" ON "settlements" USING btree ("business_id");--> statement-breakpoint
 CREATE INDEX "idx_settlements_status" ON "settlements" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "idx_settlements_type_direction" ON "settlements" USING btree ("type","direction");--> statement-breakpoint
+CREATE INDEX "idx_settlement_requests_business_id" ON "settlement_requests" USING btree ("business_id");--> statement-breakpoint
+CREATE INDEX "idx_settlement_requests_status" ON "settlement_requests" USING btree ("status");--> statement-breakpoint
+CREATE INDEX "idx_settlement_requests_created_at" ON "settlement_requests" USING btree ("created_at");--> statement-breakpoint
 CREATE INDEX "idx_promo_business" ON "promotion_business_eligibility" USING btree ("promotion_id","business_id");--> statement-breakpoint
 CREATE INDEX "idx_promotion_usage_promo" ON "promotion_usage" USING btree ("promotion_id");--> statement-breakpoint
 CREATE INDEX "idx_promotion_usage_user" ON "promotion_usage" USING btree ("user_id");--> statement-breakpoint

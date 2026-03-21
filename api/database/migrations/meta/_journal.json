@@ -5,36 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1773887296753,
-      "tag": "0000_black_silhouette",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1773951102333,
-      "tag": "0001_cute_red_skull",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1775000000000,
-      "tag": "0002_order_date_timestamptz",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1773965149379,
-      "tag": "0003_furry_omega_sentinel",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1773969000000,
-      "tag": "0004_settlement_pending_uniqueness",
+      "when": 1773975042619,
+      "tag": "0000_nebulous_bug",
       "breakpoints": true
     }
   ]
