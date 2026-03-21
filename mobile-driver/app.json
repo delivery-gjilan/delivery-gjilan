@@ -7,11 +7,6 @@
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "updates": {
-      "url": "https://u.expo.dev/1c06f250-74dc-4a5d-855c-f53e97df8c2e",
-      "checkAutomatically": "ON_ERROR_RECOVERY",
-      "fallbackToCacheTimeout": 0
-    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "deliveryapp",
@@ -93,14 +88,7 @@
           "mapboxMapsVersion": "11.11.0"
         }
       ],
-      [
-        "expo-build-properties",
-        {
-          "ios": {
-            "useFrameworks": "static"
-          }
-        }
-      ],
+      "expo-build-properties",
       [
         "expo-splash-screen",
         {
@@ -123,7 +111,9 @@
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": true
         }
-      ]
+      ],
+      "@react-native-firebase/app",
+      "./plugins/fix-firebase-modular-headers"
     ],
     "experiments": {
       "typedRoutes": true,

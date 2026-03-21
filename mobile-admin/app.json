@@ -3,7 +3,7 @@
     "name": "delivery-admin",
     "slug": "delivery-admin",
     "version": "1.0.0",
-    "orientation": "portrait",
+      "runtimeVersion": "1.0.0",
     "icon": "./assets/images/icon.png",
     "scheme": "deliveryadmin",
     "userInterfaceStyle": "automatic",
@@ -61,8 +61,37 @@
           }
         }
       ],
+      "@react-native-firebase/app",
+      "expo-build-properties",
       "./plugins/with-modular-headers"
-    ],
+      ],
+      "plugins": [
+        "expo-router",
+        "@rnmapbox/maps",
+        "@react-native-firebase/app",
+        [
+          "expo-notifications",
+          {
+            "color": "#6366f1",
+            "defaultChannel": "default",
+            "enableBackgroundRemoteNotifications": true
+          }
+        ],
+        [
+          "expo-splash-screen",
+          {
+            "image": "./assets/images/splash.png",
+            "imageWidth": 200,
+            "resizeMode": "contain",
+            "backgroundColor": "#0f172a",
+            "dark": {
+              "backgroundColor": "#0f172a"
+            }
+          }
+        ],
+        "expo-build-properties",
+        "./plugins/with-modular-headers"
+      ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true

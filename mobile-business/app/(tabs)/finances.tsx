@@ -108,6 +108,27 @@ function formatDateTime(dateStr?: string | null) {
     }
 }
 
+function calculateOrderItemSubtotal(item: any): number {
+    const quantity = Number(item?.quantity ?? 0);
+    const unitPrice = Number(item?.unitPrice ?? 0);
+
+    const selectedOptionsTotal = (item?.selectedOptions ?? []).reduce(
+        (sum: number, opt: any) => sum + Number(opt?.priceAtOrder ?? 0),
+        0,
+    );
+
+    const childItemsTotal = (item?.childItems ?? []).reduce(
+        (sum: number, child: any) => sum + calculateOrderItemSubtotal(child),
+        0,
+    );
+
+    return unitPrice * quantity + selectedOptionsTotal * quantity + childItemsTotal;
+}
+
+function calculateBusinessSubtotal(items: any[]): number {
+    return (items ?? []).reduce((sum: number, item: any) => sum + calculateOrderItemSubtotal(item), 0);
+}
+
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -207,11 +228,7 @@ export default function FinancesScreen() {
                 (entry: any) => entry?.business?.id === businessId,
             );
             const items = businessOrder?.items ?? [];
-            const gross = items.reduce(
-                (acc: number, item: any) =>
-                    acc + Number(item?.unitPrice ?? 0) * Number(item?.quantity ?? 0),
-                0,
-            );
+            const gross = calculateBusinessSubtotal(items);
             totalGross += gross;
 
             if (s.direction === 'RECEIVABLE') {
@@ -854,13 +871,7 @@ export default function FinancesScreen() {
                                             (entry: any) => entry?.business?.id === businessId,
                                         );
                                         const items = businessOrder?.items ?? [];
-                                        const grossFromItems = items.reduce(
-                                            (acc: number, item: any) =>
-                                                acc +
-                                                Number(item?.unitPrice ?? 0) *
-                                                    Number(item?.quantity ?? 0),
-                                            0,
-                                        );
+                                        const grossFromItems = calculateBusinessSubtotal(items);
                                         const settlementAmount = Number(s.amount ?? 0);
                                         const isReceivable = s.direction === 'RECEIVABLE';
 
@@ -1164,11 +1175,7 @@ export default function FinancesScreen() {
                             const isPayable = s.direction === 'PAYABLE';
                             const isReceivable = !isPayable;
                             const settlementAmount = Number(s.amount ?? 0);
-                            const grossFromItems = items.reduce(
-                                (acc: number, item: any) =>
-                                    acc + Number(item?.unitPrice ?? 0) * Number(item?.quantity ?? 0),
-                                0,
-                            );
+                            const grossFromItems = calculateBusinessSubtotal(items);
                             const commissionAmount = isReceivable
                                 ? settlementAmount
                                 : Math.max(0, grossFromItems - settlementAmount);

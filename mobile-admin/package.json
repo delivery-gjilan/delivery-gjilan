@@ -31,6 +31,7 @@
     "apollo3-cache-persist": "^0.15.0",
     "clsx": "^2.1.1",
     "expo": "~54.0.23",
+    "expo-build-properties": "^55.0.10",
     "expo-constants": "~18.0.13",
     "expo-dev-client": "~6.0.20",
     "expo-device": "~8.0.10",

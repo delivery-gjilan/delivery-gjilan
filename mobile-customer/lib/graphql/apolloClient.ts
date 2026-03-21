@@ -22,7 +22,19 @@ const logLink = new ApolloLink((operation, forward) => {
 const errorLink = onError(({ error, operation, forward }) => {
     if (CombinedGraphQLErrors.is(error)) {
         for (const err of error.errors) {
-            if (err.extensions?.code === 'UNAUTHENTICATED' || err.message === 'Unauthorized') {
+            if (err.extensions?.code === 'UNAUTHENTICATED' || err.message === 'Unauthorized' || err.message === 'Authentication failed') {
+                const def = getMainDefinition(operation.query);
+                const isSubscription =
+                    def.kind === 'OperationDefinition' && def.operation === 'subscription';
+
+                if (isSubscription) {
+                    // WS subscriptions authenticate at connection time via connectionParams.
+                    // Retrying forward() with updated headers won't help — we must force a
+                    // full WS reconnect so connectionParams() runs again with a fresh token.
+                    void refreshAccessToken().then(() => closeAndReconnectWs());
+                    return;
+                }
+
                 const alreadyRetried = operation.getContext().alreadyRetriedAuth === true;
                 if (alreadyRetried || !forward) {
                     console.warn(
@@ -102,12 +114,22 @@ const wsUrl = httpUrl ? httpUrl.replace(/^http/, 'ws') : '';
 const RECONNECT_DELAYS = [1000, 2000, 5000, 10000];
 let reconnectAttempts = 0;
 const wsReconnectListeners = new Set<() => void>();
+let activeWsSocket: { close: (code?: number, reason?: string) => void } | null = null;
 
 export function addWsReconnectListener(listener: () => void): () => void {
     wsReconnectListeners.add(listener);
     return () => {
         wsReconnectListeners.delete(listener);
     };
+}
+
+/** Force the WebSocket to close; graphql-ws will reconnect and re-run connectionParams() with a fresh token. */
+export function closeAndReconnectWs(): void {
+    try {
+        activeWsSocket?.close(4000, 'Token refresh');
+    } catch {
+        // ignore
+    }
 }
 
 const wsLink = wsUrl
@@ -131,7 +153,8 @@ const wsLink = wsUrl
               },
               keepAlive: 30000, // Send ping every 30s to keep connection alive
               on: {
-                  connected: () => {
+                  connected: (socket) => {
+                      activeWsSocket = socket as typeof activeWsSocket;
                       console.log('[WS] Connected');
                       if (reconnectAttempts > 0) {
                           console.log(`[WS] Reconnected after ${reconnectAttempts} attempts`);
@@ -147,6 +170,7 @@ const wsLink = wsUrl
                       reconnectAttempts = 0;
                   },
                   closed: (event) => {
+                      activeWsSocket = null;
                       console.log('[WS] Connection closed', event);
                   },
                   error: (err) => {
@@ -208,8 +232,12 @@ export const cacheReady: Promise<void> = persistCache({
     storage: new AsyncStorageWrapper(AsyncStorage),
     maxSize: 5 * 1024 * 1024,
     debug: __DEV__,
-}).catch((err) => {
-    console.warn('[ApolloCache] Failed to persist cache:', err);
+}).catch(async (err) => {
+    console.warn('[ApolloCache] Failed to persist/restore cache, purging:', err);
+    try {
+        await AsyncStorage.removeItem('apollo-cache-persist');
+        cache.reset();
+    } catch { /* ignore */ }
 });
 
 const client = new ApolloClient({
