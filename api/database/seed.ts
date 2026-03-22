@@ -16,6 +16,9 @@ import { settlements } from './schema/settlements';
 import { hashPassword } from '@/lib/utils/authUtils';
 import { sql, eq } from 'drizzle-orm';
 
+const OPEN_12_AM = 0; // 12:00 AM
+const CLOSE_11_59_PM = 1439; // 11:59 PM
+
 // Restaurant data with curated products and realistic images
 const RESTAURANTS_DATA = [
     {
@@ -376,26 +379,26 @@ async function seed() {
             locationLat: 42.6629 + (Math.random() - 0.5) * 0.1, // Gjilan, Kosovo area
             locationLng: 21.4694 + (Math.random() - 0.5) * 0.1,
             locationAddress: faker.location.streetAddress(),
-            opensAt: restaurantData.opensAt,
-            closesAt: restaurantData.closesAt,
+            opensAt: OPEN_12_AM,
+            closesAt: CLOSE_11_59_PM,
             isActive: true,
         };
 
         const [createdBusiness] = await db.insert(businesses).values(business).returning();
         console.log(`🏪 Created business: ${createdBusiness.name}`);
 
-        // Seed per-day schedule (Mon-Sat open, Sunday closed)
+        // Seed per-day schedule (all 7 days)
         const scheduleSlots = [];
-        for (let day = 1; day <= 6; day++) { // Mon(1) - Sat(6)
+        for (let day = 0; day <= 6; day++) { // Sun(0) - Sat(6)
             scheduleSlots.push({
                 businessId: createdBusiness.id,
                 dayOfWeek: day,
-                opensAt: restaurantData.opensAt,
-                closesAt: restaurantData.closesAt,
+                opensAt: OPEN_12_AM,
+                closesAt: CLOSE_11_59_PM,
             });
         }
         await db.insert(businessHours).values(scheduleSlots);
-        console.log(`  🕐 Added ${scheduleSlots.length}-day schedule`);
+        console.log('  🕐 Added 7-day schedule');
 
         const businessProducts: Array<{ id: string; name: string; price: number }> = [];
 
@@ -451,8 +454,8 @@ async function seed() {
             locationLat: 42.4635,
             locationLng: 21.4694,
             locationAddress: 'Gjilan, Kosovo',
-            opensAt: marketData.opensAt,
-            closesAt: marketData.closesAt,
+            opensAt: OPEN_12_AM,
+            closesAt: CLOSE_11_59_PM,
             isActive: true,
         };
 
@@ -465,8 +468,8 @@ async function seed() {
             marketScheduleSlots.push({
                 businessId: createdBusiness.id,
                 dayOfWeek: day,
-                opensAt: marketData.opensAt,
-                closesAt: marketData.closesAt,
+                opensAt: OPEN_12_AM,
+                closesAt: CLOSE_11_59_PM,
             });
         }
         await db.insert(businessHours).values(marketScheduleSlots);
@@ -526,6 +529,26 @@ async function seed() {
             name: createdBusiness.name,
             products: businessProducts,
         });
+    }
+
+    // Create a business admin assigned to Casbas Pizza
+    const casbasBusiness = createdBusinesses.find((business) => business.name === 'Casbas Pizza');
+    if (casbasBusiness) {
+        const casbasAdminPassword = await hashPassword('asdasdasd');
+        await db.insert(users).values({
+            id: faker.string.uuid(),
+            firstName: 'Casbas',
+            lastName: 'Admin',
+            email: 'casbas@gmail.com',
+            password: casbasAdminPassword,
+            role: 'BUSINESS_OWNER',
+            businessId: casbasBusiness.id,
+            emailVerified: true,
+            phoneVerified: true,
+            signupStep: 'COMPLETED',
+        });
+
+        console.log('👤 Created Casbas business admin (casbas@gmail.com / asdasdasd)');
     }
 
     // ------------------------------
@@ -939,6 +962,7 @@ async function seed() {
     console.log(`  - 3 test customer users created`);
     console.log('\n🔐 Credentials:');
     console.log('  Admin: admin@admin.com / 12345678');
+    console.log('  Casbas Business Admin: casbas@gmail.com / asdasdasd');
     console.log('  Customer: artshabani2002@gmail.com / 12345678');
     console.log('  Drivers: driver1@demo.com, driver2@demo.com, driver3@demo.com / 12345678\n');
 }

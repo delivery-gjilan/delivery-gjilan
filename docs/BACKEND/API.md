@@ -1,6 +1,6 @@
 # Backend API
 
-<!-- MDS:B1 | Domain: Backend | Updated: 2026-03-18 -->
+<!-- MDS:B1 | Domain: Backend | Updated: 2026-03-22 -->
 <!-- Depends-On: A1 -->
 <!-- Depended-By: B2, B4, B5, B6, B7, B8, B9, B10, O5 -->
 <!-- Nav: Schema/resolver changes → update B2 (Order Creation), B4 (Watchdog). Auth changes → update O5 (Security), O6 (Audit). -->
@@ -94,6 +94,8 @@ That means:
 - websocket subscriptions now include rate-limiting controls in `api/src/index.ts` to reduce per-socket abuse
 - HTTP/upload/auth rate limiting in `api/src/index.ts` uses `express-rate-limit` v8-compatible keys and `ipKeyGenerator` fallback for IPv6-safe client keying
 - store open/closed state is now broadcast through `storeStatusUpdated`
+- database seed behavior: businesses created by `api/database/seed.ts` now default to all-day hours (`opensAt=12:00 AM`, `closesAt=11:59 PM`) and seed `business_hours` rows for all 7 days
+- database seed also creates a business admin user assigned to Casbas Pizza (`casbas.admin@demo.com`)
 - generated schema and type files are large and should not be manually edited
 
 ## Recommended Next Cleanup
