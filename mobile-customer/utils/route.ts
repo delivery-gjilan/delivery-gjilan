@@ -1,13 +1,13 @@
 /**
- * Route utility for fetching real road directions via Mapbox Directions API.
- * Uses in-memory caching (10-min TTL) and in-flight request deduplication
- * to minimise API calls — same pattern as the driver app.
+ * Route utility — fetches road directions via the backend proxy (/api/directions).
+ * The Mapbox token lives server-side only; the client passes its JWT for auth.
+ * Uses in-memory caching (10-min TTL) and in-flight request deduplication.
  */
 
-const MAPBOX_TOKEN =
-    process.env.EXPO_PUBLIC_MAPBOX_TOKEN ??
-    process.env.NEXT_PUBLIC_MAPBOX_TOKEN ??
-    '';
+import { useAuthStore } from '@/store/authStore';
+
+/** Strip /graphql suffix so we get the API base URL from the same env var. */
+const API_BASE = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/graphql$/, '');
 
 // ─── Types ──────────────────────────────────────────────────
 interface Coord {
@@ -22,16 +22,6 @@ interface RouteResult {
     distanceKm: number;
     /** Estimated driving time in minutes. */
     durationMin: number;
-}
-
-interface DirectionsResponse {
-    routes: Array<{
-        distance: number; // metres
-        duration: number; // seconds
-        geometry?: {
-            coordinates: Array<[number, number]>; // [lon, lat]
-        };
-    }>;
 }
 
 // ─── Cache ──────────────────────────────────────────────────
@@ -54,24 +44,27 @@ function buildCacheKey(from: Coord, to: Coord): string {
 }
 
 // ─── Fetch ──────────────────────────────────────────────────
-async function _doFetch(url: string): Promise<RouteResult | null> {
+async function _doFetch(url: string, token: string): Promise<RouteResult | null> {
     try {
-        const res = await fetch(url);
+        const res = await fetch(url, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
         if (!res.ok) {
-            console.warn('[Route] Directions API error:', res.status);
+            console.warn('[Route] Directions proxy error:', res.status);
             return null;
         }
-        const data: DirectionsResponse = await res.json();
-        const route = data.routes?.[0];
-        if (!route?.geometry?.coordinates?.length) return null;
+        // Proxy returns { distanceKm, durationMin, geometry: [[lon, lat], ...] }
+        const data: { distanceKm: number; durationMin: number; geometry: Array<[number, number]> } =
+            await res.json();
+        if (!data.geometry?.length) return null;
 
         return {
-            coordinates: route.geometry.coordinates.map(([lon, lat]) => ({
+            coordinates: data.geometry.map(([lon, lat]) => ({
                 latitude: lat,
                 longitude: lon,
             })),
-            distanceKm: route.distance / 1000,
-            durationMin: route.duration / 60,
+            distanceKm: data.distanceKm,
+            durationMin: data.durationMin,
         };
     } catch (err) {
         console.warn('[Route] Fetch error:', err);
@@ -89,8 +82,14 @@ async function _doFetch(url: string): Promise<RouteResult | null> {
  * - Returns `null` if the API fails or no route is found.
  */
 export async function fetchRoute(from: Coord, to: Coord): Promise<RouteResult | null> {
-    if (!MAPBOX_TOKEN) {
-        console.warn('[Route] No Mapbox token — cannot fetch route');
+    const token = useAuthStore.getState().token;
+    if (!token) {
+        console.warn('[Route] No auth token — cannot fetch route');
+        return null;
+    }
+
+    if (!API_BASE) {
+        console.warn('[Route] EXPO_PUBLIC_API_URL not set');
         return null;
     }
 
@@ -105,9 +104,10 @@ export async function fetchRoute(from: Coord, to: Coord): Promise<RouteResult | 
     const existing = inFlight.get(key);
     if (existing) return existing;
 
-    const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${from.longitude},${from.latitude};${to.longitude},${to.latitude}?access_token=${MAPBOX_TOKEN}&geometries=geojson&overview=full`;
+    const points = `${from.longitude},${from.latitude};${to.longitude},${to.latitude}`;
+    const url = `${API_BASE}/api/directions?points=${encodeURIComponent(points)}`;
 
-    const promise = _doFetch(url).then((result) => {
+    const promise = _doFetch(url, token).then((result) => {
         inFlight.delete(key);
         if (result) cache.set(key, { result, expiresAt: now + CACHE_TTL });
         return result;

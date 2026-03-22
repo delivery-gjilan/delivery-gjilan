@@ -10,6 +10,7 @@ import { GET_DRIVERS, DRIVERS_UPDATED_SUBSCRIPTION } from '@/graphql/drivers';
 import { GJILAN_CENTER, GJILAN_BOUNDS, ORDER_STATUS_COLORS } from '@/utils/constants';
 import { getInitials } from '@/utils/helpers';
 import { calculateRouteDistance } from '@/utils/mapbox';
+import { useTheme } from '@/hooks/useTheme';
 
 const STATUS_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
     PENDING: 'time-outline',
@@ -45,6 +46,8 @@ export default function MapScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const cameraRef = useRef<Mapbox.Camera>(null);
+    const theme = useTheme();
+    const isDark = theme.dark;
     const hasMapboxToken = Boolean(process.env.EXPO_PUBLIC_MAPBOX_TOKEN?.trim());
 
     const [focusedOrderId, setFocusedOrderId] = useState<string | null>(null);
@@ -283,7 +286,7 @@ export default function MapScreen() {
             {hasMapboxToken ? (
                 <Mapbox.MapView
                     style={styles.map}
-                    styleURL="mapbox://styles/mapbox/streets-v12"
+                    styleURL={isDark ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/streets-v12'}
                     logoEnabled={false}
                     compassEnabled={false}
                     scaleBarEnabled={false}

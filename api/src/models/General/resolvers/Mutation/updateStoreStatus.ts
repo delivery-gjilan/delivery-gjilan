@@ -41,6 +41,9 @@ export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus
   if (input.bannerType) {
     updateData.bannerType = input.bannerType.toLowerCase();
   }
+  if (input.dispatchModeEnabled !== undefined && input.dispatchModeEnabled !== null) {
+    updateData.dispatchModeEnabled = input.dispatchModeEnabled;
+  }
 
   if (existing.length === 0) {
     // Insert new settings row
@@ -70,6 +73,7 @@ export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus
     bannerEnabled: row.bannerEnabled,
     bannerMessage: row.bannerMessage,
     bannerType: (row.bannerType || 'info').toUpperCase(),
+    dispatchModeEnabled: row.dispatchModeEnabled,
   };
 
   // Broadcast to all subscribed clients
@@ -79,6 +83,7 @@ export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus
     bannerEnabled: result.bannerEnabled,
     bannerMessage: result.bannerMessage,
     bannerType: result.bannerType,
+    dispatchModeEnabled: result.dispatchModeEnabled,
   });
 
   return result as any;

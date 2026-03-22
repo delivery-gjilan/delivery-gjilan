@@ -1,5 +1,15 @@
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-const ROUTE_CACHE_TTL_MS = 30000;
+// MAPBOX_TOKEN is no longer exposed to the browser.
+// All directions calls go through /api/directions (Next.js server route)
+// which reads MAPBOX_TOKEN from the server-side environment.
+
+// Must be >= ROUTE_RECALC_MIN_MS (60 s) in useOrderRouteDistances so the cache
+// is always alive for the full recalc-gate window. 65 s gives a small buffer.
+const ROUTE_CACHE_TTL_MS = 65000;
+
+function getAuthToken(): string | null {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('authToken');
+}
 
 type RouteResult = { distanceKm: number; durationMin: number; geometry: Array<[number, number]> };
 const routeCache = new Map<string, { value: RouteResult; timestamp: number }>();
@@ -49,22 +59,10 @@ export function getDirectionsTelemetry() {
     };
 }
 
-interface DirectionsResponse {
-    routes: Array<{
-        distance: number; // in meters
-        duration: number; // in seconds
-        geometry: {
-            coordinates: Array<[number, number]>;
-            type: string;
-        };
-    }>;
-}
-
 /**
- * Calculate route distance between two coordinates using Mapbox Directions API
- * @param from - Starting coordinates [longitude, latitude]
- * @param to - Destination coordinates [longitude, latitude]
- * @returns Distance in kilometers, duration in minutes, and polyline coordinates, or null if failed
+ * Calculate route distance between two coordinates.
+ * Proxied through the local Next.js API route (/api/directions) so the
+ * Mapbox token never leaves the server.
  */
 export async function calculateRouteDistance(
     from: { longitude: number; latitude: number },
@@ -87,31 +85,27 @@ export async function calculateRouteDistance(
 
     const promise = (async () => {
         try {
-            const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${from.longitude},${from.latitude};${to.longitude},${to.latitude}?access_token=${MAPBOX_TOKEN}&geometries=geojson&overview=full`;
+            const token = getAuthToken();
+            if (!token) {
+                console.warn('[Directions] No auth token — skipping route fetch');
+                return null;
+            }
+
+            const points = `${from.longitude},${from.latitude};${to.longitude},${to.latitude}`;
+            const url = `/api/directions?points=${encodeURIComponent(points)}`;
             recordNetworkCall();
 
-            const response = await fetch(url, { signal });
+            const response = await fetch(url, {
+                headers: { Authorization: `Bearer ${token}` },
+                signal,
+            });
             if (!response.ok) {
                 metrics.failedCalls += 1;
-                console.error('Mapbox Directions API error:', response.statusText);
+                console.error('[Directions] Proxy error:', response.statusText);
                 return null;
             }
 
-            const data: DirectionsResponse = await response.json();
-
-            if (!data.routes || data.routes.length === 0) {
-                metrics.failedCalls += 1;
-                console.error('No route found');
-                return null;
-            }
-
-            const route = data.routes[0];
-            const result: RouteResult = {
-                distanceKm: route.distance / 1000, // Convert meters to kilometers
-                durationMin: route.duration / 60,   // Convert seconds to minutes
-                geometry: route.geometry.coordinates, // Polyline coordinates
-            };
-
+            const result: RouteResult = await response.json();
             routeCache.set(key, { value: result, timestamp: Date.now() });
             metrics.successfulCalls += 1;
             return result;
@@ -121,7 +115,7 @@ export async function calculateRouteDistance(
                 return null;
             }
             metrics.failedCalls += 1;
-            console.error('Error calculating route distance:', error);
+            console.error('[Directions] Error calculating route distance:', error);
             return null;
         } finally {
             inFlightRoutes.delete(key);

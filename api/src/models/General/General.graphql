@@ -48,6 +48,7 @@ type StoreStatus {
     bannerEnabled: Boolean!
     bannerMessage: String
     bannerType: BannerType!
+    dispatchModeEnabled: Boolean!
 }
 
 input UpdateStoreStatusInput {
@@ -56,6 +57,7 @@ input UpdateStoreStatusInput {
     bannerEnabled: Boolean
     bannerMessage: String
     bannerType: BannerType
+    dispatchModeEnabled: Boolean
 }
 
 type Query {

@@ -1,5 +1,5 @@
-import { useQuery } from '@apollo/client/react';
-import { GET_STORE_STATUS } from '@/graphql/operations/store';
+import { useQuery, useSubscription } from '@apollo/client/react';
+import { GET_STORE_STATUS, STORE_STATUS_UPDATED } from '@/graphql/operations/store';
 
 interface StoreStatus {
     isStoreClosed: boolean;
@@ -7,13 +7,27 @@ interface StoreStatus {
     bannerEnabled: boolean;
     bannerMessage?: string | null;
     bannerType: string;
+    dispatchModeEnabled: boolean;
 }
 
 export function useStoreStatus() {
-    const { data, loading } = useQuery<{ getStoreStatus: StoreStatus }>(
+    const { data, loading, client } = useQuery<{ getStoreStatus: StoreStatus }>(
         GET_STORE_STATUS,
         { pollInterval: 30_000 },
     );
+
+    useSubscription<{ storeStatusUpdated: StoreStatus }>(STORE_STATUS_UPDATED, {
+        onData: ({ data: subData }) => {
+            const updated = subData.data?.storeStatusUpdated;
+            if (!updated) return;
+            client.cache.updateQuery<{ getStoreStatus: StoreStatus }>(
+                { query: GET_STORE_STATUS },
+                (existing) => ({
+                    getStoreStatus: { ...(existing?.getStoreStatus ?? {}), ...updated },
+                }),
+            );
+        },
+    });
 
     return {
         isStoreClosed: data?.getStoreStatus?.isStoreClosed ?? false,
@@ -21,6 +35,7 @@ export function useStoreStatus() {
         bannerEnabled: data?.getStoreStatus?.bannerEnabled ?? false,
         bannerMessage: data?.getStoreStatus?.bannerMessage ?? null,
         bannerType: data?.getStoreStatus?.bannerType ?? 'INFO',
+        dispatchModeEnabled: data?.getStoreStatus?.dispatchModeEnabled ?? false,
         loading,
     };
 }

@@ -10,6 +10,7 @@ import { schema } from './graphql/schema';
 import { createContext } from './graphql/createContext';
 import uploadRoutes from './routes/uploadRoutes';
 import debugRoutes from './routes/debugRoutes';
+import { directionsRouter } from './routes/directionsRoutes';
 import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/use/ws';
 import { decodeJwtToken } from '@/lib/utils/authUtils';
@@ -110,6 +111,16 @@ const uploadLimiter = rateLimit({
     message: { error: 'Too many upload requests, please try again later.' },
 });
 
+// Directions limiter — generous enough for max active orders × 3 clients
+const directionsLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 200,
+    keyGenerator: getRateLimitKey,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many directions requests, please try again later.' },
+});
+
 // Exclude high-frequency system operations from rate limiting
 const AUTH_OPERATIONS = new Set([
     'Login',
@@ -144,6 +155,7 @@ app.use('/graphql', (req, res, next) => {
 });
 
 app.use('/api/upload', uploadLimiter);
+app.use('/api/directions', directionsLimiter);
 
 // Structured request logging (replaces the old console.log middleware)
 app.use(requestLogger);
@@ -199,6 +211,9 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 // Upload routes (REST API)
 app.use('/api/upload', uploadRoutes);
+
+// Directions proxy — keeps MAPBOX_TOKEN server-side, caches in Redis
+app.use('/api/directions', directionsRouter);
 
 // Debug routes (non-production only)
 if (!isProduction) {

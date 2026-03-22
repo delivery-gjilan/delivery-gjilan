@@ -7,7 +7,7 @@ import {
   MapPin, X, Filter, Clock, Package, Phone,
   User, Store, Calendar, AlertCircle, WifiOff, Signal,
   SignalLow, SignalZero, ChevronDown, ChevronUp, Eye, EyeOff,
-  Zap, Route, ExternalLink, Crosshair, LocateFixed, Mic, Radio
+  Zap, Route, ExternalLink, Crosshair, LocateFixed, Mic, Radio, Utensils
 } from "lucide-react";
 import { ASSIGN_DRIVER_TO_ORDER, UPDATE_ORDER_STATUS } from "@/graphql/operations/orders";
 import { ADMIN_UPDATE_DRIVER_LOCATION } from "@/graphql/operations/users/mutations";
@@ -27,10 +27,10 @@ const GJILAN_BOUNDS: [[number, number], [number, number]] = [[21.39, 42.40], [21
 const MIN_ZOOM = 11.5;
 const MAX_ZOOM = 17;
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-const MAP_STYLE = process.env.NEXT_PUBLIC_MAP_STYLE_URL || "mapbox://styles/mapbox/streets-v12";
+const MAP_STYLE = process.env.NEXT_PUBLIC_MAP_STYLE_URL || "mapbox://styles/mapbox/dark-v11";
 
 const PENDING_WARNING_MS = 2 * 60 * 1000; // 2 minutes
-const ANIMATION_COMMIT_INTERVAL_MS = 66; // ~15 FPS UI commits
+const ANIMATION_COMMIT_INTERVAL_MS = 33; // ~30 FPS UI commits
 const DRIVER_GAP_DEFAULT_MS = 5000;
 const DRIVER_GAP_MIN_MS = 500;
 const DRIVER_GAP_MAX_MS = 15000;
@@ -177,6 +177,46 @@ const bearingDeg = (from: { latitude: number; longitude: number }, to: { latitud
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
+const ROUTE_SNAP_MAX_DISTANCE_M = 50;
+
+/** Snap a lat/lng point to the nearest segment of a [lon,lat][] polyline. */
+const snapToRoute = (
+  point: { latitude: number; longitude: number },
+  geometry: [number, number][],
+): { latitude: number; longitude: number } | null => {
+  if (geometry.length < 2) return null;
+  const latRad = (point.latitude * Math.PI) / 180;
+  const mPerDegLat = 111_320;
+  const mPerDegLng = 111_320 * Math.cos(latRad);
+  const px = point.longitude * mPerDegLng;
+  const py = point.latitude * mPerDegLat;
+
+  let bestDist = Infinity;
+  let bestLat = point.latitude;
+  let bestLng = point.longitude;
+
+  for (let i = 0; i < geometry.length - 1; i++) {
+    const ax = geometry[i][0] * mPerDegLng;
+    const ay = geometry[i][1] * mPerDegLat;
+    const bx = geometry[i + 1][0] * mPerDegLng;
+    const by = geometry[i + 1][1] * mPerDegLat;
+    const dx = bx - ax;
+    const dy = by - ay;
+    const lenSq = dx * dx + dy * dy;
+    const t = lenSq < 1e-9 ? 0 : clamp(((px - ax) * dx + (py - ay) * dy) / lenSq, 0, 1);
+    const projX = ax + dx * t;
+    const projY = ay + dy * t;
+    const dist = Math.hypot(px - projX, py - projY);
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestLat = geometry[i][1] + (geometry[i + 1][1] - geometry[i][1]) * t;
+      bestLng = geometry[i][0] + (geometry[i + 1][0] - geometry[i][0]) * t;
+    }
+  }
+
+  return bestDist <= ROUTE_SNAP_MAX_DISTANCE_M ? { latitude: bestLat, longitude: bestLng } : null;
+};
+
 const getOrderBusinesses = (order: any) => (
   Array.isArray(order?.businesses) ? order.businesses : []
 );
@@ -321,6 +361,8 @@ export default function MapPage() {
   const smoothedDriverGapMsRef = useRef<Record<string, number>>({});
   const driverHeadingDegRef = useRef<Record<string, number>>({});
   const orderRefs = useRef<Record<string, HTMLElement | null>>({});
+  const activeOrdersRef = useRef<any[]>([]);
+  const orderDistancesRef = useRef<any>({});
 
   // == STATE ==
   const [now, setNow] = useState(Date.now());
@@ -400,7 +442,21 @@ export default function MapPage() {
     return map;
   }, [drivers]);
 
+  const activeOrderCountByBusinessId = useMemo(() => {
+    const counts: Record<string, number> = {};
+    activeOrders.forEach((order: any) => {
+      getOrderBusinesses(order).forEach((be: any) => {
+        if (be.business?.id) counts[be.business.id] = (counts[be.business.id] || 0) + 1;
+      });
+    });
+    return counts;
+  }, [activeOrders]);
+
   const { orderDistances } = useOrderRouteDistances(activeOrders, driverMap);
+
+  // Keep refs in sync for the rAF loop (deps=[] so it captures stale closures).
+  activeOrdersRef.current = activeOrders;
+  orderDistancesRef.current = orderDistances;
 
   const filteredDrivers = useMemo(() => {
     let result = [...drivers];
@@ -513,15 +569,15 @@ export default function MapPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Camera tracking
+  // Camera tracking — fires on each GPS update only, not on every animation frame (prevents 15fps flyTo stutter)
   useEffect(() => {
     if (!followingDriverId || !mapRef.current) return;
     const followedTrack = driverTracks[followingDriverId];
     if (!followedTrack) return;
-    const pos = animatedDriverPositions[followingDriverId] || followedTrack.to;
+    const pos = followedTrack.to;
     if (!isValidLatLng(pos?.latitude, pos?.longitude)) return;
-    mapRef.current.flyTo({ center: [pos.longitude, pos.latitude], zoom: 16, duration: 400, pitch: 0 });
-  }, [followingDriverId, driverTracks, animatedDriverPositions]);
+    mapRef.current.easeTo({ center: [pos.longitude, pos.latitude], zoom: 16, duration: 600 });
+  }, [followingDriverId, driverTracks]);
 
   // Track status changes
   useEffect(() => {
@@ -684,11 +740,24 @@ export default function MapPage() {
           latitude: current.latitude + (predictedLat - current.latitude) * alpha,
           longitude: current.longitude + (predictedLng - current.longitude) * alpha,
         };
-        const headingStepMeters = distanceMeters(current, nextPoint);
-        if (headingStepMeters >= 1.5) {
-          nextHeading[driverId] = bearingDeg(current, nextPoint);
+        // Road-snap: if the driver has an active OFD order with route geometry, snap to it
+        let snapped = nextPoint;
+        const driverOrders = activeOrdersRef.current.filter(
+          (o: any) => o.driver?.id === driverId && o.status === 'OUT_FOR_DELIVERY',
+        );
+        for (const o of driverOrders) {
+          const geo = orderDistancesRef.current[o.id]?.toDropoff?.geometry;
+          if (geo && geo.length >= 2) {
+            const s = snapToRoute(nextPoint, geo);
+            if (s) { snapped = s; break; }
+          }
         }
-        nextAnimated[driverId] = nextPoint;
+
+        const headingStepMeters = distanceMeters(current, snapped);
+        if (headingStepMeters >= 1.5) {
+          nextHeading[driverId] = bearingDeg(current, snapped);
+        }
+        nextAnimated[driverId] = snapped;
       });
 
       if (hasAnyDriver) {
@@ -791,6 +860,8 @@ export default function MapPage() {
         awaitRefetchQueries: true,
       });
 
+      toast.success(`Order marked as ${status.replace(/_/g, ' ').toLowerCase()}`);
+
       if (status === "DELIVERED" || status === "CANCELLED") {
         setSelectedOrderId(null);
         setDetailPanelExpanded(false);
@@ -820,7 +891,7 @@ export default function MapPage() {
       map.fitBounds(
         [[minLng, minLat], [maxLng, maxLat]],
         {
-          padding: { top: 90, bottom: 260, left: 330, right: 120 },
+          padding: { top: 90, bottom: detailPanelExpanded ? 310 : 220, left: 330, right: 120 },
           maxZoom: 15,
           duration: 700,
           essential: true,
@@ -839,18 +910,26 @@ export default function MapPage() {
     }
 
     map.flyTo({ center: [dropoff.longitude, dropoff.latitude], zoom: 15, duration: 600, essential: true });
-  }, [driverMap]);
+  }, [driverMap, detailPanelExpanded]);
 
   const selectOrder = useCallback((orderId: string) => {
     setSelectedOrderId(orderId);
     const order = activeOrders.find((o: any) => o.id === orderId);
     if (order) focusOrder(order);
+    setTimeout(() => orderRefs.current[orderId]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
   }, [activeOrders, focusOrder]);
 
   const recenterMap = useCallback(() => {
     const map = mapRef.current?.getMap?.();
     if (!map) return;
     map.flyTo({ center: [DEFAULT_CENTER.longitude, DEFAULT_CENTER.latitude], zoom: 12, essential: true });
+  }, []);
+
+  const handleMapLoad = useCallback((e: any) => {
+    const map = e.target;
+    ['poi-label', 'transit-label'].forEach((layer) => {
+      if (map.getLayer(layer)) map.setLayoutProperty(layer, 'visibility', 'hidden');
+    });
   }, []);
 
   // ╔══════════════════════════════════════════════════════════╗
@@ -869,6 +948,7 @@ export default function MapPage() {
         maxBounds={GJILAN_BOUNDS}
         minZoom={MIN_ZOOM}
         maxZoom={MAX_ZOOM}
+        onLoad={handleMapLoad}
       >
         {/* ── Business Markers ── */}
         {businesses.map((business: any) => {
@@ -880,9 +960,22 @@ export default function MapPage() {
               <div className="relative flex items-center justify-center group cursor-pointer"
                 onMouseEnter={() => setHoveredBusinessId(business.id)}
                 onMouseLeave={() => setHoveredBusinessId(null)}>
-                <div className={`relative w-3 h-3 rounded-full ${isInactive ? "bg-slate-400" : "bg-violet-600"} shadow-md hover:scale-125 transition-all ${isHovered ? "ring-2 ring-violet-400 ring-offset-1" : ""}`} />
+                <div className={`relative w-10 h-10 rounded-full border-2 ${isInactive ? "border-slate-500/40 grayscale opacity-50" : "border-violet-500/60"} bg-[#1a1a2e] shadow-lg hover:scale-110 transition-all flex items-center justify-center overflow-hidden ${isHovered ? "ring-2 ring-violet-400 ring-offset-2 ring-offset-black" : ""}`}>
+                  {business.imageUrl ? (
+                    <img src={business.imageUrl} alt={business.name} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                  ) : (
+                    business.businessType === "RESTAURANT"
+                      ? <Utensils size={18} className="text-violet-300" />
+                      : <Store size={18} className="text-violet-300" />
+                  )}
+                </div>
+                {(activeOrderCountByBusinessId[business.id] ?? 0) > 0 && (
+                  <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-amber-500 border border-black flex items-center justify-center text-[9px] font-bold text-white z-10 pointer-events-none">
+                    {activeOrderCountByBusinessId[business.id]}
+                  </div>
+                )}
                 {isHovered && (
-                  <div className="absolute bottom-full mb-3 bg-black/95 text-white rounded-xl shadow-2xl z-[100] border border-white/20 overflow-hidden backdrop-blur-sm min-w-[240px] pointer-events-none">
+                  <div className="absolute bottom-full mb-5 bg-black/95 text-white rounded-xl shadow-2xl z-[100] border border-white/20 overflow-hidden backdrop-blur-sm min-w-[240px] pointer-events-none">
                     {business.imageUrl && (
                       <div className="w-full h-32 bg-gradient-to-br from-violet-500/20 to-purple-500/20 relative overflow-hidden">
                         <img src={business.imageUrl} alt={business.name} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
@@ -1035,7 +1128,9 @@ export default function MapPage() {
                 {isSelected && (
                   <div className="absolute -inset-1.5 w-8 h-8 rounded-full border-2 border-violet-400 animate-pulse" />
                 )}
-                <div className={`relative w-5 h-5 rounded-full ${pendingTooLong ? "bg-red-500" : "bg-violet-600"} border-2 border-white flex items-center justify-center shadow-lg hover:scale-125 transition-transform`}>
+                <div
+                  className="relative w-5 h-5 rounded-full border-2 border-white flex items-center justify-center shadow-lg hover:scale-125 transition-transform"
+                  style={{ backgroundColor: pendingTooLong ? "#ef4444" : statusColor.hex }}>
                   <Package size={12} className="text-white" />
                 </div>
                 {isHovered && (
@@ -1399,7 +1494,7 @@ export default function MapPage() {
         </div>
         
         {/* Order cards list */}
-        <div className="flex-1 overflow-y-auto scrollbar-hide" style={{ maxHeight: selectedOrder ? "calc(100vh - 260px)" : "calc(100vh - 60px)" }}>
+        <div className="flex-1 overflow-y-auto scrollbar-hide" style={{ maxHeight: `calc(100vh - ${selectedOrder ? (detailPanelExpanded ? 330 : 215) : 60}px)` }}>
           <div className="p-2 space-y-2">
             {filteredOrders.map((order: any) => {
               const statusColor = ORDER_STATUS_COLORS[order.status as keyof typeof ORDER_STATUS_COLORS] || ORDER_STATUS_COLORS.PENDING;
@@ -1537,6 +1632,9 @@ function BottomDetailPanel({
   const [selectedDriverId, setSelectedDriverId] = useState(order.driver?.id || "");
   const [showItems, setShowItems] = useState(false);
   const statusColor = ORDER_STATUS_COLORS[order.status as keyof typeof ORDER_STATUS_COLORS] || ORDER_STATUS_COLORS.PENDING;
+  const statusRank: Record<string, number> = { PENDING: 0, READY: 1, OUT_FOR_DELIVERY: 2, DELIVERED: 3, CANCELLED: 3 };
+  const isTerminalStatus = order.status === "DELIVERED" || order.status === "CANCELLED";
+  const currentRank = statusRank[order.status] ?? 0;
   const orderBusinesses = getOrderBusinesses(order);
   const businessNames = orderBusinesses.map((b: any) => b.business?.name).filter(Boolean).join(", ") || "Unknown";
   const businessPhones = orderBusinesses.map((b: any) => b.business?.phoneNumber).filter(Boolean).join(", ") || "";
@@ -1751,7 +1849,7 @@ function BottomDetailPanel({
                       <span className="text-emerald-400/80"> ({(recommendedDriver.distanceToPickupMeters / 1000).toFixed(2)} km)</span>
                     </div>
                   )}
-                  <div className="max-h-[76px] overflow-y-auto space-y-1">
+                  <div className="overflow-y-auto space-y-1" style={{ maxHeight: expanded ? '130px' : '76px' }}>
                     {assignableFreeDrivers.map(({ driver, distanceToPickupMeters }: any) => {
                       const cs = (driver.driverConnection?.connectionStatus ?? "DISCONNECTED") as keyof typeof DRIVER_CONNECTION_COLORS;
                       const ss = DRIVER_CONNECTION_COLORS[cs];
@@ -1794,12 +1892,13 @@ function BottomDetailPanel({
               <div className="text-[9px] text-zinc-500 uppercase font-semibold">Status</div>
               <select value={order.status} onChange={(e) => onUpdateStatus(order.id, e.target.value)}
                 className={`w-full border rounded-lg px-2 py-1.5 text-[11px] font-medium text-white ${statusColor.selectBg} ${statusColor.border}`}
-                style={{ colorScheme: "dark" }}>
-                <option value="PENDING" style={{ backgroundColor: "#1f2937" }}>Pending</option>
-                <option value="READY" style={{ backgroundColor: "#1f2937" }}>Ready</option>
-                <option value="OUT_FOR_DELIVERY" style={{ backgroundColor: "#1f2937" }} disabled={!order.driver?.id}>Out for Delivery</option>
-                <option value="DELIVERED" style={{ backgroundColor: "#1f2937" }}>Delivered</option>
-                <option value="CANCELLED" style={{ backgroundColor: "#1f2937" }}>Cancelled</option>
+                style={{ colorScheme: "dark" }}
+                title="Status can only move forward">
+                <option value="PENDING" style={{ backgroundColor: "#1f2937" }} disabled={isTerminalStatus || currentRank > 0}>Pending</option>
+                <option value="READY" style={{ backgroundColor: "#1f2937" }} disabled={isTerminalStatus || currentRank > 1}>Ready</option>
+                <option value="OUT_FOR_DELIVERY" style={{ backgroundColor: "#1f2937" }} disabled={isTerminalStatus || (!order.driver?.id && order.status !== "OUT_FOR_DELIVERY")}>Out for Delivery</option>
+                <option value="DELIVERED" style={{ backgroundColor: "#1f2937" }} disabled={order.status === "CANCELLED"}>Delivered</option>
+                <option value="CANCELLED" style={{ backgroundColor: "#1f2937" }} disabled={order.status === "DELIVERED"}>Cancelled</option>
               </select>
               {!order.driver?.id && (
                 <div className="text-[9px] text-amber-400/90">Assign a driver to enable Out for Delivery.</div>
@@ -1826,7 +1925,7 @@ function BottomDetailPanel({
                 <div>
                   <button onClick={() => setShowItems(!showItems)}
                     className="text-[9px] text-zinc-600 uppercase hover:text-zinc-400 transition flex items-center gap-1">
-                    {showItems ? <ChevronDown size={9} /> : <ChevronUp size={9} />}Items
+                    {showItems ? <ChevronUp size={9} /> : <ChevronDown size={9} />}Items
                   </button>
                   {showItems && (
                     <div className="mt-1 space-y-0.5">

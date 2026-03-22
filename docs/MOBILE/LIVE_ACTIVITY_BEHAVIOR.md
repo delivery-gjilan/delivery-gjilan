@@ -1,6 +1,6 @@
 # Live Activity Behavior (Customer iOS)
 
-<!-- MDS:M3 | Domain: Mobile | Updated: 2026-03-20 -->
+<!-- MDS:M3 | Domain: Mobile | Updated: 2026-03-22 -->
 <!-- Depends-On: M2, B4 -->
 <!-- Depended-By: O4 -->
 <!-- Nav: ETA/progress changes → update B4 (Watchdog heartbeat). Token lifecycle → update O4 (Push Audit). Status mapping → review B2 (Order Creation). -->
@@ -34,6 +34,7 @@ This document describes the implemented Live Activity flow for customer order tr
   - `api/src/models/Order/resolvers/Mutation/updateOrderStatus.ts`
   - `api/src/models/Order/resolvers/Mutation/updatePreparationTime.ts`
 - Heartbeat-driven ETA updates (out for delivery):
+  - `api/src/services/DriverHeartbeatHandler.ts` (periodic 90 s throttled pushes)
   - `api/src/models/Driver/resolvers/Mutation/driverHeartbeat.ts`
 
 ## Single Activity Per Order
@@ -119,12 +120,14 @@ Once token registration exists for that activity/order:
 
 ### Heartbeat Update Throttling
 
-`driverHeartbeat` now sends Live Activity updates when minute value changes, throttled by cache key:
+`DriverHeartbeatHandler.processHeartbeat()` pushes periodic Live Activity ETA updates during the `to_dropoff` navigation phase. Two throttle layers prevent excessive pushes:
 
-- key: `cache:live-activity:last-minute:{orderId}`
-- update cadence: minute-step changes (not every heartbeat tick)
+1. **Heartbeat gate:** Redis key `cache:la-heartbeat:{orderId}` with **90 s** TTL. Checked before any work.
+2. **NotificationService gate:** `sendLiveActivityUpdate` enforces a minimum interval of `LIVE_ACTIVITY_MIN_UPDATE_INTERVAL_SECONDS` (default 15 s) and a minimum ETA delta of `LIVE_ACTIVITY_MIN_ETA_DELTA_MINUTES` (default 1 min). Status changes always pass immediately.
 
-This avoids excessive push traffic while preserving smooth ETA progress.
+The combined effect is ~2–5 mid-delivery pushes for a 5–15 min delivery, refining the Dynamic Island countdown as the motorcycle driver's actual pace diverges from the initial estimate.
+
+The push is fire-and-forget and never blocks the heartbeat response path.
 
 ## Status Mapping and Phase Baselines
 
@@ -152,7 +155,14 @@ Also refreshed when preparation time is edited.
 
 ### End States
 
-- `DELIVERED` and `CANCELLED` trigger Live Activity end event (`event: end`).
+- `DELIVERED` and `CANCELLED` trigger Live Activity end event (`event: end`) when routed through `updateOrderStatus` mutation.
+- Client-side safety net: `OrderDetails.tsx` watches `isCompleted || isCancelled` and calls `endActivity()` natively as a fallback.
+
+#### Known Gap: `cancelOrder` Mutation
+
+- The `cancelOrder` mutation (used when the customer cancels from the app) sends an FCM cancellation notification but does **not** call `endLiveActivity()`.
+- The Live Activity persists on the Dynamic Island / Lock Screen until the iOS system timeout or the client-side safety net catches it.
+- Fix: add `endLiveActivity(context.notificationService, id, 'cancelled')` to `api/src/models/Order/resolvers/Mutation/cancelOrder.ts` after the order is cancelled.
 
 ## APNs Payload Contract
 
@@ -172,6 +182,7 @@ alongside existing:
 - `api/src/models/Order/resolvers/Mutation/startPreparing.ts`
 - `api/src/models/Order/resolvers/Mutation/updateOrderStatus.ts`
 - `api/src/models/Order/resolvers/Mutation/updatePreparationTime.ts`
+- `api/src/services/DriverHeartbeatHandler.ts`
 - `api/src/models/Driver/resolvers/Mutation/driverHeartbeat.ts`
 - `mobile-customer/hooks/useLiveActivity.ts`
 - `mobile-customer/modules/orders/components/OrderDetails.tsx`

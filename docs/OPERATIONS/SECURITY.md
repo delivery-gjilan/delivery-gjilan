@@ -15,6 +15,7 @@ The repo already has a reasonable baseline for an actively developed delivery pr
 - shorter access token lifetimes with refresh separation
 - stronger password and OTP handling
 - secure mobile token storage
+- **Mapbox token server-side only** — all client apps (mobile-customer, mobile-driver, admin-panel) route directions calls through backend/Next.js proxies; `NEXT_PUBLIC_MAPBOX_TOKEN` is no longer needed in browser or native bundles; coordinate inputs are sanitised (re-serialised from parsed floats, earth-range validated) before being forwarded to Mapbox
 
 That is a decent baseline, but it is not the same thing as a hardened production posture.
 

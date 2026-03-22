@@ -2,6 +2,8 @@ import { DriverService } from '@/services/DriverService';
 import { DriverWatchdogService } from '@/services/DriverWatchdogService';
 import { DriverRepository } from '@/repositories/DriverRepository';
 import { AuthRepository } from '@/repositories/AuthRepository';
+import { NotificationService } from '@/services/NotificationService';
+import { NotificationRepository } from '@/repositories/NotificationRepository';
 import { getDB } from '@/database';
 import logger from '@/lib/logger';
 
@@ -50,7 +52,8 @@ export async function initializeDriverServices() {
     watchdogService = new DriverWatchdogService(driverRepository, authRepository);
 
     // High-level service with heartbeat handling
-    driverService = new DriverService(db, authRepository, watchdogService);
+    const notificationService = new NotificationService(new NotificationRepository(db));
+    driverService = new DriverService(db, authRepository, watchdogService, notificationService);
 
     // Start the watchdog
     watchdogService.start();

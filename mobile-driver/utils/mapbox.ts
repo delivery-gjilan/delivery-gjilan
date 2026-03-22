@@ -1,7 +1,14 @@
-export const MAPBOX_TOKEN =
-    process.env.EXPO_PUBLIC_MAPBOX_TOKEN ??
-    process.env.NEXT_PUBLIC_MAPBOX_TOKEN ??
-    '';
+import { useAuthStore } from '@/store/authStore';
+
+/** Strip /graphql suffix to get the API base URL. */
+const API_BASE = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/graphql$/, '');
+
+/**
+ * Mapbox public token — used ONLY to initialise the native SDK (map rendering).
+ * Directions API calls go through the backend proxy; this token is NOT sent to Mapbox
+ * for routing requests from this file.
+ */
+export const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? '';
 
 // ---------------------------------------------------------------------------
 // Stats
@@ -14,27 +21,6 @@ export function getDirectionsApiCallCount() {
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-interface DirectionsResponse {
-    routes: Array<{
-        distance: number; // in meters
-        duration: number; // in seconds
-        legs?: Array<{
-            steps?: Array<{
-                distance: number;
-                duration: number;
-                maneuver: {
-                    instruction?: string;
-                    type?: string;
-                    modifier?: string;
-                    location: [number, number];
-                };
-            }>;
-        }>;
-        geometry?: {
-            coordinates: Array<[number, number]>;
-        };
-    }>;
-}
 
 export interface NavigationStep {
     instruction: string;
@@ -104,7 +90,7 @@ export function clearRouteCache(): void {
 // Internal fetchers
 // ---------------------------------------------------------------------------
 
-async function _doFetchSimpleRoute(url: string, key: string): Promise<{
+async function _doFetchSimpleRoute(url: string, key: string, token: string): Promise<{
     coordinates: Array<[number, number]>;
     distanceKm: number;
     durationMin: number;
@@ -112,21 +98,24 @@ async function _doFetchSimpleRoute(url: string, key: string): Promise<{
     directionsApiCallCount++;
     console.log('[MAPBOX] Directions API call #', directionsApiCallCount, '| key:', key);
     try {
-        const response = await fetch(url);
+        // Proxy returns { distanceKm, durationMin, geometry: [[lon, lat], ...] }
+        const response = await fetch(url, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
         if (!response.ok) {
-            console.error('[MAPBOX] Directions API error:', response.status, response.statusText);
+            console.error('[MAPBOX] Directions proxy error:', response.status, response.statusText);
             return null;
         }
-        const data: DirectionsResponse = await response.json();
-        const route = data.routes?.[0];
-        if (!route) {
+        const data: { distanceKm: number; durationMin: number; geometry: Array<[number, number]> } =
+            await response.json();
+        if (!data.geometry?.length) {
             console.error('[MAPBOX] No route found for key:', key);
             return null;
         }
         return {
-            coordinates: route.geometry?.coordinates ?? [],
-            distanceKm: route.distance / 1000,
-            durationMin: route.duration / 60,
+            coordinates: data.geometry,
+            distanceKm: data.distanceKm,
+            durationMin: data.durationMin,
         };
     } catch (error) {
         console.error('[MAPBOX] Fetch error:', error);
@@ -156,9 +145,11 @@ async function _fetchSimpleRoute(from: Coord, to: Coord): Promise<{
     const existing = simpleInFlight.get(key);
     if (existing) return existing;
 
-    const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${from.longitude},${from.latitude};${to.longitude},${to.latitude}?access_token=${MAPBOX_TOKEN}&geometries=geojson&overview=full`;
+    const token = useAuthStore.getState().token ?? '';
+    const points = `${from.longitude},${from.latitude};${to.longitude},${to.latitude}`;
+    const url = `${API_BASE}/api/directions?points=${encodeURIComponent(points)}`;
 
-    const promise = _doFetchSimpleRoute(url, key).then((result) => {
+    const promise = _doFetchSimpleRoute(url, key, token).then((result) => {
         simpleInFlight.delete(key);
         if (result) simpleCache.set(key, { result, expiresAt: now + SIMPLE_TTL });
         return result;
@@ -228,8 +219,9 @@ export async function fetchNavigationRoute(
     const existing = navInFlight.get(key);
     if (existing) return existing;
 
+    const token = useAuthStore.getState().token ?? '';
     const pointsStr = allPoints.map((p) => `${p.longitude},${p.latitude}`).join(';');
-    const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${pointsStr}?access_token=${MAPBOX_TOKEN}&geometries=geojson&overview=full&steps=true&language=en`;
+    const url = `${API_BASE}/api/directions?points=${encodeURIComponent(pointsStr)}&steps=true`;
 
     directionsApiCallCount++;
     console.log('[MAPBOX] Directions API call #', directionsApiCallCount, '| key:', key);
@@ -241,34 +233,30 @@ export async function fetchNavigationRoute(
         steps: NavigationStep[];
     } | null> => {
         try {
-            const response = await fetch(url);
+            // Proxy returns { distanceKm, durationMin, geometry, steps } — steps already parsed
+            const response = await fetch(url, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
             if (!response.ok) {
-                console.error('[MAPBOX] Navigation API error:', response.status, response.statusText);
+                console.error('[MAPBOX] Navigation proxy error:', response.status, response.statusText);
                 return null;
             }
-            const data: DirectionsResponse = await response.json();
-            const route = data.routes?.[0];
-            if (!route) {
+            const data: {
+                distanceKm: number;
+                durationMin: number;
+                geometry: Array<[number, number]>;
+                steps: NavigationStep[];
+            } = await response.json();
+            if (!data.geometry?.length) {
                 console.error('[MAPBOX] No navigation route found for key:', key);
                 return null;
             }
 
-            const steps: NavigationStep[] = (route.legs ?? []).flatMap((leg) =>
-                (leg.steps ?? []).map((step) => ({
-                    instruction: step.maneuver.instruction ?? 'Continue straight',
-                    distanceM: step.distance,
-                    durationS: step.duration,
-                    maneuverType: step.maneuver.type,
-                    maneuverModifier: step.maneuver.modifier,
-                    maneuverLocation: step.maneuver.location,
-                })),
-            );
-
             const result = {
-                coordinates: route.geometry?.coordinates ?? [],
-                distanceKm: route.distance / 1000,
-                durationMin: route.duration / 60,
-                steps,
+                coordinates: data.geometry,
+                distanceKm: data.distanceKm,
+                durationMin: data.durationMin,
+                steps: data.steps ?? [],
             };
 
             navCache.set(key, { result, expiresAt: now + NAV_TTL });

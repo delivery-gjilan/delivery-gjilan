@@ -967,8 +967,11 @@ export class OrderService {
     }
 
     // Valid order status transitions (state machine)
+    // MARKET/PHARMACY orders skip PREPARING and go PENDING → READY directly.
+    // Allowing READY from PENDING here covers that path while still letting
+    // restaurants use PENDING → PREPARING → READY as before.
     private static readonly VALID_TRANSITIONS: Record<string, OrderStatus[]> = {
-        PENDING: ['PREPARING', 'CANCELLED'],
+        PENDING: ['PREPARING', 'READY', 'CANCELLED'],
         PREPARING: ['READY', 'CANCELLED'],
         READY: ['OUT_FOR_DELIVERY', 'CANCELLED'],
         OUT_FOR_DELIVERY: ['DELIVERED', 'CANCELLED'],

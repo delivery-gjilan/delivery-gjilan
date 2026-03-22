@@ -78,13 +78,6 @@ export type AddUserAddressInput = {
   priority?: InputMaybe<Scalars['Int']['input']>;
 };
 
-export type AddWalletCreditInput = {
-  amount: Scalars['Float']['input'];
-  description?: InputMaybe<Scalars['String']['input']>;
-  type: Scalars['String']['input'];
-  userId: Scalars['ID']['input'];
-};
-
 export type AgoraRtcCredentials = {
   __typename?: 'AgoraRtcCredentials';
   appId: Scalars['String']['output'];
@@ -191,11 +184,13 @@ export type Business = {
   imageUrl?: Maybe<Scalars['String']['output']>;
   isActive: Scalars['Boolean']['output'];
   isOpen: Scalars['Boolean']['output'];
+  isTemporarilyClosed: Scalars['Boolean']['output'];
   location: Location;
   name: Scalars['String']['output'];
   phoneNumber?: Maybe<Scalars['String']['output']>;
   prepTimeOverrideMinutes?: Maybe<Scalars['Int']['output']>;
   schedule: Array<BusinessDayHours>;
+  temporaryClosureReason?: Maybe<Scalars['String']['output']>;
   updatedAt: Scalars['Date']['output'];
   workingHours: WorkingHours;
 };
@@ -271,12 +266,6 @@ export enum BusinessType {
   Restaurant = 'RESTAURANT'
 }
 
-export type CalculationDetails = {
-  __typename?: 'CalculationDetails';
-  itemsBreakdown: Scalars['JSON']['output'];
-  rulesApplied: Scalars['JSON']['output'];
-};
-
 export enum CampaignStatus {
   Draft = 'DRAFT',
   Failed = 'FAILED',
@@ -319,6 +308,24 @@ export type CreateBusinessInput = {
   workingHours: WorkingHoursInput;
 };
 
+export type CreateBusinessOwnerInput = {
+  email: Scalars['String']['input'];
+  firstName: Scalars['String']['input'];
+  lastName: Scalars['String']['input'];
+  password: Scalars['String']['input'];
+};
+
+export type CreateBusinessWithOwnerInput = {
+  business: CreateBusinessInput;
+  owner: CreateBusinessOwnerInput;
+};
+
+export type CreateBusinessWithOwnerPayload = {
+  __typename?: 'CreateBusinessWithOwnerPayload';
+  business: Business;
+  owner: User;
+};
+
 export type CreateCampaignInput = {
   body: Scalars['String']['input'];
   category?: InputMaybe<Scalars['String']['input']>;
@@ -343,19 +350,6 @@ export type CreateDeliveryZoneInput = {
   name: Scalars['String']['input'];
   polygon: Array<PolygonPointInput>;
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
-};
-
-export type CreateDynamicPricingRuleInput = {
-  adjustmentConfig: Scalars['JSON']['input'];
-  appliesTo: DynamicPricingRuleAppliesToInput;
-  businessId?: InputMaybe<Scalars['String']['input']>;
-  conditionConfig: Scalars['JSON']['input'];
-  conditionType: PricingConditionType;
-  description?: InputMaybe<Scalars['String']['input']>;
-  name: Scalars['String']['input'];
-  priority?: InputMaybe<Scalars['Int']['input']>;
-  validFrom?: InputMaybe<Scalars['String']['input']>;
-  validUntil?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type CreateOptionGroupInput = {
@@ -384,6 +378,7 @@ export type CreateOrderInput = {
   driverNotes?: InputMaybe<Scalars['String']['input']>;
   dropOffLocation: LocationInput;
   items: Array<CreateOrderItemInput>;
+  paymentCollection?: InputMaybe<OrderPaymentCollection>;
   promoCode?: InputMaybe<Scalars['String']['input']>;
   totalPrice: Scalars['Float']['input'];
 };
@@ -405,6 +400,7 @@ export type CreateOrderItemOptionInput = {
 export type CreateProductCategoryInput = {
   businessId: Scalars['ID']['input'];
   name: Scalars['String']['input'];
+  sortOrder?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type CreateProductInput = {
@@ -434,6 +430,8 @@ export type CreateProductVariantGroupInput = {
 
 export type CreatePromotionInput = {
   code?: InputMaybe<Scalars['String']['input']>;
+  creatorId?: InputMaybe<Scalars['ID']['input']>;
+  creatorType?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   discountValue?: InputMaybe<Scalars['Float']['input']>;
   eligibleBusinessIds?: InputMaybe<Array<Scalars['ID']['input']>>;
@@ -455,13 +453,15 @@ export type CreatePromotionInput = {
 };
 
 export type CreateSettlementRuleInput = {
-  canStackWith?: InputMaybe<Array<Scalars['String']['input']>>;
-  config: Scalars['JSON']['input'];
-  entityId: Scalars['String']['input'];
+  amount: Scalars['Float']['input'];
+  amountType: SettlementAmountType;
+  appliesTo?: InputMaybe<Scalars['String']['input']>;
+  businessId?: InputMaybe<Scalars['ID']['input']>;
+  direction: SettlementDirection;
   entityType: SettlementEntityType;
+  name: Scalars['String']['input'];
   notes?: InputMaybe<Scalars['String']['input']>;
-  priority?: InputMaybe<Scalars['Int']['input']>;
-  ruleType: SettlementRuleType;
+  promotionId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 export type CreateUserInput = {
@@ -645,40 +645,6 @@ export enum DriverPttSignalAction {
   Unmute = 'UNMUTE'
 }
 
-export type DynamicPricingRule = {
-  __typename?: 'DynamicPricingRule';
-  adjustmentConfig: Scalars['JSON']['output'];
-  appliesTo: DynamicPricingRuleAppliesTo;
-  businessId?: Maybe<Scalars['String']['output']>;
-  conditionConfig: Scalars['JSON']['output'];
-  conditionType: PricingConditionType;
-  createdAt: Scalars['String']['output'];
-  createdBy?: Maybe<Scalars['String']['output']>;
-  description?: Maybe<Scalars['String']['output']>;
-  id: Scalars['ID']['output'];
-  isActive: Scalars['Boolean']['output'];
-  name: Scalars['String']['output'];
-  priority: Scalars['Int']['output'];
-  updatedAt: Scalars['String']['output'];
-  validFrom?: Maybe<Scalars['String']['output']>;
-  validUntil?: Maybe<Scalars['String']['output']>;
-};
-
-export type DynamicPricingRuleAppliesTo = {
-  __typename?: 'DynamicPricingRuleAppliesTo';
-  allProducts?: Maybe<Scalars['Boolean']['output']>;
-  categoryIds?: Maybe<Array<Scalars['String']['output']>>;
-  productIds?: Maybe<Array<Scalars['String']['output']>>;
-  subcategoryIds?: Maybe<Array<Scalars['String']['output']>>;
-};
-
-export type DynamicPricingRuleAppliesToInput = {
-  allProducts?: InputMaybe<Scalars['Boolean']['input']>;
-  categoryIds?: InputMaybe<Array<Scalars['String']['input']>>;
-  productIds?: InputMaybe<Array<Scalars['String']['input']>>;
-  subcategoryIds?: InputMaybe<Array<Scalars['String']['input']>>;
-};
-
 export enum EntityType {
   Business = 'BUSINESS',
   Category = 'CATEGORY',
@@ -719,15 +685,13 @@ export type LoginInput = {
 
 export type Mutation = {
   __typename?: 'Mutation';
-  activateSettlementRule: SettlementRule;
   addUserAddress: UserAddress;
-  addWalletCredit: WalletTransaction;
   /** Admin sends push-to-talk signaling state to one or multiple drivers */
   adminSendPttSignal: Scalars['Boolean']['output'];
   /** Admin mutation to manually set connection status (for testing/recovery) */
   adminSetDriverConnectionStatus: User;
   adminUpdateDriverLocation: User;
-  /** Admin mutation to update per-driver settings (commission %, max active orders) */
+  /** Admin mutation to update per-driver settings (commission %, max active orders, vehicle ownership) */
   adminUpdateDriverSettings: User;
   assignDriverToOrder: Order;
   assignPromotionToUsers: Array<UserPromotion>;
@@ -735,12 +699,15 @@ export type Mutation = {
   businessDeviceHeartbeat: Scalars['Boolean']['output'];
   businessDeviceOrderSignal: Scalars['Boolean']['output'];
   cancelOrder: Order;
+  /** Admin cancels an outstanding settlement request. */
+  cancelSettlementRequest: SettlementRequest;
+  changeMyPassword: Scalars['Boolean']['output'];
   createBanner: Banner;
   createBusiness: Business;
+  createBusinessWithOwner: CreateBusinessWithOwnerPayload;
   createCampaign: NotificationCampaign;
   createDeliveryPricingTier: DeliveryPricingTier;
   createDeliveryZone: DeliveryZone;
-  createDynamicPricingRule: DynamicPricingRule;
   createOption: Option;
   createOptionGroup: OptionGroup;
   createOrder: Order;
@@ -749,17 +716,16 @@ export type Mutation = {
   createProductSubcategory: ProductSubcategory;
   createProductVariantGroup: ProductVariantGroup;
   createPromotion: Promotion;
+  /** Admin creates a settlement request, notifying the business via push. */
+  createSettlementRequest: SettlementRequest;
   createSettlementRule: SettlementRule;
   createTestOrder: Order;
   createUser: AuthResponse;
-  deactivateSettlementRule: SettlementRule;
-  deductWalletCredit: WalletTransaction;
   deleteBanner: Scalars['Boolean']['output'];
   deleteBusiness: Scalars['Boolean']['output'];
   deleteCampaign: Scalars['Boolean']['output'];
   deleteDeliveryPricingTier: Scalars['Boolean']['output'];
   deleteDeliveryZone: Scalars['Boolean']['output'];
-  deleteDynamicPricingRule: Scalars['Boolean']['output'];
   deleteMyAccount: Scalars['Boolean']['output'];
   deleteOption: Scalars['Boolean']['output'];
   deleteOptionGroup: Scalars['Boolean']['output'];
@@ -794,6 +760,9 @@ export type Mutation = {
   registerLiveActivityToken: Scalars['Boolean']['output'];
   removeUserFromPromotion: Scalars['Boolean']['output'];
   resendEmailVerification: SignupStepResponse;
+  /** Business owner accepts or disputes a pending settlement request. */
+  respondToSettlementRequest: SettlementRequest;
+  runSettlementScenarioHarness: SettlementScenarioHarnessResult;
   sendCampaign: NotificationCampaign;
   sendPushNotification: SendNotificationResult;
   setBusinessSchedule: Array<BusinessDayHours>;
@@ -809,20 +778,17 @@ export type Mutation = {
   updateBanner: Banner;
   updateBannerOrder: Banner;
   updateBusiness: Business;
-  /** @deprecated Use createSettlementRule instead */
-  updateCommissionPercentage: Scalars['Boolean']['output'];
   updateDeliveryPricingTier: DeliveryPricingTier;
   updateDeliveryZone: DeliveryZone;
   updateDriverLocation: User;
   updateDriverOnlineStatus: User;
-  updateDynamicPricingRule: DynamicPricingRule;
   updateOption: Option;
   updateOptionGroup: OptionGroup;
   updateOrderStatus: Order;
   updatePreparationTime: Order;
   updateProduct: Product;
+  updateProductCategoriesOrder: Scalars['Boolean']['output'];
   updateProductCategory: ProductCategory;
-  updateProductPricing: ProductPricing;
   updateProductSubcategory: ProductSubcategory;
   updateProductsOrder: Scalars['Boolean']['output'];
   updatePromotion: Promotion;
@@ -836,18 +802,8 @@ export type Mutation = {
 };
 
 
-export type MutationActivateSettlementRuleArgs = {
-  id: Scalars['ID']['input'];
-};
-
-
 export type MutationAddUserAddressArgs = {
   input: AddUserAddressInput;
-};
-
-
-export type MutationAddWalletCreditArgs = {
-  input: AddWalletCreditInput;
 };
 
 
@@ -875,6 +831,7 @@ export type MutationAdminUpdateDriverLocationArgs = {
 export type MutationAdminUpdateDriverSettingsArgs = {
   commissionPercentage?: InputMaybe<Scalars['Float']['input']>;
   driverId: Scalars['ID']['input'];
+  hasOwnVehicle?: InputMaybe<Scalars['Boolean']['input']>;
   maxActiveOrders?: InputMaybe<Scalars['Int']['input']>;
 };
 
@@ -906,6 +863,17 @@ export type MutationCancelOrderArgs = {
 };
 
 
+export type MutationCancelSettlementRequestArgs = {
+  requestId: Scalars['ID']['input'];
+};
+
+
+export type MutationChangeMyPasswordArgs = {
+  currentPassword: Scalars['String']['input'];
+  newPassword: Scalars['String']['input'];
+};
+
+
 export type MutationCreateBannerArgs = {
   input: CreateBannerInput;
 };
@@ -913,6 +881,11 @@ export type MutationCreateBannerArgs = {
 
 export type MutationCreateBusinessArgs = {
   input: CreateBusinessInput;
+};
+
+
+export type MutationCreateBusinessWithOwnerArgs = {
+  input: CreateBusinessWithOwnerInput;
 };
 
 
@@ -928,11 +901,6 @@ export type MutationCreateDeliveryPricingTierArgs = {
 
 export type MutationCreateDeliveryZoneArgs = {
   input: CreateDeliveryZoneInput;
-};
-
-
-export type MutationCreateDynamicPricingRuleArgs = {
-  input: CreateDynamicPricingRuleInput;
 };
 
 
@@ -977,6 +945,15 @@ export type MutationCreatePromotionArgs = {
 };
 
 
+export type MutationCreateSettlementRequestArgs = {
+  amount: Scalars['Float']['input'];
+  businessId: Scalars['ID']['input'];
+  note?: InputMaybe<Scalars['String']['input']>;
+  periodEnd: Scalars['Date']['input'];
+  periodStart: Scalars['Date']['input'];
+};
+
+
 export type MutationCreateSettlementRuleArgs = {
   input: CreateSettlementRuleInput;
 };
@@ -984,18 +961,6 @@ export type MutationCreateSettlementRuleArgs = {
 
 export type MutationCreateUserArgs = {
   input: CreateUserInput;
-};
-
-
-export type MutationDeactivateSettlementRuleArgs = {
-  id: Scalars['ID']['input'];
-};
-
-
-export type MutationDeductWalletCreditArgs = {
-  amount: Scalars['Float']['input'];
-  orderId: Scalars['ID']['input'];
-  userId: Scalars['ID']['input'];
 };
 
 
@@ -1020,11 +985,6 @@ export type MutationDeleteDeliveryPricingTierArgs = {
 
 
 export type MutationDeleteDeliveryZoneArgs = {
-  id: Scalars['ID']['input'];
-};
-
-
-export type MutationDeleteDynamicPricingRuleArgs = {
   id: Scalars['ID']['input'];
 };
 
@@ -1164,6 +1124,18 @@ export type MutationRemoveUserFromPromotionArgs = {
 };
 
 
+export type MutationRespondToSettlementRequestArgs = {
+  action: SettlementRequestAction;
+  disputeReason?: InputMaybe<Scalars['String']['input']>;
+  requestId: Scalars['ID']['input'];
+};
+
+
+export type MutationRunSettlementScenarioHarnessArgs = {
+  scenarioIds?: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
+
 export type MutationSendCampaignArgs = {
   id: Scalars['ID']['input'];
 };
@@ -1245,13 +1217,6 @@ export type MutationUpdateBusinessArgs = {
 };
 
 
-export type MutationUpdateCommissionPercentageArgs = {
-  businessId?: InputMaybe<Scalars['ID']['input']>;
-  driverId?: InputMaybe<Scalars['ID']['input']>;
-  percentage: Scalars['Float']['input'];
-};
-
-
 export type MutationUpdateDeliveryPricingTierArgs = {
   id: Scalars['ID']['input'];
   input: UpdateDeliveryPricingTierInput;
@@ -1272,12 +1237,6 @@ export type MutationUpdateDriverLocationArgs = {
 
 export type MutationUpdateDriverOnlineStatusArgs = {
   isOnline: Scalars['Boolean']['input'];
-};
-
-
-export type MutationUpdateDynamicPricingRuleArgs = {
-  id: Scalars['ID']['input'];
-  input: UpdateDynamicPricingRuleInput;
 };
 
 
@@ -1311,16 +1270,15 @@ export type MutationUpdateProductArgs = {
 };
 
 
-export type MutationUpdateProductCategoryArgs = {
-  id: Scalars['ID']['input'];
-  input: UpdateProductCategoryInput;
+export type MutationUpdateProductCategoriesOrderArgs = {
+  businessId: Scalars['ID']['input'];
+  categories: Array<ProductCategoryOrderInput>;
 };
 
 
-export type MutationUpdateProductPricingArgs = {
-  businessId: Scalars['ID']['input'];
-  input: UpdateProductPricingInput;
-  productId: Scalars['ID']['input'];
+export type MutationUpdateProductCategoryArgs = {
+  id: Scalars['ID']['input'];
+  input: UpdateProductCategoryInput;
 };
 
 
@@ -1457,6 +1415,7 @@ export type Order = {
   originalDeliveryPrice?: Maybe<Scalars['Float']['output']>;
   originalPrice?: Maybe<Scalars['Float']['output']>;
   outForDeliveryAt?: Maybe<Scalars['Date']['output']>;
+  paymentCollection: OrderPaymentCollection;
   pickupLocations: Array<Location>;
   preparationMinutes?: Maybe<Scalars['Int']['output']>;
   preparingAt?: Maybe<Scalars['Date']['output']>;
@@ -1487,6 +1446,7 @@ export type OrderDriverLiveTracking = {
 
 export type OrderItem = {
   __typename?: 'OrderItem';
+  basePrice?: Maybe<Scalars['Float']['output']>;
   childItems: Array<OrderItem>;
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
@@ -1508,6 +1468,11 @@ export type OrderItemOption = {
   optionName: Scalars['String']['output'];
   priceAtOrder: Scalars['Float']['output'];
 };
+
+export enum OrderPaymentCollection {
+  CashToDriver = 'CASH_TO_DRIVER',
+  PrepaidToPlatform = 'PREPAID_TO_PLATFORM'
+}
 
 export type OrderPromotion = {
   __typename?: 'OrderPromotion';
@@ -1537,31 +1502,6 @@ export type PolygonPointInput = {
   lng: Scalars['Float']['input'];
 };
 
-export enum PriceAdjustmentType {
-  FixedAmount = 'FIXED_AMOUNT',
-  Multiplier = 'MULTIPLIER',
-  Percentage = 'PERCENTAGE'
-}
-
-export type PriceHistoryEntry = {
-  __typename?: 'PriceHistoryEntry';
-  baseCustomerPrice: Scalars['String']['output'];
-  businessPrice: Scalars['String']['output'];
-  changedAt: Scalars['String']['output'];
-  changedBy?: Maybe<Scalars['String']['output']>;
-  platformMarkup: Scalars['String']['output'];
-  reason?: Maybe<Scalars['String']['output']>;
-};
-
-export enum PricingConditionType {
-  Custom = 'CUSTOM',
-  DayOfWeek = 'DAY_OF_WEEK',
-  Demand = 'DEMAND',
-  SpecialEvent = 'SPECIAL_EVENT',
-  TimeOfDay = 'TIME_OF_DAY',
-  Weather = 'WEATHER'
-}
-
 export type Product = {
   __typename?: 'Product';
   businessId: Scalars['ID']['output'];
@@ -1573,7 +1513,9 @@ export type Product = {
   isAvailable: Scalars['Boolean']['output'];
   isOffer: Scalars['Boolean']['output'];
   isOnSale: Scalars['Boolean']['output'];
+  markupPrice?: Maybe<Scalars['Float']['output']>;
   name: Scalars['String']['output'];
+  nightMarkedupPrice?: Maybe<Scalars['Float']['output']>;
   optionGroups: Array<OptionGroup>;
   price: Scalars['Float']['output'];
   salePrice?: Maybe<Scalars['Float']['output']>;
@@ -1603,25 +1545,18 @@ export type ProductCategory = {
   id: Scalars['ID']['output'];
   isActive: Scalars['Boolean']['output'];
   name: Scalars['String']['output'];
+  sortOrder: Scalars['Int']['output'];
   updatedAt: Scalars['String']['output'];
+};
+
+export type ProductCategoryOrderInput = {
+  id: Scalars['ID']['input'];
+  sortOrder: Scalars['Int']['input'];
 };
 
 export type ProductOrderInput = {
   id: Scalars['ID']['input'];
   sortOrder: Scalars['Int']['input'];
-};
-
-export type ProductPricing = {
-  __typename?: 'ProductPricing';
-  baseCustomerPrice: Scalars['String']['output'];
-  businessId: Scalars['String']['output'];
-  businessPrice: Scalars['String']['output'];
-  createdAt: Scalars['String']['output'];
-  id: Scalars['ID']['output'];
-  platformMarkup: Scalars['String']['output'];
-  priceHistory: Array<PriceHistoryEntry>;
-  productId: Scalars['String']['output'];
-  updatedAt: Scalars['String']['output'];
 };
 
 export type ProductSubcategory = {
@@ -1645,6 +1580,8 @@ export type Promotion = {
   assignedUsers?: Maybe<Array<UserPromotion>>;
   code?: Maybe<Scalars['String']['output']>;
   createdAt: Scalars['String']['output'];
+  creatorId?: Maybe<Scalars['ID']['output']>;
+  creatorType: Scalars['String']['output'];
   currentGlobalUsage: Scalars['Int']['output'];
   description?: Maybe<Scalars['String']['output']>;
   discountValue?: Maybe<Scalars['Float']['output']>;
@@ -1716,7 +1653,9 @@ export enum PromotionType {
   FixedAmount = 'FIXED_AMOUNT',
   FreeDelivery = 'FREE_DELIVERY',
   Percentage = 'PERCENTAGE',
-  WalletCredit = 'WALLET_CREDIT'
+  SpendXFixed = 'SPEND_X_FIXED',
+  SpendXGetFree = 'SPEND_X_GET_FREE',
+  SpendXPercent = 'SPEND_X_PERCENT'
 }
 
 export type PromotionUsage = {
@@ -1772,7 +1711,6 @@ export type PushTelemetrySummary = {
 
 export type Query = {
   __typename?: 'Query';
-  activeRulesForEntity: Array<SettlementRule>;
   auditLog?: Maybe<AuditLog>;
   auditLogs: AuditLogConnection;
   business?: Maybe<Business>;
@@ -1780,14 +1718,12 @@ export type Query = {
   businessDeviceHealth: Array<BusinessDeviceHealth>;
   businesses: Array<Business>;
   calculateDeliveryPrice: DeliveryPriceResult;
-  calculateProductPrice: Scalars['String']['output'];
   deliveryPricingConfig: DeliveryPricingConfig;
   deliveryPricingTiers: Array<DeliveryPricingTier>;
   deliveryZones: Array<DeliveryZone>;
   deviceTokens: Array<DeviceToken>;
   driverBalance: SettlementSummary;
   drivers: Array<User>;
-  dynamicPricingRules: Array<DynamicPricingRule>;
   /** Get Agora RTC credentials for the current authenticated user */
   getAgoraRtcCredentials: AgoraRtcCredentials;
   getAllPromotions: Array<Promotion>;
@@ -1801,8 +1737,6 @@ export type Query = {
   getStoreStatus: StoreStatus;
   getUserPromoMetadata?: Maybe<UserPromoMetadata>;
   getUserPromotions: Array<UserPromotion>;
-  getUserWallet?: Maybe<UserWallet>;
-  getWalletTransactions: Array<WalletTransaction>;
   me?: Maybe<User>;
   myAddresses: Array<UserAddress>;
   myBehavior?: Maybe<UserBehavior>;
@@ -1819,28 +1753,21 @@ export type Query = {
   product?: Maybe<Product>;
   productCategories: Array<ProductCategory>;
   productCategory?: Maybe<ProductCategory>;
-  productPricing?: Maybe<ProductPricing>;
-  productPricingByBusiness: Array<ProductPricing>;
   productSubcategories: Array<ProductSubcategory>;
   productSubcategoriesByBusiness: Array<ProductSubcategory>;
   products: Array<ProductCard>;
   pushTelemetryEvents: Array<PushTelemetryEvent>;
   pushTelemetrySummary: PushTelemetrySummary;
+  settlementRequests: Array<SettlementRequest>;
   settlementRule?: Maybe<SettlementRule>;
-  settlementRuleSummary: SettlementRuleSummary;
   settlementRules: Array<SettlementRule>;
+  settlementScenarioDefinitions: Array<SettlementScenarioDefinition>;
   settlementSummary: SettlementSummary;
   settlements: Array<Settlement>;
   uncompletedOrders: Array<Order>;
   userBehavior?: Maybe<UserBehavior>;
   users: Array<User>;
   validatePromotions: PromotionResult;
-};
-
-
-export type QueryActiveRulesForEntityArgs = {
-  entityId: Scalars['String']['input'];
-  entityType: SettlementEntityType;
 };
 
 
@@ -1884,11 +1811,6 @@ export type QueryCalculateDeliveryPriceArgs = {
 };
 
 
-export type QueryCalculateProductPriceArgs = {
-  productId: Scalars['ID']['input'];
-};
-
-
 export type QueryDeviceTokensArgs = {
   userId?: InputMaybe<Scalars['ID']['input']>;
 };
@@ -1896,11 +1818,6 @@ export type QueryDeviceTokensArgs = {
 
 export type QueryDriverBalanceArgs = {
   driverId: Scalars['ID']['input'];
-};
-
-
-export type QueryDynamicPricingRulesArgs = {
-  businessId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 
@@ -1951,22 +1868,17 @@ export type QueryGetPromotionUsageArgs = {
 };
 
 
+export type QueryGetStoreStatusArgs = {
+  url?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryGetUserPromoMetadataArgs = {
   userId: Scalars['ID']['input'];
 };
 
 
 export type QueryGetUserPromotionsArgs = {
-  userId: Scalars['ID']['input'];
-};
-
-
-export type QueryGetUserWalletArgs = {
-  userId: Scalars['ID']['input'];
-};
-
-
-export type QueryGetWalletTransactionsArgs = {
   userId: Scalars['ID']['input'];
 };
 
@@ -2011,16 +1923,6 @@ export type QueryProductCategoryArgs = {
 };
 
 
-export type QueryProductPricingArgs = {
-  productId: Scalars['ID']['input'];
-};
-
-
-export type QueryProductPricingByBusinessArgs = {
-  businessId: Scalars['ID']['input'];
-};
-
-
 export type QueryProductSubcategoriesArgs = {
   categoryId: Scalars['ID']['input'];
 };
@@ -2050,14 +1952,16 @@ export type QueryPushTelemetrySummaryArgs = {
 };
 
 
-export type QuerySettlementRuleArgs = {
-  id: Scalars['ID']['input'];
+export type QuerySettlementRequestsArgs = {
+  businessId?: InputMaybe<Scalars['ID']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  status?: InputMaybe<SettlementRequestStatus>;
 };
 
 
-export type QuerySettlementRuleSummaryArgs = {
-  entityId: Scalars['String']['input'];
-  entityType: SettlementEntityType;
+export type QuerySettlementRuleArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -2135,11 +2039,6 @@ export type RegisterDeviceTokenInput = {
   token: Scalars['String']['input'];
 };
 
-export type RuleSnapshot = {
-  __typename?: 'RuleSnapshot';
-  appliedRules: Scalars['JSON']['output'];
-};
-
 export type SendNotificationResult = {
   __typename?: 'SendNotificationResult';
   failureCount: Scalars['Int']['output'];
@@ -2166,24 +2065,25 @@ export type Settlement = {
   __typename?: 'Settlement';
   amount: Scalars['Float']['output'];
   business?: Maybe<Business>;
-  calculationDetails?: Maybe<CalculationDetails>;
   createdAt: Scalars['Date']['output'];
-  createdBy?: Maybe<Scalars['String']['output']>;
   currency: Scalars['String']['output'];
   direction: SettlementDirection;
   driver?: Maybe<User>;
   id: Scalars['ID']['output'];
-  metadata?: Maybe<Scalars['JSON']['output']>;
   order: Order;
   paidAt?: Maybe<Scalars['Date']['output']>;
-  paidBy?: Maybe<Scalars['String']['output']>;
   paymentMethod?: Maybe<Scalars['String']['output']>;
   paymentReference?: Maybe<Scalars['String']['output']>;
-  ruleSnapshot?: Maybe<RuleSnapshot>;
+  ruleId?: Maybe<Scalars['ID']['output']>;
   status: SettlementStatus;
   type: SettlementType;
   updatedAt: Scalars['Date']['output'];
 };
+
+export enum SettlementAmountType {
+  Fixed = 'FIXED',
+  Percent = 'PERCENT'
+}
 
 export enum SettlementDirection {
   Payable = 'PAYABLE',
@@ -2195,46 +2095,94 @@ export enum SettlementEntityType {
   Driver = 'DRIVER'
 }
 
+export type SettlementRequest = {
+  __typename?: 'SettlementRequest';
+  amount: Scalars['Float']['output'];
+  business: Business;
+  createdAt: Scalars['Date']['output'];
+  currency: Scalars['String']['output'];
+  disputeReason?: Maybe<Scalars['String']['output']>;
+  expiresAt: Scalars['Date']['output'];
+  id: Scalars['ID']['output'];
+  note?: Maybe<Scalars['String']['output']>;
+  periodEnd: Scalars['Date']['output'];
+  periodStart: Scalars['Date']['output'];
+  requestedBy?: Maybe<User>;
+  respondedAt?: Maybe<Scalars['Date']['output']>;
+  respondedBy?: Maybe<User>;
+  status: SettlementRequestStatus;
+  updatedAt: Scalars['Date']['output'];
+};
+
+export enum SettlementRequestAction {
+  Accept = 'ACCEPT',
+  Dispute = 'DISPUTE'
+}
+
+export enum SettlementRequestStatus {
+  Accepted = 'ACCEPTED',
+  Cancelled = 'CANCELLED',
+  Disputed = 'DISPUTED',
+  Expired = 'EXPIRED',
+  PendingApproval = 'PENDING_APPROVAL'
+}
+
 export type SettlementRule = {
   __typename?: 'SettlementRule';
-  activatedAt?: Maybe<Scalars['String']['output']>;
-  activatedBy?: Maybe<Scalars['String']['output']>;
-  canStackWith: Array<Scalars['String']['output']>;
-  config: Scalars['JSON']['output'];
+  amount: Scalars['Float']['output'];
+  amountType: SettlementAmountType;
+  appliesTo?: Maybe<Scalars['String']['output']>;
+  business?: Maybe<Business>;
   createdAt: Scalars['String']['output'];
-  entityId: Scalars['String']['output'];
+  direction: SettlementDirection;
   entityType: SettlementEntityType;
   id: Scalars['ID']['output'];
   isActive: Scalars['Boolean']['output'];
+  name: Scalars['String']['output'];
   notes?: Maybe<Scalars['String']['output']>;
-  priority: Scalars['Int']['output'];
-  ruleType: SettlementRuleType;
+  promotion?: Maybe<Promotion>;
   updatedAt: Scalars['String']['output'];
 };
 
 export type SettlementRuleFilterInput = {
-  entityId?: InputMaybe<Scalars['String']['input']>;
+  businessId?: InputMaybe<Scalars['ID']['input']>;
   entityType?: InputMaybe<SettlementEntityType>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
-  ruleType?: InputMaybe<SettlementRuleType>;
+  promotionId?: InputMaybe<Scalars['ID']['input']>;
 };
 
-export type SettlementRuleSummary = {
-  __typename?: 'SettlementRuleSummary';
-  activeRules: Scalars['Int']['output'];
-  rulesByType: Scalars['JSON']['output'];
-  totalRules: Scalars['Int']['output'];
+export type SettlementScenarioDefinition = {
+  __typename?: 'SettlementScenarioDefinition';
+  description: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  name: Scalars['String']['output'];
 };
 
-export enum SettlementRuleType {
-  Custom = 'CUSTOM',
-  DriverVehicleBonus = 'DRIVER_VEHICLE_BONUS',
-  FixedPerOrder = 'FIXED_PER_ORDER',
-  Percentage = 'PERCENTAGE',
-  ProductMarkup = 'PRODUCT_MARKUP'
-}
+export type SettlementScenarioHarnessResult = {
+  __typename?: 'SettlementScenarioHarnessResult';
+  failedCount: Scalars['Int']['output'];
+  passed: Scalars['Boolean']['output'];
+  passedCount: Scalars['Int']['output'];
+  results: Array<SettlementScenarioResult>;
+  total: Scalars['Int']['output'];
+};
+
+export type SettlementScenarioResult = {
+  __typename?: 'SettlementScenarioResult';
+  actualCount: Scalars['Int']['output'];
+  actualSettlements: Scalars['JSON']['output'];
+  expectedCount: Scalars['Int']['output'];
+  expectedSettlements: Scalars['JSON']['output'];
+  mismatches: Array<Scalars['String']['output']>;
+  name: Scalars['String']['output'];
+  passed: Scalars['Boolean']['output'];
+  scenarioId: Scalars['String']['output'];
+};
 
 export enum SettlementStatus {
+  Cancelled = 'CANCELLED',
+  Disputed = 'DISPUTED',
+  Overdue = 'OVERDUE',
   Paid = 'PAID',
   Pending = 'PENDING'
 }
@@ -2276,6 +2224,7 @@ export type StoreStatus = {
   bannerMessage?: Maybe<Scalars['String']['output']>;
   bannerType: BannerType;
   closedMessage?: Maybe<Scalars['String']['output']>;
+  dispatchModeEnabled: Scalars['Boolean']['output'];
   isStoreClosed: Scalars['Boolean']['output'];
 };
 
@@ -2389,10 +2338,12 @@ export type UpdateBusinessInput = {
   description?: InputMaybe<Scalars['String']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  isTemporarilyClosed?: InputMaybe<Scalars['Boolean']['input']>;
   location?: InputMaybe<LocationInput>;
   name?: InputMaybe<Scalars['String']['input']>;
   phoneNumber?: InputMaybe<Scalars['String']['input']>;
   prepTimeOverrideMinutes?: InputMaybe<Scalars['Int']['input']>;
+  temporaryClosureReason?: InputMaybe<Scalars['String']['input']>;
   workingHours?: InputMaybe<WorkingHoursInput>;
 };
 
@@ -2412,18 +2363,6 @@ export type UpdateDeliveryZoneInput = {
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
 };
 
-export type UpdateDynamicPricingRuleInput = {
-  adjustmentConfig?: InputMaybe<Scalars['JSON']['input']>;
-  appliesTo?: InputMaybe<DynamicPricingRuleAppliesToInput>;
-  conditionConfig?: InputMaybe<Scalars['JSON']['input']>;
-  description?: InputMaybe<Scalars['String']['input']>;
-  isActive?: InputMaybe<Scalars['Boolean']['input']>;
-  name?: InputMaybe<Scalars['String']['input']>;
-  priority?: InputMaybe<Scalars['Int']['input']>;
-  validFrom?: InputMaybe<Scalars['String']['input']>;
-  validUntil?: InputMaybe<Scalars['String']['input']>;
-};
-
 export type UpdateOptionGroupInput = {
   displayOrder?: InputMaybe<Scalars['Int']['input']>;
   maxSelections?: InputMaybe<Scalars['Int']['input']>;
@@ -2441,6 +2380,7 @@ export type UpdateOptionInput = {
 export type UpdateProductCategoryInput = {
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
+  sortOrder?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type UpdateProductInput = {
@@ -2449,18 +2389,14 @@ export type UpdateProductInput = {
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   isAvailable?: InputMaybe<Scalars['Boolean']['input']>;
   isOnSale?: InputMaybe<Scalars['Boolean']['input']>;
+  markupPrice?: InputMaybe<Scalars['Float']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
+  nightMarkedupPrice?: InputMaybe<Scalars['Float']['input']>;
   price?: InputMaybe<Scalars['Float']['input']>;
   salePrice?: InputMaybe<Scalars['Float']['input']>;
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
   subcategoryId?: InputMaybe<Scalars['ID']['input']>;
   variantGroupId?: InputMaybe<Scalars['ID']['input']>;
-};
-
-export type UpdateProductPricingInput = {
-  businessPrice?: InputMaybe<Scalars['String']['input']>;
-  platformMarkup?: InputMaybe<Scalars['String']['input']>;
-  reason?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type UpdateProductSubcategoryInput = {
@@ -2469,6 +2405,8 @@ export type UpdateProductSubcategoryInput = {
 
 export type UpdatePromotionInput = {
   code?: InputMaybe<Scalars['String']['input']>;
+  creatorId?: InputMaybe<Scalars['ID']['input']>;
+  creatorType?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   discountValue?: InputMaybe<Scalars['Float']['input']>;
   eligibleBusinessIds?: InputMaybe<Array<Scalars['ID']['input']>>;
@@ -2490,10 +2428,13 @@ export type UpdatePromotionInput = {
 };
 
 export type UpdateSettlementRuleInput = {
-  canStackWith?: InputMaybe<Array<Scalars['String']['input']>>;
-  config?: InputMaybe<Scalars['JSON']['input']>;
+  amount?: InputMaybe<Scalars['Float']['input']>;
+  amountType?: InputMaybe<SettlementAmountType>;
+  appliesTo?: InputMaybe<Scalars['String']['input']>;
+  direction?: InputMaybe<SettlementDirection>;
+  isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
   notes?: InputMaybe<Scalars['String']['input']>;
-  priority?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type UpdateStoreStatusInput = {
@@ -2501,6 +2442,7 @@ export type UpdateStoreStatusInput = {
   bannerMessage?: InputMaybe<Scalars['String']['input']>;
   bannerType?: InputMaybe<BannerType>;
   closedMessage?: InputMaybe<Scalars['String']['input']>;
+  dispatchModeEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   isStoreClosed: Scalars['Boolean']['input'];
 };
 
@@ -2535,6 +2477,7 @@ export type User = {
   emailVerified: Scalars['Boolean']['output'];
   firstName: Scalars['String']['output'];
   flagColor?: Maybe<Scalars['String']['output']>;
+  hasOwnVehicle?: Maybe<Scalars['Boolean']['output']>;
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
   isOnline: Scalars['Boolean']['output'];
@@ -2618,36 +2561,12 @@ export enum UserRole {
   SuperAdmin = 'SUPER_ADMIN'
 }
 
-export type UserWallet = {
-  __typename?: 'UserWallet';
-  balance: Scalars['Float']['output'];
-  createdAt: Scalars['String']['output'];
-  id: Scalars['ID']['output'];
-  transactions?: Maybe<Array<WalletTransaction>>;
-  updatedAt: Scalars['String']['output'];
-  userId: Scalars['ID']['output'];
-};
-
 export type VerifyEmailInput = {
   code: Scalars['String']['input'];
 };
 
 export type VerifyPhoneInput = {
   code: Scalars['String']['input'];
-};
-
-export type WalletTransaction = {
-  __typename?: 'WalletTransaction';
-  amount: Scalars['Float']['output'];
-  balanceAfter: Scalars['Float']['output'];
-  balanceBefore: Scalars['Float']['output'];
-  createdAt: Scalars['String']['output'];
-  description?: Maybe<Scalars['String']['output']>;
-  id: Scalars['ID']['output'];
-  orderId?: Maybe<Scalars['ID']['output']>;
-  type: Scalars['String']['output'];
-  wallet?: Maybe<UserWallet>;
-  walletId: Scalars['ID']['output'];
 };
 
 export type WorkingHours = {

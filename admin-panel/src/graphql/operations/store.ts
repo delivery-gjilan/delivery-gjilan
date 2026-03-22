@@ -8,6 +8,7 @@ export const GET_STORE_STATUS = graphql(`
             bannerEnabled
             bannerMessage
             bannerType
+            dispatchModeEnabled
         }
     }
 `);
@@ -20,6 +21,7 @@ export const UPDATE_STORE_STATUS = graphql(`
             bannerEnabled
             bannerMessage
             bannerType
+            dispatchModeEnabled
         }
     }
 `);

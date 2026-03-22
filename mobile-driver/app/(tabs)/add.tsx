@@ -70,6 +70,19 @@ export default function EarningsScreen() {
     const summary = (summaryData as any)?.settlementSummary;
     const settlements = (settlementsData as any)?.settlements ?? [];
 
+    const pendingPayable = useMemo(() =>
+        settlements
+            .filter((s: any) => s.direction === 'PAYABLE' && s.status === 'PENDING')
+            .reduce((sum: number, s: any) => sum + Number(s.amount), 0),
+        [settlements],
+    );
+    const pendingReceivable = useMemo(() =>
+        settlements
+            .filter((s: any) => s.direction === 'RECEIVABLE' && s.status === 'PENDING')
+            .reduce((sum: number, s: any) => sum + Number(s.amount), 0),
+        [settlements],
+    );
+
     const onRefresh = async () => {
         setRefreshing(true);
         await Promise.all([refetchSummary(), refetchSettlements()]);
@@ -155,6 +168,53 @@ export default function EarningsScreen() {
                                     )}
                                 </View>
                             </View>
+
+                            {/* Pending balance direction breakdown */}
+                            {(pendingPayable > 0 || pendingReceivable > 0) && (
+                                <View
+                                    className="mt-3 rounded-2xl p-4"
+                                    style={{ backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, gap: 10 }}
+                                >
+                                    <Text className="text-xs font-bold uppercase tracking-wide" style={{ color: theme.colors.subtext }}>
+                                        Pending Balance
+                                    </Text>
+                                    {pendingPayable > 0 && (
+                                        <View className="flex-row items-center justify-between">
+                                            <View className="flex-row items-center" style={{ gap: 8 }}>
+                                                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#22c55e' }} />
+                                                <Text className="text-sm" style={{ color: theme.colors.subtext }}>Platform owes you</Text>
+                                            </View>
+                                            <Text className="font-bold" style={{ color: '#22c55e', fontSize: 15 }}>
+                                                {formatCurrency(pendingPayable)}
+                                            </Text>
+                                        </View>
+                                    )}
+                                    {pendingReceivable > 0 && (
+                                        <View className="flex-row items-center justify-between">
+                                            <View className="flex-row items-center" style={{ gap: 8 }}>
+                                                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#f59e0b' }} />
+                                                <Text className="text-sm" style={{ color: theme.colors.subtext }}>You owe platform</Text>
+                                            </View>
+                                            <Text className="font-bold" style={{ color: '#f59e0b', fontSize: 15 }}>
+                                                {formatCurrency(pendingReceivable)}
+                                            </Text>
+                                        </View>
+                                    )}
+                                    {pendingPayable > 0 && pendingReceivable > 0 && (
+                                        <View style={{ borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: 8 }}>
+                                            <View className="flex-row items-center justify-between">
+                                                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>Net pending</Text>
+                                                <Text className="font-bold" style={{
+                                                    color: pendingPayable >= pendingReceivable ? '#22c55e' : '#f59e0b',
+                                                    fontSize: 15,
+                                                }}>
+                                                    {formatCurrency(Math.abs(pendingPayable - pendingReceivable))}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    )}
+                                </View>
+                            )}
                         </>
                     )}
                 </View>
@@ -178,6 +238,9 @@ export default function EarningsScreen() {
                             {settlements.map((s: any) => {
                                 const businessNames = s.order?.businesses?.map((b: any) => b.business.name).join(', ') ?? '—';
                                 const isPaid = s.status === 'PAID';
+                                const isPayable = s.direction === 'PAYABLE';
+                                const directionLabel = isPayable ? 'Platform owes you' : 'Commission';
+                                const directionColor = isPayable ? '#22c55e' : '#f59e0b';
                                 return (
                                     <View
                                         key={s.id}
@@ -199,6 +262,18 @@ export default function EarningsScreen() {
                                                 <Text className="text-xs mt-1" style={{ color: theme.colors.subtext }}>
                                                     {formatDate(s.createdAt)}
                                                 </Text>
+                                                <View style={{ flexDirection: 'row', marginTop: 5 }}>
+                                                    <View style={{
+                                                        backgroundColor: directionColor + '22',
+                                                        borderRadius: 10,
+                                                        paddingHorizontal: 7,
+                                                        paddingVertical: 2,
+                                                    }}>
+                                                        <Text style={{ color: directionColor, fontSize: 10, fontWeight: '700' }}>
+                                                            {directionLabel}
+                                                        </Text>
+                                                    </View>
+                                                </View>
                                             </View>
                                             <View className="items-end">
                                                 <Text className="text-lg font-bold" style={{ color: theme.colors.income }}>
@@ -214,7 +289,7 @@ export default function EarningsScreen() {
                                                 </View>
                                                 {isPaid && s.paidAt && (
                                                     <Text className="text-xs mt-0.5" style={{ color: theme.colors.subtext }}>
-                                                        {formatDate(s.paidAt)}
+                                                        Paid {formatDate(s.paidAt)}
                                                     </Text>
                                                 )}
                                             </View>

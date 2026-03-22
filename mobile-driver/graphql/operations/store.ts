@@ -8,6 +8,20 @@ export const GET_STORE_STATUS = gql`
             bannerEnabled
             bannerMessage
             bannerType
+            dispatchModeEnabled
+        }
+    }
+`;
+
+export const STORE_STATUS_UPDATED = gql`
+    subscription StoreStatusUpdated {
+        storeStatusUpdated {
+            isStoreClosed
+            closedMessage
+            bannerEnabled
+            bannerMessage
+            bannerType
+            dispatchModeEnabled
         }
     }
 `;

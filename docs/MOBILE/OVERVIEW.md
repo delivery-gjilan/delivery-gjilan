@@ -1,8 +1,8 @@
 # Mobile Overview
 
-<!-- MDS:M1 | Domain: Mobile | Updated: 2026-03-20 -->
+<!-- MDS:M1 | Domain: Mobile | Updated: 2026-03-22 -->
 <!-- Depends-On: A1 -->
-<!-- Depended-By: M2, M3, M4, M5, BL2, BL3 -->
+<!-- Depended-By: M2, M3, M4, M5, M8, BL2, BL3 -->
 <!-- Nav: App-level architecture changes → update all M* files. Shared pattern changes → review BL2 (Products), BL3 (Cart). -->
 
 ## Apps
@@ -65,6 +65,8 @@ Key responsibilities:
 - update battery telemetry
 
 Any regression here affects admin maps and customer delivery tracking.
+
+For a full deep-dive see [MOBILE/DRIVER_APP.md](DRIVER_APP.md) (M8): startup sequence, auth+token-refresh flow, Apollo client config, heartbeat/battery/PTT/notifications lifecycle, map+navigation screen logic, all GraphQL ops, Zustand stores, hooks inventory, and a comprehensive list of refactor candidates.
 
 ## Business And Admin Mobile Notes
 

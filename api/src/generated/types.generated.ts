@@ -2198,6 +2198,7 @@ export type StoreStatus = {
   bannerMessage?: Maybe<Scalars['String']['output']>;
   bannerType: BannerType;
   closedMessage?: Maybe<Scalars['String']['output']>;
+  dispatchModeEnabled: Scalars['Boolean']['output'];
   isStoreClosed: Scalars['Boolean']['output'];
 };
 
@@ -2415,6 +2416,7 @@ export type UpdateStoreStatusInput = {
   bannerMessage?: InputMaybe<Scalars['String']['input']>;
   bannerType?: InputMaybe<BannerType>;
   closedMessage?: InputMaybe<Scalars['String']['input']>;
+  dispatchModeEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   isStoreClosed: Scalars['Boolean']['input'];
 };
 
@@ -3861,6 +3863,7 @@ export type StoreStatusResolvers<ContextType = GraphQLContext, ParentType extend
   bannerMessage?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   bannerType?: Resolver<ResolversTypes['BannerType'], ParentType, ContextType>;
   closedMessage?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  dispatchModeEnabled?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   isStoreClosed?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };

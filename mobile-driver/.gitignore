@@ -43,6 +43,10 @@ logs/*
 
 app-example
 
+# Package artifacts
+*.tgz
+package/
+
 # generated native folders
 /ios
 /android

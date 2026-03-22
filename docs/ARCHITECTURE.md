@@ -72,7 +72,7 @@ The system does not stream the entire world state continuously. Most subscriptio
 - `allOrdersUpdated` notifies admin and business views to refetch lists
 - `driversUpdated` notifies the admin side that driver presence or location-relevant fields changed
 - `orderDriverLiveTracking` is the narrower per-order delivery tracking stream
-- `storeStatusUpdated` broadcasts store open/closed and banner changes
+- `storeStatusUpdated` broadcasts store open/closed, banner content, and `dispatchModeEnabled` state (whether admin is manually dispatching all new orders)
 
 ## Current Architectural Pressure Points
 

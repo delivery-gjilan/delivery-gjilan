@@ -4,7 +4,7 @@
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import Button from "@/components/ui/Button";
-import { LogOut, Shield, Briefcase, StoreIcon, Clock, Megaphone } from "lucide-react";
+import { LogOut, Shield, Briefcase, StoreIcon, Clock, Megaphone, Truck } from "lucide-react";
 import { useQuery, useMutation } from "@apollo/client/react";
 import { GET_STORE_STATUS, UPDATE_STORE_STATUS } from "@/graphql/operations/store";
 import { useState } from "react";
@@ -33,6 +33,7 @@ export default function Topbar() {
   const storeStatus = storeStatusData?.getStoreStatus;
   const isStoreClosed = storeStatus?.isStoreClosed ?? false;
   const bannerEnabled = storeStatus?.bannerEnabled ?? false;
+  const dispatchModeEnabled = storeStatus?.dispatchModeEnabled ?? false;
   const isSuperAdmin = admin?.role === "SUPER_ADMIN";
 
   const handleToggleStore = async (close: boolean) => {
@@ -95,6 +96,20 @@ export default function Topbar() {
     });
   };
 
+  const handleToggleDispatch = async () => {
+    await updateStoreStatus({
+      variables: {
+        input: {
+          isStoreClosed,
+          bannerEnabled,
+          bannerMessage: storeStatus?.bannerMessage ?? null,
+          bannerType: storeStatus?.bannerType as any ?? 'INFO',
+          dispatchModeEnabled: !dispatchModeEnabled,
+        },
+      },
+    });
+  };
+
   const handleLogout = () => {
     logout();
     router.push("/login");
@@ -144,6 +159,22 @@ export default function Topbar() {
                   Edit
                 </button>
               )}
+
+              <div className="w-px h-4 bg-zinc-800" />
+
+              <button
+                onClick={handleToggleDispatch}
+                disabled={updating}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                  dispatchModeEnabled
+                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+                title={dispatchModeEnabled ? 'Dispatch mode ON — you assign orders manually' : 'Self-assign mode — drivers race to accept'}
+              >
+                <Truck size={12} />
+                {dispatchModeEnabled ? 'Dispatching' : 'Self-assign'}
+              </button>
             </>
           )}
         </div>

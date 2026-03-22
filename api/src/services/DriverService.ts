@@ -5,6 +5,7 @@ import { DriverWatchdogService } from '@/services/DriverWatchdogService';
 import { DriverHeartbeatHandler } from '@/services/DriverHeartbeatHandler';
 import { DriverConnectionStatusType } from '@/database/schema/drivers';
 import type { HeartbeatEtaPayload } from '@/services/DriverHeartbeatHandler';
+import type { NotificationService } from '@/services/NotificationService';
 
 /**
  * DriverService
@@ -20,11 +21,13 @@ export class DriverService {
     private db: DbType,
     private authRepository: AuthRepository,
     private watchdogService: DriverWatchdogService,
+    notificationService?: NotificationService,
   ) {
     this.driverRepository = new DriverRepository(db);
     this.heartbeatHandler = new DriverHeartbeatHandler(
       this.driverRepository,
-      authRepository
+      authRepository,
+      notificationService,
     );
   }
 

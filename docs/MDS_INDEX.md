@@ -24,6 +24,10 @@
 | BL1 | [BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS.md](BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS.md) | Business Logic | Settlements, rules, promotions, FinancialService |
 | BL2 | [BUSINESS_LOGIC/PRODUCT_BUSINESS_CATEGORY_REFACTOR_FLOW.md](BUSINESS_LOGIC/PRODUCT_BUSINESS_CATEGORY_REFACTOR_FLOW.md) | Business Logic | CRUD flows, delete semantics, hook consolidation |
 | BL3 | [BUSINESS_LOGIC/CART_ACTIVE_ORDER_FLOW_RECOMMENDATIONS.md](BUSINESS_LOGIC/CART_ACTIVE_ORDER_FLOW_RECOMMENDATIONS.md) | Business Logic | Cart store, subscription lifecycle, race conditions |
+| BL4 | [BUSINESS_LOGIC/PERSONAL_INVENTORY_COVERAGE.md](BUSINESS_LOGIC/PERSONAL_INVENTORY_COVERAGE.md) | Business Logic | ⚠️ **Superseded by FF1** — see FUTURE_FEATURES/PERSONAL_INVENTORY_COVERAGE.md |
+| FF1 | [FUTURE_FEATURES/PERSONAL_INVENTORY_COVERAGE.md](FUTURE_FEATURES/PERSONAL_INVENTORY_COVERAGE.md) | Future Feature | Personal stock tracking, order coverage split, margin optimisation |
+| FF2 | [FUTURE_FEATURES/BUSINESS_DISPATCH.md](FUTURE_FEATURES/BUSINESS_DISPATCH.md) | Future Feature | Business-initiated driver dispatch, internal delivery runs |
+| FF3 | [FUTURE_FEATURES/CUSTOM_NAVIGATION.md](FUTURE_FEATURES/CUSTOM_NAVIGATION.md) | Future Feature | Migrating from `@badatgil/expo-mapbox-navigation` SDK to custom `@rnmapbox/maps` navigation — cost driver, unused hook inventory, step-by-step migration plan |
 | M1 | [MOBILE/OVERVIEW.md](MOBILE/OVERVIEW.md) | Mobile | Four-app architecture, shared patterns |
 | M2 | [MOBILE/PUSH_AND_LIVE_ACTIVITY.md](MOBILE/PUSH_AND_LIVE_ACTIVITY.md) | Mobile | FCM tokens, Live Activity, notification maturity |
 | M3 | [MOBILE/LIVE_ACTIVITY_BEHAVIOR.md](MOBILE/LIVE_ACTIVITY_BEHAVIOR.md) | Mobile | iOS widget, progress calculation, APNs pushes |
@@ -31,6 +35,8 @@
 | M5 | [MOBILE/ORDER_INPUT_VARIANT_OFFER_FLOW_SNAPSHOT.md](MOBILE/ORDER_INPUT_VARIANT_OFFER_FLOW_SNAPSHOT.md) | Mobile | CreateOrderInput, variants, offers, options |
 | M6 | [MOBILE/ADMIN_PANEL_MOBILE_REFACTOR_TRACKER.md](MOBILE/ADMIN_PANEL_MOBILE_REFACTOR_TRACKER.md) | Mobile | Admin-panel to mobile parity tracker (business/admin flows) |
 | M7 | [MOBILE/ORDER_SUBSCRIPTION_SYNC_MB.md](MOBILE/ORDER_SUBSCRIPTION_SYNC_MB.md) | Mobile | Subscription-first order sync, cache/store update contract, fallback refetch rules |
+| M8 | [MOBILE/DRIVER_APP.md](MOBILE/DRIVER_APP.md) | Mobile | Driver app deep-dive: heartbeat, navigation, PTT, battery, auth, stores, GraphQL ops, refactor candidates |
+| M9 | [MOBILE/MOBILE_ADMIN_DEEP_DIVE.md](MOBILE/MOBILE_ADMIN_DEEP_DIVE.md) | Mobile | Mobile-admin deep-dive: all screens, GraphQL ops, real-time arch, theme, i18n, refactor candidates |
 | O1 | [OPERATIONS/MONITORING.md](OPERATIONS/MONITORING.md) | Operations | Health endpoints, Prometheus, Grafana phases |
 | O2 | [OPERATIONS/OBSERVABILITY.md](OPERATIONS/OBSERVABILITY.md) | Operations | Loki, Promtail, structured logging, runbooks |
 | O3 | [OPERATIONS/NOTIFICATIONS.md](OPERATIONS/NOTIFICATIONS.md) | Operations | Query builder, campaigns, payload fields |
@@ -42,6 +48,7 @@
 | O9 | [OPERATIONS/DOCKER_AND_STRESS_TESTING.md](OPERATIONS/DOCKER_AND_STRESS_TESTING.md) | Operations | Containerization, k6 load testing |
 | O10 | [OPERATIONS/APP_STORE_RELEASE.md](OPERATIONS/APP_STORE_RELEASE.md) | Operations | iOS submission checklist, compliance |
 | O11 | [OPERATIONS/ANALYTICS.md](OPERATIONS/ANALYTICS.md) | Operations | KPIs, dashboards, metric calculations |
+| O12 | [OPERATIONS/DRIVER_TRACKING_SMOOTHNESS.md](OPERATIONS/DRIVER_TRACKING_SMOOTHNESS.md) | Operations | End-to-end driver position pipeline, animation tuning, dead-reckoning, route-snap |
 | UI1 | [ADMIN_MOBILEBUSINESS_UI_CONTEXT.md](ADMIN_MOBILEBUSINESS_UI_CONTEXT.md) | UI | Product types, variant groups, admin/mobile-business UX |
 | UI2 | [ADMIN_PANEL_BUSINESS_SETTLEMENTS.md](ADMIN_PANEL_BUSINESS_SETTLEMENTS.md) | UI | Business-facing settlements semantics, filters, lazy order details |
 
@@ -55,7 +62,7 @@
 | PKG1 | [../admin-panel/README.md](../admin-panel/README.md) | Package | Admin panel structure, realtime model |
 | PKG2 | [../mobile-business/README.md](../mobile-business/README.md) | Package | Business app features, GraphQL ops, structure |
 | PKG3 | [../mobile-customer/README.md](../mobile-customer/README.md) | Package | Mobile customer app module structure |
-| PKG4 | [../mobile-driver/README.md](../mobile-driver/README.md) | Package | Mobile driver app module structure |
+| PKG4 | [../mobile-driver/README.md](../mobile-driver/README.md) | Package | Mobile driver app module structure (see M8 for deep-dive) |
 | PKG5 | [../observability/README.md](../observability/README.md) | Package | Observability stack setup, alerts, scaling |
 
 ---
@@ -88,6 +95,7 @@ ARCHITECTURE (A1)
 │   ├── MOBILE/ORDER_CREATION_AUDIT (M4) → B2, B6
 │   ├── MOBILE/ORDER_INPUT_VARIANT_OFFER_FLOW_SNAPSHOT (M5)
 │   ├── MOBILE/ORDER_SUBSCRIPTION_SYNC_MB (M7) → A1, BL3
+│   ├── MOBILE/DRIVER_APP (M8) → A1, B1, B4, B5, B7, BL1
 │   └── BUSINESS_LOGIC/CART_ACTIVE_ORDER_FLOW_RECOMMENDATIONS (BL3)
 │       └── BACKEND/ORDER_CREATION (B2)
 │
@@ -105,7 +113,8 @@ ARCHITECTURE (A1)
     │   └── TESTING_PIPELINE (O8)
     │       └── DOCKER_AND_STRESS_TESTING (O9)
     ├── APP_STORE_RELEASE (O10)
-    └── ANALYTICS (O11)
+    ├── ANALYTICS (O11)
+    └── DRIVER_TRACKING_SMOOTHNESS (O12) ← B4, M8
 ```
 
 ---
@@ -118,7 +127,7 @@ ARCHITECTURE (A1)
 | Order creation flow | B2, B3, BL1 |
 | Cart → checkout → order | BL3, M4, M5 |
 | Payment collection modes | B2, M4, BL1 |
-| Order tracking (realtime) | A1, B4, M3, M7 |
+| Order tracking (realtime) | A1, B4, M3, M7, O12 |
 | Order analytics | O11 |
 
 ### Driver Domain
@@ -126,7 +135,7 @@ ARCHITECTURE (A1)
 |---------|-----------|
 | Heartbeat/presence | B4, A1 |
 | Watchdog state machine | B4, O1 |
-| Live ETA / tracking | B4, M3 |
+| Live ETA / tracking | B4, M3, O12 |
 | Driver settlements | BL1 |
 | Driver auth | O5, O6 |
 
@@ -136,7 +145,13 @@ ARCHITECTURE (A1)
 | Product CRUD | BL2, UI1 |
 | Variant groups / offers | UI1, M5 |
 | Category cascade | BL2 |
+| Market tab (mobile-customer) | BL2 |
 | Business CRUD | BL2 |
+| Order status state machine | B2 |
+| Market order flow (PENDING→READY skip) | B2 |
+| Personal inventory & order coverage | FF1 (future) |
+| Business-initiated driver dispatch | FF2 (future) |
+| Custom navigation (replace SDK) | FF3 (future) |
 
 ### Notifications Domain
 | Concern | MDS Files |
@@ -228,7 +243,7 @@ ARCHITECTURE (A1)
 | `src/lib/pubsub.ts` | B1, A1 |
 | `src/lib/metrics.ts` | O1 |
 | `src/services/DriverService.ts` | A1, B4 |
-| `src/services/DriverHeartbeatHandler.ts` | A1, B4, M3 |
+| `src/services/DriverHeartbeatHandler.ts` | A1, B4, M3, O12 |
 | `src/services/DriverWatchdogService.ts` | A1, B4 |
 | `src/services/driverServices.init.ts` | A1, B4 |
 | `src/services/DriverAuthService.ts` | O6 |
@@ -238,9 +253,11 @@ ARCHITECTURE (A1)
 | `src/services/SettlementCalculationEngine.ts` | BL1 |
 | `src/services/PromotionEngine.ts` | BL1, B2, B3 |
 | `src/services/NotificationService.ts` | M2, M3, O3, O4 |
+| `src/models/Order/resolvers/Mutation/cancelOrder.ts` | M3 |
 | `src/repositories/SettlementRepository.ts` | BL1 |
 | `src/repositories/SettlementRuleRepository.ts` | BL1 |
 | `src/routes/uploadRoutes.ts` | B9, O6 |
+| `src/routes/directionsRoutes.ts` | B1, B8, O5 |
 | `src/services/AuthService.ts` | B5 |
 | `src/lib/utils/permissions.ts` | B5, O5 |
 | `src/services/PricingService.ts` | B6 |
@@ -290,6 +307,9 @@ ARCHITECTURE (A1)
 | `src/components/businesses/ProductsBlock.tsx` | UI1 |
 | `src/lib/auth-context.tsx` | B5 |
 | `src/lib/route-access.ts` | B5 |
+| `src/lib/utils/mapbox.ts` | B1, O5 |
+| `src/app/dashboard/map/page.tsx` | O12 |
+| `src/app/api/directions/route.ts` | B1, B8, O5 |
 | `src/components/dashboard/sidebar.tsx` | UI1, B5 |
 | `src/lib/hooks/useProducts.ts` | UI1 |
 | `src/graphql/operations/products/` | UI1 |
@@ -305,20 +325,24 @@ ARCHITECTURE (A1)
 | `app/business/[businessId].tsx` | BL2 |
 | `modules/business/BusinessScreen.tsx` | BL2 |
 | `modules/cart/components/CartScreen.tsx` | BL3 |
+| `components/SuccessModalContainer.tsx` | BL3 |
 | `hooks/useLiveActivity.ts` | M3 |
 | `hooks/useCreateOrder.ts` | M4, BL3 |
 | `hooks/useActiveOrdersTracking.ts` | BL3 |
 | `hooks/useOrders.ts` | BL3 |
 | `hooks/useOrdersSubscription.ts` | BL3 |
 | `plugins/with-live-activity-extension.js` | M3 |
+| `modules/orders/components/OrderDetails.tsx` | O12 |
 | `utils/secureTokenStore.ts` | O6 |
+| `app/(tabs)/market.tsx` | BL2 |
+| `modules/product/hooks/useProducts.ts` | BL2 |
 
 ### Mobile Driver (mobile-driver/)
 | File | Referenced By |
 |------|--------------|
 | `utils/secureTokenStore.ts` | O6 |
-
-### Mobile Business (mobile-business/)
+| `utils/mapbox.ts` | B1, O5 |
+| `utils/route.ts` | B1, O5 |
 | File | Referenced By |
 |------|--------------|
 | `graphql/products.ts` | UI1 |
@@ -331,9 +355,9 @@ ARCHITECTURE (A1)
 
 | Field | Value |
 |-------|-------|
-| Last full scan | 2026-03-18 |
-| Total MDS files | 46 |
-| Total docs/ files | 32 |
+| Last full scan | 2026-03-22 (periodic heartbeat Live Activity ETA pushes in B4, M3, M8) |
+| Total MDS files | 50 |
+| Total docs/ files | 35 |
 | Broken links found | 0 |
 | Missing index entries | 0 |
 | Cross-ref gaps | 0 |

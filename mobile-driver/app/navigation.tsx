@@ -1,11 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { MapboxNavigationView } from '@badatgil/expo-mapbox-navigation';
-import { useApolloClient, useQuery, useSubscription } from '@apollo/client/react';
-import { GET_ORDERS, ALL_ORDERS_UPDATED } from '@/graphql/operations/orders';
+import { useApolloClient, useMutation, useQuery, useSubscription } from '@apollo/client/react';
+import { GET_ORDERS, ALL_ORDERS_UPDATED, UPDATE_ORDER_STATUS, DRIVER_NOTIFY_CUSTOMER } from '@/graphql/operations/orders';
 import { useNavigationStore } from '@/store/navigationStore';
 import { useDriverLocation } from '@/hooks/useDriverLocation';
 import { useAuthStore } from '@/store/authStore';
@@ -34,6 +34,18 @@ export default function NavigationScreen() {
     const lastProgressRef = useRef(0);
     const currentDriverId = useAuthStore((state) => state.user?.id);
     const mapViewRef = useRef<any>(null);
+
+    const [showPickupPanel, setShowPickupPanel] = useState(false);
+    const [showDeliveryPanel, setShowDeliveryPanel] = useState(false);
+    const [newOrderToast, setNewOrderToast] = useState<{ id: string; businessName: string } | null>(null);
+    const prevOrderIdsRef = useRef<Set<string>>(new Set());
+    const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Tracks which order IDs have already had ETA_LT_3_MIN fired this session.
+    // Backend Redis dedup is the authoritative gate; this ref just avoids firing
+    // the mutation on every 2 s progress tick once below the threshold.
+    const etaNotificationSentRef = useRef<Set<string>>(new Set());
+    const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS);
+    const [driverNotifyCustomer] = useMutation(DRIVER_NOTIFY_CUSTOMER);
 
     /* ── Store ── */
     const {
@@ -111,12 +123,45 @@ export default function NavigationScreen() {
     const setNavigationLocation = useNavigationLocationStore((state) => state.setLocation);
     const clearNavigationLocation = useNavigationLocationStore((state) => state.clearLocation);
 
-    /* ── Cleanup: clear navigation location on unmount ── */
+    /* ── Cleanup: clear navigation location and toast timer on unmount ── */
     useEffect(() => {
         return () => {
             clearNavigationLocation();
+            if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
         };
     }, [clearNavigationLocation]);
+
+    /* ── Detect newly assigned orders and show toast ── */
+    useEffect(() => {
+        const currentIds = new Set(assignedOrders.map((o: any) => String(o.id)));
+        if (prevOrderIdsRef.current.size > 0) {
+            const newOrders = assignedOrders.filter((o: any) => !prevOrderIdsRef.current.has(String(o.id)));
+            if (newOrders.length > 0) {
+                const newest = newOrders[0];
+                const bizName = newest.businesses?.[0]?.business?.name ?? 'New order';
+                setNewOrderToast({ id: newest.id, businessName: bizName });
+                if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+                toastTimerRef.current = setTimeout(() => setNewOrderToast(null), 6000);
+            }
+        }
+        prevOrderIdsRef.current = currentIds;
+    }, [assignedOrders]);
+
+    /* ── Auto-notify customer when driver is < 3 min away (to_dropoff only) ── */
+    useEffect(() => {
+        if (
+            phase !== 'to_dropoff' ||
+            durationRemainingS == null ||
+            durationRemainingS > 180 ||
+            !order?.id
+        ) return;
+
+        if (etaNotificationSentRef.current.has(order.id)) return;
+        etaNotificationSentRef.current.add(order.id);
+
+        driverNotifyCustomer({ variables: { orderId: order.id, kind: 'ETA_LT_3_MIN' } })
+            .catch(() => { /* best-effort — backend will retry on next heartbeat window */ });
+    }, [durationRemainingS, phase, order?.id, driverNotifyCustomer]);
 
     /* ── Callbacks ── */
     const handleRouteProgressChanged = useCallback(
@@ -148,46 +193,22 @@ export default function NavigationScreen() {
 
     const handleWaypointArrival = useCallback(
         (_event: any) => {
-            // With sequential navigation, waypoint arrival = arrived at pickup
             if (phase === 'to_pickup' && order?.dropoff) {
-                Alert.alert(
-                    'Arrived at Pickup',
-                    `You've arrived at ${order.businessName}. Navigate to the drop-off?`,
-                    [
-                        {
-                            text: 'End Navigation',
-                            style: 'cancel',
-                            onPress: () => {
-                                clearNavigationLocation(); // Stop providing location to heartbeat
-                                stopNavigation();
-                                router.back();
-                            },
-                        },
-                        {
-                            text: 'Navigate to Drop-off',
-                            style: 'default',
-                            onPress: () => advanceToDropoff(),
-                        },
-                    ],
-                );
+                setShowPickupPanel(true);
             }
         },
-        [phase, order, clearNavigationLocation, advanceToDropoff, stopNavigation, router],
+        [phase, order],
     );
 
     const handleFinalDestinationArrival = useCallback(() => {
-        const label = phase === 'to_dropoff' ? 'drop-off' : 'destination';
-        Alert.alert('Arrived!', `You've reached the ${label}.`, [
-            {
-                text: 'OK',
-                onPress: () => {
-                    clearNavigationLocation(); // Stop providing location to heartbeat
-                    stopNavigation();
-                    router.back();
-                },
-            },
-        ]);
-    }, [phase, clearNavigationLocation, stopNavigation, router]);
+        setShowDeliveryPanel(true);
+        // Notify customer that the driver has arrived and is waiting outside.
+        // Backend deduplicates via Redis so this is safe to call unconditionally.
+        if (order?.id) {
+            driverNotifyCustomer({ variables: { orderId: order.id, kind: 'ARRIVED_WAITING' } })
+                .catch(() => { /* best-effort */ });
+        }
+    }, [order?.id, driverNotifyCustomer]);
 
     const handleUserOffRoute = useCallback(() => {
         // SDK handles re-routing automatically — just log for analytics
@@ -331,6 +352,22 @@ export default function NavigationScreen() {
                 </Pressable>
             </View>
 
+            {/* ═══ New order assigned toast ═══ */}
+            {newOrderToast && (
+                <View style={[styles.newOrderToast, { top: insets.top + 12 }]}>
+                    <Ionicons name="bag-add-outline" size={18} color="#fff" />
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.newOrderToastTitle}>New order assigned</Text>
+                        <Text style={styles.newOrderToastSub} numberOfLines={1}>
+                            {newOrderToast.businessName}
+                        </Text>
+                    </View>
+                    <Pressable onPress={() => setNewOrderToast(null)} hitSlop={8}>
+                        <Ionicons name="close" size={18} color="rgba(255,255,255,0.65)" />
+                    </Pressable>
+                </View>
+            )}
+
             {/* ═══ Discord-style order avatars (right side) ═══ */}
             {assignedOrders.length > 1 && (
                 <View style={[styles.avatarSidebar, { bottom: 240 + insets.bottom }]}>
@@ -362,6 +399,78 @@ export default function NavigationScreen() {
                             </Pressable>
                         );
                     })}
+                </View>
+            )}
+
+            {/* ═══ Pickup arrival panel ═══ */}
+            {showPickupPanel && (
+                <View style={[styles.arrivalPanel, { paddingBottom: insets.bottom + 16 }]}>
+                    <View style={styles.arrivalPanelHandle} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                        <View style={styles.arrivalIconRing}>
+                            <Ionicons name="bag-check-outline" size={22} color="#3b82f6" />
+                        </View>
+                        <View>
+                            <Text style={styles.arrivalTitle}>Arrived at Pickup</Text>
+                            <Text style={styles.arrivalSub}>{order?.businessName}</Text>
+                        </View>
+                    </View>
+                    <Pressable
+                        style={[styles.arrivalCTA, { backgroundColor: '#3b82f6' }]}
+                        onPress={async () => {
+                            try {
+                                await updateOrderStatus({ variables: { id: order?.id, status: 'OUT_FOR_DELIVERY' } });
+                            } catch { /* order status may already be updated */ }
+                            setShowPickupPanel(false);
+                            advanceToDropoff();
+                        }}
+                    >
+                        <Ionicons name="bicycle-outline" size={18} color="#fff" />
+                        <Text style={styles.arrivalCTAText}>Picked Up — Navigate to Dropoff</Text>
+                    </Pressable>
+                    <Pressable
+                        style={styles.arrivalSecondary}
+                        onPress={() => {
+                            setShowPickupPanel(false);
+                            clearNavigationLocation();
+                            stopNavigation();
+                            router.back();
+                        }}
+                    >
+                        <Text style={styles.arrivalSecondaryText}>End Navigation</Text>
+                    </Pressable>
+                </View>
+            )}
+
+            {/* ═══ Delivery arrival panel ═══ */}
+            {showDeliveryPanel && (
+                <View style={[styles.arrivalPanel, { paddingBottom: insets.bottom + 16 }]}>
+                    <View style={styles.arrivalPanelHandle} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                        <View style={[styles.arrivalIconRing, { backgroundColor: '#22c55e20' }]}>
+                            <Ionicons name="checkmark-circle-outline" size={22} color="#22c55e" />
+                        </View>
+                        <View>
+                            <Text style={styles.arrivalTitle}>Arrived at Dropoff</Text>
+                            <Text style={styles.arrivalSub}>{order?.customerName}</Text>
+                        </View>
+                    </View>
+                    <Pressable
+                        style={[styles.arrivalCTA, { backgroundColor: '#22c55e' }]}
+                        onPress={async () => {
+                            try {
+                                await updateOrderStatus({ variables: { id: order?.id, status: 'DELIVERED' } });
+                                await driverNotifyCustomer({ variables: { orderId: order?.id, event: 'DELIVERED' } });
+                            } catch { /* navigate home regardless */ }
+                            setShowDeliveryPanel(false);
+                            clearNavigationLocation();
+                            stopNavigation();
+                            router.back();
+                        }}
+                    >
+                        <Ionicons name="checkmark" size={18} color="#fff" />
+                        <Text style={styles.arrivalCTAText}>Confirm Delivery</Text>
+                    </Pressable>
                 </View>
             )}
         </View>
@@ -532,5 +641,106 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.2,
         shadowRadius: 2,
         elevation: 3,
+    },
+
+    /* ── Arrival panels ── */
+    arrivalPanel: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: '#0f172a',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingTop: 12,
+        paddingHorizontal: 18,
+        zIndex: 200,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -5 },
+        shadowOpacity: 0.55,
+        shadowRadius: 18,
+        elevation: 28,
+    },
+    arrivalPanelHandle: {
+        width: 36,
+        height: 4,
+        backgroundColor: 'rgba(255,255,255,0.14)',
+        borderRadius: 2,
+        alignSelf: 'center',
+        marginBottom: 16,
+    },
+    arrivalIconRing: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#3b82f620',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    arrivalTitle: {
+        color: '#f1f5f9',
+        fontSize: 18,
+        fontWeight: '800',
+    },
+    arrivalSub: {
+        color: '#64748b',
+        fontSize: 13,
+        marginTop: 2,
+    },
+    arrivalCTA: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 17,
+        borderRadius: 16,
+        marginTop: 4,
+    },
+    arrivalCTAText: {
+        color: '#fff',
+        fontSize: 15,
+        fontWeight: '700',
+    },
+    arrivalSecondary: {
+        alignItems: 'center',
+        paddingVertical: 12,
+        marginTop: 2,
+    },
+    arrivalSecondaryText: {
+        color: '#64748b',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+
+    /* ── New order assigned toast ── */
+    newOrderToast: {
+        position: 'absolute',
+        left: 16,
+        right: 16,
+        backgroundColor: '#1e293b',
+        borderRadius: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        gap: 10,
+        zIndex: 150,
+        borderLeftWidth: 3,
+        borderLeftColor: '#6366f1',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 10,
+        elevation: 12,
+    },
+    newOrderToastTitle: {
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    newOrderToastSub: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 12,
+        marginTop: 1,
     },
 });

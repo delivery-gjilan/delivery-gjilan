@@ -114,6 +114,8 @@ const DRIVER_INTERPOLATION_MAX_MS = 6_000;
 const DRIVER_INTERPOLATION_RATIO = 0.82;
 const DRIVER_POSITION_EPSILON = 0.00001;
 const DRIVER_TELEPORT_GUARD_KM = 0.8;
+const DRIVER_DEAD_RECKONING_MAX_MS = 4_000;
+const DRIVER_DEAD_RECKONING_DECAY_MS = 2_500;
 const ROUTE_SNAP_MAX_DISTANCE_M = 45;
 const ROUTE_SNAP_FALLBACK_DISTANCE_M = 70;
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -228,16 +230,24 @@ const STATUS_CONFIG: Record<string, {
 };
 
 // ─── Status Steps ───────────────────────────────────────────
-const STATUS_ORDER = ['PENDING', 'PREPARING', 'OUT_FOR_DELIVERY', 'DELIVERED'] as const;
+const STATUS_ORDER_RESTAURANT = ['PENDING', 'PREPARING', 'OUT_FOR_DELIVERY', 'DELIVERED'] as const;
+const STATUS_ORDER_MARKET = ['PENDING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED'] as const;
 
 const STATUS_STEP_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
     PENDING: 'time',
     PREPARING: 'restaurant',
+    READY: 'bag-check',
     OUT_FOR_DELIVERY: 'bicycle',
     DELIVERED: 'checkmark-done-circle',
 };
 
-const getCustomerVisibleStatus = (status: string) => (status === 'READY' ? 'PREPARING' : status);
+const isMarketType = (businessType?: string | null) =>
+    businessType === 'MARKET' || businessType === 'PHARMACY';
+
+const getCustomerVisibleStatus = (status: string, businessType?: string | null) => {
+    if (isMarketType(businessType)) return status === 'PREPARING' ? 'READY' : status;
+    return status === 'READY' ? 'PREPARING' : status;
+};
 
 // ─── Pin Markers ────────────────────────────────────────────
 const MapPin = ({
@@ -416,30 +426,34 @@ const DriverAvatar = ({
 };
 
 // ─── Icon Stepper ───────────────────────────────────────
-const IconStepper = ({ status, color, theme: th, t }: {
+const IconStepper = ({ status, color, theme: th, t, businessType }: {
     status: string;
     color: string;
     theme: any;
     t: any;
+    businessType?: string | null;
 }) => {
-    const visibleStatus = getCustomerVisibleStatus(status);
-    const currentIndex = STATUS_ORDER.indexOf(visibleStatus as typeof STATUS_ORDER[number]);
+    const isMarket = isMarketType(businessType);
+    const statusOrder = isMarket ? STATUS_ORDER_MARKET : STATUS_ORDER_RESTAURANT;
+    const visibleStatus = getCustomerVisibleStatus(status, businessType);
+    const currentIndex = statusOrder.indexOf(visibleStatus as any);
     const isCancelled = status === 'CANCELLED';
 
     const stepLabels: Record<string, string> = {
         PENDING: t.orders.details.placed_at,
         PREPARING: t.orders.details.preparing_at,
+        READY: t.orders.details.ready_at,
         OUT_FOR_DELIVERY: t.orders.details.picked_up_at,
         DELIVERED: t.orders.details.delivered_at,
     };
 
     return (
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-            {STATUS_ORDER.map((step, index) => {
+            {statusOrder.map((step, index) => {
                 const done = !isCancelled && index < currentIndex;
                 const active = !isCancelled && index === currentIndex;
                 const iconName = STATUS_STEP_ICONS[step];
-                const isLast = index === STATUS_ORDER.length - 1;
+                const isLast = index === statusOrder.length - 1;
 
                 const iconColor = done ? '#22C55E' : active ? color : (th.dark ? '#3f3f46' : '#D1D5DB');
                 const leftLineColor = !isCancelled && index <= currentIndex ? '#22C55E' : (th.dark ? '#27272A' : '#E5E7EB');
@@ -524,6 +538,8 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const lastHeartbeatReceivedAtRef = useRef<number | null>(null);
     const lastObservedHeartbeatGapMsRef = useRef(5000);
     const smoothedHeartbeatGapMsRef = useRef(5000);
+    const lastTweenVelocityRef = useRef<{ latPerMs: number; lngPerMs: number } | null>(null);
+    const tweenFinishedAtRef = useRef<number | null>(null);
     const [liveDriverTracking, setLiveDriverTracking] = useState<{
         orderId: string;
         driverId: string;
@@ -543,7 +559,8 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     });
 
     const status = order?.status ?? 'PENDING';
-    const customerVisibleStatus = getCustomerVisibleStatus(status);
+    const primaryBusinessType = (order?.businesses as any)?.[0]?.business?.businessType as string | undefined;
+    const customerVisibleStatus = getCustomerVisibleStatus(status, primaryBusinessType);
     const isDeliveryPhase = status === 'OUT_FOR_DELIVERY';
     const isPreparingAnimationPhase = status === 'PENDING';
     const orderBusinesses = useMemo(() => {
@@ -656,7 +673,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
             const observedGap = now - lastHeartbeatReceivedAtRef.current;
             if (Number.isFinite(observedGap) && observedGap > 0) {
                 lastObservedHeartbeatGapMsRef.current = clamp(observedGap, 500, 15_000);
-                const emaFactor = 0.2;
+                const emaFactor = 0.35;
                 smoothedHeartbeatGapMsRef.current =
                     smoothedHeartbeatGapMsRef.current * (1 - emaFactor) +
                     lastObservedHeartbeatGapMsRef.current * emaFactor;
@@ -697,12 +714,37 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
 
         stopDriverInterpolation();
         const startedAt = Date.now();
+        lastTweenVelocityRef.current = null;
+        tweenFinishedAtRef.current = null;
+        const tweenVelocityLatPerMs = (target.latitude - start.latitude) / durationMs;
+        const tweenVelocityLngPerMs = (target.longitude - start.longitude) / durationMs;
         interpolationTimerRef.current = setInterval(() => {
             const elapsed = Date.now() - startedAt;
             const progress = clamp(elapsed / durationMs, 0, 1);
-            const easedProgress = 1 - Math.pow(1 - progress, 3);
-            const nextLat = start.latitude + (target.latitude - start.latitude) * easedProgress;
-            const nextLng = start.longitude + (target.longitude - start.longitude) * easedProgress;
+
+            let nextLat: number;
+            let nextLng: number;
+
+            if (progress < 1) {
+                // Ease-out cubic tween phase
+                const easedProgress = 1 - Math.pow(1 - progress, 3);
+                nextLat = start.latitude + (target.latitude - start.latitude) * easedProgress;
+                nextLng = start.longitude + (target.longitude - start.longitude) * easedProgress;
+            } else {
+                // Dead-reckoning phase: extrapolate beyond the tween using the tween's average velocity
+                if (!tweenFinishedAtRef.current) {
+                    tweenFinishedAtRef.current = Date.now();
+                    lastTweenVelocityRef.current = { latPerMs: tweenVelocityLatPerMs, lngPerMs: tweenVelocityLngPerMs };
+                }
+                const drAge = Date.now() - tweenFinishedAtRef.current;
+                if (drAge > DRIVER_DEAD_RECKONING_MAX_MS) {
+                    // Stop after max dead-reckoning window
+                    return;
+                }
+                const decay = Math.exp(-drAge / DRIVER_DEAD_RECKONING_DECAY_MS);
+                nextLat = target.latitude + tweenVelocityLatPerMs * drAge * decay;
+                nextLng = target.longitude + tweenVelocityLngPerMs * drAge * decay;
+            }
             const previousRendered = lastRenderedDriverLocationRef.current;
             if (previousRendered) {
                 const stepDistanceKm = calculateHaversineDistance(
@@ -728,10 +770,6 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                 longitude: nextLng,
                 address: target.address,
             });
-
-            if (progress >= 1) {
-                stopDriverInterpolation();
-            }
         }, DRIVER_INTERPOLATION_TICK_MS);
     }, [
         isDeliveryPhase,
@@ -823,18 +861,21 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     }, [deliveryRouteCoordinates]);
 
     // ─── Status ─────────────────────────────────────────────
+    const isMarket = isMarketType(primaryBusinessType);
     const config = STATUS_CONFIG[customerVisibleStatus] || STATUS_CONFIG.PENDING;
     const statusKey = toText(customerVisibleStatus).toLowerCase();
-    const statusMessage = (t.orders.status_messages as any)?.[statusKey] || '';
+    const statusMessage = isMarket
+        ? ((t.orders.status_messages_market as any)?.[statusKey] || (t.orders.status_messages as any)?.[statusKey] || '')
+        : ((t.orders.status_messages as any)?.[statusKey] || '');
     const isCompleted = status === 'DELIVERED';
     const isCancelled = status === 'CANCELLED';
     const isPendingApproval = status === 'PENDING';
-    const isPreparingPhase = customerVisibleStatus === 'PREPARING';
+    const isPreparingPhase = customerVisibleStatus === 'PREPARING' || customerVisibleStatus === 'READY';
     const businessName = orderBusinesses[0]?.business?.name || '';
 
-    // ─── ETA for PREPARING (restaurant prep only) ────
+    // ─── ETA for PREPARING (restaurant prep only — markets skip this) ────
     const preparationEta = useMemo(() => {
-        if (!isPreparingPhase) return null;
+        if (!isPreparingPhase || isMarket) return null;
 
         const prepTotal = Number(order?.preparationMinutes ?? 0);
         if (!Number.isFinite(prepTotal) || prepTotal <= 0) return null;
@@ -845,7 +886,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
 
         const elapsedMin = Math.max(0, (Date.now() - prepStartMs) / 60000);
         return Math.max(1, Math.ceil(prepTotal - elapsedMin));
-    }, [isPreparingPhase, order?.preparationMinutes, order?.preparingAt, order?.orderDate]);
+    }, [isPreparingPhase, isMarket, order?.preparationMinutes, order?.preparingAt, order?.orderDate]);
 
     // ─── ETA for OUT_FOR_DELIVERY (delivery only) ────
     const deliveryEta = useMemo(() => {
@@ -927,7 +968,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
             order?.id &&
             !isCompleted &&
             !isCancelled &&
-            (status === 'PENDING' || customerVisibleStatus === 'PREPARING' || status === 'OUT_FOR_DELIVERY')
+            (status === 'PENDING' || isPreparingPhase || status === 'OUT_FOR_DELIVERY')
         ),
     });
 
@@ -939,6 +980,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         }
         const etaMinutes = (isDeliveryPhase ? deliveryEta : isPreparingPhase ? preparationEta : null) ?? 0;
         const liveStatus = status === 'OUT_FOR_DELIVERY' ? 'out_for_delivery'
+            : (isMarket && (status === 'READY' || status === 'PREPARING')) ? 'ready'
             : 'preparing';
         const phaseInitialMinutes = status === 'OUT_FOR_DELIVERY'
             ? Math.max(1, Math.round(etaMinutes || 0))
@@ -954,8 +996,8 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                 phaseStartedAt,
                 status: liveStatus,
             });
-        } else if (customerVisibleStatus === 'PREPARING') {
-            // Start during preparing as well so updates have an active activity to target.
+        } else if (isPreparingPhase) {
+            // Start during preparing/ready as well so updates have an active activity to target.
             startLiveActivity({
                 driverName: driverName || 'Driver',
                 estimatedMinutes: etaMinutes,
@@ -1854,7 +1896,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                                 {t.orders.status.pending}
                                             </Text>
                                             <Text style={{ color: theme.colors.subtext, fontSize: 12, marginTop: 2 }}>
-                                                {t.orders.status_messages.pending}
+                                                {isMarket ? t.orders.status_messages_market.pending : t.orders.status_messages.pending}
                                             </Text>
                                         </View>
                                     </View>
@@ -1865,7 +1907,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                     entering={fadeInDown320}
                                     exiting={fadeOut220}
                                 >
-                                    <IconStepper status={customerVisibleStatus} color={config.color} theme={theme} t={t} />
+                                    <IconStepper status={customerVisibleStatus} color={config.color} theme={theme} t={t} businessType={primaryBusinessType} />
                                 </Animated.View>
                             )}
                         </View>

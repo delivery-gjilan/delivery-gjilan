@@ -1,4 +1,0 @@
---- xcodebuild: WARNING: Using the first of multiple matching destinations:
-{ platform:iOS Simulator, id:E6480FBD-8307-41A0-BC30-8E0D6D9154DD, OS:18.2, name:iPhone 16 Pro }
-{ platform:iOS Simulator, id:E6480FBD-8307-41A0-BC30-8E0D6D9154DD, OS:18.2, name:iPhone 16 Pro }
-2026-03-19 15:18:14.804 xcodebuild[7718:1733130]  DVTDeveloperAccountManager: Failed to load credentials for yllpaypal1@gmail.com: Error Domain=DVTDeveloperAccountCredentialsError Code=0 "Invalid credentials in keychain for yllpaypal1@gmail.com, missing Xcode-Token" UserInfo={NSLocalizedDescription=Invalid credentials in keychain for yllpaypal1@gmail.com, missing Xcode-Token}

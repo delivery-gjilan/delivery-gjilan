@@ -100,11 +100,6 @@ export default function OrderSuccessScreen({ orderId, type = 'order_created', ph
             ]),
         ]).start();
 
-        // Auto-close after 12 seconds
-        autoCloseTimerRef.current = setTimeout(() => {
-            onGoHome();
-        }, 12000);
-
         // Cleanup timer on unmount
         return () => {
             if (autoCloseTimerRef.current) {

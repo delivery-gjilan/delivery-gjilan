@@ -16,6 +16,9 @@ import { AuthRepository } from '@/repositories/AuthRepository';
 import { pubsub, publish, topics, type OrderDriverLiveTrackingPayload } from '@/lib/pubsub';
 import { DbDriver } from '@/database/schema/drivers';
 import { clearLiveDriverEta, setLiveDriverEta } from '@/lib/driverEtaCache';
+import { cache } from '@/lib/cache';
+import { updateLiveActivity } from '@/services/orderNotifications';
+import type { NotificationService } from '@/services/NotificationService';
 import logger from '@/lib/logger';
 
 const log = logger.child({ service: 'HeartbeatHandler' });
@@ -60,10 +63,14 @@ export interface HeartbeatEtaPayload {
   remainingEtaSeconds?: number | null;
 }
 
+/** Heartbeat-specific Live Activity update interval (seconds). */
+const HEARTBEAT_LA_UPDATE_INTERVAL_S = 90;
+
 export class DriverHeartbeatHandler {
   constructor(
     private driverRepository: DriverRepository,
-    private authRepository: AuthRepository
+    private authRepository: AuthRepository,
+    private notificationService?: NotificationService,
   ) {}
 
   /**
@@ -133,6 +140,21 @@ export class DriverHeartbeatHandler {
       await clearLiveDriverEta(userId);
     }
 
+    // ── Periodic Live Activity ETA update during delivery ──
+    if (
+      this.notificationService &&
+      etaPayload?.activeOrderId &&
+      etaPayload.navigationPhase === 'to_dropoff' &&
+      etaPayload.remainingEtaSeconds != null &&
+      etaPayload.remainingEtaSeconds > 0
+    ) {
+      this.maybePushLiveActivityEta(
+        userId,
+        etaPayload.activeOrderId,
+        Math.ceil(etaPayload.remainingEtaSeconds / 60),
+      );
+    }
+
     if (etaPayload?.activeOrderId) {
       this.publishOrderDriverLiveTracking({
         orderId: etaPayload.activeOrderId,
@@ -150,7 +172,10 @@ export class DriverHeartbeatHandler {
 
     // Publish updates when reconnecting or when location write is refreshed.
     // This keeps admin driver lists/maps in sync without waiting for watchdog transitions.
-    if (wasDisconnected || shouldUpdateLocation) {
+    // For active deliveries, always publish so the admin map receives 2s updates
+    // even when the DB location write is throttled (10s/5m gate).
+    const isActiveDelivery = !!etaPayload?.activeOrderId;
+    if (wasDisconnected || shouldUpdateLocation || isActiveDelivery) {
       if (wasDisconnected) {
         log.info({ userId, previousStatus: driver.connectionStatus }, 'heartbeat:reconnected');
       }
@@ -252,5 +277,47 @@ export class DriverHeartbeatHandler {
     await this.publishDriverUpdate([userId]);
     
     return driver;
+  }
+
+  /**
+   * Fire-and-forget Live Activity ETA push, throttled to once per ~90 s per order.
+   * The downstream `sendLiveActivityUpdate` has its own 15 s / 1-min-delta gate as a second layer.
+   */
+  private maybePushLiveActivityEta(
+    userId: string,
+    orderId: string,
+    estimatedMinutes: number,
+  ): void {
+    const gateKey = `cache:la-heartbeat:${orderId}`;
+
+    // Fully async — never blocks the heartbeat response
+    (async () => {
+      const existing = await cache.get<number>(gateKey);
+      if (existing) return; // still within throttle window
+
+      // Claim the gate before doing any work
+      await cache.set(gateKey, Date.now(), HEARTBEAT_LA_UPDATE_INTERVAL_S);
+
+      // Resolve driver name
+      let driverName = 'Your driver';
+      try {
+        const [driver] = await this.authRepository.findDriversByIds([userId]);
+        if (driver) {
+          driverName = `${driver.firstName} ${driver.lastName || ''}`.trim();
+        }
+      } catch { /* fall through with default */ }
+
+      updateLiveActivity(
+        this.notificationService!,
+        orderId,
+        'out_for_delivery',
+        driverName,
+        estimatedMinutes,
+      );
+
+      log.info({ orderId, estimatedMinutes }, 'heartbeat:liveActivity:etaUpdate');
+    })().catch((err) => {
+      log.error({ err, orderId }, 'heartbeat:liveActivity:error');
+    });
   }
 }

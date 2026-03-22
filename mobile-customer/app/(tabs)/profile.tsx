@@ -93,6 +93,8 @@ export default function Profile() {
             ? `${orders.length} ${orders.length !== 1 ? t.profile.order_count_plural : t.profile.order_count}`
             : t.profile.no_orders;
 
+    const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+
     return (
         <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }} edges={['top']}>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -118,6 +120,19 @@ export default function Profile() {
                         showDivider={false}
                     />
                 </View>
+
+                {/* Admin Portal — only for ADMIN / SUPER_ADMIN */}
+                {isAdmin && (
+                    <View className="mb-6">
+                        <ProfileRow
+                            title="Admin Portal"
+                            subtitle="Manage orders, drivers & more"
+                            icon="shield-checkmark-outline"
+                            onPress={() => router.push('/admin' as any)}
+                            showDivider={false}
+                        />
+                    </View>
+                )}
 
                 {/* Language Selection */}
                 <View className="px-5 mb-6">
