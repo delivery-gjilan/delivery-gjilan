@@ -381,6 +381,7 @@ export default function MapPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [showDriverPanel, setShowDriverPanel] = useState(true);
   const [detailPanelExpanded, setDetailPanelExpanded] = useState(false);
+  const [confirmNoDriverAction, setConfirmNoDriverAction] = useState<{ orderId: string; status: string } | null>(null);
   const [directionsTelemetry, setDirectionsTelemetry] = useState(() => getDirectionsTelemetry());
   const [driverHeadingDeg, setDriverHeadingDeg] = useState<Record<string, number>>({});
 
@@ -850,7 +851,7 @@ export default function MapPage() {
       }
 
       if (status === "OUT_FOR_DELIVERY" && !order.driver?.id) {
-        toast.error("Assign a driver before setting Out for Delivery");
+        setConfirmNoDriverAction({ orderId, status });
         return;
       }
 
@@ -866,6 +867,22 @@ export default function MapPage() {
         setSelectedOrderId(null);
         setDetailPanelExpanded(false);
       }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update status");
+    }
+  };
+
+  const handleConfirmNoDriverStatusUpdate = async () => {
+    if (!confirmNoDriverAction) return;
+    const { orderId, status } = confirmNoDriverAction;
+    setConfirmNoDriverAction(null);
+    try {
+      await updateOrderStatus({
+        variables: { id: orderId, status },
+        refetchQueries: ["GetOrders"],
+        awaitRefetchQueries: true,
+      });
+      toast.success(`Order marked as ${status.replace(/_/g, ' ').toLowerCase()} (no driver assigned)`);
     } catch (error: any) {
       toast.error(error.message || "Failed to update status");
     }
@@ -928,7 +945,7 @@ export default function MapPage() {
   const handleMapLoad = useCallback((e: any) => {
     const map = e.target;
     ['poi-label', 'transit-label'].forEach((layer) => {
-      if (map.getLayer(layer)) map.setLayoutProperty(layer, 'visibility', 'hidden');
+      if (map.getLayer(layer)) map.setLayoutProperty(layer, 'visibility', 'none');
     });
   }, []);
 
@@ -960,17 +977,17 @@ export default function MapPage() {
               <div className="relative flex items-center justify-center group cursor-pointer"
                 onMouseEnter={() => setHoveredBusinessId(business.id)}
                 onMouseLeave={() => setHoveredBusinessId(null)}>
-                <div className={`relative w-10 h-10 rounded-full border-2 ${isInactive ? "border-slate-500/40 grayscale opacity-50" : "border-violet-500/60"} bg-[#1a1a2e] shadow-lg hover:scale-110 transition-all flex items-center justify-center overflow-hidden ${isHovered ? "ring-2 ring-violet-400 ring-offset-2 ring-offset-black" : ""}`}>
+                <div className={`relative w-7 h-7 rounded-full border-[1.5px] ${isInactive ? "border-slate-500/40 grayscale opacity-50" : "border-violet-500/60"} bg-[#1a1a2e] shadow-lg hover:scale-110 transition-all flex items-center justify-center overflow-hidden ${isHovered ? "ring-2 ring-violet-400 ring-offset-1 ring-offset-black" : ""}`}>
                   {business.imageUrl ? (
                     <img src={business.imageUrl} alt={business.name} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                   ) : (
                     business.businessType === "RESTAURANT"
-                      ? <Utensils size={18} className="text-violet-300" />
-                      : <Store size={18} className="text-violet-300" />
+                      ? <Utensils size={13} className="text-violet-300" />
+                      : <Store size={13} className="text-violet-300" />
                   )}
                 </div>
                 {(activeOrderCountByBusinessId[business.id] ?? 0) > 0 && (
-                  <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-amber-500 border border-black flex items-center justify-center text-[9px] font-bold text-white z-10 pointer-events-none">
+                  <div className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-amber-500 border border-black flex items-center justify-center text-[8px] font-bold text-white z-10 pointer-events-none">
                     {activeOrderCountByBusinessId[business.id]}
                   </div>
                 )}
@@ -1494,7 +1511,7 @@ export default function MapPage() {
         </div>
         
         {/* Order cards list */}
-        <div className="flex-1 overflow-y-auto scrollbar-hide" style={{ maxHeight: `calc(100vh - ${selectedOrder ? (detailPanelExpanded ? 330 : 215) : 60}px)` }}>
+        <div className="flex-1 overflow-y-auto scrollbar-hide" style={{ maxHeight: `calc(100vh - ${selectedOrder ? (detailPanelExpanded ? 380 : 260) : 60}px)` }}>
           <div className="p-2 space-y-2">
             {filteredOrders.map((order: any) => {
               const statusColor = ORDER_STATUS_COLORS[order.status as keyof typeof ORDER_STATUS_COLORS] || ORDER_STATUS_COLORS.PENDING;
@@ -1616,6 +1633,32 @@ export default function MapPage() {
           driverProgressOnRoute={driverProgressOnRoute}
         />
       )}
+
+      {/* Confirm Out for Delivery without driver */}
+      {confirmNoDriverAction && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setConfirmNoDriverAction(null)} />
+          <div className="relative z-[201] w-full max-w-sm rounded-xl border border-zinc-700 bg-zinc-900 p-5 shadow-2xl">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertCircle size={18} className="text-amber-400" />
+              <h3 className="text-sm font-semibold text-white">No Driver Assigned</h3>
+            </div>
+            <p className="text-xs text-zinc-400 mb-4">
+              Are you sure you want to mark this order as <span className="text-white font-medium">Out for Delivery</span> without a driver assigned? The order will not be trackable until a driver is assigned.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setConfirmNoDriverAction(null)}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition">
+                Cancel
+              </button>
+              <button onClick={handleConfirmNoDriverStatusUpdate}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500 text-black hover:bg-amber-400 transition">
+                Continue Anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1701,7 +1744,7 @@ function BottomDetailPanel({
   }, [order.driver, recommendedDriver, selectedDriverId]);
 
   return (
-    <div className={`absolute bottom-0 left-[280px] right-[72px] z-40 transition-all duration-300 ${expanded ? "h-[272px]" : "h-[154px]"}`}>
+    <div className={`absolute bottom-0 left-[280px] right-[72px] z-40 transition-all duration-300 ${expanded ? "h-[320px]" : "h-[200px]"}`}>
       <div className="absolute inset-0 bg-[#0a0a0b]/95 backdrop-blur-xl border-t border-white/10 rounded-t-xl" />
 
       <div className="relative h-full flex flex-col">
@@ -1849,7 +1892,7 @@ function BottomDetailPanel({
                       <span className="text-emerald-400/80"> ({(recommendedDriver.distanceToPickupMeters / 1000).toFixed(2)} km)</span>
                     </div>
                   )}
-                  <div className="overflow-y-auto space-y-1" style={{ maxHeight: expanded ? '130px' : '76px' }}>
+                  <div className="overflow-y-auto space-y-1" style={{ maxHeight: expanded ? '180px' : '90px' }}>
                     {assignableFreeDrivers.map(({ driver, distanceToPickupMeters }: any) => {
                       const cs = (driver.driverConnection?.connectionStatus ?? "DISCONNECTED") as keyof typeof DRIVER_CONNECTION_COLORS;
                       const ss = DRIVER_CONNECTION_COLORS[cs];
@@ -1896,12 +1939,12 @@ function BottomDetailPanel({
                 title="Status can only move forward">
                 <option value="PENDING" style={{ backgroundColor: "#1f2937" }} disabled={isTerminalStatus || currentRank > 0}>Pending</option>
                 <option value="READY" style={{ backgroundColor: "#1f2937" }} disabled={isTerminalStatus || currentRank > 1}>Ready</option>
-                <option value="OUT_FOR_DELIVERY" style={{ backgroundColor: "#1f2937" }} disabled={isTerminalStatus || (!order.driver?.id && order.status !== "OUT_FOR_DELIVERY")}>Out for Delivery</option>
+                <option value="OUT_FOR_DELIVERY" style={{ backgroundColor: "#1f2937" }} disabled={isTerminalStatus}>Out for Delivery</option>
                 <option value="DELIVERED" style={{ backgroundColor: "#1f2937" }} disabled={order.status === "CANCELLED"}>Delivered</option>
                 <option value="CANCELLED" style={{ backgroundColor: "#1f2937" }} disabled={order.status === "DELIVERED"}>Cancelled</option>
               </select>
               {!order.driver?.id && (
-                <div className="text-[9px] text-amber-400/90">Assign a driver to enable Out for Delivery.</div>
+                <div className="text-[9px] text-amber-400/90">No driver assigned — will require confirmation.</div>
               )}
 
               <div className="space-y-1">

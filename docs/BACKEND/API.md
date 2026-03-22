@@ -96,6 +96,7 @@ That means:
 - store open/closed state is now broadcast through `storeStatusUpdated`
 - **Directions proxy** — `GET /api/directions?points=lon,lat;lon,lat[&steps=true&language=en]` (`api/src/routes/directionsRoutes.ts`). Requires `Authorization: Bearer <jwt>`. Sanitises coordinates (re-serialised from parsed floats, earth-range validated) to prevent SSRF. Fetches from Mapbox server-side using env `MAPBOX_TOKEN`, caches result in Redis at 65 s TTL, returns `{ distanceKm, durationMin, geometry: [[lon,lat],...], steps? }`. Rate-limited to 200 req / 15 min per user key. The Mapbox token is **never** sent to any client.
 - **Active-delivery publish bypass** — `DriverHeartbeatHandler` now publishes `driverUpdate` on every heartbeat (every 2 s) for drivers with an `activeOrderId`, even when the DB location throttle has not tripped. This keeps admin map animations smooth. See B4 for details.
+- Drizzle migration resilience: `api/database/migrations/0002_concerned_liz_osborn.sql` now uses `ADD COLUMN IF NOT EXISTS` for `store_settings.dispatch_mode_enabled` to avoid duplicate-column failures when older/manual schema states already contain that field.
 - generated schema and type files are large and should not be manually edited
 
 ## Recommended Next Cleanup

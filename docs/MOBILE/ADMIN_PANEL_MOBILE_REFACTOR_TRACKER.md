@@ -97,6 +97,11 @@ For every mobile parity PR:
 
 ## Change Log
 
+- 2026-03-22: Seeder business locations updated to proper Gjilan city center (42.4604, 21.4694 ± ~650m) — previously restaurants used 42.6629 with ±0.1° spread placing them far outside the city.
+- 2026-03-22: Mobile-customer order details `BusinessMarker` restyled to match admin panel: violet circle (`#7C3AED`) border with business image (36px via `expo-image`), fallback restaurant icon. Pulse animation color changed from amber to violet.
+- 2026-03-22: Fixed admin map BottomDetailPanel collapsed height (154px → 200px, expanded 272px → 320px) so order details are fully visible without needing to expand. Sidebar maxHeight offsets updated to match.
+- 2026-03-22: Fixed Mapbox `poi-label`/`transit-label` layer visibility value from `'hidden'` to `'none'` (Mapbox GL JS expects `visible|none`).
+- 2026-03-22: Admin map now allows setting "Out for Delivery" without a driver assigned — shows a confirmation modal warning that the order won't be trackable. Previously this was hard-blocked.
 - 2026-03-20: Business settlements `from last settlement` date mode now starts from the exact `lastPaidSettlementAt` timestamp (time preserved) instead of day start truncation, and the active filter label now shows time (`HH:mm:ss`) for clarity.
 - 2026-03-19: Phase-2 admin map optimization: extracted route-distance recalculation into `admin-panel/src/lib/hooks/useOrderRouteDistances.ts` and enabled adaptive driver polling in `useMapRealtimeData` (pause polling while driver subscription is fresh; resume after staleness threshold).
 - 2026-03-19: Extracted admin-panel map realtime data-sync logic into `admin-panel/src/lib/hooks/useMapRealtimeData.ts` (orders subscription payload-first cache updates, fallback refetch cooldown, drivers subscription merge + 10s polling safety net) to improve maintainability without changing runtime behavior.

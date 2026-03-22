@@ -15,6 +15,13 @@
       "when": 1742601600000,
       "tag": "0001_dispatch_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774157573493,
+      "tag": "0002_concerned_liz_osborn",
+      "breakpoints": true
     }
   ]
 }

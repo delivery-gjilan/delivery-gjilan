@@ -255,29 +255,22 @@ const MARKET_DATA = [
 ];
 
 async function seed() {
-    console.log('🌱 Seeding database...');
+    console.log('🌱 Seeding database (idempotent — safe to re-run)...');
     const { faker } = await import('@faker-js/faker');
     const db = await getDB();
 
-    // Clear existing data
-    await db.delete(products);
-    await db.delete(productSubcategories);
-    await db.delete(productCategories);
-    await db.delete(promotionBusinessEligibility);
-    await db.delete(userPromotions);
-    await db.delete(userPromoMetadata);
-    await db.delete(promotions);
-    await db.delete(orderItems);
-    await db.delete(orders);
-    await db.delete(businesses);
-    await db.delete(users);
-
-    console.log('🧹 Cleared existing data');
+    // ── Helper: find-or-create user by email ──
+    async function upsertUser(data: any) {
+        const existing = await db.select().from(users).where(eq(users.email, data.email)).limit(1);
+        if (existing.length > 0) return existing[0];
+        const [created] = await db.insert(users).values(data).returning();
+        return created;
+    }
 
     // Create super admin user
-    const hashedPassword = await hashPassword('12345678');
+    const hashedPassword = await hashPassword('asdasdasd');
     const adminUserId = faker.string.uuid();
-    await db.insert(users).values({
+    await upsertUser({
         id: adminUserId,
         firstName: 'Admin',
         lastName: 'Admin',
@@ -289,12 +282,12 @@ async function seed() {
         signupStep: 'COMPLETED',
     });
 
-    console.log('👤 Created super admin user (admin@admin.com / 12345678)');
+    console.log('👤 Admin user ready (admin@admin.com / 12345678)');
 
     // Create specific customer user for testing
     const specificCustomerId = faker.string.uuid();
     const specificCustomerPassword = await hashPassword('12345678');
-    await db.insert(users).values({
+    await upsertUser({
         id: specificCustomerId,
         firstName: 'Art',
         lastName: 'Shabani',
@@ -306,28 +299,29 @@ async function seed() {
         signupStep: 'COMPLETED',
     });
 
-    console.log('👤 Created test customer user (artshabani2002@gmail.com / 12345678)');
+    console.log('👤 Test customer ready (artshabani2002@gmail.com / 12345678)');
 
     // Create additional test customer users
     const customerUsers = [specificCustomerId]; // Include the specific customer
     for (let i = 0; i < 2; i++) {
         const customerId = faker.string.uuid();
         const customerPassword = await hashPassword('12345678');
-        await db.insert(users).values({
+        const email = `testcustomer${i + 1}@demo.com`;
+        const user = await upsertUser({
             id: customerId,
             firstName: faker.person.firstName(),
             lastName: faker.person.lastName(),
-            email: faker.internet.email(),
+            email,
             password: customerPassword,
             role: 'CUSTOMER',
             emailVerified: true,
             phoneVerified: true,
             signupStep: 'COMPLETED',
         });
-        customerUsers.push(customerId);
+        customerUsers.push(user.id);
     }
 
-    console.log('👥 Created 3 test customer users total');
+    console.log('👥 3 test customer users ready');
 
     // Create driver users and linked driver profiles
     const seededDrivers = [
@@ -340,7 +334,7 @@ async function seed() {
         const driverUserId = faker.string.uuid();
         const driverPassword = await hashPassword('12345678');
 
-        await db.insert(users).values({
+        const user = await upsertUser({
             id: driverUserId,
             firstName: driverSeed.firstName,
             lastName: driverSeed.lastName,
@@ -352,33 +346,45 @@ async function seed() {
             signupStep: 'COMPLETED',
         });
 
-        await db.insert(drivers).values({
-            userId: driverUserId,
-            driverLat: 42.6629 + (index * 0.01),
-            driverLng: 21.4694 + (index * 0.01),
-            onlinePreference: true,
-            connectionStatus: 'CONNECTED',
-            commissionPercentage: '20',
-            maxActiveOrders: '2',
-            lastHeartbeatAt: new Date().toISOString(),
-            lastLocationUpdate: new Date().toISOString(),
-        });
+        // Upsert driver profile
+        const existingDriver = await db.select().from(drivers).where(eq(drivers.userId, user.id)).limit(1);
+        if (existingDriver.length === 0) {
+            await db.insert(drivers).values({
+                userId: user.id,
+                driverLat: 42.4604 + (index * 0.005),
+                driverLng: 21.4694 + (index * 0.005),
+                onlinePreference: true,
+                connectionStatus: 'CONNECTED',
+                commissionPercentage: '20',
+                maxActiveOrders: '2',
+                lastHeartbeatAt: new Date().toISOString(),
+                lastLocationUpdate: new Date().toISOString(),
+            });
+        }
     }
 
-    console.log('🚗 Created 3 test drivers (driver1@demo.com, driver2@demo.com, driver3@demo.com)');
+    console.log('🚗 3 test drivers ready (driver1@demo.com, driver2@demo.com, driver3@demo.com)');
 
     // Store created businesses and their products
     const createdBusinesses: Array<{ id: string; name: string; products: Array<{ id: string; name: string; price: number }> }> = [];
 
     // Create restaurants with products
     for (const restaurantData of RESTAURANTS_DATA) {
+        // Skip if business already exists
+        const existingBiz = await db.select().from(businesses).where(eq(businesses.name, restaurantData.name)).limit(1);
+        if (existingBiz.length > 0) {
+            console.log(`🏪 Business already exists: ${restaurantData.name} — skipping`);
+            createdBusinesses.push({ id: existingBiz[0].id, name: existingBiz[0].name, products: [] });
+            continue;
+        }
+
         const business: NewDbBusiness = {
             name: restaurantData.name,
             imageUrl: restaurantData.image,
             businessType: restaurantData.type,
-            locationLat: 42.6629 + (Math.random() - 0.5) * 0.1, // Gjilan, Kosovo area
-            locationLng: 21.4694 + (Math.random() - 0.5) * 0.1,
-            locationAddress: faker.location.streetAddress(),
+            locationLat: 42.4604 + (Math.random() - 0.5) * 0.025, // Gjilan city ~1.4km spread
+            locationLng: 21.4694 + (Math.random() - 0.5) * 0.035,
+            locationAddress: faker.location.streetAddress() + ', Gjilan',
             opensAt: OPEN_12_AM,
             closesAt: CLOSE_11_59_PM,
             isActive: true,
@@ -447,13 +453,21 @@ async function seed() {
 
     // Create market with products
     for (const marketData of MARKET_DATA) {
+        // Skip if business already exists
+        const existingBiz = await db.select().from(businesses).where(eq(businesses.name, marketData.name)).limit(1);
+        if (existingBiz.length > 0) {
+            console.log(`🏪 Market already exists: ${marketData.name} — skipping`);
+            createdBusinesses.push({ id: existingBiz[0].id, name: existingBiz[0].name, products: [] });
+            continue;
+        }
+
         const business: NewDbBusiness = {
             name: marketData.name,
             imageUrl: marketData.image,
             businessType: marketData.type,
-            locationLat: 42.4635,
-            locationLng: 21.4694,
-            locationAddress: 'Gjilan, Kosovo',
+            locationLat: 42.4604 + (Math.random() - 0.5) * 0.025, // Gjilan city ~1.4km spread
+            locationLng: 21.4694 + (Math.random() - 0.5) * 0.035,
+            locationAddress: faker.location.streetAddress() + ', Gjilan',
             opensAt: OPEN_12_AM,
             closesAt: CLOSE_11_59_PM,
             isActive: true,
@@ -535,7 +549,7 @@ async function seed() {
     const casbasBusiness = createdBusinesses.find((business) => business.name === 'Casbas Pizza');
     if (casbasBusiness) {
         const casbasAdminPassword = await hashPassword('asdasdasd');
-        await db.insert(users).values({
+        await upsertUser({
             id: faker.string.uuid(),
             firstName: 'Casbas',
             lastName: 'Admin',
@@ -548,18 +562,22 @@ async function seed() {
             signupStep: 'COMPLETED',
         });
 
-        console.log('👤 Created Casbas business admin (casbas@gmail.com / asdasdasd)');
+        console.log('👤 Casbas business admin ready (casbas@gmail.com / asdasdasd)');
     }
 
     // ------------------------------
     // Seed promotions (compatible with `promotions` schema)
     // ------------------------------
     try {
+        const existingPromos = await db.select({ code: promotions.code }).from(promotions);
+        const existingCodes = new Set(existingPromos.map((p) => p.code));
+
         const [exampleBusiness] = await db.select().from(businesses).limit(1);
         const businessId = exampleBusiness?.id ?? null;
 
-        // First-order auto-applied free delivery promo (no code)
-        const [firstOrderPromo] = await db.insert(promotions).values({
+        // First-order auto-applied free delivery promo (no code) – check by name
+        const existingFirstOrder = await db.select().from(promotions).where(eq(promotions.name, 'First Order Free Delivery')).limit(1);
+        const firstOrderPromo = existingFirstOrder[0] ?? (await db.insert(promotions).values({
             code: null,
             name: 'First Order Free Delivery',
             description: 'Free delivery for users on their first order (auto-applied)',
@@ -578,10 +596,12 @@ async function seed() {
             isActive: true,
             creatorType: 'PLATFORM',
             creatorId: null,
-        }).returning();
+        }).returning())[0];
 
         // Global percentage promo
-        const [percentagePromo] = await db.insert(promotions).values({
+        const percentagePromo = existingCodes.has('WELCOME20')
+            ? (await db.select().from(promotions).where(eq(promotions.code, 'WELCOME20')).limit(1))[0]
+            : (await db.insert(promotions).values({
             code: 'WELCOME20',
             name: 'Welcome 20% Off',
             description: '20% off your order (up to 50€)',
@@ -600,10 +620,12 @@ async function seed() {
             isActive: true,
             creatorType: 'PLATFORM',
             creatorId: null,
-        }).returning();
+        }).returning())[0];
 
         // Fixed discount promo
-        const [fixedPromo] = await db.insert(promotions).values({
+        const fixedPromo = existingCodes.has('EURO3OFF')
+            ? (await db.select().from(promotions).where(eq(promotions.code, 'EURO3OFF')).limit(1))[0]
+            : (await db.insert(promotions).values({
             code: 'EURO3OFF',
             name: '3€ Off',
             description: 'Flat 3€ off on orders over 10€',
@@ -622,11 +644,13 @@ async function seed() {
             isActive: true,
             creatorType: 'PLATFORM',
             creatorId: null,
-        }).returning();
+        }).returning())[0];
 
         // Business-specific promo if a business exists
         if (businessId) {
-            const [bizPromo] = await db.insert(promotions).values({
+            const bizPromo = existingCodes.has('BIZ10')
+                ? (await db.select().from(promotions).where(eq(promotions.code, 'BIZ10')).limit(1))[0]
+                : (await db.insert(promotions).values({
                 code: 'BIZ10',
                 name: 'Business 10% Off',
                 description: '10% off for a specific business',
@@ -645,7 +669,7 @@ async function seed() {
                 isActive: true,
                 creatorType: 'PLATFORM',
                 creatorId: null,
-            }).returning();
+            }).returning())[0];
 
             await db.insert(promotionBusinessEligibility).values({
                 promotionId: bizPromo.id,
@@ -684,6 +708,11 @@ async function seed() {
     try {
         const casbasBusiness = createdBusinesses[0]; // Casbas Pizza
         if (casbasBusiness) {
+            // Check if variants already exist for this business
+            const existingVariantGroups = await db.select().from(productVariantGroups).where(eq(productVariantGroups.businessId, casbasBusiness.id)).limit(1);
+            if (existingVariantGroups.length > 0) {
+                console.log('[SEED] Product variants already exist — skipping');
+            } else {
             const [pizzaCategory] = await db
                 .select()
                 .from(productCategories)
@@ -800,6 +829,7 @@ async function seed() {
                 ]);
                 console.log('  🎁 Added "Pizza Meal Deal" (offer) with option groups to Casbas Pizza');
             }
+            } // close else (variants don't exist)
         }
         console.log('[SEED] Product variants and option groups seeded.');
     } catch (err) {
@@ -814,7 +844,12 @@ async function seed() {
 
         if (businessList.length > 0 && driverList.length > 0 && customerList.length > 0) {
             // Create delivered orders + matching settlements
+            let createdOrderCount = 0;
             for (let i = 0; i < 15; i++) {
+                const displayId = `GJ-S${String(i + 1).padStart(3, '0')}`;
+                const existingOrder = await db.select().from(orders).where(eq(orders.displayId, displayId)).limit(1);
+                if (existingOrder.length > 0) continue;
+
                 const randomBusiness = businessList[Math.floor(Math.random() * businessList.length)];
                 const randomDriver = driverList[Math.floor(Math.random() * driverList.length)];
                 const randomCustomer = customerList[Math.floor(Math.random() * customerList.length)];
@@ -828,7 +863,7 @@ async function seed() {
                 const createdAt = new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString();
 
                 const [newOrder] = await db.insert(orders).values({
-                    displayId: `GJ-S${String(i + 1).padStart(3, '0')}`,
+                    displayId,
                     userId: randomCustomer.id,
                     driverId: randomDriver.userId,
                     price: orderAmount,
@@ -844,6 +879,7 @@ async function seed() {
                 if (!newOrder) {
                     continue;
                 }
+                createdOrderCount++;
 
                 // Business settlement (platform receivable)
                 const businessPlatformMarkup = Number((orderAmount * 0.15).toFixed(2));
@@ -938,9 +974,13 @@ async function seed() {
                 });
             }
 
-            console.log('[SEED] ✅ Created 15 delivered orders with settlements');
-            console.log('[SEED]   - 15 business settlements');
-            console.log('[SEED]   - 15 driver settlements');
+            if (createdOrderCount === 0) {
+                console.log('[SEED] ⏭️  Orders already exist, skipped.');
+            } else {
+                console.log(`[SEED] ✅ Created ${createdOrderCount} delivered orders with settlements`);
+                console.log(`[SEED]   - ${createdOrderCount} business settlements`);
+                console.log(`[SEED]   - ${createdOrderCount} driver settlements`);
+            }
         } else {
             console.warn('[SEED] Settlements skipped: missing businesses, drivers, or customers');
         }

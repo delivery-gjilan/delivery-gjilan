@@ -337,9 +337,10 @@ const HomeLocationPin = ({ scale = 1 }: { scale?: number }) => (
     <MapPin icon="home" size={40} shellColor="#FFFFFF" coreColor="#111111" iconSize={18} scale={scale} />
 );
 
-const BusinessMarker = ({ active, scale = 1 }: { active: boolean; scale?: number }) => {
+const BusinessMarker = ({ active, scale = 1, imageUrl }: { active: boolean; scale?: number; imageUrl?: string | null }) => {
     const pulseScale = useSharedValue(1);
     const pulseOpacity = useSharedValue(active ? 0.32 : 0);
+    const [imgError, setImgError] = useState(false);
 
     useEffect(() => {
         if (active) {
@@ -371,6 +372,9 @@ const BusinessMarker = ({ active, scale = 1 }: { active: boolean; scale?: number
         opacity: pulseOpacity.value,
     }));
 
+    const markerSize = 36 * scale;
+    const showImage = imageUrl && !imgError;
+
     return (
         <View style={{ alignItems: 'center', justifyContent: 'center' }}>
             <Animated.View
@@ -381,12 +385,38 @@ const BusinessMarker = ({ active, scale = 1 }: { active: boolean; scale?: number
                         width: 72 * scale,
                         height: 72 * scale,
                         borderRadius: 36 * scale,
-                        backgroundColor: '#F59E0B',
+                        backgroundColor: '#7C3AED',
                     },
                     pulseAnimatedStyle,
                 ]}
             />
-            <MapPin icon="restaurant" size={46} shellColor="#FFFFFF" coreColor="#111111" iconSize={18} scale={scale} />
+            <View style={{
+                width: markerSize,
+                height: markerSize,
+                borderRadius: markerSize / 2,
+                borderWidth: 2.5,
+                borderColor: '#7C3AED',
+                backgroundColor: '#1a1a2e',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+                shadowColor: '#7C3AED',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.4,
+                shadowRadius: 6,
+                elevation: 6,
+            }}>
+                {showImage ? (
+                    <Image
+                        source={{ uri: imageUrl }}
+                        style={{ width: markerSize, height: markerSize }}
+                        contentFit="cover"
+                        onError={() => setImgError(true)}
+                    />
+                ) : (
+                    <Ionicons name="restaurant" size={16 * scale} color="#A78BFA" />
+                )}
+            </View>
         </View>
     );
 };
@@ -1653,7 +1683,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                 coordinate={[pickupLocation.longitude, pickupLocation.latitude]}
                                 anchor={{ x: 0.5, y: 1 }}
                             >
-                                <BusinessMarker active={isPreparingAnimationPhase} scale={markerScale} />
+                                <BusinessMarker active={isPreparingAnimationPhase} scale={markerScale} imageUrl={orderBusinesses[0]?.business?.imageUrl} />
                             </MapLibreGL.MarkerView>
                         )}
 
