@@ -3,7 +3,10 @@
     "name": "Zipp Admin",
     "slug": "delivery-admin",
     "version": "1.0.0",
-      "runtimeVersion": "1.0.0",
+    "runtimeVersion": "1.0.0",
+    "updates": {
+      "url": "https://u.expo.dev/311a1600-6dc4-4a4d-9772-9aa6af6edd43"
+    },
     "icon": "./assets/images/icon.png",
     "scheme": "deliveryadmin",
     "userInterfaceStyle": "automatic",
@@ -34,12 +37,9 @@
       "bundler": "metro"
     },
     "plugins": [
-      [
-        "expo-router",
-        {
-          "root": "app"
-        }
-      ],
+      "expo-router",
+      "@rnmapbox/maps",
+      "@react-native-firebase/app",
       [
         "expo-notifications",
         {
@@ -48,7 +48,6 @@
           "enableBackgroundRemoteNotifications": true
         }
       ],
-      "@rnmapbox/maps",
       [
         "expo-splash-screen",
         {
@@ -61,37 +60,9 @@
           }
         }
       ],
-      "@react-native-firebase/app",
       "expo-build-properties",
       "./plugins/with-modular-headers"
-      ],
-      "plugins": [
-        "expo-router",
-        "@rnmapbox/maps",
-        "@react-native-firebase/app",
-        [
-          "expo-notifications",
-          {
-            "color": "#6366f1",
-            "defaultChannel": "default",
-            "enableBackgroundRemoteNotifications": true
-          }
-        ],
-        [
-          "expo-splash-screen",
-          {
-            "image": "./assets/images/splash.png",
-            "imageWidth": 200,
-            "resizeMode": "contain",
-            "backgroundColor": "#0f172a",
-            "dark": {
-              "backgroundColor": "#0f172a"
-            }
-          }
-        ],
-        "expo-build-properties",
-        "./plugins/with-modular-headers"
-      ],
+    ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
@@ -101,8 +72,9 @@
         "root": "app"
       },
       "eas": {
-        "projectId": "placeholder-project-id"
+        "projectId": "311a1600-6dc4-4a4d-9772-9aa6af6edd43"
       }
-    }
+    },
+    "owner": "artshabani2002"
   }
 }

@@ -4,6 +4,9 @@
     "slug": "finance-tracker",
     "version": "1.0.0",
     "platforms": ["ios", "android"],
+    "updates": {
+      "url": "https://u.expo.dev/1c06f250-74dc-4a5d-855c-f53e97df8c2e"
+    },
     "runtimeVersion": {
       "policy": "appVersion"
     },
