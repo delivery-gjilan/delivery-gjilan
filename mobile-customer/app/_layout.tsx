@@ -54,7 +54,7 @@ function AppContent() {
                         <Stack.Screen name="auth-selection" options={{ headerShown: false }} />
                         <Stack.Screen name="signup" options={{ headerShown: false }} />
                         <Stack.Screen name="login" options={{ headerShown: false }} />
-                        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                        <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: 'none' }} />
                         <Stack.Screen 
                             name="business/[businessId]" 
                             options={{ 
@@ -81,6 +81,13 @@ function AppContent() {
                                 animation: 'slide_from_right',
                                 gestureEnabled: false,
                                 headerShown: false,
+                            }}
+                        />
+                        <Stack.Screen
+                            name="admin"
+                            options={{
+                                headerShown: false,
+                                animation: 'slide_from_right',
                             }}
                         />
                     </Stack>

@@ -440,6 +440,13 @@
             "out_for_delivery": "Porosia juaj është në rrugë",
             "cancelled": "Kjo porosi është anuluar",
             "delivered": "Porosia juaj është dorëzuar"
+        },
+        "status_messages_market": {
+            "pending": "Duke pritur që dyqani të pranojë porosinë tuaj",
+            "ready": "Porosia juaj po paketohet",
+            "out_for_delivery": "Porosia juaj është në rrugë",
+            "cancelled": "Kjo porosi është anuluar",
+            "delivered": "Porosia juaj është dorëzuar"
         }
     },
     "business": {

@@ -276,11 +276,11 @@ export default function Market() {
     // Products for active category
     const activeCategoryProducts = useMemo(() => {
         if (isDiscover) return [];
-        const filtered = allProducts.filter((p: any) => p.categoryId === activeTabId);
+        const filtered = allProducts.filter((p: any) => p.product?.categoryId === activeTabId);
         // Debug logging
         if (filtered.length === 0 && allProducts.length > 0) {
             console.log('No products found for category:', activeTabId);
-            console.log('Available products:', allProducts.map((p: any) => ({ id: p.id, name: p.name, categoryId: p.categoryId })));
+            console.log('Available products:', allProducts.map((p: any) => ({ id: p.id, name: p.name, categoryId: p.product?.categoryId })));
         }
         return filtered;
     }, [allProducts, activeTabId, isDiscover]);
@@ -307,8 +307,8 @@ export default function Market() {
                 const activeSub = activeSubcategories.find((sub) => sub.id === activeSubcategoryId);
                 if (activeSub) {
                     const prods = activeCategoryProducts
-                        .filter((p: any) => p.subcategoryId === activeSub.id)
-                        .sort((a: any, b: any) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+                        .filter((p: any) => p.product?.subcategoryId === activeSub.id)
+                        .sort((a: any, b: any) => (a.product?.sortOrder ?? 0) - (b.product?.sortOrder ?? 0));
                     if (prods.length > 0) {
                         result.push({ subcategoryId: activeSub.id, subcategoryName: activeSub.name, products: prods });
                     }
@@ -318,8 +318,8 @@ export default function Market() {
                 const firstSub = activeSubcategories[0];
                 if (firstSub) {
                     const prods = activeCategoryProducts
-                        .filter((p: any) => p.subcategoryId === firstSub.id)
-                        .sort((a: any, b: any) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+                        .filter((p: any) => p.product?.subcategoryId === firstSub.id)
+                        .sort((a: any, b: any) => (a.product?.sortOrder ?? 0) - (b.product?.sortOrder ?? 0));
                     if (prods.length > 0) {
                         result.push({ subcategoryId: firstSub.id, subcategoryName: firstSub.name, products: prods });
                     }
@@ -328,7 +328,7 @@ export default function Market() {
         } else {
             // No subcategories — show all category products
             const activeCatName = categoryList.find((c) => c.id === activeTabId)?.name ?? '';
-            const sorted = activeCategoryProducts.sort((a: any, b: any) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+            const sorted = activeCategoryProducts.sort((a: any, b: any) => (a.product?.sortOrder ?? 0) - (b.product?.sortOrder ?? 0));
             if (sorted.length > 0) {
                 result.push({ subcategoryId: `__all_${activeTabId}`, subcategoryName: activeCatName, products: sorted });
             }
@@ -340,7 +340,7 @@ export default function Market() {
     const visibleSubcategoryPills = useMemo(
         () => subcategoryPillList.filter((sub) => {
             // Show all subcategories that have products in the active category
-            const hasProducts = activeCategoryProducts.some((p: any) => p.subcategoryId === sub.id);
+            const hasProducts = activeCategoryProducts.some((p: any) => p.product?.subcategoryId === sub.id);
             return hasProducts;
         }),
         [subcategoryPillList, activeCategoryProducts],
@@ -352,7 +352,7 @@ export default function Market() {
         const q = searchQuery.toLowerCase().trim();
         const source = isDiscover ? allProducts : activeCategoryProducts;
         return source.filter(
-            (p: any) => p.name?.toLowerCase().includes(q) || (p.description ?? '').toLowerCase().includes(q),
+            (p: any) => p.name?.toLowerCase().includes(q) || (p.product?.description ?? '').toLowerCase().includes(q),
         );
     }, [allProducts, activeCategoryProducts, searchQuery, isDiscover]);
 
@@ -362,7 +362,7 @@ export default function Market() {
     const categoryImages = useMemo(() => {
         const map = new Map<string, string | null>();
         categoryList.forEach((cat) => {
-            const catProds = allProducts.filter((p: any) => p.categoryId === cat.id);
+            const catProds = allProducts.filter((p: any) => p.product?.categoryId === cat.id);
             map.set(cat.id, catProds.find((p: any) => p.imageUrl)?.imageUrl ?? null);
         });
         return map;

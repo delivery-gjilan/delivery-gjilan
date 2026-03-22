@@ -173,6 +173,7 @@ export default function OrdersScreen() {
     const { t } = useTranslation();
     const apolloClient = useApolloClient();
     const { user } = useAuthStore();
+    const isMarket = user?.business?.businessType === 'MARKET';
     const [etaModalVisible, setEtaModalVisible] = useState(false);
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const [selectedEta, setSelectedEta] = useState(10);
@@ -345,11 +346,16 @@ export default function OrdersScreen() {
         const lastTap = lastTapRef.current[order.id] || 0;
         if (now - lastTap < 400) {
             if (order.status === 'PENDING') {
-                setSelectedOrderId(order.id);
-                setSelectedEta(10);
-                setCustomEta('');
-                setEtaModalVisible(true);
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                if (isMarket) {
+                    // Market orders skip PREPARING — jump straight to READY
+                    handleMarkReady(order.id);
+                } else {
+                    setSelectedOrderId(order.id);
+                    setSelectedEta(10);
+                    setCustomEta('');
+                    setEtaModalVisible(true);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                }
             } else if (order.status === 'PREPARING') {
                 handleMarkReady(order.id);
             }
@@ -357,7 +363,7 @@ export default function OrdersScreen() {
         } else {
             lastTapRef.current[order.id] = now;
         }
-    }, []);
+    }, [isMarket]);
 
     const handleAcceptWithEta = async () => {
         if (!selectedOrderId) return;
@@ -415,7 +421,8 @@ export default function OrdersScreen() {
 
     const statusLabels: Record<OrderStatus, string> = {
         PENDING: t('orders.new_order', 'New Order'),
-        PREPARING: t('orders.preparing', 'Preparing'),
+        PREPARING: isMarket ? t('orders.packing', 'Packing') : t('orders.preparing', 'Preparing'),
+
         READY: t('orders.ready_pickup', 'Ready for Pickup'),
         OUT_FOR_DELIVERY: t('orders.out_for_delivery', 'Out for Delivery'),
         DELIVERED: t('orders.delivered', 'Delivered'),
@@ -423,6 +430,11 @@ export default function OrdersScreen() {
     };
 
     const handleAcceptTap = (orderId: string) => {
+        if (isMarket) {
+            // Market orders skip PREPARING — jump straight to READY
+            handleMarkReady(orderId);
+            return;
+        }
         setSelectedOrderId(orderId);
         setSelectedEta(10);
         setCustomEta('');

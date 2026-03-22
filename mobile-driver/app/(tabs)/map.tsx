@@ -1,14 +1,18 @@
 import React, { useMemo, useCallback, useRef, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Pressable, Alert, useColorScheme } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Mapbox from '@rnmapbox/maps';
-import { useApolloClient, useQuery, useSubscription } from '@apollo/client/react';
-import { GET_ORDERS, ALL_ORDERS_UPDATED } from '@/graphql/operations/orders';
+import Svg, { Path, Circle } from 'react-native-svg';
+import { useApolloClient, useMutation, useQuery, useSubscription } from '@apollo/client/react';
+import { GET_ORDERS, ALL_ORDERS_UPDATED, ASSIGN_DRIVER_TO_ORDER } from '@/graphql/operations/orders';
+import { OrderAcceptSheet } from '@/components/OrderAcceptSheet';
+import { OrderDetailSheet } from '@/components/OrderDetailSheet';
 import { useDriverLocation } from '@/hooks/useDriverLocation';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuthStore } from '@/store/authStore';
 import { useNavigationStore } from '@/store/navigationStore';
+import { useStoreStatus } from '@/hooks/useStoreStatus';
 import type { NavigationPhase } from '@/store/navigationStore';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchRouteGeometry } from '@/utils/mapbox';
@@ -18,7 +22,17 @@ import type { Feature, LineString } from 'geojson';
 const GJILAN_CENTER: [number, number] = [21.4694, 42.4635];
 const GJILAN_NE: [number, number] = [21.51, 42.50];
 const GJILAN_SW: [number, number] = [21.42, 42.43];
-const MAP_STYLE = 'mapbox://styles/artshabani2002/cmls0528e002701p93dejgdri';
+
+// Marching-ants dash sequence (7-frame, 7-unit cycle — matches Mapbox examples)
+const DASH_SEQ: number[][] = [
+    [3, 4],
+    [0, 1, 3, 3],
+    [0, 2, 3, 2],
+    [0, 3, 3, 1],
+    [0, 4, 3],
+    [1, 4, 2],
+    [2, 4, 1],
+];
 
 const STATUS_COLORS: Record<string, string> = {
     PENDING: '#F59E0B',
@@ -46,17 +60,37 @@ export default function MapScreen() {
     const theme = useTheme();
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const colorScheme = useColorScheme();
+    const mapStyle = colorScheme === 'dark'
+        ? 'mapbox://styles/mapbox/dark-v11'
+        : 'mapbox://styles/mapbox/light-v11';
     const currentDriverId = useAuthStore((state) => state.user?.id);
     const startNavigation = useNavigationStore((s) => s.startNavigation);
     const cameraRef = useRef<Mapbox.Camera>(null);
 
     const [focusedOrderId, setFocusedOrderId] = useState<string | null>(null);
+    const isOnline = useAuthStore((state) => state.isOnline);
+    const connectionStatus = useAuthStore((state) => state.connectionStatus);
+    const { dispatchModeEnabled } = useStoreStatus();
+
+    const [acceptSheetOrder, setAcceptSheetOrder] = useState<any>(null);
+    const skippedIds = useRef(new Set<string>());
+    const [accepting, setAccepting] = useState(false);
+    const [assignDriver] = useMutation(ASSIGN_DRIVER_TO_ORDER);
 
     // ── Route state ──
     const [routeCoords, setRouteCoords] = useState<Array<[number, number]> | null>(null);
     const [previewRouteCoords, setPreviewRouteCoords] = useState<Array<[number, number]> | null>(null);
     const [routeInfo, setRouteInfo] = useState<{ distanceKm: number; durationMin: number } | null>(null);
     const [previewRouteInfo, setPreviewRouteInfo] = useState<{ distanceKm: number; durationMin: number } | null>(null);
+
+    // ── Marching-ants animation for preview route ──
+    const [dashStep, setDashStep] = useState(0);
+    useEffect(() => {
+        if (!previewRouteCoords) { setDashStep(0); return; }
+        const id = setInterval(() => setDashStep(s => (s + 1) % DASH_SEQ.length), 100);
+        return () => clearInterval(id);
+    }, [!!previewRouteCoords]);
 
     // ── Orders query + real-time subscription ──
     const { data, loading, refetch } = useQuery(GET_ORDERS, {
@@ -137,12 +171,14 @@ export default function MapScreen() {
     }, [followDriver, location]);
 
     const availableOrders = useMemo(() => {
+        // In dispatch mode the admin assigns orders manually — hide all available pins
+        if (dispatchModeEnabled) return [];
         const orders = (data as any)?.orders ?? [];
         return orders.filter((order: any) => {
             if (order.status !== 'READY') return false;
             return !order.driver?.id;
         });
-    }, [data]);
+    }, [data, dispatchModeEnabled]);
 
     const allMapOrders = useMemo(
         () => [...assignedOrders, ...availableOrders],
@@ -211,6 +247,20 @@ export default function MapScreen() {
         return () => { cancelled = true; };
     }, [focusedOrder?.id, focusedOrder?.status, hasLocation]);
 
+    // ── Auto-refit camera when a focused order's status changes ──
+    const prevFocusedStatusRef = useRef<string | null>(null);
+    useEffect(() => {
+        if (!focusedOrder) {
+            prevFocusedStatusRef.current = null;
+            return;
+        }
+        if (prevFocusedStatusRef.current === focusedOrder.status) return;
+        prevFocusedStatusRef.current = focusedOrder.status;
+        // Small delay so route coords from the sibling effect are ready
+        const t = setTimeout(() => focusOrder(focusedOrder), 400);
+        return () => clearTimeout(t);
+    }, [focusedOrder?.status, focusedOrder?.id]);
+
     // ── GeoJSON shapes for route lines ──
     const routeShape = useMemo<Feature<LineString> | null>(() => {
         const coords = routeCoords;
@@ -245,7 +295,7 @@ export default function MapScreen() {
             const ne: [number, number] = [Math.max(...lngs) + 0.005, Math.max(...lats) + 0.005];
             const sw: [number, number] = [Math.min(...lngs) - 0.005, Math.min(...lats) - 0.005];
 
-            cameraRef.current?.fitBounds(ne, sw, [60, 60, 120, 60], 1200);
+            cameraRef.current?.fitBounds(ne, sw, [70, 20, 440, 20], 1200);
         } else if (bizLoc && dropLoc && location) {
             // Not delivering yet: show driver + pickup + dropoff (3 points)
             const lats = [location.latitude, Number(bizLoc.latitude), Number(dropLoc.latitude)];
@@ -253,7 +303,7 @@ export default function MapScreen() {
             const ne: [number, number] = [Math.max(...lngs) + 0.005, Math.max(...lats) + 0.005];
             const sw: [number, number] = [Math.min(...lngs) - 0.005, Math.min(...lats) - 0.005];
 
-            cameraRef.current?.fitBounds(ne, sw, [60, 60, 120, 60], 1200);
+            cameraRef.current?.fitBounds(ne, sw, [70, 20, 440, 20], 1200);
         } else if (bizLoc) {
             cameraRef.current?.setCamera({
                 centerCoordinate: [Number(bizLoc.longitude), Number(bizLoc.latitude)],
@@ -277,6 +327,79 @@ export default function MapScreen() {
             }
         }
     }, [followDriver, location]);
+
+    // ── Accept an available order ──
+    const handleAcceptOrder = useCallback(async (orderId: string) => {
+        if (!currentDriverId) return;
+        setAccepting(true);
+        try {
+            await assignDriver({ variables: { id: orderId, driverId: currentDriverId } });
+            const order = acceptSheetOrder;
+            const bizLoc = order?.businesses?.[0]?.business?.location;
+            const dropLoc = order?.dropOffLocation;
+            const pickup = bizLoc
+                ? {
+                    latitude: Number(bizLoc.latitude),
+                    longitude: Number(bizLoc.longitude),
+                    label: order.businesses?.[0]?.business?.name ?? 'Pickup',
+                  }
+                : null;
+            const dropoff = dropLoc
+                ? {
+                    latitude: Number(dropLoc.latitude),
+                    longitude: Number(dropLoc.longitude),
+                    label: dropLoc.address ?? 'Drop-off',
+                  }
+                : null;
+            if (pickup && location) {
+                const navOrder = {
+                    id: orderId,
+                    status: 'READY',
+                    businessName: order.businesses?.[0]?.business?.name ?? '',
+                    customerName: order.user ? `${order.user.firstName} ${order.user.lastName}` : 'Customer',
+                    pickup,
+                    dropoff,
+                };
+                startNavigation(navOrder, 'to_pickup', location);
+            }
+            setAcceptSheetOrder(null);
+            router.push('/navigation' as any);
+        } catch {
+            Alert.alert('Error', 'Failed to accept order. Please try again.');
+        } finally {
+            setAccepting(false);
+        }
+    }, [acceptSheetOrder, currentDriverId, location, assignDriver, startNavigation, router]);
+
+    const handleSkipOrder = useCallback(() => {
+        if (acceptSheetOrder) skippedIds.current.add(acceptSheetOrder.id);
+        setAcceptSheetOrder(null);
+    }, [acceptSheetOrder]);
+
+    // ── Auto-present the accept sheet when a new available order appears ──
+    useEffect(() => {
+        if (!isOnline || acceptSheetOrder || dispatchModeEnabled) return;
+        const next = availableOrders.find((o: any) => !skippedIds.current.has(o.id));
+        if (!next) return;
+        setAcceptSheetOrder(next);
+        const bizLoc = next.businesses?.[0]?.business?.location;
+        if (!bizLoc || !cameraRef.current) return;
+        if (location) {
+            const lats = [Number(bizLoc.latitude), location.latitude];
+            const lngs = [Number(bizLoc.longitude), location.longitude];
+            const ne: [number, number] = [Math.max(...lngs) + 0.006, Math.max(...lats) + 0.006];
+            const sw: [number, number] = [Math.min(...lngs) - 0.006, Math.min(...lats) - 0.006];
+            cameraRef.current.fitBounds(ne, sw, [80, 20, 420, 20], 900);
+        } else {
+            cameraRef.current.setCamera({
+                centerCoordinate: [Number(bizLoc.longitude), Number(bizLoc.latitude)],
+                zoomLevel: 14.5,
+                animationMode: 'flyTo',
+                animationDuration: 900,
+            });
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [availableOrders.length, isOnline]);
 
     // ── Launch Mapbox Navigation SDK ──
     const handleStartNavigation = useCallback(() => {
@@ -334,7 +457,7 @@ export default function MapScreen() {
             {/* ═══ Full-screen Map ═══ */}
             <Mapbox.MapView
                 style={styles.map}
-                styleURL={MAP_STYLE}
+                styleURL={mapStyle}
                 logoEnabled={false}
                 attributionEnabled={false}
                 scaleBarEnabled={false}
@@ -357,7 +480,7 @@ export default function MapScreen() {
                     } : {})}
                 />
 
-                {/* ── Preview route (pickup → dropoff, dashed) ── */}
+                {/* ── Preview route (pickup → dropoff, marching ants) ── */}
                 {previewRouteShape && (
                     <Mapbox.ShapeSource id="preview-route-source" shape={previewRouteShape}>
                         <Mapbox.LineLayer
@@ -365,14 +488,14 @@ export default function MapScreen() {
                             style={{
                                 lineColor: '#F59E0B',
                                 lineWidth: ['interpolate', ['linear'], ['zoom'],
-                                    10, 1,
-                                    13, 2,
+                                    10, 1.5,
+                                    13, 2.5,
                                     15, 4,
                                     17, 6,
                                     19, 8,
                                 ] as any,
-                                lineOpacity: 0.5,
-                                lineDasharray: [2, 3],
+                                lineOpacity: 0.75,
+                                lineDasharray: DASH_SEQ[dashStep] as any,
                                 lineCap: 'round' as const,
                                 lineJoin: 'round' as const,
                             }}
@@ -380,9 +503,28 @@ export default function MapScreen() {
                     </Mapbox.ShapeSource>
                 )}
 
-                {/* ── Active route (driver → destination, solid) ── */}
+                {/* ── Active route (driver → destination) ── */}
                 {routeShape && (
                     <Mapbox.ShapeSource id="active-route-source" shape={routeShape}>
+                        {/* Layer 1: neon glow bloom */}
+                        <Mapbox.LineLayer
+                            id="active-route-glow"
+                            style={{
+                                lineColor: focusedOrder?.status === 'OUT_FOR_DELIVERY' ? '#8B5CF6' : '#4285F4',
+                                lineWidth: ['interpolate', ['linear'], ['zoom'],
+                                    10, 8,
+                                    13, 16,
+                                    15, 28,
+                                    17, 40,
+                                    19, 54,
+                                ] as any,
+                                lineOpacity: 0.1,
+                                lineBlur: 8,
+                                lineCap: 'round' as const,
+                                lineJoin: 'round' as const,
+                            }}
+                        />
+                        {/* Layer 2: white casing */}
                         <Mapbox.LineLayer
                             id="active-route-casing"
                             style={{
@@ -394,11 +536,12 @@ export default function MapScreen() {
                                     17, 14,
                                     19, 20,
                                 ] as any,
-                                lineOpacity: 0.85,
+                                lineOpacity: 0.9,
                                 lineCap: 'round' as const,
                                 lineJoin: 'round' as const,
                             }}
                         />
+                        {/* Layer 3: coloured fill */}
                         <Mapbox.LineLayer
                             id="active-route-line"
                             style={{
@@ -410,7 +553,7 @@ export default function MapScreen() {
                                     17, 10,
                                     19, 14,
                                 ] as any,
-                                lineOpacity: 0.95,
+                                lineOpacity: 0.97,
                                 lineCap: 'round' as const,
                                 lineJoin: 'round' as const,
                             }}
@@ -418,13 +561,26 @@ export default function MapScreen() {
                     </Mapbox.ShapeSource>
                 )}
 
-                {/* Driver position */}
+                {/* Driver position — heading wedge + dot */}
                 {location && (
                     <Mapbox.PointAnnotation
                         id="driver-location"
                         coordinate={[location.longitude, location.latitude]}
                     >
-                        <View style={styles.driverDot} />
+                        <View style={styles.driverMarkerWrapper}>
+                            <Svg width={52} height={52} style={StyleSheet.absoluteFill}>
+                                {/* Accuracy halo */}
+                                <Circle cx={26} cy={26} r={22} fill="rgba(66,133,244,0.12)" />
+                                {/* Heading wedge — rotates to show direction */}
+                                <Path
+                                    d="M26 26 L20 6 A20 20 0 0 1 32 6 Z"
+                                    fill="rgba(66,133,244,0.45)"
+                                    transform={`rotate(${location.heading ?? 0}, 26, 26)`}
+                                />
+                            </Svg>
+                            {/* Blue dot */}
+                            <View style={styles.driverDot} />
+                        </View>
                     </Mapbox.PointAnnotation>
                 )}
 
@@ -435,7 +591,9 @@ export default function MapScreen() {
                     const isFocused = order.id === focusedOrderId;
                     const bizLoc = order.businesses?.[0]?.business?.location;
                     const dropLoc = order.dropOffLocation;
-                    const markerScale = isFocused ? 1.25 : 1;
+                    const markerScale = isFocused ? 1.2 : 1;
+                    const bizName = order.businesses?.[0]?.business?.name ?? '?';
+                    const bizLabel = bizName.length > 11 ? bizName.slice(0, 11) + '…' : bizName;
 
                     return (
                         <React.Fragment key={order.id}>
@@ -447,20 +605,24 @@ export default function MapScreen() {
                                     onSelected={() => focusOrder(order)}
                                 >
                                     <View style={[styles.markerContainer, { transform: [{ scale: markerScale }] }]}>
+                                        {/* Flat pill badge */}
                                         <View style={[
-                                            styles.pickupMarker,
+                                            styles.pickupPill,
                                             {
                                                 backgroundColor: statusColor,
-                                                opacity: isAssigned ? 1 : 0.5,
-                                                borderColor: isFocused ? '#fff' : '#ffffffaa',
-                                                borderWidth: isFocused ? 3 : 2,
+                                                opacity: isAssigned ? 1 : 0.6,
+                                                borderWidth: isFocused ? 2.5 : 0,
+                                                borderColor: '#fff',
+                                                shadowColor: statusColor,
+                                                shadowOpacity: isFocused ? 0.55 : 0.3,
                                             },
                                         ]}>
-                                            <Text style={styles.markerEmoji}>🏪</Text>
+                                            <Ionicons name="storefront-outline" size={12} color="#fff" />
+                                            <Text style={styles.pickupPillText}>{bizLabel}</Text>
                                         </View>
-                                        <View style={[styles.markerTip, { borderTopColor: statusColor }]} />
+                                        <View style={[styles.markerTip, { borderTopColor: statusColor, opacity: isAssigned ? 1 : 0.6 }]} />
                                     </View>
-                                    <Mapbox.Callout title={`${order.businesses[0].business.name} · ${STATUS_LABELS[order.status] ?? order.status}`} />
+                                    <Mapbox.Callout title={`${bizName} · ${STATUS_LABELS[order.status] ?? order.status}`} />
                                 </Mapbox.PointAnnotation>
                             )}
 
@@ -477,9 +639,11 @@ export default function MapScreen() {
                                             {
                                                 borderColor: statusColor,
                                                 borderWidth: isFocused ? 3 : 2.5,
+                                                shadowColor: statusColor,
+                                                shadowOpacity: isFocused ? 0.5 : 0.2,
                                             },
                                         ]}>
-                                            <Text style={styles.markerEmoji}>📍</Text>
+                                            <Ionicons name="person" size={14} color={statusColor} />
                                         </View>
                                         <View style={[styles.markerTip, { borderTopColor: statusColor }]} />
                                     </View>
@@ -492,7 +656,7 @@ export default function MapScreen() {
             </Mapbox.MapView>
 
             {/* ═══ Right-side buttons ═══ */}
-            <View style={[styles.rightButtons, { bottom: focusedOrder ? 100 + insets.bottom : 20 + insets.bottom }]}>
+            <View style={[styles.rightButtons, { bottom: (focusedOrder || acceptSheetOrder) ? 420 + insets.bottom : 20 + insets.bottom }]}>
                 {/* Lock camera button */}
                 <Pressable
                     style={[styles.mapBtn, followDriver && styles.mapBtnActive]}
@@ -549,77 +713,44 @@ export default function MapScreen() {
                 </View>
             )}
 
-            {/* ═══ Focused order bottom bar ═══ */}
-            {focusedOrder && (() => {
-                const statusColor = STATUS_COLORS[focusedOrder.status] ?? '#6B7280';
-                const bizName = focusedOrder.businesses?.[0]?.business?.name ?? 'Unknown';
-                const isAssigned = focusedOrder.driver?.id === currentDriverId;
-                const customerName = focusedOrder.user
-                    ? `${focusedOrder.user.firstName} ${focusedOrder.user.lastName}`
-                    : 'Customer';
-                const iconName = STATUS_ICONS[focusedOrder.status] ?? 'ellipse-outline';
-
+            {/* ═══ Connection status pill ═══ */}
+            {(() => {
+                const connColor =
+                    connectionStatus === 'CONNECTED' ? '#22c55e' :
+                    connectionStatus === 'STALE' ? '#f59e0b' : '#ef4444';
+                const connLabel =
+                    connectionStatus === 'CONNECTED' ? (isOnline ? 'Online' : 'Offline') :
+                    connectionStatus === 'STALE' ? 'Weak signal' :
+                    connectionStatus === 'LOST' ? 'Signal lost' : 'Offline';
                 return (
-                    <View style={[styles.focusedBar, { paddingBottom: insets.bottom + 8, backgroundColor: statusColor }]}>
-                        <View style={[styles.focusedStatusDot, { backgroundColor: 'rgba(255,255,255,0.25)' }]}>
-                            <Ionicons name={iconName as any} size={16} color="#fff" />
-                        </View>
-                        <View style={styles.focusedInfo}>
-                            <Text style={[styles.focusedBiz, { color: '#fff' }]} numberOfLines={1}>
-                                {bizName}
-                            </Text>
-                            <Text style={[styles.focusedMeta, { color: 'rgba(255,255,255,0.75)' }]} numberOfLines={1}>
-                                {isAssigned
-                                    ? `${STATUS_LABELS[focusedOrder.status]} · ${customerName}`
-                                    : 'Available to claim'}
-                            </Text>
-                            {/* Route distances */}
-                            {routeInfo && (
-                                <View style={styles.focusedRouteRows}>
-                                    <View style={styles.focusedRouteRow}>
-                                        <Ionicons
-                                            name={focusedOrder.status === 'OUT_FOR_DELIVERY' ? 'flag' : 'restaurant'}
-                                            size={12}
-                                            color="rgba(255,255,255,0.85)"
-                                        />
-                                        <Text style={[styles.focusedRouteText, { color: '#fff' }]}>
-                                            {routeInfo.distanceKm.toFixed(1)} km · {Math.ceil(routeInfo.durationMin)} min
-                                        </Text>
-                                        <Text style={[styles.focusedRouteLabel, { color: 'rgba(255,255,255,0.7)' }]}>
-                                            {focusedOrder.status === 'OUT_FOR_DELIVERY' ? '→ Dropoff' : '→ Pickup'}
-                                        </Text>
-                                    </View>
-                                    {focusedOrder.status !== 'OUT_FOR_DELIVERY' && previewRouteInfo && (
-                                        <View style={styles.focusedRouteRow}>
-                                            <Ionicons name="flag" size={12} color="rgba(255,255,255,0.6)" />
-                                            <Text style={[styles.focusedRouteTextSm, { color: 'rgba(255,255,255,0.7)' }]}>
-                                                {previewRouteInfo.distanceKm.toFixed(1)} km · {Math.ceil(previewRouteInfo.durationMin)} min
-                                            </Text>
-                                            <Text style={[styles.focusedRouteLabel, { color: 'rgba(255,255,255,0.6)' }]}>
-                                                → Dropoff
-                                            </Text>
-                                        </View>
-                                    )}
-                                </View>
-                            )}
-                        </View>
-                        <Pressable
-                            style={[styles.focusedNavBtn, { backgroundColor: 'rgba(255,255,255,0.25)' }]}
-                            onPress={handleStartNavigation}
-                            hitSlop={8}
-                        >
-                            <Ionicons name="navigate" size={20} color="#fff" />
-                        </Pressable>
-                        <Pressable
-                            style={styles.focusedCloseBtn}
-                            onPress={dismissFocusedOrder}
-                            hitSlop={8}
-                        >
-                            <Ionicons name="close" size={22} color="rgba(255,255,255,0.7)" />
-                        </Pressable>
+                    <View style={[styles.connPill, { top: insets.top + 12 }]}>
+                        <View style={[styles.connDot, { backgroundColor: connColor }]} />
+                        <Text style={styles.connPillText}>{connLabel}</Text>
                     </View>
                 );
             })()}
+
+            {/* ═══ Order detail sheet ═══ */}
+            {focusedOrder && (
+                <OrderDetailSheet
+                    order={focusedOrder}
+                    routeInfo={routeInfo}
+                    previewRouteInfo={previewRouteInfo}
+                    isAssignedToMe={focusedOrder.driver?.id === currentDriverId}
+                    onStartNavigation={handleStartNavigation}
+                    onClose={dismissFocusedOrder}
+                />
+            )}
+
+            {/* ═══ Accept sheet ═══ */}
+            {acceptSheetOrder && !focusedOrder && (
+                <OrderAcceptSheet
+                    order={acceptSheetOrder}
+                    onAccept={handleAcceptOrder}
+                    onSkip={handleSkipOrder}
+                    accepting={accepting}
+                />
+            )}
 
             {/* Loading */}
             {loading && !data && (
@@ -639,52 +770,84 @@ const styles = StyleSheet.create({
         flex: 1,
     },
 
+    /* ── Connection pill ── */
+    connPill: {
+        position: 'absolute',
+        left: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(0,0,0,0.55)',
+        borderRadius: 20,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        zIndex: 20,
+    },
+    connDot: {
+        width: 7,
+        height: 7,
+        borderRadius: 3.5,
+    },
+    connPillText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '600',
+    },
+
     /* ── Driver marker ── */
+    driverMarkerWrapper: {
+        width: 52,
+        height: 52,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     driverDot: {
-        width: 18,
-        height: 18,
-        borderRadius: 9,
+        width: 20,
+        height: 20,
+        borderRadius: 10,
         backgroundColor: '#4285F4',
         borderWidth: 3,
         borderColor: '#fff',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.35,
-        shadowRadius: 4,
-        elevation: 6,
+        shadowColor: '#4285F4',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.8,
+        shadowRadius: 6,
+        elevation: 8,
     },
 
     /* ── Order markers ── */
     markerContainer: {
         alignItems: 'center',
     },
-    pickupMarker: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+    pickupPill: {
+        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-        elevation: 4,
+        gap: 4,
+        paddingHorizontal: 9,
+        paddingVertical: 6,
+        borderRadius: 10,
+        shadowOffset: { width: 0, height: 3 },
+        shadowRadius: 6,
+        elevation: 6,
+    },
+    pickupPillText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '800',
+        letterSpacing: -0.2,
     },
     dropoffMarker: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: '#fff',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-        elevation: 4,
-    },
-    markerEmoji: {
-        fontSize: 14,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.2,
+        shadowRadius: 5,
+        elevation: 5,
     },
     markerTip: {
         width: 0,
@@ -764,75 +927,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.2,
         shadowRadius: 2,
         elevation: 3,
-    },
-
-    /* ── Focused order bottom bar ── */
-    focusedBar: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingTop: 14,
-        paddingHorizontal: 16,
-        gap: 10,
-        borderTopLeftRadius: 16,
-        borderTopRightRadius: 16,
-        overflow: 'hidden',
-    },
-    focusedStatusDot: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    focusedInfo: {
-        flex: 1,
-    },
-    focusedBiz: {
-        fontSize: 15,
-        fontWeight: '700',
-    },
-    focusedMeta: {
-        fontSize: 12,
-        marginTop: 2,
-    },
-    focusedRouteRows: {
-        marginTop: 4,
-        gap: 2,
-    },
-    focusedRouteRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    focusedRouteText: {
-        fontSize: 13,
-        fontWeight: '700',
-    },
-    focusedRouteTextSm: {
-        fontSize: 12,
-        fontWeight: '600',
-    },
-    focusedRouteLabel: {
-        fontSize: 11,
-        fontWeight: '500',
-    },
-    focusedNavBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    focusedCloseBtn: {
-        width: 38,
-        height: 38,
-        borderRadius: 19,
-        alignItems: 'center',
-        justifyContent: 'center',
     },
 
     /* ── Loading ── */

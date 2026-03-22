@@ -1,6 +1,6 @@
 # Cart + Active Order Flow Analysis and Recommendations
 
-<!-- MDS:BL3 | Domain: Business Logic | Updated: 2026-03-18 -->
+<!-- MDS:BL3 | Domain: Business Logic | Updated: 2026-03-22 -->
 <!-- Depends-On: B2, M4 -->
 <!-- Depended-By: M1 -->
 <!-- Nav: Checkout flow changes → update B2 (Order Creation), M4 (Mobile Audit). Payment collection → update BL1 (Settlements). Subscription changes → review A1 (Architecture). -->
@@ -32,10 +32,12 @@ Main files:
 3. `useCreateOrder` currently blocks locally when `hasActiveOrders === true`.
 4. Payload includes cart line price from client state.
 5. On success, `CartScreen` clears cart, resets step, updates active order store, then shows success modal.
+6. `SuccessModalContainer` immediately navigates to `/(tabs)/home` when the success phase starts (while the modal covers the screen), then auto-dismisses after 2.5 seconds. The `(tabs)` Stack.Screen has `animation: 'none'` so this navigation is instant with no slide/fade transition that would flash a black backdrop. By that time home and the active-order banner are fully rendered behind the modal — no black flash. User can still tap "Track Order" or "Go Home" manually before the timer fires.
 
 Main files:
 - `mobile-customer/modules/cart/components/CartScreen.tsx`
 - `mobile-customer/modules/cart/hooks/useCreateOrder.ts`
+- `mobile-customer/components/SuccessModalContainer.tsx`
 
 ### C. Active order tracking + floating banner
 

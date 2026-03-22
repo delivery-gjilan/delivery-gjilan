@@ -57,7 +57,7 @@ const OrderListItem = ({ order }: { order: Order }) => {
                 <View className="flex-1">
                     <Text className="text-lg font-bold text-foreground mb-1">Order #{order.id.slice(-6)}</Text>
                     <Text className="text-sm text-subtext">
-                        {totalItems} item{totalItems !== 1 ? 's' : ''} from {order.businesses.length} restaurant
+                        {totalItems} item{totalItems !== 1 ? 's' : ''} from {order.businesses.length} store
                         {order.businesses.length !== 1 ? 's' : ''}
                     </Text>
                 </View>

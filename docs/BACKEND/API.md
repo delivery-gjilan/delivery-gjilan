@@ -1,6 +1,6 @@
 # Backend API
 
-<!-- MDS:B1 | Domain: Backend | Updated: 2026-03-18 -->
+<!-- MDS:B1 | Domain: Backend | Updated: 2026-03-22 -->
 <!-- Depends-On: A1 -->
 <!-- Depended-By: B2, B4, B5, B6, B7, B8, B9, B10, O5 -->
 <!-- Nav: Schema/resolver changes → update B2 (Order Creation), B4 (Watchdog). Auth changes → update O5 (Security), O6 (Audit). -->
@@ -94,10 +94,12 @@ That means:
 - websocket subscriptions now include rate-limiting controls in `api/src/index.ts` to reduce per-socket abuse
 - HTTP/upload/auth rate limiting in `api/src/index.ts` uses `express-rate-limit` v8-compatible keys and `ipKeyGenerator` fallback for IPv6-safe client keying
 - store open/closed state is now broadcast through `storeStatusUpdated`
+- **Directions proxy** — `GET /api/directions?points=lon,lat;lon,lat[&steps=true&language=en]` (`api/src/routes/directionsRoutes.ts`). Requires `Authorization: Bearer <jwt>`. Sanitises coordinates (re-serialised from parsed floats, earth-range validated) to prevent SSRF. Fetches from Mapbox server-side using env `MAPBOX_TOKEN`, caches result in Redis at 65 s TTL, returns `{ distanceKm, durationMin, geometry: [[lon,lat],...], steps? }`. Rate-limited to 200 req / 15 min per user key. The Mapbox token is **never** sent to any client.
+- **Active-delivery publish bypass** — `DriverHeartbeatHandler` now publishes `driverUpdate` on every heartbeat (every 2 s) for drivers with an `activeOrderId`, even when the DB location throttle has not tripped. This keeps admin map animations smooth. See B4 for details.
 - generated schema and type files are large and should not be manually edited
 
 ## Recommended Next Cleanup
 
 - extract a short subscription runbook from implementation details in `api/src/index.ts` and `api/src/lib/pubsub.ts`
-- centralize repeated route-level auth middleware in shared utilities
+- centralise repeated `requireAuth` middleware (currently duplicated in `uploadRoutes.ts` and `directionsRoutes.ts`) into a shared helper
 - finish authorization hardening for pricing and settlement rule mutations

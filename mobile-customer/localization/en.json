@@ -440,6 +440,13 @@
             "out_for_delivery": "Your order is on its way",
             "cancelled": "This order has been cancelled",
             "delivered": "Your order has been delivered"
+        },
+        "status_messages_market": {
+            "pending": "Waiting for the store to accept your order",
+            "ready": "Your order is being packed",
+            "out_for_delivery": "Your order is on its way",
+            "cancelled": "This order has been cancelled",
+            "delivered": "Your order has been delivered"
         }
     },
     "business": {

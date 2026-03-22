@@ -101,6 +101,7 @@ Services call the invalidation helpers immediately after writes. The read-throug
 | `ProductService` | `cache:products:{businessId}`, `cache:product:{id}` | product create/update/delete |
 | `ProductCategoryService` | `cache:categories:{businessId}` | category create/update/delete |
 | `ProductSubcategoryService` | `cache:subcategories:{businessId}`, `cache:subcategories-cat:{categoryId}` | subcategory create/update/delete |
+| `directionsRoutes.ts` | `dir:{points}:s={steps}:l={lang}` | never invalidated (TTL-only, 65 s). Cross-client: mobile-customer, mobile-driver, and admin-panel may share the same Redis entry when routes overlap. |
 
 ---
 
@@ -116,4 +117,4 @@ Services call the invalidation helpers immediately after writes. The read-throug
 
 - **No reconnect after mid-run disconnect.** If Redis drops while the API is running, the process must be restarted to re-enable caching.  
 - **No global cache flush command.** Admin operations that affect multiple businesses (e.g., bulk product update) must call invalidation helpers per entity. There is no "nuke everything" method exposed in the cache API (though `delPattern('cache:*')` works internally).
-- **Order and user data are not cached.** Only catalog data (businesses, products, categories) goes through Redis.
+- **Order and user data are not cached.** Only catalog data (businesses, products, categories) and directions results go through Redis.

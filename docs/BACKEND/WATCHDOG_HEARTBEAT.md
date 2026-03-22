@@ -1,6 +1,6 @@
 # Watchdog And Heartbeat
 
-<!-- MDS:B4 | Domain: Backend | Updated: 2026-03-18 -->
+<!-- MDS:B4 | Domain: Backend | Updated: 2026-03-22 -->
 <!-- Depends-On: A1, B1 -->
 <!-- Depended-By: M3, O1 -->
 <!-- Nav: Timer/state changes → update M3 (Live Activity). Metrics changes → update O1 (Monitoring). -->
@@ -45,8 +45,30 @@ On each successful heartbeat it:
 - throttles DB location writes instead of writing every ping
 - stores or clears live ETA cache data
 - publishes realtime events when relevant
+- pushes periodic Live Activity ETA updates during `to_dropoff` phase (see below)
 
 The write-throttling behavior is important because it reduces DB churn while keeping maps fresh enough.
+
+### Publish Throttle vs Active-Delivery Bypass
+
+The `publishDriverUpdate` call that notifies admin/driver-list subscribers follows a two-tier policy:
+
+- **Idle / slow drivers:** publish fires only when the DB location write passes the throttle gate (10 s elapsed OR 5 m moved), so admin maps may lag up to 10 s between updates.
+- **Active deliveries (OUT_FOR_DELIVERY):** publish fires on **every heartbeat** (every 2 s) regardless of the DB throttle gate. This is gated by `!!etaPayload?.activeOrderId`. The DB write throttle still applies — only the subscription publish is bypassed — so there is no extra DB load.
+
+This means the admin map receives 2 s position updates for any driver currently delivering, which feeds the admin-side animation loop (30 fps commit with rAF dead-reckoning and route-snap).
+
+### Periodic Live Activity ETA Pushes
+
+When the heartbeat includes `navigationPhase === 'to_dropoff'` and a valid `remainingEtaSeconds`, the handler fires a throttled Live Activity update to the customer's Dynamic Island.
+
+- **Heartbeat-level gate:** Redis key `cache:la-heartbeat:{orderId}` with 90 s TTL. Only one push per 90 s per order.
+- **NotificationService gate (second layer):** `sendLiveActivityUpdate` has its own 15 s interval / 1-minute ETA-delta gate.
+- **Net effect:** ~2–5 mid-delivery ETA updates for a typical 5–15 min motorcycle delivery.
+- **Fire-and-forget:** the push is fully async and never blocks the heartbeat response.
+- **Driver name:** resolved via `authRepository.findDriversByIds` on each push (falls back to "Your driver").
+
+This replaces the earlier minute-step-change approach and provides more reliable mid-delivery ETA refinement since motorcycle drivers often arrive faster than initially estimated.
 
 ## Watchdog Model
 

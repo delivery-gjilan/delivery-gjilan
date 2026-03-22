@@ -25,6 +25,7 @@ export const getStoreStatus: NonNullable<QueryResolvers['getStoreStatus']> = asy
       bannerEnabled: false,
       bannerMessage: null,
       bannerType: 'INFO',
+      dispatchModeEnabled: false,
     };
   }
 
@@ -34,5 +35,6 @@ export const getStoreStatus: NonNullable<QueryResolvers['getStoreStatus']> = asy
     bannerEnabled: settings[0].bannerEnabled,
     bannerMessage: settings[0].bannerMessage,
     bannerType: (settings[0].bannerType || 'info').toUpperCase(),
+    dispatchModeEnabled: settings[0].dispatchModeEnabled,
   };
 };

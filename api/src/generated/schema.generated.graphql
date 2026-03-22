@@ -1423,6 +1423,7 @@ type StoreStatus {
   bannerMessage: String
   bannerType: BannerType!
   closedMessage: String
+  dispatchModeEnabled: Boolean!
   isStoreClosed: Boolean!
 }
 
@@ -1595,6 +1596,7 @@ input UpdateStoreStatusInput {
   bannerMessage: String
   bannerType: BannerType
   closedMessage: String
+  dispatchModeEnabled: Boolean
   isStoreClosed: Boolean!
 }
 

@@ -8,6 +8,7 @@ import logger from '@/lib/logger';
 import { notifyCustomerOrderStatus, updateLiveActivity, endLiveActivity } from '@/services/orderNotifications';
 import { AppError } from '@/lib/errors';
 import { parseDbTimestamp } from '@/lib/dateTime';
+import { getLiveDriverEta } from '@/lib/driverEtaCache';
 
 export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus']> = async (
     _parent,
@@ -153,7 +154,23 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
         if ((status === 'PREPARING' || status === 'READY') && dbOrder.preparationMinutes) {
             estimatedMinutes = dbOrder.preparationMinutes;
         } else if (status === 'OUT_FOR_DELIVERY') {
-            estimatedMinutes = 15; // Default 15 min for delivery
+            // Try to read real-time ETA from the driver's heartbeat cache.
+            // The driver's navigation SDK pushes remainingEtaSeconds every 2-5 s
+            // via the heartbeat mutation → driverEtaCache.
+            const driverId = dbOrder.driverId ?? userData?.userId;
+            if (driverId) {
+                try {
+                    const liveEta = await getLiveDriverEta(driverId);
+                    if (liveEta?.remainingEtaSeconds != null && liveEta.remainingEtaSeconds > 0) {
+                        estimatedMinutes = Math.ceil(liveEta.remainingEtaSeconds / 60);
+                    }
+                } catch { /* fall through to default */ }
+            }
+            // Fallback: if no live ETA is available yet (driver hasn't started
+            // navigating or heartbeat hasn't cached an ETA), use a safe default.
+            if (estimatedMinutes === 0) {
+                estimatedMinutes = 15;
+            }
         }
 
         const phaseInitialMinutes =

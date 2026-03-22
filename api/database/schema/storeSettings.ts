@@ -10,5 +10,6 @@ export const storeSettings = pgTable('store_settings', {
     bannerEnabled: boolean('banner_enabled').default(false).notNull(),
     bannerMessage: text('banner_message'),
     bannerType: text('banner_type').default('info').notNull(), // 'info' | 'warning' | 'success'
+    dispatchModeEnabled: boolean('dispatch_mode_enabled').default(false).notNull(),
     updatedAt: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
 });

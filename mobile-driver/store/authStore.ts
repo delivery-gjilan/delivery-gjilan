@@ -4,6 +4,8 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { User, UserRole } from '@/gql/graphql';
 import { deleteTokens } from '@/utils/secureTokenStore';
 
+export type DriverConnectionStatus = 'CONNECTED' | 'STALE' | 'LOST' | 'DISCONNECTED';
+
 interface AuthState {
     token: string | null;
     user: User | null;
@@ -14,17 +16,20 @@ interface AuthState {
      * Driver's online preference toggle ("I want to work")
      * Note: This is separate from the backend's connectionStatus
      * which is calculated based on whether the driver is actively sending location updates
-     * 
+     *
      * - isOnline = user's preference (manual toggle)
-     * - drivers.connectionStatus = system's calculation (automatic, based on heartbeat)
+     * - connectionStatus = system's calculation (automatic, based on heartbeat)
      */
     isOnline: boolean;
+    /** Live heartbeat connection status, updated after every successful heartbeat response. */
+    connectionStatus: DriverConnectionStatus;
 
     // Actions
     setToken: (token: string | null) => void;
     setUser: (user: User | null) => void;
     setLoading: (loading: boolean) => void;
     setOnline: (online: boolean) => void;
+    setConnectionStatus: (status: DriverConnectionStatus) => void;
     login: (token: string, user: User) => void;
     logout: () => void;
 }
@@ -47,6 +52,7 @@ export const useAuthStore = create<AuthState>()(
             hasHydrated: false,
             isAuthenticated: false,
             isOnline: false,
+            connectionStatus: 'DISCONNECTED' as DriverConnectionStatus,
 
             setToken: (token) => {
                 set((state) => ({
@@ -67,6 +73,8 @@ export const useAuthStore = create<AuthState>()(
             setLoading: (isLoading) => set({ isLoading }),
 
             setOnline: (isOnline) => set({ isOnline }),
+
+            setConnectionStatus: (connectionStatus) => set({ connectionStatus }),
 
             login: (token, user) => {
                 const onlinePref = (user as any)?.driverConnection?.onlinePreference;
@@ -90,8 +98,7 @@ export const useAuthStore = create<AuthState>()(
                     token: null,
                     user: null,
                     isAuthenticated: false,
-                    isOnline: false,
-                });
+                    isOnline: false,                    connectionStatus: 'DISCONNECTED',                });
                 console.log('[AuthStore] Logout successful');
             },
         }),

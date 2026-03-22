@@ -392,6 +392,7 @@ export function useDriverHeartbeat() {
       const data = (result.data as any)?.driverHeartbeat;
       if (data?.success) {
         setConnectionStatus(data.connectionStatus as ConnectionStatus);
+        useAuthStore.getState().setConnectionStatus(data.connectionStatus);
         console.log('[Heartbeat] Sent', {
           status: data.connectionStatus,
           locationUpdated: data.locationUpdated,

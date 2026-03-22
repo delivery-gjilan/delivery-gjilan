@@ -436,6 +436,13 @@ export const translationSchema = z.object(
                 cancelled: s(),
                 delivered: s(),
             }),
+            status_messages_market: z.object({
+                pending: s(),
+                ready: s(),
+                out_for_delivery: s(),
+                cancelled: s(),
+                delivered: s(),
+            }),
         }),
         business: z.object({
             menu: s(),
