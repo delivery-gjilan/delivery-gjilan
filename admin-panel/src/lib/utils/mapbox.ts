@@ -6,9 +6,58 @@
 // is always alive for the full recalc-gate window. 65 s gives a small buffer.
 const ROUTE_CACHE_TTL_MS = 65000;
 
-function getAuthToken(): string | null {
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql';
+
+function parseJwtExpiryMs(token: string): number | null {
+    try {
+        const [, payload] = token.split('.');
+        if (!payload) return null;
+        const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+        const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+        const decoded = JSON.parse(atob(padded)) as { exp?: number };
+        return typeof decoded.exp === 'number' ? decoded.exp * 1000 : null;
+    } catch {
+        return null;
+    }
+}
+
+let directionsRefreshPromise: Promise<string | null> | null = null;
+
+async function getValidAuthToken(): Promise<string | null> {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem('authToken');
+    const token = localStorage.getItem('authToken');
+    if (!token) return null;
+
+    // If token is still valid for > 60s, use it
+    const expiryMs = parseJwtExpiryMs(token);
+    if (expiryMs && expiryMs - Date.now() > 60_000) return token;
+
+    // Refresh the token
+    if (directionsRefreshPromise) return directionsRefreshPromise;
+    directionsRefreshPromise = (async () => {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (!refreshToken) return token; // return stale token as fallback
+        try {
+            const res = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    operationName: 'RefreshToken',
+                    query: `mutation RefreshToken($refreshToken: String!) { refreshToken(refreshToken: $refreshToken) { token refreshToken } }`,
+                    variables: { refreshToken },
+                }),
+            });
+            const data = await res.json();
+            const refreshed = data?.data?.refreshToken;
+            if (refreshed?.token) {
+                localStorage.setItem('authToken', refreshed.token);
+                if (refreshed.refreshToken) localStorage.setItem('refreshToken', refreshed.refreshToken);
+                return refreshed.token as string;
+            }
+        } catch { /* fall through */ }
+        return token; // return stale token as last resort
+    })().finally(() => { directionsRefreshPromise = null; });
+    return directionsRefreshPromise;
 }
 
 type RouteResult = { distanceKm: number; durationMin: number; geometry: Array<[number, number]> };
@@ -85,7 +134,7 @@ export async function calculateRouteDistance(
 
     const promise = (async () => {
         try {
-            const token = getAuthToken();
+            const token = await getValidAuthToken();
             if (!token) {
                 console.warn('[Directions] No auth token — skipping route fetch');
                 return null;
@@ -99,6 +148,27 @@ export async function calculateRouteDistance(
                 headers: { Authorization: `Bearer ${token}` },
                 signal,
             });
+
+            // On 401, force-refresh the token and retry once
+            if (response.status === 401) {
+                const freshToken = await getValidAuthToken();
+                if (freshToken && freshToken !== token) {
+                    const retry = await fetch(url, {
+                        headers: { Authorization: `Bearer ${freshToken}` },
+                        signal,
+                    });
+                    if (retry.ok) {
+                        const result: RouteResult = await retry.json();
+                        routeCache.set(key, { value: result, timestamp: Date.now() });
+                        metrics.successfulCalls += 1;
+                        return result;
+                    }
+                }
+                metrics.failedCalls += 1;
+                console.error('[Directions] Proxy error: Unauthorized after refresh');
+                return null;
+            }
+
             if (!response.ok) {
                 metrics.failedCalls += 1;
                 console.error('[Directions] Proxy error:', response.statusText);
