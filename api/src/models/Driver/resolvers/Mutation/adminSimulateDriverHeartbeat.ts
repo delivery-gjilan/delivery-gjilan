@@ -3,7 +3,7 @@ import { GraphQLError } from 'graphql';
 
 export const adminSimulateDriverHeartbeat: NonNullable<MutationResolvers['adminSimulateDriverHeartbeat']> = async (
   _parent,
-  { driverId, latitude, longitude, activeOrderId, navigationPhase, remainingEtaSeconds },
+  { driverId, latitude, longitude, activeOrderId, navigationPhase, remainingEtaSeconds, setOnline },
   { driverService, userData }
 ) => {
   if (!userData.userId || userData.role !== 'SUPER_ADMIN') {
@@ -19,6 +19,10 @@ export const adminSimulateDriverHeartbeat: NonNullable<MutationResolvers['adminS
   }
   if (longitude < -180 || longitude > 180) {
     throw new GraphQLError('Invalid longitude', { extensions: { code: 'BAD_USER_INPUT' } });
+  }
+
+  if (setOnline) {
+    await driverService.setOnlinePreference(driverId, true);
   }
 
   const result = await driverService.processHeartbeat(driverId, latitude, longitude, {

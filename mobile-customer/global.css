@@ -5,7 +5,7 @@
 :root {
     --background: #F8FAFC;
     --foreground: #000000;
-    --primary: #2DD4BF;
+    --primary: #7C3AED;
     --expense: #EF4444;
     --income: #22C55E;
     --card: #FFFFFF;
@@ -17,7 +17,7 @@
     :root {
         --background: #0F172A;
         --foreground: #ffffff;
-        --primary: #2DD4BF;
+        --primary: #7C3AED;
         --expense: #EF4444;
         --income: #22C55E;
         --card: #1E293B;

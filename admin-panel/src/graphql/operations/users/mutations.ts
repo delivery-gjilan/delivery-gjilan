@@ -130,6 +130,7 @@ export const ADMIN_SIMULATE_DRIVER_HEARTBEAT = graphql(`
     $activeOrderId: ID
     $navigationPhase: String
     $remainingEtaSeconds: Int
+    $setOnline: Boolean
   ) {
     adminSimulateDriverHeartbeat(
       driverId: $driverId
@@ -138,6 +139,7 @@ export const ADMIN_SIMULATE_DRIVER_HEARTBEAT = graphql(`
       activeOrderId: $activeOrderId
       navigationPhase: $navigationPhase
       remainingEtaSeconds: $remainingEtaSeconds
+      setOnline: $setOnline
     ) {
       success
       connectionStatus

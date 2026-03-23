@@ -13,67 +13,77 @@ import {
   UPDATE_ORDER_STATUS,
   START_PREPARING,
 } from "@/graphql/operations/orders";
-import { GET_ORDERS } from "@/graphql/operations/orders/queries";
-import { ALL_ORDERS_SUBSCRIPTION } from "@/graphql/operations/orders/subscriptions";
 import Button from "@/components/ui/Button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
-  Play, Pause, SkipForward, RotateCcw, Truck, Package,
-  MapPin, Clock, Zap, ChevronRight, Terminal, Signal,
-  Navigation, CheckCircle2, AlertCircle, Gauge,
+  Play, Truck, Zap, Terminal, Signal,
+  Navigation, CheckCircle2, Gauge, Square,
 } from "lucide-react";
 import { OrderStatus } from "@/gql/graphql";
 
-// ─── Gjilan Predefined Routes ────────────────────────────────────────────────
+// ─── Routes ──────────────────────────────────────────────────────────────────
 
-type Waypoint = { lat: number; lng: number; label?: string };
+type Pt = { lat: number; lng: number };
 
-const GJILAN_CENTER = { lat: 42.4635, lng: 21.4694 };
-
-const PREDEFINED_ROUTES: { name: string; description: string; waypoints: Waypoint[] }[] = [
+const ROUTES: { name: string; toPickup: Pt[]; toDropoff: Pt[] }[] = [
   {
-    name: "City Center → South Residential",
-    description: "Restaurant pickup from center, deliver south",
-    waypoints: [
-      { lat: 42.4635, lng: 21.4694, label: "Start (City Center)" },
-      { lat: 42.4625, lng: 21.4700 },
-      { lat: 42.4610, lng: 21.4710 },
+    name: "City Center → South",
+    toPickup: [
+      { lat: 42.4635, lng: 21.4694 },
+      { lat: 42.4628, lng: 21.4698 },
+      { lat: 42.4618, lng: 21.4703 },
+      { lat: 42.4607, lng: 21.4708 },
       { lat: 42.4595, lng: 21.4705 },
-      { lat: 42.4580, lng: 21.4698 },
-      { lat: 42.4565, lng: 21.4690 },
-      { lat: 42.4550, lng: 21.4685, label: "Business (Pickup)" },
-      { lat: 42.4540, lng: 21.4678 },
-      { lat: 42.4528, lng: 21.4665 },
-      { lat: 42.4515, lng: 21.4650 },
-      { lat: 42.4500, lng: 21.4640, label: "Customer (Dropoff)" },
+      { lat: 42.4583, lng: 21.4700 },
+      { lat: 42.4570, lng: 21.4693 },
+      { lat: 42.4558, lng: 21.4688 },
+      { lat: 42.4550, lng: 21.4685 },
+    ],
+    toDropoff: [
+      { lat: 42.4550, lng: 21.4685 },
+      { lat: 42.4543, lng: 21.4680 },
+      { lat: 42.4535, lng: 21.4673 },
+      { lat: 42.4527, lng: 21.4665 },
+      { lat: 42.4518, lng: 21.4656 },
+      { lat: 42.4510, lng: 21.4648 },
+      { lat: 42.4504, lng: 21.4643 },
+      { lat: 42.4500, lng: 21.4640 },
     ],
   },
   {
     name: "East → West Cross-City",
-    description: "Cross-city delivery through main streets",
-    waypoints: [
-      { lat: 42.4640, lng: 21.4780, label: "Start (East)" },
-      { lat: 42.4642, lng: 21.4760 },
-      { lat: 42.4645, lng: 21.4740 },
-      { lat: 42.4643, lng: 21.4720 },
-      { lat: 42.4640, lng: 21.4700, label: "Business (Pickup)" },
-      { lat: 42.4638, lng: 21.4680 },
-      { lat: 42.4635, lng: 21.4660 },
-      { lat: 42.4633, lng: 21.4640 },
-      { lat: 42.4630, lng: 21.4620 },
-      { lat: 42.4628, lng: 21.4600, label: "Customer (Dropoff)" },
+    toPickup: [
+      { lat: 42.4640, lng: 21.4780 },
+      { lat: 42.4641, lng: 21.4765 },
+      { lat: 42.4643, lng: 21.4748 },
+      { lat: 42.4644, lng: 21.4732 },
+      { lat: 42.4642, lng: 21.4715 },
+      { lat: 42.4640, lng: 21.4700 },
+    ],
+    toDropoff: [
+      { lat: 42.4640, lng: 21.4700 },
+      { lat: 42.4639, lng: 21.4683 },
+      { lat: 42.4637, lng: 21.4665 },
+      { lat: 42.4635, lng: 21.4648 },
+      { lat: 42.4633, lng: 21.4630 },
+      { lat: 42.4630, lng: 21.4615 },
+      { lat: 42.4628, lng: 21.4600 },
     ],
   },
   {
     name: "North Loop (Short)",
-    description: "Quick nearby delivery",
-    waypoints: [
-      { lat: 42.4660, lng: 21.4690, label: "Start" },
+    toPickup: [
+      { lat: 42.4660, lng: 21.4690 },
+      { lat: 42.4665, lng: 21.4695 },
       { lat: 42.4670, lng: 21.4700 },
-      { lat: 42.4675, lng: 21.4710, label: "Business (Pickup)" },
-      { lat: 42.4670, lng: 21.4720 },
-      { lat: 42.4665, lng: 21.4715, label: "Customer (Dropoff)" },
+      { lat: 42.4675, lng: 21.4710 },
+    ],
+    toDropoff: [
+      { lat: 42.4675, lng: 21.4710 },
+      { lat: 42.4672, lng: 21.4715 },
+      { lat: 42.4668, lng: 21.4718 },
+      { lat: 42.4665, lng: 21.4715 },
     ],
   },
 ];
@@ -97,92 +107,97 @@ interface DriverItem {
   };
 }
 
-interface OrderItem {
-  id: string;
-  displayId?: string;
-  status: string;
-  driver?: { id: string; firstName: string; lastName: string } | null;
-  dropOffLocation?: { latitude: number; longitude: number; address?: string };
-  businesses?: { business: { id: string; name: string; location?: { latitude: number; longitude: number } } }[];
-}
-
 interface LogEntry {
   id: number;
   time: string;
-  type: "action" | "success" | "error" | "info";
+  type: "phase" | "action" | "success" | "error" | "info";
   message: string;
 }
 
-type SimPhase = "idle" | "to_pickup" | "at_pickup" | "to_dropoff" | "at_dropoff";
+type AutoPhase =
+  | "idle"
+  | "warm_up"
+  | "creating_order"
+  | "assigning_driver"
+  | "preparing"
+  | "to_pickup"
+  | "at_pickup"
+  | "to_dropoff"
+  | "arriving"
+  | "completed";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function interpolateWaypoints(waypoints: Waypoint[], steps: number): Waypoint[] {
-  if (waypoints.length < 2) return waypoints;
-  const result: Waypoint[] = [];
-  for (let i = 0; i < waypoints.length - 1; i++) {
-    const a = waypoints[i];
-    const b = waypoints[i + 1];
-    const segSteps = Math.max(1, Math.round(steps / (waypoints.length - 1)));
-    for (let s = 0; s < segSteps; s++) {
-      const t = s / segSteps;
-      result.push({
-        lat: a.lat + (b.lat - a.lat) * t,
-        lng: a.lng + (b.lng - a.lng) * t,
-        label: s === 0 ? a.label : undefined,
-      });
-    }
+/** Densify a polyline by linear interpolation to produce `count` evenly spaced points */
+function densify(pts: Pt[], count: number): Pt[] {
+  if (pts.length < 2 || count < 2) return pts;
+  // compute cumulative distances
+  const dists = [0];
+  for (let i = 1; i < pts.length; i++) {
+    dists.push(dists[i - 1] + haversine(pts[i - 1], pts[i]));
   }
-  result.push(waypoints[waypoints.length - 1]);
+  const totalDist = dists[dists.length - 1];
+  const result: Pt[] = [];
+  let segIdx = 0;
+  for (let i = 0; i < count; i++) {
+    const target = (i / (count - 1)) * totalDist;
+    while (segIdx < pts.length - 2 && dists[segIdx + 1] < target) segIdx++;
+    const segLen = dists[segIdx + 1] - dists[segIdx];
+    const t = segLen > 0 ? (target - dists[segIdx]) / segLen : 0;
+    result.push({
+      lat: pts[segIdx].lat + (pts[segIdx + 1].lat - pts[segIdx].lat) * t,
+      lng: pts[segIdx].lng + (pts[segIdx + 1].lng - pts[segIdx].lng) * t,
+    });
+  }
   return result;
 }
 
-function distanceMeters(a: Waypoint, b: Waypoint): number {
+function haversine(a: Pt, b: Pt): number {
   const R = 6371000;
   const dLat = ((b.lat - a.lat) * Math.PI) / 180;
   const dLng = ((b.lng - a.lng) * Math.PI) / 180;
-  const sinLat = Math.sin(dLat / 2);
-  const sinLng = Math.sin(dLng / 2);
-  const h = sinLat * sinLat + Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * sinLng * sinLng;
+  const sLat = Math.sin(dLat / 2);
+  const sLng = Math.sin(dLng / 2);
+  const h = sLat * sLat + Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * sLng * sLng;
   return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
-function estimateEtaSeconds(points: Waypoint[], currentIdx: number, speedKmh = 30): number {
-  let totalMeters = 0;
-  for (let i = currentIdx; i < points.length - 1; i++) {
-    totalMeters += distanceMeters(points[i], points[i + 1]);
-  }
-  return Math.ceil(totalMeters / ((speedKmh * 1000) / 3600));
+function etaFromIndex(pts: Pt[], idx: number, speedKmh = 30): number {
+  let m = 0;
+  for (let i = idx; i < pts.length - 1; i++) m += haversine(pts[i], pts[i + 1]);
+  return Math.ceil(m / ((speedKmh * 1000) / 3600));
 }
 
-const CONNECTION_STATUS_COLORS: Record<string, { badge: "success" | "warning" | "danger" | "secondary"; label: string }> = {
-  CONNECTED: { badge: "success", label: "Connected" },
-  STALE: { badge: "warning", label: "Stale" },
-  LOST: { badge: "danger", label: "Lost" },
-  DISCONNECTED: { badge: "secondary", label: "Disconnected" },
+const PHASE_LABELS: Record<AutoPhase, string> = {
+  idle: "Idle",
+  warm_up: "Warming Up",
+  creating_order: "Creating Order",
+  assigning_driver: "Assigning Driver",
+  preparing: "Preparing",
+  to_pickup: "Driving → Pickup",
+  at_pickup: "At Pickup",
+  to_dropoff: "Driving → Dropoff",
+  arriving: "Arriving",
+  completed: "Completed",
 };
 
-const ORDER_STATUS_BADGES: Record<string, "warning" | "default" | "success" | "danger" | "secondary"> = {
-  PENDING: "warning",
-  PREPARING: "default",
-  READY: "default",
-  OUT_FOR_DELIVERY: "success",
-  DELIVERED: "success",
-  CANCELLED: "danger",
+const CONNECTION_BADGES: Record<string, "success" | "warning" | "danger" | "secondary"> = {
+  CONNECTED: "success",
+  STALE: "warning",
+  LOST: "danger",
+  DISCONNECTED: "secondary",
 };
 
 // ─── Page Component ──────────────────────────────────────────────────────────
 
 export default function SimulationPage() {
   // --- Driver data ---
-  const { data: driversData, loading: driversLoading } = useQuery(DRIVERS_QUERY);
+  const { data: driversData } = useQuery(DRIVERS_QUERY);
   const [drivers, setDrivers] = useState<DriverItem[]>([]);
-  const [selectedDriverId, setSelectedDriverId] = useState<string>("");
+  const [selectedDriverId, setSelectedDriverId] = useState("");
 
   useEffect(() => {
-    if (driversData?.drivers) {
-      setDrivers(driversData.drivers as DriverItem[]);
-    }
+    if (driversData?.drivers) setDrivers(driversData.drivers as DriverItem[]);
   }, [driversData?.drivers]);
 
   useSubscription(DRIVERS_UPDATED_SUBSCRIPTION, {
@@ -199,302 +214,245 @@ export default function SimulationPage() {
 
   const selectedDriver = drivers.find((d) => d.id === selectedDriverId);
 
-  // --- Orders data ---
-  const { data: ordersData, refetch: refetchOrders } = useQuery(GET_ORDERS);
-  const [orders, setOrders] = useState<OrderItem[]>([]);
-  const [selectedOrderId, setSelectedOrderId] = useState<string>("");
-
-  useEffect(() => {
-    if (ordersData?.orders) {
-      setOrders(ordersData.orders as OrderItem[]);
-    }
-  }, [ordersData?.orders]);
-
-  useSubscription(ALL_ORDERS_SUBSCRIPTION, {
-    onData: ({ data: subData }) => {
-      const incoming = subData.data?.allOrdersUpdated as OrderItem[] | undefined;
-      if (!incoming?.length) return;
-      setOrders((prev) => {
-        const byId = new Map(prev.map((o) => [o.id, o]));
-        incoming.forEach((o) => byId.set(o.id, { ...byId.get(o.id), ...o }));
-        return Array.from(byId.values());
-      });
-    },
-  });
-
-  const selectedOrder = orders.find((o) => o.id === selectedOrderId);
-  const activeOrders = orders.filter((o) => !["DELIVERED", "CANCELLED"].includes(o.status));
-
   // --- Mutations ---
   const [simulateHeartbeat] = useMutation(ADMIN_SIMULATE_DRIVER_HEARTBEAT);
-  const [createTestOrder, { loading: creatingOrder }] = useMutation(CREATE_TEST_ORDER);
+  const [createTestOrder] = useMutation(CREATE_TEST_ORDER);
   const [assignDriver] = useMutation(ASSIGN_DRIVER_TO_ORDER);
   const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS);
   const [startPreparing] = useMutation(START_PREPARING);
 
+  // --- Config ---
+  const [routeIdx, setRouteIdx] = useState(0);
+  const [heartbeatMs, setHeartbeatMs] = useState(500);
+  const [speedMultiplier, setSpeedMultiplier] = useState(1);
+
+  // --- Simulation state ---
+  const [phase, setPhase] = useState<AutoPhase>("idle");
+  const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState({ current: 0, total: 0, label: "" });
+  const abortRef = useRef<AbortController | null>(null);
+
   // --- Event log ---
   const logIdRef = useRef(0);
   const [eventLog, setEventLog] = useState<LogEntry[]>([]);
-  const logRef = useRef<HTMLDivElement>(null);
+  const logContainerRef = useRef<HTMLDivElement>(null);
 
   const addLog = useCallback((type: LogEntry["type"], message: string) => {
-    const entry: LogEntry = {
-      id: ++logIdRef.current,
-      time: new Date().toLocaleTimeString(),
-      type,
-      message,
-    };
-    setEventLog((prev) => [entry, ...prev].slice(0, 200));
+    setEventLog((prev) => [
+      { id: ++logIdRef.current, time: new Date().toLocaleTimeString("en-GB"), type, message },
+      ...prev,
+    ].slice(0, 300));
   }, []);
 
-  // --- Route simulation ---
-  const [selectedRouteIdx, setSelectedRouteIdx] = useState(0);
-  const [simPhase, setSimPhase] = useState<SimPhase>("idle");
-  const [simRunning, setSimRunning] = useState(false);
-  const [simSpeed, setSimSpeed] = useState(1); // 1x, 2x, 5x, 10x
-  const [simProgress, setSimProgress] = useState(0); // index into interpolated points
-  const [interpolatedPoints, setInterpolatedPoints] = useState<Waypoint[]>([]);
-  const simIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const simPhaseRef = useRef<SimPhase>("idle");
+  const addPhaseLog = useCallback((label: string) => {
+    addLog("phase", label);
+  }, [addLog]);
 
-  // Determine which half of the route is to_pickup vs to_dropoff
-  const route = PREDEFINED_ROUTES[selectedRouteIdx];
-  const pickupIdx = Math.floor((route.waypoints.length - 1) / 2);
-
-  useEffect(() => {
-    const pts = interpolateWaypoints(route.waypoints, 60);
-    setInterpolatedPoints(pts);
-    setSimProgress(0);
-    setSimPhase("idle");
-    simPhaseRef.current = "idle";
-  }, [selectedRouteIdx]);
-
-  const stopSimulation = useCallback(() => {
-    if (simIntervalRef.current) {
-      clearInterval(simIntervalRef.current);
-      simIntervalRef.current = null;
-    }
-    setSimRunning(false);
+  // --- Sleep helper that respects abort ---
+  const sleep = useCallback((ms: number, signal: AbortSignal) => {
+    return new Promise<void>((resolve, reject) => {
+      if (signal.aborted) return reject(new DOMException("Aborted", "AbortError"));
+      const timer = setTimeout(resolve, ms);
+      signal.addEventListener("abort", () => { clearTimeout(timer); reject(new DOMException("Aborted", "AbortError")); }, { once: true });
+    });
   }, []);
 
-  const sendHeartbeatAtIndex = useCallback(
-    async (idx: number, points: Waypoint[], navPhase: SimPhase, orderId?: string) => {
-      if (!selectedDriverId) return;
-      const pt = points[idx];
-      if (!pt) return;
+  // --- Core: send one heartbeat ---
+  const beat = useCallback(async (
+    driverId: string,
+    pt: Pt,
+    opts?: { orderId?: string; navPhase?: string; eta?: number; setOnline?: boolean },
+  ) => {
+    await simulateHeartbeat({
+      variables: {
+        driverId,
+        latitude: pt.lat,
+        longitude: pt.lng,
+        activeOrderId: opts?.orderId,
+        navigationPhase: opts?.navPhase,
+        remainingEtaSeconds: opts?.eta,
+        setOnline: opts?.setOnline,
+      },
+    });
+  }, [simulateHeartbeat]);
 
-      const etaSec = navPhase === "to_pickup" || navPhase === "to_dropoff"
-        ? estimateEtaSeconds(points, idx)
-        : undefined;
+  // ─── Full Automated Simulation ──────────────────────────────────────────────
 
-      try {
-        await simulateHeartbeat({
-          variables: {
-            driverId: selectedDriverId,
-            latitude: pt.lat,
-            longitude: pt.lng,
-            activeOrderId: orderId || selectedOrderId || undefined,
-            navigationPhase: navPhase === "idle" ? undefined : navPhase,
-            remainingEtaSeconds: etaSec,
-          },
+  const runFullSimulation = useCallback(async () => {
+    if (!selectedDriverId) { addLog("error", "Select a driver first"); return; }
+    const driverId = selectedDriverId;
+    const route = ROUTES[routeIdx];
+    const ac = new AbortController();
+    abortRef.current = ac;
+    const sig = ac.signal;
+
+    // Densify routes for smooth movement
+    const toPickupPts = densify(route.toPickup, 80 * speedMultiplier);
+    const toDropoffPts = densify(route.toDropoff, 120 * speedMultiplier);
+    const interval = heartbeatMs / speedMultiplier;
+
+    setRunning(true);
+    setEventLog([]);
+    logIdRef.current = 0;
+
+    try {
+      // ── Phase 1: Warm Up ────────────────────────────────────────────────
+      setPhase("warm_up");
+      addPhaseLog("━━━ WARM UP ━━━");
+      addLog("info", "Setting driver online & sending warm-up heartbeats...");
+      const startPt = route.toPickup[0];
+
+      for (let i = 0; i < 5; i++) {
+        if (sig.aborted) throw new DOMException("Aborted", "AbortError");
+        await beat(driverId, startPt, { setOnline: i === 0 });
+        addLog("action", `Warm-up heartbeat ${i + 1}/5`);
+        setProgress({ current: i + 1, total: 5, label: "warm up" });
+        if (i < 4) await sleep(interval, sig);
+      }
+      addLog("success", "Driver is online & connected");
+
+      // ── Phase 2: Create Order ───────────────────────────────────────────
+      setPhase("creating_order");
+      addPhaseLog("━━━ CREATE ORDER ━━━");
+      addLog("info", "Creating a test order...");
+      await sleep(500, sig);
+
+      const { data: orderData } = await createTestOrder();
+      const order = orderData?.createTestOrder;
+      if (!order) throw new Error("Failed to create test order");
+      const orderId = order.id;
+      const bizName = order.businesses?.[0]?.business?.name ?? "Unknown";
+      addLog("success", `Order #${orderId.slice(0, 8)} created — ${bizName}`);
+
+      // ── Phase 3: Assign Driver ──────────────────────────────────────────
+      setPhase("assigning_driver");
+      addPhaseLog("━━━ ASSIGN DRIVER ━━━");
+      addLog("info", `Assigning driver to order...`);
+      await sleep(800, sig);
+
+      await assignDriver({ variables: { id: orderId, driverId } });
+      addLog("success", "Driver assigned");
+
+      // ── Phase 4: Start Preparing ────────────────────────────────────────
+      setPhase("preparing");
+      addPhaseLog("━━━ PREPARING ━━━");
+      addLog("info", "Business starts preparing order (2 min)...");
+      await startPreparing({ variables: { id: orderId, preparationMinutes: 2 } });
+      addLog("success", "Order is now PREPARING");
+      await sleep(1000, sig);
+
+      // ── Phase 5: Drive to Pickup ────────────────────────────────────────
+      setPhase("to_pickup");
+      addPhaseLog("━━━ DRIVING TO PICKUP ━━━");
+      addLog("info", `Sending ${toPickupPts.length} heartbeats along route to business...`);
+
+      // Mark READY halfway through the drive (business marks it ready)
+      const readyAtIdx = Math.floor(toPickupPts.length / 2);
+
+      for (let i = 0; i < toPickupPts.length; i++) {
+        if (sig.aborted) throw new DOMException("Aborted", "AbortError");
+        const eta = etaFromIndex(toPickupPts, i);
+        await beat(driverId, toPickupPts[i], {
+          orderId,
+          navPhase: "to_pickup",
+          eta,
         });
-      } catch (err: any) {
-        addLog("error", `Heartbeat failed: ${err.message}`);
-      }
-    },
-    [selectedDriverId, selectedOrderId, simulateHeartbeat, addLog]
-  );
+        setProgress({ current: i + 1, total: toPickupPts.length, label: "to pickup" });
 
-  const startSimulation = useCallback(() => {
-    if (!selectedDriverId) {
-      addLog("error", "Select a driver first");
-      return;
-    }
-    if (interpolatedPoints.length === 0) return;
-
-    setSimRunning(true);
-    setSimProgress(0);
-    setSimPhase("to_pickup");
-    simPhaseRef.current = "to_pickup";
-    addLog("action", `Simulation started on route: ${route.name} (${simSpeed}x speed)`);
-
-    // Determine the interpolated index for the pickup point
-    const totalPts = interpolatedPoints.length;
-    const pickupProgress = Math.floor(totalPts * (pickupIdx / (route.waypoints.length - 1)));
-
-    let currentIdx = 0;
-
-    const interval = setInterval(async () => {
-      if (currentIdx >= totalPts) {
-        clearInterval(interval);
-        simIntervalRef.current = null;
-        setSimRunning(false);
-        setSimPhase("at_dropoff");
-        simPhaseRef.current = "at_dropoff";
-        addLog("success", "Simulation completed — arrived at dropoff");
-        return;
-      }
-
-      let phase = simPhaseRef.current;
-      if (currentIdx < pickupProgress) {
-        phase = "to_pickup";
-      } else if (currentIdx === pickupProgress) {
-        phase = "at_pickup";
-        if (simPhaseRef.current !== "at_pickup") {
-          addLog("info", "Arrived at business (pickup point)");
+        if (i === readyAtIdx) {
+          addLog("info", "Business marks order READY");
+          await updateOrderStatus({ variables: { id: orderId, status: OrderStatus.Ready } });
+          addLog("success", "Order → READY");
         }
-      } else {
-        phase = "to_dropoff";
+
+        if (i % 20 === 0 || i === toPickupPts.length - 1) {
+          addLog("action", `To pickup: ${i + 1}/${toPickupPts.length} — ETA ${eta}s`);
+        }
+        if (i < toPickupPts.length - 1) await sleep(interval, sig);
+      }
+      addLog("success", "Arrived at business");
+
+      // ── Phase 6: At Pickup — mark OUT_FOR_DELIVERY ──────────────────────
+      setPhase("at_pickup");
+      addPhaseLog("━━━ AT PICKUP ━━━");
+      addLog("info", "Driver picking up order...");
+
+      // Dwell at pickup for a few heartbeats
+      const pickupPt = toPickupPts[toPickupPts.length - 1];
+      for (let i = 0; i < 4; i++) {
+        if (sig.aborted) throw new DOMException("Aborted", "AbortError");
+        await beat(driverId, pickupPt, { orderId, navPhase: "to_pickup", eta: 0 });
+        if (i < 3) await sleep(interval, sig);
       }
 
-      simPhaseRef.current = phase;
-      setSimPhase(phase);
-      setSimProgress(currentIdx);
+      addLog("info", "Marking order OUT FOR DELIVERY...");
+      await updateOrderStatus({ variables: { id: orderId, status: OrderStatus.OutForDelivery } });
+      addLog("success", "Order → OUT_FOR_DELIVERY");
+      await sleep(500, sig);
 
-      await sendHeartbeatAtIndex(currentIdx, interpolatedPoints, phase, selectedOrderId || undefined);
+      // ── Phase 7: Drive to Dropoff ───────────────────────────────────────
+      setPhase("to_dropoff");
+      addPhaseLog("━━━ DRIVING TO DROPOFF ━━━");
+      addLog("info", `Sending ${toDropoffPts.length} heartbeats along route to customer...`);
 
-      currentIdx++;
-    }, 1000 / simSpeed);
+      for (let i = 0; i < toDropoffPts.length; i++) {
+        if (sig.aborted) throw new DOMException("Aborted", "AbortError");
+        const eta = etaFromIndex(toDropoffPts, i);
+        await beat(driverId, toDropoffPts[i], {
+          orderId,
+          navPhase: "to_dropoff",
+          eta,
+        });
+        setProgress({ current: i + 1, total: toDropoffPts.length, label: "to dropoff" });
 
-    simIntervalRef.current = interval;
+        if (i % 20 === 0 || i === toDropoffPts.length - 1) {
+          addLog("action", `To dropoff: ${i + 1}/${toDropoffPts.length} — ETA ${eta}s`);
+        }
+        if (i < toDropoffPts.length - 1) await sleep(interval, sig);
+      }
+      addLog("success", "Arrived at customer");
+
+      // ── Phase 8: Deliver ────────────────────────────────────────────────
+      setPhase("arriving");
+      addPhaseLog("━━━ DELIVERING ━━━");
+      addLog("info", "Driver at dropoff, completing delivery...");
+
+      const dropoffPt = toDropoffPts[toDropoffPts.length - 1];
+      for (let i = 0; i < 3; i++) {
+        if (sig.aborted) throw new DOMException("Aborted", "AbortError");
+        await beat(driverId, dropoffPt, { orderId, navPhase: "to_dropoff", eta: 0 });
+        if (i < 2) await sleep(interval, sig);
+      }
+
+      await updateOrderStatus({ variables: { id: orderId, status: OrderStatus.Delivered } });
+      addLog("success", "Order → DELIVERED");
+
+      // Final heartbeat without order
+      await beat(driverId, dropoffPt, {});
+      setPhase("completed");
+      addPhaseLog("━━━ SIMULATION COMPLETE ━━━");
+      addLog("success", `Full delivery cycle finished for order #${orderId.slice(0, 8)}`);
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        addLog("info", "Simulation cancelled");
+        setPhase("idle");
+      } else {
+        addLog("error", `Simulation failed: ${err instanceof Error ? err.message : String(err)}`);
+        setPhase("idle");
+      }
+    } finally {
+      setRunning(false);
+      abortRef.current = null;
+    }
   }, [
-    selectedDriverId,
-    interpolatedPoints,
-    route,
-    pickupIdx,
-    simSpeed,
-    selectedOrderId,
-    sendHeartbeatAtIndex,
-    addLog,
+    selectedDriverId, routeIdx, heartbeatMs, speedMultiplier,
+    beat, sleep, addLog, addPhaseLog,
+    createTestOrder, assignDriver, startPreparing, updateOrderStatus,
   ]);
 
-  const toggleSimulation = useCallback(() => {
-    if (simRunning) {
-      stopSimulation();
-      addLog("info", "Simulation paused");
-    } else if (simProgress > 0 && simProgress < interpolatedPoints.length) {
-      // Resume from current position
-      setSimRunning(true);
-      addLog("info", "Simulation resumed");
-
-      const totalPts = interpolatedPoints.length;
-      const pickupProgress = Math.floor(totalPts * (pickupIdx / (route.waypoints.length - 1)));
-      let currentIdx = simProgress;
-
-      const interval = setInterval(async () => {
-        if (currentIdx >= totalPts) {
-          clearInterval(interval);
-          simIntervalRef.current = null;
-          setSimRunning(false);
-          setSimPhase("at_dropoff");
-          simPhaseRef.current = "at_dropoff";
-          addLog("success", "Simulation completed — arrived at dropoff");
-          return;
-        }
-
-        let phase = simPhaseRef.current;
-        if (currentIdx < pickupProgress) phase = "to_pickup";
-        else if (currentIdx === pickupProgress) {
-          phase = "at_pickup";
-          if (simPhaseRef.current !== "at_pickup") addLog("info", "Arrived at business");
-        } else phase = "to_dropoff";
-
-        simPhaseRef.current = phase;
-        setSimPhase(phase);
-        setSimProgress(currentIdx);
-
-        await sendHeartbeatAtIndex(currentIdx, interpolatedPoints, phase, selectedOrderId || undefined);
-        currentIdx++;
-      }, 1000 / simSpeed);
-
-      simIntervalRef.current = interval;
-    } else {
-      startSimulation();
-    }
-  }, [simRunning, simProgress, interpolatedPoints, stopSimulation, startSimulation, pickupIdx, route, simSpeed, selectedOrderId, sendHeartbeatAtIndex, addLog]);
-
-  // Cleanup interval on unmount
-  useEffect(() => () => { if (simIntervalRef.current) clearInterval(simIntervalRef.current); }, []);
-
-  // --- Action handlers ---
-
-  const handleCreateTestOrder = async () => {
-    try {
-      addLog("action", "Creating test order...");
-      const { data } = await createTestOrder();
-      if (data?.createTestOrder) {
-        const o = data.createTestOrder;
-        addLog("success", `Test order created: #${o.id.slice(0, 8)} — ${o.businesses?.map((b: any) => b.business.name).join(", ")}`);
-        refetchOrders();
-      }
-    } catch (err: any) {
-      addLog("error", `Create test order failed: ${err.message}`);
-    }
-  };
-
-  const handleAssignDriver = async () => {
-    if (!selectedOrderId || !selectedDriverId) {
-      addLog("error", "Select both an order and a driver");
-      return;
-    }
-    try {
-      addLog("action", `Assigning driver ${selectedDriver?.firstName} to order ${selectedOrderId.slice(0, 8)}...`);
-      await assignDriver({ variables: { id: selectedOrderId, driverId: selectedDriverId } });
-      addLog("success", "Driver assigned to order");
-      refetchOrders();
-    } catch (err: any) {
-      addLog("error", `Assign failed: ${err.message}`);
-    }
-  };
-
-  const handleStartPreparing = async () => {
-    if (!selectedOrderId) return;
-    try {
-      addLog("action", "Starting preparation (5 min)...");
-      await startPreparing({ variables: { id: selectedOrderId, preparationMinutes: 5 } });
-      addLog("success", "Order is now PREPARING");
-      refetchOrders();
-    } catch (err: any) {
-      addLog("error", `Start preparing failed: ${err.message}`);
-    }
-  };
-
-  const handleStatusTransition = async (status: OrderStatus) => {
-    if (!selectedOrderId) return;
-    try {
-      addLog("action", `Updating order status to ${status}...`);
-      await updateOrderStatus({ variables: { id: selectedOrderId, status } });
-      addLog("success", `Order status → ${status}`);
-      refetchOrders();
-    } catch (err: any) {
-      addLog("error", `Status update failed: ${err.message}`);
-    }
-  };
-
-  const handleSingleHeartbeat = async () => {
-    if (!selectedDriverId) {
-      addLog("error", "Select a driver first");
-      return;
-    }
-    const loc = selectedDriver?.driverLocation;
-    const lat = loc?.latitude ?? GJILAN_CENTER.lat;
-    const lng = loc?.longitude ?? GJILAN_CENTER.lng;
-    try {
-      addLog("action", `Sending single heartbeat at (${lat.toFixed(4)}, ${lng.toFixed(4)})`);
-      await simulateHeartbeat({
-        variables: {
-          driverId: selectedDriverId,
-          latitude: lat,
-          longitude: lng,
-          activeOrderId: selectedOrderId || undefined,
-          navigationPhase: simPhase === "idle" ? undefined : simPhase,
-        },
-      });
-      addLog("success", "Heartbeat sent");
-    } catch (err: any) {
-      addLog("error", `Heartbeat failed: ${err.message}`);
-    }
-  };
+  const stopSimulation = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
@@ -505,534 +463,296 @@ export default function SimulationPage() {
         <div>
           <h1 className="text-2xl font-bold text-zinc-100 flex items-center gap-3">
             <Zap size={24} className="text-violet-400" />
-            Driver Simulation
+            Full Delivery Simulation
           </h1>
           <p className="text-sm text-zinc-500 mt-1">
-            Test driver movement, order lifecycle, and real-time updates
+            One button — driver goes online, order created, assigned, prepared, picked up, delivered.
           </p>
         </div>
-        <Badge variant={simRunning ? "success" : "secondary"}>
-          {simRunning ? "Simulation Running" : "Idle"}
+        <Badge variant={running ? "success" : phase === "completed" ? "default" : "secondary"}>
+          {PHASE_LABELS[phase]}
         </Badge>
       </div>
 
-      {/* Top row: Driver + Order selection */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Driver Selector */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Truck size={16} className="text-violet-400" />
-              Driver
-            </CardTitle>
-            <CardDescription>Select a driver to simulate</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <select
-              value={selectedDriverId}
-              onChange={(e) => setSelectedDriverId(e.target.value)}
-              className="w-full px-3 py-2 bg-[#09090b] border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-violet-500/50"
-            >
-              <option value="">— Select Driver —</option>
-              {drivers.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.firstName} {d.lastName} ({d.driverConnection?.connectionStatus ?? "UNKNOWN"})
-                </option>
-              ))}
-            </select>
-
-            {selectedDriver && (
-              <div className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800 space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400">Status</span>
-                  <Badge variant={CONNECTION_STATUS_COLORS[selectedDriver.driverConnection?.connectionStatus ?? "DISCONNECTED"]?.badge ?? "secondary"}>
-                    {selectedDriver.driverConnection?.connectionStatus ?? "DISCONNECTED"}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400">Location</span>
-                  <span className="text-zinc-300 font-mono">
-                    {selectedDriver.driverLocation
-                      ? `${selectedDriver.driverLocation.latitude.toFixed(4)}, ${selectedDriver.driverLocation.longitude.toFixed(4)}`
-                      : "No location"}
-                  </span>
-                </div>
-                {selectedDriver.driverConnection?.activeOrderId && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-zinc-400">Active Order</span>
-                    <span className="text-zinc-300 font-mono">{selectedDriver.driverConnection.activeOrderId.slice(0, 8)}...</span>
-                  </div>
-                )}
-                {selectedDriver.driverConnection?.navigationPhase && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-zinc-400">Nav Phase</span>
-                    <Badge variant="default">{selectedDriver.driverConnection.navigationPhase}</Badge>
-                  </div>
-                )}
-                {selectedDriver.driverConnection?.remainingEtaSeconds != null && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-zinc-400">ETA</span>
-                    <span className="text-zinc-300">{Math.ceil(selectedDriver.driverConnection.remainingEtaSeconds / 60)} min</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <Button size="sm" variant="outline" onClick={handleSingleHeartbeat} disabled={!selectedDriverId}>
-              <Signal size={14} /> Send Single Heartbeat
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Order Manager */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Package size={16} className="text-violet-400" />
-              Order
-            </CardTitle>
-            <CardDescription>Create or select an order to test</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex gap-2">
-              <Button size="sm" onClick={handleCreateTestOrder} disabled={creatingOrder}>
-                {creatingOrder ? "Creating..." : "Create Test Order"}
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => refetchOrders()}>
-                Refresh
-              </Button>
-            </div>
-
-            <select
-              value={selectedOrderId}
-              onChange={(e) => setSelectedOrderId(e.target.value)}
-              className="w-full px-3 py-2 bg-[#09090b] border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-violet-500/50"
-            >
-              <option value="">— Select Order —</option>
-              {activeOrders.map((o) => (
-                <option key={o.id} value={o.id}>
-                  #{o.displayId ?? o.id.slice(0, 8)} — {o.status}
-                  {o.driver ? ` (${o.driver.firstName})` : ""}
-                  {o.businesses?.[0] ? ` — ${o.businesses[0].business.name}` : ""}
-                </option>
-              ))}
-            </select>
-
-            {selectedOrder && (
-              <div className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800 space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400">Status</span>
-                  <Badge variant={ORDER_STATUS_BADGES[selectedOrder.status] ?? "secondary"}>
-                    {selectedOrder.status}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400">Driver</span>
-                  <span className="text-zinc-300">
-                    {selectedOrder.driver ? `${selectedOrder.driver.firstName} ${selectedOrder.driver.lastName}` : "Unassigned"}
-                  </span>
-                </div>
-                {selectedOrder.businesses?.[0] && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-zinc-400">Business</span>
-                    <span className="text-zinc-300">{selectedOrder.businesses[0].business.name}</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Order lifecycle buttons */}
-            <div className="space-y-2">
-              <p className="text-xs text-zinc-500 font-medium uppercase tracking-wider">Order Lifecycle</p>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleAssignDriver}
-                  disabled={!selectedOrderId || !selectedDriverId}
-                >
-                  <Truck size={12} /> Assign Driver
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleStartPreparing}
-                  disabled={!selectedOrderId}
-                >
-                  <Clock size={12} /> Start Preparing
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleStatusTransition(OrderStatus.Ready)}
-                  disabled={!selectedOrderId}
-                >
-                  <CheckCircle2 size={12} /> Mark Ready
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleStatusTransition(OrderStatus.OutForDelivery)}
-                  disabled={!selectedOrderId}
-                >
-                  <Navigation size={12} /> Out for Delivery
-                </Button>
-                <Button
-                  size="sm"
-                  variant="success"
-                  onClick={() => handleStatusTransition(OrderStatus.Delivered)}
-                  disabled={!selectedOrderId}
-                >
-                  <CheckCircle2 size={12} /> Delivered
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Route Simulation */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Navigation size={16} className="text-violet-400" />
-            Route Simulation
-          </CardTitle>
-          <CardDescription>
-            Simulate driver movement along a predefined route. Heartbeats are sent at each waypoint, updating
-            the admin map, customer order map, Live Activity, and all real-time subscriptions.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Route selector */}
-          <div className="flex items-center gap-3">
-            <select
-              value={selectedRouteIdx}
-              onChange={(e) => {
-                stopSimulation();
-                setSelectedRouteIdx(Number(e.target.value));
-              }}
-              disabled={simRunning}
-              className="flex-1 px-3 py-2 bg-[#09090b] border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-violet-500/50 disabled:opacity-50"
-            >
-              {PREDEFINED_ROUTES.map((r, i) => (
-                <option key={i} value={i}>
-                  {r.name} — {r.description}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Controls */}
-          <div className="flex items-center gap-3">
-            <Button
-              size="sm"
-              variant={simRunning ? "danger" : "primary"}
-              onClick={toggleSimulation}
-              disabled={!selectedDriverId}
-            >
-              {simRunning ? <Pause size={14} /> : <Play size={14} />}
-              {simRunning ? "Pause" : simProgress > 0 ? "Resume" : "Start"}
-            </Button>
-
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                stopSimulation();
-                setSimProgress(0);
-                setSimPhase("idle");
-                simPhaseRef.current = "idle";
-                addLog("info", "Simulation reset");
-              }}
-              disabled={simProgress === 0}
-            >
-              <RotateCcw size={14} /> Reset
-            </Button>
-
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={async () => {
-                if (!selectedDriverId || !interpolatedPoints.length) return;
-                const next = Math.min(simProgress + 1, interpolatedPoints.length - 1);
-                setSimProgress(next);
-                const totalPts = interpolatedPoints.length;
-                const pp = Math.floor(totalPts * (pickupIdx / (route.waypoints.length - 1)));
-                let phase: SimPhase = next < pp ? "to_pickup" : next === pp ? "at_pickup" : "to_dropoff";
-                setSimPhase(phase);
-                simPhaseRef.current = phase;
-                await sendHeartbeatAtIndex(next, interpolatedPoints, phase, selectedOrderId || undefined);
-                addLog("info", `Step → waypoint ${next}/${totalPts - 1}`);
-              }}
-              disabled={simRunning || !selectedDriverId}
-            >
-              <SkipForward size={14} /> Step
-            </Button>
-
-            {/* Speed selector */}
-            <div className="flex items-center gap-1.5 ml-auto">
-              <Gauge size={14} className="text-zinc-500" />
-              <span className="text-xs text-zinc-500">Speed:</span>
-              {[1, 2, 5, 10].map((s) => (
-                <button
-                  key={s}
-                  className={`px-2 py-1 text-xs rounded font-medium transition-colors ${
-                    simSpeed === s
-                      ? "bg-violet-600 text-white"
-                      : "bg-zinc-800 text-zinc-400 hover:text-zinc-200"
-                  }`}
-                  onClick={() => {
-                    setSimSpeed(s);
-                    if (simRunning) {
-                      stopSimulation();
-                      addLog("info", `Speed changed to ${s}x — click play to resume`);
-                    }
-                  }}
-                >
-                  {s}x
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Progress bar */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs text-zinc-500">
-              <span>Progress: {simProgress}/{interpolatedPoints.length - 1}</span>
-              <div className="flex items-center gap-2">
-                <Badge variant={
-                  simPhase === "to_pickup" ? "warning" :
-                  simPhase === "at_pickup" ? "default" :
-                  simPhase === "to_dropoff" ? "success" :
-                  simPhase === "at_dropoff" ? "success" :
-                  "secondary"
-                }>
-                  {simPhase === "idle" ? "Idle" :
-                   simPhase === "to_pickup" ? "→ Pickup" :
-                   simPhase === "at_pickup" ? "At Pickup" :
-                   simPhase === "to_dropoff" ? "→ Dropoff" :
-                   "At Dropoff"}
-                </Badge>
-              </div>
-            </div>
-            <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-violet-600 rounded-full transition-all duration-300"
-                style={{ width: `${interpolatedPoints.length > 1 ? (simProgress / (interpolatedPoints.length - 1)) * 100 : 0}%` }}
-              />
-            </div>
-            {/* Waypoint labels */}
-            <div className="flex justify-between text-[10px] text-zinc-600">
-              {route.waypoints.filter((w) => w.label).map((w, i) => (
-                <span key={i}>{w.label}</span>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Scenario Presets + Event Log */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Quick Scenarios */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Zap size={16} className="text-violet-400" />
-              Quick Scenarios
-            </CardTitle>
-            <CardDescription>Run predefined test sequences</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-2">
-              <ScenarioButton
-                title="Full Delivery Cycle"
-                description="Create order → Assign → Prepare → Ready → OFD → Simulate route → Delivered"
-                disabled={!selectedDriverId}
-                onClick={async () => {
-                  addLog("action", "Starting full delivery cycle scenario...");
-
-                  // 1. Create order
-                  const { data: orderData } = await createTestOrder();
-                  const order = orderData?.createTestOrder;
-                  if (!order) { addLog("error", "Failed to create order"); return; }
-                  setSelectedOrderId(order.id);
-                  addLog("success", `Order created: #${order.id.slice(0, 8)}`);
-
-                  // 2. Assign driver
-                  await assignDriver({ variables: { id: order.id, driverId: selectedDriverId } });
-                  addLog("success", "Driver assigned");
-
-                  // 3. Start preparing
-                  await startPreparing({ variables: { id: order.id, preparationMinutes: 1 } });
-                  addLog("success", "Order PREPARING (1 min)");
-
-                  // 4. Wait 2s, mark ready
-                  await new Promise((r) => setTimeout(r, 2000));
-                  await updateOrderStatus({ variables: { id: order.id, status: OrderStatus.Ready } });
-                  addLog("success", "Order READY");
-
-                  // 5. Mark OFD
-                  await updateOrderStatus({ variables: { id: order.id, status: OrderStatus.OutForDelivery } });
-                  addLog("success", "Order OUT_FOR_DELIVERY — start route simulation to see movement");
-
-                  refetchOrders();
-                }}
-              />
-
-              <ScenarioButton
-                title="Race-to-Accept Test"
-                description="Create order without assigning — tests how pending orders appear to drivers"
-                disabled={false}
-                onClick={async () => {
-                  addLog("action", "Creating unassigned order (race-to-accept)...");
-                  const { data } = await createTestOrder();
-                  if (data?.createTestOrder) {
-                    setSelectedOrderId(data.createTestOrder.id);
-                    addLog("success", `Order #${data.createTestOrder.id.slice(0, 8)} created — PENDING, no driver`);
-                    refetchOrders();
-                  }
-                }}
-              />
-
-              <ScenarioButton
-                title="Dispatch Multi-Order"
-                description="Create 3 orders and assign all to the selected driver"
-                disabled={!selectedDriverId}
-                onClick={async () => {
-                  addLog("action", "Creating 3 test orders for dispatch mode...");
-                  for (let i = 0; i < 3; i++) {
-                    const { data } = await createTestOrder();
-                    const order = data?.createTestOrder;
-                    if (order) {
-                      await assignDriver({ variables: { id: order.id, driverId: selectedDriverId } });
-                      addLog("success", `Order #${i + 1} created & assigned: ${order.id.slice(0, 8)}`);
-                    } else {
-                      addLog("error", `Failed to create order #${i + 1}`);
-                    }
-                  }
-                  addLog("info", "All 3 orders assigned — driver should see multi-order dispatch modal");
-                  refetchOrders();
-                }}
-              />
-
-              <ScenarioButton
-                title="ETA < 3 min Notification Test"
-                description="Place driver on route at near-dropoff position to trigger ETA_LT_3_MIN auto-notification"
-                disabled={!selectedDriverId || !selectedOrderId}
-                onClick={async () => {
-                  addLog("action", "Simulating near-dropoff position for ETA < 3 min...");
-                  const pts = interpolatedPoints;
-                  const nearEnd = Math.max(0, pts.length - 3);
-                  const pt = pts[nearEnd];
-                  if (!pt) { addLog("error", "No route points"); return; }
-                  try {
-                    await simulateHeartbeat({
-                      variables: {
-                        driverId: selectedDriverId,
-                        latitude: pt.lat,
-                        longitude: pt.lng,
-                        activeOrderId: selectedOrderId,
-                        navigationPhase: "to_dropoff",
-                        remainingEtaSeconds: 120,
-                      },
-                    });
-                    addLog("success", "Heartbeat sent with ETA=120s — should trigger ETA_LT_3_MIN notification");
-                  } catch (err: any) {
-                    addLog("error", `Failed: ${err.message}`);
-                  }
-                }}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Event Log */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* ── Left Panel: Controls ── */}
+        <div className="space-y-4">
+          {/* Driver Selector */}
+          <Card>
+            <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                <Terminal size={16} className="text-violet-400" />
-                Event Log
+                <Truck size={16} className="text-violet-400" />
+                Driver
               </CardTitle>
-              <Button size="sm" variant="ghost" onClick={() => setEventLog([])}>
-                Clear
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div
-              ref={logRef}
-              className="h-[340px] overflow-y-auto bg-[#09090b] border border-zinc-800 rounded-lg p-3 space-y-1 font-mono text-xs"
-            >
-              {eventLog.length === 0 ? (
-                <p className="text-zinc-600 text-center py-8">No events yet. Start a simulation or run a scenario.</p>
-              ) : (
-                eventLog.map((entry) => (
-                  <div key={entry.id} className="flex gap-2">
-                    <span className="text-zinc-600 shrink-0">{entry.time}</span>
-                    <span className={
-                      entry.type === "success" ? "text-emerald-400" :
-                      entry.type === "error" ? "text-red-400" :
-                      entry.type === "action" ? "text-violet-400" :
-                      "text-zinc-400"
-                    }>
-                      {entry.type === "success" ? "✓" :
-                       entry.type === "error" ? "✗" :
-                       entry.type === "action" ? "▶" :
-                       "ℹ"}
-                    </span>
-                    <span className="text-zinc-300">{entry.message}</span>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <select
+                value={selectedDriverId}
+                onChange={(e) => setSelectedDriverId(e.target.value)}
+                disabled={running}
+                className="w-full px-3 py-2 bg-[#09090b] border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-violet-500/50 disabled:opacity-50"
+              >
+                <option value="">— Select Driver —</option>
+                {drivers.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.firstName} {d.lastName} ({d.driverConnection?.connectionStatus ?? "UNKNOWN"})
+                  </option>
+                ))}
+              </select>
+
+              {selectedDriver && (
+                <div className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-400">Connection</span>
+                    <Badge variant={CONNECTION_BADGES[selectedDriver.driverConnection?.connectionStatus ?? "DISCONNECTED"] ?? "secondary"}>
+                      {selectedDriver.driverConnection?.connectionStatus ?? "DISCONNECTED"}
+                    </Badge>
                   </div>
-                ))
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-400">Online</span>
+                    <span className={selectedDriver.driverConnection?.onlinePreference ? "text-emerald-400" : "text-zinc-500"}>
+                      {selectedDriver.driverConnection?.onlinePreference ? "Yes" : "No"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-400">Position</span>
+                    <span className="text-zinc-300 font-mono text-[11px]">
+                      {selectedDriver.driverLocation
+                        ? `${selectedDriver.driverLocation.latitude.toFixed(4)}, ${selectedDriver.driverLocation.longitude.toFixed(4)}`
+                        : "—"}
+                    </span>
+                  </div>
+                  {selectedDriver.driverConnection?.navigationPhase && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-zinc-400">Nav Phase</span>
+                      <Badge variant="default">{selectedDriver.driverConnection.navigationPhase}</Badge>
+                    </div>
+                  )}
+                  {selectedDriver.driverConnection?.remainingEtaSeconds != null && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-zinc-400">ETA</span>
+                      <span className="text-zinc-300">{Math.ceil(selectedDriver.driverConnection.remainingEtaSeconds / 60)} min</span>
+                    </div>
+                  )}
+                  {selectedDriver.driverConnection?.activeOrderId && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-zinc-400">Active Order</span>
+                      <span className="text-zinc-300 font-mono text-[11px]">{selectedDriver.driverConnection.activeOrderId.slice(0, 8)}</span>
+                    </div>
+                  )}
+                </div>
               )}
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          {/* Configuration */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Gauge size={16} className="text-violet-400" />
+                Configuration
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Route */}
+              <div className="space-y-1.5">
+                <label className="text-xs text-zinc-500 font-medium uppercase tracking-wider">Route</label>
+                <select
+                  value={routeIdx}
+                  onChange={(e) => setRouteIdx(Number(e.target.value))}
+                  disabled={running}
+                  className="w-full px-3 py-2 bg-[#09090b] border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-violet-500/50 disabled:opacity-50"
+                >
+                  {ROUTES.map((r, i) => (
+                    <option key={i} value={i}>{r.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Heartbeat Interval */}
+              <div className="space-y-1.5">
+                <label className="text-xs text-zinc-500 font-medium uppercase tracking-wider">Heartbeat Interval</label>
+                <div className="flex gap-1.5">
+                  {[200, 500, 1000, 2000].map((ms) => (
+                    <button
+                      key={ms}
+                      disabled={running}
+                      className={`flex-1 px-2 py-1.5 text-xs rounded font-medium transition-colors disabled:opacity-50 ${
+                        heartbeatMs === ms
+                          ? "bg-violet-600 text-white"
+                          : "bg-zinc-800 text-zinc-400 hover:text-zinc-200"
+                      }`}
+                      onClick={() => setHeartbeatMs(ms)}
+                    >
+                      {ms < 1000 ? `${ms}ms` : `${ms / 1000}s`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Speed Multiplier */}
+              <div className="space-y-1.5">
+                <label className="text-xs text-zinc-500 font-medium uppercase tracking-wider">Speed</label>
+                <div className="flex gap-1.5">
+                  {[1, 2, 5, 10].map((s) => (
+                    <button
+                      key={s}
+                      disabled={running}
+                      className={`flex-1 px-2 py-1.5 text-xs rounded font-medium transition-colors disabled:opacity-50 ${
+                        speedMultiplier === s
+                          ? "bg-violet-600 text-white"
+                          : "bg-zinc-800 text-zinc-400 hover:text-zinc-200"
+                      }`}
+                      onClick={() => setSpeedMultiplier(s)}
+                    >
+                      {s}x
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-zinc-600">
+                  Points: {80 * speedMultiplier} to pickup, {120 * speedMultiplier} to dropoff —
+                  interval: {Math.round(heartbeatMs / speedMultiplier)}ms
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Action Button */}
+          <Card>
+            <CardContent className="pt-6 space-y-3">
+              {!running ? (
+                <Button
+                  className="w-full h-14 text-base font-semibold"
+                  onClick={runFullSimulation}
+                  disabled={!selectedDriverId}
+                >
+                  <Play size={20} />
+                  Start Full Simulation
+                </Button>
+              ) : (
+                <Button
+                  className="w-full h-14 text-base font-semibold"
+                  variant="danger"
+                  onClick={stopSimulation}
+                >
+                  <Square size={20} />
+                  Stop Simulation
+                </Button>
+              )}
+
+              {/* Progress */}
+              {(running || phase === "completed") && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs text-zinc-500">
+                    <span>{PHASE_LABELS[phase]}</span>
+                    {progress.total > 0 && (
+                      <span>{progress.current}/{progress.total} ({progress.label})</span>
+                    )}
+                  </div>
+                  <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-200 ${
+                        phase === "completed" ? "bg-emerald-500" : "bg-violet-600"
+                      }`}
+                      style={{
+                        width: progress.total > 0
+                          ? `${(progress.current / progress.total) * 100}%`
+                          : phase === "completed" ? "100%" : "0%",
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Phase steps */}
+              <div className="space-y-1">
+                {(["warm_up", "creating_order", "assigning_driver", "preparing", "to_pickup", "at_pickup", "to_dropoff", "arriving", "completed"] as AutoPhase[]).map((p) => {
+                  const phases: AutoPhase[] = ["warm_up", "creating_order", "assigning_driver", "preparing", "to_pickup", "at_pickup", "to_dropoff", "arriving", "completed"];
+                  const currentIdx = phases.indexOf(phase);
+                  const thisIdx = phases.indexOf(p);
+                  const isDone = phase !== "idle" && thisIdx < currentIdx;
+                  const isCurrent = p === phase;
+                  return (
+                    <div key={p} className={`flex items-center gap-2 text-xs px-2 py-1 rounded ${
+                      isCurrent ? "bg-violet-500/10 text-violet-300" :
+                      isDone ? "text-emerald-400/70" : "text-zinc-600"
+                    }`}>
+                      {isDone ? <CheckCircle2 size={12} /> :
+                       isCurrent ? <Signal size={12} className="animate-pulse" /> :
+                       <div className="w-3 h-3 rounded-full border border-zinc-700" />}
+                      <span>{PHASE_LABELS[p]}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ── Right Panel: Event Log ── */}
+        <div className="lg:col-span-2">
+          <Card className="h-full">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Terminal size={16} className="text-violet-400" />
+                  Live Event Log
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-zinc-600">{eventLog.length} events</span>
+                  <Button size="sm" variant="ghost" onClick={() => setEventLog([])}>
+                    Clear
+                  </Button>
+                </div>
+              </div>
+              <CardDescription>
+                Real-time log of every heartbeat, status change, and phase transition.
+                Open the Map page side-by-side to see the driver marker move smoothly.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div
+                ref={logContainerRef}
+                className="h-[680px] overflow-y-auto bg-[#09090b] border border-zinc-800 rounded-lg p-3 space-y-0.5 font-mono text-xs"
+              >
+                {eventLog.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-zinc-600 space-y-2">
+                    <Navigation size={32} className="opacity-30" />
+                    <p>Select a driver and click Start Full Simulation</p>
+                    <p className="text-[10px] text-zinc-700">
+                      The simulation will: set driver online → create order → assign →
+                      prepare → drive to pickup → pick up → drive to dropoff → deliver
+                    </p>
+                  </div>
+                ) : (
+                  eventLog.map((entry) => (
+                    <div key={entry.id} className={`flex gap-2 ${entry.type === "phase" ? "mt-2 mb-1" : ""}`}>
+                      <span className="text-zinc-600 shrink-0 w-[60px]">{entry.time}</span>
+                      {entry.type === "phase" ? (
+                        <span className="text-violet-400 font-bold">{entry.message}</span>
+                      ) : (
+                        <>
+                          <span className={`shrink-0 ${
+                            entry.type === "success" ? "text-emerald-400" :
+                            entry.type === "error" ? "text-red-400" :
+                            entry.type === "action" ? "text-violet-400" :
+                            "text-zinc-500"
+                          }`}>
+                            {entry.type === "success" ? "✓" :
+                             entry.type === "error" ? "✗" :
+                             entry.type === "action" ? "▶" : "·"}
+                          </span>
+                          <span className="text-zinc-300">{entry.message}</span>
+                        </>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
-  );
-}
-
-// ─── Sub-components ──────────────────────────────────────────────────────────
-
-function ScenarioButton({
-  title,
-  description,
-  disabled,
-  onClick,
-}: {
-  title: string;
-  description: string;
-  disabled: boolean;
-  onClick: () => void;
-}) {
-  const [running, setRunning] = useState(false);
-
-  return (
-    <button
-      className={`w-full text-left px-4 py-3 rounded-lg border transition-all duration-150 ${
-        disabled || running
-          ? "border-zinc-800/50 bg-zinc-900/30 opacity-50 cursor-not-allowed"
-          : "border-zinc-800 bg-zinc-900/50 hover:border-violet-500/50 hover:bg-violet-500/5 cursor-pointer"
-      }`}
-      disabled={disabled || running}
-      onClick={async () => {
-        setRunning(true);
-        try { await onClick(); } finally { setRunning(false); }
-      }}
-    >
-      <div className="flex items-center justify-between">
-        <div>
-          <span className="text-sm font-medium text-zinc-200">{title}</span>
-          <p className="text-xs text-zinc-500 mt-0.5">{description}</p>
-        </div>
-        {running ? (
-          <div className="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
-        ) : (
-          <ChevronRight size={16} className="text-zinc-600" />
-        )}
-      </div>
-    </button>
   );
 }

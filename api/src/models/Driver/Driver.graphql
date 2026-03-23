@@ -187,6 +187,8 @@ extend type Mutation {
         activeOrderId: ID
         navigationPhase: String
         remainingEtaSeconds: Int
+        """When true, also sets the driver's onlinePreference to true"""
+        setOnline: Boolean
     ): DriverHeartbeatResult!
 }
 

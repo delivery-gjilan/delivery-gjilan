@@ -17,6 +17,7 @@ import { useQuery } from '@apollo/client/react';
 import { GET_BANNERS } from '@/graphql/operations/banners';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import type { WoltHeaderBannerType } from '@/components/WoltHeader';
+import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 
 function HorizontalCardSkeleton() {
     const theme = useTheme();
@@ -135,24 +136,28 @@ export default function Discover() {
     };
 
     const renderCards = (items: typeof restaurants) =>
-        items.map((item) => {
+        items.map((item, index) => {
             const lat = (item as any).location?.latitude || 42.4635;
             const lng = (item as any).location?.longitude || 21.4694;
             const fee = estimateDeliveryPrice(lat, lng);
 
             return (
-                <CompactRestaurantCard
+                <Animated.View
                     key={item.id}
-                    id={item.id}
-                    name={item.name}
-                    imageUrl={item.imageUrl}
-                    description={(item as any).description}
-                    isOpen={item.isOpen}
-                    onPress={handleBusinessPress}
-                    deliveryFee={fee}
-                    deliveryTime={getPrepTimeLabel(item)}
-                    activePromotion={(item as any).activePromotion}
-                />
+                    entering={FadeInDown.delay(index * 70).duration(400).springify()}
+                >
+                    <CompactRestaurantCard
+                        id={item.id}
+                        name={item.name}
+                        imageUrl={item.imageUrl}
+                        description={(item as any).description}
+                        isOpen={item.isOpen}
+                        onPress={handleBusinessPress}
+                        deliveryFee={fee}
+                        deliveryTime={getPrepTimeLabel(item)}
+                        activePromotion={(item as any).activePromotion}
+                    />
+                </Animated.View>
             );
         });
 
@@ -212,44 +217,50 @@ export default function Discover() {
                 ) : (
                     <ScrollView showsVerticalScrollIndicator={false}>
                         {/* Category Icons */}
-                        <View style={{ marginBottom: 20, marginTop: 4 }}>
+                        <Animated.View entering={FadeIn.duration(500)} style={{ marginBottom: 20, marginTop: 4 }}>
                             <CategoryIcons categories={categories} />
-                        </View>
+                        </Animated.View>
 
                         {/* Promo Banners */}
-                        <View style={{ marginBottom: 20 }}>
+                        <Animated.View entering={FadeInDown.delay(100).duration(500)} style={{ marginBottom: 20 }}>
                             <PromoSlider banners={promoBanners} />
-                        </View>
+                        </Animated.View>
 
                         {/* Popular Right Now */}
-                        <DiscoverSection
-                            title={t.home.popular_now}
-                            seeAllLabel={t.home.see_all}
-                            onSeeAll={goToRestaurants}
-                        >
-                            {renderCards(popularRestaurants)}
-                        </DiscoverSection>
-
-                        {/* Active Promotions Section */}
-                        {promoRestaurants.length > 0 && (
+                        <Animated.View entering={FadeInDown.delay(200).duration(500)}>
                             <DiscoverSection
-                                title={t.home.active_discounts}
+                                title={t.home.popular_now}
                                 seeAllLabel={t.home.see_all}
                                 onSeeAll={goToRestaurants}
                             >
-                                {renderCards(promoRestaurants)}
+                                {renderCards(popularRestaurants)}
                             </DiscoverSection>
+                        </Animated.View>
+
+                        {/* Active Promotions Section */}
+                        {promoRestaurants.length > 0 && (
+                            <Animated.View entering={FadeInDown.delay(300).duration(500)}>
+                                <DiscoverSection
+                                    title={t.home.active_discounts}
+                                    seeAllLabel={t.home.see_all}
+                                    onSeeAll={goToRestaurants}
+                                >
+                                    {renderCards(promoRestaurants)}
+                                </DiscoverSection>
+                            </Animated.View>
                         )}
 
                         {/* Open Now */}
                         {openNowRestaurants.length > 0 && (
-                            <DiscoverSection
-                                title={t.home.open_now}
-                                seeAllLabel={t.home.see_all}
-                                onSeeAll={goToRestaurants}
-                            >
-                                {renderCards(openNowRestaurants)}
-                            </DiscoverSection>
+                            <Animated.View entering={FadeInDown.delay(400).duration(500)}>
+                                <DiscoverSection
+                                    title={t.home.open_now}
+                                    seeAllLabel={t.home.see_all}
+                                    onSeeAll={goToRestaurants}
+                                >
+                                    {renderCards(openNowRestaurants)}
+                                </DiscoverSection>
+                            </Animated.View>
                         )}
 
                         {/* Bottom spacing */}

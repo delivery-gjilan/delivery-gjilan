@@ -688,7 +688,17 @@ type Mutation {
   Triggers the full heartbeat pipeline (ETA cache, Live Activity, subscriptions).
   Non-production only.
   """
-  adminSimulateDriverHeartbeat(activeOrderId: ID, driverId: ID!, latitude: Float!, longitude: Float!, navigationPhase: String, remainingEtaSeconds: Int): DriverHeartbeatResult!
+  adminSimulateDriverHeartbeat(
+    activeOrderId: ID
+    driverId: ID!
+    latitude: Float!
+    longitude: Float!
+    navigationPhase: String
+    remainingEtaSeconds: Int
+
+    """When true, also sets the driver's onlinePreference to true"""
+    setOnline: Boolean
+  ): DriverHeartbeatResult!
   adminUpdateDriverLocation(driverId: ID!, latitude: Float!, longitude: Float!): User!
 
   """

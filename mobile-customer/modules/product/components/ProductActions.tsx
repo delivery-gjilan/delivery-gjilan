@@ -83,7 +83,7 @@ export function ProductActions({ product, selectedOptions, parentProduct, editin
                     paddingTop: 16,
                 }}
             >
-                <View className="bg-expense/20 py-4 rounded-xl items-center">
+                <View style={{ backgroundColor: theme.colors.expense + '20', paddingVertical: 16, borderRadius: 16, alignItems: 'center' }}>
                     <Text className="text-expense text-base font-semibold">{t.product.unavailable_message}</Text>
                 </View>
             </View>
@@ -134,7 +134,7 @@ export function ProductActions({ product, selectedOptions, parentProduct, editin
                 <Text className="text-foreground text-lg font-semibold">{t.product.quantity}</Text>
 
                 <View style={{ position: 'relative' }}>
-                    <View className="flex-row items-center bg-background border border-border rounded-full">
+                    <View className="flex-row items-center bg-background border border-border" style={{ borderRadius: 24 }}>
                         <TouchableOpacity
                             onPress={decrementQuantity}
                             className="w-12 h-12 items-center justify-center"
@@ -181,11 +181,13 @@ export function ProductActions({ product, selectedOptions, parentProduct, editin
                 <AnimatedTouchable
                     onPress={handleMainAction}
                     disabled={!isSelectionValid || (isInCart && !hasQuantityChanged)}
-                    className="py-4 rounded-xl items-center"
                     style={{
                         backgroundColor: (!isSelectionValid || (isInCart && !hasQuantityChanged)) ? theme.colors.subtext : theme.colors.primary,
                         opacity: (!isSelectionValid || (isInCart && !hasQuantityChanged)) ? 0.5 : 1,
-                        transform: [{ scale: buttonScaleAnim }]
+                        transform: [{ scale: buttonScaleAnim }],
+                        paddingVertical: 16,
+                        borderRadius: 16,
+                        alignItems: 'center' as const,
                     }}
                     activeOpacity={0.7}
                 >
@@ -199,9 +201,14 @@ export function ProductActions({ product, selectedOptions, parentProduct, editin
                 {isInCart && (
                     <TouchableOpacity
                         onPress={removeFromCart}
-                        className="py-4 rounded-xl items-center border-2"
-                        style={{ borderColor: theme.colors.expense }}
                         activeOpacity={0.7}
+                        style={{
+                            paddingVertical: 16,
+                            borderRadius: 16,
+                            alignItems: 'center',
+                            borderWidth: 1.5,
+                            borderColor: theme.colors.expense,
+                        }}
                     >
                         <View className="flex-row items-center gap-2">
                             <Ionicons name="trash-outline" size={20} color={theme.colors.expense} />
