@@ -824,6 +824,7 @@ export type MutationadminSimulateDriverHeartbeatArgs = {
   longitude: Scalars['Float']['input'];
   navigationPhase?: InputMaybe<Scalars['String']['input']>;
   remainingEtaSeconds?: InputMaybe<Scalars['Int']['input']>;
+  setOnline?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 

@@ -54,6 +54,7 @@ function AppContent() {
                         <Stack.Screen name="auth-selection" options={{ headerShown: false }} />
                         <Stack.Screen name="signup" options={{ headerShown: false }} />
                         <Stack.Screen name="login" options={{ headerShown: false }} />
+                        <Stack.Screen name="brand-splash" options={{ headerShown: false, animation: 'fade' }} />
                         <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: 'none' }} />
                         <Stack.Screen 
                             name="business/[businessId]" 

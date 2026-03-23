@@ -58,37 +58,56 @@ export function ProductDetails({
     };
 
     return (
-        <View className="px-6 py-6" style={{ paddingBottom: 100 }}>
+        <View style={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 100 }}>
             {/* Product Name */}
-            <Text className="text-foreground text-3xl font-bold mb-2">{activeProduct.name}</Text>
+            <Text style={{ color: theme.colors.text, fontSize: 24, fontWeight: '700', marginBottom: 6 }}>
+                {activeProduct.name}
+            </Text>
 
             {/* Price Section */}
-            <View className="flex-row items-center mb-6">
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
                 {activeProduct.isOnSale && activeProduct.salePrice ? (
                     <>
-                        <Text className="text-expense text-3xl font-bold mr-3">€{activeProduct.salePrice.toFixed(2)}</Text>
-                        <Text className="text-subtext text-xl line-through">€{activeProduct.price.toFixed(2)}</Text>
+                        <Text style={{ color: theme.colors.expense, fontSize: 22, fontWeight: '700', marginRight: 10 }}>
+                            €{activeProduct.salePrice.toFixed(2)}
+                        </Text>
+                        <Text style={{ color: theme.colors.subtext, fontSize: 17, textDecorationLine: 'line-through' }}>
+                            €{activeProduct.price.toFixed(2)}
+                        </Text>
                     </>
                 ) : (
-                    <Text className="text-primary text-3xl font-bold">€{effectivePrice.toFixed(2)}</Text>
+                    <Text style={{ color: theme.colors.primary, fontSize: 22, fontWeight: '700' }}>
+                        €{effectivePrice.toFixed(2)}
+                    </Text>
                 )}
             </View>
 
             {/* Variants Selector */}
             {selectableVariants.length > 1 && (
-                <View className="mb-8">
-                    <Text className="text-foreground text-lg font-bold mb-4">Select Variant</Text>
-                    <View className="flex-row flex-wrap" style={{ gap: 10 }}>
+                <View style={{ marginBottom: 28 }}>
+                    <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '700', marginBottom: 12 }}>
+                        Select Variant
+                    </Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
                         {selectableVariants.map((v: any) => (
                             <TouchableOpacity
                                 key={v.id}
                                 onPress={() => setSelectedVariantId(v.id)}
-                                className={`px-4 py-2 rounded-xl border-2 ${
-                                    selectedVariantId === v.id ? 'border-primary bg-primary/5' : 'border-border'
-                                }`}
+                                style={{
+                                    paddingHorizontal: 16,
+                                    paddingVertical: 10,
+                                    borderRadius: 14,
+                                    borderWidth: 1.5,
+                                    borderColor: selectedVariantId === v.id ? theme.colors.primary : theme.colors.border,
+                                    backgroundColor: selectedVariantId === v.id ? theme.colors.primary + '10' : 'transparent',
+                                }}
                             >
                                 <Text
-                                    className={`font-semibold ${selectedVariantId === v.id ? 'text-primary' : 'text-subtext'}`}
+                                    style={{
+                                        fontWeight: '600',
+                                        fontSize: 14,
+                                        color: selectedVariantId === v.id ? theme.colors.primary : theme.colors.subtext,
+                                    }}
                                 >
                                     {v.name}
                                 </Text>
@@ -102,37 +121,51 @@ export function ProductDetails({
             {optionGroupsForSelection.length > 0 && (
                 <View>
                     {optionGroupsForSelection.map((group: any) => (
-                        <View key={group.id} className="mb-8">
-                            <View className="flex-row items-baseline justify-between mb-4">
-                                <Text className="text-foreground text-lg font-bold">{group.name}</Text>
-                                <Text className="text-subtext text-xs uppercase font-semibold">
-                                    {group.minSelections > 0 ? 'Required' : 'Optional'} 
+                        <View key={group.id} style={{ marginBottom: 28 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
+                                <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '700' }}>
+                                    {group.name}
+                                </Text>
+                                <Text style={{ color: theme.colors.subtext, fontSize: 11, textTransform: 'uppercase', fontWeight: '600' }}>
+                                    {group.minSelections > 0 ? 'Required' : 'Optional'}
                                     {group.maxSelections > 1 ? ` (Max ${group.maxSelections})` : ''}
                                 </Text>
                             </View>
-                            
-                            <View className="gap-3">
+
+                            <View style={{ gap: 8 }}>
                                 {group.options.map((option: any) => {
                                     const isSelected = selectedOptions[group.id]?.includes(option.id);
                                     return (
                                         <TouchableOpacity
                                             key={option.id}
                                             onPress={() => handleOptionToggle(group.id, option.id, group.maxSelections)}
-                                            className="flex-row items-center justify-between py-3 px-4 rounded-xl border border-border bg-card"
+                                            style={{
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                paddingVertical: 14,
+                                                paddingHorizontal: 16,
+                                                borderRadius: 14,
+                                                borderWidth: 1,
+                                                borderColor: isSelected ? theme.colors.primary : theme.colors.border,
+                                                backgroundColor: isSelected ? theme.colors.primary + '08' : theme.colors.card,
+                                            }}
                                         >
-                                            <View className="flex-row items-center flex-1">
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
                                                 <Ionicons
-                                                    name={isSelected 
-                                                        ? (group.maxSelections === 1 ? 'radio-button-on' : 'checkbox') 
+                                                    name={isSelected
+                                                        ? (group.maxSelections === 1 ? 'radio-button-on' : 'checkbox')
                                                         : (group.maxSelections === 1 ? 'radio-button-off' : 'square-outline')
                                                     }
                                                     size={22}
                                                     color={isSelected ? theme.colors.primary : theme.colors.subtext}
                                                 />
-                                                <Text className="text-foreground text-base ml-3 flex-1">{option.name}</Text>
+                                                <Text style={{ color: theme.colors.text, fontSize: 15, marginLeft: 12, flex: 1 }}>
+                                                    {option.name}
+                                                </Text>
                                             </View>
                                             {option.extraPrice > 0 && (
-                                                <Text className="text-primary font-semibold">
+                                                <Text style={{ color: theme.colors.primary, fontWeight: '600', fontSize: 14 }}>
                                                     +€{option.extraPrice.toFixed(2)}
                                                 </Text>
                                             )}
@@ -146,13 +179,15 @@ export function ProductDetails({
             )}
 
             {/* Divider */}
-            <View className="h-px bg-border mb-6" />
+            <View style={{ height: 1, backgroundColor: theme.colors.border, marginBottom: 20 }} />
 
             {/* Description */}
             {(activeProduct.description || product.description) && (
-                <View className="mb-6">
-                    <Text className="text-foreground text-lg font-semibold mb-3">{t.product.description}</Text>
-                    <Text className="text-subtext text-base leading-6">
+                <View style={{ marginBottom: 20 }}>
+                    <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '600', marginBottom: 10 }}>
+                        {t.product.description}
+                    </Text>
+                    <Text style={{ color: theme.colors.subtext, fontSize: 15, lineHeight: 22 }}>
                         {activeProduct.description || product.description}
                     </Text>
                 </View>
