@@ -92,8 +92,16 @@ export async function GET(request: NextRequest) {
         `https://api.mapbox.com/directions/v5/mapbox/driving/${safePoints}` +
         `?access_token=${MAPBOX_TOKEN}&geometries=geojson&overview=full${extras}`;
 
-    const upstream = await fetch(mapboxUrl);
+    let upstream: Response;
+    try {
+        upstream = await fetch(mapboxUrl);
+    } catch (err) {
+        console.error('[Directions] Mapbox fetch failed:', err);
+        return NextResponse.json({ error: 'Upstream directions error' }, { status: 502 });
+    }
     if (!upstream.ok) {
+        const body = await upstream.text().catch(() => '');
+        console.error(`[Directions] Mapbox returned ${upstream.status}: ${body}`);
         return NextResponse.json({ error: 'Upstream directions error' }, { status: 502 });
     }
 

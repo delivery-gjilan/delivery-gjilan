@@ -34,6 +34,7 @@ export default function Topbar() {
   const isStoreClosed = storeStatus?.isStoreClosed ?? false;
   const bannerEnabled = storeStatus?.bannerEnabled ?? false;
   const dispatchModeEnabled = storeStatus?.dispatchModeEnabled ?? false;
+  const assignmentModeLabel = dispatchModeEnabled ? 'Dispatch mode' : 'Self-assign mode';
   const isSuperAdmin = admin?.role === "SUPER_ADMIN";
 
   const handleToggleStore = async (close: boolean) => {
@@ -161,6 +162,14 @@ export default function Topbar() {
               )}
 
               <div className="w-px h-4 bg-zinc-800" />
+
+              <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+                <span>Order mode</span>
+                <span className="text-zinc-400">Currently:</span>
+                <span className={`font-medium ${dispatchModeEnabled ? 'text-amber-300' : 'text-emerald-300'}`}>
+                  {assignmentModeLabel}
+                </span>
+              </div>
 
               <button
                 onClick={handleToggleDispatch}
