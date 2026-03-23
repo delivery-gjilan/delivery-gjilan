@@ -42,8 +42,9 @@ function withFixFirebaseModularHeaders(config) {
   pod 'PromisesObjC', :modular_headers => true
 `;
 
-      // Find the target block and insert after it starts
-      const targetMatch = podfile.match(/target ['"]mobilecustomer['"] do/);
+      // Find the first target block and insert after it starts.
+      // The app target name can change (e.g. branding rename), so avoid hardcoding.
+      const targetMatch = podfile.match(/target\s+['"][^'"]+['"]\s+do/);
       if (targetMatch) {
         const insertIndex = podfile.indexOf(targetMatch[0]) + targetMatch[0].length;
         podfile = podfile.slice(0, insertIndex) + modularHeadersPatch + podfile.slice(insertIndex);

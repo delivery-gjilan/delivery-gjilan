@@ -680,6 +680,12 @@ export type Mutation = {
   adminSendPttSignal: Scalars['Boolean']['output'];
   /** Admin mutation to manually set connection status (for testing/recovery) */
   adminSetDriverConnectionStatus: User;
+  /**
+   * Admin simulation heartbeat — wraps processHeartbeat for SUPER_ADMIN.
+   * Triggers the full heartbeat pipeline (ETA cache, Live Activity, subscriptions).
+   * Non-production only.
+   */
+  adminSimulateDriverHeartbeat: DriverHeartbeatResult;
   adminUpdateDriverLocation: User;
   /** Admin mutation to update per-driver settings (commission %, max active orders, vehicle ownership) */
   adminUpdateDriverSettings: User;
@@ -808,6 +814,16 @@ export type MutationadminSendPttSignalArgs = {
 export type MutationadminSetDriverConnectionStatusArgs = {
   driverId: Scalars['ID']['input'];
   status: DriverConnectionStatus;
+};
+
+
+export type MutationadminSimulateDriverHeartbeatArgs = {
+  activeOrderId?: InputMaybe<Scalars['ID']['input']>;
+  driverId: Scalars['ID']['input'];
+  latitude: Scalars['Float']['input'];
+  longitude: Scalars['Float']['input'];
+  navigationPhase?: InputMaybe<Scalars['String']['input']>;
+  remainingEtaSeconds?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -3228,6 +3244,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   addUserAddress?: Resolver<ResolversTypes['UserAddress'], ParentType, ContextType, RequireFields<MutationaddUserAddressArgs, 'input'>>;
   adminSendPttSignal?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationadminSendPttSignalArgs, 'action' | 'channelName' | 'driverIds'>>;
   adminSetDriverConnectionStatus?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationadminSetDriverConnectionStatusArgs, 'driverId' | 'status'>>;
+  adminSimulateDriverHeartbeat?: Resolver<ResolversTypes['DriverHeartbeatResult'], ParentType, ContextType, RequireFields<MutationadminSimulateDriverHeartbeatArgs, 'driverId' | 'latitude' | 'longitude'>>;
   adminUpdateDriverLocation?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationadminUpdateDriverLocationArgs, 'driverId' | 'latitude' | 'longitude'>>;
   adminUpdateDriverSettings?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationadminUpdateDriverSettingsArgs, 'driverId'>>;
   assignDriverToOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationassignDriverToOrderArgs, 'id'>>;

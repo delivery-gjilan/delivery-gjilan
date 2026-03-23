@@ -20,6 +20,7 @@ import {
   Bell,
   LayoutDashboard,
   Image,
+  Zap,
 } from "lucide-react";
 
 const menu: any[] = [
@@ -30,6 +31,7 @@ const menu: any[] = [
   { name: "Businesses", href: "/dashboard/businesses", icon: Store, superAdminOnly: true },
   { name: "Market", href: "/dashboard/market", icon: Store, superAdminOnly: true },
   { name: "Drivers", href: "/dashboard/drivers", icon: Truck, superAdminOnly: true },
+  { name: "Simulation", href: "/dashboard/simulation", icon: Zap, superAdminOnly: true },
 
   { divider: true, superAdminOnly: true },
 

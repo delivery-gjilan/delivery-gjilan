@@ -682,6 +682,13 @@ type Mutation {
   Admin mutation to manually set connection status (for testing/recovery)
   """
   adminSetDriverConnectionStatus(driverId: ID!, status: DriverConnectionStatus!): User!
+
+  """
+  Admin simulation heartbeat — wraps processHeartbeat for SUPER_ADMIN.
+  Triggers the full heartbeat pipeline (ETA cache, Live Activity, subscriptions).
+  Non-production only.
+  """
+  adminSimulateDriverHeartbeat(activeOrderId: ID, driverId: ID!, latitude: Float!, longitude: Float!, navigationPhase: String, remainingEtaSeconds: Int): DriverHeartbeatResult!
   adminUpdateDriverLocation(driverId: ID!, latitude: Float!, longitude: Float!): User!
 
   """

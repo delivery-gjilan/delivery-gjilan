@@ -13,6 +13,7 @@ const superAdminOnlyPrefixes = [
     "/dashboard/notifications",
     "/dashboard/realtime",
     "/dashboard/logs",
+    "/dashboard/simulation",
     "/admin",
 ];
 

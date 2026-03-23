@@ -20,7 +20,7 @@ platform :ios, podfile_properties['ios.deploymentTarget'] || '15.1'
 
 prepare_react_native_project!
 
-target 'deliveryadmin' do
+target 'ZippAdmin' do
   # Enable modular headers for Firebase dependencies (required for static libraries)
   pod 'GoogleUtilities', :modular_headers => true
   pod 'FirebaseCore', :modular_headers => true

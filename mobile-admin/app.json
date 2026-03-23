@@ -25,6 +25,7 @@
         "ACCESS_COARSE_LOCATION"
       ],
       "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0f172a"
       },
       "edgeToEdgeEnabled": true,

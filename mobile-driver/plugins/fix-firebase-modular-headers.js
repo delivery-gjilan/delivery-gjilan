@@ -38,7 +38,8 @@ function withFixFirebaseModularHeaders(config) {
   pod 'PromisesObjC', :modular_headers => true
 `;
 
-        const targetMatch = podfile.match(/target ['"]mobiledriver['"] do/);
+        // Target names can change during branding; match any iOS target block.
+        const targetMatch = podfile.match(/target\s+['"][^'"]+['"]\s+do/);
         if (targetMatch) {
           const insertIndex = podfile.indexOf(targetMatch[0]) + targetMatch[0].length;
           podfile = podfile.slice(0, insertIndex) + modularHeadersPatch + podfile.slice(insertIndex);

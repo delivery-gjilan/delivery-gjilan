@@ -121,3 +121,28 @@ export const SET_USER_PERMISSIONS = graphql(`
     }
   }
 `);
+
+export const ADMIN_SIMULATE_DRIVER_HEARTBEAT = graphql(`
+  mutation AdminSimulateDriverHeartbeat(
+    $driverId: ID!
+    $latitude: Float!
+    $longitude: Float!
+    $activeOrderId: ID
+    $navigationPhase: String
+    $remainingEtaSeconds: Int
+  ) {
+    adminSimulateDriverHeartbeat(
+      driverId: $driverId
+      latitude: $latitude
+      longitude: $longitude
+      activeOrderId: $activeOrderId
+      navigationPhase: $navigationPhase
+      remainingEtaSeconds: $remainingEtaSeconds
+    ) {
+      success
+      connectionStatus
+      locationUpdated
+      lastHeartbeatAt
+    }
+  }
+`);

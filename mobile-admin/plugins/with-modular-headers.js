@@ -42,8 +42,9 @@ function withFixFirebaseModularHeaders(config) {
   pod 'PromisesObjC', :modular_headers => true
 `;
 
-      // Find the target block and insert after it starts
-      const targetMatch = podfile.match(/target ['"]deliveryadmin['"] do/);
+      // Find the first target block and insert after it starts.
+      // Target names can change when branding is updated.
+      const targetMatch = podfile.match(/target\s+['"][^'"]+['"]\s+do/);
       if (targetMatch) {
         const insertIndex = podfile.indexOf(targetMatch[0]) + targetMatch[0].length;
         podfile = podfile.slice(0, insertIndex) + modularHeadersPatch + podfile.slice(insertIndex);

@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Zipp Driver",
-    "slug": "finance-tracker",
+    "slug": "zipp-driver",
     "version": "1.0.0",
     "platforms": ["ios", "android"],
     "updates": {
