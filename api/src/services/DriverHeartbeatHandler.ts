@@ -97,8 +97,10 @@ export class DriverHeartbeatHandler {
       driver = await this.driverRepository.createDriver(userId);
     }
 
-    // Determine if we should update location in DB
-    const shouldUpdateLocation = this.shouldUpdateLocation(driver, latitude, longitude, now);
+    // Always write location to DB on every heartbeat so the
+    // driversUpdated subscription carries fresh coordinates for the
+    // admin map in real-time (no throttle gate).
+    const shouldUpdateLocation = true;
 
     // Process heartbeat (always updates lastHeartbeatAt and connectionStatus)
     const wasDisconnected = driver.connectionStatus === 'DISCONNECTED' || 
@@ -111,10 +113,6 @@ export class DriverHeartbeatHandler {
       longitude,
       shouldUpdateLocation
     );
-
-    if (shouldUpdateLocation) {
-      await this.publishDriverUpdate([userId]);
-    }
 
     if (!updatedDriver) {
       return {
@@ -170,12 +168,9 @@ export class DriverHeartbeatHandler {
       });
     }
 
-    // Publish updates when reconnecting or when location write is refreshed.
-    // This keeps admin driver lists/maps in sync without waiting for watchdog transitions.
-    // For active deliveries, always publish so the admin map receives 2s updates
-    // even when the DB location write is throttled (10s/5m gate).
-    const isActiveDelivery = !!etaPayload?.activeOrderId;
-    if (wasDisconnected || shouldUpdateLocation || isActiveDelivery) {
+    // Publish updates when reconnecting or when location/state changed.
+    // Active deliveries always write to DB above, so shouldUpdateLocation covers them.
+    if (wasDisconnected || shouldUpdateLocation) {
       if (wasDisconnected) {
         log.info({ userId, previousStatus: driver.connectionStatus }, 'heartbeat:reconnected');
       }

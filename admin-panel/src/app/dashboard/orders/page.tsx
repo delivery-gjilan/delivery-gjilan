@@ -5,7 +5,6 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import { gql } from "@apollo/client";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
-import { Table, Th, Td } from "@/components/ui/Table";
 import Dropdown from "@/components/ui/Dropdown";
 import Input from "@/components/ui/Input";
 import { useOrders, useUpdateOrderStatus } from "@/lib/hooks/useOrders";
@@ -290,16 +289,6 @@ function CopyableId({ displayId }: { displayId: string }) {
     );
 }
 
-function TimeDisplay({ date }: { date: string }) {
-    const d = new Date(date);
-    return (
-        <div className="text-sm">
-            <div className="text-zinc-300">{d.toLocaleDateString([], { month: "short", day: "numeric" })}</div>
-            <div className="text-zinc-500 text-xs">{d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
-        </div>
-    );
-}
-
 /* ---------------------------------------------------------
    PAGE
 --------------------------------------------------------- */
@@ -545,16 +534,18 @@ export default function OrdersPage() {
             <div className="mb-8">
                 <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-3">Active Orders</h2>
 
-                {isBusinessUser ? (
-                    /* ── Card View (Business Users) ── */
-                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                        {activeOrders.length === 0 ? (
-                            <div className="col-span-full text-center text-zinc-600 py-12">No active orders</div>
-                        ) : (
-                            activeOrders.map((order) => {
-                                const nextStatus = order.status === "PENDING" ? "PREPARING" : order.status === "PREPARING" ? "READY" : null;
-                                return (
-                                    <div key={order.id} className="bg-[#111113] border border-zinc-800 rounded-xl p-4 hover:border-zinc-700 transition-colors">
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {activeOrders.length === 0 ? (
+                        <div className="col-span-full text-center text-zinc-600 py-12">
+                            {searchQuery ? "No active orders matching your search" : "No active orders"}
+                        </div>
+                    ) : (
+                        activeOrders.map((order) => {
+                            const nextStatus = STATUS_FLOW[order.status];
+                            const businessNames = getOrderBusinessesSafe(order).map(b => b.business.name).join(", ");
+                            const earnings = !isBusinessUser ? computeOrderEarnings(order, businessSettlementRules) : null;
+                            return (
+                                <div key={order.id} className={`bg-[#111113] border rounded-xl p-4 hover:border-zinc-700 transition-colors ${STATUS_COLORS[order.status].border}`}>
                                         {/* Header */}
                                         <div className="flex items-start justify-between mb-3">
                                             <div>
@@ -566,23 +557,27 @@ export default function OrdersPage() {
                                             <StatusBadge status={order.status} />
                                         </div>
 
-                                        {/* Customer */}
-                                        {order.user && (
-                                            <div className="mb-3 pb-3 border-b border-zinc-800/60">
+                                        {/* Customer + Business */}
+                                        <div className="mb-3 pb-3 border-b border-zinc-800/60 space-y-1.5">
+                                            {order.user && (
                                                 <div className="flex items-center gap-2">
                                                     <User size={14} className="text-zinc-500" />
                                                     <span className="text-sm text-white font-medium">
                                                         {order.user.firstName} {order.user.lastName}
                                                     </span>
+                                                    {order.user.phoneNumber && (
+                                                        <>
+                                                            <span className="text-zinc-700">·</span>
+                                                            <span className="text-xs text-zinc-500">{order.user.phoneNumber}</span>
+                                                        </>
+                                                    )}
                                                 </div>
-                                                {order.user.phoneNumber && (
-                                                    <div className="flex items-center gap-2 mt-1 ml-[22px]">
-                                                        <Phone size={12} className="text-zinc-600" />
-                                                        <span className="text-xs text-zinc-500">{order.user.phoneNumber}</span>
-                                                    </div>
-                                                )}
+                                            )}
+                                            <div className="flex items-center gap-2">
+                                                <Store size={14} className="text-violet-500" />
+                                                <span className="text-sm text-zinc-300">{businessNames}</span>
                                             </div>
-                                        )}
+                                        </div>
 
                                         {/* Items */}
                                         <div className="mb-3 space-y-1">
@@ -645,9 +640,42 @@ export default function OrdersPage() {
                                             </div>
                                         )}
 
+                                        {/* Driver assignment (super admin) */}
+                                        {isSuperAdmin && (
+                                            <div className="mb-3">
+                                                <Dropdown
+                                                    value={order.driver?.id || ""}
+                                                    onChange={(val) => handleAssignDriver(order.id, val)}
+                                                    options={driverOptions}
+                                                    disabled={assigningDriverOrderId === order.id}
+                                                    className="w-full"
+                                                />
+                                            </div>
+                                        )}
+
                                         {/* Footer */}
                                         <div className="flex items-center justify-between pt-3 border-t border-zinc-800/60">
-                                            <div className="text-lg font-bold text-white">${order.totalPrice.toFixed(2)}</div>
+                                            <div>
+                                                <div className="text-lg font-bold text-white">${order.totalPrice.toFixed(2)}</div>
+                                                {earnings && (
+                                                    <div className="group relative">
+                                                        <span className="inline-flex items-center rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
+                                                            +${earnings.total.toFixed(2)}
+                                                        </span>
+                                                        {earnings.deliveryIncluded && earnings.deliveryCommission > 0 && (
+                                                            <span className="ml-1 inline-flex items-center rounded-full bg-cyan-500/15 border border-cyan-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300">
+                                                                DEL+
+                                                            </span>
+                                                        )}
+                                                        <div className="pointer-events-none absolute left-0 bottom-full z-[120] mb-2 w-56 rounded-md border border-zinc-700 bg-[#0a0a0d] p-2 text-left text-[11px] text-zinc-300 opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+                                                            <div className="font-semibold text-zinc-200 mb-1">Earnings breakdown</div>
+                                                            <div className="flex justify-between"><span className="text-zinc-500">Delivery</span><span className={earnings.deliveryIncluded ? 'text-cyan-300' : 'text-zinc-500'}>+${(earnings.deliveryIncluded ? earnings.deliveryCommission : earnings.deliveryCommissionPotential).toFixed(2)}</span></div>
+                                                            <div className="flex justify-between"><span className="text-zinc-500">Restaurant</span><span>+${earnings.restaurantCommission.toFixed(2)}</span></div>
+                                                            <div className="flex justify-between"><span className="text-zinc-500">Markup</span><span>+${earnings.markup.toFixed(2)}</span></div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
                                             <div className="flex items-center gap-2">
                                                 {nextStatus && (() => {
                                                     const c = STATUS_COLORS[nextStatus];
@@ -659,10 +687,20 @@ export default function OrdersPage() {
                                                         >
                                                             <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
                                                             {STATUS_LABELS[nextStatus]}
+                                                            <ArrowRight size={12} />
                                                         </button>
                                                     );
                                                 })()}
-                                                <Button variant="outline" size="sm" onClick={() => openDetails(order)}>Details</Button>
+                                                {isSuperAdmin && (
+                                                    <Dropdown
+                                                        value={order.status}
+                                                        onChange={(val) => handleStatusChange(order, val)}
+                                                        options={STATUS_OPTIONS}
+                                                        disabled={updateLoading && updatingOrderId === order.id}
+                                                        className="min-w-[130px]"
+                                                    />
+                                                )}
+                                                <Button variant="ghost" size="sm" onClick={() => openDetails(order)}>Details</Button>
                                             </div>
                                         </div>
                                     </div>
@@ -670,218 +708,93 @@ export default function OrdersPage() {
                             })
                         )}
                     </div>
-                ) : (
-                    /* ── Table View (Super Admin) ── */
-                    <Table>
-                        <thead>
-                            <tr>
-                                <Th>Order</Th>
-                                <Th>Time</Th>
-                                <Th>Customer</Th>
-                                <Th>Business</Th>
-                                <Th>Driver</Th>
-                                <Th>Status</Th>
-                                <Th className="text-right">Total</Th>
-                                <Th></Th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {activeOrders.length === 0 ? (
-                                <tr>
-                                    <Td colSpan={8}>
-                                        <div className="text-center text-zinc-600 py-12">
-                                            {searchQuery ? "No active orders matching your search" : "No active orders"}
-                                        </div>
-                                    </Td>
-                                </tr>
-                            ) : (
-                                activeOrders.map((order) => {
-                                    const nextStatus = STATUS_FLOW[order.status];
-                                    const businessNames = getOrderBusinessesSafe(order).map(b => b.business.name).join(", ");
-                                    const earnings = computeOrderEarnings(order, businessSettlementRules);
-                                    return (
-                                        <tr key={order.id} className="hover:bg-zinc-900/30 transition-colors">
-                                            <Td><CopyableId displayId={order.displayId} /></Td>
-                                            <Td><TimeDisplay date={order.orderDate} /></Td>
-                                            <Td>
-                                                {order.user ? (
-                                                    <div>
-                                                        <div className="text-sm text-white font-medium">
-                                                            {order.user.firstName} {order.user.lastName}
-                                                        </div>
-                                                        <div className="text-zinc-500 text-xs">{order.user.email}</div>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-zinc-600 text-sm">N/A</span>
-                                                )}
-                                            </Td>
-                                            <Td><span className="text-sm text-zinc-300">{businessNames}</span></Td>
-                                            <Td>
-                                                <Dropdown
-                                                    value={order.driver?.id || ""}
-                                                    onChange={(val) => handleAssignDriver(order.id, val)}
-                                                    options={driverOptions}
-                                                    disabled={assigningDriverOrderId === order.id}
-                                                    className="min-w-[160px]"
-                                                />
-                                            </Td>
-                                            <Td>
-                                                <div className="flex items-center gap-2">
-                                                    {nextStatus && (() => {
-                                                        const c = STATUS_COLORS[nextStatus];
-                                                        return (
-                                                            <button
-                                                                onClick={() => handleNextStatus(order)}
-                                                                disabled={updateLoading && updatingOrderId === order.id}
-                                                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${c.bg} ${c.text} ${c.border} hover:brightness-125`}
-                                                            >
-                                                                <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
-                                                                {STATUS_LABELS[nextStatus]}
-                                                                <ArrowRight size={14} />
-                                                            </button>
-                                                        );
-                                                    })()}
-                                                    <Dropdown
-                                                        value={order.status}
-                                                        onChange={(val) => handleStatusChange(order, val)}
-                                                        options={STATUS_OPTIONS}
-                                                        disabled={updateLoading && updatingOrderId === order.id}
-                                                        className="min-w-[150px]"
-                                                    />
-                                                </div>
-                                            </Td>
-                                            <Td className="text-right">
-                                                <div className="flex flex-col items-end gap-1">
-                                                    <span className="font-semibold text-white">${order.totalPrice.toFixed(2)}</span>
-                                                    <div className="group relative overflow-visible">
-                                                        <span className="inline-flex items-center rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
-                                                            +${earnings.total.toFixed(2)}
-                                                        </span>
-                                                        {earnings.deliveryIncluded && earnings.deliveryCommission > 0 && (
-                                                            <span className="ml-1 inline-flex items-center rounded-full bg-cyan-500/15 border border-cyan-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300 align-middle">
-                                                                DEL+
-                                                            </span>
-                                                        )}
-                                                        <div className="pointer-events-none absolute right-0 bottom-full z-[120] mb-2 w-64 rounded-md border border-zinc-700 bg-[#0a0a0d] p-2 text-left text-[11px] text-zinc-300 opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
-                                                            <div className="font-semibold text-zinc-200 mb-1">Earnings breakdown</div>
-                                                            <div className="flex justify-between"><span className="text-zinc-500">Delivery commission</span><span className={earnings.deliveryIncluded ? 'text-cyan-300' : 'text-zinc-500'}>+${(earnings.deliveryIncluded ? earnings.deliveryCommission : earnings.deliveryCommissionPotential).toFixed(2)}</span></div>
-                                                            {!earnings.deliveryIncluded && (
-                                                                <div className="text-[10px] text-zinc-500 mt-0.5">Pending: added when driver is assigned/out for delivery.</div>
-                                                            )}
-                                                            {earnings.deliveryIncluded && (
-                                                                <div className="text-[10px] text-cyan-300 mt-0.5">Delivery commission is now included.</div>
-                                                            )}
-                                                            <div className="flex justify-between"><span className="text-zinc-500">Restaurant commission</span><span>+${earnings.restaurantCommission.toFixed(2)}</span></div>
-                                                            <div className="flex justify-between"><span className="text-zinc-500">Markup</span><span>+${earnings.markup.toFixed(2)}</span></div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </Td>
-                                            <Td>
-                                                <Button variant="ghost" size="sm" onClick={() => openDetails(order)}>Details</Button>
-                                            </Td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </Table>
-                )}
             </div>
 
             {/* ════════════════ COMPLETED ORDERS ════════════════ */}
             {showCompleted && (
                 <div className="mb-8">
                     <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-3">Completed Orders</h2>
-                    <Table>
-                        <thead>
-                            <tr>
-                                <Th>Order</Th>
-                                <Th>Time</Th>
-                                <Th>Customer</Th>
-                                <Th>Business</Th>
-                                <Th>Driver</Th>
-                                <Th>Status</Th>
-                                <Th className="text-right">Total</Th>
-                                <Th></Th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {completedOrders.length === 0 ? (
-                                <tr>
-                                    <Td colSpan={8}>
-                                        <div className="text-center text-zinc-600 py-12">
-                                            {searchQuery ? "No completed orders matching your search" : "No completed orders yet"}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {completedOrders.length === 0 ? (
+                            <div className="col-span-full text-center text-zinc-600 py-12">
+                                {searchQuery ? "No completed orders matching your search" : "No completed orders yet"}
+                            </div>
+                        ) : (
+                            completedOrders.map((order) => {
+                                const businessNames = getOrderBusinessesSafe(order).map(b => b.business.name).join(", ");
+                                const earnings = !isBusinessUser ? computeOrderEarnings(order, businessSettlementRules) : null;
+                                return (
+                                    <div key={order.id} className={`bg-[#111113] border rounded-xl p-4 opacity-75 hover:opacity-100 transition-all ${STATUS_COLORS[order.status].border}`}>
+                                        {/* Header */}
+                                        <div className="flex items-start justify-between mb-3">
+                                            <div>
+                                                <CopyableId displayId={order.displayId} />
+                                                <div className="text-xs text-zinc-600 mt-1">
+                                                    {new Date(order.orderDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                                </div>
+                                            </div>
+                                            {isSuperAdmin ? (
+                                                <Dropdown
+                                                    value={order.status}
+                                                    onChange={(val) => handleStatusChange(order, val)}
+                                                    options={STATUS_OPTIONS}
+                                                    disabled={updateLoading && updatingOrderId === order.id}
+                                                    className="min-w-[130px]"
+                                                />
+                                            ) : (
+                                                <StatusBadge status={order.status} />
+                                            )}
                                         </div>
-                                    </Td>
-                                </tr>
-                            ) : (
-                                completedOrders.map((order) => {
-                                    const businessNames = getOrderBusinessesSafe(order).map(b => b.business.name).join(", ");
-                                    const earnings = computeOrderEarnings(order, businessSettlementRules);
-                                    return (
-                                        <tr key={order.id} className="hover:bg-zinc-900/30 transition-colors">
-                                            <Td><CopyableId displayId={order.displayId} /></Td>
-                                            <Td><TimeDisplay date={order.orderDate} /></Td>
-                                            <Td>
-                                                {order.user ? (
-                                                    <div>
-                                                        <div className="text-sm text-white font-medium">
-                                                            {order.user.firstName} {order.user.lastName}
-                                                        </div>
-                                                        <div className="text-zinc-500 text-xs">{order.user.email}</div>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-zinc-600 text-sm">N/A</span>
-                                                )}
-                                            </Td>
-                                            <Td><span className="text-sm text-zinc-300">{businessNames}</span></Td>
-                                            <Td>
-                                                {order.driver ? (
-                                                    <span className="text-sm text-zinc-300">
+
+                                        {/* Customer + Business */}
+                                        <div className="mb-3 pb-3 border-b border-zinc-800/60 space-y-1.5">
+                                            {order.user && (
+                                                <div className="flex items-center gap-2">
+                                                    <User size={14} className="text-zinc-500" />
+                                                    <span className="text-sm text-white font-medium">
+                                                        {order.user.firstName} {order.user.lastName}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            <div className="flex items-center gap-2">
+                                                <Store size={14} className="text-violet-500" />
+                                                <span className="text-sm text-zinc-300">{businessNames}</span>
+                                            </div>
+                                            {order.driver && (
+                                                <div className="flex items-center gap-2">
+                                                    <Package size={14} className="text-zinc-500" />
+                                                    <span className="text-sm text-zinc-400">
                                                         {order.driver.firstName} {order.driver.lastName}
                                                     </span>
-                                                ) : (
-                                                    <span className="text-zinc-600 text-sm">—</span>
-                                                )}
-                                            </Td>
-                                            <Td><StatusBadge status={order.status} /></Td>
-                                            <Td className="text-right">
-                                                <div className="flex flex-col items-end gap-1">
-                                                    <span className="font-semibold text-white">${order.totalPrice.toFixed(2)}</span>
-                                                    <div className="group relative overflow-visible">
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Footer */}
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <div className="text-lg font-bold text-white">${order.totalPrice.toFixed(2)}</div>
+                                                {earnings && (
+                                                    <div className="group relative">
                                                         <span className="inline-flex items-center rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
                                                             +${earnings.total.toFixed(2)}
                                                         </span>
-                                                        {earnings.deliveryIncluded && earnings.deliveryCommission > 0 && (
-                                                            <span className="ml-1 inline-flex items-center rounded-full bg-cyan-500/15 border border-cyan-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300 align-middle">
-                                                                DEL+
-                                                            </span>
-                                                        )}
-                                                        <div className="pointer-events-none absolute right-0 bottom-full z-[120] mb-2 w-64 rounded-md border border-zinc-700 bg-[#0a0a0d] p-2 text-left text-[11px] text-zinc-300 opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+                                                        <div className="pointer-events-none absolute left-0 bottom-full z-[120] mb-2 w-56 rounded-md border border-zinc-700 bg-[#0a0a0d] p-2 text-left text-[11px] text-zinc-300 opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
                                                             <div className="font-semibold text-zinc-200 mb-1">Earnings breakdown</div>
-                                                            <div className="flex justify-between"><span className="text-zinc-500">Delivery commission</span><span className={earnings.deliveryIncluded ? 'text-cyan-300' : 'text-zinc-500'}>+${(earnings.deliveryIncluded ? earnings.deliveryCommission : earnings.deliveryCommissionPotential).toFixed(2)}</span></div>
-                                                            {!earnings.deliveryIncluded && (
-                                                                <div className="text-[10px] text-zinc-500 mt-0.5">Pending: added when driver is assigned/out for delivery.</div>
-                                                            )}
-                                                            {earnings.deliveryIncluded && (
-                                                                <div className="text-[10px] text-cyan-300 mt-0.5">Delivery commission is now included.</div>
-                                                            )}
-                                                            <div className="flex justify-between"><span className="text-zinc-500">Restaurant commission</span><span>+${earnings.restaurantCommission.toFixed(2)}</span></div>
+                                                            <div className="flex justify-between"><span className="text-zinc-500">Delivery</span><span>+${(earnings.deliveryIncluded ? earnings.deliveryCommission : earnings.deliveryCommissionPotential).toFixed(2)}</span></div>
+                                                            <div className="flex justify-between"><span className="text-zinc-500">Restaurant</span><span>+${earnings.restaurantCommission.toFixed(2)}</span></div>
                                                             <div className="flex justify-between"><span className="text-zinc-500">Markup</span><span>+${earnings.markup.toFixed(2)}</span></div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            </Td>
-                                            <Td>
-                                                <Button variant="ghost" size="sm" onClick={() => openDetails(order)}>Details</Button>
-                                            </Td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </Table>
+                                                )}
+                                            </div>
+                                            <Button variant="ghost" size="sm" onClick={() => openDetails(order)}>Details</Button>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
                 </div>
             )}
 

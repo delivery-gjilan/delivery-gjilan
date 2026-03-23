@@ -11,6 +11,7 @@ This document is a fast context handoff for future UI changes across `admin-pane
 
 - 2026-03-19: Admin orders earnings calculation now derives business commission from active business settlement rules (same finance-rule source) instead of only business profile percentage, so `+earnings` matches configured `Settlement Rules` behavior.
 - 2026-03-19: Refined admin orders earnings indicator behavior: delivery commission is now conditionally included only after driver assignment/out-for-delivery, marked with `DEL+`, and earnings tooltip now overlays above rows to avoid table layout/scroll expansion.
+- 2026-03-19: Admin orders page (`/dashboard/orders`) refactored from dual layout (card view for business users, table view for super admin) to a unified card grid for all roles. Cards show status-colored border, customer + business + driver info, items preview, driver notes, prep time controls. Super admin cards additionally show driver assignment dropdown, status dropdown, and platform earnings with hover breakdown. Completed orders also use card grid with dimmed opacity, and super admin gets status dropdown on those too. Removed `Table`/`Th`/`Td` and `TimeDisplay` component (no longer used).
 - 2026-03-19: Added admin orders earnings indicator in `admin-panel/src/app/dashboard/orders/page.tsx` for non-business admin views: each order now shows `+earnings` with breakdown (delivery commission, restaurant commission, markup) in table rows and order details modal.
 - 2026-03-19: Restyled admin financial settlements tables (`/admin/financial/settlements`) to match business settlements table language (dark grid, compact header, status/direction chips, row hover, and action button styling) for cross-surface consistency.
 - 2026-03-19: Added mobile parity tracker `docs/MOBILE/ADMIN_PANEL_MOBILE_REFACTOR_TRACKER.md` to keep business/admin mobile refactor aligned with admin-panel changes as a living backlog.
@@ -64,6 +65,11 @@ This document is a fast context handoff for future UI changes across `admin-pane
   - Reusable products management block used outside market page
   - Mirrors create/edit/delete behavior for product/offer/variant
   - Includes variant-group select/create in create and edit flows
+
+- `admin-panel/src/components/dashboard/topbar.tsx`
+  - Super-admin controls include store live/close, global banner, and dispatch toggle
+  - Assignment mode context is shown inline as: `Order mode Currently: Dispatch mode|Self-assign mode`
+  - This label reflects `dispatchModeEnabled` from `getStoreStatus` so the active order-assignment flow is always explicit
 
 - `admin-panel/src/lib/hooks/useProducts.ts`
   - Core product hooks and data flattening from `ProductCard -> Product`

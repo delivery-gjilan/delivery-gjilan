@@ -49,14 +49,13 @@ On each successful heartbeat it:
 
 The write-throttling behavior is important because it reduces DB churn while keeping maps fresh enough.
 
-### Publish Throttle vs Active-Delivery Bypass
+### Location Write & Publish Policy
 
-The `publishDriverUpdate` call that notifies admin/driver-list subscribers follows a two-tier policy:
+Every heartbeat writes `driverLat`, `driverLng`, and `lastLocationUpdate` to the drivers table unconditionally (no throttle gate). A single `publishDriverUpdate` fires after the write, so the `driversUpdated` subscription always carries fresh coordinates for the admin map (~2 s cadence per driver).
 
-- **Idle / slow drivers:** publish fires only when the DB location write passes the throttle gate (10 s elapsed OR 5 m moved), so admin maps may lag up to 10 s between updates.
-- **Active deliveries (OUT_FOR_DELIVERY):** publish fires on **every heartbeat** (every 2 s) regardless of the DB throttle gate. This is gated by `!!etaPayload?.activeOrderId`. The DB write throttle still applies — only the subscription publish is bypassed — so there is no extra DB load.
+The previous 10 s / 5 m DB throttle has been removed. The `shouldUpdateLocation` private method still exists for reference but is no longer called.
 
-This means the admin map receives 2 s position updates for any driver currently delivering, which feeds the admin-side animation loop (30 fps commit with rAF dead-reckoning and route-snap).
+This means the admin map receives 2 s position updates with fresh coordinates for **all** online drivers, which feeds the admin-side animation loop (30 fps commit with rAF dead-reckoning and route-snap).
 
 ### Periodic Live Activity ETA Pushes
 

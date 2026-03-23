@@ -1190,32 +1190,28 @@ export default function MapPage() {
               pitchAlignment="viewport"
               rotationAlignment="viewport"
             >
-              <div className={`relative flex flex-col items-center group cursor-pointer ${connectionStatus === "DISCONNECTED" || connectionStatus === "LOST" ? "opacity-50" : ""}`}
+              <div className={`relative flex flex-col items-center group cursor-pointer ${connectionStatus === "DISCONNECTED" || connectionStatus === "LOST" ? "opacity-40" : ""}`}
                 onClick={() => {
                   const newId = isFollowing ? null : track.id;
                   setFollowingDriverId(newId);
                   if (newId && mapRef.current) mapRef.current.jumpTo({ center: [pos.longitude, pos.latitude], zoom: 16 });
                 }}>
-                {isFollowing && <div className="absolute inset-0 w-12 h-12 -top-2 -left-2 rounded-full border-2 border-blue-400 animate-pulse" />}
-                <div className={`absolute -top-2 -right-2 z-10 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full ${statusStyle.bg} ${connectionStatus === "STALE" ? "animate-pulse" : ""}`}>
-                  <StatusIcon size={10} className="text-white" />
-                </div>
-                {isBusy && connectionStatus === "CONNECTED" && (
-                  <div className="absolute inset-0 w-8 h-8 -top-1 -left-1 rounded-full border-2 border-emerald-400 animate-pulse" />
-                )}
+                {isFollowing && <div className="absolute inset-0 w-10 h-10 -top-2 -left-2 rounded-full border-2 border-blue-400 animate-pulse pointer-events-none" />}
+                {/* tiny connection-status dot */}
+                <div className={`absolute -top-1 -right-1 z-10 w-2.5 h-2.5 rounded-full ${statusStyle.bg} border border-black ${connectionStatus === "STALE" ? "animate-pulse" : ""}`} />
                 {driver ? (
                   <div
-                    className={`relative w-8 h-8 rounded-full ${getAvatarColor(driver.id)} flex items-center justify-center font-bold text-white text-xs border-2 ${statusStyle.border} shadow-lg transition-all ${isBusy ? `ring-1.5 ${statusStyle.ring}` : ""}`}
+                    className={`relative w-6 h-6 rounded-full ${getAvatarColor(driver.id)} flex items-center justify-center font-bold text-white text-[10px] shadow-md border-2 ${isBusy ? 'border-amber-400' : 'border-black/40'} transition-all`}
                     style={{ transform: 'translateZ(0)' }}
                   >
                     <div
-                      className="absolute -top-2 w-0 h-0 border-l-[5px] border-r-[5px] border-b-[8px] border-l-transparent border-r-transparent border-b-white/90"
+                      className="absolute -top-1.5 w-0 h-0 border-l-[4px] border-r-[4px] border-b-[6px] border-l-transparent border-r-transparent border-b-white/80"
                       style={{ left: '50%', transform: `translateX(-50%) rotate(${driverHeadingDeg[track.id] ?? 0}deg)` }}
                     />
                     {getInitials(driver.firstName, driver.lastName)}
                   </div>
                 ) : (
-                  <div className={`w-5 h-5 rounded-full ${statusStyle.bg} border-2 border-white shadow-lg`} />
+                  <div className={`w-4 h-4 rounded-full ${statusStyle.bg} shadow-md`} />
                 )}
                 <div className="absolute bottom-full mb-3 hidden group-hover:block bg-black/95 text-white text-xs rounded-lg shadow-2xl z-[100] border border-white/20 min-w-[220px] backdrop-blur-sm">
                   <div className="p-3">
