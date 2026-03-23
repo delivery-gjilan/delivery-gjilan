@@ -6,6 +6,7 @@ import { FinancialService } from '@/services/FinancialService';
 import { createAuditLogger } from '@/services/AuditLogger';
 import logger from '@/lib/logger';
 import { notifyCustomerOrderStatus, updateLiveActivity, endLiveActivity } from '@/services/orderNotifications';
+import { getDispatchService } from '@/services/driverServices.init';
 import { AppError } from '@/lib/errors';
 import { parseDbTimestamp } from '@/lib/dateTime';
 import { getLiveDriverEta } from '@/lib/driverEtaCache';
@@ -130,6 +131,19 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
     
     // Send push notification to customer
     notifyCustomerOrderStatus(context.notificationService, dbOrder.userId, id, status);
+
+    // Dispatch to nearby drivers when an order becomes ready for pickup.
+    if (status === 'READY' && currentStatus !== 'READY') {
+        try {
+            const dispatchService = getDispatchService();
+            dispatchService.dispatchOrder(id, context.notificationService).catch((err) =>
+                logger.error({ err, orderId: id }, 'updateOrderStatus:dispatch:error'),
+            );
+        } catch (err) {
+            // getDispatchService throws if not yet initialized; log and continue.
+            logger.warn({ err }, 'updateOrderStatus:dispatch:serviceNotReady');
+        }
+    }
     
     // Update Live Activity (Dynamic Island) on every status transition.
     const statusToLiveActivityStatus: Record<string, 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled'> = {

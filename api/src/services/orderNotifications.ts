@@ -155,6 +155,55 @@ export function notifyAdminsNewOrder(
         .catch((err) => logger.error({ err, orderId }, 'Failed to send admin new-order notification'));
 }
 
+/**
+ * Notify a set of drivers that a new order is ready for pickup (wave 1).
+ */
+export function notifyDriversOrderReady(
+    notificationService: NotificationService,
+    driverIds: string[],
+    orderId: string,
+    businessName?: string,
+): void {
+    if (driverIds.length === 0) return;
+
+    const payload: NotificationPayload = {
+        title: 'New Order Available! 📦',
+        body: businessName
+            ? `Order from ${businessName} is ready for pickup.`
+            : 'A new order is ready for pickup.',
+        data: { orderId, screen: 'orders', type: 'ORDER_READY_POOL' },
+        timeSensitive: true,
+        relevanceScore: 0.9,
+    };
+
+    notificationService
+        .sendToUsersByAppType(driverIds, 'DRIVER', payload, 'ORDER_READY_POOL')
+        .catch((err) => logger.error({ err, orderId }, 'Failed to notify drivers of ready order'));
+}
+
+/**
+ * Notify the second wave of drivers when the first wave didn't accept in time.
+ */
+export function notifyDriversOrderExpanded(
+    notificationService: NotificationService,
+    driverIds: string[],
+    orderId: string,
+): void {
+    if (driverIds.length === 0) return;
+
+    const payload: NotificationPayload = {
+        title: 'Order Still Available 📦',
+        body: 'An order is waiting for pickup. Tap to claim it.',
+        data: { orderId, screen: 'orders', type: 'ORDER_READY_POOL' },
+        timeSensitive: true,
+        relevanceScore: 0.8,
+    };
+
+    notificationService
+        .sendToUsersByAppType(driverIds, 'DRIVER', payload, 'ORDER_READY_POOL')
+        .catch((err) => logger.error({ err, orderId }, 'Failed to notify expanded drivers'));
+}
+
 export function notifyBusinessNewOrder(
     notificationService: NotificationService,
     businessUserIds: string[],

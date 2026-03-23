@@ -3,9 +3,15 @@
     "name": "Zipp Driver",
     "slug": "zipp-driver",
     "version": "1.0.0",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "updates": {
-      "url": "https://u.expo.dev/1c06f250-74dc-4a5d-855c-f53e97df8c2e"
+      "url": "https://u.expo.dev/d813bf35-bd14-4516-bc09-b9f11566764f",
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      }
     },
     "runtimeVersion": {
       "policy": "appVersion"
@@ -127,9 +133,9 @@
         "root": "app"
       },
       "eas": {
-        "projectId": "1c06f250-74dc-4a5d-855c-f53e97df8c2e"
+        "projectId": "d813bf35-bd14-4516-bc09-b9f11566764f"
       }
     },
-    "owner": "edonramadani"
+    "owner": "artshabani2002"
   }
 }

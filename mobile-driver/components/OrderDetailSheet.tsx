@@ -1,13 +1,16 @@
-import React, { useEffect, useCallback } from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
-import Animated, {
-    useSharedValue,
-    useAnimatedStyle,
-    withSpring,
-    withTiming,
-} from 'react-native-reanimated';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+    Animated,
+    PanResponder,
+    Pressable,
+    StyleSheet,
+    Text,
+    View,
+    ActivityIndicator,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const STATUS_COLORS: Record<string, string> = {
     PENDING: '#f59e0b',
@@ -28,12 +31,15 @@ const STATUS_ICONS: Record<string, string> = {
     OUT_FOR_DELIVERY: 'bicycle-outline',
 };
 
+const ITEMS_PREVIEW = 3;
+
 interface Props {
     order: any;
     routeInfo: { distanceKm: number; durationMin: number } | null;
     previewRouteInfo: { distanceKm: number; durationMin: number } | null;
     isAssignedToMe: boolean;
     onStartNavigation: () => void;
+    onMarkPickedUp?: () => Promise<void>;
     onClose: () => void;
 }
 
@@ -43,25 +49,68 @@ export function OrderDetailSheet({
     previewRouteInfo,
     isAssignedToMe,
     onStartNavigation,
+    onMarkPickedUp,
     onClose,
 }: Props) {
-    const translateY = useSharedValue(600);
-    const opacity = useSharedValue(0);
+    const insets = useSafeAreaInsets();
+    const slideY = useRef(new Animated.Value(320)).current;
+    const [showAllItems, setShowAllItems] = useState(false);
+    const [markingPickedUp, setMarkingPickedUp] = useState(false);
 
+    // Simple slide-up on mount / order change
     useEffect(() => {
-        translateY.value = withSpring(0, { damping: 22, stiffness: 210 });
-        opacity.value = withTiming(1, { duration: 200 });
+        slideY.setValue(320);
+        Animated.spring(slideY, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 80,
+            friction: 14,
+        }).start();
     }, [order?.id]);
 
-    const animStyle = useAnimatedStyle(() => ({
-        transform: [{ translateY: translateY.value }],
-        opacity: opacity.value,
-    }));
+    // Drag-to-dismiss
+    const panResponder = useRef(
+        PanResponder.create({
+            onMoveShouldSetPanResponder: (_, gs) =>
+                gs.dy > 6 && Math.abs(gs.dy) > Math.abs(gs.dx),
+            onPanResponderMove: (_, gs) => {
+                if (gs.dy > 0) slideY.setValue(gs.dy);
+            },
+            onPanResponderRelease: (_, gs) => {
+                if (gs.dy > 90 || gs.vy > 0.6) {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    Animated.timing(slideY, {
+                        toValue: 500,
+                        duration: 180,
+                        useNativeDriver: true,
+                    }).start(onClose);
+                } else {
+                    Animated.spring(slideY, {
+                        toValue: 0,
+                        useNativeDriver: true,
+                        tension: 70,
+                        friction: 12,
+                    }).start();
+                }
+            },
+        }),
+    ).current;
 
     const handleStart = useCallback(() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         onStartNavigation();
     }, [onStartNavigation]);
+
+    const handleMarkPickedUp = useCallback(async () => {
+        if (!onMarkPickedUp) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        setMarkingPickedUp(true);
+        try {
+            await onMarkPickedUp();
+        } finally {
+            setMarkingPickedUp(false);
+        }
+    }, [onMarkPickedUp]);
 
     const statusColor = STATUS_COLORS[order.status] ?? '#6b7280';
     const statusLabel = STATUS_LABELS[order.status] ?? order.status;
@@ -72,343 +121,201 @@ export function OrderDetailSheet({
         ? `${order.user.firstName} ${order.user.lastName}`.trim()
         : '';
     const dropAddress = order.dropOffLocation?.address ?? '';
-    const items = order.businesses?.flatMap((b: any) => b.items ?? []) ?? [];
-    const deliveryPrice = Number(order.deliveryPrice ?? 0).toFixed(2);
+    const items: any[] = order.businesses?.flatMap((b: any) => b.items ?? []) ?? [];
     const totalItems = items.reduce((s: number, i: any) => s + (i.quantity || 1), 0);
-
-    const totalMinutes =
-        routeInfo && previewRouteInfo
-            ? Math.round(routeInfo.durationMin + previewRouteInfo.durationMin)
-            : routeInfo
-            ? Math.round(routeInfo.durationMin)
-            : null;
-
+    const deliveryPrice = Number(order.deliveryPrice ?? 0).toFixed(2);
     const isDelivering = order.status === 'OUT_FOR_DELIVERY';
+    const isReady = order.status === 'READY' || order.status === 'PREPARING';
+    const isReadyForPickup = order.status === 'READY';
+
+    // ── ETA rows ──────────────────────────────────────────────────────────────
+    // routeInfo      = driver → current destination (pickup when READY, dropoff when delivering)
+    // previewRouteInfo = pickup → dropoff (only available while picking up)
+    const etaToPickup =
+        isReady && routeInfo
+            ? { km: routeInfo.distanceKm, min: Math.round(routeInfo.durationMin) }
+            : null;
+    const etaToCustomer = (() => {
+        if (isDelivering && routeInfo)
+            return { km: routeInfo.distanceKm, min: Math.round(routeInfo.durationMin) };
+        if (isReady && previewRouteInfo)
+            return { km: previewRouteInfo.distanceKm, min: Math.round(previewRouteInfo.durationMin) };
+        return null;
+    })();
+
+    // ── Items list ────────────────────────────────────────────────────────────
+    const visibleItems = showAllItems ? items : items.slice(0, ITEMS_PREVIEW);
+    const hasMoreItems = items.length > ITEMS_PREVIEW;
 
     return (
         <Animated.View
-            style={[{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 100 }, animStyle]}
+            style={[styles.root, { transform: [{ translateY: slideY }] }]}
         >
-            <View
-                style={{
-                    backgroundColor: '#0f172a',
-                    borderTopLeftRadius: 26,
-                    borderTopRightRadius: 26,
-                    paddingBottom: 36,
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: -5 },
-                    shadowOpacity: 0.5,
-                    shadowRadius: 18,
-                    elevation: 22,
-                }}
-            >
-                {/* Drag handle / close zone */}
-                <Pressable
-                    onPress={onClose}
-                    style={{ paddingVertical: 12, alignItems: 'center' }}
-                    hitSlop={12}
-                >
-                    <View
-                        style={{
-                            width: 36,
-                            height: 4,
-                            backgroundColor: 'rgba(255,255,255,0.14)',
-                            borderRadius: 2,
-                        }}
-                    />
-                </Pressable>
+            <View style={[styles.sheet, { paddingBottom: insets.bottom + 6 }]}>
+                {/* ── Drag handle ── */}
+                <View {...panResponder.panHandlers} style={styles.dragZone}>
+                    <View style={styles.handle} />
+                </View>
 
-                <ScrollView
-                    bounces={false}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 4 }}
-                >
-                    {/* Header */}
-                    <View
-                        style={{
-                            flexDirection: 'row',
-                            alignItems: 'flex-start',
-                            justifyContent: 'space-between',
-                            marginBottom: 14,
-                        }}
-                    >
-                        <View style={{ flex: 1, marginRight: 10 }}>
-                            <Text
-                                style={{ color: '#f1f5f9', fontSize: 19, fontWeight: '800' }}
-                                numberOfLines={1}
-                            >
-                                {bizName}
-                            </Text>
+                <View style={styles.body}>
+                    {/* ── Header row: biz name + close + status ── */}
+                    <View style={[styles.headerRow, { marginBottom: 8 }]}>
+                        <View style={styles.headerLeft}>
+                            <Text style={styles.bizName} numberOfLines={1}>{bizName}</Text>
                             {customerName ? (
-                                <Text style={{ color: '#64748b', fontSize: 13, marginTop: 3 }}>
-                                    <Ionicons name="person-outline" size={11} color="#64748b" />{' '}
+                                <Text style={styles.customerName}>
+                                    <Ionicons name="person-outline" size={10} color="#475569" />{' '}
                                     {customerName}
                                 </Text>
                             ) : null}
                         </View>
-                        <View
-                            style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 5,
+                        <View style={styles.headerRight}>
+                            <View style={[styles.statusBadge, {
                                 backgroundColor: `${statusColor}1A`,
-                                borderRadius: 20,
-                                paddingHorizontal: 10,
-                                paddingVertical: 5,
-                                marginTop: 2,
-                                borderWidth: 1,
-                                borderColor: `${statusColor}30`,
-                            }}
-                        >
-                            <Ionicons name={statusIcon as any} size={12} color={statusColor} />
-                            <Text style={{ color: statusColor, fontSize: 11, fontWeight: '700' }}>
-                                {statusLabel}
-                            </Text>
+                                borderColor: `${statusColor}33`,
+                            }]}>
+                                <Ionicons name={statusIcon as any} size={11} color={statusColor} />
+                                <Text style={[styles.statusText, { color: statusColor }]}>
+                                    {statusLabel}
+                                </Text>
+                            </View>
+                            <Pressable onPress={onClose} style={styles.closeBtn} hitSlop={10}>
+                                <Ionicons name="close" size={18} color="#475569" />
+                            </Pressable>
                         </View>
                     </View>
 
-                    {/* Route tiles */}
-                    {(routeInfo || totalMinutes) && (
-                        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
-                            {routeInfo && (
-                                <View
-                                    style={{
-                                        flex: 1,
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                        gap: 7,
-                                        backgroundColor: 'rgba(255,255,255,0.05)',
-                                        borderRadius: 12,
-                                        padding: 10,
-                                    }}
-                                >
-                                    <Ionicons name="navigate-outline" size={14} color="#94a3b8" />
-                                    <Text style={{ color: '#f1f5f9', fontSize: 13, fontWeight: '700' }}>
-                                        {routeInfo.distanceKm.toFixed(1)} km
+                    {/* ── Earnings + item count ── */}
+                    <View style={styles.statsRow}>
+                        <View style={[styles.statTile, styles.statTileEarnings]}>
+                            <Text style={styles.statValue}>€{deliveryPrice}</Text>
+                            <Text style={styles.statLabel}>You earn</Text>
+                        </View>
+                        <View style={styles.statTile}>
+                            <Text style={styles.statValue}>{totalItems}</Text>
+                            <Text style={styles.statLabel}>
+                                {totalItems === 1 ? 'item' : 'items'}
+                            </Text>
+                        </View>
+                        <View style={styles.statTile}>
+                            <Text style={styles.statValue}>
+                                #{order.displayId ?? '—'}
+                            </Text>
+                            <Text style={styles.statLabel}>Order</Text>
+                        </View>
+                    </View>
+
+                    {/* ── ETA section ── */}
+                    {(etaToPickup || etaToCustomer) && (
+                        <View style={styles.etaSection}>
+                            {etaToPickup && (
+                                <View style={styles.etaRow}>
+                                    <View style={[styles.etaDot, { backgroundColor: '#3b82f6' }]} />
+                                    <Text style={styles.etaText}>
+                                        <Text style={styles.etaStrong}>{etaToPickup.km.toFixed(1)} km</Text>
+                                        {' '}to pickup
                                     </Text>
-                                    <Text style={{ color: '#64748b', fontSize: 11 }}>to pickup</Text>
+                                    <Text style={styles.etaMin}>~{etaToPickup.min} min</Text>
                                 </View>
                             )}
-                            {totalMinutes != null && (
-                                <View
-                                    style={{
-                                        flex: 1,
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                        gap: 7,
-                                        backgroundColor: 'rgba(255,255,255,0.05)',
-                                        borderRadius: 12,
-                                        padding: 10,
-                                    }}
-                                >
-                                    <Ionicons name="time-outline" size={14} color="#94a3b8" />
-                                    <Text style={{ color: '#f1f5f9', fontSize: 13, fontWeight: '700' }}>
-                                        ~{totalMinutes} min
+                            {etaToCustomer && (
+                                <View style={styles.etaRow}>
+                                    <View style={[styles.etaDot, { backgroundColor: '#8b5cf6' }]} />
+                                    <Text style={styles.etaText}>
+                                        <Text style={styles.etaStrong}>{etaToCustomer.km.toFixed(1)} km</Text>
+                                        {' '}to customer
                                     </Text>
-                                    <Text style={{ color: '#64748b', fontSize: 11 }}>total</Text>
+                                    <Text style={styles.etaMin}>~{etaToCustomer.min} min</Text>
                                 </View>
                             )}
                         </View>
                     )}
 
-                    {/* Drop-off address */}
+                    {/* ── Drop-off address ── */}
                     {dropAddress ? (
-                        <View
-                            style={{
-                                flexDirection: 'row',
-                                alignItems: 'flex-start',
-                                gap: 10,
-                                marginBottom: 14,
-                            }}
-                        >
-                            <View
-                                style={{
-                                    width: 28,
-                                    height: 28,
-                                    borderRadius: 14,
-                                    backgroundColor: '#7c3aed1A',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    marginTop: 1,
-                                    borderWidth: 1,
-                                    borderColor: '#7c3aed30',
-                                }}
-                            >
-                                <Ionicons name="location-outline" size={13} color="#a78bfa" />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text
-                                    style={{
-                                        color: '#64748b',
-                                        fontSize: 9,
-                                        fontWeight: '700',
-                                        textTransform: 'uppercase',
-                                        letterSpacing: 0.8,
-                                        marginBottom: 2,
-                                    }}
-                                >
-                                    Drop-off
-                                </Text>
-                                <Text
-                                    style={{ color: '#f1f5f9', fontSize: 13, lineHeight: 19 }}
-                                    numberOfLines={2}
-                                >
-                                    {dropAddress}
-                                </Text>
-                            </View>
+                        <View style={styles.addressRow}>
+                            <Ionicons name="location-outline" size={13} color="#a78bfa" />
+                            <Text style={styles.addressText} numberOfLines={1}>
+                                {dropAddress}
+                            </Text>
                         </View>
                     ) : null}
 
-                    {/* Items */}
+                    {/* ── Items list ── */}
                     {items.length > 0 && (
-                        <View
-                            style={{
-                                backgroundColor: 'rgba(255,255,255,0.04)',
-                                borderRadius: 14,
-                                padding: 12,
-                                marginBottom: 14,
-                            }}
-                        >
-                            <Text
-                                style={{
-                                    color: '#64748b',
-                                    fontSize: 9,
-                                    fontWeight: '700',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: 0.8,
-                                    marginBottom: 8,
-                                }}
-                            >
-                                Order Contents
-                            </Text>
-                            {items.slice(0, 5).map((item: any, idx: number) => (
+                        <View style={styles.itemsCard}>
+                            {visibleItems.map((item: any, idx: number) => (
                                 <View
                                     key={idx}
-                                    style={{
-                                        flexDirection: 'row',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center',
-                                        marginBottom: idx < Math.min(items.length, 5) - 1 ? 6 : 0,
-                                    }}
+                                    style={[
+                                        styles.itemRow,
+                                        idx < visibleItems.length - 1 && styles.itemRowBorder,
+                                    ]}
                                 >
-                                    <Text
-                                        style={{ color: '#cbd5e1', fontSize: 13, flex: 1 }}
-                                        numberOfLines={1}
-                                    >
+                                    <Text style={styles.itemName} numberOfLines={1}>
                                         {item.name}
                                     </Text>
-                                    <Text
-                                        style={{
-                                            color: '#475569',
-                                            fontSize: 13,
-                                            fontWeight: '600',
-                                            marginLeft: 8,
-                                        }}
-                                    >
-                                        ×{item.quantity}
-                                    </Text>
+                                    <Text style={styles.itemQty}>×{item.quantity}</Text>
                                 </View>
                             ))}
-                            {items.length > 5 && (
-                                <Text
-                                    style={{ color: '#64748b', fontSize: 11, marginTop: 4 }}
+                            {hasMoreItems && (
+                                <Pressable
+                                    onPress={() => setShowAllItems((v) => !v)}
+                                    style={styles.showMoreBtn}
                                 >
-                                    +{items.length - 5} more items
-                                </Text>
+                                    <Text style={styles.showMoreText}>
+                                        {showAllItems
+                                            ? 'Show less'
+                                            : `+${items.length - ITEMS_PREVIEW} more`}
+                                    </Text>
+                                    <Ionicons
+                                        name={showAllItems ? 'chevron-up' : 'chevron-down'}
+                                        size={12}
+                                        color="#64748b"
+                                    />
+                                </Pressable>
                             )}
                         </View>
                     )}
+                </View>
 
-                    {/* Financials row */}
-                    <View
-                        style={{
-                            flexDirection: 'row',
-                            justifyContent: 'space-between',
-                            marginBottom: 16,
-                            paddingHorizontal: 2,
-                        }}
-                    >
-                        <View style={{ alignItems: 'center' }}>
-                            <Text
-                                style={{
-                                    color: '#64748b',
-                                    fontSize: 9,
-                                    fontWeight: '700',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: 0.8,
-                                    marginBottom: 3,
-                                }}
-                            >
-                                Delivery Fee
-                            </Text>
-                            <Text style={{ color: '#4ade80', fontSize: 15, fontWeight: '800' }}>
-                                €{deliveryPrice}
-                            </Text>
-                        </View>
-                        <View style={{ alignItems: 'center' }}>
-                            <Text
-                                style={{
-                                    color: '#64748b',
-                                    fontSize: 9,
-                                    fontWeight: '700',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: 0.8,
-                                    marginBottom: 3,
-                                }}
-                            >
-                                Items
-                            </Text>
-                            <Text style={{ color: '#f1f5f9', fontSize: 15, fontWeight: '800' }}>
-                                {totalItems}
-                            </Text>
-                        </View>
-                        <View style={{ alignItems: 'center' }}>
-                            <Text
-                                style={{
-                                    color: '#64748b',
-                                    fontSize: 9,
-                                    fontWeight: '700',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: 0.8,
-                                    marginBottom: 3,
-                                }}
-                            >
-                                Order #{order.displayId ?? '—'}
-                            </Text>
-                            <Text style={{ color: '#f1f5f9', fontSize: 15, fontWeight: '800' }}>
-                                #{order.displayId ?? '—'}
-                            </Text>
-                        </View>
-                    </View>
-                </ScrollView>
-
-                {/* CTA */}
+                {/* ── CTA ── */}
                 {isAssignedToMe && (
-                    <View style={{ paddingHorizontal: 18 }}>
+                    <View style={styles.ctaContainer}>
+                        {/* Food Picked Up — shows only when the order is physically ready at the counter */}
+                        {isReadyForPickup && onMarkPickedUp && (
+                            <Pressable
+                                onPress={handleMarkPickedUp}
+                                disabled={markingPickedUp}
+                                style={[styles.ctaButton, styles.ctaPickedUp, markingPickedUp && { opacity: 0.65 }]}
+                            >
+                                {markingPickedUp ? (
+                                    <ActivityIndicator size="small" color="#0f172a" />
+                                ) : (
+                                    <Ionicons name="bag-check-outline" size={19} color="#0f172a" />
+                                )}
+                                <Text style={[styles.ctaText, { color: '#0f172a' }]}>
+                                    Food Picked Up
+                                </Text>
+                            </Pressable>
+                        )}
+                        {/* Navigate button — secondary when READY (food not yet picked up), primary when delivering */}
                         <Pressable
                             onPress={handleStart}
-                            style={{
-                                height: 58,
-                                borderRadius: 18,
-                                backgroundColor: isDelivering ? '#7c3aed' : '#3b82f6',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                flexDirection: 'row',
-                                gap: 8,
-                                shadowColor: isDelivering ? '#7c3aed' : '#3b82f6',
-                                shadowOffset: { width: 0, height: 5 },
-                                shadowOpacity: 0.38,
-                                shadowRadius: 12,
-                                elevation: 10,
-                            }}
+                            style={[
+                                styles.ctaButton,
+                                isDelivering
+                                    ? { backgroundColor: '#7c3aed', shadowColor: '#7c3aed' }
+                                    : styles.ctaSecondary,
+                            ]}
                         >
                             <Ionicons
                                 name={isDelivering ? 'navigate' : 'bicycle-outline'}
-                                size={20}
-                                color="#fff"
+                                size={19}
+                                color={isDelivering ? '#fff' : '#64748b'}
                             />
-                            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>
-                                {isDelivering ? 'Continue Navigation' : 'Start Navigation'}
+                            <Text style={[styles.ctaText, !isDelivering && { color: '#64748b' }]}>
+                                {isDelivering ? 'Continue Navigation' : 'Navigate to Pickup'}
                             </Text>
                         </Pressable>
                     </View>
@@ -417,3 +324,248 @@ export function OrderDetailSheet({
         </Animated.View>
     );
 }
+
+const styles = StyleSheet.create({
+    root: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 100,
+    },
+    sheet: {
+        backgroundColor: '#0f172a',
+        borderTopLeftRadius: 22,
+        borderTopRightRadius: 22,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.45,
+        shadowRadius: 14,
+        elevation: 20,
+    },
+    dragZone: {
+        paddingVertical: 10,
+        alignItems: 'center',
+    },
+    handle: {
+        width: 32,
+        height: 4,
+        backgroundColor: 'rgba(255,255,255,0.13)',
+        borderRadius: 2,
+    },
+    body: {
+        paddingHorizontal: 16,
+    },
+
+    /* ── Header ── */
+    headerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 12,
+    },
+    headerLeft: {
+        flex: 1,
+        marginRight: 8,
+    },
+    headerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    bizName: {
+        color: '#f1f5f9',
+        fontSize: 15,
+        fontWeight: '800',
+    },
+    customerName: {
+        color: '#475569',
+        fontSize: 11,
+        marginTop: 2,
+    },
+    statusBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        borderRadius: 16,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderWidth: 1,
+    },
+    statusText: {
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    closeBtn: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    /* ── Stats ── */
+    statsRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 8,
+    },
+    statTile: {
+        flex: 1,
+        backgroundColor: 'rgba(255,255,255,0.04)',
+        borderRadius: 10,
+        paddingVertical: 7,
+        paddingHorizontal: 8,
+        alignItems: 'center',
+        gap: 2,
+    },
+    statTileEarnings: {
+        backgroundColor: 'rgba(74,222,128,0.07)',
+        borderWidth: 1,
+        borderColor: 'rgba(74,222,128,0.15)',
+    },
+    statValue: {
+        color: '#f1f5f9',
+        fontSize: 14,
+        fontWeight: '800',
+    },
+    statLabel: {
+        color: '#475569',
+        fontSize: 9,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.6,
+    },
+
+    /* ── ETA ── */
+    etaSection: {
+        backgroundColor: 'rgba(255,255,255,0.04)',
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        gap: 4,
+        marginBottom: 8,
+    },
+    etaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    etaDot: {
+        width: 7,
+        height: 7,
+        borderRadius: 4,
+    },
+    etaText: {
+        flex: 1,
+        color: '#94a3b8',
+        fontSize: 12,
+    },
+    etaStrong: {
+        color: '#f1f5f9',
+        fontWeight: '700',
+    },
+    etaMin: {
+        color: '#64748b',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+
+    /* ── Address ── */
+    addressRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(167,139,250,0.07)',
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        marginBottom: 8,
+    },
+    addressText: {
+        flex: 1,
+        color: '#cbd5e1',
+        fontSize: 12,
+    },
+
+    /* ── Items ── */
+    itemsCard: {
+        backgroundColor: 'rgba(255,255,255,0.04)',
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingTop: 6,
+        paddingBottom: 4,
+        marginBottom: 8,
+    },
+    itemRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 5,
+    },
+    itemRowBorder: {
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: 'rgba(255,255,255,0.06)',
+    },
+    itemName: {
+        color: '#cbd5e1',
+        fontSize: 12,
+        flex: 1,
+    },
+    itemQty: {
+        color: '#475569',
+        fontSize: 12,
+        fontWeight: '600',
+        marginLeft: 8,
+    },
+    showMoreBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+        paddingVertical: 7,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: 'rgba(255,255,255,0.06)',
+    },
+    showMoreText: {
+        color: '#64748b',
+        fontSize: 11,
+        fontWeight: '600',
+    },
+
+    /* ── CTA ── */
+    ctaContainer: {
+        paddingHorizontal: 16,
+        marginTop: 0,
+        gap: 7,
+    },
+    ctaButton: {
+        height: 46,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: 8,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 10,
+        elevation: 10,
+    },
+    ctaPickedUp: {
+        backgroundColor: '#4ade80',
+        shadowColor: '#4ade80',
+    },
+    ctaSecondary: {
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        shadowOpacity: 0,
+        elevation: 0,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+    },
+    ctaText: {
+        color: '#fff',
+        fontSize: 15,
+        fontWeight: '800',
+    },
+});

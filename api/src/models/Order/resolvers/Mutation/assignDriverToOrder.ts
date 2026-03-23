@@ -4,6 +4,7 @@ import logger from '@/lib/logger';
 import { drivers as driversTable } from '@/database/schema';
 import { eq } from 'drizzle-orm';
 import { notifyDriverOrderAssigned } from '@/services/orderNotifications';
+import { getDispatchService } from '@/services/driverServices.init';
 import { AppError } from '@/lib/errors';
 
 export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToOrder']> = async (
@@ -96,6 +97,15 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
 
     if (!order) {
         throw AppError.conflict('This order has already been taken by another driver');
+    }
+
+    // Cancel any pending wave-2 dispatch expansion — order has been claimed.
+    if (isDriver) {
+        try {
+            getDispatchService().cancelDispatch(id);
+        } catch {
+            // Service may not be initialized in test environments; safe to ignore.
+        }
     }
 
     // Get the order to find the user ID for publishing

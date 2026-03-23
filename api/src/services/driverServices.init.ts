@@ -4,6 +4,7 @@ import { DriverRepository } from '@/repositories/DriverRepository';
 import { AuthRepository } from '@/repositories/AuthRepository';
 import { NotificationService } from '@/services/NotificationService';
 import { NotificationRepository } from '@/repositories/NotificationRepository';
+import { OrderDispatchService } from '@/services/OrderDispatchService';
 import { getDB } from '@/database';
 import logger from '@/lib/logger';
 
@@ -25,12 +26,13 @@ const log = logger.child({ service: 'DriverServices' });
 
 let driverService: DriverService | null = null;
 let watchdogService: DriverWatchdogService | null = null;
-let initializingPromise: Promise<{ driverService: DriverService; watchdogService: DriverWatchdogService }> | null = null;
+let dispatchService: OrderDispatchService | null = null;
+let initializingPromise: Promise<{ driverService: DriverService; watchdogService: DriverWatchdogService; dispatchService: OrderDispatchService }> | null = null;
 
 export async function initializeDriverServices() {
-  if (driverService && watchdogService) {
+  if (driverService && watchdogService && dispatchService) {
     log.debug('driverServices:alreadyInitialized');
-    return { driverService, watchdogService };
+    return { driverService, watchdogService, dispatchService };
   }
 
   if (initializingPromise) {
@@ -55,12 +57,15 @@ export async function initializeDriverServices() {
     const notificationService = new NotificationService(new NotificationRepository(db));
     driverService = new DriverService(db, authRepository, watchdogService, notificationService);
 
+    // Order dispatch service - two-wave driver notification on READY
+    dispatchService = new OrderDispatchService(db, driverRepository);
+
     // Start the watchdog
     watchdogService.start();
 
     log.info('driverServices:ready');
 
-    return { driverService, watchdogService };
+    return { driverService, watchdogService, dispatchService };
   })();
 
   try {
@@ -68,6 +73,16 @@ export async function initializeDriverServices() {
   } finally {
     initializingPromise = null;
   }
+}
+
+/**
+ * Get the OrderDispatchService singleton (throws if not yet initialized).
+ */
+export function getDispatchService(): OrderDispatchService {
+  if (!dispatchService) {
+    throw new Error('OrderDispatchService not initialized — call initializeDriverServices() first');
+  }
+  return dispatchService;
 }
 
 /**

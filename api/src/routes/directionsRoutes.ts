@@ -108,8 +108,10 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
     try {
         const upstream = await fetch(mapboxUrl);
         if (!upstream.ok) {
-            log.error({ status: upstream.status }, 'Mapbox upstream error');
-            res.status(502).json({ error: 'Upstream directions error' });
+            let mapboxBody: unknown;
+            try { mapboxBody = await upstream.json(); } catch { mapboxBody = await upstream.text().catch(() => null); }
+            log.error({ status: upstream.status, mapboxBody }, 'Mapbox upstream error');
+            res.status(502).json({ error: 'Upstream directions error', mapboxStatus: upstream.status, detail: mapboxBody });
             return;
         }
 
