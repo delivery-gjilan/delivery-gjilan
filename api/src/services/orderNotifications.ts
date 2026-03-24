@@ -10,6 +10,16 @@ const customerStatusMessages: Record<string, (orderId: string) => NotificationPa
     PREPARING: (orderId) => ({
         title: 'Order Accepted! 🎉',
         body: 'Your order has been accepted and is being prepared.',
+        localeContent: {
+            en: {
+                title: 'Order Accepted! 🎉',
+                body: 'Your order has been accepted and is being prepared.',
+            },
+            al: {
+                title: 'Porosia u pranua! 🎉',
+                body: 'Porosia juaj u pranua dhe po pergatitet.',
+            },
+        },
         data: { orderId, screen: 'orders/active', type: 'ORDER_STATUS' },
         timeSensitive: false,
         relevanceScore: 0.6,
@@ -17,6 +27,16 @@ const customerStatusMessages: Record<string, (orderId: string) => NotificationPa
     OUT_FOR_DELIVERY: (orderId) => ({
         title: 'On the Way! 🚗',
         body: 'Your order is on its way to you!',
+        localeContent: {
+            en: {
+                title: 'On the Way! 🚗',
+                body: 'Your order is on its way to you!',
+            },
+            al: {
+                title: 'Ne rruge! 🚗',
+                body: 'Porosia juaj eshte ne rruge drejt jush!',
+            },
+        },
         data: { orderId, screen: 'orders/active', type: 'ORDER_STATUS' },
         timeSensitive: true, // ← Time-sensitive: bypass Focus modes
         relevanceScore: 0.9,
@@ -25,6 +45,16 @@ const customerStatusMessages: Record<string, (orderId: string) => NotificationPa
     DELIVERED: (orderId) => ({
         title: 'Delivered! ✅',
         body: 'Your order has been delivered. Enjoy!',
+        localeContent: {
+            en: {
+                title: 'Delivered! ✅',
+                body: 'Your order has been delivered. Enjoy!',
+            },
+            al: {
+                title: 'U dorezua! ✅',
+                body: 'Porosia juaj u dorezua. Ju befte mire!',
+            },
+        },
         data: { orderId, screen: 'orders/active', type: 'ORDER_STATUS' },
         timeSensitive: true, // ← Time-sensitive: important notification
         relevanceScore: 1.0,
@@ -33,6 +63,16 @@ const customerStatusMessages: Record<string, (orderId: string) => NotificationPa
     CANCELLED: (orderId) => ({
         title: 'Order Cancelled',
         body: 'Your order has been cancelled.',
+        localeContent: {
+            en: {
+                title: 'Order Cancelled',
+                body: 'Your order has been cancelled.',
+            },
+            al: {
+                title: 'Porosia u anulua',
+                body: 'Porosia juaj u anulua.',
+            },
+        },
         data: { orderId, screen: 'orders/active', type: 'ORDER_STATUS' },
         timeSensitive: true, // ← Time-sensitive: user needs to know immediately
         relevanceScore: 0.95,
@@ -100,6 +140,29 @@ export function updateLiveActivity(
 }
 
 /**
+ * Notify a driver that the admin sent them a message.
+ */
+export function notifyDriverNewAdminMessage(
+    notificationService: NotificationService,
+    driverId: string,
+    body: string,
+    alertType: 'INFO' | 'WARNING' | 'URGENT',
+): void {
+    const titleMap = { INFO: '💬 New Message', WARNING: '⚠️ Warning from Admin', URGENT: '🚨 Urgent Message' };
+    const payload: NotificationPayload = {
+        title: titleMap[alertType] ?? '💬 New Message',
+        body,
+        data: { screen: 'messages', type: 'ADMIN_MESSAGE' },
+        timeSensitive: alertType !== 'INFO',
+        relevanceScore: alertType === 'URGENT' ? 1.0 : alertType === 'WARNING' ? 0.8 : 0.5,
+    };
+
+    notificationService
+        .sendToUserByAppType(driverId, 'DRIVER', payload, 'ADMIN_ALERT')
+        .catch((err) => logger.error({ err, driverId }, 'Failed to send admin message notification to driver'));
+}
+
+/**
  * End Live Activity when order is completed or cancelled.
  */
 export function endLiveActivity(
@@ -127,12 +190,57 @@ export function notifyDriverOrderAssigned(
         body: pickupAddress
             ? `New delivery from ${pickupAddress}. Tap to view details.`
             : 'You have a new delivery. Tap to view details.',
+        localeContent: {
+            en: {
+                title: 'New Order Assigned! 🚀',
+                body: pickupAddress
+                    ? `New delivery from ${pickupAddress}. Tap to view details.`
+                    : 'You have a new delivery. Tap to view details.',
+            },
+            al: {
+                title: 'Porosi e re u caktua! 🚀',
+                body: pickupAddress
+                    ? `Dergese e re nga ${pickupAddress}. Prek per detaje.`
+                    : 'Keni nje dergese te re. Prek per te pare detajet.',
+            },
+        },
         data: { orderId, screen: 'order-detail', type: 'ORDER_ASSIGNED' },
     };
 
     notificationService
         .sendToUserByAppType(driverId, 'DRIVER', payload, 'ORDER_ASSIGNED')
         .catch((err) => logger.error({ err, driverId, orderId }, 'Failed to send driver assignment notification'));
+}
+
+/**
+ * Notify a driver that their order was re-assigned to someone else by an admin.
+ */
+export function notifyDriverOrderReassigned(
+    notificationService: NotificationService,
+    previousDriverId: string,
+    orderId: string,
+): void {
+    const payload: NotificationPayload = {
+        title: 'Order Reassigned',
+        body: 'An admin has reassigned one of your orders to another driver.',
+        localeContent: {
+            en: {
+                title: 'Order Reassigned',
+                body: 'An admin has reassigned one of your orders to another driver.',
+            },
+            al: {
+                title: 'Porosia u ricaktua',
+                body: 'Nje admin e ricaktoi nje nga porosite tuaja te nje shofer tjeter.',
+            },
+        },
+        data: { orderId, screen: 'orders', type: 'ORDER_REASSIGNED' },
+        timeSensitive: true,
+        relevanceScore: 1.0,
+    };
+
+    notificationService
+        .sendToUserByAppType(previousDriverId, 'DRIVER', payload, 'ORDER_REASSIGNED')
+        .catch((err) => logger.error({ err, previousDriverId, orderId }, 'Failed to send driver reassignment notification'));
 }
 
 export function notifyAdminsNewOrder(
@@ -145,6 +253,16 @@ export function notifyAdminsNewOrder(
     const payload: NotificationPayload = {
         title: 'New Order Received',
         body: 'A new order was placed. Tap to review it in admin.',
+        localeContent: {
+            en: {
+                title: 'New Order Received',
+                body: 'A new order was placed. Tap to review it in admin.',
+            },
+            al: {
+                title: 'U pranua porosi e re',
+                body: 'U vendos nje porosi e re. Prek per ta shqyrtuar ne admin.',
+            },
+        },
         data: { orderId, screen: 'orders', type: 'NEW_ORDER_ADMIN' },
         timeSensitive: true,
         relevanceScore: 0.9,
@@ -171,6 +289,20 @@ export function notifyDriversOrderReady(
         body: businessName
             ? `Order from ${businessName} is ready for pickup.`
             : 'A new order is ready for pickup.',
+        localeContent: {
+            en: {
+                title: 'New Order Available! 📦',
+                body: businessName
+                    ? `Order from ${businessName} is ready for pickup.`
+                    : 'A new order is ready for pickup.',
+            },
+            al: {
+                title: 'Porosi e re e disponueshme! 📦',
+                body: businessName
+                    ? `Porosia nga ${businessName} eshte gati per marrje.`
+                    : 'Nje porosi e re eshte gati per marrje.',
+            },
+        },
         data: { orderId, screen: 'orders', type: 'ORDER_READY_POOL' },
         timeSensitive: true,
         relevanceScore: 0.9,
@@ -194,6 +326,16 @@ export function notifyDriversOrderExpanded(
     const payload: NotificationPayload = {
         title: 'Order Still Available 📦',
         body: 'An order is waiting for pickup. Tap to claim it.',
+        localeContent: {
+            en: {
+                title: 'Order Still Available 📦',
+                body: 'An order is waiting for pickup. Tap to claim it.',
+            },
+            al: {
+                title: 'Porosia ende e disponueshme 📦',
+                body: 'Nje porosi po pret per marrje. Prek per ta pranuar.',
+            },
+        },
         data: { orderId, screen: 'orders', type: 'ORDER_READY_POOL' },
         timeSensitive: true,
         relevanceScore: 0.8,
@@ -214,6 +356,16 @@ export function notifyBusinessNewOrder(
     const payload: NotificationPayload = {
         title: 'New Order for Your Business',
         body: 'You have a new incoming order. Tap to view details.',
+        localeContent: {
+            en: {
+                title: 'New Order for Your Business',
+                body: 'You have a new incoming order. Tap to view details.',
+            },
+            al: {
+                title: 'Porosi e re per biznesin tuaj',
+                body: 'Keni nje porosi te re hyrse. Prek per te pare detajet.',
+            },
+        },
         data: { orderId, screen: 'orders', type: 'NEW_ORDER_BUSINESS' },
         timeSensitive: true,
         relevanceScore: 0.9,
@@ -309,13 +461,23 @@ export function notifyCustomerFromDriver(
     const copy = contentByKind[kind];
 
     const payload: NotificationPayload = {
-        title: preferredLanguage === 'al' ? copy.titleAl : copy.titleEn,
-        body: preferredLanguage === 'al' ? copy.bodyAl : copy.bodyEn,
+        title: copy.titleEn,
+        body: copy.bodyEn,
+        locale: preferredLanguage,
+        localeContent: {
+            en: {
+                title: copy.titleEn,
+                body: copy.bodyEn,
+            },
+            al: {
+                title: copy.titleAl,
+                body: copy.bodyAl,
+            },
+        },
         data: {
             orderId,
             screen: 'orders/active',
             type: copy.type,
-            language: preferredLanguage,
         },
         timeSensitive: true,
         relevanceScore: kind === 'ETA_LT_3_MIN' ? 0.98 : 1,

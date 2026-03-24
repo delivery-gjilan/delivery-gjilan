@@ -22,6 +22,20 @@
       "when": 1774157573493,
       "tag": "0002_concerned_liz_osborn",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1774272883000,
+      "tag": "0003_driver_messages",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1774317600000,
+      "tag": "0004_notification_campaign_locale",
+      "breakpoints": true
     }
   ]
 }

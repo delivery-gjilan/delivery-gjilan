@@ -13,6 +13,8 @@ export const createCampaign: NonNullable<MutationResolvers['createCampaign']> = 
     const campaign = await notificationService.repo.createCampaign({
         title: input.title,
         body: input.body,
+        titleAl: input.titleAl ?? null,
+        bodyAl: input.bodyAl ?? null,
         data: input.data as Record<string, unknown> | undefined,
         imageUrl: input.imageUrl ?? null,
         timeSensitive: input.timeSensitive ?? false,

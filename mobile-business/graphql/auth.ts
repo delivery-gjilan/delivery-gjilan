@@ -31,3 +31,12 @@ export const CHANGE_MY_PASSWORD = gql`
         changeMyPassword(currentPassword: $currentPassword, newPassword: $newPassword)
     }
 `;
+
+export const SET_MY_PREFERRED_LANGUAGE = gql`
+    mutation SetMyPreferredLanguage($language: AppLanguage!) {
+        setMyPreferredLanguage(language: $language) {
+            id
+            preferredLanguage
+        }
+    }
+`;

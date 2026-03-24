@@ -3,7 +3,7 @@ import { createAuditLogger } from '@/services/AuditLogger';
 import logger from '@/lib/logger';
 import { drivers as driversTable } from '@/database/schema';
 import { eq } from 'drizzle-orm';
-import { notifyDriverOrderAssigned } from '@/services/orderNotifications';
+import { notifyDriverOrderAssigned, notifyDriverOrderReassigned } from '@/services/orderNotifications';
 import { getDispatchService } from '@/services/driverServices.init';
 import { AppError } from '@/lib/errors';
 
@@ -34,6 +34,9 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
     if (!dbOrderBefore) {
         throw AppError.notFound('Order');
     }
+
+    // Remember who had this order before reassignment (admin only — drivers only self-assign)
+    const previousDriverId = isSuperAdmin ? (dbOrderBefore.driverId ?? null) : null;
 
     if (isDriver) {
         if (!userData?.userId) {
@@ -118,13 +121,22 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
         await orderService.publishAllOrders();
     }
 
-    // Push notification to driver (fire-and-forget)
+    // Push notification to new driver (fire-and-forget)
     if (effectiveDriverId) {
         notifyDriverOrderAssigned(
             context.notificationService,
             effectiveDriverId,
             id,
             dbOrder?.dropoffAddress || undefined,
+        );
+    }
+
+    // Notify previous driver if the order was taken away from them by an admin
+    if (previousDriverId && previousDriverId !== effectiveDriverId) {
+        notifyDriverOrderReassigned(
+            context.notificationService,
+            previousDriverId,
+            id,
         );
     }
     

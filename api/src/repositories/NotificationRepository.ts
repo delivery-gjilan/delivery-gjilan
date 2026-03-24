@@ -17,6 +17,7 @@ import {
     NewDbPushTelemetryEvent,
     DbBusinessDeviceHealth,
 } from '@/database/schema/notifications';
+import { users } from '@/database/schema/users';
 import { eq, inArray, and, sql, gte, desc } from 'drizzle-orm';
 
 export interface PushTelemetryEventsFilter {
@@ -104,6 +105,29 @@ export class NotificationRepository {
             .select()
             .from(deviceTokens)
             .where(and(inArray(deviceTokens.userId, userIds), eq(deviceTokens.appType, appType)));
+    }
+
+    async getUserPreferredLanguage(userId: string): Promise<string | undefined> {
+        const [row] = await this.db
+            .select({ preferredLanguage: users.preferredLanguage })
+            .from(users)
+            .where(eq(users.id, userId));
+
+        return row?.preferredLanguage;
+    }
+
+    async getUsersPreferredLanguages(userIds: string[]): Promise<Record<string, string>> {
+        if (userIds.length === 0) return {};
+
+        const rows = await this.db
+            .select({
+                id: users.id,
+                preferredLanguage: users.preferredLanguage,
+            })
+            .from(users)
+            .where(inArray(users.id, userIds));
+
+        return Object.fromEntries(rows.map((row) => [row.id, row.preferredLanguage]));
     }
 
     async removeTokensForUser(userId: string): Promise<void> {

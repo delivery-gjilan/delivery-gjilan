@@ -1,6 +1,7 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { UserQueryService } from '@/services/UserQueryService';
 import { AppError } from '@/lib/errors';
+import type { NotificationPayload } from '@/services/NotificationService';
 
 export const sendCampaign: NonNullable<MutationResolvers['sendCampaign']> = async (
     _parent,
@@ -23,18 +24,27 @@ export const sendCampaign: NonNullable<MutationResolvers['sendCampaign']> = asyn
         const queryService = new UserQueryService(db);
         const userIds = await queryService.resolveUserIds(campaign.query as Record<string, unknown>);
 
-        const payload = {
+        const rawData = campaign.data
+            ? Object.fromEntries(Object.entries(campaign.data).map(([k, v]) => [k, String(v)]))
+            : undefined;
+
+        const localeContent =
+            campaign.titleAl && campaign.bodyAl
+                ? {
+                    en: { title: campaign.title, body: campaign.body },
+                    al: { title: campaign.titleAl, body: campaign.bodyAl },
+                }
+                : undefined;
+
+        const payload: NotificationPayload = {
             title: campaign.title,
             body: campaign.body,
-            data: campaign.data
-                ? Object.fromEntries(
-                    Object.entries(campaign.data).map(([k, v]) => [k, String(v)])
-                  )
-                : undefined,
-                        imageUrl: campaign.imageUrl || undefined,
-                        timeSensitive: campaign.timeSensitive,
-                        category: campaign.category || undefined,
-                        relevanceScore: campaign.relevanceScore ?? undefined,
+            localeContent,
+            data: rawData,
+            imageUrl: campaign.imageUrl || undefined,
+            timeSensitive: campaign.timeSensitive,
+            category: campaign.category || undefined,
+            relevanceScore: campaign.relevanceScore ?? undefined,
         };
 
         const result = await notificationService.sendToUsers(userIds, payload, 'PROMOTIONAL');

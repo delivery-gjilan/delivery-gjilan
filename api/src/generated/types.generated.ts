@@ -324,6 +324,7 @@ export type CreateBusinessWithOwnerPayload = {
 
 export type CreateCampaignInput = {
   body: Scalars['String']['input'];
+  bodyAl?: InputMaybe<Scalars['String']['input']>;
   category?: InputMaybe<Scalars['String']['input']>;
   data?: InputMaybe<Scalars['JSON']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
@@ -331,6 +332,7 @@ export type CreateCampaignInput = {
   relevanceScore?: InputMaybe<Scalars['Float']['input']>;
   timeSensitive?: InputMaybe<Scalars['Boolean']['input']>;
   title: Scalars['String']['input'];
+  titleAl?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type CreateDeliveryPricingTierInput = {
@@ -620,6 +622,35 @@ export type DriverHeartbeatResult = {
   success: Scalars['Boolean']['output'];
 };
 
+export type DriverMessage = {
+  __typename?: 'DriverMessage';
+  admin?: Maybe<DriverMessageUser>;
+  adminId: Scalars['ID']['output'];
+  alertType: MessageAlertType;
+  body: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  driver?: Maybe<DriverMessageUser>;
+  driverId: Scalars['ID']['output'];
+  id: Scalars['ID']['output'];
+  readAt?: Maybe<Scalars['DateTime']['output']>;
+  senderRole: Scalars['String']['output'];
+};
+
+export type DriverMessageThread = {
+  __typename?: 'DriverMessageThread';
+  driverId: Scalars['ID']['output'];
+  driverName: Scalars['String']['output'];
+  lastMessage?: Maybe<DriverMessage>;
+  unreadCount: Scalars['Int']['output'];
+};
+
+export type DriverMessageUser = {
+  __typename?: 'DriverMessageUser';
+  firstName: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  lastName: Scalars['String']['output'];
+};
+
 export type DriverPttSignal = {
   __typename?: 'DriverPttSignal';
   action: DriverPttSignalAction;
@@ -672,6 +703,11 @@ export type LoginInput = {
   email: Scalars['String']['input'];
   password: Scalars['String']['input'];
 };
+
+export type MessageAlertType =
+  | 'INFO'
+  | 'URGENT'
+  | 'WARNING';
 
 export type Mutation = {
   __typename?: 'Mutation';
@@ -747,6 +783,8 @@ export type Mutation = {
   login: AuthResponse;
   logoutAllSessions: Scalars['Boolean']['output'];
   logoutCurrentSession: Scalars['Boolean']['output'];
+  /** Mark all messages in a conversation as read */
+  markDriverMessagesRead: Scalars['Boolean']['output'];
   markFirstOrderUsed: UserPromoMetadata;
   markSettlementAsPaid: Settlement;
   markSettlementAsPartiallyPaid: Settlement;
@@ -755,11 +793,15 @@ export type Mutation = {
   registerDeviceToken: Scalars['Boolean']['output'];
   registerLiveActivityToken: Scalars['Boolean']['output'];
   removeUserFromPromotion: Scalars['Boolean']['output'];
+  /** Driver replies to admin */
+  replyToDriverMessage: DriverMessage;
   resendEmailVerification: SignupStepResponse;
   /** Business owner accepts or disputes a pending settlement request. */
   respondToSettlementRequest: SettlementRequest;
   runSettlementScenarioHarness: SettlementScenarioHarnessResult;
   sendCampaign: NotificationCampaign;
+  /** Admin sends a message to a driver */
+  sendDriverMessage: DriverMessage;
   sendPushNotification: SendNotificationResult;
   setBusinessSchedule: Array<BusinessDayHours>;
   setDefaultAddress: Scalars['Boolean']['output'];
@@ -1087,6 +1129,11 @@ export type MutationlogoutCurrentSessionArgs = {
 };
 
 
+export type MutationmarkDriverMessagesReadArgs = {
+  otherUserId: Scalars['ID']['input'];
+};
+
+
 export type MutationmarkFirstOrderUsedArgs = {
   userId: Scalars['ID']['input'];
 };
@@ -1135,6 +1182,12 @@ export type MutationremoveUserFromPromotionArgs = {
 };
 
 
+export type MutationreplyToDriverMessageArgs = {
+  adminId: Scalars['ID']['input'];
+  body: Scalars['String']['input'];
+};
+
+
 export type MutationrespondToSettlementRequestArgs = {
   action: SettlementRequestAction;
   disputeReason?: InputMaybe<Scalars['String']['input']>;
@@ -1149,6 +1202,13 @@ export type MutationrunSettlementScenarioHarnessArgs = {
 
 export type MutationsendCampaignArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type MutationsendDriverMessageArgs = {
+  alertType: MessageAlertType;
+  body: Scalars['String']['input'];
+  driverId: Scalars['ID']['input'];
 };
 
 
@@ -1376,6 +1436,7 @@ export type Notification = {
 export type NotificationCampaign = {
   __typename?: 'NotificationCampaign';
   body: Scalars['String']['output'];
+  bodyAl?: Maybe<Scalars['String']['output']>;
   category?: Maybe<Scalars['String']['output']>;
   createdAt: Scalars['DateTime']['output'];
   data?: Maybe<Scalars['JSON']['output']>;
@@ -1392,6 +1453,7 @@ export type NotificationCampaign = {
   targetCount: Scalars['Int']['output'];
   timeSensitive: Scalars['Boolean']['output'];
   title: Scalars['String']['output'];
+  titleAl?: Maybe<Scalars['String']['output']>;
 };
 
 export type NotificationType =
@@ -1742,6 +1804,10 @@ export type Query = {
   deliveryZones: Array<DeliveryZone>;
   deviceTokens: Array<DeviceToken>;
   driverBalance: SettlementSummary;
+  /** Admin: list of all driver threads with unread counts */
+  driverMessageThreads: Array<DriverMessageThread>;
+  /** Admin: full conversation with a specific driver */
+  driverMessages: Array<DriverMessage>;
   drivers: Array<User>;
   /** Get Agora RTC credentials for the current authenticated user */
   getAgoraRtcCredentials: AgoraRtcCredentials;
@@ -1759,6 +1825,8 @@ export type Query = {
   me?: Maybe<User>;
   myAddresses: Array<UserAddress>;
   myBehavior?: Maybe<UserBehavior>;
+  /** Driver: my messages */
+  myDriverMessages: Array<DriverMessage>;
   /** Get live metrics for the authenticated driver */
   myDriverMetrics: DriverDailyMetrics;
   myReferralStats: ReferralStats;
@@ -1843,6 +1911,13 @@ export type QuerydriverBalanceArgs = {
 };
 
 
+export type QuerydriverMessagesArgs = {
+  driverId: Scalars['ID']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
 export type QuerygetAgoraRtcCredentialsArgs = {
   channelName: Scalars['String']['input'];
   role: AgoraRtcRole;
@@ -1902,6 +1977,12 @@ export type QuerygetUserPromoMetadataArgs = {
 
 export type QuerygetUserPromotionsArgs = {
   userId: Scalars['ID']['input'];
+};
+
+
+export type QuerymyDriverMessagesArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -2092,12 +2173,14 @@ export type SendNotificationResult = {
 
 export type SendPushNotificationInput = {
   body: Scalars['String']['input'];
+  bodyAl?: InputMaybe<Scalars['String']['input']>;
   category?: InputMaybe<Scalars['String']['input']>;
   data?: InputMaybe<Scalars['JSON']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   relevanceScore?: InputMaybe<Scalars['Float']['input']>;
   timeSensitive?: InputMaybe<Scalars['Boolean']['input']>;
   title: Scalars['String']['input'];
+  titleAl?: InputMaybe<Scalars['String']['input']>;
   userIds: Array<Scalars['ID']['input']>;
 };
 
@@ -2303,9 +2386,13 @@ export type SubmitPhoneNumberInput = {
 
 export type Subscription = {
   __typename?: 'Subscription';
+  /** Admin receives replies from a specific driver in real-time */
+  adminMessageReceived: DriverMessage;
   allOrdersUpdated: Array<Order>;
   auditLogCreated: AuditLog;
   driverConnectionStatusChanged: DriverConnection;
+  /** Driver receives messages from admin in real-time */
+  driverMessageReceived: DriverMessage;
   /** Per-driver push-to-talk signal stream (start/stop/mute/unmute) */
   driverPttSignal: DriverPttSignal;
   driversUpdated: Array<User>;
@@ -2315,6 +2402,11 @@ export type Subscription = {
   settlementStatusChanged: Settlement;
   storeStatusUpdated: StoreStatus;
   userOrdersUpdated: Array<Order>;
+};
+
+
+export type SubscriptionadminMessageReceivedArgs = {
+  driverId: Scalars['ID']['input'];
 };
 
 
@@ -2784,6 +2876,9 @@ export type ResolversTypes = {
   DriverCustomerNotificationKind: ResolverTypeWrapper<'ETA_LT_3_MIN' | 'ARRIVED_WAITING'>;
   DriverDailyMetrics: ResolverTypeWrapper<Omit<DriverDailyMetrics, 'connectionStatus'> & { connectionStatus: ResolversTypes['DriverConnectionStatus'] }>;
   DriverHeartbeatResult: ResolverTypeWrapper<Omit<DriverHeartbeatResult, 'connectionStatus'> & { connectionStatus: ResolversTypes['DriverConnectionStatus'] }>;
+  DriverMessage: ResolverTypeWrapper<Omit<DriverMessage, 'alertType'> & { alertType: ResolversTypes['MessageAlertType'] }>;
+  DriverMessageThread: ResolverTypeWrapper<Omit<DriverMessageThread, 'lastMessage'> & { lastMessage?: Maybe<ResolversTypes['DriverMessage']> }>;
+  DriverMessageUser: ResolverTypeWrapper<DriverMessageUser>;
   DriverPttSignal: ResolverTypeWrapper<Omit<DriverPttSignal, 'action'> & { action: ResolversTypes['DriverPttSignalAction'] }>;
   DriverPttSignalAction: ResolverTypeWrapper<'STARTED' | 'STOPPED' | 'MUTE' | 'UNMUTE'>;
   EntityType: ResolverTypeWrapper<'USER' | 'BUSINESS' | 'PRODUCT' | 'ORDER' | 'SETTLEMENT' | 'DRIVER' | 'CATEGORY' | 'SUBCATEGORY' | 'DELIVERY_ZONE'>;
@@ -2792,6 +2887,7 @@ export type ResolversTypes = {
   Location: ResolverTypeWrapper<Location>;
   LocationInput: LocationInput;
   LoginInput: LoginInput;
+  MessageAlertType: ResolverTypeWrapper<'INFO' | 'WARNING' | 'URGENT'>;
   Mutation: ResolverTypeWrapper<{}>;
   Notification: ResolverTypeWrapper<Omit<Notification, 'type'> & { type: ResolversTypes['NotificationType'] }>;
   NotificationCampaign: ResolverTypeWrapper<Omit<NotificationCampaign, 'sender' | 'status'> & { sender?: Maybe<ResolversTypes['User']>, status: ResolversTypes['CampaignStatus'] }>;
@@ -2944,6 +3040,9 @@ export type ResolversParentTypes = {
   DriverConnection: DriverConnection;
   DriverDailyMetrics: DriverDailyMetrics;
   DriverHeartbeatResult: DriverHeartbeatResult;
+  DriverMessage: DriverMessage;
+  DriverMessageThread: Omit<DriverMessageThread, 'lastMessage'> & { lastMessage?: Maybe<ResolversParentTypes['DriverMessage']> };
+  DriverMessageUser: DriverMessageUser;
   DriverPttSignal: DriverPttSignal;
   InitiateSignupInput: InitiateSignupInput;
   JSON: Scalars['JSON']['output'];
@@ -3299,6 +3398,35 @@ export type DriverHeartbeatResultResolvers<ContextType = GraphQLContext, ParentT
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
+export type DriverMessageResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['DriverMessage'] = ResolversParentTypes['DriverMessage']> = {
+  admin?: Resolver<Maybe<ResolversTypes['DriverMessageUser']>, ParentType, ContextType>;
+  adminId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  alertType?: Resolver<ResolversTypes['MessageAlertType'], ParentType, ContextType>;
+  body?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  createdAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+  driver?: Resolver<Maybe<ResolversTypes['DriverMessageUser']>, ParentType, ContextType>;
+  driverId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  readAt?: Resolver<Maybe<ResolversTypes['DateTime']>, ParentType, ContextType>;
+  senderRole?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type DriverMessageThreadResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['DriverMessageThread'] = ResolversParentTypes['DriverMessageThread']> = {
+  driverId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  driverName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  lastMessage?: Resolver<Maybe<ResolversTypes['DriverMessage']>, ParentType, ContextType>;
+  unreadCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type DriverMessageUserResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['DriverMessageUser'] = ResolversParentTypes['DriverMessageUser']> = {
+  firstName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  lastName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
 export type DriverPttSignalResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['DriverPttSignal'] = ResolversParentTypes['DriverPttSignal']> = {
   action?: Resolver<ResolversTypes['DriverPttSignalAction'], ParentType, ContextType>;
   adminId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
@@ -3323,6 +3451,8 @@ export type LocationResolvers<ContextType = GraphQLContext, ParentType extends R
   longitude?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
+
+export type MessageAlertTypeResolvers = EnumResolverSignature<{ INFO?: any, URGENT?: any, WARNING?: any }, ResolversTypes['MessageAlertType']>;
 
 export type MutationResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Mutation'] = ResolversParentTypes['Mutation']> = {
   addUserAddress?: Resolver<ResolversTypes['UserAddress'], ParentType, ContextType, RequireFields<MutationaddUserAddressArgs, 'input'>>;
@@ -3381,6 +3511,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   login?: Resolver<ResolversTypes['AuthResponse'], ParentType, ContextType, RequireFields<MutationloginArgs, 'input'>>;
   logoutAllSessions?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   logoutCurrentSession?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationlogoutCurrentSessionArgs, 'refreshToken'>>;
+  markDriverMessagesRead?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationmarkDriverMessagesReadArgs, 'otherUserId'>>;
   markFirstOrderUsed?: Resolver<ResolversTypes['UserPromoMetadata'], ParentType, ContextType, RequireFields<MutationmarkFirstOrderUsedArgs, 'userId'>>;
   markSettlementAsPaid?: Resolver<ResolversTypes['Settlement'], ParentType, ContextType, RequireFields<MutationmarkSettlementAsPaidArgs, 'settlementId'>>;
   markSettlementAsPartiallyPaid?: Resolver<ResolversTypes['Settlement'], ParentType, ContextType, RequireFields<MutationmarkSettlementAsPartiallyPaidArgs, 'amount' | 'settlementId'>>;
@@ -3389,10 +3520,12 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   registerDeviceToken?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationregisterDeviceTokenArgs, 'input'>>;
   registerLiveActivityToken?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationregisterLiveActivityTokenArgs, 'activityId' | 'orderId' | 'token'>>;
   removeUserFromPromotion?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationremoveUserFromPromotionArgs, 'promotionId' | 'userId'>>;
+  replyToDriverMessage?: Resolver<ResolversTypes['DriverMessage'], ParentType, ContextType, RequireFields<MutationreplyToDriverMessageArgs, 'adminId' | 'body'>>;
   resendEmailVerification?: Resolver<ResolversTypes['SignupStepResponse'], ParentType, ContextType>;
   respondToSettlementRequest?: Resolver<ResolversTypes['SettlementRequest'], ParentType, ContextType, RequireFields<MutationrespondToSettlementRequestArgs, 'action' | 'requestId'>>;
   runSettlementScenarioHarness?: Resolver<ResolversTypes['SettlementScenarioHarnessResult'], ParentType, ContextType, Partial<MutationrunSettlementScenarioHarnessArgs>>;
   sendCampaign?: Resolver<ResolversTypes['NotificationCampaign'], ParentType, ContextType, RequireFields<MutationsendCampaignArgs, 'id'>>;
+  sendDriverMessage?: Resolver<ResolversTypes['DriverMessage'], ParentType, ContextType, RequireFields<MutationsendDriverMessageArgs, 'alertType' | 'body' | 'driverId'>>;
   sendPushNotification?: Resolver<ResolversTypes['SendNotificationResult'], ParentType, ContextType, RequireFields<MutationsendPushNotificationArgs, 'input'>>;
   setBusinessSchedule?: Resolver<Array<ResolversTypes['BusinessDayHours']>, ParentType, ContextType, RequireFields<MutationsetBusinessScheduleArgs, 'businessId' | 'schedule'>>;
   setDefaultAddress?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationsetDefaultAddressArgs, 'id'>>;
@@ -3446,6 +3579,7 @@ export type NotificationResolvers<ContextType = GraphQLContext, ParentType exten
 
 export type NotificationCampaignResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['NotificationCampaign'] = ResolversParentTypes['NotificationCampaign']> = {
   body?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  bodyAl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   category?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
   data?: Resolver<Maybe<ResolversTypes['JSON']>, ParentType, ContextType>;
@@ -3462,6 +3596,7 @@ export type NotificationCampaignResolvers<ContextType = GraphQLContext, ParentTy
   targetCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   timeSensitive?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   title?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  titleAl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -3767,6 +3902,8 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   deliveryZones?: Resolver<Array<ResolversTypes['DeliveryZone']>, ParentType, ContextType>;
   deviceTokens?: Resolver<Array<ResolversTypes['DeviceToken']>, ParentType, ContextType, Partial<QuerydeviceTokensArgs>>;
   driverBalance?: Resolver<ResolversTypes['SettlementSummary'], ParentType, ContextType, RequireFields<QuerydriverBalanceArgs, 'driverId'>>;
+  driverMessageThreads?: Resolver<Array<ResolversTypes['DriverMessageThread']>, ParentType, ContextType>;
+  driverMessages?: Resolver<Array<ResolversTypes['DriverMessage']>, ParentType, ContextType, RequireFields<QuerydriverMessagesArgs, 'driverId'>>;
   drivers?: Resolver<Array<ResolversTypes['User']>, ParentType, ContextType>;
   getAgoraRtcCredentials?: Resolver<ResolversTypes['AgoraRtcCredentials'], ParentType, ContextType, RequireFields<QuerygetAgoraRtcCredentialsArgs, 'channelName' | 'role'>>;
   getAllPromotions?: Resolver<Array<ResolversTypes['Promotion']>, ParentType, ContextType, Partial<QuerygetAllPromotionsArgs>>;
@@ -3783,6 +3920,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   me?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
   myAddresses?: Resolver<Array<ResolversTypes['UserAddress']>, ParentType, ContextType>;
   myBehavior?: Resolver<Maybe<ResolversTypes['UserBehavior']>, ParentType, ContextType>;
+  myDriverMessages?: Resolver<Array<ResolversTypes['DriverMessage']>, ParentType, ContextType, Partial<QuerymyDriverMessagesArgs>>;
   myDriverMetrics?: Resolver<ResolversTypes['DriverDailyMetrics'], ParentType, ContextType>;
   myReferralStats?: Resolver<ResolversTypes['ReferralStats'], ParentType, ContextType>;
   notificationCampaign?: Resolver<Maybe<ResolversTypes['NotificationCampaign']>, ParentType, ContextType, RequireFields<QuerynotificationCampaignArgs, 'id'>>;
@@ -4007,9 +4145,11 @@ export type StoreStatusResolvers<ContextType = GraphQLContext, ParentType extend
 };
 
 export type SubscriptionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Subscription'] = ResolversParentTypes['Subscription']> = {
+  adminMessageReceived?: SubscriptionResolver<ResolversTypes['DriverMessage'], "adminMessageReceived", ParentType, ContextType, RequireFields<SubscriptionadminMessageReceivedArgs, 'driverId'>>;
   allOrdersUpdated?: SubscriptionResolver<Array<ResolversTypes['Order']>, "allOrdersUpdated", ParentType, ContextType>;
   auditLogCreated?: SubscriptionResolver<ResolversTypes['AuditLog'], "auditLogCreated", ParentType, ContextType, Partial<SubscriptionauditLogCreatedArgs>>;
   driverConnectionStatusChanged?: SubscriptionResolver<ResolversTypes['DriverConnection'], "driverConnectionStatusChanged", ParentType, ContextType, RequireFields<SubscriptiondriverConnectionStatusChangedArgs, 'driverId'>>;
+  driverMessageReceived?: SubscriptionResolver<ResolversTypes['DriverMessage'], "driverMessageReceived", ParentType, ContextType>;
   driverPttSignal?: SubscriptionResolver<ResolversTypes['DriverPttSignal'], "driverPttSignal", ParentType, ContextType, RequireFields<SubscriptiondriverPttSignalArgs, 'driverId'>>;
   driversUpdated?: SubscriptionResolver<Array<ResolversTypes['User']>, "driversUpdated", ParentType, ContextType>;
   orderDriverLiveTracking?: SubscriptionResolver<ResolversTypes['OrderDriverLiveTracking'], "orderDriverLiveTracking", ParentType, ContextType, RequireFields<SubscriptionorderDriverLiveTrackingArgs, 'orderId'>>;
@@ -4157,11 +4297,15 @@ export type Resolvers<ContextType = GraphQLContext> = {
   DriverCustomerNotificationKind?: DriverCustomerNotificationKindResolvers;
   DriverDailyMetrics?: DriverDailyMetricsResolvers<ContextType>;
   DriverHeartbeatResult?: DriverHeartbeatResultResolvers<ContextType>;
+  DriverMessage?: DriverMessageResolvers<ContextType>;
+  DriverMessageThread?: DriverMessageThreadResolvers<ContextType>;
+  DriverMessageUser?: DriverMessageUserResolvers<ContextType>;
   DriverPttSignal?: DriverPttSignalResolvers<ContextType>;
   DriverPttSignalAction?: DriverPttSignalActionResolvers;
   EntityType?: EntityTypeResolvers;
   JSON?: GraphQLScalarType;
   Location?: LocationResolvers<ContextType>;
+  MessageAlertType?: MessageAlertTypeResolvers;
   Mutation?: MutationResolvers<ContextType>;
   Notification?: NotificationResolvers<ContextType>;
   NotificationCampaign?: NotificationCampaignResolvers<ContextType>;

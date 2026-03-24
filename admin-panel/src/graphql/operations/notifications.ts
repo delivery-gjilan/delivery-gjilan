@@ -6,6 +6,8 @@ export const GET_NOTIFICATION_CAMPAIGNS = gql`
       id
       title
       body
+      titleAl
+      bodyAl
       data
       imageUrl
       timeSensitive
@@ -29,6 +31,8 @@ export const GET_NOTIFICATION_CAMPAIGN = gql`
       id
       title
       body
+      titleAl
+      bodyAl
       data
       imageUrl
       timeSensitive
@@ -67,6 +71,8 @@ export const CREATE_CAMPAIGN = gql`
       id
       title
       body
+      titleAl
+      bodyAl
       imageUrl
       timeSensitive
       category

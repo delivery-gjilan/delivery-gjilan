@@ -86,7 +86,8 @@ class ExpoMapboxNavigationViewController: UIViewController {
         navigation = mapboxNavigation!.navigation()
         tripSession = mapboxNavigation!.tripSession()
 
-        routeProgressCancellable = navigation!.routeProgress.sink { progressState in
+        routeProgressCancellable = navigation!.routeProgress.sink { [weak self] progressState in
+            guard let self else { return }
             if(progressState != nil){
 
 
@@ -122,7 +123,8 @@ class ExpoMapboxNavigationViewController: UIViewController {
             }
         }
 
-        waypointArrivalCancellable = navigation!.waypointsArrival.sink { arrivalStatus in
+        waypointArrivalCancellable = navigation!.waypointsArrival.sink { [weak self] arrivalStatus in
+            guard let self else { return }
             let event = arrivalStatus.event
             if event is WaypointArrivalStatus.Events.ToFinalDestination {
                 self.onFinalDestinationArrival?()
@@ -131,11 +133,12 @@ class ExpoMapboxNavigationViewController: UIViewController {
             }
         }
 
-        reroutingCancellable = navigation!.rerouting.sink { rerouteStatus in
-            self.onRouteChanged?()            
+        reroutingCancellable = navigation!.rerouting.sink { [weak self] rerouteStatus in
+            self?.onRouteChanged?()            
         }
 
-        sessionCancellable = tripSession!.session.sink { session in 
+        sessionCancellable = tripSession!.session.sink { [weak self] session in 
+            guard let self else { return }
             let state = session.state
             switch state {
                 case .activeGuidance(let activeGuidanceState):
@@ -159,6 +162,16 @@ class ExpoMapboxNavigationViewController: UIViewController {
 
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
+        // Cancel all Combine subscriptions immediately so no further events
+        // are dispatched to the (soon-to-be-deallocated) ExpoFabricView.
+        routeProgressCancellable?.cancel()
+        waypointArrivalCancellable?.cancel()
+        reroutingCancellable?.cancel()
+        sessionCancellable?.cancel()
+        routeProgressCancellable = nil
+        waypointArrivalCancellable = nil
+        reroutingCancellable = nil
+        sessionCancellable = nil
         Task { @MainActor in tripSession?.setToIdle() } // Stops navigation
     }
 

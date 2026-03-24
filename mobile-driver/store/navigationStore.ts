@@ -14,6 +14,7 @@ export interface NavigationOrder {
     status: string;
     businessName: string;
     customerName: string;
+    customerPhone: string | null;
     pickup: NavigationDestination;
     dropoff: NavigationDestination | null;
 }

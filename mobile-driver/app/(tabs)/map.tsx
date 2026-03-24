@@ -60,11 +60,14 @@ export default function MapScreen() {
     const cameraRef = useRef<Mapbox.Camera>(null);
 
     const [focusedOrderId, setFocusedOrderId] = useState<string | null>(null);
+    const [sheetHeight, setSheetHeight] = useState(0);
+    const sheetHeightRef = useRef(0);
     const isOnline = useAuthStore((state) => state.isOnline);
     const connectionStatus = useAuthStore((state) => state.connectionStatus);
     const { dispatchModeEnabled } = useStoreStatus();
 
     const [acceptSheetOrder, setAcceptSheetOrder] = useState<any>(null);
+    const [acceptSheetHeight, setAcceptSheetHeight] = useState(0);
     const [markingPickedUpIds, setMarkingPickedUpIds] = useState<Set<string>>(new Set());
     const [acceptAutoCountdown, setAcceptAutoCountdown] = useState(true);
     const skippedIds = useRef(new Set<string>());
@@ -286,6 +289,10 @@ export default function MapScreen() {
 
         setFocusedOrderId(order.id);
 
+        // Padding: respect the info sheet at top and card bar at bottom
+        const padTop = (sheetHeightRef.current || 0) + 20;
+        const padBottom = BOTTOM_BAR_HEIGHT + 20;
+
         // OUT_FOR_DELIVERY: show driver + dropoff only
         if (order.status === 'OUT_FOR_DELIVERY' && dropLoc && location) {
             const lats = [Number(dropLoc.latitude), location.latitude];
@@ -293,7 +300,7 @@ export default function MapScreen() {
             const ne: [number, number] = [Math.max(...lngs) + 0.005, Math.max(...lats) + 0.005];
             const sw: [number, number] = [Math.min(...lngs) - 0.005, Math.min(...lats) - 0.005];
 
-            cameraRef.current?.fitBounds(ne, sw, [70, 20, 440, 20], 1200);
+            cameraRef.current?.fitBounds(ne, sw, [padTop, 20, padBottom, 20], 1200);
         } else if (bizLoc && dropLoc && location) {
             // Not delivering yet: show driver + pickup + dropoff (3 points)
             const lats = [location.latitude, Number(bizLoc.latitude), Number(dropLoc.latitude)];
@@ -301,7 +308,7 @@ export default function MapScreen() {
             const ne: [number, number] = [Math.max(...lngs) + 0.005, Math.max(...lats) + 0.005];
             const sw: [number, number] = [Math.min(...lngs) - 0.005, Math.min(...lats) - 0.005];
 
-            cameraRef.current?.fitBounds(ne, sw, [70, 20, 440, 20], 1200);
+            cameraRef.current?.fitBounds(ne, sw, [padTop, 20, padBottom, 20], 1200);
         } else if (bizLoc) {
             cameraRef.current?.setCamera({
                 centerCoordinate: [Number(bizLoc.longitude), Number(bizLoc.latitude)],
@@ -370,6 +377,7 @@ export default function MapScreen() {
                 startNavigation(navOrder, 'to_pickup', location);
             }
             setAcceptSheetOrder(null);
+            setAcceptSheetHeight(0);
         } catch {
             Alert.alert('Error', 'Failed to accept order. Please try again.');
         } finally {
@@ -382,6 +390,7 @@ export default function MapScreen() {
             skippedIds.current.add(acceptSheetOrder.id);
         }
         setAcceptSheetOrder(null);
+        setAcceptSheetHeight(0);
     }, [acceptSheetOrder, acceptAutoCountdown]);
 
     const handleMarkPickedUp = useCallback(async (orderId?: string) => {
@@ -484,6 +493,7 @@ export default function MapScreen() {
             status: order.status,
             businessName: order.businesses?.[0]?.business?.name ?? 'Business',
             customerName,
+            customerPhone: order.user?.phoneNumber ?? null,
             pickup,
             dropoff,
         };
@@ -505,6 +515,13 @@ export default function MapScreen() {
     // Dismiss focused order when tapping elsewhere
     const dismissFocusedOrder = useCallback(() => {
         setFocusedOrderId(null);
+        setSheetHeight(0);
+        sheetHeightRef.current = 0;
+    }, []);
+
+    const handleSheetHeightChange = useCallback((h: number) => {
+        sheetHeightRef.current = h;
+        setSheetHeight(h);
     }, []);
 
     return (
@@ -517,6 +534,7 @@ export default function MapScreen() {
                 attributionEnabled={false}
                 scaleBarEnabled={false}
                 onTouchEnd={handleMapTouchEnd}
+                onPress={focusedOrderId ? dismissFocusedOrder : undefined}
             >
                 <Mapbox.Camera
                     ref={cameraRef}
@@ -526,6 +544,12 @@ export default function MapScreen() {
                     }}
                     maxBounds={{ ne: GJILAN_NE, sw: GJILAN_SW }}
                     minZoomLevel={12}
+                    padding={{
+                        paddingTop: acceptSheetOrder && !focusedOrder ? acceptSheetHeight : 0,
+                        paddingBottom: assignedOrders.length > 0 ? BOTTOM_BAR_HEIGHT : 0,
+                        paddingLeft: 0,
+                        paddingRight: 0,
+                    }}
                     {...(followDriver && location ? {
                         centerCoordinate: [location.longitude, location.latitude],
                         bearing: location.heading ?? 0,
@@ -695,7 +719,21 @@ export default function MapScreen() {
             </Mapbox.MapView>
 
             {/* ═══ Right-side buttons ═══ */}
-            <View style={[styles.rightButtons, { bottom: (assignedOrders.length > 0 && !focusedOrder ? BOTTOM_BAR_HEIGHT + 12 : 20 + insets.bottom) }]}>
+            <View style={[styles.rightButtons, { bottom: (assignedOrders.length > 0 ? BOTTOM_BAR_HEIGHT + 12 : 20 + insets.bottom) }]}>
+                {/* Available orders pool button */}
+                {!dispatchModeEnabled && isOnline && !acceptSheetOrder && availableOrders.length > 0 && (
+                    <Pressable
+                        style={[styles.mapBtn, styles.mapBtnPool]}
+                        onPress={handlePoolOpen}
+                    >
+                        <Ionicons name="layers-outline" size={20} color="#22d3ee" />
+                        {availableOrders.length > 0 && (
+                            <View style={styles.poolBadge}>
+                                <Text style={styles.poolBadgeText}>{availableOrders.length}</Text>
+                            </View>
+                        )}
+                    </Pressable>
+                )}
                 {/* Lock camera button */}
                 <Pressable
                     style={[styles.mapBtn, followDriver && styles.mapBtnActive]}
@@ -746,31 +784,25 @@ export default function MapScreen() {
                     onStartNavigation={handleStartNavigation}
                     onMarkPickedUp={handleMarkPickedUp}
                     onClose={dismissFocusedOrder}
+                    onHeightChange={handleSheetHeightChange}
                 />
             )}
 
+
+
             {/* ═══ Accept sheet ═══ */}
-            {acceptSheetOrder && !focusedOrder && (
+            {acceptSheetOrder && (
                 <OrderAcceptSheet
                     order={acceptSheetOrder}
                     onAccept={handleAcceptOrder}
                     onSkip={handleSkipOrder}
                     accepting={accepting}
                     autoCountdown={acceptAutoCountdown}
+                    onHeightChange={setAcceptSheetHeight}
                 />
             )}
 
-            {/* ═══ Order Pool pill — top bar ═══ */}
-            {!dispatchModeEnabled && isOnline && !acceptSheetOrder && availableOrders.length > 0 && (
-                <Pressable
-                    style={[styles.poolPill, { top: insets.top + 12 }]}
-                    onPress={handlePoolOpen}
-                >
-                    <Ionicons name="layers-outline" size={16} color="#22d3ee" />
-                    <Text style={styles.poolPillText}>{availableOrders.length} available order{availableOrders.length !== 1 ? 's' : ''}</Text>
-                    <Ionicons name="chevron-down" size={14} color="#64748b" />
-                </Pressable>
-            )}
+            {/* ═══ Order Pool pill — REMOVED (moved to right button column) ═══ */}
 
             {/* ═══ Order Pool Sheet ═══ */}
             {poolOpen && (
@@ -789,7 +821,7 @@ export default function MapScreen() {
             )}
 
             {/* ═══ Order cards — merged with tab bar ═══ */}
-            {assignedOrders.length > 0 && !focusedOrder && (
+            {assignedOrders.length > 0 && (
                 <View style={[styles.bottomBar, { bottom: 0 }]}>
                     <ScrollView
                         horizontal
@@ -985,6 +1017,27 @@ const styles = StyleSheet.create({
         borderWidth: 1.5,
         borderColor: '#4285F4',
     },
+    mapBtnPool: {
+        borderWidth: 1.5,
+        borderColor: 'rgba(34,211,238,0.35)',
+        backgroundColor: 'rgba(34,211,238,0.08)',
+    },
+    poolBadge: {
+        position: 'absolute',
+        top: 6,
+        right: 6,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: '#22d3ee',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    poolBadgeText: {
+        color: '#0f172a',
+        fontSize: 9,
+        fontWeight: '800',
+    },
 
     /* ── Order cards bar ── */
     bottomBar: {
@@ -1100,37 +1153,6 @@ const styles = StyleSheet.create({
     },
     barNavBtn: {
         backgroundColor: '#4f46e5',
-    },
-
-    /* ── Pool pill ── */
-    poolPill: {
-        position: 'absolute',
-        alignSelf: 'center',
-        left: 70,
-        right: 70,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 7,
-        backgroundColor: 'rgba(10,12,24,0.88)',
-        borderRadius: 20,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderWidth: 1,
-        borderColor: 'rgba(34,211,238,0.25)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.4,
-        shadowRadius: 8,
-        elevation: 10,
-        zIndex: 20,
-    },
-    poolPillText: {
-        color: '#e2e8f0',
-        fontSize: 12,
-        fontWeight: '700',
-        flex: 1,
-        textAlign: 'center',
     },
 
     /* ── Loading ── */

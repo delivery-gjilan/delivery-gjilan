@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Props {
     orders: any[];
@@ -10,31 +9,16 @@ interface Props {
 }
 
 export function OrderPoolSheet({ orders, onSelectOrder, onClose }: Props) {
-    const insets = useSafeAreaInsets();
-
     return (
         /* Full-screen backdrop — tap outside panel to dismiss */
         <Pressable style={styles.backdrop} onPress={onClose}>
             {/* Panel — stop propagation so taps inside don't dismiss */}
             <Pressable
-                style={[styles.panel, { top: insets.top + 8 }]}
+                style={styles.panel}
                 onPress={(e) => e.stopPropagation()}
             >
-                {/* Header */}
-                <View style={styles.headerRow}>
-                    <View style={styles.headerLeft}>
-                        <Text style={styles.title}>Available Orders</Text>
-                        <View style={styles.countBadge}>
-                            <Text style={styles.countText}>{orders.length}</Text>
-                        </View>
-                    </View>
-                    <Pressable onPress={onClose} style={styles.closeBtn}>
-                        <Ionicons name="close" size={18} color="#94a3b8" />
-                    </Pressable>
-                </View>
-
-                {/* Divider */}
-                <View style={styles.divider} />
+                {/* Drag handle */}
+                <View style={styles.handle} />
 
                 {orders.length === 0 ? (
                     <View style={styles.emptyState}>
@@ -121,10 +105,12 @@ const styles = StyleSheet.create({
     },
     panel: {
         position: 'absolute',
-        left: 12,
-        right: 12,
+        top: 0,
+        left: 0,
+        right: 0,
         backgroundColor: '#0f172a',
-        borderRadius: 20,
+        borderBottomLeftRadius: 20,
+        borderBottomRightRadius: 20,
         maxHeight: '65%',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 8 },
@@ -133,49 +119,14 @@ const styles = StyleSheet.create({
         elevation: 28,
         overflow: 'hidden',
     },
-    headerRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 18,
-        paddingTop: 16,
-        paddingBottom: 12,
-    },
-    headerLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-    },
-    title: {
-        color: '#f1f5f9',
-        fontSize: 16,
-        fontWeight: '800',
-    },
-    countBadge: {
-        backgroundColor: '#22d3ee',
-        borderRadius: 10,
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        minWidth: 24,
-        alignItems: 'center',
-    },
-    countText: {
-        color: '#0f172a',
-        fontSize: 12,
-        fontWeight: '800',
-    },
-    closeBtn: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: 'rgba(255,255,255,0.07)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    divider: {
-        height: StyleSheet.hairlineWidth,
-        backgroundColor: 'rgba(255,255,255,0.08)',
-        marginHorizontal: 18,
+    handle: {
+        width: 36,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        alignSelf: 'center',
+        marginTop: 10,
+        marginBottom: 8,
     },
     emptyState: {
         alignItems: 'center',

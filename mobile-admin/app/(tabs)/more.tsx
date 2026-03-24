@@ -9,7 +9,7 @@ import { useTranslations } from '@/hooks/useTranslations';
 import { useAuthStore } from '@/store/authStore';
 import { useThemeStore } from '@/store/useThemeStore';
 import { useLocaleStore } from '@/store/useLocaleStore';
-import { GET_STORE_STATUS, UPDATE_STORE_STATUS } from '@/graphql/misc';
+import { GET_STORE_STATUS, SET_MY_PREFERRED_LANGUAGE, UPDATE_STORE_STATUS } from '@/graphql/misc';
 import { deleteItemAsync } from 'expo-secure-store';
 import { getInitials } from '@/utils/helpers';
 
@@ -74,6 +74,7 @@ export default function MoreScreen() {
 
     const { data: storeData }: any = useQuery(GET_STORE_STATUS);
     const [updateStoreStatus] = useMutation(UPDATE_STORE_STATUS);
+    const [setMyPreferredLanguage] = useMutation(SET_MY_PREFERRED_LANGUAGE);
 
     const isStoreOpen = storeData?.storeStatus?.isOpen ?? false;
 
@@ -109,9 +110,20 @@ export default function MoreScreen() {
         setThemeChoice(cycle[themeChoice]);
     };
 
-    const handleLanguageToggle = () => {
+    const handleLanguageToggle = async () => {
         const next = languageChoice === 'en' ? 'al' : 'en';
         setLanguageChoice(next);
+
+        try {
+            await setMyPreferredLanguage({
+                variables: {
+                    language: next === 'al' ? 'AL' : 'EN',
+                },
+            });
+        } catch {
+            setLanguageChoice(languageChoice);
+            Alert.alert('Error', 'Failed to sync language preference');
+        }
     };
 
     const themeLabel = themeChoice === 'light' ? 'Light' : themeChoice === 'dark' ? 'Dark' : 'System';

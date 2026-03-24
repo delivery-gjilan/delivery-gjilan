@@ -1,5 +1,6 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { AppError } from '@/lib/errors';
+import type { NotificationPayload } from '@/services/NotificationService';
 
 export const sendPushNotification: NonNullable<MutationResolvers['sendPushNotification']> = async (
     _parent,
@@ -10,12 +11,25 @@ export const sendPushNotification: NonNullable<MutationResolvers['sendPushNotifi
         throw AppError.forbidden('Only admins can send push notifications');
     }
 
-    const payload = {
+    const rawData = input.data
+        ? Object.fromEntries(
+            Object.entries(input.data as Record<string, unknown>).map(([k, v]) => [k, String(v)]),
+        )
+        : undefined;
+
+    const localeContent =
+        input.titleAl && input.bodyAl
+            ? {
+                en: { title: input.title, body: input.body },
+                al: { title: input.titleAl, body: input.bodyAl },
+            }
+            : undefined;
+
+    const payload: NotificationPayload = {
         title: input.title,
         body: input.body,
-        data: input.data ? Object.fromEntries(
-            Object.entries(input.data as Record<string, unknown>).map(([k, v]) => [k, String(v)])
-        ) : undefined,
+        localeContent,
+        data: rawData,
         imageUrl: input.imageUrl || undefined,
         timeSensitive: input.timeSensitive || false,
         category: input.category || undefined,

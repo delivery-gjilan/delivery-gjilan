@@ -49,6 +49,8 @@ interface Campaign {
   id: string;
   title: string;
   body: string;
+  titleAl: string | null;
+  bodyAl: string | null;
   data: Record<string, unknown> | null;
   imageUrl: string | null;
   timeSensitive: boolean;
@@ -217,6 +219,8 @@ export default function NotificationsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [titleAl, setTitleAl] = useState("");
+  const [bodyAl, setBodyAl] = useState("");
   const [campaignImageUrl, setCampaignImageUrl] = useState("");
   const [campaignCategory, setCampaignCategory] = useState("");
   const [campaignTimeSensitive, setCampaignTimeSensitive] = useState(false);
@@ -338,6 +342,8 @@ export default function NotificationsPage() {
   const resetCreateForm = () => {
     setTitle("");
     setBody("");
+    setTitleAl("");
+    setBodyAl("");
     setCampaignImageUrl("");
     setCampaignCategory("");
     setCampaignTimeSensitive(false);
@@ -355,6 +361,8 @@ export default function NotificationsPage() {
           input: {
             title: title.trim(),
             body: body.trim(),
+            titleAl: titleAl.trim() || undefined,
+            bodyAl: bodyAl.trim() || undefined,
             imageUrl: campaignImageUrl.trim() || undefined,
             category: campaignCategory || undefined,
             timeSensitive: campaignTimeSensitive,
@@ -396,6 +404,8 @@ export default function NotificationsPage() {
   const handleDuplicate = (campaign: Campaign) => {
     setTitle(campaign.title);
     setBody(campaign.body);
+    setTitleAl(campaign.titleAl || "");
+    setBodyAl(campaign.bodyAl || "");
     setCampaignImageUrl(campaign.imageUrl || "");
     setCampaignCategory(campaign.category || "");
     setCampaignTimeSensitive(campaign.timeSensitive);
@@ -418,6 +428,8 @@ export default function NotificationsPage() {
             userIds: selectedUsers.map((u) => u.id),
             title: directTitle.trim(),
             body: directBody.trim(),
+            titleAl: directTitleAl.trim() || undefined,
+            bodyAl: directBodyAl.trim() || undefined,
             imageUrl: directImageUrl.trim() || undefined,
             timeSensitive: directTimeSensitive,
             category: directCategory || undefined,
@@ -432,6 +444,8 @@ export default function NotificationsPage() {
       }
       setDirectTitle("");
       setDirectBody("");
+      setDirectTitleAl("");
+      setDirectBodyAl("");
       setDirectImageUrl("");
       setDirectTimeSensitive(false);
       setDirectCategory("");
@@ -736,6 +750,25 @@ export default function NotificationsPage() {
                   placeholder="Notification body..."
                   className="w-full bg-[#09090b] border border-zinc-800 rounded-lg px-3 py-2 text-white placeholder-neutral-600 text-sm resize-none h-24 focus:outline-none focus:ring-1 focus:ring-violet-500"
                 />
+              </div>
+
+              <div className="border border-zinc-800 rounded-lg p-3 space-y-3">
+                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Albanian Translation (optional)</p>
+                <Input
+                  label="Title (AL)"
+                  value={directTitleAl}
+                  onChange={(e) => setDirectTitleAl(e.target.value)}
+                  placeholder="Titulli shqip..."
+                />
+                <div>
+                  <label className="block text-sm font-medium text-zinc-400 mb-1">Message (AL)</label>
+                  <textarea
+                    value={directBodyAl}
+                    onChange={(e) => setDirectBodyAl(e.target.value)}
+                    placeholder="Mesazhi shqip..."
+                    className="w-full bg-[#09090b] border border-zinc-800 rounded-lg px-3 py-2 text-white placeholder-neutral-600 text-sm resize-none h-24 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                  />
+                </div>
               </div>
 
               <Input
@@ -1118,6 +1151,25 @@ export default function NotificationsPage() {
                 placeholder="e.g., Get 20% off all orders this weekend!"
                 className="w-full bg-[#09090b] border border-zinc-800 rounded-lg px-3 py-2 text-white placeholder-neutral-600 text-sm resize-none h-20 focus:outline-none focus:ring-1 focus:ring-violet-500"
               />
+            </div>
+
+            <div className="border border-zinc-800 rounded-lg p-3 space-y-3">
+              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Albanian Translation (optional)</p>
+              <Input
+                label="Title (AL)"
+                value={titleAl}
+                onChange={(e) => setTitleAl(e.target.value)}
+                placeholder="e.g., Ofertë speciale e fundjavës!"
+              />
+              <div>
+                <label className="block text-sm font-medium text-zinc-400 mb-1">Message (AL)</label>
+                <textarea
+                  value={bodyAl}
+                  onChange={(e) => setBodyAl(e.target.value)}
+                  placeholder="e.g., Merr 20% zbritje të gjitha porositë këtë fundjavë!"
+                  className="w-full bg-[#09090b] border border-zinc-800 rounded-lg px-3 py-2 text-white placeholder-neutral-600 text-sm resize-none h-20 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                />
+              </div>
             </div>
 
             <Input

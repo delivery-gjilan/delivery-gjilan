@@ -20,6 +20,15 @@ export const UPDATE_STORE_STATUS = gql`
     }
 `;
 
+export const SET_MY_PREFERRED_LANGUAGE = gql`
+    mutation SetMyPreferredLanguage($language: AppLanguage!) {
+        setMyPreferredLanguage(language: $language) {
+            id
+            preferredLanguage
+        }
+    }
+`;
+
 // ─── Notifications ───
 
 export const GET_NOTIFICATION_CAMPAIGNS = gql`

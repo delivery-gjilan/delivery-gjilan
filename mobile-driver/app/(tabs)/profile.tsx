@@ -7,6 +7,8 @@ import { useTranslations } from '@/hooks/useTranslations';
 import { useAuthStore } from '@/store/authStore';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/Button';
+import { useMutation } from '@apollo/client/react';
+import { SET_MY_PREFERRED_LANGUAGE_MUTATION } from '@/graphql/operations/auth';
 
 export default function Profile() {
     const theme = useTheme();
@@ -14,6 +16,7 @@ export default function Profile() {
     const { logout } = useAuth();
     const { t, languageChoice, setLanguageChoice } = useTranslations();
     const user = useAuthStore((state) => state.user);
+    const [setMyPreferredLanguage] = useMutation(SET_MY_PREFERRED_LANGUAGE_MUTATION);
     const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim();
 
     const handleLogout = () => {
@@ -34,9 +37,20 @@ export default function Profile() {
         ]);
     };
 
-    const toggleLanguage = () => {
+    const toggleLanguage = async () => {
         const newLang = languageChoice === 'en' ? 'al' : 'en';
         setLanguageChoice(newLang);
+
+        try {
+            await setMyPreferredLanguage({
+                variables: {
+                    language: newLang === 'al' ? 'AL' : 'EN',
+                },
+            });
+        } catch {
+            setLanguageChoice(languageChoice);
+            Alert.alert('Error', 'Failed to sync language preference. Please try again.');
+        }
     };
 
     return (

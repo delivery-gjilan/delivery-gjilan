@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import {
     Animated,
     PanResponder,
@@ -6,7 +6,6 @@ import {
     StyleSheet,
     Text,
     View,
-    ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -31,8 +30,6 @@ const STATUS_ICONS: Record<string, string> = {
     OUT_FOR_DELIVERY: 'bicycle-outline',
 };
 
-const ITEMS_PREVIEW = 3;
-
 interface Props {
     order: any;
     routeInfo: { distanceKm: number; durationMin: number } | null;
@@ -41,6 +38,7 @@ interface Props {
     onStartNavigation: () => void;
     onMarkPickedUp?: () => Promise<void>;
     onClose: () => void;
+    onHeightChange?: (h: number) => void;
 }
 
 export function OrderDetailSheet({
@@ -51,37 +49,39 @@ export function OrderDetailSheet({
     onStartNavigation,
     onMarkPickedUp,
     onClose,
+    onHeightChange,
 }: Props) {
     const insets = useSafeAreaInsets();
-    const slideY = useRef(new Animated.Value(320)).current;
-    const [showAllItems, setShowAllItems] = useState(false);
-    const [markingPickedUp, setMarkingPickedUp] = useState(false);
+    const slideY = useRef(new Animated.Value(-300)).current;
 
-    // Simple slide-up on mount / order change
+    const handleLayout = useCallback((e: any) => {
+        onHeightChange?.(e.nativeEvent.layout.height);
+    }, [onHeightChange]);
+
     useEffect(() => {
-        slideY.setValue(320);
+        slideY.setValue(-300);
         Animated.spring(slideY, {
             toValue: 0,
             useNativeDriver: true,
-            tension: 80,
-            friction: 14,
+            tension: 90,
+            friction: 16,
         }).start();
     }, [order?.id]);
 
-    // Drag-to-dismiss
+    // Swipe up to dismiss
     const panResponder = useRef(
         PanResponder.create({
             onMoveShouldSetPanResponder: (_, gs) =>
-                gs.dy > 6 && Math.abs(gs.dy) > Math.abs(gs.dx),
+                gs.dy < -6 && Math.abs(gs.dy) > Math.abs(gs.dx),
             onPanResponderMove: (_, gs) => {
-                if (gs.dy > 0) slideY.setValue(gs.dy);
+                if (gs.dy < 0) slideY.setValue(gs.dy);
             },
             onPanResponderRelease: (_, gs) => {
-                if (gs.dy > 90 || gs.vy > 0.6) {
+                if (gs.dy < -60 || gs.vy < -0.4) {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     Animated.timing(slideY, {
-                        toValue: 500,
-                        duration: 180,
+                        toValue: -300,
+                        duration: 160,
                         useNativeDriver: true,
                     }).start(onClose);
                 } else {
@@ -95,22 +95,6 @@ export function OrderDetailSheet({
             },
         }),
     ).current;
-
-    const handleStart = useCallback(() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        onStartNavigation();
-    }, [onStartNavigation]);
-
-    const handleMarkPickedUp = useCallback(async () => {
-        if (!onMarkPickedUp) return;
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        setMarkingPickedUp(true);
-        try {
-            await onMarkPickedUp();
-        } finally {
-            setMarkingPickedUp(false);
-        }
-    }, [onMarkPickedUp]);
 
     const statusColor = STATUS_COLORS[order.status] ?? '#6b7280';
     const statusLabel = STATUS_LABELS[order.status] ?? order.status;
@@ -126,11 +110,7 @@ export function OrderDetailSheet({
     const deliveryPrice = Number(order.deliveryPrice ?? 0).toFixed(2);
     const isDelivering = order.status === 'OUT_FOR_DELIVERY';
     const isReady = order.status === 'READY' || order.status === 'PREPARING';
-    const isReadyForPickup = order.status === 'READY';
 
-    // ── ETA rows ──────────────────────────────────────────────────────────────
-    // routeInfo      = driver → current destination (pickup when READY, dropoff when delivering)
-    // previewRouteInfo = pickup → dropoff (only available while picking up)
     const etaToPickup =
         isReady && routeInfo
             ? { km: routeInfo.distanceKm, min: Math.round(routeInfo.durationMin) }
@@ -143,183 +123,79 @@ export function OrderDetailSheet({
         return null;
     })();
 
-    // ── Items list ────────────────────────────────────────────────────────────
-    const visibleItems = showAllItems ? items : items.slice(0, ITEMS_PREVIEW);
-    const hasMoreItems = items.length > ITEMS_PREVIEW;
-
     return (
-        <Animated.View
-            style={[styles.root, { transform: [{ translateY: slideY }] }]}
-        >
-            <View style={[styles.sheet, { paddingBottom: insets.bottom + 6 }]}>
-                {/* ── Drag handle ── */}
-                <View {...panResponder.panHandlers} style={styles.dragZone}>
-                    <View style={styles.handle} />
-                </View>
+        <Animated.View style={[styles.root, { transform: [{ translateY: slideY }] }]}>
+            <View style={[styles.sheet, { paddingTop: insets.top + 6 }]} onLayout={handleLayout}>
+                {/* Colored accent line */}
+                <View style={[styles.accentLine, { backgroundColor: statusColor }]} />
 
-                <View style={styles.body}>
-                    {/* ── Header row: biz name + close + status ── */}
-                    <View style={[styles.headerRow, { marginBottom: 8 }]}>
-                        <View style={styles.headerLeft}>
+                <View {...panResponder.panHandlers} style={styles.body}>
+                    {/* Row 1: status pill + order # + earnings + close */}
+                    <View style={styles.topRow}>
+                        <View style={[styles.statusPill, { backgroundColor: `${statusColor}20`, borderColor: `${statusColor}40` }]}>
+                            <Ionicons name={statusIcon as any} size={11} color={statusColor} />
+                            <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
+                        </View>
+                        <Text style={styles.orderNum}>#{order.displayId ?? '—'}</Text>
+                        <View style={styles.earningsBadge}>
+                            <Text style={styles.earningsText}>€{deliveryPrice}</Text>
+                        </View>
+                        <Pressable onPress={onClose} hitSlop={12} style={styles.closeBtn}>
+                            <Ionicons name="close" size={16} color="#475569" />
+                        </Pressable>
+                    </View>
+
+                    {/* Row 2: biz + customer */}
+                    <View style={styles.infoRow}>
+                        <View style={[styles.bizDot, { backgroundColor: statusColor }]}>
+                            <Text style={styles.bizDotText}>{bizName.charAt(0).toUpperCase()}</Text>
+                        </View>
+                        <View style={styles.infoText}>
                             <Text style={styles.bizName} numberOfLines={1}>{bizName}</Text>
-                            {customerName ? (
-                                <Text style={styles.customerName}>
-                                    <Ionicons name="person-outline" size={10} color="#475569" />{' '}
-                                    {customerName}
-                                </Text>
-                            ) : null}
+                            {customerName ? <Text style={styles.customerName} numberOfLines={1}>{customerName}</Text> : null}
                         </View>
-                        <View style={styles.headerRight}>
-                            <View style={[styles.statusBadge, {
-                                backgroundColor: `${statusColor}1A`,
-                                borderColor: `${statusColor}33`,
-                            }]}>
-                                <Ionicons name={statusIcon as any} size={11} color={statusColor} />
-                                <Text style={[styles.statusText, { color: statusColor }]}>
-                                    {statusLabel}
-                                </Text>
-                            </View>
-                            <Pressable onPress={onClose} style={styles.closeBtn} hitSlop={10}>
-                                <Ionicons name="close" size={18} color="#475569" />
-                            </Pressable>
+                        {/* Item count */}
+                        <View style={styles.itemCountBadge}>
+                            <Ionicons name="bag-outline" size={11} color="#64748b" />
+                            <Text style={styles.itemCountText}>{totalItems}</Text>
                         </View>
                     </View>
 
-                    {/* ── Earnings + item count ── */}
-                    <View style={styles.statsRow}>
-                        <View style={[styles.statTile, styles.statTileEarnings]}>
-                            <Text style={styles.statValue}>€{deliveryPrice}</Text>
-                            <Text style={styles.statLabel}>You earn</Text>
-                        </View>
-                        <View style={styles.statTile}>
-                            <Text style={styles.statValue}>{totalItems}</Text>
-                            <Text style={styles.statLabel}>
-                                {totalItems === 1 ? 'item' : 'items'}
-                            </Text>
-                        </View>
-                        <View style={styles.statTile}>
-                            <Text style={styles.statValue}>
-                                #{order.displayId ?? '—'}
-                            </Text>
-                            <Text style={styles.statLabel}>Order</Text>
-                        </View>
-                    </View>
-
-                    {/* ── ETA section ── */}
-                    {(etaToPickup || etaToCustomer) && (
-                        <View style={styles.etaSection}>
-                            {etaToPickup && (
-                                <View style={styles.etaRow}>
-                                    <View style={[styles.etaDot, { backgroundColor: '#3b82f6' }]} />
-                                    <Text style={styles.etaText}>
-                                        <Text style={styles.etaStrong}>{etaToPickup.km.toFixed(1)} km</Text>
-                                        {' '}to pickup
-                                    </Text>
-                                    <Text style={styles.etaMin}>~{etaToPickup.min} min</Text>
-                                </View>
-                            )}
-                            {etaToCustomer && (
-                                <View style={styles.etaRow}>
-                                    <View style={[styles.etaDot, { backgroundColor: '#8b5cf6' }]} />
-                                    <Text style={styles.etaText}>
-                                        <Text style={styles.etaStrong}>{etaToCustomer.km.toFixed(1)} km</Text>
-                                        {' '}to customer
-                                    </Text>
-                                    <Text style={styles.etaMin}>~{etaToCustomer.min} min</Text>
-                                </View>
-                            )}
-                        </View>
-                    )}
-
-                    {/* ── Drop-off address ── */}
+                    {/* Row 3: address */}
                     {dropAddress ? (
                         <View style={styles.addressRow}>
-                            <Ionicons name="location-outline" size={13} color="#a78bfa" />
-                            <Text style={styles.addressText} numberOfLines={1}>
-                                {dropAddress}
-                            </Text>
+                            <Ionicons name="location-outline" size={12} color="#a78bfa" />
+                            <Text style={styles.addressText} numberOfLines={1}>{dropAddress}</Text>
                         </View>
                     ) : null}
 
-                    {/* ── Items list ── */}
-                    {items.length > 0 && (
-                        <View style={styles.itemsCard}>
-                            {visibleItems.map((item: any, idx: number) => (
-                                <View
-                                    key={idx}
-                                    style={[
-                                        styles.itemRow,
-                                        idx < visibleItems.length - 1 && styles.itemRowBorder,
-                                    ]}
-                                >
-                                    <Text style={styles.itemName} numberOfLines={1}>
-                                        {item.name}
+                    {/* Row 4: ETA chips */}
+                    {(etaToPickup || etaToCustomer) && (
+                        <View style={styles.etaRow}>
+                            {etaToPickup && (
+                                <View style={styles.etaChip}>
+                                    <Ionicons name="storefront-outline" size={11} color="#3b82f6" />
+                                    <Text style={styles.etaText}>
+                                        <Text style={styles.etaBold}>{etaToPickup.km.toFixed(1)} km</Text>
+                                        {'  '}~{etaToPickup.min} min
                                     </Text>
-                                    <Text style={styles.itemQty}>×{item.quantity}</Text>
                                 </View>
-                            ))}
-                            {hasMoreItems && (
-                                <Pressable
-                                    onPress={() => setShowAllItems((v) => !v)}
-                                    style={styles.showMoreBtn}
-                                >
-                                    <Text style={styles.showMoreText}>
-                                        {showAllItems
-                                            ? 'Show less'
-                                            : `+${items.length - ITEMS_PREVIEW} more`}
+                            )}
+                            {etaToCustomer && (
+                                <View style={styles.etaChip}>
+                                    <Ionicons name="cube-outline" size={11} color="#8b5cf6" />
+                                    <Text style={styles.etaText}>
+                                        <Text style={styles.etaBold}>{etaToCustomer.km.toFixed(1)} km</Text>
+                                        {'  '}~{etaToCustomer.min} min
                                     </Text>
-                                    <Ionicons
-                                        name={showAllItems ? 'chevron-up' : 'chevron-down'}
-                                        size={12}
-                                        color="#64748b"
-                                    />
-                                </Pressable>
+                                </View>
                             )}
                         </View>
                     )}
                 </View>
 
-                {/* ── CTA ── */}
-                {isAssignedToMe && (
-                    <View style={styles.ctaContainer}>
-                        {/* Food Picked Up — shows only when the order is physically ready at the counter */}
-                        {isReadyForPickup && onMarkPickedUp && (
-                            <Pressable
-                                onPress={handleMarkPickedUp}
-                                disabled={markingPickedUp}
-                                style={[styles.ctaButton, styles.ctaPickedUp, markingPickedUp && { opacity: 0.65 }]}
-                            >
-                                {markingPickedUp ? (
-                                    <ActivityIndicator size="small" color="#0f172a" />
-                                ) : (
-                                    <Ionicons name="bag-check-outline" size={19} color="#0f172a" />
-                                )}
-                                <Text style={[styles.ctaText, { color: '#0f172a' }]}>
-                                    Food Picked Up
-                                </Text>
-                            </Pressable>
-                        )}
-                        {/* Navigate button — secondary when READY (food not yet picked up), primary when delivering */}
-                        <Pressable
-                            onPress={handleStart}
-                            style={[
-                                styles.ctaButton,
-                                isDelivering
-                                    ? { backgroundColor: '#7c3aed', shadowColor: '#7c3aed' }
-                                    : styles.ctaSecondary,
-                            ]}
-                        >
-                            <Ionicons
-                                name={isDelivering ? 'navigate' : 'bicycle-outline'}
-                                size={19}
-                                color={isDelivering ? '#fff' : '#64748b'}
-                            />
-                            <Text style={[styles.ctaText, !isDelivering && { color: '#64748b' }]}>
-                                {isDelivering ? 'Continue Navigation' : 'Navigate to Pickup'}
-                            </Text>
-                        </Pressable>
-                    </View>
-                )}
+                {/* Drag handle */}
+                <View style={styles.handle} />
             </View>
         </Animated.View>
     );
@@ -328,244 +204,178 @@ export function OrderDetailSheet({
 const styles = StyleSheet.create({
     root: {
         position: 'absolute',
-        bottom: 0,
+        top: 0,
         left: 0,
         right: 0,
         zIndex: 100,
     },
     sheet: {
-        backgroundColor: '#0f172a',
-        borderTopLeftRadius: 22,
-        borderTopRightRadius: 22,
+        backgroundColor: 'rgba(13,17,23,0.97)',
+        borderBottomLeftRadius: 20,
+        borderBottomRightRadius: 20,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: -4 },
+        shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.45,
         shadowRadius: 14,
         elevation: 20,
+        overflow: 'hidden',
     },
-    dragZone: {
-        paddingVertical: 10,
-        alignItems: 'center',
-    },
-    handle: {
-        width: 32,
-        height: 4,
-        backgroundColor: 'rgba(255,255,255,0.13)',
-        borderRadius: 2,
+    accentLine: {
+        height: 2,
+        marginHorizontal: 16,
+        borderRadius: 1,
+        marginBottom: 8,
+        opacity: 0.7,
     },
     body: {
-        paddingHorizontal: 16,
+        paddingHorizontal: 14,
+        gap: 7,
+        paddingBottom: 4,
     },
 
-    /* ── Header ── */
-    headerRow: {
+    /* ── Top row ── */
+    topRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 12,
+        gap: 7,
     },
-    headerLeft: {
-        flex: 1,
-        marginRight: 8,
-    },
-    headerRight: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    bizName: {
-        color: '#f1f5f9',
-        fontSize: 15,
-        fontWeight: '800',
-    },
-    customerName: {
-        color: '#475569',
-        fontSize: 11,
-        marginTop: 2,
-    },
-    statusBadge: {
+    statusPill: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
-        borderRadius: 16,
+        borderRadius: 20,
         paddingHorizontal: 8,
-        paddingVertical: 4,
+        paddingVertical: 3,
         borderWidth: 1,
     },
     statusText: {
         fontSize: 10,
         fontWeight: '700',
     },
+    orderNum: {
+        flex: 1,
+        color: '#475569',
+        fontSize: 11,
+        fontWeight: '600',
+    },
+    earningsBadge: {
+        backgroundColor: 'rgba(74,222,128,0.12)',
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderWidth: 1,
+        borderColor: 'rgba(74,222,128,0.2)',
+    },
+    earningsText: {
+        color: '#4ade80',
+        fontSize: 12,
+        fontWeight: '800',
+    },
     closeBtn: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        backgroundColor: 'rgba(255,255,255,0.05)',
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        backgroundColor: 'rgba(255,255,255,0.06)',
         alignItems: 'center',
         justifyContent: 'center',
     },
 
-    /* ── Stats ── */
-    statsRow: {
+    /* ── Info row ── */
+    infoRow: {
         flexDirection: 'row',
-        gap: 8,
-        marginBottom: 8,
-    },
-    statTile: {
-        flex: 1,
-        backgroundColor: 'rgba(255,255,255,0.04)',
-        borderRadius: 10,
-        paddingVertical: 7,
-        paddingHorizontal: 8,
         alignItems: 'center',
-        gap: 2,
+        gap: 8,
     },
-    statTileEarnings: {
-        backgroundColor: 'rgba(74,222,128,0.07)',
-        borderWidth: 1,
-        borderColor: 'rgba(74,222,128,0.15)',
+    bizDot: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
     },
-    statValue: {
+    bizDotText: {
+        fontSize: 13,
+        fontWeight: '900',
+        color: '#fff',
+    },
+    infoText: {
+        flex: 1,
+        gap: 1,
+    },
+    bizName: {
         color: '#f1f5f9',
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: '800',
     },
-    statLabel: {
-        color: '#475569',
-        fontSize: 9,
-        fontWeight: '700',
-        textTransform: 'uppercase',
-        letterSpacing: 0.6,
+    customerName: {
+        color: '#64748b',
+        fontSize: 11,
     },
-
-    /* ── ETA ── */
-    etaSection: {
-        backgroundColor: 'rgba(255,255,255,0.04)',
-        borderRadius: 10,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        gap: 4,
-        marginBottom: 8,
-    },
-    etaRow: {
+    itemCountBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 3,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        borderRadius: 8,
+        paddingHorizontal: 7,
+        paddingVertical: 3,
     },
-    etaDot: {
-        width: 7,
-        height: 7,
-        borderRadius: 4,
-    },
-    etaText: {
-        flex: 1,
-        color: '#94a3b8',
-        fontSize: 12,
-    },
-    etaStrong: {
-        color: '#f1f5f9',
-        fontWeight: '700',
-    },
-    etaMin: {
+    itemCountText: {
         color: '#64748b',
-        fontSize: 12,
-        fontWeight: '600',
+        fontSize: 11,
+        fontWeight: '700',
     },
 
     /* ── Address ── */
     addressRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: 5,
         backgroundColor: 'rgba(167,139,250,0.07)',
-        borderRadius: 10,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        marginBottom: 8,
+        borderRadius: 8,
+        paddingHorizontal: 9,
+        paddingVertical: 5,
     },
     addressText: {
         flex: 1,
-        color: '#cbd5e1',
-        fontSize: 12,
+        color: '#c4b5fd',
+        fontSize: 11,
     },
 
-    /* ── Items ── */
-    itemsCard: {
-        backgroundColor: 'rgba(255,255,255,0.04)',
-        borderRadius: 10,
-        paddingHorizontal: 12,
-        paddingTop: 6,
-        paddingBottom: 4,
-        marginBottom: 8,
-    },
-    itemRow: {
+    /* ── ETA chips ── */
+    etaRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        gap: 6,
+    },
+    etaChip: {
+        flex: 1,
+        flexDirection: 'row',
         alignItems: 'center',
+        gap: 5,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderRadius: 8,
+        paddingHorizontal: 9,
         paddingVertical: 5,
     },
-    itemRowBorder: {
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: 'rgba(255,255,255,0.06)',
-    },
-    itemName: {
-        color: '#cbd5e1',
-        fontSize: 12,
+    etaText: {
+        color: '#94a3b8',
+        fontSize: 11,
         flex: 1,
     },
-    itemQty: {
-        color: '#475569',
-        fontSize: 12,
-        fontWeight: '600',
-        marginLeft: 8,
-    },
-    showMoreBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 4,
-        paddingVertical: 7,
-        borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: 'rgba(255,255,255,0.06)',
-    },
-    showMoreText: {
-        color: '#64748b',
-        fontSize: 11,
-        fontWeight: '600',
+    etaBold: {
+        color: '#e2e8f0',
+        fontWeight: '700',
     },
 
-    /* ── CTA ── */
-    ctaContainer: {
-        paddingHorizontal: 16,
-        marginTop: 0,
-        gap: 7,
-    },
-    ctaButton: {
-        height: 46,
-        borderRadius: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'row',
-        gap: 8,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.35,
-        shadowRadius: 10,
-        elevation: 10,
-    },
-    ctaPickedUp: {
-        backgroundColor: '#4ade80',
-        shadowColor: '#4ade80',
-    },
-    ctaSecondary: {
-        backgroundColor: 'rgba(255,255,255,0.06)',
-        shadowOpacity: 0,
-        elevation: 0,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
-    },
-    ctaText: {
-        color: '#fff',
-        fontSize: 15,
-        fontWeight: '800',
+    /* ── Drag handle ── */
+    handle: {
+        width: 32,
+        height: 3,
+        backgroundColor: 'rgba(255,255,255,0.10)',
+        borderRadius: 2,
+        alignSelf: 'center',
+        marginTop: 8,
+        marginBottom: 8,
     },
 });

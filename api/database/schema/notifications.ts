@@ -30,6 +30,8 @@ export const notificationCampaigns = pgTable('notification_campaigns', {
     id: uuid('id').primaryKey().defaultRandom().notNull(),
     title: text('title').notNull(),
     body: text('body').notNull(),
+    titleAl: text('title_al'),
+    bodyAl: text('body_al'),
     data: jsonb('data').$type<Record<string, unknown>>(),
     imageUrl: text('image_url'),
     timeSensitive: boolean('time_sensitive').default(false).notNull(),
