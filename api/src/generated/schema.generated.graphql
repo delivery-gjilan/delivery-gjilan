@@ -223,6 +223,32 @@ enum BusinessDeviceOnlineStatus {
   STALE
 }
 
+type BusinessMessage {
+  admin: BusinessMessageUser
+  adminId: ID!
+  alertType: MessageAlertType!
+  body: String!
+  businessUser: BusinessMessageUser
+  businessUserId: ID!
+  createdAt: DateTime!
+  id: ID!
+  readAt: DateTime
+  senderRole: String!
+}
+
+type BusinessMessageThread {
+  businessUserId: ID!
+  businessUserName: String!
+  lastMessage: BusinessMessage
+  unreadCount: Int!
+}
+
+type BusinessMessageUser {
+  firstName: String!
+  id: ID!
+  lastName: String!
+}
+
 type BusinessPromotion {
   description: String
   discountValue: Float
@@ -802,6 +828,9 @@ type Mutation {
   logoutAllSessions: Boolean!
   logoutCurrentSession(refreshToken: String!): Boolean!
 
+  """Mark all messages in a business conversation as read"""
+  markBusinessMessagesRead(otherUserId: ID!): Boolean!
+
   """Mark all messages in a conversation as read"""
   markDriverMessagesRead(otherUserId: ID!): Boolean!
   markFirstOrderUsed(userId: ID!): UserPromoMetadata!
@@ -813,6 +842,9 @@ type Mutation {
   registerLiveActivityToken(activityId: String!, orderId: ID!, token: String!): Boolean!
   removeUserFromPromotion(promotionId: ID!, userId: ID!): Boolean!
 
+  """Business user replies to admin"""
+  replyToBusinessMessage(adminId: ID!, body: String!): BusinessMessage!
+
   """Driver replies to admin"""
   replyToDriverMessage(adminId: ID!, body: String!): DriverMessage!
   resendEmailVerification: SignupStepResponse!
@@ -820,6 +852,9 @@ type Mutation {
   """Business owner accepts or disputes a pending settlement request."""
   respondToSettlementRequest(action: SettlementRequestAction!, disputeReason: String, requestId: ID!): SettlementRequest!
   runSettlementScenarioHarness(scenarioIds: [String!]): SettlementScenarioHarnessResult!
+
+  """Admin sends a message to a business user"""
+  sendBusinessMessage(alertType: MessageAlertType!, body: String!, businessUserId: ID!): BusinessMessage!
   sendCampaign(id: ID!): NotificationCampaign!
 
   """Admin sends a message to a driver"""
@@ -1228,6 +1263,12 @@ type Query {
   business(id: ID!): Business
   businessBalance(businessId: ID!): SettlementSummary!
   businessDeviceHealth(hours: Int): [BusinessDeviceHealth!]!
+
+  """Admin: list of all business user threads with unread counts"""
+  businessMessageThreads: [BusinessMessageThread!]!
+
+  """Admin: full conversation with a specific business user"""
+  businessMessages(businessUserId: ID!, limit: Int, offset: Int): [BusinessMessage!]!
   businesses: [Business!]!
   calculateDeliveryPrice(businessId: ID!, dropoffLat: Float!, dropoffLng: Float!): DeliveryPriceResult!
   deliveryPricingConfig: DeliveryPricingConfig!
@@ -1259,6 +1300,9 @@ type Query {
   me: User
   myAddresses: [UserAddress!]!
   myBehavior: UserBehavior
+
+  """Business user: my messages"""
+  myBusinessMessages(limit: Int, offset: Int): [BusinessMessage!]!
 
   """Driver: my messages"""
   myDriverMessages(limit: Int, offset: Int): [DriverMessage!]!
@@ -1549,10 +1593,16 @@ input SubmitPhoneNumberInput {
 }
 
 type Subscription {
+  """Admin receives replies from a specific business user in real-time"""
+  adminBusinessMessageReceived(businessUserId: ID!): BusinessMessage!
+
   """Admin receives replies from a specific driver in real-time"""
   adminMessageReceived(driverId: ID!): DriverMessage!
   allOrdersUpdated: [Order!]!
   auditLogCreated(action: ActionType, actorType: ActorType, entityType: EntityType): AuditLog!
+
+  """Business user receives messages from admin in real-time"""
+  businessMessageReceived: BusinessMessage!
   driverConnectionStatusChanged(driverId: ID!): DriverConnection!
 
   """Driver receives messages from admin in real-time"""

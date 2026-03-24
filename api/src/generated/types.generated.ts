@@ -249,6 +249,35 @@ export type BusinessDeviceOnlineStatus =
   | 'ONLINE'
   | 'STALE';
 
+export type BusinessMessage = {
+  __typename?: 'BusinessMessage';
+  admin?: Maybe<BusinessMessageUser>;
+  adminId: Scalars['ID']['output'];
+  alertType: MessageAlertType;
+  body: Scalars['String']['output'];
+  businessUser?: Maybe<BusinessMessageUser>;
+  businessUserId: Scalars['ID']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  id: Scalars['ID']['output'];
+  readAt?: Maybe<Scalars['DateTime']['output']>;
+  senderRole: Scalars['String']['output'];
+};
+
+export type BusinessMessageThread = {
+  __typename?: 'BusinessMessageThread';
+  businessUserId: Scalars['ID']['output'];
+  businessUserName: Scalars['String']['output'];
+  lastMessage?: Maybe<BusinessMessage>;
+  unreadCount: Scalars['Int']['output'];
+};
+
+export type BusinessMessageUser = {
+  __typename?: 'BusinessMessageUser';
+  firstName: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  lastName: Scalars['String']['output'];
+};
+
 export type BusinessPromotion = {
   __typename?: 'BusinessPromotion';
   description?: Maybe<Scalars['String']['output']>;
@@ -783,6 +812,8 @@ export type Mutation = {
   login: AuthResponse;
   logoutAllSessions: Scalars['Boolean']['output'];
   logoutCurrentSession: Scalars['Boolean']['output'];
+  /** Mark all messages in a business conversation as read */
+  markBusinessMessagesRead: Scalars['Boolean']['output'];
   /** Mark all messages in a conversation as read */
   markDriverMessagesRead: Scalars['Boolean']['output'];
   markFirstOrderUsed: UserPromoMetadata;
@@ -793,12 +824,16 @@ export type Mutation = {
   registerDeviceToken: Scalars['Boolean']['output'];
   registerLiveActivityToken: Scalars['Boolean']['output'];
   removeUserFromPromotion: Scalars['Boolean']['output'];
+  /** Business user replies to admin */
+  replyToBusinessMessage: BusinessMessage;
   /** Driver replies to admin */
   replyToDriverMessage: DriverMessage;
   resendEmailVerification: SignupStepResponse;
   /** Business owner accepts or disputes a pending settlement request. */
   respondToSettlementRequest: SettlementRequest;
   runSettlementScenarioHarness: SettlementScenarioHarnessResult;
+  /** Admin sends a message to a business user */
+  sendBusinessMessage: BusinessMessage;
   sendCampaign: NotificationCampaign;
   /** Admin sends a message to a driver */
   sendDriverMessage: DriverMessage;
@@ -1129,6 +1164,11 @@ export type MutationlogoutCurrentSessionArgs = {
 };
 
 
+export type MutationmarkBusinessMessagesReadArgs = {
+  otherUserId: Scalars['ID']['input'];
+};
+
+
 export type MutationmarkDriverMessagesReadArgs = {
   otherUserId: Scalars['ID']['input'];
 };
@@ -1182,6 +1222,12 @@ export type MutationremoveUserFromPromotionArgs = {
 };
 
 
+export type MutationreplyToBusinessMessageArgs = {
+  adminId: Scalars['ID']['input'];
+  body: Scalars['String']['input'];
+};
+
+
 export type MutationreplyToDriverMessageArgs = {
   adminId: Scalars['ID']['input'];
   body: Scalars['String']['input'];
@@ -1197,6 +1243,13 @@ export type MutationrespondToSettlementRequestArgs = {
 
 export type MutationrunSettlementScenarioHarnessArgs = {
   scenarioIds?: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
+
+export type MutationsendBusinessMessageArgs = {
+  alertType: MessageAlertType;
+  body: Scalars['String']['input'];
+  businessUserId: Scalars['ID']['input'];
 };
 
 
@@ -1797,6 +1850,10 @@ export type Query = {
   business?: Maybe<Business>;
   businessBalance: SettlementSummary;
   businessDeviceHealth: Array<BusinessDeviceHealth>;
+  /** Admin: list of all business user threads with unread counts */
+  businessMessageThreads: Array<BusinessMessageThread>;
+  /** Admin: full conversation with a specific business user */
+  businessMessages: Array<BusinessMessage>;
   businesses: Array<Business>;
   calculateDeliveryPrice: DeliveryPriceResult;
   deliveryPricingConfig: DeliveryPricingConfig;
@@ -1825,6 +1882,8 @@ export type Query = {
   me?: Maybe<User>;
   myAddresses: Array<UserAddress>;
   myBehavior?: Maybe<UserBehavior>;
+  /** Business user: my messages */
+  myBusinessMessages: Array<BusinessMessage>;
   /** Driver: my messages */
   myDriverMessages: Array<DriverMessage>;
   /** Get live metrics for the authenticated driver */
@@ -1891,6 +1950,13 @@ export type QuerybusinessBalanceArgs = {
 
 export type QuerybusinessDeviceHealthArgs = {
   hours?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QuerybusinessMessagesArgs = {
+  businessUserId: Scalars['ID']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -1977,6 +2043,12 @@ export type QuerygetUserPromoMetadataArgs = {
 
 export type QuerygetUserPromotionsArgs = {
   userId: Scalars['ID']['input'];
+};
+
+
+export type QuerymyBusinessMessagesArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -2386,10 +2458,14 @@ export type SubmitPhoneNumberInput = {
 
 export type Subscription = {
   __typename?: 'Subscription';
+  /** Admin receives replies from a specific business user in real-time */
+  adminBusinessMessageReceived: BusinessMessage;
   /** Admin receives replies from a specific driver in real-time */
   adminMessageReceived: DriverMessage;
   allOrdersUpdated: Array<Order>;
   auditLogCreated: AuditLog;
+  /** Business user receives messages from admin in real-time */
+  businessMessageReceived: BusinessMessage;
   driverConnectionStatusChanged: DriverConnection;
   /** Driver receives messages from admin in real-time */
   driverMessageReceived: DriverMessage;
@@ -2402,6 +2478,11 @@ export type Subscription = {
   settlementStatusChanged: Settlement;
   storeStatusUpdated: StoreStatus;
   userOrdersUpdated: Array<Order>;
+};
+
+
+export type SubscriptionadminBusinessMessageReceivedArgs = {
+  businessUserId: Scalars['ID']['input'];
 };
 
 
@@ -2835,6 +2916,9 @@ export type ResolversTypes = {
   BusinessDeviceHealth: ResolverTypeWrapper<Omit<BusinessDeviceHealth, 'onlineStatus' | 'platform'> & { onlineStatus: ResolversTypes['BusinessDeviceOnlineStatus'], platform: ResolversTypes['DevicePlatform'] }>;
   BusinessDeviceHeartbeatInput: BusinessDeviceHeartbeatInput;
   BusinessDeviceOnlineStatus: ResolverTypeWrapper<'ONLINE' | 'STALE' | 'OFFLINE'>;
+  BusinessMessage: ResolverTypeWrapper<Omit<BusinessMessage, 'alertType'> & { alertType: ResolversTypes['MessageAlertType'] }>;
+  BusinessMessageThread: ResolverTypeWrapper<Omit<BusinessMessageThread, 'lastMessage'> & { lastMessage?: Maybe<ResolversTypes['BusinessMessage']> }>;
+  BusinessMessageUser: ResolverTypeWrapper<BusinessMessageUser>;
   BusinessPromotion: ResolverTypeWrapper<Omit<BusinessPromotion, 'type'> & { type: ResolversTypes['PromotionType'] }>;
   BusinessType: ResolverTypeWrapper<'MARKET' | 'PHARMACY' | 'RESTAURANT'>;
   CampaignStatus: ResolverTypeWrapper<'DRAFT' | 'SENDING' | 'SENT' | 'FAILED'>;
@@ -3005,6 +3089,9 @@ export type ResolversParentTypes = {
   BusinessDayHoursInput: BusinessDayHoursInput;
   BusinessDeviceHealth: BusinessDeviceHealth;
   BusinessDeviceHeartbeatInput: BusinessDeviceHeartbeatInput;
+  BusinessMessage: BusinessMessage;
+  BusinessMessageThread: Omit<BusinessMessageThread, 'lastMessage'> & { lastMessage?: Maybe<ResolversParentTypes['BusinessMessage']> };
+  BusinessMessageUser: BusinessMessageUser;
   BusinessPromotion: BusinessPromotion;
   CartContextInput: CartContextInput;
   CartItemInput: CartItemInput;
@@ -3269,6 +3356,35 @@ export type BusinessDeviceHealthResolvers<ContextType = GraphQLContext, ParentTy
 
 export type BusinessDeviceOnlineStatusResolvers = EnumResolverSignature<{ OFFLINE?: any, ONLINE?: any, STALE?: any }, ResolversTypes['BusinessDeviceOnlineStatus']>;
 
+export type BusinessMessageResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['BusinessMessage'] = ResolversParentTypes['BusinessMessage']> = {
+  admin?: Resolver<Maybe<ResolversTypes['BusinessMessageUser']>, ParentType, ContextType>;
+  adminId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  alertType?: Resolver<ResolversTypes['MessageAlertType'], ParentType, ContextType>;
+  body?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  businessUser?: Resolver<Maybe<ResolversTypes['BusinessMessageUser']>, ParentType, ContextType>;
+  businessUserId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  createdAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  readAt?: Resolver<Maybe<ResolversTypes['DateTime']>, ParentType, ContextType>;
+  senderRole?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type BusinessMessageThreadResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['BusinessMessageThread'] = ResolversParentTypes['BusinessMessageThread']> = {
+  businessUserId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  businessUserName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  lastMessage?: Resolver<Maybe<ResolversTypes['BusinessMessage']>, ParentType, ContextType>;
+  unreadCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type BusinessMessageUserResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['BusinessMessageUser'] = ResolversParentTypes['BusinessMessageUser']> = {
+  firstName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  lastName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
 export type BusinessPromotionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['BusinessPromotion'] = ResolversParentTypes['BusinessPromotion']> = {
   description?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   discountValue?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
@@ -3511,6 +3627,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   login?: Resolver<ResolversTypes['AuthResponse'], ParentType, ContextType, RequireFields<MutationloginArgs, 'input'>>;
   logoutAllSessions?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   logoutCurrentSession?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationlogoutCurrentSessionArgs, 'refreshToken'>>;
+  markBusinessMessagesRead?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationmarkBusinessMessagesReadArgs, 'otherUserId'>>;
   markDriverMessagesRead?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationmarkDriverMessagesReadArgs, 'otherUserId'>>;
   markFirstOrderUsed?: Resolver<ResolversTypes['UserPromoMetadata'], ParentType, ContextType, RequireFields<MutationmarkFirstOrderUsedArgs, 'userId'>>;
   markSettlementAsPaid?: Resolver<ResolversTypes['Settlement'], ParentType, ContextType, RequireFields<MutationmarkSettlementAsPaidArgs, 'settlementId'>>;
@@ -3520,10 +3637,12 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   registerDeviceToken?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationregisterDeviceTokenArgs, 'input'>>;
   registerLiveActivityToken?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationregisterLiveActivityTokenArgs, 'activityId' | 'orderId' | 'token'>>;
   removeUserFromPromotion?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationremoveUserFromPromotionArgs, 'promotionId' | 'userId'>>;
+  replyToBusinessMessage?: Resolver<ResolversTypes['BusinessMessage'], ParentType, ContextType, RequireFields<MutationreplyToBusinessMessageArgs, 'adminId' | 'body'>>;
   replyToDriverMessage?: Resolver<ResolversTypes['DriverMessage'], ParentType, ContextType, RequireFields<MutationreplyToDriverMessageArgs, 'adminId' | 'body'>>;
   resendEmailVerification?: Resolver<ResolversTypes['SignupStepResponse'], ParentType, ContextType>;
   respondToSettlementRequest?: Resolver<ResolversTypes['SettlementRequest'], ParentType, ContextType, RequireFields<MutationrespondToSettlementRequestArgs, 'action' | 'requestId'>>;
   runSettlementScenarioHarness?: Resolver<ResolversTypes['SettlementScenarioHarnessResult'], ParentType, ContextType, Partial<MutationrunSettlementScenarioHarnessArgs>>;
+  sendBusinessMessage?: Resolver<ResolversTypes['BusinessMessage'], ParentType, ContextType, RequireFields<MutationsendBusinessMessageArgs, 'alertType' | 'body' | 'businessUserId'>>;
   sendCampaign?: Resolver<ResolversTypes['NotificationCampaign'], ParentType, ContextType, RequireFields<MutationsendCampaignArgs, 'id'>>;
   sendDriverMessage?: Resolver<ResolversTypes['DriverMessage'], ParentType, ContextType, RequireFields<MutationsendDriverMessageArgs, 'alertType' | 'body' | 'driverId'>>;
   sendPushNotification?: Resolver<ResolversTypes['SendNotificationResult'], ParentType, ContextType, RequireFields<MutationsendPushNotificationArgs, 'input'>>;
@@ -3895,6 +4014,8 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   business?: Resolver<Maybe<ResolversTypes['Business']>, ParentType, ContextType, RequireFields<QuerybusinessArgs, 'id'>>;
   businessBalance?: Resolver<ResolversTypes['SettlementSummary'], ParentType, ContextType, RequireFields<QuerybusinessBalanceArgs, 'businessId'>>;
   businessDeviceHealth?: Resolver<Array<ResolversTypes['BusinessDeviceHealth']>, ParentType, ContextType, Partial<QuerybusinessDeviceHealthArgs>>;
+  businessMessageThreads?: Resolver<Array<ResolversTypes['BusinessMessageThread']>, ParentType, ContextType>;
+  businessMessages?: Resolver<Array<ResolversTypes['BusinessMessage']>, ParentType, ContextType, RequireFields<QuerybusinessMessagesArgs, 'businessUserId'>>;
   businesses?: Resolver<Array<ResolversTypes['Business']>, ParentType, ContextType>;
   calculateDeliveryPrice?: Resolver<ResolversTypes['DeliveryPriceResult'], ParentType, ContextType, RequireFields<QuerycalculateDeliveryPriceArgs, 'businessId' | 'dropoffLat' | 'dropoffLng'>>;
   deliveryPricingConfig?: Resolver<ResolversTypes['DeliveryPricingConfig'], ParentType, ContextType>;
@@ -3920,6 +4041,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   me?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
   myAddresses?: Resolver<Array<ResolversTypes['UserAddress']>, ParentType, ContextType>;
   myBehavior?: Resolver<Maybe<ResolversTypes['UserBehavior']>, ParentType, ContextType>;
+  myBusinessMessages?: Resolver<Array<ResolversTypes['BusinessMessage']>, ParentType, ContextType, Partial<QuerymyBusinessMessagesArgs>>;
   myDriverMessages?: Resolver<Array<ResolversTypes['DriverMessage']>, ParentType, ContextType, Partial<QuerymyDriverMessagesArgs>>;
   myDriverMetrics?: Resolver<ResolversTypes['DriverDailyMetrics'], ParentType, ContextType>;
   myReferralStats?: Resolver<ResolversTypes['ReferralStats'], ParentType, ContextType>;
@@ -4145,9 +4267,11 @@ export type StoreStatusResolvers<ContextType = GraphQLContext, ParentType extend
 };
 
 export type SubscriptionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Subscription'] = ResolversParentTypes['Subscription']> = {
+  adminBusinessMessageReceived?: SubscriptionResolver<ResolversTypes['BusinessMessage'], "adminBusinessMessageReceived", ParentType, ContextType, RequireFields<SubscriptionadminBusinessMessageReceivedArgs, 'businessUserId'>>;
   adminMessageReceived?: SubscriptionResolver<ResolversTypes['DriverMessage'], "adminMessageReceived", ParentType, ContextType, RequireFields<SubscriptionadminMessageReceivedArgs, 'driverId'>>;
   allOrdersUpdated?: SubscriptionResolver<Array<ResolversTypes['Order']>, "allOrdersUpdated", ParentType, ContextType>;
   auditLogCreated?: SubscriptionResolver<ResolversTypes['AuditLog'], "auditLogCreated", ParentType, ContextType, Partial<SubscriptionauditLogCreatedArgs>>;
+  businessMessageReceived?: SubscriptionResolver<ResolversTypes['BusinessMessage'], "businessMessageReceived", ParentType, ContextType>;
   driverConnectionStatusChanged?: SubscriptionResolver<ResolversTypes['DriverConnection'], "driverConnectionStatusChanged", ParentType, ContextType, RequireFields<SubscriptiondriverConnectionStatusChangedArgs, 'driverId'>>;
   driverMessageReceived?: SubscriptionResolver<ResolversTypes['DriverMessage'], "driverMessageReceived", ParentType, ContextType>;
   driverPttSignal?: SubscriptionResolver<ResolversTypes['DriverPttSignal'], "driverPttSignal", ParentType, ContextType, RequireFields<SubscriptiondriverPttSignalArgs, 'driverId'>>;
@@ -4278,6 +4402,9 @@ export type Resolvers<ContextType = GraphQLContext> = {
   BusinessDayHours?: BusinessDayHoursResolvers<ContextType>;
   BusinessDeviceHealth?: BusinessDeviceHealthResolvers<ContextType>;
   BusinessDeviceOnlineStatus?: BusinessDeviceOnlineStatusResolvers;
+  BusinessMessage?: BusinessMessageResolvers<ContextType>;
+  BusinessMessageThread?: BusinessMessageThreadResolvers<ContextType>;
+  BusinessMessageUser?: BusinessMessageUserResolvers<ContextType>;
   BusinessPromotion?: BusinessPromotionResolvers<ContextType>;
   BusinessType?: BusinessTypeResolvers;
   CampaignStatus?: CampaignStatusResolvers;
