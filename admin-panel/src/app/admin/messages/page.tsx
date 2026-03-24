@@ -11,8 +11,9 @@ import {
     MARK_DRIVER_MESSAGES_READ,
 } from '@/graphql/operations/driverMessages/mutations';
 import { ADMIN_MESSAGE_RECEIVED } from '@/graphql/operations/driverMessages/subscriptions';
+import { DRIVERS_QUERY } from '@/graphql/operations/users/queries';
 import { toast } from 'sonner';
-import { MessageSquare, Send, ChevronDown, AlertTriangle, Info, Zap } from 'lucide-react';
+import { MessageSquare, Send, AlertTriangle, Info, Zap, Plus, Search, X } from 'lucide-react';
 
 type AlertType = 'INFO' | 'WARNING' | 'URGENT';
 
@@ -70,18 +71,29 @@ function formatDate(iso: string) {
     return d.toLocaleDateString();
 }
 
+interface DriverItem {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+}
+
 export default function MessagesPage() {
     const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
     const [selectedDriverName, setSelectedDriverName] = useState<string>('');
     const [messageInput, setMessageInput] = useState('');
     const [alertType, setAlertType] = useState<AlertType>('INFO');
     const [messages, setMessages] = useState<DriverMessage[]>([]);
+    const [showDriverPicker, setShowDriverPicker] = useState(false);
+    const [driverSearch, setDriverSearch] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const { data: threadsData, loading: threadsLoading, refetch: refetchThreads } =
         useQuery<{ driverMessageThreads: DriverMessageThread[] }>(GET_DRIVER_MESSAGE_THREADS, {
             pollInterval: 30000,
         });
+
+    const { data: driversData } = useQuery<{ drivers: DriverItem[] }>(DRIVERS_QUERY);
 
     const { loading: messagesLoading, refetch: refetchMessages } =
         useQuery<{ driverMessages: DriverMessage[] }>(
@@ -142,6 +154,16 @@ export default function MessagesPage() {
         refetchMessages();
     };
 
+    const handleStartNewConversation = (driver: DriverItem) => {
+        const name = [driver.firstName, driver.lastName].filter(Boolean).join(' ').trim() || driver.email;
+        setSelectedDriverId(driver.id);
+        setSelectedDriverName(name);
+        setMessages([]);
+        setShowDriverPicker(false);
+        setDriverSearch('');
+        refetchMessages();
+    };
+
     const handleSend = async () => {
         const body = messageInput.trim();
         if (!body || !selectedDriverId) return;
@@ -159,6 +181,11 @@ export default function MessagesPage() {
     };
 
     const threads = threadsData?.driverMessageThreads ?? [];
+    const allDrivers = driversData?.drivers ?? [];
+    const filteredDrivers = allDrivers.filter((d) => {
+        const name = [d.firstName, d.lastName].join(' ').toLowerCase();
+        return name.includes(driverSearch.toLowerCase()) || d.email.toLowerCase().includes(driverSearch.toLowerCase());
+    });
 
     // Group messages by date
     type MessageGroup = { date: string; messages: DriverMessage[] };
@@ -173,14 +200,21 @@ export default function MessagesPage() {
     }
 
     return (
-        <div className="flex h-full rounded-xl overflow-hidden border border-white/10 bg-[#111113]">
+        <div className="relative flex h-full rounded-xl overflow-hidden border border-white/10 bg-[#111113]">
             {/* Left panel — thread list */}
             <div className="w-72 flex-shrink-0 border-r border-white/10 flex flex-col">
-                <div className="px-4 py-3 border-b border-white/10">
+                <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
                     <h2 className="text-sm font-semibold text-white flex items-center gap-2">
                         <MessageSquare size={16} className="text-indigo-400" />
                         Driver Messages
                     </h2>
+                    <button
+                        onClick={() => setShowDriverPicker(true)}
+                        className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 rounded-lg px-2.5 py-1.5 transition-colors font-medium"
+                    >
+                        <Plus size={13} />
+                        New
+                    </button>
                 </div>
 
                 {threadsLoading && (
@@ -190,8 +224,15 @@ export default function MessagesPage() {
                 )}
 
                 {!threadsLoading && threads.length === 0 && (
-                    <div className="flex-1 flex items-center justify-center text-zinc-500 text-sm px-4 text-center">
-                        No conversations yet. Send the first message from the driver list.
+                    <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 text-sm px-4 text-center gap-3">
+                        <MessageSquare size={32} className="text-zinc-700" />
+                        <p>No conversations yet.</p>
+                        <button
+                            onClick={() => setShowDriverPicker(true)}
+                            className="text-xs text-indigo-400 hover:text-indigo-300 underline underline-offset-2"
+                        >
+                            Start a new conversation
+                        </button>
                     </div>
                 )}
 
@@ -240,6 +281,58 @@ export default function MessagesPage() {
                     })}
                 </div>
             </div>
+
+            {/* Driver picker modal */}
+            {showDriverPicker && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => { setShowDriverPicker(false); setDriverSearch(''); }}>
+                    <div className="bg-[#18181b] border border-white/10 rounded-2xl w-80 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                            <span className="text-sm font-semibold text-white">Choose a driver</span>
+                            <button onClick={() => { setShowDriverPicker(false); setDriverSearch(''); }} className="text-zinc-500 hover:text-white transition-colors">
+                                <X size={16} />
+                            </button>
+                        </div>
+                        <div className="px-3 py-2 border-b border-white/10">
+                            <div className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2">
+                                <Search size={14} className="text-zinc-500 flex-shrink-0" />
+                                <input
+                                    autoFocus
+                                    type="text"
+                                    placeholder="Search drivers…"
+                                    value={driverSearch}
+                                    onChange={(e) => setDriverSearch(e.target.value)}
+                                    className="flex-1 bg-transparent text-sm text-white placeholder-zinc-500 focus:outline-none"
+                                />
+                            </div>
+                        </div>
+                        <div className="max-h-64 overflow-y-auto">
+                            {filteredDrivers.length === 0 && (
+                                <p className="text-center text-zinc-500 text-sm py-6">No drivers found</p>
+                            )}
+                            {filteredDrivers.map((driver) => {
+                                const name = [driver.firstName, driver.lastName].filter(Boolean).join(' ').trim() || driver.email;
+                                return (
+                                    <button
+                                        key={driver.id}
+                                        onClick={() => handleStartNewConversation(driver)}
+                                        className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
+                                    >
+                                        <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center flex-shrink-0">
+                                            <span className="text-xs font-bold text-indigo-300">
+                                                {name.charAt(0).toUpperCase()}
+                                            </span>
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-medium text-white truncate">{name}</p>
+                                            <p className="text-xs text-zinc-500 truncate">{driver.email}</p>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Right panel — chat view */}
             <div className="flex-1 flex flex-col min-w-0">
