@@ -71,8 +71,6 @@ function formatDate(iso: string) {
     return d.toLocaleDateString();
 }
 
-<<<<<<< HEAD
-=======
 interface DriverItem {
     id: string;
     firstName: string;
@@ -80,18 +78,14 @@ interface DriverItem {
     email: string;
 }
 
->>>>>>> 10bf545e24922a05cc0e9550992f6f744c0821ce
 export default function MessagesPage() {
     const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
     const [selectedDriverName, setSelectedDriverName] = useState<string>('');
     const [messageInput, setMessageInput] = useState('');
     const [alertType, setAlertType] = useState<AlertType>('INFO');
     const [messages, setMessages] = useState<DriverMessage[]>([]);
-<<<<<<< HEAD
-=======
     const [showDriverPicker, setShowDriverPicker] = useState(false);
     const [driverSearch, setDriverSearch] = useState('');
->>>>>>> 10bf545e24922a05cc0e9550992f6f744c0821ce
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const { data: threadsData, loading: threadsLoading, refetch: refetchThreads } =
@@ -99,19 +93,22 @@ export default function MessagesPage() {
             pollInterval: 30000,
         });
 
-<<<<<<< HEAD
-=======
     const { data: driversData } = useQuery<{ drivers: DriverItem[] }>(DRIVERS_QUERY);
 
->>>>>>> 10bf545e24922a05cc0e9550992f6f744c0821ce
-    const { loading: messagesLoading, refetch: refetchMessages } =
+    const { loading: messagesLoading } =
         useQuery<{ driverMessages: DriverMessage[] }>(
             GET_DRIVER_MESSAGES,
             {
                 variables: { driverId: selectedDriverId, limit: 100 },
                 skip: !selectedDriverId,
                 onCompleted: (data) => {
-                    setMessages(data.driverMessages ?? []);
+                    const incoming = data.driverMessages ?? [];
+                    setMessages((prev) => {
+                        const ids = new Set(prev.map((m) => m.id));
+                        const merged = [...prev, ...incoming.filter((m) => !ids.has(m.id))];
+                        // sort by createdAt to keep order correct
+                        return merged.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                    });
                 },
             }
         );
@@ -119,7 +116,10 @@ export default function MessagesPage() {
     const [sendMessage, { loading: sending }] = useMutation(SEND_DRIVER_MESSAGE, {
         onCompleted: (data) => {
             if (data?.sendDriverMessage) {
-                setMessages((prev) => [...prev, data.sendDriverMessage]);
+                setMessages((prev) => {
+                    if (prev.some((m) => m.id === data.sendDriverMessage.id)) return prev;
+                    return [...prev, data.sendDriverMessage];
+                });
                 refetchThreads();
             }
         },
@@ -150,6 +150,11 @@ export default function MessagesPage() {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
+    // Clear messages when switching threads so onCompleted starts fresh
+    useEffect(() => {
+        setMessages([]);
+    }, [selectedDriverId]);
+
     // Mark as read when opening thread
     useEffect(() => {
         if (!selectedDriverId) return;
@@ -159,23 +164,16 @@ export default function MessagesPage() {
     const handleSelectThread = (thread: DriverMessageThread) => {
         setSelectedDriverId(thread.driverId);
         setSelectedDriverName(thread.driverName);
-        setMessages([]);
-        refetchMessages();
     };
 
-<<<<<<< HEAD
-=======
     const handleStartNewConversation = (driver: DriverItem) => {
         const name = [driver.firstName, driver.lastName].filter(Boolean).join(' ').trim() || driver.email;
         setSelectedDriverId(driver.id);
         setSelectedDriverName(name);
-        setMessages([]);
         setShowDriverPicker(false);
         setDriverSearch('');
-        refetchMessages();
     };
 
->>>>>>> 10bf545e24922a05cc0e9550992f6f744c0821ce
     const handleSend = async () => {
         const body = messageInput.trim();
         if (!body || !selectedDriverId) return;
@@ -193,14 +191,11 @@ export default function MessagesPage() {
     };
 
     const threads = threadsData?.driverMessageThreads ?? [];
-<<<<<<< HEAD
-=======
     const allDrivers = driversData?.drivers ?? [];
     const filteredDrivers = allDrivers.filter((d) => {
         const name = [d.firstName, d.lastName].join(' ').toLowerCase();
         return name.includes(driverSearch.toLowerCase()) || d.email.toLowerCase().includes(driverSearch.toLowerCase());
     });
->>>>>>> 10bf545e24922a05cc0e9550992f6f744c0821ce
 
     // Group messages by date
     type MessageGroup = { date: string; messages: DriverMessage[] };
@@ -215,23 +210,14 @@ export default function MessagesPage() {
     }
 
     return (
-<<<<<<< HEAD
-        <div className="flex h-full rounded-xl overflow-hidden border border-white/10 bg-[#111113]">
-            {/* Left panel — thread list */}
-            <div className="w-72 flex-shrink-0 border-r border-white/10 flex flex-col">
-                <div className="px-4 py-3 border-b border-white/10">
-=======
         <div className="relative flex h-full rounded-xl overflow-hidden border border-white/10 bg-[#111113]">
             {/* Left panel — thread list */}
             <div className="w-72 flex-shrink-0 border-r border-white/10 flex flex-col">
                 <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
->>>>>>> 10bf545e24922a05cc0e9550992f6f744c0821ce
                     <h2 className="text-sm font-semibold text-white flex items-center gap-2">
                         <MessageSquare size={16} className="text-indigo-400" />
                         Driver Messages
                     </h2>
-<<<<<<< HEAD
-=======
                     <button
                         onClick={() => setShowDriverPicker(true)}
                         className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 rounded-lg px-2.5 py-1.5 transition-colors font-medium"
@@ -239,7 +225,6 @@ export default function MessagesPage() {
                         <Plus size={13} />
                         New
                     </button>
->>>>>>> 10bf545e24922a05cc0e9550992f6f744c0821ce
                 </div>
 
                 {threadsLoading && (
@@ -249,10 +234,6 @@ export default function MessagesPage() {
                 )}
 
                 {!threadsLoading && threads.length === 0 && (
-<<<<<<< HEAD
-                    <div className="flex-1 flex items-center justify-center text-zinc-500 text-sm px-4 text-center">
-                        No conversations yet. Send the first message from the driver list.
-=======
                     <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 text-sm px-4 text-center gap-3">
                         <MessageSquare size={32} className="text-zinc-700" />
                         <p>No conversations yet.</p>
@@ -262,7 +243,6 @@ export default function MessagesPage() {
                         >
                             Start a new conversation
                         </button>
->>>>>>> 10bf545e24922a05cc0e9550992f6f744c0821ce
                     </div>
                 )}
 
@@ -312,8 +292,6 @@ export default function MessagesPage() {
                 </div>
             </div>
 
-<<<<<<< HEAD
-=======
             {/* Driver picker modal */}
             {showDriverPicker && (
                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => { setShowDriverPicker(false); setDriverSearch(''); }}>
@@ -366,7 +344,6 @@ export default function MessagesPage() {
                 </div>
             )}
 
->>>>>>> 10bf545e24922a05cc0e9550992f6f744c0821ce
             {/* Right panel — chat view */}
             <div className="flex-1 flex flex-col min-w-0">
                 {!selectedDriverId ? (
