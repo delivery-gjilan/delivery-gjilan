@@ -13,6 +13,9 @@ import { useAuthStore } from '@/store/authStore';
 import { useNavigationLocationStore } from '@/store/navigationLocationStore';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { OrderAcceptSheet } from '@/components/OrderAcceptSheet';
+import DriverMessageBanner from '@/components/DriverMessageBanner';
+import type { AlertType } from '@/components/DriverMessageBanner';
+import { DRIVER_MESSAGE_RECEIVED_SUB } from '@/graphql/operations/driverMessages';
 import * as Haptics from 'expo-haptics';
 import type { NavigationPhase } from '@/store/navigationStore';
 
@@ -1068,6 +1071,15 @@ export default function NavigationScreen() {
     const [arrivedAt, setArrivedAt] = useState<number>(0);
     const [notifiedAt, setNotifiedAt] = useState<number | null>(null);
     const [newOrderToast, setNewOrderToast] = useState<{ id: string; businessName: string } | null>(null);
+    const [navIncomingMessage, setNavIncomingMessage] = useState<{ id: string; body: string; alertType: AlertType; adminId: string } | null>(null);
+
+    useSubscription(DRIVER_MESSAGE_RECEIVED_SUB, {
+        onData: ({ data: subData }) => {
+            const msg = subData.data?.driverMessageReceived;
+            if (!msg || msg.senderRole !== 'ADMIN') return;
+            setNavIncomingMessage({ id: msg.id, body: msg.body, alertType: msg.alertType as AlertType, adminId: msg.adminId });
+        },
+    });
     const prevOrderIdsRef = useRef<Set<string>>(new Set());
     const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     // Tracks which order IDs have already had ETA_LT_3_MIN fired this session.
@@ -1491,6 +1503,18 @@ export default function NavigationScreen() {
                     onSkip={handleSkipOrder}
                     accepting={accepting}
                     autoCountdown={acceptAutoCountdown}
+                />
+            )}
+
+            {/* ═══ Driver message banner ═══ */}
+            {navIncomingMessage && (
+                <DriverMessageBanner
+                    key={navIncomingMessage.id}
+                    senderName="Dispatcher"
+                    body={navIncomingMessage.body}
+                    alertType={navIncomingMessage.alertType}
+                    adminId={navIncomingMessage.adminId}
+                    onDismiss={() => setNavIncomingMessage(null)}
                 />
             )}
 

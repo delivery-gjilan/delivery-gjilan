@@ -163,6 +163,29 @@ export function notifyDriverNewAdminMessage(
 }
 
 /**
+ * Notify a business user that the admin sent them a message.
+ */
+export function notifyBusinessUserNewAdminMessage(
+    notificationService: NotificationService,
+    businessUserId: string,
+    body: string,
+    alertType: 'INFO' | 'WARNING' | 'URGENT',
+): void {
+    const titleMap = { INFO: '💬 New Message', WARNING: '⚠️ Warning from Admin', URGENT: '🚨 Urgent Message' };
+    const payload: NotificationPayload = {
+        title: titleMap[alertType] ?? '💬 New Message',
+        body,
+        data: { screen: 'messages', type: 'ADMIN_MESSAGE' },
+        timeSensitive: alertType !== 'INFO',
+        relevanceScore: alertType === 'URGENT' ? 1.0 : alertType === 'WARNING' ? 0.8 : 0.5,
+    };
+
+    notificationService
+        .sendToUserByAppType(businessUserId, 'BUSINESS', payload, 'ADMIN_ALERT')
+        .catch((err) => logger.error({ err, businessUserId }, 'Failed to send admin message notification to business user'));
+}
+
+/**
  * End Live Activity when order is completed or cancelled.
  */
 export function endLiveActivity(

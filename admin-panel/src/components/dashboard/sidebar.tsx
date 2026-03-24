@@ -22,6 +22,7 @@ import {
   Image,
   Zap,
   MessageSquare,
+  Building2,
 } from "lucide-react";
 
 const menu: any[] = [
@@ -53,6 +54,7 @@ const menu: any[] = [
   { name: "Promotions", href: "/dashboard/promotions", icon: Tag, superAdminOnly: true },
 
   { name: "Driver Messages", href: "/admin/messages", icon: MessageSquare, superAdminOnly: true },
+  { name: "Business Messages", href: "/admin/business-messages", icon: Building2, superAdminOnly: true },
 
   { divider: true, superAdminOnly: true },
 

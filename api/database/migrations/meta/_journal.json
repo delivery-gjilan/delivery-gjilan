@@ -36,6 +36,13 @@
       "when": 1774317600000,
       "tag": "0004_notification_campaign_locale",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1774400000000,
+      "tag": "0005_business_messages",
+      "breakpoints": true
     }
   ]
 }

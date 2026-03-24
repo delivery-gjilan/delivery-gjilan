@@ -3,11 +3,11 @@ import { Animated, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMutation } from '@apollo/client/react';
-import { MARK_DRIVER_MESSAGES_READ_DRIVER } from '@/graphql/operations/driverMessages';
+import { MARK_BUSINESS_MESSAGES_READ_BUSINESS } from '@/graphql/messages';
 
 export type AlertType = 'INFO' | 'WARNING' | 'URGENT';
 
-interface DriverMessageBannerProps {
+interface BusinessMessageBannerProps {
     senderName: string;
     body: string;
     alertType: AlertType;
@@ -26,13 +26,13 @@ const ALERT_CONFIG: Record<AlertType, {
     label: string;
 }> = {
     INFO: {
-        bg: '#0f1e35',
-        accent: '#3b82f6',
-        border: '#1d4ed840',
-        labelBg: '#1d4ed820',
-        labelText: '#93c5fd',
+        bg: '#130a2e',
+        accent: '#7c3aed',
+        border: '#5b21b640',
+        labelBg: '#5b21b620',
+        labelText: '#c4b5fd',
         iconName: 'information-circle',
-        iconColor: '#60a5fa',
+        iconColor: '#a78bfa',
         label: 'INFO',
     },
     WARNING: {
@@ -59,14 +59,14 @@ const ALERT_CONFIG: Record<AlertType, {
 
 const DOUBLE_TAP_DELAY = 350;
 
-export default function DriverMessageBanner({ senderName, body, alertType, adminId, onDismiss }: DriverMessageBannerProps) {
+export default function BusinessMessageBanner({ senderName, body, alertType, adminId, onDismiss }: BusinessMessageBannerProps) {
     const router = useRouter();
     const translateY = useRef(new Animated.Value(-200)).current;
     const opacity = useRef(new Animated.Value(0)).current;
     const config = ALERT_CONFIG[alertType] ?? ALERT_CONFIG.INFO;
     const lastTapRef = useRef<number>(0);
     const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const [markRead] = useMutation(MARK_DRIVER_MESSAGES_READ_DRIVER);
+    const [markRead] = useMutation(MARK_BUSINESS_MESSAGES_READ_BUSINESS);
 
     useEffect(() => {
         Animated.parallel([

@@ -8,6 +8,12 @@ export const DateTimeScalar = new GraphQLScalarType({
             return value.toISOString();
         }
         if (typeof value === 'string') {
+            // Normalize PostgreSQL format "2026-03-24 10:30:00+00" → ISO 8601
+            const normalized = value.replace(' ', 'T');
+            const date = new Date(normalized);
+            if (!isNaN(date.getTime())) {
+                return date.toISOString();
+            }
             return value;
         }
         throw new GraphQLError(`Value is not a valid DateTime: ${value}`);
