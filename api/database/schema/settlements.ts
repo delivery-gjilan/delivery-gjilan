@@ -1,9 +1,10 @@
-import { pgTable, uuid, varchar, numeric, timestamp, pgEnum, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, numeric, timestamp, pgEnum, index, boolean } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import { drivers } from './drivers';
 import { businesses } from './businesses';
 import { orders } from './orders';
 import { settlementRules, settlementDirection } from './settlementRules';
+import { settlementPayments } from './settlementPayments';
 
 export { settlementDirection };
 
@@ -28,15 +29,23 @@ export const settlements = pgTable('settlements', {
     driverId: uuid('driver_id').references(() => drivers.id, { onDelete: 'set null' }),
     businessId: uuid('business_id').references(() => businesses.id, { onDelete: 'set null' }),
     orderId: uuid('order_id')
-        .notNull()
         .references(() => orders.id, { onDelete: 'cascade' }),
 
     // Which rule produced this settlement (null for manually created / backfilled)
     ruleId: uuid('rule_id').references(() => settlementRules.id, { onDelete: 'set null' }),
 
+    // Which payment settled this settlement (set when is_settled = true via SettlingService)
+    settlementPaymentId: uuid('settlement_payment_id').references(() => settlementPayments.id, { onDelete: 'set null' }),
+
+    // If this is a carry-forward remainder settlement, which payment created it
+    sourcePaymentId: uuid('source_payment_id').references(() => settlementPayments.id, { onDelete: 'set null' }),
+
     amount: numeric('amount', { mode: 'number', precision: 10, scale: 2 }).notNull(),
     currency: varchar('currency', { length: 3 }).default('EUR').notNull(),
     status: settlementStatus('status').default('PENDING').notNull(),
+
+    /** Whether this settlement has been fully resolved (primary filter for active vs done) */
+    isSettled: boolean('is_settled').default(false).notNull(),
 
     paidAt: timestamp('paid_at', { withTimezone: true, mode: 'string' }),
     paymentReference: varchar('payment_reference', { length: 100 }),
@@ -54,6 +63,7 @@ export const settlements = pgTable('settlements', {
     index('idx_settlements_driver_id').on(t.driverId),
     index('idx_settlements_business_id').on(t.businessId),
     index('idx_settlements_status').on(t.status),
+    index('idx_settlements_is_settled').on(t.isSettled),
     index('idx_settlements_type_direction').on(t.type, t.direction),
 ]));
 
@@ -73,6 +83,16 @@ export const settlementsRelations = relations(settlements, ({ one }) => ({
     rule: one(settlementRules, {
         fields: [settlements.ruleId],
         references: [settlementRules.id],
+    }),
+    settlementPayment: one(settlementPayments, {
+        fields: [settlements.settlementPaymentId],
+        references: [settlementPayments.id],
+        relationName: 'settledBy',
+    }),
+    sourcePayment: one(settlementPayments, {
+        fields: [settlements.sourcePaymentId],
+        references: [settlementPayments.id],
+        relationName: 'spawnedFrom',
     }),
 }));
 

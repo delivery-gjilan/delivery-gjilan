@@ -1,5 +1,6 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { SettlementRequestRepository } from '@/repositories/SettlementRequestRepository';
+import { SettlingService } from '@/services/SettlingService';
 import { GraphQLError } from 'graphql';
 import logger from '@/lib/logger';
 
@@ -45,11 +46,16 @@ export const respondToSettlementRequest: NonNullable<
 
     if (action === 'ACCEPT') {
         const requestedAmount = Number(existing.amount ?? 0);
-        const settlementResult = await repo.settlePendingReceivableForPeriod(
+
+        // Use the SettlingService to settle ALL unsettled settlements for this
+        // business, with the request amount as the payment.
+        const settlingService = new SettlingService(db);
+        const settleResult = await settlingService.settleWithBusiness(
             existing.businessId,
-            existing.periodStart,
-            existing.periodEnd,
             requestedAmount,
+            userData.userId,
+            'SETTLEMENT_REQUEST_ACCEPTED',
+            `request:${requestId}`,
         );
 
         logger.info(
@@ -57,11 +63,12 @@ export const respondToSettlementRequest: NonNullable<
                 requestId,
                 businessId: existing.businessId,
                 requestedAmount,
-                settledCount: settlementResult.settledCount,
-                settledAmount: settlementResult.settledAmount,
-                remainingAmount: settlementResult.remainingAmount,
+                settledCount: settleResult.settledCount,
+                netAmount: settleResult.netAmount,
+                remainderAmount: settleResult.remainderAmount,
+                paymentId: settleResult.paymentId,
             },
-            'settlementRequest:accept — settled requested amount oldest-first',
+            'settlementRequest:accept — settled via SettlingService',
         );
 
         const updated = await repo.accept(requestId, userData.userId);
@@ -71,7 +78,7 @@ export const respondToSettlementRequest: NonNullable<
             if (notificationService) {
                 await notificationService.sendToTopic('admins', {
                     title: '✅ Settlement Accepted',
-                    body: `Business accepted settlement of €${requestedAmount.toFixed(2)}. €${settlementResult.settledAmount.toFixed(2)} applied across ${settlementResult.settledCount} settlement(s).`,
+                    body: `Business accepted settlement of €${requestedAmount.toFixed(2)}. ${settleResult.settledCount} settlement(s) settled.${settleResult.remainderAmount > 0 ? ` Remainder: €${settleResult.remainderAmount.toFixed(2)}` : ''}`,
                     data: {
                         type: 'SETTLEMENT_REQUEST_ACCEPTED',
                         requestId,

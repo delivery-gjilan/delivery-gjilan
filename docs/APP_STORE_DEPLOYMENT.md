@@ -503,3 +503,7 @@ All apps use `appVersionSource: "remote"` in EAS with `autoIncrement: true` for 
 - Remove the Alcohol category entirely from the categories array
 - Set age rating to 4+ for broader reach
 - You can always add it back later with proper compliance
+
+
+
+---- also I think I should have the button to stop notifications and stuff on all apps ?

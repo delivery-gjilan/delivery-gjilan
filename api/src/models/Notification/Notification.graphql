@@ -65,6 +65,8 @@ type NotificationCampaign {
     id: ID!
     title: String!
     body: String!
+    titleAl: String
+    bodyAl: String
     data: JSON
     imageUrl: String
     timeSensitive: Boolean!
@@ -157,6 +159,8 @@ input SendPushNotificationInput {
     userIds: [ID!]!
     title: String!
     body: String!
+    titleAl: String
+    bodyAl: String
     data: JSON
     imageUrl: String
     timeSensitive: Boolean
@@ -167,6 +171,8 @@ input SendPushNotificationInput {
 input CreateCampaignInput {
     title: String!
     body: String!
+    titleAl: String
+    bodyAl: String
     data: JSON
     imageUrl: String
     timeSensitive: Boolean

@@ -467,7 +467,12 @@
         "in_cart": "In Cart",
         "quantity": "Quantity",
         "remove_from_cart": "Remove from Cart",
-        "cannot_add_item": "Cannot Add Item"
+        "cannot_add_item": "Cannot Add Item",
+        "add_another": "Add another?",
+        "repeat_last": "Same as before",
+        "customize_new": "Choose new options",
+        "current_options": "Current options",
+        "offers": "Offers"
     },
     "store_closed": {
         "title": "Store Temporarily Closed",

@@ -9,8 +9,23 @@ import { GET_ORDERS } from '@/graphql/operations/orders/queries';
 import { ALL_ORDERS_SUBSCRIPTION } from '@/graphql/operations/orders/subscriptions';
 
 const SUBSCRIPTION_REFETCH_COOLDOWN_MS = 1500;
-const DRIVER_POLL_MS = 10000;
+const DRIVER_POLL_MS = 30000; // polling is a fallback only; subscription is primary
 const DRIVER_SUBSCRIPTION_FRESH_MS = 20000;
+
+/** Merge incoming drivers into existing list, keeping the newest location per driver. */
+function mergeDriversByTimestamp(existing: any[], incoming: any[]): any[] {
+    const byId = new globalThis.Map<string, any>((existing || []).map((d: any) => [d.id, d]));
+    for (const driver of incoming) {
+        const prev = byId.get(driver.id);
+        if (prev?.driverLocationUpdatedAt && driver.driverLocationUpdatedAt) {
+            const prevTs = new Date(prev.driverLocationUpdatedAt).getTime();
+            const nextTs = new Date(driver.driverLocationUpdatedAt).getTime();
+            if (nextTs < prevTs) continue; // skip stale
+        }
+        byId.set(driver.id, { ...prev, ...driver });
+    }
+    return Array.from(byId.values());
+}
 
 export function useMapRealtimeData() {
     const apolloClient = useApolloClient();
@@ -23,45 +38,47 @@ export function useMapRealtimeData() {
         data: driverData,
         startPolling,
         stopPolling,
-    } = useQuery(DRIVERS_QUERY);
+    } = useQuery(DRIVERS_QUERY, { fetchPolicy: 'no-cache' });
     const { data: orderData, refetch: refetchOrders } = useQuery(GET_ORDERS);
 
     const [driversLive, setDriversLive] = useState<any[]>([]);
     const lastSubscriptionRefetchMsRef = useRef(0);
     const lastDriverSubscriptionMsRef = useRef(0);
-    const isDriverPollingRef = useRef(true);
+    const isDriverPollingRef = useRef(false);
 
-    useEffect(() => {
-        startPolling(DRIVER_POLL_MS);
-        return () => {
-            stopPolling();
-        };
-    }, [startPolling, stopPolling]);
-
+    // Polling is a pure fallback — only activate when the subscription
+    // hasn't delivered data within DRIVER_SUBSCRIPTION_FRESH_MS.
     useEffect(() => {
         const interval = setInterval(() => {
             const ageMs = Date.now() - lastDriverSubscriptionMsRef.current;
-            const hasFreshSubscription =
+            const subAlive =
                 lastDriverSubscriptionMsRef.current > 0 && ageMs <= DRIVER_SUBSCRIPTION_FRESH_MS;
 
-            if (hasFreshSubscription && isDriverPollingRef.current) {
+            if (subAlive && isDriverPollingRef.current) {
                 stopPolling();
                 isDriverPollingRef.current = false;
-                return;
-            }
-
-            if (!hasFreshSubscription && !isDriverPollingRef.current) {
+            } else if (!subAlive && !isDriverPollingRef.current) {
                 startPolling(DRIVER_POLL_MS);
                 isDriverPollingRef.current = true;
             }
         }, 5000);
 
-        return () => clearInterval(interval);
+        // Start polling initially until the first subscription event arrives
+        startPolling(DRIVER_POLL_MS);
+        isDriverPollingRef.current = true;
+
+        return () => {
+            clearInterval(interval);
+            stopPolling();
+        };
     }, [startPolling, stopPolling]);
 
     useEffect(() => {
         if ((driverData as any)?.drivers) {
-            setDriversLive((driverData as any).drivers);
+            const drivers = (driverData as any).drivers as any[];
+            const s = drivers[0];
+            console.log(`[RT:poll] ${drivers.length} drivers`, s ? `${s.id.slice(0,8)} lat=${s.driverLocation?.latitude} updatedAt=${s.driverLocationUpdatedAt}` : 'empty');
+            setDriversLive((prev) => mergeDriversByTimestamp(prev, drivers));
         }
     }, [driverData]);
 
@@ -100,6 +117,8 @@ export function useMapRealtimeData() {
     useSubscription(DRIVERS_UPDATED_SUBSCRIPTION, {
         onData: ({ data: subscriptionData }) => {
             const incoming = (subscriptionData.data as any)?.driversUpdated as any[] | undefined;
+            const s = incoming?.[0];
+            console.log(`[RT:sub] ${incoming?.length ?? 0} drivers`, s ? `${s.id.slice(0,8)} lat=${s.driverLocation?.latitude} updatedAt=${s.driverLocationUpdatedAt}` : 'empty');
             if (!incoming || incoming.length === 0) return;
 
             lastDriverSubscriptionMsRef.current = Date.now();
@@ -108,13 +127,10 @@ export function useMapRealtimeData() {
                 isDriverPollingRef.current = false;
             }
 
-            setDriversLive((prev) => {
-                const byId = new globalThis.Map<string, any>((prev || []).map((d: any) => [d.id, d]));
-                incoming.forEach((driver: any) => {
-                    byId.set(driver.id, { ...byId.get(driver.id), ...driver });
-                });
-                return Array.from(byId.values());
-            });
+            setDriversLive((prev) => mergeDriversByTimestamp(prev, incoming));
+        },
+        onError: (err) => {
+            console.error('[RT:sub] driversUpdated subscription error:', err);
         },
     });
 

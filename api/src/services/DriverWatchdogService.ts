@@ -3,7 +3,8 @@
  * 
  * Runs every 10 seconds to check driver connection states:
  * - CONNECTED -> STALE (no heartbeat for 45s)
- * - STALE -> LOST (no heartbeat for 90s)
+ * - STALE -> DISCONNECTED (no heartbeat for 25s)
+ * - STALE/CONNECTED -> LOST (no heartbeat for 90s, legacy safety net)
  * 
  * Publishes state changes via GraphQL subscriptions for admin dashboard.
  */
@@ -21,6 +22,7 @@ export class DriverWatchdogService {
   private watchdogInterval: NodeJS.Timeout | null = null;
   private isRunning = false;
   private staleTimers = new Map<string, NodeJS.Timeout>();
+  private disconnectedTimers = new Map<string, NodeJS.Timeout>();
   private lostTimers = new Map<string, NodeJS.Timeout>();
 
   constructor(
@@ -45,7 +47,12 @@ export class DriverWatchdogService {
     }, WATCHDOG_INTERVAL_MS);
 
     log.info(
-      { intervalMs: WATCHDOG_INTERVAL_MS, staleThreshold: CONNECTION_THRESHOLDS.STALE, lostThreshold: CONNECTION_THRESHOLDS.LOST },
+      {
+        intervalMs: WATCHDOG_INTERVAL_MS,
+        staleThreshold: CONNECTION_THRESHOLDS.STALE,
+        disconnectedThreshold: CONNECTION_THRESHOLDS.DISCONNECTED,
+        lostThreshold: CONNECTION_THRESHOLDS.LOST,
+      },
       'watchdog:started',
     );
   }
@@ -72,6 +79,7 @@ export class DriverWatchdogService {
     const nowMs = Date.now();
 
     const staleDelay = Math.max(0, heartbeatMs + CONNECTION_THRESHOLDS.STALE * 1000 - nowMs);
+    const disconnectedDelay = Math.max(0, heartbeatMs + CONNECTION_THRESHOLDS.DISCONNECTED * 1000 - nowMs);
     const lostDelay = Math.max(0, heartbeatMs + CONNECTION_THRESHOLDS.LOST * 1000 - nowMs);
 
     this.clearDriverTimers(userId);
@@ -88,7 +96,14 @@ export class DriverWatchdogService {
       });
     }, lostDelay);
 
+    const disconnectedTimer = setTimeout(() => {
+      this.markDriverDisconnectedNow(userId).catch((error) => {
+        log.error({ err: error, userId }, 'watchdog:timer:disconnected:error');
+      });
+    }, disconnectedDelay);
+
     this.staleTimers.set(userId, staleTimer);
+    this.disconnectedTimers.set(userId, disconnectedTimer);
     this.lostTimers.set(userId, lostTimer);
   }
 
@@ -106,12 +121,19 @@ export class DriverWatchdogService {
     try {
       // Mark CONNECTED -> STALE (45s no heartbeat)
       const staleDrivers = await this.driverRepository.markStaleDrivers();
+
+      // Mark CONNECTED/STALE/LOST -> DISCONNECTED (25s no heartbeat)
+      const disconnectedDrivers = await this.driverRepository.markDisconnectedDrivers();
       
       // Mark STALE/CONNECTED -> LOST (90s no heartbeat)
       const lostDrivers = await this.driverRepository.markLostDrivers();
 
       staleDrivers.forEach((driver) => {
         this.staleTimers.delete(driver.userId);
+      });
+
+      disconnectedDrivers.forEach((driver) => {
+        this.clearDriverTimers(driver.userId);
       });
 
       lostDrivers.forEach((driver) => {
@@ -133,11 +155,19 @@ export class DriverWatchdogService {
         );
       }
 
+      if (disconnectedDrivers.length > 0) {
+        log.info(
+          { count: disconnectedDrivers.length, driverIds: disconnectedDrivers.map(d => d.userId) },
+          'watchdog:marked:disconnected',
+        );
+      }
+
       // Publish updates if any state changed
-      const totalChanges = staleDrivers.length + lostDrivers.length;
+      const totalChanges = staleDrivers.length + disconnectedDrivers.length + lostDrivers.length;
       if (totalChanges > 0) {
         const changedDriverIds = Array.from(new Set([
           ...staleDrivers.map((d) => d.userId),
+          ...disconnectedDrivers.map((d) => d.userId),
           ...lostDrivers.map((d) => d.userId),
         ]));
         await this.publishDriverUpdate(changedDriverIds);
@@ -186,6 +216,12 @@ export class DriverWatchdogService {
       this.staleTimers.delete(userId);
     }
 
+    const disconnectedTimer = this.disconnectedTimers.get(userId);
+    if (disconnectedTimer) {
+      clearTimeout(disconnectedTimer);
+      this.disconnectedTimers.delete(userId);
+    }
+
     const lostTimer = this.lostTimers.get(userId);
     if (lostTimer) {
       clearTimeout(lostTimer);
@@ -195,8 +231,10 @@ export class DriverWatchdogService {
 
   private clearAllTimers(): void {
     this.staleTimers.forEach((timer) => clearTimeout(timer));
+    this.disconnectedTimers.forEach((timer) => clearTimeout(timer));
     this.lostTimers.forEach((timer) => clearTimeout(timer));
     this.staleTimers.clear();
+    this.disconnectedTimers.clear();
     this.lostTimers.clear();
   }
 
@@ -214,6 +252,16 @@ export class DriverWatchdogService {
     const updated = await this.driverRepository.markDriverLostIfExpired(userId);
     if (updated) {
       log.info({ userId }, 'watchdog:timer:marked:lost');
+      await this.publishDriverUpdate([userId]);
+    }
+  }
+
+  private async markDriverDisconnectedNow(userId: string): Promise<void> {
+    this.disconnectedTimers.delete(userId);
+    const updated = await this.driverRepository.markDriverDisconnectedIfExpired(userId);
+    if (updated) {
+      this.clearDriverTimers(userId);
+      log.info({ userId }, 'watchdog:timer:marked:disconnected');
       await this.publishDriverUpdate([userId]);
     }
   }

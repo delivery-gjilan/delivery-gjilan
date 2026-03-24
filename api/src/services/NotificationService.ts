@@ -23,6 +23,10 @@ type LiveActivityUpdateGate = {
 export interface NotificationPayload {
     title: string;
     body: string;
+    /** Explicit locale override for this send. Falls back to user preference. */
+    locale?: string;
+    /** Localized variants keyed by locale (for example: en, al). */
+    localeContent?: Record<string, { title: string; body: string }>;
     data?: Record<string, string>;
     /** Image URL to display in the notification (optional) */
     imageUrl?: string;
@@ -69,6 +73,40 @@ export interface BusinessDeviceHeartbeatPayload {
 
 export class NotificationService {
     constructor(public readonly repo: NotificationRepository) {}
+
+    private normalizeLocale(locale?: string): string {
+        return locale === 'al' ? 'al' : 'en';
+    }
+
+    private resolveLocalizedPayload(payload: NotificationPayload, locale?: string): NotificationPayload {
+        const normalizedLocale = this.normalizeLocale(locale ?? payload.locale);
+        const localizedCopy = payload.localeContent?.[normalizedLocale] ?? payload.localeContent?.en;
+        const resolvedTitle = localizedCopy?.title ?? payload.title;
+        const resolvedBody = localizedCopy?.body ?? payload.body;
+
+        const { localeContent: _localeContent, locale: _localeOverride, data, ...rest } = payload;
+
+        return {
+            ...rest,
+            title: resolvedTitle,
+            body: resolvedBody,
+            data: {
+                ...(data ?? {}),
+                language: normalizedLocale,
+            },
+        };
+    }
+
+    private mergeSendResults(results: SendResult[]): SendResult {
+        return results.reduce<SendResult>(
+            (acc, result) => ({
+                successCount: acc.successCount + result.successCount,
+                failureCount: acc.failureCount + result.failureCount,
+                staleTokens: acc.staleTokens.concat(result.staleTokens),
+            }),
+            { successCount: 0, failureCount: 0, staleTokens: [] },
+        );
+    }
 
     // ────────────────────────────────────────────────────────────────
     // Token management
@@ -169,6 +207,9 @@ export class NotificationService {
         payload: NotificationPayload,
         type: NotificationType,
     ): Promise<SendResult> {
+        const preferredLanguage = await this.repo.getUserPreferredLanguage(userId);
+        const localizedPayload = this.resolveLocalizedPayload(payload, preferredLanguage);
+
         logger.info({ userId, title: payload.title }, 'notification:sendToUser — looking up device tokens');
         const tokens = await this.repo.getTokensByUserId(userId);
         if (tokens.length === 0) {
@@ -178,14 +219,14 @@ export class NotificationService {
 
         logger.info({ userId, tokenCount: tokens.length, platforms: tokens.map(t => t.platform) }, 'notification:sendToUser — found tokens, sending multicast');
         const tokenStrings = tokens.map((t) => t.token);
-        const result = await this.sendMulticast(tokenStrings, payload);
+        const result = await this.sendMulticast(tokenStrings, localizedPayload);
 
         // Log the notification
         await this.repo.createNotification({
             userId,
-            title: payload.title,
-            body: payload.body,
-            data: payload.data as Record<string, unknown> | undefined,
+            title: localizedPayload.title,
+            body: localizedPayload.body,
+            data: localizedPayload.data as Record<string, unknown> | undefined,
             type,
         });
 
@@ -198,19 +239,22 @@ export class NotificationService {
         payload: NotificationPayload,
         type: NotificationType,
     ): Promise<SendResult> {
+        const preferredLanguage = await this.repo.getUserPreferredLanguage(userId);
+        const localizedPayload = this.resolveLocalizedPayload(payload, preferredLanguage);
+
         const tokens = await this.repo.getTokensByUserIdAndAppType(userId, appType);
         if (tokens.length === 0) {
             return { successCount: 0, failureCount: 0, staleTokens: [] };
         }
 
         const tokenStrings = tokens.map((t) => t.token);
-        const result = await this.sendMulticast(tokenStrings, payload);
+        const result = await this.sendMulticast(tokenStrings, localizedPayload);
 
         await this.repo.createNotification({
             userId,
-            title: payload.title,
-            body: payload.body,
-            data: payload.data as Record<string, unknown> | undefined,
+            title: localizedPayload.title,
+            body: localizedPayload.body,
+            data: localizedPayload.data as Record<string, unknown> | undefined,
             type,
         });
 
@@ -228,26 +272,39 @@ export class NotificationService {
     ): Promise<SendResult> {
         if (userIds.length === 0) return { successCount: 0, failureCount: 0, staleTokens: [] };
 
-        const allTokens = await this.repo.getTokensByUserIds(userIds);
-        if (allTokens.length === 0) {
-            logger.debug({ userCount: userIds.length }, 'No device tokens for any users, skipping push');
-            return { successCount: 0, failureCount: 0, staleTokens: [] };
+        const preferredLanguages = await this.repo.getUsersPreferredLanguages(userIds);
+        const groupedUserIds = userIds.reduce<Record<string, string[]>>((acc, userId) => {
+            const locale = this.normalizeLocale(payload.locale ?? preferredLanguages[userId]);
+            if (!acc[locale]) acc[locale] = [];
+            acc[locale].push(userId);
+            return acc;
+        }, {});
+
+        const results: SendResult[] = [];
+
+        for (const [locale, localeUserIds] of Object.entries(groupedUserIds)) {
+            const localizedPayload = this.resolveLocalizedPayload(payload, locale);
+            const allTokens = await this.repo.getTokensByUserIds(localeUserIds);
+            if (allTokens.length === 0) {
+                logger.debug({ userCount: localeUserIds.length, locale }, 'No device tokens for locale group, skipping push');
+                continue;
+            }
+
+            const tokenStrings = allTokens.map((t) => t.token);
+            const result = await this.sendMulticast(tokenStrings, localizedPayload);
+            results.push(result);
+
+            const notificationRecords = localeUserIds.map((uid) => ({
+                userId: uid,
+                title: localizedPayload.title,
+                body: localizedPayload.body,
+                data: localizedPayload.data as Record<string, unknown> | undefined,
+                type,
+            }));
+            await this.repo.createNotifications(notificationRecords);
         }
 
-        const tokenStrings = allTokens.map((t) => t.token);
-        const result = await this.sendMulticast(tokenStrings, payload);
-
-        // Log notifications for all users
-        const notificationRecords = userIds.map((uid) => ({
-            userId: uid,
-            title: payload.title,
-            body: payload.body,
-            data: payload.data as Record<string, unknown> | undefined,
-            type,
-        }));
-        await this.repo.createNotifications(notificationRecords);
-
-        return result;
+        return this.mergeSendResults(results);
     }
 
     async sendToUsersByAppType(
@@ -260,24 +317,38 @@ export class NotificationService {
             return { successCount: 0, failureCount: 0, staleTokens: [] };
         }
 
-        const allTokens = await this.repo.getTokensByUserIdsAndAppType(userIds, appType);
-        if (allTokens.length === 0) {
-            return { successCount: 0, failureCount: 0, staleTokens: [] };
+        const preferredLanguages = await this.repo.getUsersPreferredLanguages(userIds);
+        const groupedUserIds = userIds.reduce<Record<string, string[]>>((acc, userId) => {
+            const locale = this.normalizeLocale(payload.locale ?? preferredLanguages[userId]);
+            if (!acc[locale]) acc[locale] = [];
+            acc[locale].push(userId);
+            return acc;
+        }, {});
+
+        const results: SendResult[] = [];
+
+        for (const [locale, localeUserIds] of Object.entries(groupedUserIds)) {
+            const localizedPayload = this.resolveLocalizedPayload(payload, locale);
+            const allTokens = await this.repo.getTokensByUserIdsAndAppType(localeUserIds, appType);
+            if (allTokens.length === 0) {
+                continue;
+            }
+
+            const tokenStrings = allTokens.map((t) => t.token);
+            const result = await this.sendMulticast(tokenStrings, localizedPayload);
+            results.push(result);
+
+            const notificationRecords = localeUserIds.map((uid) => ({
+                userId: uid,
+                title: localizedPayload.title,
+                body: localizedPayload.body,
+                data: localizedPayload.data as Record<string, unknown> | undefined,
+                type,
+            }));
+            await this.repo.createNotifications(notificationRecords);
         }
 
-        const tokenStrings = allTokens.map((t) => t.token);
-        const result = await this.sendMulticast(tokenStrings, payload);
-
-        const notificationRecords = userIds.map((uid) => ({
-            userId: uid,
-            title: payload.title,
-            body: payload.body,
-            data: payload.data as Record<string, unknown> | undefined,
-            type,
-        }));
-        await this.repo.createNotifications(notificationRecords);
-
-        return result;
+        return this.mergeSendResults(results);
     }
 
     // ────────────────────────────────────────────────────────────────

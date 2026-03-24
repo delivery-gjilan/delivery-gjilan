@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { CartControls } from './CartControls';
+import { ComplexCartControls } from './ComplexCartControls';
 import { getEffectiveProductPrice } from '@/modules/product/utils/pricing';
 
 type ProductCardItem = GetProductsQuery['products'][number];
@@ -22,6 +23,7 @@ export function ProductCard({ productCard, businessType }: ProductCardProps) {
     // Use product from card if single product, otherwise fallback to first variant.
     const product = productCard.product || productCard.variants[0];
     const hasVariants = productCard.variants.length > 0;
+    const isComplexProduct = hasVariants || productCard.isOffer || productCard.hasOptionGroups;
     const targetProductId = productCard.product?.id || productCard.variants[0]?.id;
 
     const handlePress = () => {
@@ -137,15 +139,14 @@ export function ProductCard({ productCard, businessType }: ProductCardProps) {
                         {/* Cart Controls or Customize Button */}
                         {productCard.product?.isAvailable !== false && (
                             <View style={{ flexShrink: 0, marginLeft: 8 }}>
-                                {!hasVariants && !productCard.isOffer ? (
+                                {!isComplexProduct ? (
                                     <CartControls product={productCard.product!} businessType={businessType} />
-                                ) : (
-                                    <View className="bg-primary/10 px-3 py-2 rounded-full">
-                                        <Text className="text-primary text-xs font-bold">
-                                            {productCard.isOffer ? 'Configure' : 'Options'}
-                                        </Text>
-                                    </View>
-                                )}
+                                ) : targetProductId ? (
+                                    <ComplexCartControls
+                                        productId={targetProductId}
+                                        businessType={businessType}
+                                    />
+                                ) : null}
                             </View>
                         )}
                     </View>

@@ -100,7 +100,10 @@
       }
     },
     "updates": {
-      "url": "https://u.expo.dev/e5c04b16-6851-4fce-aa03-e4a183f0becf"
+      "url": "https://u.expo.dev/e5c04b16-6851-4fce-aa03-e4a183f0becf",
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      }
     },
     "runtimeVersion": {
       "policy": "appVersion"

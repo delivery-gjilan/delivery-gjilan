@@ -463,6 +463,11 @@ export const translationSchema = z.object(
             quantity: s(),
             remove_from_cart: s(),
             cannot_add_item: s(),
+            add_another: s(),
+            repeat_last: s(),
+            customize_new: s(),
+            current_options: s(),
+            offers: s(),
         }),
         store_closed: z.object({
             title: s(),

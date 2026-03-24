@@ -22,11 +22,14 @@ type Settlement {
     direction: SettlementDirection!
     driver: User
     business: Business
-    order: Order!
+    order: Order
     ruleId: ID
     amount: Float!
     currency: String!
     status: SettlementStatus!
+    isSettled: Boolean!
+    settlementPayment: SettlementPayment
+    sourcePayment: SettlementPayment
     paidAt: Date
     paymentReference: String
     paymentMethod: String
@@ -74,6 +77,7 @@ type Query {
         type: SettlementType
         direction: SettlementDirection
         status: SettlementStatus
+        isSettled: Boolean
         driverId: ID
         businessId: ID
         startDate: Date
@@ -94,6 +98,19 @@ type Query {
     
     driverBalance(driverId: ID!): SettlementSummary!
     businessBalance(businessId: ID!): SettlementSummary!
+    unsettledBalance(entityType: SettlementType!, entityId: ID!): Float!
+
+    settlementPayments(
+        entityType: SettlementType
+        driverId: ID
+        businessId: ID
+        startDate: Date
+        endDate: Date
+        limit: Int
+        offset: Int
+    ): [SettlementPayment!]!
+
+    settlementPayment(id: ID!): SettlementPayment
 }
 
 type Mutation {
@@ -122,6 +139,18 @@ type Mutation {
 
     """Admin cancels an outstanding settlement request."""
     cancelSettlementRequest(requestId: ID!): SettlementRequest!
+
+    """Settle all unsettled settlements for a driver (always full)."""
+    settleWithDriver(driverId: ID!): SettleResult!
+
+    """Settle all unsettled settlements for a business. Supports partial payment."""
+    settleWithBusiness(
+        businessId: ID!
+        amount: Float!
+        paymentMethod: String
+        paymentReference: String
+        note: String
+    ): SettleResult!
 }
 
 # ─── Settlement Requests ─────────────────────────────────────────────────────
@@ -169,4 +198,35 @@ extend type Query {
 extend type Subscription {
     settlementCreated(type: SettlementType): Settlement!
     settlementStatusChanged(id: ID!): Settlement!
+}
+
+# ─── Settlement Payments ──────────────────────────────────────────────────────
+
+enum SettlementPaymentDirection {
+    ENTITY_TO_PLATFORM
+    PLATFORM_TO_ENTITY
+}
+
+type SettlementPayment {
+    id: ID!
+    entityType: SettlementType!
+    driver: User
+    business: Business
+    amount: Float!
+    direction: SettlementPaymentDirection!
+    totalBalanceAtTime: Float!
+    paymentMethod: String
+    paymentReference: String
+    note: String
+    createdBy: User
+    createdAt: Date!
+}
+
+type SettleResult {
+    payment: SettlementPayment!
+    settledCount: Int!
+    netAmount: Float!
+    direction: SettlementPaymentDirection!
+    remainderAmount: Float!
+    remainderSettlement: Settlement
 }

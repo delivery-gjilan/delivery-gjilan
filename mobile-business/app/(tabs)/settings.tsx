@@ -21,7 +21,7 @@ import { UserPermission } from '@/gql/graphql';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useLocaleStore } from '@/store/useLocaleStore';
 import { useNotificationSettingsStore } from '@/store/useNotificationSettingsStore';
-import { CHANGE_MY_PASSWORD } from '@/graphql/auth';
+import { CHANGE_MY_PASSWORD, SET_MY_PREFERRED_LANGUAGE } from '@/graphql/auth';
 import { GET_BUSINESS_SCHEDULE, SET_BUSINESS_SCHEDULE } from '@/graphql/business';
 
 type DayState = {
@@ -91,7 +91,26 @@ export default function SettingsScreen() {
     }, [scheduleData]);
 
     const [changeMyPassword] = useMutation(CHANGE_MY_PASSWORD);
+    const [setMyPreferredLanguage] = useMutation(SET_MY_PREFERRED_LANGUAGE);
     const [setBusinessSchedule] = useMutation(SET_BUSINESS_SCHEDULE);
+
+    const handleLanguageChoice = async (choice: 'en' | 'al') => {
+        if (choice === languageChoice) return;
+
+        const previousLanguage = languageChoice;
+        setLanguageChoice(choice);
+
+        try {
+            await setMyPreferredLanguage({
+                variables: {
+                    language: choice === 'al' ? 'AL' : 'EN',
+                },
+            });
+        } catch {
+            setLanguageChoice(previousLanguage);
+            Alert.alert(t('common.error', 'Error'), 'Failed to sync language preference.');
+        }
+    };
 
     const scheduleCount = useMemo(
         () => dayStates.filter((d) => d.enabled).length,
@@ -322,13 +341,13 @@ export default function SettingsScreen() {
                         <View className="flex-row gap-2">
                             <TouchableOpacity
                                 className={`px-3 py-1.5 rounded-full ${languageChoice === 'en' ? 'bg-primary' : 'bg-card'}`}
-                                onPress={() => setLanguageChoice('en')}
+                                onPress={() => handleLanguageChoice('en')}
                             >
                                 <Text className={`${languageChoice === 'en' ? 'text-white' : 'text-subtext'} font-semibold`}>EN</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 className={`px-3 py-1.5 rounded-full ${languageChoice === 'al' ? 'bg-primary' : 'bg-card'}`}
-                                onPress={() => setLanguageChoice('al')}
+                                onPress={() => handleLanguageChoice('al')}
                             >
                                 <Text className={`${languageChoice === 'al' ? 'text-white' : 'text-subtext'} font-semibold`}>SQ</Text>
                             </TouchableOpacity>

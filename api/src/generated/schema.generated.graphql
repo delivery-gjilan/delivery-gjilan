@@ -298,6 +298,7 @@ type CreateBusinessWithOwnerPayload {
 
 input CreateCampaignInput {
   body: String!
+  bodyAl: String
   category: String
   data: JSON
   imageUrl: String
@@ -305,6 +306,7 @@ input CreateCampaignInput {
   relevanceScore: Float
   timeSensitive: Boolean
   title: String!
+  titleAl: String
 }
 
 input CreateDeliveryPricingTierInput {
@@ -617,6 +619,32 @@ type DriverHeartbeatResult {
   success: Boolean!
 }
 
+type DriverMessage {
+  admin: DriverMessageUser
+  adminId: ID!
+  alertType: MessageAlertType!
+  body: String!
+  createdAt: DateTime!
+  driver: DriverMessageUser
+  driverId: ID!
+  id: ID!
+  readAt: DateTime
+  senderRole: String!
+}
+
+type DriverMessageThread {
+  driverId: ID!
+  driverName: String!
+  lastMessage: DriverMessage
+  unreadCount: Int!
+}
+
+type DriverMessageUser {
+  firstName: String!
+  id: ID!
+  lastName: String!
+}
+
 type DriverPttSignal {
   action: DriverPttSignalAction!
   adminId: ID!
@@ -670,6 +698,12 @@ input LocationInput {
 input LoginInput {
   email: String!
   password: String!
+}
+
+enum MessageAlertType {
+  INFO
+  URGENT
+  WARNING
 }
 
 type Mutation {
@@ -767,6 +801,9 @@ type Mutation {
   login(input: LoginInput!): AuthResponse!
   logoutAllSessions: Boolean!
   logoutCurrentSession(refreshToken: String!): Boolean!
+
+  """Mark all messages in a conversation as read"""
+  markDriverMessagesRead(otherUserId: ID!): Boolean!
   markFirstOrderUsed(userId: ID!): UserPromoMetadata!
   markSettlementAsPaid(paymentMethod: String, paymentReference: String, settlementId: ID!): Settlement!
   markSettlementAsPartiallyPaid(amount: Float!, settlementId: ID!): Settlement!
@@ -775,18 +812,32 @@ type Mutation {
   registerDeviceToken(input: RegisterDeviceTokenInput!): Boolean!
   registerLiveActivityToken(activityId: String!, orderId: ID!, token: String!): Boolean!
   removeUserFromPromotion(promotionId: ID!, userId: ID!): Boolean!
+
+  """Driver replies to admin"""
+  replyToDriverMessage(adminId: ID!, body: String!): DriverMessage!
   resendEmailVerification: SignupStepResponse!
 
   """Business owner accepts or disputes a pending settlement request."""
   respondToSettlementRequest(action: SettlementRequestAction!, disputeReason: String, requestId: ID!): SettlementRequest!
   runSettlementScenarioHarness(scenarioIds: [String!]): SettlementScenarioHarnessResult!
   sendCampaign(id: ID!): NotificationCampaign!
+
+  """Admin sends a message to a driver"""
+  sendDriverMessage(alertType: MessageAlertType!, body: String!, driverId: ID!): DriverMessage!
   sendPushNotification(input: SendPushNotificationInput!): SendNotificationResult!
   setBusinessSchedule(businessId: ID!, schedule: [BusinessDayHoursInput!]!): [BusinessDayHours!]!
   setDefaultAddress(id: ID!): Boolean!
   setDeliveryPricingTiers(input: SetDeliveryPricingTiersInput!): [DeliveryPricingTier!]!
   setMyPreferredLanguage(language: AppLanguage!): User!
   setUserPermissions(permissions: [UserPermission!]!, userId: ID!): User!
+
+  """
+  Settle all unsettled settlements for a business. Supports partial payment.
+  """
+  settleWithBusiness(amount: Float!, businessId: ID!, note: String, paymentMethod: String, paymentReference: String): SettleResult!
+
+  """Settle all unsettled settlements for a driver (always full)."""
+  settleWithDriver(driverId: ID!): SettleResult!
   startPreparing(id: ID!, preparationMinutes: Int!): Order!
   submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
   trackPushTelemetry(input: TrackPushTelemetryInput!): Boolean!
@@ -831,6 +882,7 @@ type Notification {
 
 type NotificationCampaign {
   body: String!
+  bodyAl: String
   category: String
   createdAt: DateTime!
   data: JSON
@@ -847,6 +899,7 @@ type NotificationCampaign {
   targetCount: Int!
   timeSensitive: Boolean!
   title: String!
+  titleAl: String
 }
 
 enum NotificationType {
@@ -999,6 +1052,7 @@ type Product {
 
 type ProductCard {
   basePrice: Float!
+  hasOptionGroups: Boolean!
   id: ID!
   imageUrl: String
   isOffer: Boolean!
@@ -1181,6 +1235,12 @@ type Query {
   deliveryZones: [DeliveryZone!]!
   deviceTokens(userId: ID): [DeviceToken!]!
   driverBalance(driverId: ID!): SettlementSummary!
+
+  """Admin: list of all driver threads with unread counts"""
+  driverMessageThreads: [DriverMessageThread!]!
+
+  """Admin: full conversation with a specific driver"""
+  driverMessages(driverId: ID!, limit: Int, offset: Int): [DriverMessage!]!
   drivers: [User!]!
 
   """Get Agora RTC credentials for the current authenticated user"""
@@ -1200,6 +1260,9 @@ type Query {
   myAddresses: [UserAddress!]!
   myBehavior: UserBehavior
 
+  """Driver: my messages"""
+  myDriverMessages(limit: Int, offset: Int): [DriverMessage!]!
+
   """Get live metrics for the authenticated driver"""
   myDriverMetrics: DriverDailyMetrics!
   myReferralStats: ReferralStats!
@@ -1218,13 +1281,16 @@ type Query {
   products(businessId: ID!): [ProductCard!]!
   pushTelemetryEvents(appType: DeviceAppType, eventType: PushTelemetryEventType, hours: Int, limit: Int, platform: DevicePlatform): [PushTelemetryEvent!]!
   pushTelemetrySummary(hours: Int): PushTelemetrySummary!
+  settlementPayment(id: ID!): SettlementPayment
+  settlementPayments(businessId: ID, driverId: ID, endDate: Date, entityType: SettlementType, limit: Int, offset: Int, startDate: Date): [SettlementPayment!]!
   settlementRequests(businessId: ID, limit: Int, offset: Int, status: SettlementRequestStatus): [SettlementRequest!]!
   settlementRule(id: ID!): SettlementRule
   settlementRules(filter: SettlementRuleFilterInput): [SettlementRule!]!
   settlementScenarioDefinitions: [SettlementScenarioDefinition!]!
   settlementSummary(businessId: ID, driverId: ID, endDate: Date, startDate: Date, type: SettlementType): SettlementSummary!
-  settlements(businessId: ID, direction: SettlementDirection, driverId: ID, endDate: Date, limit: Int, offset: Int, startDate: Date, status: SettlementStatus, type: SettlementType): [Settlement!]!
+  settlements(businessId: ID, direction: SettlementDirection, driverId: ID, endDate: Date, isSettled: Boolean, limit: Int, offset: Int, startDate: Date, status: SettlementStatus, type: SettlementType): [Settlement!]!
   uncompletedOrders: [Order!]!
+  unsettledBalance(entityId: ID!, entityType: SettlementType!): Float!
   userBehavior(userId: ID!): UserBehavior
   users: [User!]!
   validatePromotions(cart: CartContextInput!, manualCode: String): PromotionResult!
@@ -1273,17 +1339,28 @@ type SendNotificationResult {
 
 input SendPushNotificationInput {
   body: String!
+  bodyAl: String
   category: String
   data: JSON
   imageUrl: String
   relevanceScore: Float
   timeSensitive: Boolean
   title: String!
+  titleAl: String
   userIds: [ID!]!
 }
 
 input SetDeliveryPricingTiersInput {
   tiers: [CreateDeliveryPricingTierInput!]!
+}
+
+type SettleResult {
+  direction: SettlementPaymentDirection!
+  netAmount: Float!
+  payment: SettlementPayment!
+  remainderAmount: Float!
+  remainderSettlement: Settlement
+  settledCount: Int!
 }
 
 type Settlement {
@@ -1294,11 +1371,14 @@ type Settlement {
   direction: SettlementDirection!
   driver: User
   id: ID!
-  order: Order!
+  isSettled: Boolean!
+  order: Order
   paidAt: Date
   paymentMethod: String
   paymentReference: String
   ruleId: ID
+  settlementPayment: SettlementPayment
+  sourcePayment: SettlementPayment
   status: SettlementStatus!
   type: SettlementType!
   updatedAt: Date!
@@ -1317,6 +1397,26 @@ enum SettlementDirection {
 enum SettlementEntityType {
   BUSINESS
   DRIVER
+}
+
+type SettlementPayment {
+  amount: Float!
+  business: Business
+  createdAt: Date!
+  createdBy: User
+  direction: SettlementPaymentDirection!
+  driver: User
+  entityType: SettlementType!
+  id: ID!
+  note: String
+  paymentMethod: String
+  paymentReference: String
+  totalBalanceAtTime: Float!
+}
+
+enum SettlementPaymentDirection {
+  ENTITY_TO_PLATFORM
+  PLATFORM_TO_ENTITY
 }
 
 type SettlementRequest {
@@ -1449,9 +1549,14 @@ input SubmitPhoneNumberInput {
 }
 
 type Subscription {
+  """Admin receives replies from a specific driver in real-time"""
+  adminMessageReceived(driverId: ID!): DriverMessage!
   allOrdersUpdated: [Order!]!
   auditLogCreated(action: ActionType, actorType: ActorType, entityType: EntityType): AuditLog!
   driverConnectionStatusChanged(driverId: ID!): DriverConnection!
+
+  """Driver receives messages from admin in real-time"""
+  driverMessageReceived: DriverMessage!
 
   """Per-driver push-to-talk signal stream (start/stop/mute/unmute)"""
   driverPttSignal(driverId: ID!): DriverPttSignal!

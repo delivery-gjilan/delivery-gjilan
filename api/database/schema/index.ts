@@ -11,6 +11,7 @@ export * from './drivers';
 export * from './settlements';
 export * from './settlementRules';
 export * from './settlementRequests';
+export * from './settlementPayments';
 // productPricing removed — pricing lives on the products table (basePrice, markupPrice, nightMarkedupPrice, salePrice)
 export * from './auditLogs';
 export * from './userBehaviors';
@@ -30,3 +31,4 @@ export * from './productVariantGroups';
 export * from './optionGroups';
 export * from './options';
 export * from './orderItemOptions';
+export * from './driverMessages';

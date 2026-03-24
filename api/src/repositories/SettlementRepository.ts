@@ -6,6 +6,8 @@ import { DbSettlement } from '@/database/schema/settlements';
 export interface SettlementFilters {
     type?: string;
     status?: string;
+    direction?: string;
+    isSettled?: boolean;
     driverId?: string;
     businessId?: string;
     orderId?: string;
@@ -41,6 +43,14 @@ export class SettlementRepository {
 
         if (filters.status) {
             conditions.push(eq(settlements.status, filters.status as any));
+        }
+
+        if (filters.direction) {
+            conditions.push(eq(settlements.direction, filters.direction as any));
+        }
+
+        if (filters.isSettled !== undefined) {
+            conditions.push(eq(settlements.isSettled, filters.isSettled));
         }
 
         if (filters.driverId) {
@@ -176,6 +186,7 @@ export class SettlementRepository {
             .update(settlements)
             .set({
                 status: 'PAID',
+                isSettled: true,
                 paidAt: now,
                 updatedAt: now,
             })
@@ -194,6 +205,7 @@ export class SettlementRepository {
             .update(settlements)
             .set({
                 status: 'PAID',
+                isSettled: true,
                 paidAt: now,
                 updatedAt: now,
             })
@@ -263,7 +275,9 @@ export class SettlementRepository {
             .update(settlements)
             .set({
                 status: 'PENDING',
+                isSettled: false,
                 paidAt: null,
+                settlementPaymentId: null,
                 updatedAt: now,
             })
             .where(eq(settlements.id, settlementId))
@@ -288,5 +302,67 @@ export class SettlementRepository {
             )
             .returning({ id: settlements.id });
         return deleted.length;
+    }
+
+    /**
+     * Get all unsettled settlements for a given entity (driver or business).
+     */
+    async getUnsettledByEntity(
+        entityType: 'DRIVER' | 'BUSINESS',
+        entityId: string,
+    ): Promise<DbSettlement[]> {
+        const entityFilter =
+            entityType === 'DRIVER'
+                ? eq(settlements.driverId, entityId)
+                : eq(settlements.businessId, entityId);
+
+        return this.db
+            .select()
+            .from(settlements)
+            .where(
+                and(
+                    eq(settlements.type, entityType),
+                    eq(settlements.isSettled, false),
+                    entityFilter,
+                ),
+            )
+            .orderBy(sql`${settlements.createdAt} ASC`);
+    }
+
+    /**
+     * Calculate the unsettled net balance for an entity.
+     * Positive = entity owes platform, negative = platform owes entity.
+     */
+    async getUnsettledBalance(
+        entityType: 'DRIVER' | 'BUSINESS',
+        entityId: string,
+    ): Promise<number> {
+        const entityFilter =
+            entityType === 'DRIVER'
+                ? eq(settlements.driverId, entityId)
+                : eq(settlements.businessId, entityId);
+
+        const result = await this.db
+            .select({
+                net: sql<number>`
+                    COALESCE(SUM(
+                        CASE WHEN ${settlements.direction} = 'RECEIVABLE'
+                            THEN CAST(${settlements.amount} AS NUMERIC)
+                            ELSE -CAST(${settlements.amount} AS NUMERIC)
+                        END
+                    ), 0)::FLOAT
+                `,
+            })
+            .from(settlements)
+            .where(
+                and(
+                    eq(settlements.type, entityType),
+                    eq(settlements.isSettled, false),
+                    entityFilter,
+                ),
+            )
+            .then((rows: any[]) => rows[0]);
+
+        return result?.net ?? 0;
     }
 }

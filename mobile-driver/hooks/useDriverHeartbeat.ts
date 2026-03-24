@@ -75,7 +75,7 @@ const DRIVER_HEARTBEAT_MUTATION_TEXT = `
 
 async function sendBackgroundHeartbeat(latitude: number, longitude: number): Promise<void> {
   try {
-    const token = await getValidAccessToken(0);
+    const token = await getValidAccessToken(30_000);
     const endpoint = process.env.EXPO_PUBLIC_API_URL;
 
     if (!token || !endpoint) {
@@ -133,6 +133,7 @@ export function useDriverHeartbeat() {
   const lastLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('DISCONNECTED');
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const lastHeartbeatSentRef = useRef<number>(0);
 
   const getHeartbeatIntervalMs = useCallback(() => {
     const navState = useNavigationStore.getState();
@@ -391,6 +392,7 @@ export function useDriverHeartbeat() {
 
       const data = (result.data as any)?.driverHeartbeat;
       if (data?.success) {
+        lastHeartbeatSentRef.current = Date.now();
         setConnectionStatus(data.connectionStatus as ConnectionStatus);
         useAuthStore.getState().setConnectionStatus(data.connectionStatus);
         console.log('[Heartbeat] Sent', {
@@ -477,15 +479,29 @@ export function useDriverHeartbeat() {
 
       if (wasBackground && isNowActive && isAuthenticated) {
         startLocationWatch();
-        // App came to foreground – ensure the foreground heartbeat interval is running.
-        // Don't send an immediate extra heartbeat here; the background task may have
-        // just fired and the interval will pick up naturally on its next tick.
-        if (!heartbeatIntervalRef.current) {
-          console.log('[Heartbeat] Heartbeat stopped while backgrounded, restarting...');
+
+        // iOS suspends JS timers in background — setInterval stops firing but
+        // the ref is never cleared. Detect this by checking when we last
+        // successfully sent a heartbeat. If it's been more than 3× the
+        // expected interval, the timer is effectively dead.
+        const timeSinceLastHb = Date.now() - lastHeartbeatSentRef.current;
+        const expectedInterval = getHeartbeatIntervalMs();
+        const isIntervalStale = timeSinceLastHb > expectedInterval * 3;
+
+        if (!heartbeatIntervalRef.current || isIntervalStale) {
+          // Kill any zombie interval ref before restarting
+          if (heartbeatIntervalRef.current) {
+            clearInterval(heartbeatIntervalRef.current);
+            heartbeatIntervalRef.current = null;
+          }
+          console.log('[Heartbeat] Heartbeat stale/stopped while backgrounded, restarting...', { timeSinceLastHb });
           startHeartbeat();
         } else {
+          // Interval still alive — send one immediate heartbeat to recover
+          // status quickly, then let the interval continue.
+          doHeartbeat();
           applyHeartbeatInterval();
-          console.log('[Heartbeat] App foregrounded, heartbeat interval active');
+          console.log('[Heartbeat] App foregrounded, immediate heartbeat + interval reapplied');
         }
       }
 

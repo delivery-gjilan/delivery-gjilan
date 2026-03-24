@@ -467,7 +467,12 @@
         "in_cart": "Në Shportë",
         "quantity": "Sasia",
         "remove_from_cart": "Hiq nga Shporta",
-        "cannot_add_item": "Nuk Mund të Shtohet"
+        "cannot_add_item": "Nuk Mund të Shtohet",
+        "add_another": "Shto edhe një?",
+        "repeat_last": "Njëjtë si më parë",
+        "customize_new": "Zgjedh opsione të reja",
+        "current_options": "Opsionet aktuale",
+        "offers": "Oferta"
     },
     "store_closed": {
         "title": "Dyqani Mbyllur Përkohësisht",

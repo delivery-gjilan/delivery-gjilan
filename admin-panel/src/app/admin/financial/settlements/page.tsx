@@ -52,6 +52,7 @@ const GET_SETTLEMENTS_PAGE = gql`
     $type: SettlementType
     $status: SettlementStatus
     $direction: SettlementDirection
+    $isSettled: Boolean
     $driverId: ID
     $businessId: ID
     $startDate: Date
@@ -63,6 +64,7 @@ const GET_SETTLEMENTS_PAGE = gql`
       type: $type
       status: $status
       direction: $direction
+      isSettled: $isSettled
       driverId: $driverId
       businessId: $businessId
       startDate: $startDate
@@ -73,6 +75,7 @@ const GET_SETTLEMENTS_PAGE = gql`
       id
       type
       direction
+      isSettled
       driver {
         id
         firstName
@@ -164,6 +167,70 @@ const BACKFILL_SETTLEMENTS = gql`
   }
 `;
 
+const SETTLE_WITH_DRIVER_MUTATION = gql`
+  mutation SettleWithDriverPage($driverId: ID!) {
+    settleWithDriver(driverId: $driverId) {
+      payment {
+        id
+        amount
+        direction
+        totalBalanceAtTime
+        createdAt
+      }
+      settledCount
+      netAmount
+      direction
+      remainderAmount
+      remainderSettlement {
+        id
+        amount
+        direction
+      }
+    }
+  }
+`;
+
+const SETTLE_WITH_BUSINESS_MUTATION = gql`
+  mutation SettleWithBusinessPage(
+    $businessId: ID!
+    $amount: Float!
+    $paymentMethod: String
+    $paymentReference: String
+    $note: String
+  ) {
+    settleWithBusiness(
+      businessId: $businessId
+      amount: $amount
+      paymentMethod: $paymentMethod
+      paymentReference: $paymentReference
+      note: $note
+    ) {
+      payment {
+        id
+        amount
+        direction
+        totalBalanceAtTime
+        createdAt
+      }
+      settledCount
+      netAmount
+      direction
+      remainderAmount
+      remainderSettlement {
+        id
+        amount
+        direction
+      }
+    }
+  }
+`;
+
+const GET_UNSETTLED_BALANCE_QUERY = gql`
+  query GetUnsettledBalancePage($entityType: SettlementType!, $entityId: ID!) {
+    unsettledBalance(entityType: $entityType, entityId: $entityId)
+  }
+`;
+
 const CREATE_SETTLEMENT_REQUEST_MUTATION = gql`
   mutation AdminCreateSettlementRequest(
     $businessId: ID!
@@ -234,11 +301,19 @@ export default function SettlementsPage() {
   const [activeTab, setActiveTab] = useState<'business' | 'driver'>('business');
   const [statusFilter, setStatusFilter] = useState<'all' | SettlementStatus>('all');
   const [directionFilter, setDirectionFilter] = useState<'all' | SettlementDirection>('all');
+  const [settledFilter, setSettledFilter] = useState<'all' | 'settled' | 'unsettled'>('unsettled');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [selectedSettlement, setSelectedSettlement] = useState<any>(null);
   const [bulkPartialAmount, setBulkPartialAmount] = useState('');
   const [bulkProcessing, setBulkProcessing] = useState(false);
+  // Settle dialog state
+  const [settleDialogOpen, setSettleDialogOpen] = useState(false);
+  const [settleAmount, setSettleAmount] = useState('');
+  const [settlePaymentMethod, setSettlePaymentMethod] = useState('');
+  const [settlePaymentRef, setSettlePaymentRef] = useState('');
+  const [settleNote, setSettleNote] = useState('');
+  const [settleSubmitting, setSettleSubmitting] = useState(false);
 
   // Request settlement dialog state
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
@@ -262,6 +337,7 @@ export default function SettlementsPage() {
       type: SettlementType.Business,
       status: statusFilter === 'all' ? null : statusFilter,
       direction: directionFilter === 'all' ? null : directionFilter,
+      isSettled: settledFilter === 'all' ? null : settledFilter === 'settled',
       limit: 200,
     },
   });
@@ -276,6 +352,7 @@ export default function SettlementsPage() {
       type: SettlementType.Driver,
       status: statusFilter === 'all' ? null : statusFilter,
       direction: directionFilter === 'all' ? null : directionFilter,
+      isSettled: settledFilter === 'all' ? null : settledFilter === 'settled',
       limit: 200,
     },
   });
@@ -429,6 +506,10 @@ export default function SettlementsPage() {
   // Settlement request mutations
   const [createSettlementRequest] = useMutation(CREATE_SETTLEMENT_REQUEST_MUTATION);
   const [cancelSettlementRequest] = useMutation(CANCEL_SETTLEMENT_REQUEST_MUTATION);
+
+  // New settling mutations
+  const [settleWithDriver] = useMutation(SETTLE_WITH_DRIVER_MUTATION);
+  const [settleWithBusiness] = useMutation(SETTLE_WITH_BUSINESS_MUTATION);
 
   // Fetch settlement requests for selected business
   const {
@@ -679,6 +760,65 @@ export default function SettlementsPage() {
     }
   };
 
+  const openSettleDialog = () => {
+    if (!selectedGroup) return;
+    const pending = selectedGroup.pendingAmount;
+    setSettleAmount(pending > 0 ? pending.toFixed(2) : '');
+    setSettlePaymentMethod('');
+    setSettlePaymentRef('');
+    setSettleNote('');
+    setSettleDialogOpen(true);
+  };
+
+  const handleSettle = async () => {
+    if (!selectedEntityId || !selectedGroup) return;
+
+    setSettleSubmitting(true);
+    try {
+      if (activeTab === 'driver') {
+        const { data } = await settleWithDriver({
+          variables: { driverId: selectedEntityId },
+        });
+        const result = data?.settleWithDriver;
+        toast({
+          title: 'Driver settled',
+          description: `${result?.settledCount ?? 0} settlements settled. Net: €${Number(result?.netAmount ?? 0).toFixed(2)} (${result?.direction}).`,
+        });
+      } else {
+        const amount = parseFloat(settleAmount);
+        if (!Number.isFinite(amount) || amount <= 0) {
+          toast({ title: 'Invalid amount', description: 'Enter a valid amount > 0.', variant: 'destructive' });
+          setSettleSubmitting(false);
+          return;
+        }
+        const { data } = await settleWithBusiness({
+          variables: {
+            businessId: selectedEntityId,
+            amount,
+            paymentMethod: settlePaymentMethod.trim() || undefined,
+            paymentReference: settlePaymentRef.trim() || undefined,
+            note: settleNote.trim() || undefined,
+          },
+        });
+        const result = data?.settleWithBusiness;
+        const remainderMsg = result?.remainderAmount > 0
+          ? ` Remainder: €${Number(result.remainderAmount).toFixed(2)} carried forward.`
+          : '';
+        toast({
+          title: 'Business settled',
+          description: `${result?.settledCount ?? 0} settlements settled. Paid: €${Number(result?.netAmount ?? 0).toFixed(2)}.${remainderMsg}`,
+        });
+      }
+
+      setSettleDialogOpen(false);
+      await handleRefresh();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message ?? 'Failed to settle', variant: 'destructive' });
+    } finally {
+      setSettleSubmitting(false);
+    }
+  };
+
   const renderContent = () => (
     <Card className="shadow-sm">
       {/* Filters and Stats Bar */}
@@ -693,6 +833,13 @@ export default function SettlementsPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={openSettleDialog}
+                  className="gap-2 bg-green-600 hover:bg-green-700 text-white"
+                >
+                  Settle
+                </Button>
                 {activeTab === 'business' && (
                   <Button
                     size="sm"
@@ -763,6 +910,36 @@ export default function SettlementsPage() {
                   className="h-7 px-3"
                 >
                   Cancelled
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-muted-foreground mr-1">Settled:</span>
+              <div className="flex gap-1 rounded-md bg-muted/30 p-1">
+                <Button
+                  variant={settledFilter === 'all' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setSettledFilter('all')}
+                  className="h-7 px-3"
+                >
+                  All
+                </Button>
+                <Button
+                  variant={settledFilter === 'unsettled' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setSettledFilter('unsettled')}
+                  className="h-7 px-3 text-orange-600"
+                >
+                  Unsettled
+                </Button>
+                <Button
+                  variant={settledFilter === 'settled' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setSettledFilter('settled')}
+                  className="h-7 px-3 text-green-600"
+                >
+                  Settled
                 </Button>
               </div>
             </div>
@@ -888,7 +1065,9 @@ export default function SettlementsPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="font-mono text-xs text-zinc-400">
-                    #{settlement.order?.displayId || settlement.order?.id?.slice(-6)}
+                    {settlement.order
+                      ? `#${settlement.order.displayId || settlement.order.id?.slice(-6)}`
+                      : <span className="text-zinc-600 italic">carry-forward</span>}
                   </TableCell>
                   <TableCell className="text-sm text-zinc-400">
                     {settlement.paymentReference || '-'}
@@ -1016,6 +1195,14 @@ export default function SettlementsPage() {
               >
                 <Send className="h-3.5 w-3.5 mr-2" />
                 Request Settlement
+              </Button>
+
+              <Button
+                className="bg-green-600 hover:bg-green-700"
+                onClick={openSettleDialog}
+                disabled={!selectedGroup}
+              >
+                Settle
               </Button>
             </div>
           </div>
@@ -1183,7 +1370,7 @@ export default function SettlementsPage() {
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Order ID</Label>
-                  <div className="font-mono text-sm mt-1">{selectedSettlement.order?.id.slice(0, 12)}...</div>
+                  <div className="font-mono text-sm mt-1">{selectedSettlement.order ? `${selectedSettlement.order.id.slice(0, 12)}...` : <span className="text-muted-foreground italic">Carry-forward (no order)</span>}</div>
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Created At</Label>
@@ -1209,6 +1396,18 @@ export default function SettlementsPage() {
                     )}
                   >
                     {selectedSettlement.status}
+                  </Badge>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Settled</Label>
+                  <Badge 
+                    variant={selectedSettlement.isSettled ? 'default' : 'secondary'}
+                    className={cn(
+                      "mt-1",
+                      selectedSettlement.isSettled ? "bg-green-600" : "bg-orange-500"
+                    )}
+                  >
+                    {selectedSettlement.isSettled ? 'Yes' : 'No'}
                   </Badge>
                 </div>
               </div>
@@ -1248,7 +1447,12 @@ export default function SettlementsPage() {
               <div className="rounded-lg border bg-background p-4 space-y-3">
                 <div className="text-sm font-semibold">Order Details</div>
 
-                <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
+                {!selectedSettlement.order ? (
+                  <div className="text-sm text-muted-foreground italic py-2">
+                    This is a carry-forward settlement from a partial payment — no associated order.
+                  </div>
+                ) : (
+                <><div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
                   <div>
                     <span className="text-muted-foreground">Display ID:</span>{' '}
                     <span className="font-medium">{selectedSettlement.order?.displayId || '-'}</span>
@@ -1315,6 +1519,8 @@ export default function SettlementsPage() {
                     ))
                   )}
                 </div>
+                </>
+                )}
               </div>
 
               {selectedSettlement.status === SettlementStatus.Pending && (
@@ -1415,6 +1621,97 @@ export default function SettlementsPage() {
                 disabled={reqSubmitting}
               >
                 {reqSubmitting ? 'Sending…' : 'Send Request'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Settle Dialog */}
+      <Dialog open={settleDialogOpen} onOpenChange={setSettleDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Settle — {selectedGroup?.name}
+              {activeTab === 'driver' ? ' (Driver, full settlement)' : ''}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {activeTab === 'driver' ? (
+              <p className="text-sm text-muted-foreground">
+                All unsettled settlements for this driver will be marked as settled and a payment record will be created.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Enter the payment amount. If less than the total balance, a carry-forward settlement will be created for the remainder.
+                </p>
+                <div>
+                  <Label htmlFor="settle-amount" className="text-xs text-muted-foreground mb-1 block">
+                    Amount (EUR) *
+                  </Label>
+                  <Input
+                    id="settle-amount"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={settleAmount}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSettleAmount(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="settle-method" className="text-xs text-muted-foreground mb-1 block">
+                    Payment Method
+                  </Label>
+                  <Input
+                    id="settle-method"
+                    placeholder="e.g. Bank Transfer, Cash"
+                    value={settlePaymentMethod}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSettlePaymentMethod(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="settle-ref" className="text-xs text-muted-foreground mb-1 block">
+                    Payment Reference
+                  </Label>
+                  <Input
+                    id="settle-ref"
+                    placeholder="e.g. TXN-123456"
+                    value={settlePaymentRef}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSettlePaymentRef(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="settle-note" className="text-xs text-muted-foreground mb-1 block">
+                    Note
+                  </Label>
+                  <textarea
+                    id="settle-note"
+                    rows={2}
+                    placeholder="Optional note…"
+                    value={settleNote}
+                    onChange={(e) => setSettleNote(e.target.value)}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="ghost"
+                onClick={() => setSettleDialogOpen(false)}
+                disabled={settleSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="bg-green-600 hover:bg-green-700"
+                onClick={handleSettle}
+                disabled={settleSubmitting}
+              >
+                {settleSubmitting ? 'Settling…' : 'Confirm Settle'}
               </Button>
             </div>
           </div>

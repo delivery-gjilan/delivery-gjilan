@@ -145,10 +145,20 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
 
     const productsByCategory = useMemo(() => {
         const allProductCards = products ?? [];
+
+        // Extract offer products into their own group
+        const offerProducts = allProductCards.filter((p) => p.isOffer);
+        const nonOfferProducts = allProductCards.filter((p) => !p.isOffer);
+
         const grouped = new Map<string, ProductCardItem[]>();
 
+        // Add offers as a special category at the beginning
+        if (offerProducts.length > 0) {
+            grouped.set('__offers', offerProducts);
+        }
+
         categories.forEach((cat) => {
-            const catProducts = allProductCards.filter((p) => p.product?.categoryId === cat.id);
+            const catProducts = nonOfferProducts.filter((p) => p.product?.categoryId === cat.id);
             if (catProducts.length > 0) {
                 grouped.set(cat.id, catProducts);
             }
@@ -156,7 +166,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
 
         // Uncategorized
         const categorizedIds = new Set(categories.map((c: any) => c.id));
-        const uncategorized = allProductCards.filter((p) => {
+        const uncategorized = nonOfferProducts.filter((p) => {
             const categoryId = p.product?.categoryId;
             return !categoryId || !categorizedIds.has(categoryId);
         });
@@ -621,6 +631,46 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                 >
                     {!isSearching && (
                         <View style={{ paddingBottom: 60 }}>
+                            {/* ═══ Offers section ═══ */}
+                            {productsByCategory.has('__offers') && (
+                                <View>
+                                    <View
+                                        style={{
+                                            paddingHorizontal: 16,
+                                            paddingTop: 16,
+                                            paddingBottom: 10,
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            gap: 8,
+                                        }}
+                                    >
+                                        <Ionicons name="pricetag" size={18} color={theme.colors.primary} />
+                                        <Text
+                                            style={{
+                                                fontSize: 18,
+                                                fontWeight: '800',
+                                                color: theme.colors.primary,
+                                                textTransform: 'uppercase',
+                                                letterSpacing: 0.3,
+                                            }}
+                                        >
+                                            {t.product.offers}
+                                        </Text>
+                                    </View>
+                                    <View style={{ paddingHorizontal: 16 }}>
+                                        {(productsByCategory.get('__offers') ?? []).map(
+                                            (productCard) => (
+                                                <ProductCard
+                                                    key={productCard.id}
+                                                    productCard={productCard}
+                                                    businessType={business.businessType}
+                                                />
+                                            ),
+                                        )}
+                                    </View>
+                                </View>
+                            )}
+
                             {visibleCategories.map((cat, catIdx) => {
                                 const catProducts = productsByCategory.get(cat.id) ?? [];
                                 return (
@@ -632,7 +682,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                         <View
                                             style={{
                                                 paddingHorizontal: 16,
-                                                paddingTop: catIdx === 0 ? 16 : 28,
+                                                paddingTop: catIdx === 0 && !productsByCategory.has('__offers') ? 16 : 28,
                                                 paddingBottom: 10,
                                             }}
                                         >

@@ -26,17 +26,7 @@ export default function TabLayout() {
     return (
         <Tabs
             screenOptions={{
-                headerShown: true,
-                headerStyle: {
-                    backgroundColor: theme.colors.card,
-                },
-                headerTintColor: theme.colors.text,
-                headerShadowVisible: false,
-                headerRight: () => (
-                    <Pressable onPress={handleLogout} style={{ paddingHorizontal: 16, paddingVertical: 6 }}>
-                        <Ionicons name="log-out-outline" size={22} color={theme.colors.text} />
-                    </Pressable>
-                ),
+                headerShown: false,
                 tabBarStyle: {
                     backgroundColor: theme.colors.card,
                     borderTopColor: theme.colors.border,
@@ -67,6 +57,14 @@ export default function TabLayout() {
                 options={{
                     title: 'Earnings',
                     tabBarIcon: ({ color, size }) => <Ionicons name="cash-outline" size={size} color={color} />,
+                }}
+            />
+
+            <Tabs.Screen
+                name="messages"
+                options={{
+                    title: 'Messages',
+                    tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles-outline" size={size} color={color} />,
                 }}
             />
 

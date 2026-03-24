@@ -1,13 +1,14 @@
 import React, { useMemo, useCallback, useRef, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Pressable, Alert, useColorScheme } from 'react-native';
+import { View, Text, Image, StyleSheet, ActivityIndicator, Pressable, Alert, useColorScheme, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Mapbox from '@rnmapbox/maps';
-import Svg, { Path, Circle } from 'react-native-svg';
+
 import { useApolloClient, useMutation, useQuery, useSubscription } from '@apollo/client/react';
-import { GET_ORDERS, ALL_ORDERS_UPDATED, ASSIGN_DRIVER_TO_ORDER } from '@/graphql/operations/orders';
+import { GET_ORDERS, ALL_ORDERS_UPDATED, ASSIGN_DRIVER_TO_ORDER, UPDATE_ORDER_STATUS } from '@/graphql/operations/orders';
 import { OrderAcceptSheet } from '@/components/OrderAcceptSheet';
 import { OrderDetailSheet } from '@/components/OrderDetailSheet';
+import { OrderPoolSheet } from '@/components/OrderPoolSheet';
 import { useDriverLocation } from '@/hooks/useDriverLocation';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuthStore } from '@/store/authStore';
@@ -19,20 +20,10 @@ import { fetchRouteGeometry } from '@/utils/mapbox';
 import type { Feature, LineString } from 'geojson';
 
 /* ─── Constants ─── */
+const BOTTOM_BAR_HEIGHT = 108;
 const GJILAN_CENTER: [number, number] = [21.4694, 42.4635];
 const GJILAN_NE: [number, number] = [21.51, 42.50];
 const GJILAN_SW: [number, number] = [21.42, 42.43];
-
-// Marching-ants dash sequence (7-frame, 7-unit cycle — matches Mapbox examples)
-const DASH_SEQ: number[][] = [
-    [3, 4],
-    [0, 1, 3, 3],
-    [0, 2, 3, 2],
-    [0, 3, 3, 1],
-    [0, 4, 3],
-    [1, 4, 2],
-    [2, 4, 1],
-];
 
 const STATUS_COLORS: Record<string, string> = {
     PENDING: '#F59E0B',
@@ -69,14 +60,21 @@ export default function MapScreen() {
     const cameraRef = useRef<Mapbox.Camera>(null);
 
     const [focusedOrderId, setFocusedOrderId] = useState<string | null>(null);
+    const [sheetHeight, setSheetHeight] = useState(0);
+    const sheetHeightRef = useRef(0);
     const isOnline = useAuthStore((state) => state.isOnline);
     const connectionStatus = useAuthStore((state) => state.connectionStatus);
     const { dispatchModeEnabled } = useStoreStatus();
 
     const [acceptSheetOrder, setAcceptSheetOrder] = useState<any>(null);
+    const [acceptSheetHeight, setAcceptSheetHeight] = useState(0);
+    const [markingPickedUpIds, setMarkingPickedUpIds] = useState<Set<string>>(new Set());
+    const [acceptAutoCountdown, setAcceptAutoCountdown] = useState(true);
     const skippedIds = useRef(new Set<string>());
     const [accepting, setAccepting] = useState(false);
+    const [poolOpen, setPoolOpen] = useState(false);
     const [assignDriver] = useMutation(ASSIGN_DRIVER_TO_ORDER);
+    const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS);
 
     // ── Route state ──
     const [routeCoords, setRouteCoords] = useState<Array<[number, number]> | null>(null);
@@ -85,12 +83,7 @@ export default function MapScreen() {
     const [previewRouteInfo, setPreviewRouteInfo] = useState<{ distanceKm: number; durationMin: number } | null>(null);
 
     // ── Marching-ants animation for preview route ──
-    const [dashStep, setDashStep] = useState(0);
-    useEffect(() => {
-        if (!previewRouteCoords) { setDashStep(0); return; }
-        const id = setInterval(() => setDashStep(s => (s + 1) % DASH_SEQ.length), 100);
-        return () => clearInterval(id);
-    }, [!!previewRouteCoords]);
+    // (removed — preview route now uses a simple static style)
 
     // ── Orders query + real-time subscription ──
     const { data, loading, refetch } = useQuery(GET_ORDERS, {
@@ -155,16 +148,19 @@ export default function MapScreen() {
         if (location) {
             cameraRef.current?.setCamera({
                 centerCoordinate: [location.longitude, location.latitude],
-                animationDuration: 300,
+                bearing: location.heading ?? 0,
+                zoomLevel: hasActiveNavigation ? 16 : 14.5,
+                animationDuration: 600,
                 animationMode: 'easeTo',
             });
         }
-    }, [location]);
+    }, [location, hasActiveNavigation]);
 
     const handleMapTouchEnd = useCallback(() => {
         if (!followDriver || !location) return;
         cameraRef.current?.setCamera({
             centerCoordinate: [location.longitude, location.latitude],
+            bearing: location.heading ?? 0,
             animationDuration: 300,
             animationMode: 'easeTo',
         });
@@ -222,6 +218,11 @@ export default function MapScreen() {
                 : null;
 
             if (focusedOrder.status === 'OUT_FOR_DELIVERY' && dropoffCoord) {
+                // Clear the pickup→dropoff preview — not needed while delivering
+                if (!cancelled) {
+                    setPreviewRouteCoords(null);
+                    setPreviewRouteInfo(null);
+                }
                 const result = await fetchRouteGeometry(driverCoord, dropoffCoord);
                 if (!cancelled && result) {
                     setRouteCoords(result.coordinates);
@@ -288,6 +289,10 @@ export default function MapScreen() {
 
         setFocusedOrderId(order.id);
 
+        // Padding: respect the info sheet at top and card bar at bottom
+        const padTop = (sheetHeightRef.current || 0) + 20;
+        const padBottom = BOTTOM_BAR_HEIGHT + 20;
+
         // OUT_FOR_DELIVERY: show driver + dropoff only
         if (order.status === 'OUT_FOR_DELIVERY' && dropLoc && location) {
             const lats = [Number(dropLoc.latitude), location.latitude];
@@ -295,7 +300,7 @@ export default function MapScreen() {
             const ne: [number, number] = [Math.max(...lngs) + 0.005, Math.max(...lats) + 0.005];
             const sw: [number, number] = [Math.min(...lngs) - 0.005, Math.min(...lats) - 0.005];
 
-            cameraRef.current?.fitBounds(ne, sw, [70, 20, 440, 20], 1200);
+            cameraRef.current?.fitBounds(ne, sw, [padTop, 20, padBottom, 20], 1200);
         } else if (bizLoc && dropLoc && location) {
             // Not delivering yet: show driver + pickup + dropoff (3 points)
             const lats = [location.latitude, Number(bizLoc.latitude), Number(dropLoc.latitude)];
@@ -303,7 +308,7 @@ export default function MapScreen() {
             const ne: [number, number] = [Math.max(...lngs) + 0.005, Math.max(...lats) + 0.005];
             const sw: [number, number] = [Math.min(...lngs) - 0.005, Math.min(...lats) - 0.005];
 
-            cameraRef.current?.fitBounds(ne, sw, [70, 20, 440, 20], 1200);
+            cameraRef.current?.fitBounds(ne, sw, [padTop, 20, padBottom, 20], 1200);
         } else if (bizLoc) {
             cameraRef.current?.setCamera({
                 centerCoordinate: [Number(bizLoc.longitude), Number(bizLoc.latitude)],
@@ -317,16 +322,25 @@ export default function MapScreen() {
     const toggleFollowDriver = useCallback(() => {
         if (followDriver) {
             setFollowDriver(false);
+            // Return to north-up; let user keep whatever tilt they set
+            cameraRef.current?.setCamera({
+                bearing: 0,
+                animationDuration: 500,
+                animationMode: 'easeTo',
+            });
         } else {
             setFollowDriver(true);
             if (location) {
                 cameraRef.current?.setCamera({
                     centerCoordinate: [location.longitude, location.latitude],
-                    animationDuration: 600,
+                    bearing: location.heading ?? 0,
+                    zoomLevel: hasActiveNavigation ? 16 : 14.5,
+                    animationDuration: 700,
+                    animationMode: 'flyTo',
                 });
             }
         }
-    }, [followDriver, location]);
+    }, [followDriver, location, hasActiveNavigation]);
 
     // ── Accept an available order ──
     const handleAcceptOrder = useCallback(async (orderId: string) => {
@@ -363,7 +377,7 @@ export default function MapScreen() {
                 startNavigation(navOrder, 'to_pickup', location);
             }
             setAcceptSheetOrder(null);
-            router.push('/navigation' as any);
+            setAcceptSheetHeight(0);
         } catch {
             Alert.alert('Error', 'Failed to accept order. Please try again.');
         } finally {
@@ -372,15 +386,64 @@ export default function MapScreen() {
     }, [acceptSheetOrder, currentDriverId, location, assignDriver, startNavigation, router]);
 
     const handleSkipOrder = useCallback(() => {
-        if (acceptSheetOrder) skippedIds.current.add(acceptSheetOrder.id);
+        if (acceptSheetOrder && acceptAutoCountdown) {
+            skippedIds.current.add(acceptSheetOrder.id);
+        }
         setAcceptSheetOrder(null);
-    }, [acceptSheetOrder]);
+        setAcceptSheetHeight(0);
+    }, [acceptSheetOrder, acceptAutoCountdown]);
+
+    const handleMarkPickedUp = useCallback(async (orderId?: string) => {
+        const targetId = orderId ?? focusedOrder?.id;
+        if (!targetId) return;
+        setMarkingPickedUpIds(prev => new Set(prev).add(targetId));
+        try {
+            await updateOrderStatus({ variables: { id: targetId, status: 'OUT_FOR_DELIVERY' } });
+        } catch {
+            Alert.alert('Error', 'Could not update order status. Please try again.');
+        } finally {
+            setMarkingPickedUpIds(prev => { const next = new Set(prev); next.delete(targetId); return next; });
+        }
+    }, [focusedOrder?.id, updateOrderStatus]);
+
+    // ── Pool handlers ──
+    const handlePoolOpen = useCallback(() => {
+        setPoolOpen(true);
+        setFocusedOrderId(null);
+    }, []);
+
+    const handlePoolClose = useCallback(() => {
+        setPoolOpen(false);
+    }, []);
+
+    const handlePoolSelectOrder = useCallback((order: any) => {
+        setPoolOpen(false);
+        setAcceptAutoCountdown(false);
+        setAcceptSheetOrder(order);
+        const bizLoc = order.businesses?.[0]?.business?.location;
+        if (!bizLoc || !cameraRef.current) return;
+        if (location) {
+            const lats = [Number(bizLoc.latitude), location.latitude];
+            const lngs = [Number(bizLoc.longitude), location.longitude];
+            const ne: [number, number] = [Math.max(...lngs) + 0.006, Math.max(...lats) + 0.006];
+            const sw: [number, number] = [Math.min(...lngs) - 0.006, Math.min(...lats) - 0.006];
+            cameraRef.current.fitBounds(ne, sw, [80, 20, 420, 20], 900);
+        } else {
+            cameraRef.current.setCamera({
+                centerCoordinate: [Number(bizLoc.longitude), Number(bizLoc.latitude)],
+                zoomLevel: 14.5,
+                animationMode: 'flyTo',
+                animationDuration: 900,
+            });
+        }
+    }, [location]);
 
     // ── Auto-present the accept sheet when a new available order appears ──
     useEffect(() => {
-        if (!isOnline || acceptSheetOrder || dispatchModeEnabled) return;
+        if (!isOnline || acceptSheetOrder || dispatchModeEnabled || poolOpen) return;
         const next = availableOrders.find((o: any) => !skippedIds.current.has(o.id));
         if (!next) return;
+        setAcceptAutoCountdown(true);
         setAcceptSheetOrder(next);
         const bizLoc = next.businesses?.[0]?.business?.location;
         if (!bizLoc || !cameraRef.current) return;
@@ -402,16 +465,17 @@ export default function MapScreen() {
     }, [availableOrders.length, isOnline]);
 
     // ── Launch Mapbox Navigation SDK ──
-    const handleStartNavigation = useCallback(() => {
-        if (!focusedOrder || !location) return;
-        const bizLoc = focusedOrder.businesses?.[0]?.business?.location;
-        const dropLoc = focusedOrder.dropOffLocation;
+    const handleStartNavigation = useCallback((targetOrder?: any) => {
+        const order = targetOrder ?? focusedOrder;
+        if (!order || !location) return;
+        const bizLoc = order.businesses?.[0]?.business?.location;
+        const dropLoc = order.dropOffLocation;
         if (!bizLoc) return;
 
         const pickup = {
             latitude: Number(bizLoc.latitude),
             longitude: Number(bizLoc.longitude),
-            label: focusedOrder.businesses?.[0]?.business?.name ?? 'Pickup',
+            label: order.businesses?.[0]?.business?.name ?? 'Pickup',
         };
         const dropoff = dropLoc
             ? {
@@ -420,21 +484,22 @@ export default function MapScreen() {
                 label: dropLoc.address ?? 'Drop-off',
             }
             : null;
-        const customerName = focusedOrder.user
-            ? `${focusedOrder.user.firstName} ${focusedOrder.user.lastName}`
+        const customerName = order.user
+            ? `${order.user.firstName} ${order.user.lastName}`
             : 'Customer';
 
         const navOrder = {
-            id: focusedOrder.id,
-            status: focusedOrder.status,
-            businessName: focusedOrder.businesses?.[0]?.business?.name ?? 'Business',
+            id: order.id,
+            status: order.status,
+            businessName: order.businesses?.[0]?.business?.name ?? 'Business',
             customerName,
+            customerPhone: order.user?.phoneNumber ?? null,
             pickup,
             dropoff,
         };
 
         const phase: NavigationPhase =
-            focusedOrder.status === 'OUT_FOR_DELIVERY' ? 'to_dropoff' : 'to_pickup';
+            order.status === 'OUT_FOR_DELIVERY' ? 'to_dropoff' : 'to_pickup';
 
         const origin = { latitude: location.latitude, longitude: location.longitude };
         startNavigation(navOrder, phase, origin);
@@ -450,6 +515,13 @@ export default function MapScreen() {
     // Dismiss focused order when tapping elsewhere
     const dismissFocusedOrder = useCallback(() => {
         setFocusedOrderId(null);
+        setSheetHeight(0);
+        sheetHeightRef.current = 0;
+    }, []);
+
+    const handleSheetHeightChange = useCallback((h: number) => {
+        sheetHeightRef.current = h;
+        setSheetHeight(h);
     }, []);
 
     return (
@@ -462,6 +534,7 @@ export default function MapScreen() {
                 attributionEnabled={false}
                 scaleBarEnabled={false}
                 onTouchEnd={handleMapTouchEnd}
+                onPress={focusedOrderId ? dismissFocusedOrder : undefined}
             >
                 <Mapbox.Camera
                     ref={cameraRef}
@@ -469,19 +542,25 @@ export default function MapScreen() {
                         centerCoordinate: initialCenter,
                         zoomLevel: location ? 14.5 : 13.5,
                     }}
-                    maxBounds={{
-                        ne: GJILAN_NE,
-                        sw: GJILAN_SW,
+                    maxBounds={{ ne: GJILAN_NE, sw: GJILAN_SW }}
+                    minZoomLevel={12}
+                    padding={{
+                        paddingTop: acceptSheetOrder && !focusedOrder ? acceptSheetHeight : 0,
+                        paddingBottom: assignedOrders.length > 0 ? BOTTOM_BAR_HEIGHT : 0,
+                        paddingLeft: 0,
+                        paddingRight: 0,
                     }}
                     {...(followDriver && location ? {
                         centerCoordinate: [location.longitude, location.latitude],
-                        animationDuration: 300,
+                        bearing: location.heading ?? 0,
+                        zoomLevel: hasActiveNavigation ? 16 : undefined,
+                        animationDuration: 600,
                         animationMode: 'easeTo' as const,
                     } : {})}
                 />
 
-                {/* ── Preview route (pickup → dropoff, marching ants) ── */}
-                {previewRouteShape && (
+                {/* ── Preview route (pickup → dropoff) — only while picking up ── */}
+                {previewRouteShape && focusedOrder?.status !== 'OUT_FOR_DELIVERY' && (
                     <Mapbox.ShapeSource id="preview-route-source" shape={previewRouteShape}>
                         <Mapbox.LineLayer
                             id="preview-route-line"
@@ -494,8 +573,7 @@ export default function MapScreen() {
                                     17, 6,
                                     19, 8,
                                 ] as any,
-                                lineOpacity: 0.75,
-                                lineDasharray: DASH_SEQ[dashStep] as any,
+                                lineOpacity: 0.6,
                                 lineCap: 'round' as const,
                                 lineJoin: 'round' as const,
                             }}
@@ -561,68 +639,58 @@ export default function MapScreen() {
                     </Mapbox.ShapeSource>
                 )}
 
-                {/* Driver position — heading wedge + dot */}
-                {location && (
-                    <Mapbox.PointAnnotation
-                        id="driver-location"
-                        coordinate={[location.longitude, location.latitude]}
-                    >
-                        <View style={styles.driverMarkerWrapper}>
-                            <Svg width={52} height={52} style={StyleSheet.absoluteFill}>
-                                {/* Accuracy halo */}
-                                <Circle cx={26} cy={26} r={22} fill="rgba(66,133,244,0.12)" />
-                                {/* Heading wedge — rotates to show direction */}
-                                <Path
-                                    d="M26 26 L20 6 A20 20 0 0 1 32 6 Z"
-                                    fill="rgba(66,133,244,0.45)"
-                                    transform={`rotate(${location.heading ?? 0}, 26, 26)`}
-                                />
-                            </Svg>
-                            {/* Blue dot */}
-                            <View style={styles.driverDot} />
-                        </View>
-                    </Mapbox.PointAnnotation>
+                {/* Driver position — native Mapbox location layer (smooth interpolation) */}
+                {permissionGranted && (
+                    <Mapbox.UserLocation
+                        visible
+                        showsUserHeadingIndicator={hasActiveNavigation && followDriver}
+                        renderMode={Mapbox.UserLocationRenderMode.Normal}
+                    />
                 )}
 
-                {/* Order markers */}
+                {/* Order markers — pickup pins for assigned orders only; drop-off pins always */}
                 {allMapOrders.map((order: any) => {
                     const statusColor = STATUS_COLORS[order.status] ?? '#6B7280';
                     const isAssigned = order.driver?.id === currentDriverId;
                     const isFocused = order.id === focusedOrderId;
                     const bizLoc = order.businesses?.[0]?.business?.location;
                     const dropLoc = order.dropOffLocation;
-                    const markerScale = isFocused ? 1.2 : 1;
-                    const bizName = order.businesses?.[0]?.business?.name ?? '?';
-                    const bizLabel = bizName.length > 11 ? bizName.slice(0, 11) + '…' : bizName;
+                    const biz = order.businesses?.[0]?.business;
+                    const bizName = biz?.name ?? '?';
+                    const bizImageUrl = biz?.imageUrl;
+                    const isRestaurant = biz?.businessType === 'RESTAURANT';
 
                     return (
                         <React.Fragment key={order.id}>
-                            {bizLoc && (
+                            {/* Only show pickup pin for orders assigned to me */}
+                            {isAssigned && bizLoc && (
                                 <Mapbox.PointAnnotation
                                     id={`pickup-${order.id}`}
                                     coordinate={[Number(bizLoc.longitude), Number(bizLoc.latitude)]}
-                                    anchor={{ x: 0.5, y: 1 }}
+                                    anchor={{ x: 0.5, y: 0.5 }}
                                     onSelected={() => focusOrder(order)}
                                 >
-                                    <View style={[styles.markerContainer, { transform: [{ scale: markerScale }] }]}>
-                                        {/* Flat pill badge */}
-                                        <View style={[
-                                            styles.pickupPill,
-                                            {
-                                                backgroundColor: statusColor,
-                                                opacity: isAssigned ? 1 : 0.6,
-                                                borderWidth: isFocused ? 2.5 : 0,
-                                                borderColor: '#fff',
-                                                shadowColor: statusColor,
-                                                shadowOpacity: isFocused ? 0.55 : 0.3,
-                                            },
-                                        ]}>
-                                            <Ionicons name="storefront-outline" size={12} color="#fff" />
-                                            <Text style={styles.pickupPillText}>{bizLabel}</Text>
-                                        </View>
-                                        <View style={[styles.markerTip, { borderTopColor: statusColor, opacity: isAssigned ? 1 : 0.6 }]} />
+                                    <View style={[
+                                        styles.bizMarker,
+                                        {
+                                            borderColor: isFocused ? '#a78bfa' : 'rgba(139,92,246,0.6)',
+                                            borderWidth: isFocused ? 2 : 1.5,
+                                            transform: [{ scale: isFocused ? 1.15 : 1 }],
+                                        },
+                                    ]}>
+                                        {bizImageUrl ? (
+                                            <Image
+                                                source={{ uri: bizImageUrl }}
+                                                style={styles.bizMarkerImage}
+                                            />
+                                        ) : (
+                                            <Ionicons
+                                                name={isRestaurant ? 'restaurant-outline' : 'storefront-outline'}
+                                                size={13}
+                                                color="#c4b5fd"
+                                            />
+                                        )}
                                     </View>
-                                    <Mapbox.Callout title={`${bizName} · ${STATUS_LABELS[order.status] ?? order.status}`} />
                                 </Mapbox.PointAnnotation>
                             )}
 
@@ -630,24 +698,19 @@ export default function MapScreen() {
                                 <Mapbox.PointAnnotation
                                     id={`dropoff-${order.id}`}
                                     coordinate={[Number(dropLoc.longitude), Number(dropLoc.latitude)]}
-                                    anchor={{ x: 0.5, y: 1 }}
+                                    anchor={{ x: 0.5, y: 0.5 }}
                                     onSelected={() => focusOrder(order)}
                                 >
-                                    <View style={[styles.markerContainer, { transform: [{ scale: markerScale }] }]}>
-                                        <View style={[
-                                            styles.dropoffMarker,
-                                            {
-                                                borderColor: statusColor,
-                                                borderWidth: isFocused ? 3 : 2.5,
-                                                shadowColor: statusColor,
-                                                shadowOpacity: isFocused ? 0.5 : 0.2,
-                                            },
-                                        ]}>
-                                            <Ionicons name="person" size={14} color={statusColor} />
-                                        </View>
-                                        <View style={[styles.markerTip, { borderTopColor: statusColor }]} />
+                                    <View style={[
+                                        styles.dropoffMarker,
+                                        {
+                                            backgroundColor: statusColor,
+                                            borderWidth: isFocused ? 3 : 2,
+                                            transform: [{ scale: isFocused ? 1.15 : 1 }],
+                                        },
+                                    ]}>
+                                        <Ionicons name="cube" size={12} color="#fff" />
                                     </View>
-                                    <Mapbox.Callout title={dropLoc.address ?? 'Drop-off'} />
                                 </Mapbox.PointAnnotation>
                             )}
                         </React.Fragment>
@@ -656,7 +719,21 @@ export default function MapScreen() {
             </Mapbox.MapView>
 
             {/* ═══ Right-side buttons ═══ */}
-            <View style={[styles.rightButtons, { bottom: (focusedOrder || acceptSheetOrder) ? 420 + insets.bottom : 20 + insets.bottom }]}>
+            <View style={[styles.rightButtons, { bottom: (assignedOrders.length > 0 ? BOTTOM_BAR_HEIGHT + 12 : 20 + insets.bottom) }]}>
+                {/* Available orders pool button */}
+                {!dispatchModeEnabled && isOnline && !acceptSheetOrder && availableOrders.length > 0 && (
+                    <Pressable
+                        style={[styles.mapBtn, styles.mapBtnPool]}
+                        onPress={handlePoolOpen}
+                    >
+                        <Ionicons name="layers-outline" size={20} color="#22d3ee" />
+                        {availableOrders.length > 0 && (
+                            <View style={styles.poolBadge}>
+                                <Text style={styles.poolBadgeText}>{availableOrders.length}</Text>
+                            </View>
+                        )}
+                    </Pressable>
+                )}
                 {/* Lock camera button */}
                 <Pressable
                     style={[styles.mapBtn, followDriver && styles.mapBtnActive]}
@@ -678,42 +755,9 @@ export default function MapScreen() {
                 </Pressable>
             </View>
 
-            {/* ═══ Discord-style order avatars (right side) ═══ */}
-            {allMapOrders.length > 0 && (
-                <View style={[styles.avatarSidebar, { top: insets.top + 80 }]}>
-                    {allMapOrders.map((order: any) => {
-                        const statusColor = STATUS_COLORS[order.status] ?? '#6B7280';
-                        const isFocused = order.id === focusedOrderId;
-                        const iconName = STATUS_ICONS[order.status] ?? 'ellipse-outline';
-                        const bizName = order.businesses?.[0]?.business?.name ?? '?';
-                        const initial = bizName.charAt(0).toUpperCase();
-
-                        return (
-                            <Pressable
-                                key={order.id}
-                                onPress={() => focusOrder(order)}
-                                onLongPress={() => focusOrder(order)}
-                                style={[
-                                    styles.avatarBtn,
-                                    {
-                                        backgroundColor: statusColor,
-                                        borderColor: isFocused ? '#fff' : 'transparent',
-                                        borderWidth: isFocused ? 2.5 : 0,
-                                        transform: [{ scale: isFocused ? 1.15 : 1 }],
-                                    },
-                                ]}
-                            >
-                                <Text style={styles.avatarInitial}>{initial}</Text>
-                                <View style={styles.avatarStatusBadge}>
-                                    <Ionicons name={iconName as any} size={10} color={statusColor} />
-                                </View>
-                            </Pressable>
-                        );
-                    })}
-                </View>
-            )}
-
             {/* ═══ Connection status pill ═══ */}
+
+            {/* ═══ Connection status pill ═══ (needs to stay inside MapView container) */}
             {(() => {
                 const connColor =
                     connectionStatus === 'CONNECTED' ? '#22c55e' :
@@ -738,17 +782,34 @@ export default function MapScreen() {
                     previewRouteInfo={previewRouteInfo}
                     isAssignedToMe={focusedOrder.driver?.id === currentDriverId}
                     onStartNavigation={handleStartNavigation}
+                    onMarkPickedUp={handleMarkPickedUp}
                     onClose={dismissFocusedOrder}
+                    onHeightChange={handleSheetHeightChange}
                 />
             )}
 
+
+
             {/* ═══ Accept sheet ═══ */}
-            {acceptSheetOrder && !focusedOrder && (
+            {acceptSheetOrder && (
                 <OrderAcceptSheet
                     order={acceptSheetOrder}
                     onAccept={handleAcceptOrder}
                     onSkip={handleSkipOrder}
                     accepting={accepting}
+                    autoCountdown={acceptAutoCountdown}
+                    onHeightChange={setAcceptSheetHeight}
+                />
+            )}
+
+            {/* ═══ Order Pool pill — REMOVED (moved to right button column) ═══ */}
+
+            {/* ═══ Order Pool Sheet ═══ */}
+            {poolOpen && (
+                <OrderPoolSheet
+                    orders={availableOrders}
+                    onSelectOrder={handlePoolSelectOrder}
+                    onClose={handlePoolClose}
                 />
             )}
 
@@ -757,6 +818,87 @@ export default function MapScreen() {
                 <View style={styles.loadingOverlay}>
                     <ActivityIndicator size="large" color={theme.colors.primary} />
                 </View>
+            )}
+
+            {/* ═══ Order cards — merged with tab bar ═══ */}
+            {assignedOrders.length > 0 && (
+                <View style={[styles.bottomBar, { bottom: 0 }]}>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.barContent}
+                    >
+                    {assignedOrders.map((order: any) => {
+                        const statusColor = STATUS_COLORS[order.status] ?? '#6B7280';
+                        const isFocused = order.id === focusedOrderId;
+                        const bizName = order.businesses?.[0]?.business?.name ?? '?';
+                        const initial = bizName.charAt(0).toUpperCase();
+                        const earnings = Number(order.deliveryPrice ?? 0).toFixed(2);
+                        const dropAddress = order.dropOffLocation?.address ?? '';
+                        const shortDrop = dropAddress.split(',')[0] || '';
+                        const isReady = order.status === 'READY';
+                        const isPickingUp = markingPickedUpIds.has(order.id);
+
+                        return (
+                            <Pressable
+                                key={order.id}
+                                style={[
+                                    styles.barCard,
+                                    { borderLeftColor: statusColor },
+                                    isFocused && styles.barCardFocused,
+                                ]}
+                                onPress={() => focusOrder(order)}
+                            >
+                                {/* Row 1: avatar + name/address + earnings */}
+                                <View style={styles.barCardTop}>
+                                    <View style={[styles.barAvatar, { backgroundColor: statusColor }]}>
+                                        <Text style={styles.barAvatarText}>{initial}</Text>
+                                    </View>
+                                    <View style={styles.barCardInfo}>
+                                        <Text style={styles.barBizName} numberOfLines={1}>{bizName}</Text>
+                                        {shortDrop ? (
+                                            <Text style={styles.barDropAddress} numberOfLines={1}>{shortDrop}</Text>
+                                        ) : null}
+                                    </View>
+                                    <View style={styles.barEarnings}>
+                                        <Text style={styles.barEarningsText}>€{earnings}</Text>
+                                    </View>
+                                </View>
+
+                                {/* Row 2: status badge + action buttons */}
+                                <View style={styles.barCardBottom}>
+                                    <View style={[styles.barStatusBadge, { backgroundColor: statusColor + '22' }]}>
+                                        <View style={[styles.barStatusDot, { backgroundColor: statusColor }]} />
+                                        <Text style={[styles.barStatusText, { color: statusColor }]}>
+                                            {STATUS_LABELS[order.status] ?? order.status}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.barActions}>
+                                        {isReady && (
+                                            <Pressable
+                                                style={[styles.barActionBtn, styles.barPickupBtn]}
+                                                onPress={() => handleMarkPickedUp(order.id)}
+                                                disabled={isPickingUp}
+                                            >
+                                                {isPickingUp
+                                                    ? <ActivityIndicator size={10} color="#fff" />
+                                                    : <Ionicons name="checkmark-outline" size={13} color="#fff" />
+                                                }
+                                            </Pressable>
+                                        )}
+                                        <Pressable
+                                            style={[styles.barActionBtn, styles.barNavBtn]}
+                                            onPress={() => handleStartNavigation(order)}
+                                        >
+                                            <Ionicons name="navigate-outline" size={13} color="#fff" />
+                                        </Pressable>
+                                    </View>
+                                </View>
+                            </Pressable>
+                        );
+                    })}
+                </ScrollView>
+            </View>
             )}
         </View>
     );
@@ -795,69 +937,58 @@ const styles = StyleSheet.create({
     },
 
     /* ── Driver marker ── */
-    driverMarkerWrapper: {
-        width: 52,
-        height: 52,
+    driverMarkerWrap: {
+        width: 24,
+        height: 24,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    driverDot: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
+    driverGPSDot: {
+        width: 18,
+        height: 18,
+        borderRadius: 9,
         backgroundColor: '#4285F4',
         borderWidth: 3,
         borderColor: '#fff',
         shadowColor: '#4285F4',
         shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.8,
-        shadowRadius: 6,
+        shadowOpacity: 0.7,
+        shadowRadius: 5,
         elevation: 8,
     },
 
     /* ── Order markers ── */
-    markerContainer: {
-        alignItems: 'center',
-    },
-    pickupPill: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        paddingHorizontal: 9,
-        paddingVertical: 6,
-        borderRadius: 10,
-        shadowOffset: { width: 0, height: 3 },
-        shadowRadius: 6,
-        elevation: 6,
-    },
-    pickupPillText: {
-        color: '#fff',
-        fontSize: 11,
-        fontWeight: '800',
-        letterSpacing: -0.2,
-    },
-    dropoffMarker: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+    bizMarker: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: '#1a1a2e',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#fff',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.2,
-        shadowRadius: 5,
+        overflow: 'hidden',
+        shadowColor: '#7c3aed',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.35,
+        shadowRadius: 6,
         elevation: 5,
     },
-    markerTip: {
-        width: 0,
-        height: 0,
-        borderLeftWidth: 5,
-        borderRightWidth: 5,
-        borderTopWidth: 7,
-        borderLeftColor: 'transparent',
-        borderRightColor: 'transparent',
-        marginTop: -1,
+    bizMarkerImage: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+    },
+    dropoffMarker: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        borderColor: '#fff',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.35,
+        shadowRadius: 5,
+        elevation: 6,
     },
 
     /* ── Right-side buttons ── */
@@ -886,47 +1017,142 @@ const styles = StyleSheet.create({
         borderWidth: 1.5,
         borderColor: '#4285F4',
     },
-
-    /* ── Discord-style avatar sidebar ── */
-    avatarSidebar: {
-        position: 'absolute',
-        right: 12,
-        alignItems: 'center',
-        gap: 10,
-        zIndex: 10,
+    mapBtnPool: {
+        borderWidth: 1.5,
+        borderColor: 'rgba(34,211,238,0.35)',
+        backgroundColor: 'rgba(34,211,238,0.08)',
     },
-    avatarBtn: {
-        width: 46,
-        height: 46,
-        borderRadius: 23,
+    poolBadge: {
+        position: 'absolute',
+        top: 6,
+        right: 6,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: '#22d3ee',
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 6,
-        elevation: 5,
     },
-    avatarInitial: {
-        fontSize: 18,
+    poolBadgeText: {
+        color: '#0f172a',
+        fontSize: 9,
+        fontWeight: '800',
+    },
+
+    /* ── Order cards bar ── */
+    bottomBar: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        paddingTop: 8,
+        paddingBottom: 8,
+    },
+    barContent: {
+        paddingHorizontal: 12,
+        gap: 10,
+        flexDirection: 'row',
+        alignItems: 'stretch',
+    },
+    barCard: {
+        width: 215,
+        borderRadius: 14,
+        backgroundColor: 'rgba(10,12,24,0.88)',
+        borderLeftWidth: 3,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.09)',
+        padding: 10,
+        gap: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.55,
+        shadowRadius: 12,
+        elevation: 12,
+    },
+    barCardFocused: {
+        backgroundColor: 'rgba(30,27,75,0.92)',
+        borderColor: 'rgba(139,92,246,0.4)',
+    },
+    barCardTop: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 7,
+    },
+    barAvatar: {
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+    },
+    barAvatarText: {
+        fontSize: 12,
         fontWeight: '800',
         color: '#fff',
     },
-    avatarStatusBadge: {
-        position: 'absolute',
-        bottom: -2,
-        right: -2,
-        width: 18,
-        height: 18,
-        borderRadius: 9,
-        backgroundColor: '#fff',
+    barCardInfo: {
+        flex: 1,
+        gap: 2,
+    },
+    barBizName: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#e2e8f0',
+    },
+    barDropAddress: {
+        fontSize: 10,
+        color: '#64748b',
+    },
+    barEarnings: {
+        backgroundColor: 'rgba(5, 46, 22, 0.9)',
+        borderRadius: 6,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        flexShrink: 0,
+    },
+    barEarningsText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#22c55e',
+    },
+    barCardBottom: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    barStatusBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        borderRadius: 6,
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+    },
+    barStatusDot: {
+        width: 5,
+        height: 5,
+        borderRadius: 2.5,
+    },
+    barStatusText: {
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    barActions: {
+        flexDirection: 'row',
+        gap: 5,
+    },
+    barActionBtn: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
-        elevation: 3,
+    },
+    barPickupBtn: {
+        backgroundColor: '#16a34a',
+    },
+    barNavBtn: {
+        backgroundColor: '#4f46e5',
     },
 
     /* ── Loading ── */

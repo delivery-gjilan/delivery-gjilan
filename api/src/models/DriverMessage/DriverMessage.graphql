@@ -1,0 +1,61 @@
+enum MessageAlertType {
+    INFO
+    WARNING
+    URGENT
+}
+
+type DriverMessage {
+    id: ID!
+    adminId: ID!
+    driverId: ID!
+    senderRole: String!
+    body: String!
+    alertType: MessageAlertType!
+    readAt: DateTime
+    createdAt: DateTime!
+    admin: DriverMessageUser
+    driver: DriverMessageUser
+}
+
+type DriverMessageUser {
+    id: ID!
+    firstName: String!
+    lastName: String!
+}
+
+type DriverMessageThread {
+    driverId: ID!
+    driverName: String!
+    unreadCount: Int!
+    lastMessage: DriverMessage
+}
+
+extend type Query {
+    """Admin: full conversation with a specific driver"""
+    driverMessages(driverId: ID!, limit: Int, offset: Int): [DriverMessage!]!
+
+    """Driver: my messages"""
+    myDriverMessages(limit: Int, offset: Int): [DriverMessage!]!
+
+    """Admin: list of all driver threads with unread counts"""
+    driverMessageThreads: [DriverMessageThread!]!
+}
+
+extend type Mutation {
+    """Admin sends a message to a driver"""
+    sendDriverMessage(driverId: ID!, body: String!, alertType: MessageAlertType!): DriverMessage!
+
+    """Driver replies to admin"""
+    replyToDriverMessage(adminId: ID!, body: String!): DriverMessage!
+
+    """Mark all messages in a conversation as read"""
+    markDriverMessagesRead(otherUserId: ID!): Boolean!
+}
+
+extend type Subscription {
+    """Driver receives messages from admin in real-time"""
+    driverMessageReceived: DriverMessage! @skipAuth
+
+    """Admin receives replies from a specific driver in real-time"""
+    adminMessageReceived(driverId: ID!): DriverMessage! @skipAuth
+}

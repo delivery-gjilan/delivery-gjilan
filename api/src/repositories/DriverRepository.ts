@@ -4,8 +4,9 @@ import { eq, sql, and, isNotNull, or } from 'drizzle-orm';
 
 // Thresholds for connection state transitions (in seconds)
 export const CONNECTION_THRESHOLDS = {
-  STALE: 45,      // No heartbeat for 45s -> STALE (iOS background location fires every ~30-60s)
-  LOST: 90,       // No heartbeat for 90s -> LOST
+  STALE: 45,      // No heartbeat for 45s -> STALE (warning state)
+  LOST: 90,       // No heartbeat for 90s -> LOST (legacy/intermediate state)
+  DISCONNECTED: 25, // No heartbeat for 25s -> DISCONNECTED (treat force-killed app as offline quickly)
   LOCATION_THROTTLE: 10, // Only write location every 10s
   LOCATION_DISTANCE_METERS: 5, // Only write if moved more than 5m
 } as const;
@@ -167,7 +168,7 @@ export class DriverRepository {
   }
 
   /**
-   * Mark drivers as STALE if lastHeartbeatAt is between 45-90 seconds ago
+   * Mark drivers as STALE if lastHeartbeatAt is between stale and disconnected thresholds
    * Only affects drivers currently marked as CONNECTED
    */
   async markStaleDrivers(): Promise<DbDriver[]> {
@@ -179,9 +180,9 @@ export class DriverRepository {
       .where(
         and(
           isNotNull(driversTable.lastHeartbeatAt),
-          // Between stale and lost thresholds (use raw SQL for interval to avoid parameterization)
+          // Between stale and disconnected thresholds (use raw SQL for interval to avoid parameterization)
           sql`${driversTable.lastHeartbeatAt} < now() - interval '${sql.raw(String(CONNECTION_THRESHOLDS.STALE))} seconds'`,
-          sql`${driversTable.lastHeartbeatAt} >= now() - interval '${sql.raw(String(CONNECTION_THRESHOLDS.LOST))} seconds'`,
+          sql`${driversTable.lastHeartbeatAt} >= now() - interval '${sql.raw(String(CONNECTION_THRESHOLDS.DISCONNECTED))} seconds'`,
           // Only if currently CONNECTED
           eq(driversTable.connectionStatus, 'CONNECTED')
         )
@@ -192,8 +193,9 @@ export class DriverRepository {
   }
 
   /**
-   * Mark drivers as LOST if lastHeartbeatAt is older than lost threshold (90 seconds)
-   * Affects drivers marked as CONNECTED or STALE
+    * Mark drivers as LOST if lastHeartbeatAt is older than lost threshold (legacy path)
+    * Affects drivers marked as CONNECTED or STALE. In normal operation,
+    * drivers should transition to DISCONNECTED before hitting this state.
    */
   async markLostDrivers(): Promise<DbDriver[]> {
     const result = await this.db
@@ -233,7 +235,7 @@ export class DriverRepository {
           eq(driversTable.userId, userId),
           isNotNull(driversTable.lastHeartbeatAt),
           sql`${driversTable.lastHeartbeatAt} < now() - interval '${sql.raw(String(CONNECTION_THRESHOLDS.STALE))} seconds'`,
-          sql`${driversTable.lastHeartbeatAt} >= now() - interval '${sql.raw(String(CONNECTION_THRESHOLDS.LOST))} seconds'`,
+          sql`${driversTable.lastHeartbeatAt} >= now() - interval '${sql.raw(String(CONNECTION_THRESHOLDS.DISCONNECTED))} seconds'`,
           eq(driversTable.connectionStatus, 'CONNECTED')
         )
       )
@@ -260,6 +262,61 @@ export class DriverRepository {
           or(
             eq(driversTable.connectionStatus, 'CONNECTED'),
             eq(driversTable.connectionStatus, 'STALE')
+          )
+        )
+      )
+      .returning();
+
+    return driver;
+  }
+
+  /**
+   * Mark drivers as DISCONNECTED if heartbeat is older than disconnected threshold.
+   * This catches force-killed app cases quickly.
+   */
+  async markDisconnectedDrivers(): Promise<DbDriver[]> {
+    const result = await this.db
+      .update(driversTable)
+      .set({
+        connectionStatus: 'DISCONNECTED',
+        disconnectedAt: new Date().toISOString(),
+      })
+      .where(
+        and(
+          isNotNull(driversTable.lastHeartbeatAt),
+          sql`${driversTable.lastHeartbeatAt} < now() - interval '${sql.raw(String(CONNECTION_THRESHOLDS.DISCONNECTED))} seconds'`,
+          or(
+            eq(driversTable.connectionStatus, 'CONNECTED'),
+            eq(driversTable.connectionStatus, 'STALE'),
+            eq(driversTable.connectionStatus, 'LOST')
+          )
+        )
+      )
+      .returning();
+
+    return result;
+  }
+
+  /**
+   * Mark one driver as DISCONNECTED only if heartbeat is expired for disconnected threshold.
+   * This is used by realtime watchdog timers to avoid table-wide scans.
+   */
+  async markDriverDisconnectedIfExpired(userId: string): Promise<DbDriver | undefined> {
+    const [driver] = await this.db
+      .update(driversTable)
+      .set({
+        connectionStatus: 'DISCONNECTED',
+        disconnectedAt: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(driversTable.userId, userId),
+          isNotNull(driversTable.lastHeartbeatAt),
+          sql`${driversTable.lastHeartbeatAt} < now() - interval '${sql.raw(String(CONNECTION_THRESHOLDS.DISCONNECTED))} seconds'`,
+          or(
+            eq(driversTable.connectionStatus, 'CONNECTED'),
+            eq(driversTable.connectionStatus, 'STALE'),
+            eq(driversTable.connectionStatus, 'LOST')
           )
         )
       )

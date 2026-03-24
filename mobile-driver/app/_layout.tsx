@@ -10,6 +10,10 @@ import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { useDriverPttReceiver } from '@/hooks/useDriverPttReceiver';
 import InfoBanner from '@/components/InfoBanner';
 import type { InfoBannerType } from '@/components/InfoBanner';
+import DriverMessageBanner from '@/components/DriverMessageBanner';
+import type { AlertType } from '@/components/DriverMessageBanner';
+import { useSubscription } from '@apollo/client/react';
+import { DRIVER_MESSAGE_RECEIVED_SUB } from '@/graphql/operations/driverMessages';
 import Mapbox from '@rnmapbox/maps';
 import { MAPBOX_TOKEN } from '@/utils/mapbox';
 
@@ -22,6 +26,23 @@ function AppContent() {
     const { bannerEnabled, bannerMessage, bannerType } = useStoreStatus();
     const [bannerDismissed, setBannerDismissed] = useState(false);
     const showBanner = bannerEnabled && !!bannerMessage && !bannerDismissed;
+
+    interface IncomingMessage {
+        id: string;
+        senderRole: string;
+        body: string;
+        alertType: AlertType;
+        adminId: string;
+    }
+    const [incomingMessage, setIncomingMessage] = useState<IncomingMessage | null>(null);
+
+    useSubscription(DRIVER_MESSAGE_RECEIVED_SUB, {
+        onData: ({ data: subData }) => {
+            const msg = subData.data?.driverMessageReceived as IncomingMessage | undefined;
+            if (!msg || msg.senderRole !== 'ADMIN') return;
+            setIncomingMessage(msg);
+        },
+    });
 
     return (
         <>
@@ -38,6 +59,15 @@ function AppContent() {
                     message={bannerMessage}
                     type={(bannerType as InfoBannerType) ?? 'INFO'}
                     onDismiss={() => setBannerDismissed(true)}
+                />
+            )}
+            {incomingMessage && (
+                <DriverMessageBanner
+                    key={incomingMessage.id}
+                    senderName="Dispatcher"
+                    body={incomingMessage.body}
+                    alertType={incomingMessage.alertType}
+                    onDismiss={() => setIncomingMessage(null)}
                 />
             )}
             <Stack screenOptions={{ headerShown: false }}>

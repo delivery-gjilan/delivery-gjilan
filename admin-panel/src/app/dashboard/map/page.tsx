@@ -39,6 +39,7 @@ const DRIVER_TAU_MAX_MS = 480;
 const DRIVER_LOOKAHEAD_MIN_SEC = 0.35;
 const DRIVER_LOOKAHEAD_MAX_SEC = 1.2;
 const DRIVER_TELEPORT_GUARD_METERS = 800;
+const DRIVER_JITTER_DEAD_ZONE_METERS = 5; // ignore GPS jitter below this threshold
 
 const ORDER_STATUS_COLORS = {
   PENDING: { bg: "bg-amber-500/10", border: "border-amber-500/50", text: "text-amber-500", marker: "#f59e0b", selectBg: "bg-amber-500/20", hex: "#f59e0b" },
@@ -647,6 +648,11 @@ export default function MapPage() {
             { latitude: previousTarget.latitude, longitude: previousTarget.longitude },
             { latitude: newPos.latitude, longitude: newPos.longitude },
           );
+          // Ignore GPS jitter — keep previous target when movement is below dead zone
+          if (jumpMeters < DRIVER_JITTER_DEAD_ZONE_METERS) {
+            next[driver.id] = { id: driver.id, name: `${driver.firstName} ${driver.lastName}`.trim(), to: { latitude: previousTarget.latitude, longitude: previousTarget.longitude }, updatedAt: driver.driverLocationUpdatedAt };
+            return;
+          }
           if (jumpMeters >= DRIVER_TELEPORT_GUARD_METERS) {
             velocityLatPerSec = 0;
             velocityLngPerSec = 0;

@@ -21,6 +21,7 @@ import {
   LayoutDashboard,
   Image,
   Zap,
+  MessageSquare,
 } from "lucide-react";
 
 const menu: any[] = [
@@ -50,6 +51,8 @@ const menu: any[] = [
   { name: "Admins", href: "/dashboard/admins", icon: UserCog, superAdminOnly: true },
   { name: "Users", href: "/dashboard/users", icon: Users, superAdminOnly: true },
   { name: "Promotions", href: "/dashboard/promotions", icon: Tag, superAdminOnly: true },
+
+  { name: "Driver Messages", href: "/admin/messages", icon: MessageSquare, superAdminOnly: true },
 
   { divider: true, superAdminOnly: true },
 

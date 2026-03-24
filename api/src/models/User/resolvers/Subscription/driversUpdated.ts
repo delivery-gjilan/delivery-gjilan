@@ -19,7 +19,15 @@ export const driversUpdated: NonNullable<SubscriptionResolvers['driversUpdated']
 
     return subscribe(pubsub, topics.allDriversChanged());
   },
-  resolve: (payload: DriversUpdatedPayload) => {
+  resolve: (payload: DriversUpdatedPayload, _args: unknown, context: any) => {
+    // DataLoaders cache per subscription lifetime. Clear cached entries so
+    // field resolvers (driverLocation, driverLocationUpdatedAt) fetch fresh
+    // coordinates from the DB on every event instead of returning stale data.
+    if (context?.loaders?.driverByUserIdLoader) {
+      for (const driver of payload.drivers) {
+        context.loaders.driverByUserIdLoader.clear(String(driver.id));
+      }
+    }
     return payload.drivers;
   },
 };

@@ -8,6 +8,7 @@ export const GET_PRODUCTS = graphql(`
             imageUrl
             basePrice
             isOffer
+            hasOptionGroups
             variants {
                 id
                 name
