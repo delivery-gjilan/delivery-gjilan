@@ -118,6 +118,15 @@ export default function TabLayout() {
                 }}
             />
             <Tabs.Screen
+                name="messages"
+                options={{
+                    title: t('tabs.messages', 'Messages'),
+                    tabBarIcon: ({ color }) => (
+                        <Ionicons name="chatbubbles-outline" size={26} color={color} />
+                    ),
+                }}
+            />
+            <Tabs.Screen
                 name="settlement-history"
                 options={{
                     href: null,

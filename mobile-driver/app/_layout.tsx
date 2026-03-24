@@ -67,6 +67,7 @@ function AppContent() {
                     senderName="Dispatcher"
                     body={incomingMessage.body}
                     alertType={incomingMessage.alertType}
+                    adminId={incomingMessage.adminId}
                     onDismiss={() => setIncomingMessage(null)}
                 />
             )}

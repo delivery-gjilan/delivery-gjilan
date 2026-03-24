@@ -3,24 +3,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useSubscription } from '@apollo/client/react';
 import {
-    GET_DRIVER_MESSAGE_THREADS,
-    GET_DRIVER_MESSAGES,
-} from '@/graphql/operations/driverMessages/queries';
+    GET_BUSINESS_MESSAGE_THREADS,
+    GET_BUSINESS_MESSAGES,
+} from '@/graphql/operations/businessMessages/queries';
 import {
-    SEND_DRIVER_MESSAGE,
-    MARK_DRIVER_MESSAGES_READ,
-} from '@/graphql/operations/driverMessages/mutations';
-import { ADMIN_MESSAGE_RECEIVED } from '@/graphql/operations/driverMessages/subscriptions';
-import { DRIVERS_QUERY } from '@/graphql/operations/users/queries';
+    SEND_BUSINESS_MESSAGE,
+    MARK_BUSINESS_MESSAGES_READ,
+} from '@/graphql/operations/businessMessages/mutations';
+import { ADMIN_BUSINESS_MESSAGE_RECEIVED } from '@/graphql/operations/businessMessages/subscriptions';
+import { USERS_QUERY } from '@/graphql/operations/users/queries';
 import { toast } from 'sonner';
-import { MessageSquare, Send, AlertTriangle, Info, Zap, Plus, Search, X } from 'lucide-react';
+import { MessageSquare, Send, AlertTriangle, Info, Zap, Plus, Search, X, Building2 } from 'lucide-react';
 
 type AlertType = 'INFO' | 'WARNING' | 'URGENT';
 
-interface DriverMessage {
+interface BusinessMessage {
     id: string;
     adminId: string;
-    driverId: string;
+    businessUserId: string;
     senderRole: string;
     body: string;
     alertType: AlertType;
@@ -28,18 +28,27 @@ interface DriverMessage {
     createdAt: string;
 }
 
-interface DriverMessageThread {
-    driverId: string;
-    driverName: string;
+interface BusinessMessageThread {
+    businessUserId: string;
+    businessUserName: string;
     unreadCount: number;
-    lastMessage?: DriverMessage | null;
+    lastMessage?: BusinessMessage | null;
+}
+
+interface UserItem {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: string;
+    business?: { id: string; name: string } | null;
 }
 
 const ALERT_STYLES: Record<AlertType, { badge: string; border: string; bg: string; icon: React.ReactNode }> = {
     INFO: {
-        badge: 'bg-blue-500/20 text-blue-300',
-        border: 'border-blue-500/30',
-        bg: 'bg-blue-500/10',
+        badge: 'bg-purple-500/20 text-purple-300',
+        border: 'border-purple-500/30',
+        bg: 'bg-purple-500/10',
         icon: <Info size={12} className="inline mr-1" />,
     },
     WARNING: {
@@ -57,12 +66,12 @@ const ALERT_STYLES: Record<AlertType, { badge: string; border: string; bg: strin
 };
 
 function formatTime(iso: string) {
-    const d = new Date(iso);
+    const d = new Date(iso.replace(' ', 'T'));
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 function formatDate(iso: string) {
-    const d = new Date(iso);
+    const d = new Date(iso.replace(' ', 'T'));
     const today = new Date();
     if (d.toDateString() === today.toDateString()) return 'Today';
     const yesterday = new Date(today);
@@ -71,67 +80,60 @@ function formatDate(iso: string) {
     return d.toLocaleDateString();
 }
 
-interface DriverItem {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-}
-
-export default function MessagesPage() {
-    const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
-    const [selectedDriverName, setSelectedDriverName] = useState<string>('');
+export default function BusinessMessagesPage() {
+    const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+    const [selectedUserName, setSelectedUserName] = useState<string>('');
     const [messageInput, setMessageInput] = useState('');
     const [alertType, setAlertType] = useState<AlertType>('INFO');
-    const [messages, setMessages] = useState<DriverMessage[]>([]);
-    const [showDriverPicker, setShowDriverPicker] = useState(false);
-    const [driverSearch, setDriverSearch] = useState('');
+    const [messages, setMessages] = useState<BusinessMessage[]>([]);
+    const [showUserPicker, setShowUserPicker] = useState(false);
+    const [userSearch, setUserSearch] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const { data: threadsData, loading: threadsLoading, refetch: refetchThreads } =
-        useQuery<{ driverMessageThreads: DriverMessageThread[] }>(GET_DRIVER_MESSAGE_THREADS, {
+        useQuery<{ businessMessageThreads: BusinessMessageThread[] }>(GET_BUSINESS_MESSAGE_THREADS, {
             pollInterval: 30000,
         });
 
-    const { data: driversData } = useQuery<{ drivers: DriverItem[] }>(DRIVERS_QUERY);
+    const { data: usersData } = useQuery<{ users: UserItem[] }>(USERS_QUERY);
 
     const { loading: messagesLoading, refetch: refetchMessages } =
-        useQuery<{ driverMessages: DriverMessage[] }>(
-            GET_DRIVER_MESSAGES,
+        useQuery<{ businessMessages: BusinessMessage[] }>(
+            GET_BUSINESS_MESSAGES,
             {
-                variables: { driverId: selectedDriverId, limit: 100 },
-                skip: !selectedDriverId,
+                variables: { businessUserId: selectedUserId, limit: 100 },
+                skip: !selectedUserId,
                 onCompleted: (data) => {
-                    setMessages(data.driverMessages ?? []);
+                    setMessages(data.businessMessages ?? []);
                 },
             }
         );
 
-    const [sendMessage, { loading: sending }] = useMutation(SEND_DRIVER_MESSAGE, {
+    const [sendMessage, { loading: sending }] = useMutation(SEND_BUSINESS_MESSAGE, {
         onCompleted: (data) => {
-            if (data?.sendDriverMessage) {
-                setMessages((prev) => [...prev, data.sendDriverMessage]);
+            if (data?.sendBusinessMessage) {
+                setMessages((prev) => [...prev, data.sendBusinessMessage]);
                 refetchThreads();
             }
         },
         onError: (err) => toast.error('Failed to send: ' + err.message),
     });
 
-    const [markRead] = useMutation(MARK_DRIVER_MESSAGES_READ);
+    const [markRead] = useMutation(MARK_BUSINESS_MESSAGES_READ);
 
-    useSubscription(ADMIN_MESSAGE_RECEIVED, {
-        variables: { driverId: selectedDriverId },
-        skip: !selectedDriverId,
+    useSubscription(ADMIN_BUSINESS_MESSAGE_RECEIVED, {
+        variables: { businessUserId: selectedUserId },
+        skip: !selectedUserId,
         onData: ({ data: subData }) => {
-            const msg = subData.data?.adminMessageReceived as DriverMessage | undefined;
+            const msg = subData.data?.adminBusinessMessageReceived as BusinessMessage | undefined;
             if (!msg) return;
             setMessages((prev) => {
                 if (prev.some((m) => m.id === msg.id)) return prev;
                 return [...prev, msg];
             });
             refetchThreads();
-            if (msg.senderRole === 'DRIVER') {
-                toast.info(`${selectedDriverName}: ${msg.body}`);
+            if (msg.senderRole === 'BUSINESS') {
+                toast.info(`${selectedUserName}: ${msg.body}`);
             }
         },
     });
@@ -143,33 +145,33 @@ export default function MessagesPage() {
 
     // Mark as read when opening thread
     useEffect(() => {
-        if (!selectedDriverId) return;
-        markRead({ variables: { otherUserId: selectedDriverId } });
-    }, [selectedDriverId, markRead]);
+        if (!selectedUserId) return;
+        markRead({ variables: { otherUserId: selectedUserId } });
+    }, [selectedUserId, markRead]);
 
-    const handleSelectThread = (thread: DriverMessageThread) => {
-        setSelectedDriverId(thread.driverId);
-        setSelectedDriverName(thread.driverName);
+    const handleSelectThread = (thread: BusinessMessageThread) => {
+        setSelectedUserId(thread.businessUserId);
+        setSelectedUserName(thread.businessUserName);
         setMessages([]);
         refetchMessages();
     };
 
-    const handleStartNewConversation = (driver: DriverItem) => {
-        const name = [driver.firstName, driver.lastName].filter(Boolean).join(' ').trim() || driver.email;
-        setSelectedDriverId(driver.id);
-        setSelectedDriverName(name);
+    const handleStartNewConversation = (user: UserItem) => {
+        const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim() || user.email;
+        setSelectedUserId(user.id);
+        setSelectedUserName(name);
         setMessages([]);
-        setShowDriverPicker(false);
-        setDriverSearch('');
+        setShowUserPicker(false);
+        setUserSearch('');
         refetchMessages();
     };
 
     const handleSend = async () => {
         const body = messageInput.trim();
-        if (!body || !selectedDriverId) return;
+        if (!body || !selectedUserId) return;
         setMessageInput('');
         await sendMessage({
-            variables: { driverId: selectedDriverId, body, alertType },
+            variables: { businessUserId: selectedUserId, body, alertType },
         });
     };
 
@@ -180,15 +182,21 @@ export default function MessagesPage() {
         }
     };
 
-    const threads = threadsData?.driverMessageThreads ?? [];
-    const allDrivers = driversData?.drivers ?? [];
-    const filteredDrivers = allDrivers.filter((d) => {
-        const name = [d.firstName, d.lastName].join(' ').toLowerCase();
-        return name.includes(driverSearch.toLowerCase()) || d.email.toLowerCase().includes(driverSearch.toLowerCase());
+    const threads = threadsData?.businessMessageThreads ?? [];
+    const allUsers = (usersData?.users ?? []).filter(
+        (u) => u.role === 'BUSINESS_OWNER' || u.role === 'BUSINESS_EMPLOYEE',
+    );
+    const filteredUsers = allUsers.filter((u) => {
+        const name = [u.firstName, u.lastName].join(' ').toLowerCase();
+        return (
+            name.includes(userSearch.toLowerCase()) ||
+            u.email.toLowerCase().includes(userSearch.toLowerCase()) ||
+            (u.business?.name ?? '').toLowerCase().includes(userSearch.toLowerCase())
+        );
     });
 
     // Group messages by date
-    type MessageGroup = { date: string; messages: DriverMessage[] };
+    type MessageGroup = { date: string; messages: BusinessMessage[] };
     const grouped: MessageGroup[] = [];
     for (const msg of messages) {
         const date = formatDate(msg.createdAt);
@@ -205,12 +213,12 @@ export default function MessagesPage() {
             <div className="w-72 flex-shrink-0 border-r border-white/10 flex flex-col">
                 <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
                     <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-                        <MessageSquare size={16} className="text-indigo-400" />
-                        Driver Messages
+                        <Building2 size={16} className="text-purple-400" />
+                        Business Messages
                     </h2>
                     <button
-                        onClick={() => setShowDriverPicker(true)}
-                        className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 rounded-lg px-2.5 py-1.5 transition-colors font-medium"
+                        onClick={() => setShowUserPicker(true)}
+                        className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 rounded-lg px-2.5 py-1.5 transition-colors font-medium"
                     >
                         <Plus size={13} />
                         New
@@ -225,11 +233,11 @@ export default function MessagesPage() {
 
                 {!threadsLoading && threads.length === 0 && (
                     <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 text-sm px-4 text-center gap-3">
-                        <MessageSquare size={32} className="text-zinc-700" />
+                        <Building2 size={32} className="text-zinc-700" />
                         <p>No conversations yet.</p>
                         <button
-                            onClick={() => setShowDriverPicker(true)}
-                            className="text-xs text-indigo-400 hover:text-indigo-300 underline underline-offset-2"
+                            onClick={() => setShowUserPicker(true)}
+                            className="text-xs text-purple-400 hover:text-purple-300 underline underline-offset-2"
                         >
                             Start a new conversation
                         </button>
@@ -238,22 +246,22 @@ export default function MessagesPage() {
 
                 <div className="flex-1 overflow-y-auto">
                     {threads.map((thread) => {
-                        const isActive = thread.driverId === selectedDriverId;
+                        const isActive = thread.businessUserId === selectedUserId;
                         const alertStyle = thread.lastMessage
                             ? ALERT_STYLES[thread.lastMessage.alertType] ?? ALERT_STYLES.INFO
                             : null;
                         return (
                             <button
-                                key={thread.driverId}
+                                key={thread.businessUserId}
                                 onClick={() => handleSelectThread(thread)}
                                 className={`w-full text-left px-4 py-3 border-b border-white/5 transition-colors hover:bg-white/5 ${isActive ? 'bg-white/10' : ''}`}
                             >
                                 <div className="flex items-center justify-between mb-1">
                                     <span className="text-sm font-medium text-white truncate">
-                                        {thread.driverName}
+                                        {thread.businessUserName}
                                     </span>
                                     {thread.unreadCount > 0 && (
-                                        <span className="ml-2 flex-shrink-0 text-xs font-bold bg-indigo-500 text-white rounded-full w-5 h-5 flex items-center justify-center">
+                                        <span className="ml-2 flex-shrink-0 text-xs font-bold bg-purple-500 text-white rounded-full w-5 h-5 flex items-center justify-center">
                                             {thread.unreadCount}
                                         </span>
                                     )}
@@ -282,13 +290,22 @@ export default function MessagesPage() {
                 </div>
             </div>
 
-            {/* Driver picker modal */}
-            {showDriverPicker && (
-                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => { setShowDriverPicker(false); setDriverSearch(''); }}>
-                    <div className="bg-[#18181b] border border-white/10 rounded-2xl w-80 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            {/* Business user picker modal */}
+            {showUserPicker && (
+                <div
+                    className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                    onClick={() => { setShowUserPicker(false); setUserSearch(''); }}
+                >
+                    <div
+                        className="bg-[#18181b] border border-white/10 rounded-2xl w-80 shadow-2xl overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-                            <span className="text-sm font-semibold text-white">Choose a driver</span>
-                            <button onClick={() => { setShowDriverPicker(false); setDriverSearch(''); }} className="text-zinc-500 hover:text-white transition-colors">
+                            <span className="text-sm font-semibold text-white">Choose a business user</span>
+                            <button
+                                onClick={() => { setShowUserPicker(false); setUserSearch(''); }}
+                                className="text-zinc-500 hover:text-white transition-colors"
+                            >
                                 <X size={16} />
                             </button>
                         </div>
@@ -298,33 +315,35 @@ export default function MessagesPage() {
                                 <input
                                     autoFocus
                                     type="text"
-                                    placeholder="Search drivers…"
-                                    value={driverSearch}
-                                    onChange={(e) => setDriverSearch(e.target.value)}
+                                    placeholder="Search by name, email, or business…"
+                                    value={userSearch}
+                                    onChange={(e) => setUserSearch(e.target.value)}
                                     className="flex-1 bg-transparent text-sm text-white placeholder-zinc-500 focus:outline-none"
                                 />
                             </div>
                         </div>
                         <div className="max-h-64 overflow-y-auto">
-                            {filteredDrivers.length === 0 && (
-                                <p className="text-center text-zinc-500 text-sm py-6">No drivers found</p>
+                            {filteredUsers.length === 0 && (
+                                <p className="text-center text-zinc-500 text-sm py-6">No business users found</p>
                             )}
-                            {filteredDrivers.map((driver) => {
-                                const name = [driver.firstName, driver.lastName].filter(Boolean).join(' ').trim() || driver.email;
+                            {filteredUsers.map((user) => {
+                                const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim() || user.email;
                                 return (
                                     <button
-                                        key={driver.id}
-                                        onClick={() => handleStartNewConversation(driver)}
+                                        key={user.id}
+                                        onClick={() => handleStartNewConversation(user)}
                                         className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
                                     >
-                                        <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center flex-shrink-0">
-                                            <span className="text-xs font-bold text-indigo-300">
+                                        <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                                            <span className="text-xs font-bold text-purple-300">
                                                 {name.charAt(0).toUpperCase()}
                                             </span>
                                         </div>
                                         <div className="min-w-0">
                                             <p className="text-sm font-medium text-white truncate">{name}</p>
-                                            <p className="text-xs text-zinc-500 truncate">{driver.email}</p>
+                                            <p className="text-xs text-zinc-500 truncate">
+                                                {user.business?.name ? `${user.business.name} · ` : ''}{user.email}
+                                            </p>
                                         </div>
                                     </button>
                                 );
@@ -336,22 +355,22 @@ export default function MessagesPage() {
 
             {/* Right panel — chat view */}
             <div className="flex-1 flex flex-col min-w-0">
-                {!selectedDriverId ? (
+                {!selectedUserId ? (
                     <div className="flex-1 flex items-center justify-center text-zinc-500 text-sm">
-                        Select a driver to view messages
+                        Select a business user to view messages
                     </div>
                 ) : (
                     <>
                         {/* Header */}
                         <div className="px-5 py-3 border-b border-white/10 flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center flex-shrink-0">
-                                <span className="text-xs font-bold text-indigo-300">
-                                    {selectedDriverName.charAt(0).toUpperCase()}
+                            <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                                <span className="text-xs font-bold text-purple-300">
+                                    {selectedUserName.charAt(0).toUpperCase()}
                                 </span>
                             </div>
                             <div>
-                                <p className="text-sm font-semibold text-white">{selectedDriverName}</p>
-                                <p className="text-[10px] text-zinc-500">Conversation</p>
+                                <p className="text-sm font-semibold text-white">{selectedUserName}</p>
+                                <p className="text-[10px] text-zinc-500">Business User</p>
                             </div>
                         </div>
 
@@ -398,7 +417,7 @@ export default function MessagesPage() {
                                                                 {formatTime(msg.createdAt)}
                                                             </span>
                                                             {isAdmin && msg.readAt && (
-                                                                <span className="text-[10px] text-indigo-400">✓ Read</span>
+                                                                <span className="text-[10px] text-purple-400">✓ Read</span>
                                                             )}
                                                         </div>
                                                     </div>
@@ -441,12 +460,12 @@ export default function MessagesPage() {
                                     onKeyDown={handleKeyDown}
                                     placeholder="Type a message… (Enter to send, Shift+Enter for newline)"
                                     rows={2}
-                                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 resize-none focus:outline-none focus:border-indigo-500/50 focus:bg-white/8 transition-colors"
+                                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 resize-none focus:outline-none focus:border-purple-500/50 focus:bg-white/8 transition-colors"
                                 />
                                 <button
                                     onClick={handleSend}
                                     disabled={!messageInput.trim() || sending}
-                                    className="flex-shrink-0 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl px-4 py-2.5 transition-colors flex items-center gap-2 text-sm font-medium"
+                                    className="flex-shrink-0 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl px-4 py-2.5 transition-colors flex items-center gap-2 text-sm font-medium"
                                 >
                                     <Send size={15} />
                                     Send

@@ -1,0 +1,55 @@
+type BusinessMessage {
+    id: ID!
+    adminId: ID!
+    businessUserId: ID!
+    senderRole: String!
+    body: String!
+    alertType: MessageAlertType!
+    readAt: DateTime
+    createdAt: DateTime!
+    admin: BusinessMessageUser
+    businessUser: BusinessMessageUser
+}
+
+type BusinessMessageUser {
+    id: ID!
+    firstName: String!
+    lastName: String!
+}
+
+type BusinessMessageThread {
+    businessUserId: ID!
+    businessUserName: String!
+    unreadCount: Int!
+    lastMessage: BusinessMessage
+}
+
+extend type Query {
+    """Admin: full conversation with a specific business user"""
+    businessMessages(businessUserId: ID!, limit: Int, offset: Int): [BusinessMessage!]!
+
+    """Business user: my messages"""
+    myBusinessMessages(limit: Int, offset: Int): [BusinessMessage!]!
+
+    """Admin: list of all business user threads with unread counts"""
+    businessMessageThreads: [BusinessMessageThread!]!
+}
+
+extend type Mutation {
+    """Admin sends a message to a business user"""
+    sendBusinessMessage(businessUserId: ID!, body: String!, alertType: MessageAlertType!): BusinessMessage!
+
+    """Business user replies to admin"""
+    replyToBusinessMessage(adminId: ID!, body: String!): BusinessMessage!
+
+    """Mark all messages in a business conversation as read"""
+    markBusinessMessagesRead(otherUserId: ID!): Boolean!
+}
+
+extend type Subscription {
+    """Business user receives messages from admin in real-time"""
+    businessMessageReceived: BusinessMessage! @skipAuth
+
+    """Admin receives replies from a specific business user in real-time"""
+    adminBusinessMessageReceived(businessUserId: ID!): BusinessMessage! @skipAuth
+}

@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';import {
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import {
     View,
     Text,
     TextInput,
@@ -11,20 +12,20 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useSubscription } from '@apollo/client/react';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '@/hooks/useTheme';
 import {
-    MY_DRIVER_MESSAGES,
-    DRIVER_MESSAGE_RECEIVED_SUB,
-    REPLY_TO_DRIVER_MESSAGE,
-    MARK_DRIVER_MESSAGES_READ_DRIVER,
-} from '@/graphql/operations/driverMessages';
+    MY_BUSINESS_MESSAGES,
+    BUSINESS_MESSAGE_RECEIVED_SUB,
+    REPLY_TO_BUSINESS_MESSAGE,
+    MARK_BUSINESS_MESSAGES_READ_BUSINESS,
+} from '@/graphql/messages';
+import { useTranslation } from '@/hooks/useTranslation';
 
 type AlertType = 'INFO' | 'WARNING' | 'URGENT';
 
-interface DriverMessage {
+interface BusinessMessage {
     id: string;
     adminId: string;
-    driverId: string;
+    businessUserId: string;
     senderRole: string;
     body: string;
     alertType: AlertType;
@@ -32,8 +33,17 @@ interface DriverMessage {
     createdAt: string;
 }
 
+const COLORS = {
+    bg: '#0f172a',
+    card: '#1e293b',
+    border: '#334155',
+    text: '#f1f5f9',
+    subtext: '#94a3b8',
+    primary: '#7c3aed',
+};
+
 const ALERT_CONFIG: Record<AlertType, { bg: string; border: string; textColor: string; labelColor: string }> = {
-    INFO: { bg: '#1e3a5f22', border: '#3b82f644', textColor: '#93c5fd', labelColor: '#60a5fa' },
+    INFO: { bg: '#1e0a4a22', border: '#7c3aed44', textColor: '#c4b5fd', labelColor: '#a78bfa' },
     WARNING: { bg: '#451a0322', border: '#f59e0b44', textColor: '#fcd34d', labelColor: '#f59e0b' },
     URGENT: { bg: '#450a0a22', border: '#ef444444', textColor: '#fca5a5', labelColor: '#ef4444' },
 };
@@ -41,7 +51,6 @@ const ALERT_CONFIG: Record<AlertType, { bg: string; border: string; textColor: s
 /** Parses both ISO-8601 and PostgreSQL's "2026-03-24 10:30:00+00" format safely on iOS */
 function parseDate(value: string | null | undefined): Date {
     if (!value) return new Date(NaN);
-    // Replace space separator that PostgreSQL uses — JSC on iOS rejects it
     const normalized = value.replace(' ', 'T');
     return new Date(normalized);
 }
@@ -65,9 +74,9 @@ function formatDateLabel(value: string) {
 
 type ListItem =
     | { type: 'date'; label: string; key: string }
-    | { type: 'message'; message: DriverMessage; key: string };
+    | { type: 'message'; message: BusinessMessage; key: string };
 
-function buildListItems(messages: DriverMessage[]): ListItem[] {
+function buildListItems(messages: BusinessMessage[]): ListItem[] {
     const items: ListItem[] = [];
     let lastDate = '';
     for (const msg of messages) {
@@ -82,45 +91,44 @@ function buildListItems(messages: DriverMessage[]): ListItem[] {
 }
 
 export default function MessagesScreen() {
-    const theme = useTheme();
-    const [extraMessages, setExtraMessages] = useState<DriverMessage[]>([]);
+    const { t } = useTranslation();
+    const [extraMessages, setExtraMessages] = useState<BusinessMessage[]>([]);
     const [replyText, setReplyText] = useState('');
     const flatListRef = useRef<FlatList>(null);
 
-    const { loading, data: queryData } = useQuery<{ myDriverMessages: DriverMessage[] }>(MY_DRIVER_MESSAGES, {
+    const { loading, data: queryData } = useQuery<{ myBusinessMessages: BusinessMessage[] }>(MY_BUSINESS_MESSAGES, {
         variables: { limit: 100 },
         fetchPolicy: 'cache-and-network',
     });
 
     // Derive base messages and adminId directly from query data (survives remount/cache)
-    const baseMessages = queryData?.myDriverMessages ?? [];
+    const baseMessages = queryData?.myBusinessMessages ?? [];
     const adminId = baseMessages.find((m) => m.senderRole === 'ADMIN')?.adminId ?? null;
 
     // Merge base messages with any extras that arrived via subscription/mutation
-    // after the last query fetch, deduplicating by id
     const messages = React.useMemo(() => {
         const byId = new Map(baseMessages.map((m) => [m.id, m]));
         for (const m of extraMessages) {
             if (!byId.has(m.id)) byId.set(m.id, m);
         }
         return Array.from(byId.values()).sort(
-            (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+            (a, b) => parseDate(a.createdAt).getTime() - parseDate(b.createdAt).getTime(),
         );
     }, [baseMessages, extraMessages]);
 
-    const [markRead] = useMutation(MARK_DRIVER_MESSAGES_READ_DRIVER);
-    const [reply, { loading: replying }] = useMutation(REPLY_TO_DRIVER_MESSAGE, {
+    const [markRead] = useMutation(MARK_BUSINESS_MESSAGES_READ_BUSINESS);
+    const [reply, { loading: replying }] = useMutation(REPLY_TO_BUSINESS_MESSAGE, {
         onCompleted: (data) => {
-            if (data?.replyToDriverMessage) {
-                setExtraMessages((prev) => [...prev, data.replyToDriverMessage]);
+            if (data?.replyToBusinessMessage) {
+                setExtraMessages((prev) => [...prev, data.replyToBusinessMessage]);
                 scrollToBottom();
             }
         },
     });
 
-    useSubscription(DRIVER_MESSAGE_RECEIVED_SUB, {
+    useSubscription(BUSINESS_MESSAGE_RECEIVED_SUB, {
         onData: ({ data: subData }) => {
-            const msg = subData.data?.driverMessageReceived as DriverMessage | undefined;
+            const msg = subData.data?.businessMessageReceived as BusinessMessage | undefined;
             if (!msg) return;
             setExtraMessages((prev) => {
                 if (prev.some((m) => m.id === msg.id)) return prev;
@@ -160,17 +168,17 @@ export default function MessagesScreen() {
         if (item.type === 'date') {
             return (
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 12, paddingHorizontal: 16 }}>
-                    <View style={{ flex: 1, height: 1, backgroundColor: theme.colors.border }} />
-                    <Text style={{ color: theme.colors.subtext, fontSize: 11, marginHorizontal: 8, fontWeight: '600' }}>
+                    <View style={{ flex: 1, height: 1, backgroundColor: COLORS.border }} />
+                    <Text style={{ color: COLORS.subtext, fontSize: 11, marginHorizontal: 8, fontWeight: '600' }}>
                         {item.label}
                     </Text>
-                    <View style={{ flex: 1, height: 1, backgroundColor: theme.colors.border }} />
+                    <View style={{ flex: 1, height: 1, backgroundColor: COLORS.border }} />
                 </View>
             );
         }
 
         const { message: msg } = item;
-        const isDriver = msg.senderRole === 'DRIVER';
+        const isBusiness = msg.senderRole === 'BUSINESS';
         const alertCfg = ALERT_CONFIG[msg.alertType] ?? ALERT_CONFIG.INFO;
 
         return (
@@ -178,7 +186,7 @@ export default function MessagesScreen() {
                 style={{
                     paddingHorizontal: 16,
                     marginBottom: 8,
-                    alignItems: isDriver ? 'flex-end' : 'flex-start',
+                    alignItems: isBusiness ? 'flex-end' : 'flex-start',
                 }}
             >
                 <View
@@ -186,26 +194,22 @@ export default function MessagesScreen() {
                         maxWidth: '78%',
                         borderRadius: 18,
                         borderWidth: 1,
-                        backgroundColor: isDriver
-                            ? theme.colors.card
-                            : alertCfg.bg,
-                        borderColor: isDriver
-                            ? theme.colors.border
-                            : alertCfg.border,
+                        backgroundColor: isBusiness ? COLORS.card : alertCfg.bg,
+                        borderColor: isBusiness ? COLORS.border : alertCfg.border,
                         paddingHorizontal: 14,
                         paddingVertical: 10,
                     }}
                 >
-                    {!isDriver && (
+                    {!isBusiness && (
                         <Text style={{ color: alertCfg.labelColor, fontSize: 10, fontWeight: '700', marginBottom: 3 }}>
                             {msg.alertType}
                         </Text>
                     )}
-                    <Text style={{ color: theme.colors.text, fontSize: 14, lineHeight: 20 }}>{msg.body}</Text>
+                    <Text style={{ color: COLORS.text, fontSize: 14, lineHeight: 20 }}>{msg.body}</Text>
                     <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4, gap: 4 }}>
-                        <Text style={{ color: theme.colors.subtext, fontSize: 10 }}>{formatTime(msg.createdAt)}</Text>
-                        {!isDriver && msg.readAt && (
-                            <Text style={{ color: '#6366f1', fontSize: 10 }}>✓ Read</Text>
+                        <Text style={{ color: COLORS.subtext, fontSize: 10 }}>{formatTime(msg.createdAt)}</Text>
+                        {!isBusiness && msg.readAt && (
+                            <Text style={{ color: COLORS.primary, fontSize: 10 }}>✓ Read</Text>
                         )}
                     </View>
                 </View>
@@ -214,37 +218,38 @@ export default function MessagesScreen() {
     };
 
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.bg }}>
             {/* Header */}
             <View
                 style={{
                     paddingHorizontal: 20,
                     paddingVertical: 14,
                     borderBottomWidth: 1,
-                    borderBottomColor: theme.colors.border,
+                    borderBottomColor: COLORS.border,
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 10,
                 }}
             >
-                <Ionicons name="chatbubbles-outline" size={22} color={theme.colors.primary} />
-                <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text }}>Messages</Text>
+                <Ionicons name="chatbubbles-outline" size={22} color={COLORS.primary} />
+                <Text style={{ fontSize: 18, fontWeight: '700', color: COLORS.text }}>
+                    {t('tabs.messages', 'Messages')}
+                </Text>
             </View>
 
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
             >
                 {loading ? (
                     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                        <ActivityIndicator color={theme.colors.primary} />
+                        <ActivityIndicator color={COLORS.primary} />
                     </View>
                 ) : messages.length === 0 ? (
                     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
-                        <Ionicons name="chatbubble-outline" size={48} color={theme.colors.subtext} style={{ marginBottom: 12 }} />
-                        <Text style={{ color: theme.colors.subtext, fontSize: 14, textAlign: 'center' }}>
-                            No messages yet. Your dispatcher will reach out here.
+                        <Ionicons name="chatbubble-outline" size={48} color={COLORS.subtext} style={{ marginBottom: 12 }} />
+                        <Text style={{ color: COLORS.subtext, fontSize: 14, textAlign: 'center' }}>
+                            {t('messages.empty', 'No messages yet. Your admin will reach out here.')}
                         </Text>
                     </View>
                 ) : (
@@ -264,8 +269,8 @@ export default function MessagesScreen() {
                         paddingHorizontal: 16,
                         paddingVertical: 12,
                         borderTopWidth: 1,
-                        borderTopColor: theme.colors.border,
-                        backgroundColor: theme.colors.background,
+                        borderTopColor: COLORS.border,
+                        backgroundColor: COLORS.bg,
                         flexDirection: 'row',
                         alignItems: 'flex-end',
                         gap: 10,
@@ -274,22 +279,22 @@ export default function MessagesScreen() {
                     <TextInput
                         value={replyText}
                         onChangeText={setReplyText}
-                        placeholder="Reply…"
-                        placeholderTextColor={theme.colors.subtext}
+                        placeholder={t('messages.reply_placeholder', 'Reply…')}
+                        placeholderTextColor={COLORS.subtext}
                         multiline
                         autoCorrect={false}
                         spellCheck={false}
                         autoCapitalize="none"
                         style={{
                             flex: 1,
-                            backgroundColor: theme.colors.card,
+                            backgroundColor: COLORS.card,
                             borderRadius: 20,
                             borderWidth: 1,
-                            borderColor: theme.colors.border,
+                            borderColor: COLORS.border,
                             paddingHorizontal: 14,
                             paddingTop: 10,
                             paddingBottom: 10,
-                            color: theme.colors.text,
+                            color: COLORS.text,
                             fontSize: 14,
                             maxHeight: 100,
                         }}
@@ -298,22 +303,16 @@ export default function MessagesScreen() {
                         onPress={handleSend}
                         disabled={!replyText.trim() || replying || !adminId}
                         style={({ pressed }) => ({
-                            width: 42,
-                            height: 42,
-                            borderRadius: 21,
-                            backgroundColor: !replyText.trim() || !adminId
-                                ? theme.colors.border
-                                : theme.colors.primary,
+                            width: 44,
+                            height: 44,
+                            borderRadius: 22,
+                            backgroundColor: COLORS.primary,
                             alignItems: 'center',
                             justifyContent: 'center',
-                            opacity: pressed ? 0.8 : 1,
+                            opacity: (!replyText.trim() || replying || !adminId) ? 0.4 : pressed ? 0.8 : 1,
                         })}
                     >
-                        {replying ? (
-                            <ActivityIndicator size="small" color="#fff" />
-                        ) : (
-                            <Ionicons name="send" size={18} color="#fff" />
-                        )}
+                        <Ionicons name="send" size={18} color="#fff" />
                     </Pressable>
                 </View>
             </KeyboardAvoidingView>

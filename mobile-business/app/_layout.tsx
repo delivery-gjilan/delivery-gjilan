@@ -1,7 +1,7 @@
 import '../global.css';
 import { useEffect, useRef, useState } from 'react';
 import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
-import { ApolloProvider, useQuery } from '@apollo/client/react';
+import { ApolloProvider, useQuery, useSubscription } from '@apollo/client/react';
 import { apolloClient } from '@/lib/apollo';
 import { useAuthStore } from '@/store/authStore';
 import { useLocaleStore } from '@/store/useLocaleStore';
@@ -12,7 +12,10 @@ import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator } from 'react-native';
 import InfoBanner from '@/components/InfoBanner';
 import type { InfoBannerType } from '@/components/InfoBanner';
+import BusinessMessageBanner from '@/components/BusinessMessageBanner';
+import type { AlertType } from '@/components/BusinessMessageBanner';
 import { GET_STORE_STATUS } from '@/graphql/store';
+import { BUSINESS_MESSAGE_RECEIVED_SUB } from '@/graphql/messages';
 
 function AppContent() {
     const router = useRouter();
@@ -21,6 +24,9 @@ function AppContent() {
     const { isAuthenticated, hasHydrated, authInitComplete } = useAuthStore();
     const loadTranslation = useLocaleStore((state) => state.loadTranslation);
     const [bannerDismissed, setBannerDismissed] = useState(false);
+    const [incomingMessage, setIncomingMessage] = useState<{
+        id: string; body: string; alertType: AlertType; adminId: string;
+    } | null>(null);
     const isMounted = useRef(false);
 
     useEffect(() => {
@@ -32,6 +38,21 @@ function AppContent() {
     const bannerMessage = storeData?.getStoreStatus?.bannerMessage ?? null;
     const bannerType = (storeData?.getStoreStatus?.bannerType as InfoBannerType) ?? 'INFO';
     const showBanner = bannerEnabled && !!bannerMessage && !bannerDismissed;
+
+    // Subscribe to business messages globally so banner shows even outside messages tab
+    useSubscription(BUSINESS_MESSAGE_RECEIVED_SUB, {
+        skip: !isAuthenticated,
+        onData: ({ data: subData }) => {
+            const msg = subData.data?.businessMessageReceived;
+            if (!msg || msg.senderRole !== 'ADMIN') return;
+            setIncomingMessage({
+                id: msg.id,
+                body: msg.body,
+                alertType: msg.alertType as AlertType,
+                adminId: msg.adminId,
+            });
+        },
+    });
 
     // Initialize authentication
     useAuthInitialization();
@@ -74,6 +95,15 @@ function AppContent() {
                     message={bannerMessage}
                     type={bannerType}
                     onDismiss={() => setBannerDismissed(true)}
+                />
+            )}
+            {incomingMessage && (
+                <BusinessMessageBanner
+                    senderName="Admin"
+                    body={incomingMessage.body}
+                    alertType={incomingMessage.alertType}
+                    adminId={incomingMessage.adminId}
+                    onDismiss={() => setIncomingMessage(null)}
                 />
             )}
             <Stack screenOptions={{ headerShown: false }}>
