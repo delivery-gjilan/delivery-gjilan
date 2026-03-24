@@ -55,13 +55,26 @@ export function useDriverLocation(options: UseDriverLocationOptions = {}) {
       };
     }
 
-    const alpha = 0.3; // Smoothing factor
+    const alpha = 0.15; // Lower = smoother, reacts more slowly to new readings
     return {
       latitude: alpha * current.latitude + (1 - alpha) * previous.latitude,
       longitude: alpha * current.longitude + (1 - alpha) * previous.longitude,
       altitude: current.altitude,
       accuracy: current.accuracy,
-      heading: current.heading ?? previous.heading,
+      heading: (() => {
+        const raw = current.heading;
+        // Below ~5 km/h GPS heading is noise — keep last known value
+        if (raw == null || (current.speed != null && current.speed < 1.5)) {
+          return previous.heading;
+        }
+        const prev = previous.heading;
+        if (prev == null) return raw;
+        // Circular EMA — handles 0°/360° wraparound correctly
+        let delta = raw - prev;
+        if (delta > 180) delta -= 360;
+        if (delta < -180) delta += 360;
+        return (((prev + 0.25 * delta) % 360) + 360) % 360;
+      })(),
       speed: current.speed ?? previous.speed,
       timestamp: Date.now(),
     };
@@ -99,8 +112,8 @@ export function useDriverLocation(options: UseDriverLocationOptions = {}) {
             const now = Date.now();
             const timeSinceLastUpdate = now - lastUpdateRef.current;
 
-            // Throttle updates to prevent performance issues
-            if (timeSinceLastUpdate < 500) return;
+            // Allow updates up to ~10fps so movement is incremental rather than large jumps
+            if (timeSinceLastUpdate < 100) return;
 
             const smoothedLocation = smoothLocation(loc.coords, locationRef.current);
             

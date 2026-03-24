@@ -787,6 +787,14 @@ type Mutation {
   setDeliveryPricingTiers(input: SetDeliveryPricingTiersInput!): [DeliveryPricingTier!]!
   setMyPreferredLanguage(language: AppLanguage!): User!
   setUserPermissions(permissions: [UserPermission!]!, userId: ID!): User!
+
+  """
+  Settle all unsettled settlements for a business. Supports partial payment.
+  """
+  settleWithBusiness(amount: Float!, businessId: ID!, note: String, paymentMethod: String, paymentReference: String): SettleResult!
+
+  """Settle all unsettled settlements for a driver (always full)."""
+  settleWithDriver(driverId: ID!): SettleResult!
   startPreparing(id: ID!, preparationMinutes: Int!): Order!
   submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
   trackPushTelemetry(input: TrackPushTelemetryInput!): Boolean!
@@ -999,6 +1007,7 @@ type Product {
 
 type ProductCard {
   basePrice: Float!
+  hasOptionGroups: Boolean!
   id: ID!
   imageUrl: String
   isOffer: Boolean!
@@ -1218,13 +1227,16 @@ type Query {
   products(businessId: ID!): [ProductCard!]!
   pushTelemetryEvents(appType: DeviceAppType, eventType: PushTelemetryEventType, hours: Int, limit: Int, platform: DevicePlatform): [PushTelemetryEvent!]!
   pushTelemetrySummary(hours: Int): PushTelemetrySummary!
+  settlementPayment(id: ID!): SettlementPayment
+  settlementPayments(businessId: ID, driverId: ID, endDate: Date, entityType: SettlementType, limit: Int, offset: Int, startDate: Date): [SettlementPayment!]!
   settlementRequests(businessId: ID, limit: Int, offset: Int, status: SettlementRequestStatus): [SettlementRequest!]!
   settlementRule(id: ID!): SettlementRule
   settlementRules(filter: SettlementRuleFilterInput): [SettlementRule!]!
   settlementScenarioDefinitions: [SettlementScenarioDefinition!]!
   settlementSummary(businessId: ID, driverId: ID, endDate: Date, startDate: Date, type: SettlementType): SettlementSummary!
-  settlements(businessId: ID, direction: SettlementDirection, driverId: ID, endDate: Date, limit: Int, offset: Int, startDate: Date, status: SettlementStatus, type: SettlementType): [Settlement!]!
+  settlements(businessId: ID, direction: SettlementDirection, driverId: ID, endDate: Date, isSettled: Boolean, limit: Int, offset: Int, startDate: Date, status: SettlementStatus, type: SettlementType): [Settlement!]!
   uncompletedOrders: [Order!]!
+  unsettledBalance(entityId: ID!, entityType: SettlementType!): Float!
   userBehavior(userId: ID!): UserBehavior
   users: [User!]!
   validatePromotions(cart: CartContextInput!, manualCode: String): PromotionResult!
@@ -1286,6 +1298,15 @@ input SetDeliveryPricingTiersInput {
   tiers: [CreateDeliveryPricingTierInput!]!
 }
 
+type SettleResult {
+  direction: SettlementPaymentDirection!
+  netAmount: Float!
+  payment: SettlementPayment!
+  remainderAmount: Float!
+  remainderSettlement: Settlement
+  settledCount: Int!
+}
+
 type Settlement {
   amount: Float!
   business: Business
@@ -1294,11 +1315,14 @@ type Settlement {
   direction: SettlementDirection!
   driver: User
   id: ID!
-  order: Order!
+  isSettled: Boolean!
+  order: Order
   paidAt: Date
   paymentMethod: String
   paymentReference: String
   ruleId: ID
+  settlementPayment: SettlementPayment
+  sourcePayment: SettlementPayment
   status: SettlementStatus!
   type: SettlementType!
   updatedAt: Date!
@@ -1317,6 +1341,26 @@ enum SettlementDirection {
 enum SettlementEntityType {
   BUSINESS
   DRIVER
+}
+
+type SettlementPayment {
+  amount: Float!
+  business: Business
+  createdAt: Date!
+  createdBy: User
+  direction: SettlementPaymentDirection!
+  driver: User
+  entityType: SettlementType!
+  id: ID!
+  note: String
+  paymentMethod: String
+  paymentReference: String
+  totalBalanceAtTime: Float!
+}
+
+enum SettlementPaymentDirection {
+  ENTITY_TO_PLATFORM
+  PLATFORM_TO_ENTITY
 }
 
 type SettlementRequest {

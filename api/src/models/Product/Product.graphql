@@ -57,6 +57,7 @@ type ProductCard {
     imageUrl: String
     basePrice: Float!
     isOffer: Boolean!
+    hasOptionGroups: Boolean!
     variants: [Product!]!
     product: Product
 }

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,11 +20,11 @@ const STATUS_COLORS: Record<string, string> = {
     OUT_FOR_DELIVERY: '#8B5CF6',
 };
 
-const STATUS_ICONS: Record<string, string> = {
-    PENDING: 'time-outline',
-    PREPARING: 'restaurant-outline',
-    READY: 'bag-check-outline',
-    OUT_FOR_DELIVERY: 'bicycle-outline',
+const STATUS_LABELS: Record<string, string> = {
+    PENDING: 'Pending',
+    PREPARING: 'Preparing',
+    READY: 'Ready',
+    OUT_FOR_DELIVERY: 'Delivering',
 };
 
 export default function NavigationScreen() {
@@ -44,6 +44,7 @@ export default function NavigationScreen() {
     // Backend Redis dedup is the authoritative gate; this ref just avoids firing
     // the mutation on every 2 s progress tick once below the threshold.
     const etaNotificationSentRef = useRef<Set<string>>(new Set());
+    const [markingPickedUpIds, setMarkingPickedUpIds] = useState<Set<string>>(new Set());
     const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS);
     const [driverNotifyCustomer] = useMutation(DRIVER_NOTIFY_CUSTOMER);
 
@@ -255,22 +256,20 @@ export default function NavigationScreen() {
         startNavigation(navOrder, newPhase, origin);
     }, [currentOrigin, startNavigation]);
 
+    /* ── Mark order as picked up ── */
+    const handleMarkPickedUp = useCallback(async (orderId: string) => {
+        setMarkingPickedUpIds(prev => new Set(prev).add(orderId));
+        try {
+            await updateOrderStatus({ variables: { id: orderId, status: 'OUT_FOR_DELIVERY' } });
+        } catch { /* ignore */ } finally {
+            setMarkingPickedUpIds(prev => { const s = new Set(prev); s.delete(orderId); return s; });
+        }
+    }, [updateOrderStatus]);
+
     /* ── Recenter map ── */
     const handleRecenter = useCallback(() => {
         mapViewRef.current?.recenterMap?.();
     }, []);
-
-    /* ── Display values ── */
-    const statusColor = order ? (STATUS_COLORS[order.status] ?? '#6B7280') : '#6B7280';
-    const phaseLabel = phase === 'to_dropoff' ? '→ Drop-off' : '→ Pickup';
-    const distanceText = distanceRemainingM != null
-        ? distanceRemainingM >= 1000
-            ? `${(distanceRemainingM / 1000).toFixed(1)} km`
-            : `${Math.round(distanceRemainingM)} m`
-        : null;
-    const durationText = durationRemainingS != null
-        ? `${Math.ceil(durationRemainingS / 60)} min`
-        : null;
 
     /* ── Guard: if no destination or location yet, show loading state ── */
     if (!coordinates || !order || !destination) {
@@ -302,8 +301,14 @@ export default function NavigationScreen() {
                 routeProfile="driving-traffic"
                 locale="en"
                 mute={true}
-                mapStyle="mapbox://styles/mapbox/navigation-night-v1"
+                mapStyle="mapbox://styles/mapbox/dark-v11"
                 disableAlternativeRoutes={true}
+                followingZoom={16}
+                initialLocation={{
+                    latitude: currentOrigin.latitude,
+                    longitude: currentOrigin.longitude,
+                    zoom: 15,
+                }}
                 onRouteProgressChanged={handleRouteProgressChanged}
                 onCancelNavigation={handleCancelNavigation}
                 onWaypointArrival={handleWaypointArrival}
@@ -313,34 +318,14 @@ export default function NavigationScreen() {
                 onRoutesLoaded={() => console.log('[Navigation] Routes loaded')}
             />
 
-            {/* ═══ Custom floating bar (covers native controls) ═══ */}
-            <View style={styles.floatingBar}>
-                <View style={[styles.floatingBarInner, { backgroundColor: statusColor, paddingBottom: insets.bottom + 30 }]}>
-                    <View style={styles.floatingBarLeft}>
-                        <Text style={styles.floatingBizName} numberOfLines={1}>
-                            {order.businessName}
-                        </Text>
-                        <Text style={styles.floatingPhase}>
-                            {phaseLabel}
-                            {phase === 'to_dropoff' ? ` · ${order.customerName}` : ''}
-                        </Text>
-                    </View>
-                    {distanceText && (
-                        <View style={styles.floatingBarRight}>
-                            <Text style={styles.floatingEta}>{distanceText}</Text>
-                            {durationText && <Text style={styles.floatingEtaSub}>{durationText}</Text>}
-                        </View>
-                    )}
-                    {/* Exit button */}
-                    <Pressable
-                        style={[styles.controlBtn, styles.controlBtnExit]}
-                        onPress={handleCancelNavigation}
-                        hitSlop={8}
-                    >
-                        <Ionicons name="close" size={20} color="#fff" />
-                    </Pressable>
-                </View>
-            </View>
+            {/* ═══ Back button ═══ */}
+            <Pressable
+                style={[styles.backBtn, { top: insets.top + 8 }]}
+                onPress={handleCancelNavigation}
+                hitSlop={12}
+            >
+                <Ionicons name="arrow-back" size={24} color="#fff" />
+            </Pressable>
 
             {/* ═══ Right-side buttons (recenter) ═══ */}
             <View style={[styles.rightButtons, { bottom: 180 + insets.bottom }]}>
@@ -368,37 +353,78 @@ export default function NavigationScreen() {
                 </View>
             )}
 
-            {/* ═══ Discord-style order avatars (right side) ═══ */}
-            {assignedOrders.length > 1 && (
-                <View style={[styles.avatarSidebar, { bottom: 240 + insets.bottom }]}>
-                    {assignedOrders.map((o: any) => {
-                        const statusColor = STATUS_COLORS[o.status] ?? '#6B7280';
-                        const isFocused = o.id === order?.id;
-                        const iconName = STATUS_ICONS[o.status] ?? 'ellipse-outline';
-                        const bizName = o.businesses?.[0]?.business?.name ?? '?';
-                        const initial = bizName.charAt(0).toUpperCase();
+            {/* ═══ Order cards bar (bottom) ═══ */}
+            {assignedOrders.length >= 1 && (
+                <View style={[styles.bottomBar, { bottom: insets.bottom + 8 }]}>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.barContent}
+                    >
+                        {assignedOrders.map((o: any) => {
+                            const statusColor = STATUS_COLORS[o.status] ?? '#6B7280';
+                            const isFocused = o.id === order?.id;
+                            const bizName = o.businesses?.[0]?.business?.name ?? '?';
+                            const initial = bizName.charAt(0).toUpperCase();
+                            const earnings = Number(o.deliveryPrice ?? 0).toFixed(2);
+                            const dropAddress = o.dropOffLocation?.address ?? '';
+                            const shortDrop = dropAddress.split(',')[0] || '';
+                            const isReady = o.status === 'READY';
+                            const isPickingUp = markingPickedUpIds.has(o.id);
 
-                        return (
-                            <Pressable
-                                key={o.id}
-                                onPress={() => switchToOrder(o)}
-                                style={[
-                                    styles.avatarBtn,
-                                    {
-                                        backgroundColor: statusColor,
-                                        borderColor: isFocused ? '#fff' : 'transparent',
-                                        borderWidth: isFocused ? 2.5 : 0,
-                                        transform: [{ scale: isFocused ? 1.15 : 1 }],
-                                    },
-                                ]}
-                            >
-                                <Text style={styles.avatarInitial}>{initial}</Text>
-                                <View style={styles.avatarStatusBadge}>
-                                    <Ionicons name={iconName as any} size={10} color={statusColor} />
-                                </View>
-                            </Pressable>
-                        );
-                    })}
+                            return (
+                                <Pressable
+                                    key={o.id}
+                                    style={[
+                                        styles.barCard,
+                                        { borderLeftColor: statusColor },
+                                        isFocused && styles.barCardFocused,
+                                    ]}
+                                    onPress={() => switchToOrder(o)}
+                                >
+                                    {/* Row 1: avatar + name/address + earnings */}
+                                    <View style={styles.barCardTop}>
+                                        <View style={[styles.barAvatar, { backgroundColor: statusColor }]}>
+                                            <Text style={styles.barAvatarText}>{initial}</Text>
+                                        </View>
+                                        <View style={styles.barCardInfo}>
+                                            <Text style={styles.barBizName} numberOfLines={1}>{bizName}</Text>
+                                            {shortDrop ? (
+                                                <Text style={styles.barDropAddress} numberOfLines={1}>{shortDrop}</Text>
+                                            ) : null}
+                                        </View>
+                                        <View style={styles.barEarnings}>
+                                            <Text style={styles.barEarningsText}>€{earnings}</Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Row 2: status badge + action buttons */}
+                                    <View style={styles.barCardBottom}>
+                                        <View style={[styles.barStatusBadge, { backgroundColor: statusColor + '22' }]}>
+                                            <View style={[styles.barStatusDot, { backgroundColor: statusColor }]} />
+                                            <Text style={[styles.barStatusText, { color: statusColor }]}>
+                                                {STATUS_LABELS[o.status] ?? o.status}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.barActions}>
+                                            {isReady && (
+                                                <Pressable
+                                                    style={[styles.barActionBtn, styles.barPickupBtn]}
+                                                    onPress={() => handleMarkPickedUp(o.id)}
+                                                    disabled={isPickingUp}
+                                                >
+                                                    {isPickingUp
+                                                        ? <ActivityIndicator size={10} color="#fff" />
+                                                        : <Ionicons name="checkmark-outline" size={13} color="#fff" />
+                                                    }
+                                                </Pressable>
+                                            )}
+                                        </View>
+                                    </View>
+                                </Pressable>
+                            );
+                        })}
+                    </ScrollView>
                 </View>
             )}
 
@@ -498,6 +524,14 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 
+    /* ── Back button ── */
+    backBtn: {
+        position: 'absolute',
+        left: 16,
+        zIndex: 100,
+        padding: 8,
+    },
+
     /* ── Cancel button (loading state) ── */
     cancelBtn: {
         position: 'absolute',
@@ -508,62 +542,6 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.15)',
         alignItems: 'center',
         justifyContent: 'center',
-    },
-
-    /* ── Floating bar (covers native controls) ── */
-    floatingBar: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        paddingHorizontal: 0,
-        paddingTop: 0,
-        paddingBottom: 0,
-        margin: 0,
-        zIndex: 100,
-    },
-    floatingBarInner: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 16,
-        paddingHorizontal: 16,
-        paddingTop: 30,
-        borderRadius: 0,
-        gap: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -3 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 10,
-    },
-    floatingBarLeft: {
-        flex: 1,
-    },
-    floatingBizName: {
-        color: '#fff',
-        fontSize: 15,
-        fontWeight: '700',
-    },
-    floatingPhase: {
-        color: 'rgba(255,255,255,0.85)',
-        fontSize: 12,
-        fontWeight: '500',
-        marginTop: 2,
-    },
-    floatingBarRight: {
-        alignItems: 'flex-end',
-        marginRight: 4,
-    },
-    floatingEta: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '800',
-    },
-    floatingEtaSub: {
-        color: 'rgba(255,255,255,0.8)',
-        fontSize: 12,
-        fontWeight: '600',
     },
 
     /* ── Control buttons ── */
@@ -601,46 +579,116 @@ const styles = StyleSheet.create({
         elevation: 5,
     },
 
-    /* ── Discord-style avatar sidebar ── */
-    avatarSidebar: {
+    /* ── Order cards bar ── */
+    bottomBar: {
         position: 'absolute',
-        right: 12,
-        alignItems: 'center',
-        gap: 10,
+        left: 0,
+        right: 0,
         zIndex: 50,
     },
-    avatarBtn: {
-        width: 46,
-        height: 46,
-        borderRadius: 23,
+    barContent: {
+        paddingHorizontal: 12,
+        gap: 10,
+        flexDirection: 'row',
+        alignItems: 'stretch',
+    },
+    barCard: {
+        width: 215,
+        borderRadius: 14,
+        backgroundColor: 'rgba(10,12,24,0.88)',
+        borderLeftWidth: 3,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.09)',
+        padding: 10,
+        gap: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.55,
+        shadowRadius: 12,
+        elevation: 12,
+    },
+    barCardFocused: {
+        backgroundColor: 'rgba(30,27,75,0.92)',
+        borderColor: 'rgba(139,92,246,0.4)',
+    },
+    barCardTop: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 7,
+    },
+    barAvatar: {
+        width: 26,
+        height: 26,
+        borderRadius: 13,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 6,
-        elevation: 5,
+        flexShrink: 0,
     },
-    avatarInitial: {
-        fontSize: 18,
+    barAvatarText: {
+        fontSize: 12,
         fontWeight: '800',
         color: '#fff',
     },
-    avatarStatusBadge: {
-        position: 'absolute',
-        bottom: -2,
-        right: -2,
-        width: 18,
-        height: 18,
-        borderRadius: 9,
-        backgroundColor: '#fff',
+    barCardInfo: {
+        flex: 1,
+        gap: 2,
+    },
+    barBizName: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#e2e8f0',
+    },
+    barDropAddress: {
+        fontSize: 10,
+        color: '#64748b',
+    },
+    barEarnings: {
+        backgroundColor: 'rgba(5, 46, 22, 0.9)',
+        borderRadius: 6,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        flexShrink: 0,
+    },
+    barEarningsText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#22c55e',
+    },
+    barCardBottom: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    barStatusBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        borderRadius: 6,
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+    },
+    barStatusDot: {
+        width: 5,
+        height: 5,
+        borderRadius: 2.5,
+    },
+    barStatusText: {
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    barActions: {
+        flexDirection: 'row',
+        gap: 5,
+    },
+    barActionBtn: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
-        elevation: 3,
+    },
+    barPickupBtn: {
+        backgroundColor: '#16a34a',
     },
 
     /* ── Arrival panels ── */

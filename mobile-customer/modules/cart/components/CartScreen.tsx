@@ -21,6 +21,9 @@ import { GET_MY_ADDRESSES, ADD_USER_ADDRESS, SET_DEFAULT_ADDRESS } from '@/graph
 import { CALCULATE_DELIVERY_PRICE } from '@/graphql/operations/deliveryPricing';
 import type { UserAddress } from '@/gql/graphql';
 import { calculateItemUnitTotal } from '../utils/price';
+import { RepeatOrCustomizeModal } from '@/modules/business/components/RepeatOrCustomizeModal';
+import type { CartItem } from '../types';
+import * as Haptics from 'expo-haptics';
 
 type CheckoutLocation = SelectedAddress;
 
@@ -81,6 +84,13 @@ export const CartScreen = () => {
     const screenWidth = Dimensions.get('window').width;
     const headerTopPadding = Platform.OS === 'ios' ? 10 : 6;
     const suppressAutoCloseRef = useRef(false);
+
+    // Repeat-or-customize modal state for complex cart items
+    const [repeatModalProductId, setRepeatModalProductId] = useState<string | null>(null);
+    const repeatModalCartItems = useMemo(
+        () => (repeatModalProductId ? items.filter((i) => i.productId === repeatModalProductId) : []),
+        [items, repeatModalProductId],
+    );
 
     const handleEditCartItem = useCallback(
         (item: (typeof items)[number]) => {
@@ -830,7 +840,14 @@ export const CartScreen = () => {
                                             </Text>
 
                                             <TouchableOpacity
-                                                onPress={() => updateQuantity(item.cartItemId, item.quantity + 1)}
+                                                onPress={() => {
+                                                    const isComplex = item.selectedOptions.length > 0 || item.childItems?.length;
+                                                    if (isComplex) {
+                                                        setRepeatModalProductId(item.productId);
+                                                    } else {
+                                                        updateQuantity(item.cartItemId, item.quantity + 1);
+                                                    }
+                                                }}
                                                 className="w-8 h-8 rounded-full items-center justify-center"
                                                 style={{ backgroundColor: theme.colors.primary }}
                                             >
@@ -1127,6 +1144,26 @@ export const CartScreen = () => {
             )}
 
             {/* Save Address Prompt Modal */}
+            <RepeatOrCustomizeModal
+                visible={repeatModalProductId !== null}
+                onClose={() => setRepeatModalProductId(null)}
+                cartItems={repeatModalCartItems}
+                onRepeat={(cartItem) => {
+                    updateQuantity(cartItem.cartItemId, cartItem.quantity + 1);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    setRepeatModalProductId(null);
+                }}
+                onCustomize={() => {
+                    const pid = repeatModalProductId;
+                    setRepeatModalProductId(null);
+                    if (pid) {
+                        router.push({
+                            pathname: '/product/[productId]',
+                            params: { productId: pid },
+                        });
+                    }
+                }}
+            />
             <Modal visible={showSaveAddressPrompt} transparent animationType="fade" onRequestClose={handleSkipSaving}>
                 <BlurView
                     intensity={Platform.OS === 'ios' ? 60 : 100}

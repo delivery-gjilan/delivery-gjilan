@@ -5,6 +5,7 @@ export const GET_SETTLEMENTS = graphql(`
         $type: SettlementType
         $status: SettlementStatus
         $direction: SettlementDirection
+        $isSettled: Boolean
         $driverId: ID
         $businessId: ID
         $startDate: Date
@@ -16,6 +17,7 @@ export const GET_SETTLEMENTS = graphql(`
             type: $type
             status: $status
             direction: $direction
+            isSettled: $isSettled
             driverId: $driverId
             businessId: $businessId
             startDate: $startDate
@@ -26,6 +28,7 @@ export const GET_SETTLEMENTS = graphql(`
             id
             type
             direction
+            isSettled
             driver {
                 id
                 firstName
@@ -237,6 +240,116 @@ export const GET_SETTLEMENT_REQUESTS = graphql(`
                 firstName
                 lastName
             }
+        }
+    }
+`);
+
+export const SETTLE_WITH_DRIVER = graphql(`
+    mutation SettleWithDriver($driverId: ID!) {
+        settleWithDriver(driverId: $driverId) {
+            payment {
+                id
+                amount
+                direction
+                totalBalanceAtTime
+                createdAt
+            }
+            settledCount
+            netAmount
+            direction
+            remainderAmount
+            remainderSettlement {
+                id
+                amount
+                direction
+            }
+        }
+    }
+`);
+
+export const SETTLE_WITH_BUSINESS = graphql(`
+    mutation SettleWithBusiness(
+        $businessId: ID!
+        $amount: Float!
+        $paymentMethod: String
+        $paymentReference: String
+        $note: String
+    ) {
+        settleWithBusiness(
+            businessId: $businessId
+            amount: $amount
+            paymentMethod: $paymentMethod
+            paymentReference: $paymentReference
+            note: $note
+        ) {
+            payment {
+                id
+                amount
+                direction
+                totalBalanceAtTime
+                createdAt
+            }
+            settledCount
+            netAmount
+            direction
+            remainderAmount
+            remainderSettlement {
+                id
+                amount
+                direction
+            }
+        }
+    }
+`);
+
+export const GET_UNSETTLED_BALANCE = graphql(`
+    query GetUnsettledBalance($entityType: SettlementType!, $entityId: ID!) {
+        unsettledBalance(entityType: $entityType, entityId: $entityId)
+    }
+`);
+
+export const GET_SETTLEMENT_PAYMENTS = graphql(`
+    query GetSettlementPayments(
+        $entityType: SettlementType
+        $driverId: ID
+        $businessId: ID
+        $startDate: Date
+        $endDate: Date
+        $limit: Int
+        $offset: Int
+    ) {
+        settlementPayments(
+            entityType: $entityType
+            driverId: $driverId
+            businessId: $businessId
+            startDate: $startDate
+            endDate: $endDate
+            limit: $limit
+            offset: $offset
+        ) {
+            id
+            entityType
+            driver {
+                id
+                firstName
+                lastName
+            }
+            business {
+                id
+                name
+            }
+            amount
+            direction
+            totalBalanceAtTime
+            paymentMethod
+            paymentReference
+            note
+            createdBy {
+                id
+                firstName
+                lastName
+            }
+            createdAt
         }
     }
 `);

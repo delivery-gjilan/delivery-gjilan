@@ -1,7 +1,6 @@
 import type { SettlementResolvers } from './../../../generated/types.generated';
 import { eq } from 'drizzle-orm';
-import { businesses, drivers, users } from '@/database/schema';
-import { AppError } from '@/lib/errors';
+import { businesses, drivers, users, settlementPayments } from '@/database/schema';
 
 const normalizeDateValue = (value: string | Date | null | undefined): Date | null => {
     if (!value) return null;
@@ -39,13 +38,39 @@ export const Settlement: SettlementResolvers = {
             .then((result) => result?.[0]);
         return business || null;
     },
+
     order: async (settlement, _, { orderService }) => {
+        if (!settlement.orderId) return null;
         const order = await orderService.getOrderById(String(settlement.orderId));
-        if (!order) {
-            throw AppError.notFound('Order');
-        }
-        return order;
+        return order || null;
     },
+
+    isSettled: (settlement) => {
+        return (settlement as any).isSettled ?? false;
+    },
+
+    settlementPayment: async (settlement, _, { db }) => {
+        const paymentId = (settlement as any).settlementPaymentId;
+        if (!paymentId) return null;
+        const result = await db
+            .select()
+            .from(settlementPayments)
+            .where(eq(settlementPayments.id, paymentId))
+            .limit(1);
+        return result[0] ?? null;
+    },
+
+    sourcePayment: async (settlement, _, { db }) => {
+        const paymentId = (settlement as any).sourcePaymentId;
+        if (!paymentId) return null;
+        const result = await db
+            .select()
+            .from(settlementPayments)
+            .where(eq(settlementPayments.id, paymentId))
+            .limit(1);
+        return result[0] ?? null;
+    },
+
     createdAt: (settlement) => normalizeDateValue(settlement.createdAt),
     updatedAt: (settlement) => normalizeDateValue(settlement.updatedAt),
     paidAt: (settlement) => normalizeDateValue(settlement.paidAt ?? null),

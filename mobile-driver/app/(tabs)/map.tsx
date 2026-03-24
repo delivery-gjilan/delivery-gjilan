@@ -25,17 +25,6 @@ const GJILAN_CENTER: [number, number] = [21.4694, 42.4635];
 const GJILAN_NE: [number, number] = [21.51, 42.50];
 const GJILAN_SW: [number, number] = [21.42, 42.43];
 
-// Marching-ants dash sequence (7-frame, 7-unit cycle — matches Mapbox examples)
-const DASH_SEQ: number[][] = [
-    [3, 4],
-    [0, 1, 3, 3],
-    [0, 2, 3, 2],
-    [0, 3, 3, 1],
-    [0, 4, 3],
-    [1, 4, 2],
-    [2, 4, 1],
-];
-
 const STATUS_COLORS: Record<string, string> = {
     PENDING: '#F59E0B',
     PREPARING: '#06B6D4',
@@ -91,12 +80,7 @@ export default function MapScreen() {
     const [previewRouteInfo, setPreviewRouteInfo] = useState<{ distanceKm: number; durationMin: number } | null>(null);
 
     // ── Marching-ants animation for preview route ──
-    const [dashStep, setDashStep] = useState(0);
-    useEffect(() => {
-        if (!previewRouteCoords) { setDashStep(0); return; }
-        const id = setInterval(() => setDashStep(s => (s + 1) % DASH_SEQ.length), 100);
-        return () => clearInterval(id);
-    }, [!!previewRouteCoords]);
+    // (removed — preview route now uses a simple static style)
 
     // ── Orders query + real-time subscription ──
     const { data, loading, refetch } = useQuery(GET_ORDERS, {
@@ -161,16 +145,19 @@ export default function MapScreen() {
         if (location) {
             cameraRef.current?.setCamera({
                 centerCoordinate: [location.longitude, location.latitude],
-                animationDuration: 300,
+                bearing: location.heading ?? 0,
+                zoomLevel: hasActiveNavigation ? 16 : 14.5,
+                animationDuration: 600,
                 animationMode: 'easeTo',
             });
         }
-    }, [location]);
+    }, [location, hasActiveNavigation]);
 
     const handleMapTouchEnd = useCallback(() => {
         if (!followDriver || !location) return;
         cameraRef.current?.setCamera({
             centerCoordinate: [location.longitude, location.latitude],
+            bearing: location.heading ?? 0,
             animationDuration: 300,
             animationMode: 'easeTo',
         });
@@ -328,16 +315,25 @@ export default function MapScreen() {
     const toggleFollowDriver = useCallback(() => {
         if (followDriver) {
             setFollowDriver(false);
+            // Return to north-up; let user keep whatever tilt they set
+            cameraRef.current?.setCamera({
+                bearing: 0,
+                animationDuration: 500,
+                animationMode: 'easeTo',
+            });
         } else {
             setFollowDriver(true);
             if (location) {
                 cameraRef.current?.setCamera({
                     centerCoordinate: [location.longitude, location.latitude],
-                    animationDuration: 600,
+                    bearing: location.heading ?? 0,
+                    zoomLevel: hasActiveNavigation ? 16 : 14.5,
+                    animationDuration: 700,
+                    animationMode: 'flyTo',
                 });
             }
         }
-    }, [followDriver, location]);
+    }, [followDriver, location, hasActiveNavigation]);
 
     // ── Accept an available order ──
     const handleAcceptOrder = useCallback(async (orderId: string) => {
@@ -374,7 +370,6 @@ export default function MapScreen() {
                 startNavigation(navOrder, 'to_pickup', location);
             }
             setAcceptSheetOrder(null);
-            router.push('/navigation' as any);
         } catch {
             Alert.alert('Error', 'Failed to accept order. Please try again.');
         } finally {
@@ -529,14 +524,18 @@ export default function MapScreen() {
                         centerCoordinate: initialCenter,
                         zoomLevel: location ? 14.5 : 13.5,
                     }}
+                    maxBounds={{ ne: GJILAN_NE, sw: GJILAN_SW }}
+                    minZoomLevel={12}
                     {...(followDriver && location ? {
                         centerCoordinate: [location.longitude, location.latitude],
-                        animationDuration: 300,
+                        bearing: location.heading ?? 0,
+                        zoomLevel: hasActiveNavigation ? 16 : undefined,
+                        animationDuration: 600,
                         animationMode: 'easeTo' as const,
                     } : {})}
                 />
 
-                {/* ── Preview route (pickup → dropoff, marching ants) — only while picking up ── */}
+                {/* ── Preview route (pickup → dropoff) — only while picking up ── */}
                 {previewRouteShape && focusedOrder?.status !== 'OUT_FOR_DELIVERY' && (
                     <Mapbox.ShapeSource id="preview-route-source" shape={previewRouteShape}>
                         <Mapbox.LineLayer
@@ -550,8 +549,7 @@ export default function MapScreen() {
                                     17, 6,
                                     19, 8,
                                 ] as any,
-                                lineOpacity: 0.75,
-                                lineDasharray: DASH_SEQ[dashStep] as any,
+                                lineOpacity: 0.6,
                                 lineCap: 'round' as const,
                                 lineJoin: 'round' as const,
                             }}
@@ -617,16 +615,13 @@ export default function MapScreen() {
                     </Mapbox.ShapeSource>
                 )}
 
-                {/* Driver position — Google Maps style dot */}
-                {location && (
-                    <Mapbox.PointAnnotation
-                        id="driver-location"
-                        coordinate={[location.longitude, location.latitude]}
-                    >
-                        <View style={styles.driverMarkerWrap}>
-                            <View style={styles.driverGPSDot} />
-                        </View>
-                    </Mapbox.PointAnnotation>
+                {/* Driver position — native Mapbox location layer (smooth interpolation) */}
+                {permissionGranted && (
+                    <Mapbox.UserLocation
+                        visible
+                        showsUserHeadingIndicator={hasActiveNavigation && followDriver}
+                        renderMode={Mapbox.UserLocationRenderMode.Normal}
+                    />
                 )}
 
                 {/* Order markers — pickup pins for assigned orders only; drop-off pins always */}

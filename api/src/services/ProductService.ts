@@ -111,6 +111,19 @@ export class ProductService {
     async getProductCards(businessId: string): Promise<ProductCard[]> {
         const allProducts = await this.getProducts(businessId);
 
+        // Batch-query which products have option groups
+        const allProductIds = allProducts.map((p) => p.id);
+        const productsWithOptionGroups = new Set<string>();
+        if (this.db && allProductIds.length > 0) {
+            const rows = await this.db
+                .selectDistinct({ productId: optionGroups.productId })
+                .from(optionGroups)
+                .where(inArray(optionGroups.productId, allProductIds));
+            for (const row of rows) {
+                productsWithOptionGroups.add(row.productId);
+            }
+        }
+
         const variantGroupMap = new Map<string, Product[]>();
         const standaloneProducts: Product[] = [];
 
@@ -154,6 +167,7 @@ export class ProductService {
                 imageUrl: representative.imageUrl,
                 basePrice,
                 isOffer: representative.isOffer,
+                hasOptionGroups: variants.some((v) => productsWithOptionGroups.has(v.id)),
                 variants,
                 product: undefined,
             });
@@ -167,6 +181,7 @@ export class ProductService {
                 imageUrl: product.imageUrl,
                 basePrice: product.price, // Product.price maps from DB basePrice
                 isOffer: product.isOffer,
+                hasOptionGroups: productsWithOptionGroups.has(product.id),
                 variants: [],
                 product,
             });
