@@ -102,7 +102,13 @@ export default function MessagesPage() {
                 variables: { driverId: selectedDriverId, limit: 100 },
                 skip: !selectedDriverId,
                 onCompleted: (data) => {
-                    setMessages(data.driverMessages ?? []);
+                    const incoming = data.driverMessages ?? [];
+                    setMessages((prev) => {
+                        const ids = new Set(prev.map((m) => m.id));
+                        const merged = [...prev, ...incoming.filter((m) => !ids.has(m.id))];
+                        // sort by createdAt to keep order correct
+                        return merged.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                    });
                 },
             }
         );
@@ -110,7 +116,10 @@ export default function MessagesPage() {
     const [sendMessage, { loading: sending }] = useMutation(SEND_DRIVER_MESSAGE, {
         onCompleted: (data) => {
             if (data?.sendDriverMessage) {
-                setMessages((prev) => [...prev, data.sendDriverMessage]);
+                setMessages((prev) => {
+                    if (prev.some((m) => m.id === data.sendDriverMessage.id)) return prev;
+                    return [...prev, data.sendDriverMessage];
+                });
                 refetchThreads();
             }
         },
@@ -141,6 +150,11 @@ export default function MessagesPage() {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
+    // Clear messages when switching threads so onCompleted starts fresh
+    useEffect(() => {
+        setMessages([]);
+    }, [selectedDriverId]);
+
     // Mark as read when opening thread
     useEffect(() => {
         if (!selectedDriverId) return;
@@ -150,18 +164,14 @@ export default function MessagesPage() {
     const handleSelectThread = (thread: DriverMessageThread) => {
         setSelectedDriverId(thread.driverId);
         setSelectedDriverName(thread.driverName);
-        setMessages([]);
-        refetchMessages();
     };
 
     const handleStartNewConversation = (driver: DriverItem) => {
         const name = [driver.firstName, driver.lastName].filter(Boolean).join(' ').trim() || driver.email;
         setSelectedDriverId(driver.id);
         setSelectedDriverName(name);
-        setMessages([]);
         setShowDriverPicker(false);
         setDriverSearch('');
-        refetchMessages();
     };
 
     const handleSend = async () => {
