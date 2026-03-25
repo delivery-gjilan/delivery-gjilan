@@ -111,10 +111,17 @@ export function useOrdersSubscription() {
             return false;
         }
 
-        client.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => ({
-            ...(existing ?? {}),
-            orders: nextOrders,
-        }));
+        client.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
+            const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
+            const byId = new Map(currentOrders.map((o: any) => [String(o?.id), o]));
+            nextOrders.forEach((o: any) => {
+                if (o?.id) byId.set(String(o.id), o);
+            });
+            return {
+                ...(existing ?? {}),
+                orders: Array.from(byId.values()),
+            };
+        });
 
         nextOrders.forEach((order) => {
             if (!order?.id) {
@@ -125,10 +132,13 @@ export function useOrdersSubscription() {
                 variables: { id: String(order.id) },
                 data: { order },
             });
-        });
 
-        const activeOrders = nextOrders.filter((order) => isActiveOrderForUser(order));
-        setActiveOrders(activeOrders as unknown as any);
+            if (isActiveOrderForUser(order)) {
+                updateOrder(order as unknown as any);
+            } else if (String(order?.userId) === String(userId)) {
+                removeOrder(String(order.id));
+            }
+        });
 
         return true;
     };

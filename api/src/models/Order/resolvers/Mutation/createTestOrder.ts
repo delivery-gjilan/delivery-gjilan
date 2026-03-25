@@ -155,7 +155,7 @@ export const createTestOrder: NonNullable<MutationResolvers['createTestOrder']> 
     );
 
     // 8. Publish updates for real-time subscriptions
-    await orderService.publishUserOrders(randomCustomer.id);
+    await orderService.publishSingleUserOrder(randomCustomer.id, createdOrder.id);
     await orderService.publishAllOrders();
 
     // 9. Return the order through the normal mapping

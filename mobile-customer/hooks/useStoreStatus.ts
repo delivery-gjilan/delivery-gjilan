@@ -1,35 +1,57 @@
 import { useEffect } from 'react';
 import { useQuery } from '@apollo/client/react';
+import { useShallow } from 'zustand/react/shallow';
 import { GET_STORE_STATUS, STORE_STATUS_UPDATED } from '@/graphql/operations/store';
+import { useStoreStatusStore } from '@/store/storeStatusStore';
 
-export const useStoreStatus = () => {
-    const { data, loading, error, subscribeToMore } = useQuery(GET_STORE_STATUS, {
+/**
+ * Mount once in _layout.tsx — runs the query + subscription and syncs into
+ * the Zustand store.  All other screens use `useStoreStatus()` which is a
+ * cheap Zustand read with zero network/WS cost.
+ */
+export const useStoreStatusInit = () => {
+    const update = useStoreStatusStore((s) => s._update);
+    const setLoading = useStoreStatusStore((s) => s._setLoading);
+
+    const { data, loading, subscribeToMore } = useQuery(GET_STORE_STATUS, {
         fetchPolicy: 'network-only',
     });
+
+    useEffect(() => {
+        setLoading(loading);
+    }, [loading, setLoading]);
+
+    useEffect(() => {
+        if (data?.getStoreStatus) {
+            update(data.getStoreStatus);
+        }
+    }, [data, update]);
 
     useEffect(() => {
         const unsubscribe = subscribeToMore({
             document: STORE_STATUS_UPDATED,
             updateQuery: (prev: any, { subscriptionData }: any) => {
-                if (!subscriptionData.data?.storeStatusUpdated) return prev;
-                return {
-                    ...prev,
-                    getStoreStatus: subscriptionData.data.storeStatusUpdated,
-                };
+                const next = subscriptionData.data?.storeStatusUpdated;
+                if (!next) return prev;
+                update(next);
+                return { ...prev, getStoreStatus: next };
             },
         } as any);
         return unsubscribe;
-    }, [subscribeToMore]);
+    }, [subscribeToMore, update]);
+};
 
-    const status = data?.getStoreStatus;
-
-    return {
-        isStoreClosed: status?.isStoreClosed ?? false,
-        closedMessage: status?.closedMessage,
-        bannerEnabled: status?.bannerEnabled ?? false,
-        bannerMessage: status?.bannerMessage ?? null,
-        bannerType: (status?.bannerType ?? 'INFO') as 'INFO' | 'WARNING' | 'SUCCESS',
-        loading,
-        error,
-    };
+/**
+ * Lightweight reader — returns store status from Zustand.
+ * No query, no subscription, no network cost.
+ */
+export const useStoreStatus = () => {
+    return useStoreStatusStore(useShallow((s) => ({
+        isStoreClosed: s.isStoreClosed,
+        closedMessage: s.closedMessage,
+        bannerEnabled: s.bannerEnabled,
+        bannerMessage: s.bannerMessage,
+        bannerType: s.bannerType,
+        loading: s.loading,
+    })));
 };

@@ -10,13 +10,13 @@ export const FloatingBars = () => {
     const insets = useSafeAreaInsets();
 
     // Routes where floating bars should not appear
-    const hiddenRoutes = ['/product/', '/cart', '/orders', '/login', '/signup', '/auth-selection', '/invite-friends', '/profile', '/addresses'];
+    const hiddenRoutes = ['/product/', '/cart', '/orders', '/login', '/signup', '/auth-selection', '/invite-friends', '/profile', '/addresses', '/business/'];
     const shouldHide = hiddenRoutes.some((route) => pathname.startsWith(route)) || pathname === '/';
 
     // Delay showing bars so they don't pop in while a screen is still sliding away.
     // Hide immediately, show only after the exit transition finishes.
     const [visible, setVisible] = useState(!shouldHide);
-    const timerRef = useRef<ReturnType<typeof setTimeout>>();
+    const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
     useEffect(() => {
         if (timerRef.current) clearTimeout(timerRef.current);

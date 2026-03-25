@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image, Platform, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, Platform, Dimensions } from 'react-native';
+import { Image } from 'expo-image';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { Ionicons } from '@expo/vector-icons';
@@ -43,7 +44,7 @@ interface CompactRestaurantCardProps {
     } | null;
 }
 
-export function CompactRestaurantCard({
+export const CompactRestaurantCard = React.memo(function CompactRestaurantCard({
     id,
     name,
     imageUrl,
@@ -86,7 +87,9 @@ export function CompactRestaurantCard({
                 <Image
                     source={{ uri: imageUrl || getPlaceholderImage(id) }}
                     style={{ width: '100%', height: IMAGE_HEIGHT, borderTopLeftRadius: 12, borderTopRightRadius: 12 }}
-                    resizeMode="cover"
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    transition={200}
                 />
 
                 {/* Promotion Badge */}
@@ -113,7 +116,13 @@ export function CompactRestaurantCard({
                                   ? `-€${activePromotion.discountValue.toFixed(2)}`
                                   : activePromotion.type === 'FREE_DELIVERY'
                                     ? t.business.free_delivery
-                                    : activePromotion.name}
+                                    : activePromotion.type === 'SPEND_X_GET_FREE'
+                                      ? t.business.free_delivery
+                                      : activePromotion.type === 'SPEND_X_PERCENT' && activePromotion.discountValue
+                                        ? `-${Math.round(activePromotion.discountValue)}%`
+                                        : activePromotion.type === 'SPEND_X_FIXED' && activePromotion.discountValue
+                                          ? `-€${activePromotion.discountValue.toFixed(2)}`
+                                          : activePromotion.name}
                         </Text>
                     </View>
                 )}
@@ -182,4 +191,4 @@ export function CompactRestaurantCard({
             </View>
         </TouchableOpacity>
     );
-}
+});

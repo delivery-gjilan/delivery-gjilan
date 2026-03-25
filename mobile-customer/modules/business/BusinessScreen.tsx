@@ -7,6 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import Animated, {
     useSharedValue, useAnimatedScrollHandler,
     useAnimatedStyle, interpolate, Extrapolate, runOnJS, withTiming,
+    FadeInDown,
 } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,11 +18,15 @@ import { useBusiness } from './hooks/useBusiness';
 import { useProducts } from './hooks/useProducts';
 import { useQuery } from '@apollo/client/react';
 import { GET_PRODUCT_CATEGORIES } from '@/graphql/operations/products';
+import { GET_PROMOTION_THRESHOLDS } from '@/graphql/operations/promotions';
 import { BusinessHeader, HERO_HEIGHT } from './components/BusinessHeader';
 import { ProductCard } from './components/ProductCard';
 import { ErrorMessage } from './components/ErrorMessage';
 import { BusinessHeaderSkeleton, ProductCardSkeleton } from '@/components/Skeleton';
 import { GetProductsQuery, BusinessType } from '@/gql/graphql';
+import { useCart } from '@/modules/cart/hooks/useCart';
+import { calculateItemTotal, calculateCartItemCount } from '@/modules/cart/utils/price';
+import { PromotionProgressBar } from '@/modules/cart/components/PromotionProgressBar';
 
 type ProductCardItem = GetProductsQuery['products'][number];
 
@@ -107,6 +112,58 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
     const insets = useSafeAreaInsets();
     const { business, loading: businessLoading, error: businessError } = useBusiness(businessId);
     const { products, loading: productsLoading, error: productsError, refetch: refetchProducts } = useProducts(businessId);
+
+    // ─── Cart items for this business (for progress bar) ────
+    const { items: cartItems } = useCart();
+    const businessCartItems = useMemo(
+        () => cartItems.filter((item) => item.businessId === businessId),
+        [cartItems, businessId],
+    );
+    const businessCartTotal = useMemo(
+        () => businessCartItems.reduce((sum, item) => sum + calculateItemTotal(item), 0),
+        [businessCartItems],
+    );
+    const businessCartCount = useMemo(
+        () => calculateCartItemCount(businessCartItems),
+        [businessCartItems],
+    );
+
+    // Stable minimal context — only changes when businessId changes.
+    // We DON'T include cart items here to avoid creating a new reference every render,
+    // which would cause Apollo to re-query in an infinite loop.
+    const thresholdQueryContext = useMemo(() => ({
+        items: [],
+        subtotal: 0,
+        deliveryPrice: 0,
+        businessIds: [businessId],
+    }), [businessId]);
+
+    const { data: thresholdsData } = useQuery(GET_PROMOTION_THRESHOLDS, {
+        variables: { cart: thresholdQueryContext },
+        fetchPolicy: 'cache-and-network',
+        context: { silentErrors: true },
+        skip: !businessId,
+    });
+
+    const applicableThreshold = useMemo(() => {
+        const list = thresholdsData?.getPromotionThresholds;
+        if (!list || list.length === 0) return null;
+        const matching = list.filter((p: any) => {
+            if (!p || !p.spendThreshold) return false;
+            const ids = p.eligibleBusinessIds || [];
+            return ids.length === 0 || ids.includes(businessId);
+        });
+        if (matching.length === 0) return null;
+        matching.sort((a: any, b: any) => (b.priority || 0) - (a.priority || 0));
+        return matching[0];
+    }, [thresholdsData, businessId]);
+
+    const thresholdSpend = applicableThreshold?.spendThreshold;
+    const thresholdProgress = thresholdSpend ? Math.min(Number(businessCartTotal) / Number(thresholdSpend), 1) : 0;
+    const thresholdAmountRemaining = thresholdSpend ? Math.max(0, Number(thresholdSpend) - Number(businessCartTotal)) : 0;
+    const formatCurrency = (value: number) => `€${Number(value).toFixed(2)}`;
+
+
 
     const { data: categoriesData, refetch: refetchCategories } = useQuery(GET_PRODUCT_CATEGORIES, {
         variables: { businessId },
@@ -393,8 +450,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
         : null;
 
     // ─── Render ─────────────────────────────────────────────
-    return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['bottom']}>
+    return (<SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['bottom']}>
             <Animated.ScrollView
                 ref={scrollRef}
                 showsVerticalScrollIndicator={false}
@@ -837,6 +893,64 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                         )}
                     </RNScrollView>
                 </View>
+            )}
+            {/* ═══ Bottom Action Panel — View Cart + Progress Bar ═══ */}
+            {businessCartItems.length > 0 && applicableThreshold && thresholdSpend && (
+                <Animated.View
+                    entering={FadeInDown.duration(280)}
+                    style={{
+                        backgroundColor: theme.colors.card,
+                        borderTopWidth: 1,
+                        borderTopColor: theme.colors.border,
+                        paddingHorizontal: 16,
+                        paddingTop: 12,
+                        paddingBottom: 12,
+                    }}
+                >
+                    {applicableThreshold && thresholdSpend && (
+                        <View style={{ marginBottom: 10 }}>
+                            <PromotionProgressBar
+                                progress={thresholdProgress}
+                                amountRemaining={thresholdAmountRemaining}
+                                spendThreshold={thresholdSpend}
+                                promoName={applicableThreshold.name || 'Promo'}
+                                isUnlocked={thresholdProgress >= 1}
+                                isApplied={false}
+                                formatCurrency={formatCurrency}
+                            />
+                        </View>
+                    )}
+                    <TouchableOpacity
+                        activeOpacity={0.9}
+                        onPress={() => expoRouter.push('/cart')}
+                        style={{
+                            backgroundColor: theme.colors.primary,
+                            borderRadius: 14,
+                            paddingVertical: 14,
+                            paddingHorizontal: 16,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                        }}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                            <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 }}>
+                                <Text style={{ color: 'white', fontWeight: '700', fontSize: 14 }}>
+                                    {businessCartCount}
+                                </Text>
+                            </View>
+                            <Text style={{ color: 'white', fontWeight: '600', fontSize: 16 }}>
+                                {t.cart.view_cart}
+                            </Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Text style={{ color: 'white', fontWeight: '700', fontSize: 16 }}>
+                                {formatCurrency(businessCartTotal)}
+                            </Text>
+                            <Ionicons name="chevron-forward" size={18} color="white" />
+                        </View>
+                    </TouchableOpacity>
+                </Animated.View>
             )}
         </SafeAreaView>
     );

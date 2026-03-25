@@ -4,7 +4,6 @@ import { Text, View } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslations } from '@/hooks/useTranslations';
-import { GlobalPromoBanner } from '@/components/GlobalPromoBanner';
 
 export default function TabLayout() {
     const theme = useTheme();
@@ -38,9 +37,7 @@ export default function TabLayout() {
     };
 
     return (
-        <>
-            <GlobalPromoBanner />
-            <Tabs
+        <Tabs
                 screenOptions={{
                     headerShown: false,
                     tabBarStyle: {
@@ -104,7 +101,6 @@ export default function TabLayout() {
                         href: null,
                     }}
                 />
-            </Tabs>
-        </>
+        </Tabs>
     );
 }

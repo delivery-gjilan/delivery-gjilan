@@ -115,7 +115,7 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
     const dbOrder = await orderService.orderRepository.findById(id);
     if (dbOrder) {
         // Publish to user's channel for real-time updates
-        await orderService.publishUserOrders(dbOrder.userId);
+        await orderService.publishSingleUserOrder(dbOrder.userId, id);
         
         // Publish to all admins for real-time updates
         await orderService.publishAllOrders();

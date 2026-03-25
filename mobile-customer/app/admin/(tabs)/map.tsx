@@ -2,11 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, Pressable, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useApolloClient, useQuery, useSubscription } from '@apollo/client/react';
+import { useQuery } from '@apollo/client/react';
 import { Ionicons } from '@expo/vector-icons';
 import Mapbox from '@rnmapbox/maps';
-import { ADMIN_GET_ORDERS, ADMIN_ALL_ORDERS_SUBSCRIPTION } from '@/graphql/operations/admin/orders';
-import { ADMIN_GET_DRIVERS, ADMIN_DRIVERS_UPDATED_SUBSCRIPTION } from '@/graphql/operations/admin/drivers';
+import { ADMIN_GET_ORDERS } from '@/graphql/operations/admin/orders';
+import { ADMIN_GET_DRIVERS } from '@/graphql/operations/admin/drivers';
 import { GJILAN_CENTER, GJILAN_BOUNDS, ADMIN_ORDER_STATUS_COLORS, adminGetInitials } from '@/utils/adminHelpers';
 import { calculateRouteDistance } from '@/utils/mapbox';
 import { useTheme } from '@/hooks/useTheme';
@@ -38,7 +38,6 @@ const toLineFeature = (geometry: Array<[number, number]>) => ({
 });
 
 export default function AdminMapScreen() {
-    const apolloClient = useApolloClient();
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const theme = useTheme();
@@ -54,77 +53,6 @@ export default function AdminMapScreen() {
 
     const { data: ordersData, loading: ordersLoading, refetch: refetchOrders }: any = useQuery(ADMIN_GET_ORDERS);
     const { data: driversData, refetch: refetchDrivers }: any = useQuery(ADMIN_GET_DRIVERS);
-
-    // Throttled refetch refs — orders
-    const ordersRefetchCooldownRef = useRef(0);
-    const ordersRefetchInFlightRef = useRef(false);
-    const ordersRefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    // Throttled refetch refs — drivers
-    const driversRefetchCooldownRef = useRef(0);
-    const driversRefetchInFlightRef = useRef(false);
-    const driversRefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    useEffect(() => {
-        return () => {
-            if (ordersRefetchTimerRef.current) clearTimeout(ordersRefetchTimerRef.current);
-            if (driversRefetchTimerRef.current) clearTimeout(driversRefetchTimerRef.current);
-        };
-    }, []);
-
-    const scheduleOrdersRefetch = useCallback(() => {
-        const now = Date.now();
-        const canRunNow = now - ordersRefetchCooldownRef.current >= 1200 && !ordersRefetchInFlightRef.current;
-        if (!canRunNow) {
-            if (ordersRefetchTimerRef.current) return;
-            ordersRefetchTimerRef.current = setTimeout(() => {
-                ordersRefetchTimerRef.current = null;
-                if (ordersRefetchInFlightRef.current) return;
-                ordersRefetchInFlightRef.current = true;
-                ordersRefetchCooldownRef.current = Date.now();
-                refetchOrders().finally(() => { ordersRefetchInFlightRef.current = false; });
-            }, 350);
-            return;
-        }
-        ordersRefetchInFlightRef.current = true;
-        ordersRefetchCooldownRef.current = now;
-        refetchOrders().finally(() => { ordersRefetchInFlightRef.current = false; });
-    }, [refetchOrders]);
-
-    const scheduleDriversRefetch = useCallback(() => {
-        const now = Date.now();
-        const canRunNow = now - driversRefetchCooldownRef.current >= 1200 && !driversRefetchInFlightRef.current;
-        if (!canRunNow) {
-            if (driversRefetchTimerRef.current) return;
-            driversRefetchTimerRef.current = setTimeout(() => {
-                driversRefetchTimerRef.current = null;
-                if (driversRefetchInFlightRef.current) return;
-                driversRefetchInFlightRef.current = true;
-                driversRefetchCooldownRef.current = Date.now();
-                refetchDrivers().finally(() => { driversRefetchInFlightRef.current = false; });
-            }, 350);
-            return;
-        }
-        driversRefetchInFlightRef.current = true;
-        driversRefetchCooldownRef.current = now;
-        refetchDrivers().finally(() => { driversRefetchInFlightRef.current = false; });
-    }, [refetchDrivers]);
-
-    useSubscription(ADMIN_ALL_ORDERS_SUBSCRIPTION, {
-        onData: ({ data: subscriptionData }) => {
-            const incomingOrders = (subscriptionData.data as any)?.allOrdersUpdated as any[] | undefined;
-            if (!incomingOrders || incomingOrders.length === 0) {
-                scheduleOrdersRefetch();
-                return;
-            }
-            apolloClient.cache.updateQuery({ query: ADMIN_GET_ORDERS }, (existing: any) => {
-                const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
-                const byId = new Map(currentOrders.map((o: any) => [String(o?.id), o]));
-                incomingOrders.forEach((o: any) => { byId.set(String(o?.id), { ...(byId.get(String(o?.id)) as any), ...o }); });
-                return { ...(existing ?? {}), orders: Array.from(byId.values()) };
-            });
-        },
-    });
-    useSubscription(ADMIN_DRIVERS_UPDATED_SUBSCRIPTION, { onData: () => scheduleDriversRefetch() });
 
     const orders = ordersData?.orders || [];
     const drivers = driversData?.drivers || [];

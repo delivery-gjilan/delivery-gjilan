@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, Platform } from 'react-native';
+import { Image } from 'expo-image';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { Ionicons } from '@expo/vector-icons';
@@ -42,7 +43,7 @@ interface ListRestaurantCardProps {
     } | null;
 }
 
-export function ListRestaurantCard({
+export const ListRestaurantCard = React.memo(function ListRestaurantCard({
     id,
     name,
     imageUrl,
@@ -99,7 +100,9 @@ export function ListRestaurantCard({
                     borderRadius: 8,
                     backgroundColor: theme.colors.card,
                 }}
-                resizeMode="cover"
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={200}
             />
 
             {/* Content */}
@@ -160,7 +163,13 @@ export function ListRestaurantCard({
                                   ? t.business.flat_discount.replace('{{amount}}', activePromotion.discountValue.toFixed(2))
                                   : activePromotion.type === 'FREE_DELIVERY'
                                     ? t.business.free_delivery
-                                    : activePromotion.name}
+                                    : activePromotion.type === 'SPEND_X_GET_FREE'
+                                      ? t.business.free_delivery
+                                      : activePromotion.type === 'SPEND_X_PERCENT' && activePromotion.discountValue
+                                        ? t.business.item_discount.replace('{{percent}}', String(Math.round(activePromotion.discountValue)))
+                                        : activePromotion.type === 'SPEND_X_FIXED' && activePromotion.discountValue
+                                          ? t.business.flat_discount.replace('{{amount}}', activePromotion.discountValue.toFixed(2))
+                                          : activePromotion.name}
                         </Text>
                     </View>
                 )}
@@ -177,4 +186,4 @@ export function ListRestaurantCard({
             <Ionicons name="chevron-forward" size={20} color={theme.colors.subtext} style={{ marginLeft: 8 }} />
         </TouchableOpacity>
     );
-}
+});

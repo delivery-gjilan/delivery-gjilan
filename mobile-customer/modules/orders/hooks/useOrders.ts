@@ -15,10 +15,10 @@ export function useOrders() {
     const setActiveOrders = useActiveOrdersStore((state) => state.setActiveOrders);
     const userId = useAuthStore((state) => state.user?.id);
     
-    // Initial query to load data - use network-only to always fetch fresh data and avoid stale cache
+    // Show cached data immediately, refresh in background
     const { data, loading, error, refetch } = useQuery(GET_ORDERS, {
-        fetchPolicy: 'network-only',
-        nextFetchPolicy: 'network-only', // Don't fall back to cache-first
+        fetchPolicy: 'cache-and-network',
+        nextFetchPolicy: 'cache-first',
     });
 
     // Update store when query data changes (subscription updates are handled by useOrdersSubscription)

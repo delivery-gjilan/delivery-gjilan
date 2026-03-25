@@ -1,72 +1,22 @@
-import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, FlatList, RefreshControl, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useApolloClient, useQuery, useSubscription } from '@apollo/client/react';
+import { useQuery } from '@apollo/client/react';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { AdminStatusBadge, AdminFilterChip } from '@/components/admin/AdminComponents';
-import { ADMIN_GET_ORDERS, ADMIN_ALL_ORDERS_SUBSCRIPTION } from '@/graphql/operations/admin/orders';
+import { ADMIN_GET_ORDERS } from '@/graphql/operations/admin/orders';
 import { adminFormatRelativeTime, adminFormatCurrency, ADMIN_ORDER_STATUS_COLORS } from '@/utils/adminHelpers';
 
 type StatusTab = 'ALL' | 'PENDING' | 'PREPARING' | 'READY' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED';
 
 export default function AdminOrdersScreen() {
-    const apolloClient = useApolloClient();
     const theme = useTheme();
     const router = useRouter();
 
     const [activeTab, setActiveTab] = useState<StatusTab>('ALL');
     const { data, loading, refetch }: any = useQuery(ADMIN_GET_ORDERS);
-
-    const refetchCooldownRef = useRef(0);
-    const refetchInFlightRef = useRef(false);
-    const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    useEffect(() => {
-        return () => {
-            if (refetchTimerRef.current) clearTimeout(refetchTimerRef.current);
-        };
-    }, []);
-
-    const scheduleRefetch = useCallback(() => {
-        const now = Date.now();
-        const canRunNow = now - refetchCooldownRef.current >= 1200 && !refetchInFlightRef.current;
-
-        if (!canRunNow) {
-            if (refetchTimerRef.current) return;
-            refetchTimerRef.current = setTimeout(() => {
-                refetchTimerRef.current = null;
-                if (refetchInFlightRef.current) return;
-                refetchInFlightRef.current = true;
-                refetchCooldownRef.current = Date.now();
-                refetch().finally(() => { refetchInFlightRef.current = false; });
-            }, 350);
-            return;
-        }
-
-        refetchInFlightRef.current = true;
-        refetchCooldownRef.current = now;
-        refetch().finally(() => { refetchInFlightRef.current = false; });
-    }, [refetch]);
-
-    useSubscription(ADMIN_ALL_ORDERS_SUBSCRIPTION, {
-        onData: ({ data: subscriptionData }) => {
-            const incomingOrders = (subscriptionData.data as any)?.allOrdersUpdated as any[] | undefined;
-            if (!incomingOrders || incomingOrders.length === 0) {
-                scheduleRefetch();
-                return;
-            }
-            apolloClient.cache.updateQuery({ query: ADMIN_GET_ORDERS }, (existing: any) => {
-                const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
-                const byId = new Map(currentOrders.map((o: any) => [String(o?.id), o]));
-                incomingOrders.forEach((o: any) => {
-                    byId.set(String(o?.id), { ...(byId.get(String(o?.id)) as any), ...o });
-                });
-                return { ...(existing ?? {}), orders: Array.from(byId.values()) };
-            });
-        },
-    });
 
     const orders = data?.orders || [];
 

@@ -89,6 +89,8 @@ interface PromotionProgressBarProps {
     isApplied: boolean;
     /** Format currency helper */
     formatCurrency: (value: number) => string;
+    /** Called once when progress tips from locked → unlocked */
+    onUnlock?: () => void;
 }
 
 export function PromotionProgressBar({
@@ -99,6 +101,7 @@ export function PromotionProgressBar({
     isUnlocked,
     isApplied,
     formatCurrency,
+    onUnlock,
 }: PromotionProgressBarProps) {
     const theme = useTheme();
     const { particles, showConfetti, fire } = useConfetti();
@@ -139,8 +142,10 @@ export function PromotionProgressBar({
     // Celebration when unlocked!
     useEffect(() => {
         if (isUnlocked && !prevUnlocked.current) {
-            // Fire confetti
+            // Fire inline confetti on the bar
             fire();
+            // Notify parent so it can show a centered toast
+            onUnlock?.();
 
             // Bounce the whole bar
             Animated.sequence([
@@ -187,37 +192,33 @@ export function PromotionProgressBar({
     });
 
     // --- Colors based on progress ---
-    const barGradient: [string, string] = isUnlocked
-        ? ['#059669', '#34D399'] // green celebratory
-        : progress > 0.7
-            ? ['#7C3AED', '#A78BFA'] // purple close!
-            : ['#6366F1', '#818CF8']; // indigo default
+    const barGradient: [string, string] = ['#059669', '#34D399']; // always green
 
     return (
         <Animated.View
             style={{
                 paddingHorizontal: 16,
-                paddingVertical: 12,
+                paddingVertical: 7,
                 transform: [{ scale: bounceAnim }],
             }}
         >
             {/* Label row */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
                     <View
                         style={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: 14,
+                            width: 22,
+                            height: 22,
+                            borderRadius: 11,
                             backgroundColor: isUnlocked ? '#059669' : theme.colors.primary + '20',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            marginRight: 8,
+                            marginRight: 6,
                         }}
                     >
                         <Ionicons
                             name={isUnlocked ? 'checkmark-circle' : 'gift-outline'}
-                            size={16}
+                            size={13}
                             color={isUnlocked ? '#fff' : theme.colors.primary}
                         />
                     </View>
@@ -225,7 +226,7 @@ export function PromotionProgressBar({
                         <Text
                             numberOfLines={1}
                             style={{
-                                fontSize: 13,
+                                fontSize: 12,
                                 fontWeight: '700',
                                 color: isUnlocked ? '#059669' : theme.colors.text,
                             }}
@@ -235,7 +236,7 @@ export function PromotionProgressBar({
                                 : promoName}
                         </Text>
                         {!isUnlocked && (
-                            <Text style={{ fontSize: 11, color: theme.colors.subtext, marginTop: 1 }}>
+                            <Text style={{ fontSize: 10, color: theme.colors.subtext, marginTop: 1 }}>
                                 Spend {formatCurrency(spendThreshold)} to unlock
                             </Text>
                         )}
@@ -248,17 +249,17 @@ export function PromotionProgressBar({
                         style={{
                             transform: [{ scale: badgeScale }],
                             backgroundColor: '#059669',
-                            paddingHorizontal: 10,
-                            paddingVertical: 4,
-                            borderRadius: 12,
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                            borderRadius: 10,
                         }}
                     >
-                        <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>
+                        <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>
                             UNLOCKED
                         </Text>
                     </Animated.View>
                 ) : (
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.primary }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.primary }}>
                         {formatCurrency(amountRemaining)} left
                     </Text>
                 )}
@@ -269,18 +270,18 @@ export function PromotionProgressBar({
                 {/* Background track */}
                 <View
                     style={{
-                        height: 10,
+                        height: 5,
                         backgroundColor: theme.colors.border,
-                        borderRadius: 5,
+                        borderRadius: 3,
                         overflow: 'hidden',
                     }}
                 >
                     {/* Animated fill with gradient */}
                     <Animated.View
                         style={{
-                            height: 10,
+                            height: 5,
                             width: barWidth,
-                            borderRadius: 5,
+                            borderRadius: 3,
                             overflow: 'hidden',
                         }}
                     >
@@ -311,11 +312,11 @@ export function PromotionProgressBar({
                     <Animated.View
                         style={{
                             position: 'absolute',
-                            top: -4,
+                            top: -3,
                             left: 0,
                             right: 0,
-                            height: 18,
-                            borderRadius: 9,
+                            height: 11,
+                            borderRadius: 6,
                             backgroundColor: '#34D399',
                             opacity: glowOpacity,
                         }}
@@ -362,7 +363,7 @@ export function PromotionProgressBar({
             </View>
 
             {/* Percentage notches */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 3 }}>
                 <Text style={{ fontSize: 10, color: theme.colors.subtext }}>€0</Text>
                 <Text style={{ fontSize: 10, color: theme.colors.subtext, fontWeight: '600' }}>
                     {progressPercent}%

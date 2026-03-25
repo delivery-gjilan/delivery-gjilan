@@ -3,6 +3,7 @@ import { View, Text, Animated, Easing, Dimensions, TouchableOpacity } from 'reac
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useQuery } from '@apollo/client/react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { GET_ACTIVE_GLOBAL_PROMOTIONS } from '@/graphql/operations/promotions';
@@ -19,7 +20,8 @@ interface PromoBannerInfo {
 
 export function GlobalPromoBanner() {
     const theme = useTheme();
-    const { t } = useTranslations();   
+    const { t } = useTranslations();
+    const insets = useSafeAreaInsets();
     const { data } = useQuery(GET_ACTIVE_GLOBAL_PROMOTIONS, {
         fetchPolicy: 'cache-and-network',
         pollInterval: 60_000, // refresh every minute
@@ -77,7 +79,7 @@ export function GlobalPromoBanner() {
     }, [data, dismissed, t]);
 
     // ---- Animations ----
-    const slideAnim = useRef(new Animated.Value(-60)).current;
+    const slideAnim = useRef(new Animated.Value(-120)).current;
     const shimmerAnim = useRef(new Animated.Value(0)).current;
     const iconPulse = useRef(new Animated.Value(1)).current;
     const isVisible = promos.length > 0;
@@ -85,7 +87,7 @@ export function GlobalPromoBanner() {
     // Slide in/out
     useEffect(() => {
         Animated.spring(slideAnim, {
-            toValue: isVisible ? 0 : -60,
+            toValue: isVisible ? 0 : -120,
             useNativeDriver: true,
             tension: 80,
             friction: 12,
@@ -144,8 +146,9 @@ export function GlobalPromoBanner() {
                 style={{
                     flexDirection: 'row',
                     alignItems: 'center',
+                    paddingTop: insets.top + 8,
+                    paddingBottom: 10,
                     paddingHorizontal: 16,
-                    paddingVertical: 10,
                     overflow: 'hidden',
                 }}
             >

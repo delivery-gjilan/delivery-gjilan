@@ -42,7 +42,7 @@ export const updatePreparationTime: NonNullable<MutationResolvers['updatePrepara
 
     const dbOrder = await orderService.orderRepository.findById(id);
     if (dbOrder) {
-        await orderService.publishUserOrders(dbOrder.userId);
+        await orderService.publishSingleUserOrder(dbOrder.userId, id);
         await orderService.publishAllOrders();
 
         if (dbOrder.status === 'PREPARING') {

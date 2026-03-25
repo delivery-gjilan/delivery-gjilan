@@ -1,9 +1,14 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
+import { useAdminOrdersSubscription } from '@/hooks/useAdminOrdersSubscription';
 
 export default function AdminTabsLayout() {
     const theme = useTheme();
+
+    // Single subscription for admin order + driver updates — both map and orders
+    // tabs read from the shared Apollo cache.
+    useAdminOrdersSubscription();
 
     return (
         <Tabs

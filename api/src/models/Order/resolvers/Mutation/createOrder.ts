@@ -22,9 +22,9 @@ export const createOrder: NonNullable<MutationResolvers['createOrder']> = async 
     // Best-effort side effects: the order is already persisted, so don't fail the
     // mutation response if realtime publish throws (e.g. transient WS/pubsub issues).
     try {
-        await orderService.publishUserOrders(userData.userId!);
+        await orderService.publishSingleUserOrder(userData.userId!, order.id);
     } catch (error) {
-        log.error({ err: error, userId: userData.userId, orderId: order.id }, 'createOrder:publishUserOrders:failed');
+        log.error({ err: error, userId: userData.userId, orderId: order.id }, 'createOrder:publishSingleUserOrder:failed');
     }
 
     try {

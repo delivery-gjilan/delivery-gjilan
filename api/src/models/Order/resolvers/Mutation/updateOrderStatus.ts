@@ -125,7 +125,7 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
     logger.debug({ orderId: id }, 'order:updateOrderStatus publishing status update');
     
     // Find the order to get the user ID
-    await orderService.publishUserOrders(dbOrder.userId);
+    await orderService.publishSingleUserOrder(dbOrder.userId, id);
     
     // Publish to all admins for real-time updates
     await orderService.publishAllOrders();

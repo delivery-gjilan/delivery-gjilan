@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert, Modal, TextInput, Animated, Dimensions, Platform, BackHandler, LayoutAnimation, UIManager } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Modal, TextInput, Animated, Dimensions, Platform, BackHandler, LayoutAnimation, UIManager } from 'react-native';
+import { Image } from 'expo-image';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -26,6 +27,9 @@ import type { CartItem } from '../types';
 import * as Haptics from 'expo-haptics';
 import { PromotionProgressBar } from './PromotionProgressBar';
 import { PromoAppliedCelebration } from './PromoAppliedCelebration';
+
+// Persists across CartScreen mounts so we never replay the celebration for the same promo
+const _celebrationShownPromoIds = new Set<string>();
 
 type CheckoutLocation = SelectedAddress;
 
@@ -87,6 +91,7 @@ export const CartScreen = () => {
     const proceedButtonAnim = useRef(new Animated.Value(1)).current;
     const screenWidth = Dimensions.get('window').width;
     const headerTopPadding = Platform.OS === 'ios' ? 10 : 6;
+    const insets = useSafeAreaInsets();
     const suppressAutoCloseRef = useRef(false);
 
     const formatCurrency = useCallback((value: number) => `€${value.toFixed(2)}`, []);
@@ -112,27 +117,30 @@ export const CartScreen = () => {
     );
 
     const [validatePromotionsManual, { loading: manualPromoLoading }] = useLazyQuery(VALIDATE_PROMOTIONS, {
-        fetchPolicy: 'no-cache',
+        fetchPolicy: 'cache-and-network',
     });
 
     const [calculateDeliveryPriceFn] = useLazyQuery(CALCULATE_DELIVERY_PRICE, {
-        fetchPolicy: 'no-cache',
+        fetchPolicy: 'cache-and-network',
     });
 
-    const cartContext = useMemo(() => {
-        const businessIds = Array.from(new Set(items.map((item) => item.businessId)));
-        return {
-            items: items.map((item) => ({
-                productId: item.productId,
-                businessId: item.businessId,
-                quantity: item.quantity,
-                price: item.unitPrice,
-            })),
-            subtotal: total,
-            deliveryPrice,
-            businessIds,
-        };
-    }, [items, total, deliveryPrice]);
+    // Stable array reference — only changes when the actual set of business IDs changes,
+    // not when total or deliveryPrice change. Prevents cascading re-renders.
+    const businessIdsKey = items.map((i) => i.businessId).sort().join(',');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const businessIds = useMemo(() => Array.from(new Set(items.map((item) => item.businessId))), [businessIdsKey]);
+
+    const cartContext = useMemo(() => ({
+        items: items.map((item) => ({
+            productId: item.productId,
+            businessId: item.businessId,
+            quantity: item.quantity,
+            price: item.unitPrice,
+        })),
+        subtotal: total,
+        deliveryPrice,
+        businessIds,
+    }), [items, total, deliveryPrice, businessIds]);
 
     // Query server for promotion thresholds applicable to this cart (used for progress display)
     const { data: thresholdsData, error: thresholdsError, loading: thresholdsLoading } = useQuery(
@@ -140,7 +148,7 @@ export const CartScreen = () => {
         {
             variables: { cart: cartContext },
             skip: items.length === 0,
-            fetchPolicy: 'no-cache',
+            fetchPolicy: 'cache-and-network',
         },
     );
 
@@ -153,13 +161,13 @@ export const CartScreen = () => {
             if (!p || !p.spendThreshold) return false;
             const ids = p.eligibleBusinessIds || [];
             if (ids.length === 0) return true; // global
-            return cartContext.businessIds.some((bId) => ids.includes(bId));
+            return businessIds.some((bId) => ids.includes(bId));
         });
         
         if (matching.length === 0) return null;
         matching.sort((a, b) => (b.priority || 0) - (a.priority || 0));
         return matching[0];
-    }, [thresholdsData, cartContext.businessIds]);
+    }, [thresholdsData, businessIds]);
 
     const spendThreshold = applicableConditional?.spendThreshold;
     const progress = spendThreshold ? Math.min(Number(total) / Number(spendThreshold), 1) : 0;
@@ -169,6 +177,7 @@ export const CartScreen = () => {
     const [showCelebration, setShowCelebration] = useState(false);
     const [celebrationMessage, setCelebrationMessage] = useState('');
     const [celebrationSavings, setCelebrationSavings] = useState('');
+    // celebrationShownRef is module-level (_celebrationShownPromoIds) — see top of file
 
     // Notifier state/animation
     const [notifier, setNotifier] = useState<null | { type: 'progress' | 'success'; message: string }>(null);
@@ -185,6 +194,10 @@ export const CartScreen = () => {
     const autoAppliedPromotionIdRef = useRef<string | null>(null);
     const [autoApplying, setAutoApplying] = useState(false);
     const hadItemsOnMount = useRef(items.length > 0);
+    // Keep a ref to the latest cartContext so the auto-apply effect doesn't need
+    // cartContext / total / deliveryPrice in its deps (prevents waterfall re-runs).
+    const cartContextRef = useRef(cartContext);
+    useEffect(() => { cartContextRef.current = cartContext; }, [cartContext]);
 
     // Auto-close cart when all items are removed
     useEffect(() => {
@@ -211,8 +224,11 @@ export const CartScreen = () => {
         let mounted = true;
         const doAutoApply = async () => {
             setAutoApplying(true);
+            // Use the ref so that a delivery-price update mid-flight doesn't re-trigger
+            // this effect — cartContextRef always holds the latest values.
+            const ctx = cartContextRef.current;
             try {
-                const response = await validatePromotionsManual({ variables: { cart: cartContext } });
+                const response = await validatePromotionsManual({ variables: { cart: ctx } });
                 const result = (response?.data as any)?.validatePromotions;
                 if (!result || (Array.isArray(result.promotions) && result.promotions.length === 0)) {
                     return;
@@ -226,8 +242,8 @@ export const CartScreen = () => {
                     code: promoCode,
                     discountAmount: Number(result.totalDiscount ?? 0),
                     freeDeliveryApplied: result.freeDeliveryApplied ?? false,
-                    effectiveDeliveryPrice: Number(result.finalDeliveryPrice ?? deliveryPrice),
-                    totalPrice: Number(result.finalTotal ?? total + deliveryPrice),
+                    effectiveDeliveryPrice: Number(result.finalDeliveryPrice ?? ctx.deliveryPrice),
+                    totalPrice: Number(result.finalTotal ?? ctx.subtotal + ctx.deliveryPrice),
                 });
                 setCouponCode(promoCode); // Show the code in the input field
                 autoAppliedPromotionIdRef.current = firstPromo?.id ?? applicableConditional.id;
@@ -238,12 +254,8 @@ export const CartScreen = () => {
                     ),
                     'success',
                 );
-                // Trigger celebration overlay
-                const promoName = firstPromo?.name || applicableConditional.name || t.cart.promotion_label;
-                setCelebrationMessage(promoName);
-                const discount = Number(result.totalDiscount ?? 0);
-                setCelebrationSavings(discount > 0 ? `-${formatCurrency(discount)}` : (result.freeDeliveryApplied ? t.cart.free_delivery : ''));
-                setShowCelebration(true);
+                // The PromotionProgressBar's inline confetti handles the celebration when
+                // threshold is hit — no full-screen overlay needed here.
             } catch {
                 // ignore - best effort
             } finally {
@@ -256,7 +268,7 @@ export const CartScreen = () => {
         return () => {
             mounted = false;
         };
-    }, [progress, applicableConditional, cartContext, total, deliveryPrice, promoResult, t]);
+    }, [progress, applicableConditional, promoResult, t]);
 
     // Get saved addresses sorted by priority (default first)
     const savedAddresses = useMemo(() => {
@@ -484,11 +496,15 @@ export const CartScreen = () => {
                 t.cart.discount_added.replace('{{amount}}', Number(result.totalDiscount ?? 0).toFixed(2)),
                 'success'
             );
-            // Trigger celebration overlay for manual coupon
-            setCelebrationMessage(couponCode.trim());
-            const discount = Number(result.totalDiscount ?? 0);
-            setCelebrationSavings(discount > 0 ? `-${formatCurrency(discount)}` : (result.freeDeliveryApplied ? t.cart.free_delivery : ''));
-            setShowCelebration(true);
+            // Show full-screen celebration for manual coupon (once per code)
+            const couponKey = `manual:${couponCode.trim().toUpperCase()}`;
+            if (!_celebrationShownPromoIds.has(couponKey)) {
+                _celebrationShownPromoIds.add(couponKey);
+                const discount = Number(result.totalDiscount ?? 0);
+                setCelebrationMessage(couponCode.trim());
+                setCelebrationSavings(discount > 0 ? `-${formatCurrency(discount)}` : (result.freeDeliveryApplied ? t.cart.free_delivery : ''));
+                setShowCelebration(true);
+            }
         } catch (err) {
             setPromoError(t.cart.unable_validate_promo);
         }
@@ -849,7 +865,9 @@ export const CartScreen = () => {
                                         <Image
                                             source={{ uri: item.imageUrl }}
                                             className="w-20 h-20 rounded-lg"
-                                            resizeMode="cover"
+                                            contentFit="cover"
+                                            cachePolicy="memory-disk"
+                                            transition={200}
                                         />
                                     ) : (
                                         <View
@@ -1133,7 +1151,8 @@ export const CartScreen = () => {
                                         <Image
                                             source={{ uri: item.imageUrl }}
                                             className="w-10 h-10 rounded-lg mr-3"
-                                            resizeMode="cover"
+                                            contentFit="cover"
+                                            cachePolicy="memory-disk"
                                         />
                                     ) : (
                                         <View
@@ -1211,53 +1230,113 @@ export const CartScreen = () => {
                         </View>
 
                         {/* Promo Code */}
-                        <View className="rounded-2xl border p-4 mb-4" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
-                            <Text className="text-xs uppercase font-semibold mb-2" style={{ color: theme.colors.subtext }}>
-                                {t.cart.promo_code}
-                            </Text>
-                            <View className="flex-row items-center gap-2">
-                                <TextInput
-                                    value={couponCode}
-                                    onChangeText={setCouponCode}
-                                    placeholder={t.cart.enter_code}
-                                    placeholderTextColor={theme.colors.subtext}
-                                    className="flex-1 px-3 py-2 rounded-xl text-sm"
-                                    style={{
-                                        color: theme.colors.text,
-                                        backgroundColor: theme.colors.background,
-                                        borderWidth: 1,
-                                        borderColor: theme.colors.border,
-                                    }}
-                                />
-                                <TouchableOpacity
-                                    className="px-4 py-2 rounded-xl"
-                                    style={{
-                                        backgroundColor: manualPromoLoading ? theme.colors.border : theme.colors.primary,
-                                        opacity: manualPromoLoading ? 0.7 : 1,
-                                    }}
-                                    onPress={handleApplyCoupon}
-                                    disabled={manualPromoLoading}
-                                >
-                                    {manualPromoLoading ? (
-                                        <ActivityIndicator size="small" color={theme.colors.text} />
-                                    ) : (
-                                        <Text className="text-white font-semibold">{t.common.apply}</Text>
-                                    )}
-                                </TouchableOpacity>
+                        <View
+                            className="rounded-2xl border p-4 mb-4"
+                            style={{
+                                borderColor: promoResult ? theme.colors.income + '55' : theme.colors.border,
+                                backgroundColor: theme.colors.card,
+                            }}
+                        >
+                            <View className="flex-row items-center justify-between mb-3">
+                                <View className="flex-row items-center gap-2">
+                                    <Ionicons
+                                        name="pricetag-outline"
+                                        size={14}
+                                        color={promoResult ? theme.colors.income : theme.colors.subtext}
+                                    />
+                                    <Text
+                                        className="text-xs uppercase font-semibold"
+                                        style={{ color: promoResult ? theme.colors.income : theme.colors.subtext }}
+                                    >
+                                        {t.cart.promo_code}
+                                    </Text>
+                                </View>
+                                {promoResult && (
+                                    <View
+                                        className="flex-row items-center gap-1 px-2 py-0.5 rounded-full"
+                                        style={{ backgroundColor: theme.colors.income + '20' }}
+                                    >
+                                        <Ionicons name="checkmark-circle" size={11} color={theme.colors.income} />
+                                        <Text className="text-xs font-bold" style={{ color: theme.colors.income }}>{t.cart.promo_applied_title}</Text>
+                                    </View>
+                                )}
                             </View>
+
+                            {promoResult ? (
+                                /* Applied state: pill tag with code + savings + remove */
+                                <View
+                                    className="flex-row items-center justify-between px-3 py-2.5 rounded-xl"
+                                    style={{
+                                        backgroundColor: theme.colors.income + '15',
+                                        borderWidth: 1,
+                                        borderColor: theme.colors.income + '40',
+                                    }}
+                                >
+                                    <View className="flex-row items-center gap-2">
+                                        <View
+                                            className="px-2 py-0.5 rounded"
+                                            style={{ backgroundColor: theme.colors.income + '28' }}
+                                        >
+                                            <Text
+                                                className="text-xs font-bold tracking-widest"
+                                                style={{ color: theme.colors.income }}
+                                            >
+                                                {promoResult.code.toUpperCase()}
+                                            </Text>
+                                        </View>
+                                        <Text className="text-sm font-semibold" style={{ color: theme.colors.income }}>
+                                            {promoResult.freeDeliveryApplied && promoResult.discountAmount === 0
+                                                ? t.cart.free_delivery
+                                                : `-${formatCurrency(promoResult.discountAmount)}`}
+                                        </Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        onPress={() => setCouponCode('')}
+                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                    >
+                                        <Ionicons name="close-circle" size={18} color={theme.colors.subtext} />
+                                    </TouchableOpacity>
+                                </View>
+                            ) : (
+                                /* Input state */
+                                <View className="flex-row items-center gap-2">
+                                    <TextInput
+                                        value={couponCode}
+                                        onChangeText={setCouponCode}
+                                        placeholder={t.cart.enter_code}
+                                        placeholderTextColor={theme.colors.subtext}
+                                        className="flex-1 px-3 py-2 rounded-xl text-sm"
+                                        autoCapitalize="characters"
+                                        style={{
+                                            color: theme.colors.text,
+                                            backgroundColor: theme.colors.background,
+                                            borderWidth: 1,
+                                            borderColor: promoError ? theme.colors.expense + '80' : theme.colors.border,
+                                        }}
+                                    />
+                                    <TouchableOpacity
+                                        className="px-4 py-2 rounded-xl"
+                                        style={{
+                                            backgroundColor: manualPromoLoading ? theme.colors.border : theme.colors.primary,
+                                            opacity: manualPromoLoading ? 0.7 : 1,
+                                        }}
+                                        onPress={handleApplyCoupon}
+                                        disabled={manualPromoLoading}
+                                    >
+                                        {manualPromoLoading ? (
+                                            <ActivityIndicator size="small" color={theme.colors.text} />
+                                        ) : (
+                                            <Text className="text-white font-semibold">{t.common.apply}</Text>
+                                        )}
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+
                             {promoError && (
                                 <View className="flex-row items-center gap-1 mt-2">
                                     <Ionicons name="alert-circle" size={14} color={theme.colors.expense} />
                                     <Text className="text-xs flex-1" style={{ color: theme.colors.expense }}>
                                         {promoError}
-                                    </Text>
-                                </View>
-                            )}
-                            {promoResult && !promoError && (
-                                <View className="flex-row items-center gap-1 mt-2">
-                                    <Ionicons name="checkmark-circle" size={14} color={theme.colors.income} />
-                                    <Text className="text-xs flex-1" style={{ color: theme.colors.income }}>
-                                        {t.cart.promo_applied.replace('{{code}}', promoResult.code)}
                                     </Text>
                                 </View>
                             )}
@@ -1545,7 +1624,7 @@ export const CartScreen = () => {
                     pointerEvents="none"
                     style={{
                         position: 'absolute',
-                        top: 12,
+                        top: insets.top + 12,
                         left: 16,
                         right: 16,
                         zIndex: 9999,

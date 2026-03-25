@@ -1192,6 +1192,21 @@ export class OrderService {
         });
     }
 
+    /**
+     * Lightweight delta publish — fetches and publishes only the single changed
+     * order instead of re-querying the full uncompleted set.  The client merges
+     * the incoming order into its local cache by id.
+     */
+    async publishSingleUserOrder(userId: string, orderId: string) {
+        const dbOrder = await this.orderRepository.findById(orderId);
+        if (!dbOrder) return;
+        const order = await this.mapToOrder(dbOrder);
+        publish(this.pubsub, topics.ordersByUserChanged(userId), {
+            userId,
+            orders: [order],
+        });
+    }
+
     async publishAllOrders() {
         // Lightweight signal — clients refetch on their own
         publish(this.pubsub, topics.allOrdersChanged(), { orders: [] });

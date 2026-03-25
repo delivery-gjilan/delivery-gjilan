@@ -36,7 +36,7 @@ export const cancelOrder: NonNullable<MutationResolvers['cancelOrder']> = async 
 
     const order = await orderService.cancelOrder(id);
 
-    await orderService.publishUserOrders(dbOrder.userId);
+    await orderService.publishSingleUserOrder(dbOrder.userId, id);
     await orderService.publishAllOrders();
 
     // Push notification to customer (fire-and-forget)

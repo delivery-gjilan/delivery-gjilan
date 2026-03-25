@@ -56,7 +56,7 @@ export const startPreparing: NonNullable<MutationResolvers['startPreparing']> = 
             dbOrder.orderDate || null,
         );
 
-        await orderService.publishUserOrders(dbOrder.userId);
+        await orderService.publishSingleUserOrder(dbOrder.userId, id);
         await orderService.publishAllOrders();
 
         notifyCustomerOrderStatus(context.notificationService, dbOrder.userId, id, 'PREPARING');

@@ -10,7 +10,7 @@ import client from '@/lib/graphql/apolloClient';
 import LoadingScreen from '@/components/LoadingScreen';
 import { FloatingBars } from '@/components/FloatingBars';
 import { useActiveOrdersTracking } from '@/hooks/useActiveOrdersTracking';
-import { useStoreStatus } from '@/hooks/useStoreStatus';
+import { useStoreStatusInit, useStoreStatus } from '@/hooks/useStoreStatus';
 import { useNotifications } from '@/hooks/useNotifications';
 import StoreClosedScreen from '@/components/StoreClosedScreen';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -25,6 +25,7 @@ import { useCartDataStore } from '@/modules/cart/store/cartDataStore';
 // Inner component that uses Apollo Client (must be inside ApolloProvider)
 function AppContent() {
     const theme = useTheme();
+    useStoreStatusInit();
     const { isStoreClosed, closedMessage, loading: storeStatusLoading } = useStoreStatus();
 
     // Initialize push notifications

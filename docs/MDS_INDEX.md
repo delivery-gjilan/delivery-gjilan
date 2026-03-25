@@ -37,6 +37,7 @@
 | M7 | [MOBILE/ORDER_SUBSCRIPTION_SYNC_MB.md](MOBILE/ORDER_SUBSCRIPTION_SYNC_MB.md) | Mobile | Subscription-first order sync, cache/store update contract, fallback refetch rules |
 | M8 | [MOBILE/DRIVER_APP.md](MOBILE/DRIVER_APP.md) | Mobile | Driver app deep-dive: heartbeat, navigation, PTT, battery, auth, stores, GraphQL ops, refactor candidates |
 | M9 | [MOBILE/MOBILE_ADMIN_DEEP_DIVE.md](MOBILE/MOBILE_ADMIN_DEEP_DIVE.md) | Mobile | Mobile-admin deep-dive: all screens, GraphQL ops, real-time arch, theme, i18n, refactor candidates |
+| M10 | [MOBILE/REALTIME_SUBSCRIPTIONS_CUSTOMER.md](MOBILE/REALTIME_SUBSCRIPTIONS_CUSTOMER.md) | Mobile | Subscription topology audit, connection count, payload sizing, duplicate subscriptions, optimization roadmap |
 | O1 | [OPERATIONS/MONITORING.md](OPERATIONS/MONITORING.md) | Operations | Health endpoints, Prometheus, Grafana phases |
 | O2 | [OPERATIONS/OBSERVABILITY.md](OPERATIONS/OBSERVABILITY.md) | Operations | Loki, Promtail, structured logging, runbooks |
 | O3 | [OPERATIONS/NOTIFICATIONS.md](OPERATIONS/NOTIFICATIONS.md) | Operations | Query builder, campaigns, payload fields |
@@ -95,6 +96,7 @@ ARCHITECTURE (A1)
 │   ├── MOBILE/ORDER_CREATION_AUDIT (M4) → B2, B6
 │   ├── MOBILE/ORDER_INPUT_VARIANT_OFFER_FLOW_SNAPSHOT (M5)
 │   ├── MOBILE/ORDER_SUBSCRIPTION_SYNC_MB (M7) → A1, BL3
+│   ├── MOBILE/REALTIME_SUBSCRIPTIONS_CUSTOMER (M10) → A1, B1, B4, M7, BL3
 │   ├── MOBILE/DRIVER_APP (M8) → A1, B1, B4, B5, B7, BL1
 │   └── BUSINESS_LOGIC/CART_ACTIVE_ORDER_FLOW_RECOMMENDATIONS (BL3)
 │       └── BACKEND/ORDER_CREATION (B2)
