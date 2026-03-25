@@ -74,11 +74,13 @@ const errorLink = onError(({ error, operation, forward }) => {
                 });
             }
         }
-        // Show first non-auth GraphQL error as toast
+        // Show first non-auth GraphQL error as toast (skip operations marked as silent)
         const firstError = error.errors[0];
-        if (firstError) {
+        if (firstError && !operation.getContext().silentErrors) {
             console.error(`[Apollo] GraphQL error in ${operation.operationName}:`, firstError.message);
             toast.error(firstError.message);
+        } else if (firstError) {
+            console.warn(`[Apollo] Silent GraphQL error in ${operation.operationName}:`, firstError.message);
         }
     } else {
         // Network or other error

@@ -1283,6 +1283,7 @@ type Query {
   """Admin: full conversation with a specific driver"""
   driverMessages(driverId: ID!, limit: Int, offset: Int): [DriverMessage!]!
   drivers: [User!]!
+  getActiveGlobalPromotions: [Promotion!]!
 
   """Get Agora RTC credentials for the current authenticated user"""
   getAgoraRtcCredentials(channelName: String!, role: AgoraRtcRole!): AgoraRtcCredentials!

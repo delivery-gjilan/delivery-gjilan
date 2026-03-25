@@ -68,10 +68,10 @@ const GJILAN_BOUNDS = {
 };
 
 // ─── Helper Functions ───────────────────────────────────────
-const formatOrderDate = (value?: string | null) => {
-    if (!value) return 'Unknown date';
+const formatOrderDate = (value?: string | null, fallback = 'Unknown date') => {
+    if (!value) return fallback;
     const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return 'Unknown date';
+    if (Number.isNaN(parsed.getTime())) return fallback;
     return parsed.toLocaleDateString('en-GB', {
         day: '2-digit',
         month: 'short',
@@ -119,6 +119,12 @@ const DRIVER_DEAD_RECKONING_DECAY_MS = 2_500;
 const ROUTE_SNAP_MAX_DISTANCE_M = 45;
 const ROUTE_SNAP_FALLBACK_DISTANCE_M = 70;
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+// ─── Cinematic Camera Constants ─────────────────────────
+const CAMERA_INTRO_ZOOM = 13.0;        // wide starting zoom — flies into restaurant
+const CAMERA_APPROACH_NEAR_M = 400;   // driver ~400m away: reframe
+const CAMERA_APPROACH_CLOSE_M = 150;  // driver ~150m away: tighten + mild tilt
+const CAMERA_APPROACH_ARRIVAL_M = 80; // driver ~80m away: zoom in 3D on dropoff
 const AVATAR_COLORS = ['#2563EB', '#7C3AED', '#DB2777', '#EA580C', '#16A34A', '#4F46E5'];
 
 const getInitials = (firstName?: string | null, lastName?: string | null) => {
@@ -333,9 +339,43 @@ const VehiclePin = ({ icon, size = 28, rotationDeg = 0, scale = 1 }: { icon: key
     </View>
 );
 
-const HomeLocationPin = ({ scale = 1 }: { scale?: number }) => (
-    <MapPin icon="home" size={40} shellColor="#FFFFFF" coreColor="#111111" iconSize={18} scale={scale} />
-);
+const HomeLocationPin = ({ scale = 1 }: { scale?: number }) => {
+    const size = 36 * scale;
+    const pointerSize = 10 * scale;
+    return (
+        <View style={{ alignItems: 'center' }}>
+            <View style={{
+                alignItems: 'center',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.15,
+                shadowRadius: 8,
+                elevation: 6,
+            }}>
+                <View style={{
+                    width: size,
+                    height: size,
+                    borderRadius: size / 2,
+                    backgroundColor: '#111111',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 2.5,
+                    borderColor: '#FFFFFF',
+                }}>
+                    <Ionicons name="home" size={Math.round(16 * scale)} color="#FFFFFF" />
+                </View>
+                <View style={{
+                    width: pointerSize,
+                    height: pointerSize,
+                    backgroundColor: '#111111',
+                    transform: [{ rotate: '45deg' }],
+                    marginTop: -(pointerSize / 2),
+                    borderBottomRightRadius: 3 * scale,
+                }} />
+            </View>
+        </View>
+    );
+};
 
 const BusinessMarker = ({ active, scale = 1, imageUrl }: { active: boolean; scale?: number; imageUrl?: string | null }) => {
     const pulseScale = useSharedValue(1);
@@ -568,6 +608,11 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const lastHeartbeatReceivedAtRef = useRef<number | null>(null);
     const lastObservedHeartbeatGapMsRef = useRef(5000);
     const smoothedHeartbeatGapMsRef = useRef(5000);
+    // ─── Cinematic camera state refs ─────────────────────
+    const hasIntroFiredRef = useRef(false);           // first-ever focus fly-in
+    const isFirstDeliveryFitRef = useRef(false);       // delivery reveal zoom-out+in
+    const approachStageRef = useRef(0);                // 0=none 1=near 2=close 3=arrival
+    const lastApproachCheckRef = useRef(0);            // throttle timestamp
     const lastTweenVelocityRef = useRef<{ latPerMs: number; lngPerMs: number } | null>(null);
     const tweenFinishedAtRef = useRef<number | null>(null);
     const [liveDriverTracking, setLiveDriverTracking] = useState<{
@@ -1043,9 +1088,10 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         if (!cameraRef.current) return;
 
         if (isDeliveryPhase) {
-            // OUT_FOR_DELIVERY: fit driver + dropoff
+            // OUT_FOR_DELIVERY: fit driver + pickup (business) + dropoff (home)
             const coords: { latitude: number; longitude: number }[] = [];
             if (driverLocation) coords.push({ latitude: driverLocation.latitude, longitude: driverLocation.longitude });
+            if (pickupLocation) coords.push({ latitude: pickupLocation.latitude, longitude: pickupLocation.longitude });
             if (dropoffLocation) coords.push({ latitude: dropoffLocation.latitude, longitude: dropoffLocation.longitude });
             if (coords.length < 2) {
                 const c = coords[0] || (dropoffLocation ? { latitude: dropoffLocation.latitude, longitude: dropoffLocation.longitude } : null);
@@ -1056,16 +1102,30 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
             const lats = coords.map(c => c.latitude);
             const ne: [number, number] = [Math.max(...lngs), Math.max(...lats)];
             const sw: [number, number] = [Math.min(...lngs), Math.min(...lats)];
+
+            isFirstDeliveryFitRef.current = true;
             cameraRef.current.fitBounds(ne, sw, [120, 80, SCREEN_HEIGHT * 0.42, 80], 800);
         } else {
             // PENDING / PREPARING / READY: center on business
             const loc = pickupLocation;
             if (loc && typeof loc.latitude === 'number') {
-                cameraRef.current.setCamera({
-                    centerCoordinate: [loc.longitude, loc.latitude],
-                    zoomLevel: 15.5,
-                    animationDuration: 800,
-                });
+                if (!hasIntroFiredRef.current) {
+                    // ── Cinematic intro: map starts zoomed out and flies into the restaurant
+                    hasIntroFiredRef.current = true;
+                    cameraRef.current.setCamera({
+                        centerCoordinate: [loc.longitude, loc.latitude],
+                        zoomLevel: 15.5,
+                        animationDuration: 1400,
+                        animationMode: 'flyTo',
+                        pitch: 0,
+                    });
+                } else {
+                    cameraRef.current.setCamera({
+                        centerCoordinate: [loc.longitude, loc.latitude],
+                        zoomLevel: 15.5,
+                        animationDuration: 800,
+                    });
+                }
             }
         }
     }, [pickupLocation, dropoffLocation, driverLocation, isDeliveryPhase]);
@@ -1088,6 +1148,63 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
 
         return () => clearTimeout(timeout);
     }, [order?.id, status, pickupLocation, dropoffLocation]);
+
+    // ─── Reset cinematic stages when order changes ─────────
+    useEffect(() => {
+        approachStageRef.current = 0;
+        isFirstDeliveryFitRef.current = false;
+        hasIntroFiredRef.current = false;
+    }, [order?.id]);
+
+    // ─── Driver approach: progressive zoom-in as driver nears customer ─────────
+    useEffect(() => {
+        if (!isDeliveryPhase || !driverLocation || !dropoffLocation || !cameraRef.current) return;
+
+        // Throttle: check at most every 2 seconds (driverLocation updates every 50ms)
+        const now = Date.now();
+        if (now - lastApproachCheckRef.current < 2000) return;
+        lastApproachCheckRef.current = now;
+
+        const distKm = calculateHaversineDistance(
+            driverLocation.latitude,
+            driverLocation.longitude,
+            dropoffLocation.latitude,
+            dropoffLocation.longitude,
+        );
+        const distM = distKm * 1000;
+
+        if (distM <= CAMERA_APPROACH_ARRIVAL_M && approachStageRef.current < 3) {
+            // ~80m away: cinematic tilt toward dropoff, very close-up
+            approachStageRef.current = 3;
+            cameraRef.current.setCamera({
+                centerCoordinate: [dropoffLocation.longitude, dropoffLocation.latitude],
+                zoomLevel: 17,
+                pitch: 45,
+                animationDuration: 1200,
+                animationMode: 'flyTo',
+            });
+        } else if (distM <= CAMERA_APPROACH_CLOSE_M && approachStageRef.current < 2) {
+            // ~150m away: mid-tilt framing driver + dropoff together
+            approachStageRef.current = 2;
+            const midLng = (driverLocation.longitude + dropoffLocation.longitude) / 2;
+            const midLat = (driverLocation.latitude + dropoffLocation.latitude) / 2;
+            cameraRef.current.setCamera({
+                centerCoordinate: [midLng, midLat],
+                zoomLevel: 16.5,
+                pitch: 25,
+                animationDuration: 1000,
+                animationMode: 'flyTo',
+            });
+        } else if (distM <= CAMERA_APPROACH_NEAR_M && approachStageRef.current < 1) {
+            // ~400m away: reframe to keep both driver and dropoff in view
+            approachStageRef.current = 1;
+            const lngs = [driverLocation.longitude, dropoffLocation.longitude];
+            const lats = [driverLocation.latitude, dropoffLocation.latitude];
+            const ne: [number, number] = [Math.max(...lngs), Math.max(...lats)];
+            const sw: [number, number] = [Math.min(...lngs), Math.min(...lats)];
+            cameraRef.current.fitBounds(ne, sw, [120, 80, SCREEN_HEIGHT * 0.42, 80], 1000);
+        }
+    }, [driverLocation, isDeliveryPhase, dropoffLocation]);
 
     // ─── Handlers ───────────────────────────────────────────
     const handleCallDriver = useCallback(async () => {
@@ -1157,7 +1274,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                 <Ionicons name="alert-circle-outline" size={80} color={theme.colors.subtext} />
                 <Text style={{ fontSize: 18, color: theme.colors.text, marginTop: 16 }}>{t.orders.details.not_found}</Text>
                 <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 24 }}>
-                    <Text style={{ color: theme.colors.primary, fontSize: 16, fontWeight: '600' }}>Go Back</Text>
+                    <Text style={{ color: theme.colors.primary, fontSize: 16, fontWeight: '600' }}>{t.common.go_back}</Text>
                 </TouchableOpacity>
             </View>
         );
@@ -1251,10 +1368,10 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                             <Ionicons name={config.icon} size={36} color={config.color} />
                         </View>
                         <Text style={{ fontSize: 24, fontWeight: '800', color: config.textColor, marginBottom: 6, letterSpacing: -0.5 }}>
-                            {isCompleted ? t.orders.details.order_delivered : 'Order Cancelled'}
+                            {isCompleted ? t.orders.details.order_delivered : t.orders.details.order_cancelled}
                         </Text>
                         <Text style={{ fontSize: 13, color: config.textColor, opacity: 0.7, textAlign: 'center', fontWeight: '500' }}>
-                            {formatOrderDate(order.orderDate)}
+                            {formatOrderDate(order.orderDate, t.orders.details.unknown_date)}
                         </Text>
                     </View>
 
@@ -1275,8 +1392,8 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                     }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
                             <Ionicons name="receipt-outline" size={14} color={theme.colors.primary} style={{ marginRight: 6 }} />
-                            <Text style={{ fontSize: 11, color: theme.colors.subtext, fontWeight: '600', letterSpacing: 0.5 }}>
-                                ORDER NUMBER
+                            <Text style={{ fontSize: 11, color: theme.colors.subtext, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                                {t.orders.details.order_number}
                             </Text>
                         </View>
                         <Text style={{ fontSize: 22, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.5 }}>
@@ -1308,7 +1425,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                 <Ionicons name="cart-outline" size={16} color={theme.colors.primary} style={{ marginRight: 8 }} />
                                 <Text style={{ fontSize: 15, fontWeight: '700', color: theme.colors.text, letterSpacing: -0.3 }}>
-                                        {(t.orders.details as any).order_items || 'Order items'}
+                                        {t.orders.details.order_items}
                                 </Text>
                             </View>
                         </View>
@@ -1477,37 +1594,97 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                         shadowRadius: 8,
                         elevation: 2,
                     }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                            <Ionicons name="cash-outline" size={16} color={theme.colors.primary} style={{ marginRight: 8 }} />
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+                            <Ionicons name="receipt-outline" size={16} color={theme.colors.primary} style={{ marginRight: 8 }} />
                             <Text style={{ fontSize: 15, fontWeight: '700', color: theme.colors.text, letterSpacing: -0.3 }}>
-                                Price Summary
+                                {t.orders.details.price_summary}
                             </Text>
                         </View>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10, paddingLeft: 24 }}>
-                            <Text style={{ fontSize: 14, color: theme.colors.subtext, fontWeight: '500' }}>{t.common.subtotal}</Text>
-                            <Text style={{ fontSize: 14, color: theme.colors.text, fontWeight: '600' }}>
-                                €{formatCurrency(order.orderPrice)}
-                            </Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10, paddingLeft: 24 }}>
-                            <Text style={{ fontSize: 14, color: '#22C55E', fontWeight: '600' }}>{t.common.delivery_fee || 'Delivery fee'}</Text>
-                            <Text style={{ fontSize: 14, color: '#22C55E', fontWeight: '700' }}>
-                                €{formatCurrency(order.deliveryPrice ?? 0)}
-                            </Text>
-                        </View>
+
+                        {/* Subtotal row */}
+                        {(() => {
+                            const origPrice = (order as any).originalPrice;
+                            const hasItemDiscount = origPrice != null && origPrice > order.orderPrice;
+                            return (
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10, paddingLeft: 24, alignItems: 'center' }}>
+                                    <Text style={{ fontSize: 14, color: theme.colors.subtext, fontWeight: '500' }}>{t.common.subtotal}</Text>
+                                    <View style={{ alignItems: 'flex-end' }}>
+                                        {hasItemDiscount && (
+                                            <Text style={{ fontSize: 12, color: theme.colors.subtext, textDecorationLine: 'line-through', marginBottom: 1 }}>
+                                                €{formatCurrency(origPrice)}
+                                            </Text>
+                                        )}
+                                        <Text style={{ fontSize: 14, color: theme.colors.text, fontWeight: '600' }}>
+                                            €{formatCurrency(order.orderPrice)}
+                                        </Text>
+                                    </View>
+                                </View>
+                            );
+                        })()}
+
+                        {/* Delivery fee row */}
+                        {(() => {
+                            const origDelivery = (order as any).originalDeliveryPrice;
+                            const hasDeliveryDiscount = origDelivery != null && origDelivery > (order.deliveryPrice ?? 0);
+                            return (
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10, paddingLeft: 24, alignItems: 'center' }}>
+                                    <Text style={{ fontSize: 14, color: theme.colors.subtext, fontWeight: '500' }}>{t.common.delivery_fee || 'Delivery fee'}</Text>
+                                    <View style={{ alignItems: 'flex-end' }}>
+                                        {hasDeliveryDiscount && (
+                                            <Text style={{ fontSize: 12, color: theme.colors.subtext, textDecorationLine: 'line-through', marginBottom: 1 }}>
+                                                €{formatCurrency(origDelivery)}
+                                            </Text>
+                                        )}
+                                        <Text style={{ fontSize: 14, color: order.deliveryPrice === 0 ? '#22C55E' : theme.colors.text, fontWeight: '600' }}>
+                                            {order.deliveryPrice === 0 ? 'Free' : `€${formatCurrency(order.deliveryPrice ?? 0)}`}
+                                        </Text>
+                                    </View>
+                                </View>
+                            );
+                        })()}
+
+                        {/* Promo / discount rows */}
+                        {(() => {
+                            const promos: any[] = (order as any).orderPromotions ?? [];
+                            if (!promos.length) return null;
+                            const totalDiscount = promos.reduce((acc: number, p: any) => acc + (p.discountAmount ?? 0), 0);
+                            return (
+                                <View style={{
+                                    marginHorizontal: 0,
+                                    marginBottom: 10,
+                                    paddingHorizontal: 14,
+                                    paddingVertical: 10,
+                                    backgroundColor: '#22C55E12',
+                                    borderRadius: 10,
+                                    borderWidth: 1,
+                                    borderColor: '#22C55E30',
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Ionicons name="pricetag-outline" size={14} color="#22C55E" />
+                                        <Text style={{ fontSize: 13, color: '#22C55E', fontWeight: '700' }}>
+                                            Promo{promos.length > 1 ? ` (×${promos.length})` : ''} applied
+                                        </Text>
+                                    </View>
+                                    <Text style={{ fontSize: 14, color: '#22C55E', fontWeight: '800' }}>
+                                        −€{formatCurrency(totalDiscount)}
+                                    </Text>
+                                </View>
+                            );
+                        })()}
+
+                        {/* Divider */}
                         <View style={{
                             borderTopWidth: 1,
                             borderTopColor: theme.colors.border,
                             borderStyle: 'dashed',
                             marginVertical: 6,
-                            marginHorizontal: 24,
                         }} />
-                        <View style={{
-                            paddingTop: 8,
-                            flexDirection: 'row',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                        }}>
+
+                        {/* Total */}
+                        <View style={{ paddingTop: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                             <Text style={{ fontSize: 17, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.3 }}>
                                 {t.common.total}
                             </Text>
@@ -1515,6 +1692,28 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                 €{formatCurrency(order.totalPrice)}
                             </Text>
                         </View>
+
+                        {/* Payment method */}
+                        {(order as any).paymentCollection && (
+                            <View style={{
+                                marginTop: 12,
+                                paddingTop: 12,
+                                borderTopWidth: 1,
+                                borderTopColor: theme.colors.border + '60',
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 8,
+                            }}>
+                                <Ionicons
+                                    name={(order as any).paymentCollection === 'CASH_TO_DRIVER' ? 'cash-outline' : 'card-outline'}
+                                    size={15}
+                                    color={theme.colors.subtext}
+                                />
+                                <Text style={{ fontSize: 13, color: theme.colors.subtext, fontWeight: '500' }}>
+                                    {(order as any).paymentCollection === 'CASH_TO_DRIVER' ? 'Cash on delivery' : 'Paid online'}
+                                </Text>
+                            </View>
+                        )}
                     </View>
 
                     {/* Delivery Address */}
@@ -1546,7 +1745,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                     <Ionicons name="location" size={16} color={theme.colors.primary} />
                                 </View>
                                 <Text style={{ fontSize: 15, fontWeight: '700', color: theme.colors.text, letterSpacing: -0.3 }}>
-                                    {(t.orders.details as any).delivery_address || 'Delivery address'}
+                                    {t.orders.details.delivery_address}
                                 </Text>
                             </View>
                             <Text style={{ fontSize: 14, color: theme.colors.subtext, lineHeight: 22, fontWeight: '500', paddingLeft: 42 }}>
@@ -1621,7 +1820,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const mapFallback = (
         <View style={{ flex: 1, backgroundColor: '#1a1a2e', alignItems: 'center', justifyContent: 'center' }}>
             <Ionicons name="map-outline" size={48} color="#555" />
-            <Text style={{ color: '#555', marginTop: 8, fontSize: 14 }}>Map unavailable</Text>
+            <Text style={{ color: '#555', marginTop: 8, fontSize: 14 }}>{t.orders.details.map_unavailable}</Text>
         </View>
     );
 
@@ -1656,25 +1855,11 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                             }}
                             defaultSettings={{
                                 centerCoordinate: [defaultRegion.longitude, defaultRegion.latitude],
-                                zoomLevel: 15.5,
+                                zoomLevel: CAMERA_INTRO_ZOOM,
                             }}
                         />
 
-                        {/* Road route for delivery phase (helps anchor movement to streets) */}
-                        {isDeliveryPhase && deliveryRouteShape && (
-                            <MapLibreGL.ShapeSource id="delivery-route-source" shape={deliveryRouteShape as any}>
-                                <MapLibreGL.LineLayer
-                                    id="delivery-route-line"
-                                    style={{
-                                        lineColor: '#A78BFA',
-                                        lineWidth: 5,
-                                        lineOpacity: 0.55,
-                                        lineCap: 'round',
-                                        lineJoin: 'round',
-                                    }}
-                                />
-                            </MapLibreGL.ShapeSource>
-                        )}
+
 
                         {/* Business marker (always visible while order is active) */}
                         {pickupLocation && typeof pickupLocation.latitude === 'number' && typeof pickupLocation.longitude === 'number' && (
@@ -1989,7 +2174,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                             }}
                         >
                             <Text style={{ color: theme.colors.subtext, fontSize: 13, fontWeight: '600' }}>
-                                {showSummary ? '▲ Hide order summary' : '▼ Show order summary'}
+                                {showSummary ? `▲ ${t.orders.details.hide_order_summary}` : `▼ ${t.orders.details.show_order_summary}`}
                             </Text>
                         </TouchableOpacity>
 
@@ -2047,7 +2232,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                                     {item.quantity}× {item.name}
                                                 </Text>
                                                 <Text style={{ color: theme.colors.text, fontSize: 13, fontWeight: '600' }}>
-                                                    €{formatCurrency(Number(item.price) * Number(item.quantity))}
+                                                    €{formatCurrency(Number(item.unitPrice) * Number(item.quantity))}
                                                 </Text>
                                             </View>
                                         ))

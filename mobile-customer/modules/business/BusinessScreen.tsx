@@ -306,7 +306,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
 
     // ─── Category tabs animated style (show after scrolling) ───
     const categoryTabsStyle = useAnimatedStyle(() => {
-        const infoSectionHeight = 140; // Approximate height of restaurant info section
+        const infoSectionHeight = 110; // Approximate height of restaurant info section
         const showThreshold = HERO_HEIGHT + infoSectionHeight - 100;
         return {
             opacity: interpolate(
@@ -414,7 +414,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                         backgroundColor: theme.colors.background,
                     }}
                 >
-                    <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16, alignItems: 'center' }}>
+                    <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, alignItems: 'center' }}>
                         {/* Name – centered */}
                         <Text
                             style={{
@@ -429,7 +429,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                         </Text>
 
                         {/* Open status · schedule · delivery */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, flexWrap: 'wrap', justifyContent: 'center', gap: 6 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, flexWrap: 'wrap', justifyContent: 'center', gap: 6 }}>
                             <View
                                 style={{
                                     backgroundColor: business.isOpen ? '#1B873520' : '#D32F2F20',
@@ -490,13 +490,13 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                 flexDirection: 'row',
                                 alignItems: 'center',
                                 alignSelf: 'center',
-                                marginTop: 12,
+                                marginTop: 8,
                                 backgroundColor: theme.colors.primary + '20',
                                 borderWidth: 1,
                                 borderColor: theme.colors.primary + '45',
                                 borderRadius: 10,
-                                paddingHorizontal: 18,
-                                paddingVertical: 10,
+                                paddingHorizontal: 16,
+                                paddingVertical: 7,
                                 justifyContent: 'center',
                                 gap: 8,
                             }}
@@ -682,8 +682,8 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                         <View
                                             style={{
                                                 paddingHorizontal: 16,
-                                                paddingTop: catIdx === 0 && !productsByCategory.has('__offers') ? 16 : 28,
-                                                paddingBottom: 10,
+                                                paddingTop: catIdx === 0 && !productsByCategory.has('__offers') ? 12 : 20,
+                                                paddingBottom: 8,
                                             }}
                                         >
                                             <Text
@@ -716,7 +716,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                             {/* Uncategorized products */}
                             {productsByCategory.has('__uncategorized') && (
                                 <View>
-                                    <View style={{ paddingHorizontal: 16, paddingTop: 28, paddingBottom: 10 }}>
+                                    <View style={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: 8 }}>
                                         <Text
                                             style={{
                                                 fontSize: 18,

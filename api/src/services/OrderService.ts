@@ -1185,10 +1185,10 @@ export class OrderService {
     }
 
     async publishUserOrders(userId: string) {
-        // Lightweight signal — client refetches on its own
+        const orders = await this.getUserUncompletedOrders(userId);
         publish(this.pubsub, topics.ordersByUserChanged(userId), {
             userId,
-            orders: [],
+            orders,
         });
     }
 

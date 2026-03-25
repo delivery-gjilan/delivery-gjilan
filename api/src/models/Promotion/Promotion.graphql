@@ -213,6 +213,9 @@ type Query {
   # Get applicable promotions for user's cart
   getApplicablePromotions(cart: CartContextInput!, manualCode: String): [ApplicablePromotion!]!
 
+  # Get active global promotions visible to customers (no cart context needed)
+  getActiveGlobalPromotions: [Promotion!]!
+
   # Get active conditional promotions that have spend thresholds (for progress bars)
   getPromotionThresholds(cart: CartContextInput!): [PromotionThreshold!]!
   

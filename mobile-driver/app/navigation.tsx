@@ -8,7 +8,6 @@ import { useApolloClient, useMutation, useQuery, useSubscription } from '@apollo
 import { GET_ORDERS, ALL_ORDERS_UPDATED, UPDATE_ORDER_STATUS, DRIVER_NOTIFY_CUSTOMER, ASSIGN_DRIVER_TO_ORDER } from '@/graphql/operations/orders';
 import { GET_MY_DRIVER_METRICS } from '@/graphql/operations/driver';
 import { useNavigationStore } from '@/store/navigationStore';
-import { useDriverLocation } from '@/hooks/useDriverLocation';
 import { useAuthStore } from '@/store/authStore';
 import { useNavigationLocationStore } from '@/store/navigationLocationStore';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
@@ -1202,16 +1201,10 @@ export default function NavigationScreen() {
         setAcceptSheetOrder(null);
     }, [acceptSheetOrder]);
 
-    /* ── Driver location (for live updates during navigation) ── */
-    const { location } = useDriverLocation({
-        smoothing: false,
-        timeInterval: 2000,
-        distanceFilter: 10,
-    });
-
     /* ── Build coordinates for MapboxNavigationView ── */
-    // Use stored origin initially, then switch to live GPS updates
-    const currentOrigin = location || originLocation;
+    // Use the stored origin only — the Navigation SDK tracks GPS internally.
+    // Feeding live GPS updates into coordinates causes the SDK to restart routing.
+    const currentOrigin = originLocation;
     const coordinates = useMemo(() => {
         if (!currentOrigin || !destination) return null;
         return [

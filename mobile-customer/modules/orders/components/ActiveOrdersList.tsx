@@ -9,6 +9,26 @@ import { Order } from '@/gql/graphql';
 
 const OrderStatusBadge = ({ status }: { status: string }) => {
     const theme = useTheme();
+    const { t } = useTranslations();
+
+    const getStatusLabel = () => {
+        switch (status) {
+            case 'PENDING':
+                return t.orders.status.pending;
+            case 'PREPARING':
+                return t.orders.status.preparing;
+            case 'READY':
+                return t.orders.status.ready;
+            case 'OUT_FOR_DELIVERY':
+                return t.orders.status.out_for_delivery;
+            case 'DELIVERED':
+                return t.orders.status.delivered;
+            case 'CANCELLED':
+                return t.orders.status.cancelled;
+            default:
+                return t.orders.status.in_progress;
+        }
+    };
 
     const getStatusColor = () => {
         switch (status) {
@@ -28,7 +48,7 @@ const OrderStatusBadge = ({ status }: { status: string }) => {
     return (
         <View className="px-3 py-1 rounded-full" style={{ backgroundColor: getStatusColor() + '20' }}>
             <Text className="text-xs font-semibold" style={{ color: getStatusColor() }}>
-                {status.replace(/_/g, ' ')}
+                {getStatusLabel()}
             </Text>
         </View>
     );
@@ -37,6 +57,7 @@ const OrderStatusBadge = ({ status }: { status: string }) => {
 const OrderListItem = ({ order }: { order: Order }) => {
     const router = useRouter();
     const theme = useTheme();
+    const { t } = useTranslations();
 
     const totalItems = order.businesses.reduce(
         (sum, business) => sum + business.items.reduce((s, item) => s + item.quantity, 0),
@@ -55,10 +76,13 @@ const OrderListItem = ({ order }: { order: Order }) => {
         >
             <View className="flex-row justify-between items-start mb-2">
                 <View className="flex-1">
-                    <Text className="text-lg font-bold text-foreground mb-1">Order #{order.id.slice(-6)}</Text>
+                    <Text className="text-lg font-bold text-foreground mb-1">
+                        {t.orders.order_prefix}
+                        {order.id.slice(-6)}
+                    </Text>
                     <Text className="text-sm text-subtext">
-                        {totalItems} item{totalItems !== 1 ? 's' : ''} from {order.businesses.length} store
-                        {order.businesses.length !== 1 ? 's' : ''}
+                        {totalItems} {totalItems !== 1 ? t.orders.item_plural : t.orders.item_singular} {t.orders.from}{' '}
+                        {order.businesses.length} {order.businesses.length !== 1 ? t.orders.restaurant_plural : t.orders.restaurant_singular}
                     </Text>
                 </View>
                 <OrderStatusBadge status={order.status} />
@@ -66,7 +90,12 @@ const OrderListItem = ({ order }: { order: Order }) => {
 
             <View className="flex-row justify-between items-center mt-2 pt-2 border-t border-border">
                 <Text className="text-base font-semibold text-foreground">€{order.totalPrice.toFixed(2)}</Text>
-                <Ionicons name="chevron-forward" size={20} color={theme.colors.subtext} />
+                <View className="flex-row items-center gap-1">
+                    <Text className="text-xs font-semibold" style={{ color: theme.colors.primary }}>
+                        {t.orders.view_details}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={18} color={theme.colors.primary} />
+                </View>
             </View>
         </TouchableOpacity>
     );

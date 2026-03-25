@@ -10,9 +10,12 @@ import {
     Alert,
     Modal,
     Pressable,
+    ScrollView,
+    Image,
     useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Audio } from 'expo-av';
 import { useApolloClient, useQuery, useMutation, useSubscription } from '@apollo/client/react';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -186,7 +189,10 @@ export default function OrdersScreen() {
     const [selectedPrepTime, setSelectedPrepTime] = useState(20);
     const [customPrepTime, setCustomPrepTime] = useState('');
     const lastTapRef = useRef<Record<string, number>>({});
+    const singleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pendingOrderIdsRef = useRef<Set<string>>(new Set());
+    const soundRef = useRef<Audio.Sound | null>(null);
+    const [productModalOrder, setProductModalOrder] = useState<Order | null>(null);
     const { width } = useWindowDimensions();
     const isTablet = width >= 768;
     const businessId = user?.businessId ?? '';
@@ -196,6 +202,29 @@ export default function OrdersScreen() {
         const interval = setInterval(() => setTick((t) => t + 1), 1000);
         return () => clearInterval(interval);
     }, []);
+
+    // Load beep sound
+    useEffect(() => {
+        Audio.Sound.createAsync(require('@/assets/beep.wav')).then(({ sound }) => {
+            soundRef.current = sound;
+        }).catch(() => {});
+        return () => {
+            soundRef.current?.unloadAsync();
+        };
+    }, []);
+
+    // Play beep × 3 with 1000 ms gaps: beep → 1000ms → beep → 1000ms → beep
+    const playBeepPeriod = useCallback(() => {
+        const beep = () => soundRef.current?.replayAsync().catch(() => {});
+        beep();
+        setTimeout(beep, 1000);
+        setTimeout(beep, 2000);
+    }, []);
+
+    // Single period is 3 beeps 2100ms apart (4200ms total); cycle = period + 15s cooldown
+    const playTwoPeriods = useCallback(() => {
+        playBeepPeriod();
+    }, [playBeepPeriod]);
 
     const { data, loading, refetch } = useQuery(GET_BUSINESS_ORDERS);
     const { data: businessData, refetch: refetchBusinessOperations } = useQuery(GET_BUSINESS_OPERATIONS, {
@@ -320,31 +349,37 @@ export default function OrdersScreen() {
 
         if (hasNewPending) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            setTimeout(() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-            }, 220);
+            playBeepPeriod();
+            setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 400);
         }
-    }, [sortedOrders]);
+    }, [sortedOrders, playBeepPeriod]);
 
     useEffect(() => {
         if (!hasPendingOrders) {
             return;
         }
 
+        // 2 periods immediately, then every 19.5 s (2×period + 15 s cooldown)
+        playTwoPeriods();
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
         const interval = setInterval(() => {
+            playTwoPeriods();
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            setTimeout(() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            }, 320);
-        }, 20000);
+        }, 17000);
 
         return () => clearInterval(interval);
-    }, [hasPendingOrders]);
+    }, [hasPendingOrders, playTwoPeriods]);
 
     const handleDoubleTap = useCallback((order: Order) => {
         const now = Date.now();
         const lastTap = lastTapRef.current[order.id] || 0;
         if (now - lastTap < 400) {
+            // Double tap — cancel any pending single-tap and act
+            if (singleTapTimerRef.current) {
+                clearTimeout(singleTapTimerRef.current);
+                singleTapTimerRef.current = null;
+            }
             if (order.status === 'PENDING') {
                 if (isMarket) {
                     // Market orders skip PREPARING — jump straight to READY
@@ -362,6 +397,13 @@ export default function OrdersScreen() {
             lastTapRef.current[order.id] = 0;
         } else {
             lastTapRef.current[order.id] = now;
+            // Single tap on market order — show product images after delay
+            if (isMarket) {
+                singleTapTimerRef.current = setTimeout(() => {
+                    singleTapTimerRef.current = null;
+                    setProductModalOrder(order);
+                }, 420);
+            }
         }
     }, [isMarket]);
 
@@ -464,17 +506,13 @@ export default function OrdersScreen() {
     const handleCloseStore = async () => {
         if (!businessId) return;
         const reason = closingReason.trim();
-        if (!reason) {
-            Alert.alert(t('common.error', 'Error'), t('orders.close_reason_required', 'Please enter a closure reason.'));
-            return;
-        }
         try {
             await updateBusinessOperations({
                 variables: {
                     id: businessId,
                     input: {
                         isTemporarilyClosed: true,
-                        temporaryClosureReason: reason,
+                        temporaryClosureReason: reason || null,
                     },
                 },
             });
@@ -557,6 +595,7 @@ export default function OrdersScreen() {
         }
 
         return (
+            <View style={isTablet ? { flex: 1 } : undefined}>
             <Pressable
                 onPress={() => handleDoubleTap(order)}
                 style={({ pressed }) => ({
@@ -567,10 +606,9 @@ export default function OrdersScreen() {
                 <View
                     className="bg-card rounded-2xl mb-3 overflow-hidden"
                     style={{
-                        marginHorizontal: isTablet ? 16 : 12,
-                        maxWidth: isTablet ? 980 : undefined,
-                        alignSelf: 'center',
-                        width: '100%',
+                        marginHorizontal: 8,
+                        flex: isTablet ? 1 : undefined,
+                        width: isTablet ? undefined : '100%' as const,
                         borderLeftWidth: 4,
                         borderLeftColor: pendingBlinkOn ? '#ef4444' : STATUS_COLORS[order.status],
                         borderWidth: 1,
@@ -687,6 +725,20 @@ export default function OrdersScreen() {
                                         </Text>
                                     </View>
 
+                                    {isMarket && item.imageUrl ? (
+                                        <Image
+                                            source={{ uri: item.imageUrl }}
+                                            style={{
+                                                width: isTablet ? 52 : 44,
+                                                height: isTablet ? 52 : 44,
+                                                borderRadius: 10,
+                                                marginRight: 10,
+                                                backgroundColor: '#1e293b',
+                                            }}
+                                            resizeMode="cover"
+                                        />
+                                    ) : null}
+
                                     <View className="flex-1">
                                         <View className="flex-row items-center justify-between">
                                             <View className="flex-1 pr-2">
@@ -780,6 +832,7 @@ export default function OrdersScreen() {
                     )}
                 </View>
             </Pressable>
+            </View>
         );
     };
 
@@ -865,6 +918,9 @@ export default function OrdersScreen() {
                     data={sortedOrders}
                     keyExtractor={(item) => item.id}
                     renderItem={renderOrderCard}
+                    key={isTablet ? 'two-col' : 'one-col'}
+                    numColumns={isTablet ? 2 : 1}
+                    columnWrapperStyle={isTablet ? { paddingHorizontal: 8 } : undefined}
                     refreshControl={
                         <RefreshControl refreshing={false} onRefresh={refetch} tintColor="#7C3AED" />
                     }
@@ -1155,6 +1211,160 @@ export default function OrdersScreen() {
                                 )}
                             </TouchableOpacity>
                         </View>
+                    </Pressable>
+                </Pressable>
+            </Modal>
+
+            {/* ── Product Images Modal (Market only) ── */}
+            <Modal
+                visible={!!productModalOrder}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setProductModalOrder(null)}
+            >
+                <Pressable
+                    className="flex-1 justify-end"
+                    style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}
+                    onPress={() => setProductModalOrder(null)}
+                >
+                    <Pressable
+                        style={{
+                            backgroundColor: '#0f172a',
+                            borderTopLeftRadius: 28,
+                            borderTopRightRadius: 28,
+                            maxHeight: '88%',
+                            paddingBottom: 32,
+                            borderWidth: 1,
+                            borderColor: 'rgba(255,255,255,0.08)',
+                        }}
+                        onPress={(e) => e.stopPropagation()}
+                    >
+                        {/* Handle bar */}
+                        <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 4 }}>
+                            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)' }} />
+                        </View>
+
+                        {/* Header */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 }}>
+                            <View>
+                                <Text style={{ color: '#f1f5f9', fontSize: 20, fontWeight: '700' }}>
+                                    #{productModalOrder?.displayId}
+                                </Text>
+                                <Text style={{ color: '#64748b', fontSize: 13, marginTop: 2 }}>
+                                    {productModalOrder?.businesses.find((b) => b.business.id === user?.businessId)?.items.length ?? 0} items
+                                </Text>
+                            </View>
+                            <Pressable
+                                onPress={() => setProductModalOrder(null)}
+                                hitSlop={12}
+                                style={{
+                                    width: 34,
+                                    height: 34,
+                                    borderRadius: 10,
+                                    backgroundColor: 'rgba(255,255,255,0.07)',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
+                            >
+                                <Ionicons name="close" size={18} color="#64748b" />
+                            </Pressable>
+                        </View>
+
+                        <ScrollView
+                            style={{ paddingHorizontal: 16 }}
+                            showsVerticalScrollIndicator={false}
+                        >
+                            {productModalOrder?.businesses
+                                .find((b) => b.business.id === user?.businessId)
+                                ?.items.map((item, index) => (
+                                    <View
+                                        key={index}
+                                        style={{
+                                            flexDirection: 'row',
+                                            alignItems: 'flex-start',
+                                            backgroundColor: '#1e293b',
+                                            borderRadius: 18,
+                                            padding: 14,
+                                            marginBottom: 12,
+                                            borderWidth: 1,
+                                            borderColor: 'rgba(255,255,255,0.07)',
+                                        }}
+                                    >
+                                        {/* Product image or placeholder */}
+                                        {item.imageUrl ? (
+                                            <Image
+                                                source={{ uri: item.imageUrl }}
+                                                style={{
+                                                    width: 80,
+                                                    height: 80,
+                                                    borderRadius: 14,
+                                                    backgroundColor: '#0f172a',
+                                                    marginRight: 14,
+                                                    flexShrink: 0,
+                                                }}
+                                                resizeMode="cover"
+                                            />
+                                        ) : (
+                                            <View
+                                                style={{
+                                                    width: 80,
+                                                    height: 80,
+                                                    borderRadius: 14,
+                                                    backgroundColor: '#0f172a',
+                                                    marginRight: 14,
+                                                    flexShrink: 0,
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    borderWidth: 1,
+                                                    borderColor: 'rgba(255,255,255,0.06)',
+                                                }}
+                                            >
+                                                <Ionicons name="image-outline" size={28} color="#334155" />
+                                            </View>
+                                        )}
+
+                                        {/* Item info */}
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={{ color: '#f1f5f9', fontSize: 16, fontWeight: '700', lineHeight: 22 }}>
+                                                {item.name}
+                                            </Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 8 }}>
+                                                <View style={{
+                                                    paddingHorizontal: 10,
+                                                    paddingVertical: 3,
+                                                    borderRadius: 20,
+                                                    backgroundColor: '#7c3aed22',
+                                                    borderWidth: 1,
+                                                    borderColor: '#7c3aed44',
+                                                }}>
+                                                    <Text style={{ color: '#c4b5fd', fontSize: 12, fontWeight: '700' }}>
+                                                        ×{item.quantity}
+                                                    </Text>
+                                                </View>
+                                                <Text style={{ color: '#94a3b8', fontSize: 13 }}>
+                                                    €{item.unitPrice.toFixed(2)} each
+                                                </Text>
+                                            </View>
+                                            <Text style={{ color: '#10b981', fontSize: 16, fontWeight: '800', marginTop: 6 }}>
+                                                €{(item.unitPrice * item.quantity).toFixed(2)}
+                                            </Text>
+                                            {item.notes ? (
+                                                <View style={{
+                                                    marginTop: 8,
+                                                    backgroundColor: '#f59e0b18',
+                                                    borderRadius: 10,
+                                                    padding: 8,
+                                                    borderWidth: 1,
+                                                    borderColor: '#f59e0b33',
+                                                }}>
+                                                    <Text style={{ color: '#fcd34d', fontSize: 12 }}>{item.notes}</Text>
+                                                </View>
+                                            ) : null}
+                                        </View>
+                                    </View>
+                                ))
+                            }
+                        </ScrollView>
                     </Pressable>
                 </Pressable>
             </Modal>

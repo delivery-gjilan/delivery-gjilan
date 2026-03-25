@@ -8,10 +8,12 @@ import {
     KeyboardAvoidingView,
     Platform,
     ActivityIndicator,
+    Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useSubscription } from '@apollo/client/react';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     MY_BUSINESS_MESSAGES,
     BUSINESS_MESSAGE_RECEIVED_SUB,
@@ -19,6 +21,8 @@ import {
     MARK_BUSINESS_MESSAGES_READ_BUSINESS,
 } from '@/graphql/messages';
 import { useTranslation } from '@/hooks/useTranslation';
+
+const CLEAR_STORAGE_KEY = 'business_chat_cleared_at';
 
 type AlertType = 'INFO' | 'WARNING' | 'URGENT';
 
@@ -42,10 +46,10 @@ const COLORS = {
     primary: '#7c3aed',
 };
 
-const ALERT_CONFIG: Record<AlertType, { bg: string; border: string; textColor: string; labelColor: string }> = {
-    INFO: { bg: '#1e0a4a22', border: '#7c3aed44', textColor: '#c4b5fd', labelColor: '#a78bfa' },
-    WARNING: { bg: '#451a0322', border: '#f59e0b44', textColor: '#fcd34d', labelColor: '#f59e0b' },
-    URGENT: { bg: '#450a0a22', border: '#ef444444', textColor: '#fca5a5', labelColor: '#ef4444' },
+const ALERT_CONFIG: Record<AlertType, { bg: string; border: string; textColor: string; labelColor: string; labelText: string }> = {
+    INFO: { bg: '#1e0a4a22', border: '#7c3aed44', textColor: '#c4b5fd', labelColor: '#a78bfa', labelText: 'Message' },
+    WARNING: { bg: '#451a0322', border: '#f59e0b44', textColor: '#fcd34d', labelColor: '#f59e0b', labelText: 'Warning' },
+    URGENT: { bg: '#450a0a22', border: '#ef444444', textColor: '#fca5a5', labelColor: '#ef4444', labelText: 'Urgent' },
 };
 
 /** Parses both ISO-8601 and PostgreSQL's "2026-03-24 10:30:00+00" format safely on iOS */
@@ -94,7 +98,15 @@ export default function MessagesScreen() {
     const { t } = useTranslation();
     const [extraMessages, setExtraMessages] = useState<BusinessMessage[]>([]);
     const [replyText, setReplyText] = useState('');
+    const [clearedAt, setClearedAt] = useState<number | null>(null);
     const flatListRef = useRef<FlatList>(null);
+
+    // Load persisted clear timestamp
+    useEffect(() => {
+        AsyncStorage.getItem(CLEAR_STORAGE_KEY).then((val) => {
+            if (val) setClearedAt(parseInt(val, 10));
+        });
+    }, []);
 
     const { loading, data: queryData } = useQuery<{ myBusinessMessages: BusinessMessage[] }>(MY_BUSINESS_MESSAGES, {
         variables: { limit: 100 },
@@ -105,16 +117,16 @@ export default function MessagesScreen() {
     const baseMessages = queryData?.myBusinessMessages ?? [];
     const adminId = baseMessages.find((m) => m.senderRole === 'ADMIN')?.adminId ?? null;
 
-    // Merge base messages with any extras that arrived via subscription/mutation
+    // Merge base messages with any extras that arrived via subscription/mutation, filtered by clearedAt
     const messages = React.useMemo(() => {
         const byId = new Map(baseMessages.map((m) => [m.id, m]));
         for (const m of extraMessages) {
             if (!byId.has(m.id)) byId.set(m.id, m);
         }
-        return Array.from(byId.values()).sort(
-            (a, b) => parseDate(a.createdAt).getTime() - parseDate(b.createdAt).getTime(),
-        );
-    }, [baseMessages, extraMessages]);
+        return Array.from(byId.values())
+            .filter((m) => !clearedAt || parseDate(m.createdAt).getTime() > clearedAt)
+            .sort((a, b) => parseDate(a.createdAt).getTime() - parseDate(b.createdAt).getTime());
+    }, [baseMessages, extraMessages, clearedAt]);
 
     const [markRead] = useMutation(MARK_BUSINESS_MESSAGES_READ_BUSINESS);
     const [reply, { loading: replying }] = useMutation(REPLY_TO_BUSINESS_MESSAGE, {
@@ -162,6 +174,25 @@ export default function MessagesScreen() {
         await reply({ variables: { adminId, body } });
     };
 
+    const handleClearChat = () => {
+        Alert.alert(
+            'Clear Chat',
+            'This will hide all current messages. New messages will still appear.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Clear',
+                    style: 'destructive',
+                    onPress: async () => {
+                        const now = Date.now();
+                        await AsyncStorage.setItem(CLEAR_STORAGE_KEY, now.toString());
+                        setClearedAt(now);
+                    },
+                },
+            ],
+        );
+    };
+
     const listItems = buildListItems(messages);
 
     const renderItem = ({ item }: { item: ListItem }) => {
@@ -202,7 +233,7 @@ export default function MessagesScreen() {
                 >
                     {!isBusiness && (
                         <Text style={{ color: alertCfg.labelColor, fontSize: 10, fontWeight: '700', marginBottom: 3 }}>
-                            {msg.alertType}
+                            {alertCfg.labelText}
                         </Text>
                     )}
                     <Text style={{ color: COLORS.text, fontSize: 14, lineHeight: 20 }}>{msg.body}</Text>
@@ -232,9 +263,18 @@ export default function MessagesScreen() {
                 }}
             >
                 <Ionicons name="chatbubbles-outline" size={22} color={COLORS.primary} />
-                <Text style={{ fontSize: 18, fontWeight: '700', color: COLORS.text }}>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: COLORS.text, flex: 1 }}>
                     {t('tabs.messages', 'Messages')}
                 </Text>
+                {messages.length > 0 && (
+                    <Pressable
+                        onPress={handleClearChat}
+                        hitSlop={8}
+                        style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, padding: 4 })}
+                    >
+                        <Ionicons name="trash-outline" size={20} color={COLORS.subtext} />
+                    </Pressable>
+                )}
             </View>
 
             <KeyboardAvoidingView

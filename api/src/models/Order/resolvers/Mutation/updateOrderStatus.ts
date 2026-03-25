@@ -65,7 +65,8 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
         }
 
         const allowed: Record<string, string[]> = {
-            PREPARING: ['READY'],
+            PENDING: ['READY', 'CANCELLED'],   // MARKET/PHARMACY: skip PREPARING
+            PREPARING: ['READY', 'CANCELLED'],
         };
 
         if (!allowed[currentStatus]?.includes(status)) {

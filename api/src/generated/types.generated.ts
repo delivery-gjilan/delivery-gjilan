@@ -1866,6 +1866,7 @@ export type Query = {
   /** Admin: full conversation with a specific driver */
   driverMessages: Array<DriverMessage>;
   drivers: Array<User>;
+  getActiveGlobalPromotions: Array<Promotion>;
   /** Get Agora RTC credentials for the current authenticated user */
   getAgoraRtcCredentials: AgoraRtcCredentials;
   getAllPromotions: Array<Promotion>;
@@ -4026,6 +4027,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   driverMessageThreads?: Resolver<Array<ResolversTypes['DriverMessageThread']>, ParentType, ContextType>;
   driverMessages?: Resolver<Array<ResolversTypes['DriverMessage']>, ParentType, ContextType, RequireFields<QuerydriverMessagesArgs, 'driverId'>>;
   drivers?: Resolver<Array<ResolversTypes['User']>, ParentType, ContextType>;
+  getActiveGlobalPromotions?: Resolver<Array<ResolversTypes['Promotion']>, ParentType, ContextType>;
   getAgoraRtcCredentials?: Resolver<ResolversTypes['AgoraRtcCredentials'], ParentType, ContextType, RequireFields<QuerygetAgoraRtcCredentialsArgs, 'channelName' | 'role'>>;
   getAllPromotions?: Resolver<Array<ResolversTypes['Promotion']>, ParentType, ContextType, Partial<QuerygetAllPromotionsArgs>>;
   getApplicablePromotions?: Resolver<Array<ResolversTypes['ApplicablePromotion']>, ParentType, ContextType, RequireFields<QuerygetApplicablePromotionsArgs, 'cart'>>;
