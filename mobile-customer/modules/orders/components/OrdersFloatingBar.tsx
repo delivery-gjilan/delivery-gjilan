@@ -107,7 +107,7 @@ export const OrdersFloatingBar = () => {
             default:
                 return {
                     label: t.orders.status.in_progress,
-                    message: 'Your order is being processed',
+                    message: t.orders.in_progress_message,
                     bgColor: theme.colors.primary,
                     icon: 'hourglass-outline' as const,
                 };
@@ -115,6 +115,12 @@ export const OrdersFloatingBar = () => {
     };
 
     const statusInfo = getStatusInfo(customerVisibleStatus);
+    const activeOrderTitle =
+        activeOrderCount > 1 ? `${activeOrderCount} ${t.orders.active_orders}` : t.orders.active_bar;
+    const activeOrderSubtitle =
+        activeOrderCount > 1 ? t.orders.multiple_active_cta : displayBusinessName;
+    const activeOrderHint =
+        activeOrderCount > 1 ? t.orders.multiple_active_subtitle : statusInfo.message;
 
     const handlePress = async () => {
         if (!activeOrderId) {
@@ -123,7 +129,7 @@ export const OrdersFloatingBar = () => {
                 hasActiveOrders,
                 activeOrdersCount: activeOrders.length,
             });
-            toast.warning(t.common.error, (t.orders as any).banner_unavailable || 'Order details unavailable');
+            toast.warning(t.common.error, t.orders.banner_unavailable);
             return;
         }
 
@@ -160,13 +166,13 @@ export const OrdersFloatingBar = () => {
                 </View>
                 <View className="flex-1">
                     <Text className="text-white font-semibold text-base">
-                        {activeOrderCount > 1 ? `${activeOrderCount} ${t.orders.active_orders}` : t.orders.active_bar}
+                        {activeOrderTitle}
                     </Text>
                     <Text className="text-white/80 text-xs" numberOfLines={1}>
-                        {activeOrderCount > 1 ? 'Tap to view all active orders' : displayBusinessName}
+                        {activeOrderSubtitle}
                     </Text>
                     <Text className="text-white/70 text-xs mt-0.5" numberOfLines={1}>
-                        {activeOrderCount > 1 ? 'Multiple orders are currently in progress' : statusInfo.message}
+                        {activeOrderHint}
                     </Text>
                 </View>
             </View>

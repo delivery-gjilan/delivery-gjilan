@@ -177,6 +177,15 @@ export const GET_ORDER = graphql(`
                     }
                 }
             }
+            originalPrice
+            originalDeliveryPrice
+            paymentCollection
+            orderPromotions {
+                id
+                promotionId
+                appliesTo
+                discountAmount
+            }
         }
     }
 `);

@@ -7,6 +7,7 @@
 
 ## Recent Updates
 
+- 2026-03-25: Comprehensive doc refresh — added PromotionEngine service docs, stacking logic, progression bar (mobile-customer), corrected promotions table fields to match actual schema, added mobile-customer key files.
 - 2026-03-20: Added DB-level pending-settlement uniqueness guard (`uq_settlements_pending_fingerprint`) plus conflict-safe inserts in `FinancialService.createOrderSettlements()` to hard-stop occasional duplicate pending rows under concurrent triggers.
 - 2026-03-19: Settlement creation is now protected by an order-scoped Postgres advisory transaction lock in `FinancialService.createOrderSettlements()` to prevent duplicate settlements during concurrent delivery/backfill triggers.
 - 2026-03-18: Fixed mobile-admin settlement action wiring to pass `settlementId` (not `id`) to `markSettlementAsPaid`.
@@ -176,22 +177,32 @@ Promotions are a separate discount system. They reduce what the customer pays.
 
 ### Database: `promotions`
 
-Key fields:
-
-| Field | Purpose |
-|-------|---------|
-| `type` | `FIXED_AMOUNT`, `PERCENTAGE`, `FREE_DELIVERY`, `SPEND_X_GET_FREE`, `SPEND_X_PERCENT`, `SPEND_X_FIXED` |
-| `code` | Promo code the customer enters (or null for auto-apply) |
-| `discount_value` | The discount amount or percentage |
-| `min_order_amount` | Minimum order total to qualify |
-| `max_discount_amount` | Cap on the discount |
-| `target` | `ALL_USERS`, `SPECIFIC_USERS`, `FIRST_ORDER`, `CONDITIONAL` |
-| `auto_apply` | Whether it applies automatically without a code |
-| `is_stackable` | Whether it can combine with other promos |
-| `usage_limit` / `per_user_limit` | Usage caps |
-| `valid_from` / `valid_until` | Date window |
-| `created_by_type` | `PLATFORM` or `BUSINESS` |
-| `business_id` | If business-created, which business owns it |
+| Field | Type | Purpose |
+|-------|------|---------|
+| `id` | UUID | Primary key |
+| `code` | text (unique, nullable) | Promo code the customer enters (null = auto-applied / codeless) |
+| `name` | text | Human label |
+| `description` | text (nullable) | Optional description |
+| `type` | enum | `FIXED_AMOUNT`, `PERCENTAGE`, `FREE_DELIVERY`, `SPEND_X_GET_FREE`, `SPEND_X_PERCENT`, `SPEND_X_FIXED` |
+| `target` | enum | `ALL_USERS`, `SPECIFIC_USERS`, `FIRST_ORDER`, `CONDITIONAL` |
+| `discount_value` | numeric(10,2) | The discount amount (EUR) or percentage (0–100) |
+| `max_discount_cap` | numeric(10,2) | Cap on percentage discounts |
+| `min_order_amount` | numeric(10,2) | Minimum subtotal to qualify |
+| `spend_threshold` | numeric(10,2) | For conditional/SPEND_X_* promos: subtotal required to unlock |
+| `threshold_reward` | jsonb | For SPEND_X_* promos: `{ type: 'FREE_DELIVERY' \| 'FIXED_AMOUNT' \| 'PERCENTAGE', value?: number }` |
+| `max_global_usage` | integer | Total times this promo can be used globally |
+| `max_usage_per_user` | integer | Times each user can use it |
+| `current_global_usage` | integer | Counter incremented on each usage |
+| `is_stackable` | boolean | Whether it can combine with other promos |
+| `priority` | integer | Higher = applied first; controls stacking order |
+| `is_active` | boolean | Only active promos are considered |
+| `starts_at` | timestamp | Start of validity window |
+| `ends_at` | timestamp | End of validity window |
+| `total_revenue` | numeric(12,2) | Sum of order subtotals where this promo was used |
+| `total_usage_count` | integer | Total redemptions |
+| `creator_type` | enum | `PLATFORM` or `BUSINESS` |
+| `creator_id` | UUID (nullable) | FK → businesses (null = platform-created) |
+| `created_by` | UUID (nullable) | FK → users |
 
 ### Database: `order_promotions`
 
@@ -226,6 +237,136 @@ You can create a settlement rule with a `promotion_id`. This rule only fires for
 ### 2. Promotions change the order totals
 
 Promotions reduce `order.price` (item discounts) or `order.deliveryPrice` (delivery discounts). Since PERCENT settlement rules calculate against these values, the settlement amounts naturally adjust. If a customer gets 20% off items, the business commission (which is a % of subtotal) is also lower.
+
+---
+
+## PromotionEngine (Server-Side)
+
+`api/src/services/PromotionEngine.ts` is the single service class for all promotion logic.
+
+### `getApplicablePromotions(userId, cart, manualPromoCode?)`
+
+Finds all eligible promotions:
+
+1. Check user's first-order status via `user_promo_metadata`
+2. Query all promotions that are: active, within time window (`startsAt`/`endsAt`), and meet `minOrderAmount`
+3. If `manualPromoCode` is provided, filter to only that code
+4. For each candidate, check target eligibility:
+   - `ALL_USERS` → check code usage limits; if `spendThreshold` exists, also check threshold met
+   - `FIRST_ORDER` → user must not have used a first-order promo before
+   - `SPECIFIC_USERS` → user must have an active assignment in `user_promotions`
+   - `CONDITIONAL` → cart subtotal must meet `spendThreshold`
+5. Check business eligibility via `promotion_business_eligibility` (empty = global)
+6. Check per-user and global usage limits
+7. Calculate discount via `calculateDiscount()`
+8. Sort by priority (highest first)
+
+### `applyPromotions(userId, cart, manualPromoCode?)`
+
+Selects the best combination and returns final totals:
+
+1. Get applicable promotions from above
+2. Always apply the first (highest priority) promotion
+3. If first promo is stackable, add all remaining stackable promos
+4. Sum total discount and check free delivery across all applied promos
+5. Return `PromotionResult` with `finalSubtotal`, `finalDeliveryPrice`, `finalTotal`
+
+### Discount Calculation by Type
+
+| Type | Calculation | Notes |
+|------|-------------|-------|
+| `FIXED_AMOUNT` | `discountValue` | Flat EUR off subtotal |
+| `PERCENTAGE` | `subtotal × discountValue / 100` | Capped by `maxDiscountCap` if set |
+| `FREE_DELIVERY` | 0 (discount handled via `freeDelivery` flag) | Sets delivery to €0 |
+| `SPEND_X_GET_FREE` | 0 (grants free delivery via `thresholdReward`) | Free item/delivery when threshold met |
+| `SPEND_X_PERCENT` | `subtotal × discountValue / 100` | Percentage discount after threshold |
+| `SPEND_X_FIXED` | `discountValue` | Fixed discount after threshold |
+
+All discounts are capped at the subtotal (`min(discount, subtotal)`).
+
+### Free Delivery Detection
+
+A promo grants free delivery if:
+- `type === 'FREE_DELIVERY'`, or
+- `thresholdReward.type === 'FREE_DELIVERY'`
+
+### Stacking Rules
+
+- The first promo (highest priority) is always applied
+- Additional promos are added only if the first promo is `isStackable = true` AND the candidate is also stackable
+- Non-stackable promos are mutually exclusive with everything except themselves
+
+### `recordUsage(promotionIds, userId, orderId, ...)`
+
+Called after order creation:
+- Locks each promotion row (`SELECT ... FOR UPDATE`) inside a transaction
+- Re-validates usage limits under lock to prevent races
+- Inserts `promotion_usage` records
+- Increments `currentGlobalUsage`, `totalUsageCount`, `totalRevenue` on the promotion
+- Updates `user_promotions.usageCount` and `user_promo_metadata.totalSavings`
+
+### `reverseUsage(orderId, userId)`
+
+Called on order cancellation:
+- Deletes `promotion_usage` records for the order
+- Decrements promotion and user metadata counters with `GREATEST(0, val - 1)`
+
+---
+
+## Mobile-Customer: Progression Bar & Auto-Apply
+
+The mobile-customer cart screen (`modules/cart/components/CartScreen.tsx`) implements a spend-threshold progression bar and automatic promotion application.
+
+### Progression Bar
+
+1. **Query**: `GET_PROMOTION_THRESHOLDS` is executed with the current cart context (items, subtotal, deliveryPrice, businessIds)
+2. **API response**: Returns `PromotionThreshold[]` — active promotions with a `spendThreshold` (target = `CONDITIONAL` or `ALL_USERS` with threshold)
+3. **Filtering**: Frontend filters thresholds by business eligibility — if `eligibleBusinessIds` is empty, the promo is global
+4. **Selection**: Picks the highest-priority matching threshold
+5. **Progress calculation**:
+   - `progress = min(cartSubtotal / spendThreshold, 1)`
+   - `amountRemaining = max(0, spendThreshold - cartSubtotal)`
+6. **Display**: An animated bar shown when `0 < progress < 1` and no promo is already applied
+   - Text: _"Spend €{threshold} to unlock: {promo name}"_ with remaining amount
+   - Animated width: `{progress × 100}%`
+
+### Auto-Apply
+
+When the cart subtotal reaches or exceeds the spend threshold (`progress >= 1`):
+
+1. Triggers `VALIDATE_PROMOTIONS` query (without `manualCode`, so server applies auto-eligible promos)
+2. If a promo is returned, sets `promoResult` state with discount details
+3. Fills the promo code input with the applied code
+4. Shows a success notifier: _"Promotion applied: {name}"_
+5. Tracks via `autoAppliedPromotionIdRef` to prevent re-triggering
+
+### Auto-Remove
+
+If the user decreases cart items so the subtotal drops below the threshold (`progress < 1`) and the promo was auto-applied, the promo is automatically cleared.
+
+### Manual Code Entry
+
+Step 3 (Review) includes a promo code input:
+1. User types a code and taps "Apply"
+2. `VALIDATE_PROMOTIONS` query with `manualCode` param
+3. If valid → sets `promoResult`, shows success notification
+4. If invalid → shows error: _"Promotion not valid."_
+5. Clearing the input clears the applied promo
+
+### Price Breakdown at Checkout
+
+```
+Subtotal = sum of all cart items (including option extras)
+Delivery = base delivery price (or €0 if free delivery promo)
+Priority = +€1.50 if priority delivery selected
+Discount = total promo discount amount
+
+Final Total = Subtotal + Delivery + Priority - Discount
+```
+
+### Order Submission
+
+`promoResult.code` is passed to `createOrder` mutation as `promoCode`. The server re-validates the promotion during order creation via `PromotionEngine.applyPromotions()`, records usage, and creates settlements.
 
 ---
 
@@ -301,13 +442,21 @@ deleteSettlementRule(id: ID!): Boolean!
 ### Promotion Queries & Mutations
 
 ```graphql
-getAllPromotions(isActive, type, target, businessId): [Promotion!]!
+getAllPromotions(isActive: Boolean): [Promotion!]!
 getPromotion(id: ID!): Promotion
-getApplicablePromotions(userId, cartContext): [ApplicablePromotion!]!
-validatePromotions(userId, promotionIds, cartContext): PromotionResult!
+getApplicablePromotions(cart: CartContextInput!, manualCode: String): [ApplicablePromotion!]!
+getPromotionThresholds(cart: CartContextInput!): [PromotionThreshold!]!
+validatePromotions(cart: CartContextInput!, manualCode: String): PromotionResult!
+getUserPromotions(userId: ID!): [UserPromotion!]!
+getPromotionUsage(promotionId: ID!): [PromotionUsage!]!
+getUserPromoMetadata(userId: ID!): UserPromoMetadata
+getPromotionAnalytics(promotionId: ID!): PromotionAnalyticsResult
 createPromotion(input: CreatePromotionInput!): Promotion!
 updatePromotion(id: ID!, input: UpdatePromotionInput!): Promotion!
 deletePromotion(id: ID!): Boolean!
+assignPromotionToUsers(input: AssignPromotionToUserInput!): [UserPromotion!]!
+removeUserFromPromotion(promotionId: ID!, userId: ID!): Boolean!
+markFirstOrderUsed(userId: ID!): Boolean!
 ```
 
 ---
@@ -316,20 +465,35 @@ deletePromotion(id: ID!): Boolean!
 
 | File | Purpose |
 |------|---------|
+| **API — Schema** | |
 | `api/database/schema/settlements.ts` | Settlements table + relations |
 | `api/database/schema/settlementRules.ts` | Settlement rules table + relations + shared enums |
 | `api/database/schema/orders.ts` | Order schema, including payment collection mode |
 | `api/database/schema/promotions.ts` | Promotions + user_promotions + usage + eligibility tables |
 | `api/database/schema/orderPromotions.ts` | Order ↔ promotion link table |
-| `api/src/models/Order/Order.graphql` | Order GraphQL schema and create-order input |
+| **API — Services** | |
 | `api/src/services/SettlementCalculationEngine.ts` | Matches rules to orders, calculates amounts |
 | `api/src/services/FinancialService.ts` | Orchestrates settlement creation/cancellation |
+| `api/src/services/PromotionEngine.ts` | Promotion eligibility, stacking, discount calculation, usage tracking |
+| **API — Repositories** | |
 | `api/src/repositories/SettlementRepository.ts` | Settlement CRUD, pay/unsettle, summaries |
 | `api/src/repositories/SettlementRuleRepository.ts` | Rule CRUD |
+| **API — GraphQL** | |
+| `api/src/models/Order/Order.graphql` | Order GraphQL schema and create-order input |
 | `api/src/models/Settlement/Settlement.graphql` | Settlement GraphQL schema |
-| `api/src/services/SettlementScenarioHarnessService.ts` | Seed + scenario execution + expected/actual comparison |
 | `api/src/models/SettlementRule/SettlementRule.graphql` | Settlement rule GraphQL schema |
-| `api/src/models/Promotion/Promotion.graphql` | Promotion GraphQL schema |
+| `api/src/models/Promotion/Promotion.graphql` | Promotion GraphQL schema (types, inputs, queries, mutations) |
+| `api/src/models/Promotion/resolvers/Query/getPromotionThresholds.ts` | Threshold query for progression bar |
+| `api/src/models/Promotion/resolvers/Query/validatePromotions.ts` | Validate & apply promotions resolver |
+| `api/src/models/Promotion/resolvers/Query/getApplicablePromotions.ts` | List applicable promotions resolver |
+| **API — Testing** | |
+| `api/src/services/SettlementScenarioHarnessService.ts` | Seed + scenario execution + expected/actual comparison |
+| **Admin Panel** | |
 | `admin-panel/src/app/admin/financial/rules/page.tsx` | Admin settlement rules UI |
 | `admin-panel/src/app/admin/financial/testing/page.tsx` | Admin settlement scenario testing harness UI |
 | `admin-panel/src/app/dashboard/finances/page.tsx` | Admin finances dashboard |
+| **Mobile Customer** | |
+| `mobile-customer/modules/cart/components/CartScreen.tsx` | Cart + checkout with progression bar, promo code, auto-apply |
+| `mobile-customer/modules/cart/hooks/useCreateOrder.ts` | Order creation hook (passes `promoCode`) |
+| `mobile-customer/graphql/operations/promotions.ts` | `VALIDATE_PROMOTIONS` + `GET_PROMOTION_THRESHOLDS` queries |
+| `mobile-customer/components/PromoSlider.tsx` | Promotional banner carousel on home screen |

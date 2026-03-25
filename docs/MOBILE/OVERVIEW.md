@@ -1,6 +1,6 @@
 # Mobile Overview
 
-<!-- MDS:M1 | Domain: Mobile | Updated: 2026-03-22 -->
+<!-- MDS:M1 | Domain: Mobile | Updated: 2026-03-24 -->
 <!-- Depends-On: A1 -->
 <!-- Depended-By: M2, M3, M4, M5, M8, BL2, BL3 -->
 <!-- Nav: App-level architecture changes → update all M* files. Shared pattern changes → review BL2 (Products), BL3 (Cart). -->
@@ -40,7 +40,13 @@ The apps are separate packages, but they share a set of conventions:
 - order history and active order tracking
 - store-status banner and store-closed handling
 
-Bottom tab UX now includes an active-tab underline tile using theme primary purple for clearer current-tab state.
+Bottom tab UX uses a stronger active state with dynamic icon fill and an animated underline marker aligned to the customer theme primary color.
+
+Customer checkout/cart UI now uses a three-step flow shell (cart, address, review) with localized step labels and notifier/error copy so both supported languages render the same flow language. Step 3 review shows a payment method card (cash on delivery), total in the confirm button, and character counter on driver notes. Duplicate translation keys cleaned up.
+
+Active-order floating and order-history surfaces in mobile-customer now use localized status and CTA copy consistently, including multi-active-order guidance and unified status badge wording across list and floating entry points.
+
+OrderDetails screen in mobile-customer now uses localized strings for all user-visible copy: order number label, price summary heading, delivery address heading, order items heading, show/hide summary toggle, map unavailable fallback, unknown date fallback, and cancelled status banner. Removed all `as any` translation key workarounds by adding proper schema keys.
 
 `mobile-business` finances now supports business-focused settlement review with filters (period, status, direction, order search) and table-style settlement rows.
 

@@ -35,3 +35,18 @@ export const GET_PROMOTION_THRESHOLDS = graphql(`
         }
     }
 `);
+
+export const GET_ACTIVE_GLOBAL_PROMOTIONS = graphql(`
+    query GetActiveGlobalPromotions {
+        getActiveGlobalPromotions {
+            id
+            name
+            description
+            type
+            target
+            discountValue
+            spendThreshold
+            isActive
+        }
+    }
+`);

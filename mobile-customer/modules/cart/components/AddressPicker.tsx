@@ -219,6 +219,36 @@ export default function AddressPicker({
                 setPinLocation(null);
                 setPinAddress('');
                 lastGeocodedPos.current = null;
+
+                // Auto-detect current GPS location on open
+                (async () => {
+                    try {
+                        const { status } = await Location.requestForegroundPermissionsAsync();
+                        if (status !== 'granted') return;
+
+                        let current: Location.LocationObject | null = null;
+                        try {
+                            current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+                        } catch {
+                            current = await Location.getLastKnownPositionAsync();
+                        }
+                        if (!current) return;
+
+                        const { latitude, longitude } = current.coords;
+                        setPinLocation({ latitude, longitude });
+                        setMapCenter([longitude, latitude]);
+                        lastGeocodedPos.current = { lat: latitude, lng: longitude };
+
+                        cameraRef.current?.setCamera({
+                            centerCoordinate: [longitude, latitude],
+                            zoomLevel: 16,
+                            animationDuration: 600,
+                        });
+
+                        const address = await reverseGeocode(latitude, longitude);
+                        setPinAddress(address);
+                    } catch { /* best-effort */ }
+                })();
             }
         } else {
             // Cleanup on close

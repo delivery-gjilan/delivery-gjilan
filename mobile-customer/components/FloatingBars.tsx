@@ -3,6 +3,7 @@ import { usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CartFloatingBar } from '@/modules/cart/components/CartFloatingBar';
 import { OrdersFloatingBar } from '@/modules/orders/components/OrdersFloatingBar';
+import { useState, useEffect, useRef } from 'react';
 
 export const FloatingBars = () => {
     const pathname = usePathname();
@@ -12,7 +13,24 @@ export const FloatingBars = () => {
     const hiddenRoutes = ['/product/', '/cart', '/orders', '/login', '/signup', '/auth-selection', '/invite-friends', '/profile', '/addresses'];
     const shouldHide = hiddenRoutes.some((route) => pathname.startsWith(route)) || pathname === '/';
 
-    if (shouldHide) return null;
+    // Delay showing bars so they don't pop in while a screen is still sliding away.
+    // Hide immediately, show only after the exit transition finishes.
+    const [visible, setVisible] = useState(!shouldHide);
+    const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+    useEffect(() => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+
+        if (shouldHide) {
+            setVisible(false);
+        } else {
+            timerRef.current = setTimeout(() => setVisible(true), 350);
+        }
+
+        return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+    }, [shouldHide]);
+
+    if (!visible) return null;
 
     // Check if we're on a tab route
     const tabRoutes = ['/market', '/home', '/profile', '/restaurants', '/analytics'];

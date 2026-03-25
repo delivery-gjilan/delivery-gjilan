@@ -24,10 +24,13 @@ import { calculateItemUnitTotal } from '../utils/price';
 import { RepeatOrCustomizeModal } from '@/modules/business/components/RepeatOrCustomizeModal';
 import type { CartItem } from '../types';
 import * as Haptics from 'expo-haptics';
+import { PromotionProgressBar } from './PromotionProgressBar';
+import { PromoAppliedCelebration } from './PromoAppliedCelebration';
 
 type CheckoutLocation = SelectedAddress;
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+const PRIORITY_SURCHARGE = 1.50;
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -56,6 +59,7 @@ export const CartScreen = () => {
     const [pendingLocationToSave, setPendingLocationToSave] = useState<CheckoutLocation | null>(null);
     const [addressName, setAddressName] = useState('');
     const [driverNotes, setDriverNotes] = useState('');
+    const [isPriority, setIsPriority] = useState(false);
     const [promoError, setPromoError] = useState<string | null>(null);
     const [saveAddressError, setSaveAddressError] = useState<string | null>(null);
     
@@ -84,6 +88,8 @@ export const CartScreen = () => {
     const screenWidth = Dimensions.get('window').width;
     const headerTopPadding = Platform.OS === 'ios' ? 10 : 6;
     const suppressAutoCloseRef = useRef(false);
+
+    const formatCurrency = useCallback((value: number) => `€${value.toFixed(2)}`, []);
 
     // Repeat-or-customize modal state for complex cart items
     const [repeatModalProductId, setRepeatModalProductId] = useState<string | null>(null);
@@ -159,6 +165,11 @@ export const CartScreen = () => {
     const progress = spendThreshold ? Math.min(Number(total) / Number(spendThreshold), 1) : 0;
     const amountRemaining = spendThreshold ? Math.max(0, Number(spendThreshold) - Number(total)) : 0;
 
+    // Celebration overlay state
+    const [showCelebration, setShowCelebration] = useState(false);
+    const [celebrationMessage, setCelebrationMessage] = useState('');
+    const [celebrationSavings, setCelebrationSavings] = useState('');
+
     // Notifier state/animation
     const [notifier, setNotifier] = useState<null | { type: 'progress' | 'success'; message: string }>(null);
     const notifierAnim = useRef(new Animated.Value(0)).current;
@@ -178,7 +189,6 @@ export const CartScreen = () => {
     // Auto-close cart when all items are removed
     useEffect(() => {
         if (!suppressAutoCloseRef.current && hadItemsOnMount.current && items.length === 0) {
-            // Cart had items initially but is now empty - close it
             router.back();
         }
     }, [items.length, router]);
@@ -222,9 +232,18 @@ export const CartScreen = () => {
                 setCouponCode(promoCode); // Show the code in the input field
                 autoAppliedPromotionIdRef.current = firstPromo?.id ?? applicableConditional.id;
                 showNotifier(
-                    `Promotion applied${firstPromo?.name ? `: ${firstPromo.name}` : ''}`,
+                    t.cart.promotion_applied_notifier.replace(
+                        '{{name}}',
+                        firstPromo?.name ? `: ${firstPromo.name}` : '',
+                    ),
                     'success',
                 );
+                // Trigger celebration overlay
+                const promoName = firstPromo?.name || applicableConditional.name || t.cart.promotion_label;
+                setCelebrationMessage(promoName);
+                const discount = Number(result.totalDiscount ?? 0);
+                setCelebrationSavings(discount > 0 ? `-${formatCurrency(discount)}` : (result.freeDeliveryApplied ? t.cart.free_delivery : ''));
+                setShowCelebration(true);
             } catch {
                 // ignore - best effort
             } finally {
@@ -237,7 +256,7 @@ export const CartScreen = () => {
         return () => {
             mounted = false;
         };
-    }, [progress, applicableConditional, cartContext, total, deliveryPrice, promoResult]);
+    }, [progress, applicableConditional, cartContext, total, deliveryPrice, promoResult, t]);
 
     // Get saved addresses sorted by priority (default first)
     const savedAddresses = useMemo(() => {
@@ -335,7 +354,9 @@ export const CartScreen = () => {
 
     // ─── Step navigation with layout animation ──────────────
     const goToStep = useCallback((s: 1 | 2 | 3) => {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        if (Platform.OS === 'android') {
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        }
         setStep(s);
     }, []);
 
@@ -463,6 +484,11 @@ export const CartScreen = () => {
                 t.cart.discount_added.replace('{{amount}}', Number(result.totalDiscount ?? 0).toFixed(2)),
                 'success'
             );
+            // Trigger celebration overlay for manual coupon
+            setCelebrationMessage(couponCode.trim());
+            const discount = Number(result.totalDiscount ?? 0);
+            setCelebrationSavings(discount > 0 ? `-${formatCurrency(discount)}` : (result.freeDeliveryApplied ? t.cart.free_delivery : ''));
+            setShowCelebration(true);
         } catch (err) {
             setPromoError(t.cart.unable_validate_promo);
         }
@@ -498,13 +524,17 @@ export const CartScreen = () => {
         ? promoResult?.discountAmount ?? 0
         : 0;
 
-    const appliedDeliveryPrice = manualPromoApplied
+    const prioritySurcharge = isPriority ? PRIORITY_SURCHARGE : 0;
+
+    const baseDeliveryPrice = manualPromoApplied
         ? promoResult?.effectiveDeliveryPrice ?? deliveryPrice
         : deliveryPrice;
 
-    const finalTotal = manualPromoApplied
+    const appliedDeliveryPrice = baseDeliveryPrice + prioritySurcharge;
+
+    const finalTotal = (manualPromoApplied
         ? promoResult?.totalPrice ?? Math.max(0, total + deliveryPrice - appliedDiscount)
-        : Math.max(0, total + deliveryPrice - appliedDiscount);
+        : Math.max(0, total + deliveryPrice - appliedDiscount)) + prioritySurcharge;
 
     const reconcileCartBeforeCheckout = useCallback(async () => {
         if (items.length === 0) {
@@ -550,7 +580,7 @@ export const CartScreen = () => {
         goToStep(1);
         Alert.alert(
             t.cart.order_failed,
-            'Some items in your cart are no longer available and were removed. Please review your cart and try again.',
+            t.cart.items_unavailable_removed,
             [{ text: t.common.ok }],
         );
 
@@ -676,13 +706,23 @@ export const CartScreen = () => {
 
                 {/* Empty State */}
                 <View className="flex-1 items-center justify-center px-6">
-                    <Ionicons name="cart-outline" size={80} color={theme.colors.subtext} />
-                    <Text className="text-xl font-semibold mt-4" style={{ color: theme.colors.text }}>
+                    <View className="w-28 h-28 rounded-full items-center justify-center mb-2" style={{ backgroundColor: theme.colors.primary + '10' }}>
+                        <Ionicons name="bag-outline" size={56} color={theme.colors.primary} />
+                    </View>
+                    <Text className="text-xl font-bold mt-4" style={{ color: theme.colors.text }}>
                         {t.cart.empty}
                     </Text>
-                    <Text className="mt-2 text-center" style={{ color: theme.colors.subtext }}>
+                    <Text className="mt-2 text-center text-sm" style={{ color: theme.colors.subtext }}>
                         {t.cart.empty_subtitle}
                     </Text>
+                    <TouchableOpacity
+                        className="mt-6 px-6 py-3 rounded-xl flex-row items-center gap-2"
+                        style={{ backgroundColor: theme.colors.primary }}
+                        onPress={() => router.back()}
+                    >
+                        <Ionicons name="restaurant-outline" size={18} color="white" />
+                        <Text className="text-white font-semibold">{t.cart.browse_menu}</Text>
+                    </TouchableOpacity>
                 </View>
             </SafeAreaView>
         );
@@ -708,13 +748,15 @@ export const CartScreen = () => {
                 <View className="flex-1 flex-row items-center justify-center mx-2">
                 {([
                     { s: 1 as const, icon: 'cart-outline' as const, iconDone: 'cart' as const, label: t.cart.title },
-                    { s: 2 as const, icon: 'location-outline' as const, iconDone: 'location' as const, label: t.cart.step_address ?? 'Address' },
-                    { s: 3 as const, icon: 'document-text-outline' as const, iconDone: 'document-text' as const, label: t.cart.step_review ?? 'Review' },
+                    { s: 2 as const, icon: 'location-outline' as const, iconDone: 'location' as const, label: t.cart.step_address },
+                    { s: 3 as const, icon: 'document-text-outline' as const, iconDone: 'document-text' as const, label: t.cart.step_review },
                 ] as const).map(({ s, icon, iconDone, label }, idx) => {
                     const done = step > s;
                     const active = step === s;
-                    const lineColor = done ? '#22C55E' : theme.colors.border;
-                    const iconColor = done || active ? '#22C55E' : theme.colors.subtext;
+                    const doneColor = theme.colors.income;
+                    const activeColor = theme.colors.primary;
+                    const lineColor = done ? doneColor : active ? activeColor : theme.colors.border;
+                    const iconColor = done ? doneColor : active ? activeColor : theme.colors.subtext;
                     return (
                         <React.Fragment key={s}>
                             {idx > 0 && (
@@ -722,14 +764,14 @@ export const CartScreen = () => {
                             )}
                             <View className="items-center" style={{ width: 52 }}>
                                 {done ? (
-                                    <Ionicons name={iconDone} size={20} color="#22C55E" />
+                                    <Ionicons name={iconDone} size={20} color={doneColor} />
                                 ) : (
                                     <Ionicons name={icon} size={20} color={iconColor} />
                                 )}
                                 <Text style={{
                                     fontSize: 10,
                                     marginTop: 3,
-                                    color: done || active ? '#22C55E' : theme.colors.subtext,
+                                    color: done ? doneColor : active ? activeColor : theme.colors.subtext,
                                     fontWeight: active ? '700' : done ? '600' : '400',
                                 }}>
                                     {label}
@@ -747,25 +789,51 @@ export const CartScreen = () => {
             {step === 1 && (
                 <>
                     {/* Threshold progress indicator for conditional promotions */}
-                    {applicableConditional && spendThreshold && progress > 0 && progress < 1 && !promoResult && (
-                        <View className="px-4 py-3">
-                            <View className="flex-row items-center justify-between mb-2">
-                                <Text className="text-sm" style={{ color: theme.colors.subtext }}>
-                                    Spend €{spendThreshold.toFixed(2)} to unlock: {applicableConditional.name || 'promotion'}
-                                </Text>
-                                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
-                                    €{amountRemaining.toFixed(2)}
-                                </Text>
-                            </View>
-                            <View style={{ height: 8, backgroundColor: theme.colors.border, borderRadius: 8, overflow: 'hidden' }}>
-                                <Animated.View style={{ height: 8, width: `${Math.round(progress * 100)}%`, backgroundColor: theme.colors.primary }} />
-                            </View>
-                        </View>
+                    {applicableConditional && spendThreshold && progress > 0 && !promoResult && (
+                        <PromotionProgressBar
+                            progress={progress}
+                            amountRemaining={amountRemaining}
+                            spendThreshold={spendThreshold}
+                            promoName={applicableConditional.name || t.cart.promotion_label}
+                            isUnlocked={progress >= 1}
+                            isApplied={false}
+                            formatCurrency={formatCurrency}
+                        />
                     )}
 
                     {/* Cart Items */}
                     <ScrollView className="flex-1">
                         <View className="p-4 gap-3">
+                            <View
+                                className="rounded-2xl overflow-hidden border"
+                                style={{
+                                    backgroundColor: theme.colors.card,
+                                    borderColor: theme.colors.border,
+                                }}
+                            >
+                                <View style={{ height: 3, backgroundColor: theme.colors.primary }} />
+                                <View className="p-4">
+                                    <View className="flex-row items-center justify-between">
+                                        <View className="flex-row items-center gap-2">
+                                            <View
+                                                className="px-2.5 py-1 rounded-full"
+                                                style={{ backgroundColor: theme.colors.primary + '18' }}
+                                            >
+                                                <Text className="text-xs font-bold" style={{ color: theme.colors.primary }}>
+                                                    {items.length} {items.length === 1 ? t.common.item : t.common.items}
+                                                </Text>
+                                            </View>
+                                            <Text className="text-sm font-medium" style={{ color: theme.colors.subtext }}>
+                                                {t.cart.order_summary}
+                                            </Text>
+                                        </View>
+                                        <Text className="text-xl font-bold" style={{ color: theme.colors.primary }}>
+                                            {formatCurrency(total)}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+
                             {items.map((item) => (
                                 <TouchableOpacity
                                     key={item.cartItemId}
@@ -801,8 +869,13 @@ export const CartScreen = () => {
                                             {item.name}
                                         </Text>
                                         <Text className="font-bold mt-1" style={{ color: theme.colors.primary }}>
-                                            €{calculateItemUnitTotal(item).toFixed(2)}
+                                            {formatCurrency(calculateItemUnitTotal(item))}
                                         </Text>
+                                        {item.quantity > 1 && (
+                                            <Text className="text-xs mt-0.5" style={{ color: theme.colors.subtext }}>
+                                                {item.quantity} × {formatCurrency(calculateItemUnitTotal(item))} = {formatCurrency(calculateItemUnitTotal(item) * item.quantity)}
+                                            </Text>
+                                        )}
 
                                         {item.selectedOptions.length > 0 && (
                                             <View className="mt-1">
@@ -827,32 +900,37 @@ export const CartScreen = () => {
 
                                         {/* Quantity Controls */}
                                         <View className="flex-row items-center mt-2 gap-2">
-                                            <TouchableOpacity
-                                                onPress={() => updateQuantity(item.cartItemId, item.quantity - 1)}
-                                                className="w-8 h-8 rounded-full items-center justify-center"
-                                                style={{ backgroundColor: theme.colors.border }}
+                                            <View
+                                                className="flex-row items-center rounded-full px-1 py-1"
+                                                style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border }}
                                             >
-                                                <Ionicons name="remove" size={16} color={theme.colors.text} />
-                                            </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    onPress={() => updateQuantity(item.cartItemId, item.quantity - 1)}
+                                                    className="w-8 h-8 rounded-full items-center justify-center"
+                                                    style={{ backgroundColor: theme.colors.border }}
+                                                >
+                                                    <Ionicons name="remove" size={16} color={theme.colors.text} />
+                                                </TouchableOpacity>
 
-                                            <Text className="text-base font-semibold px-3" style={{ color: theme.colors.text }}>
-                                                {item.quantity}
-                                            </Text>
+                                                <Text className="text-base font-semibold px-3" style={{ color: theme.colors.text }}>
+                                                    {item.quantity}
+                                                </Text>
 
-                                            <TouchableOpacity
-                                                onPress={() => {
-                                                    const isComplex = item.selectedOptions.length > 0 || item.childItems?.length;
-                                                    if (isComplex) {
-                                                        setRepeatModalProductId(item.productId);
-                                                    } else {
-                                                        updateQuantity(item.cartItemId, item.quantity + 1);
-                                                    }
-                                                }}
-                                                className="w-8 h-8 rounded-full items-center justify-center"
-                                                style={{ backgroundColor: theme.colors.primary }}
-                                            >
-                                                <Ionicons name="add" size={16} color="white" />
-                                            </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    onPress={() => {
+                                                        const isComplex = item.selectedOptions.length > 0 || item.childItems?.length;
+                                                        if (isComplex) {
+                                                            setRepeatModalProductId(item.productId);
+                                                        } else {
+                                                            updateQuantity(item.cartItemId, item.quantity + 1);
+                                                        }
+                                                    }}
+                                                    className="w-8 h-8 rounded-full items-center justify-center"
+                                                    style={{ backgroundColor: theme.colors.primary }}
+                                                >
+                                                    <Ionicons name="add" size={16} color="white" />
+                                                </TouchableOpacity>
+                                            </View>
                                         </View>
 
                                         {/* Item Notes Input */}
@@ -860,7 +938,7 @@ export const CartScreen = () => {
                                             <TextInput
                                                 value={item.notes || ''}
                                                 onChangeText={(text) => updateItemNotes(item.cartItemId, text)}
-                                                placeholder={t.cart.item_notes_placeholder || "Add special instructions..."}
+                                                placeholder={t.cart.item_notes_placeholder}
                                                 placeholderTextColor={theme.colors.subtext}
                                                 className="text-xs px-2 py-1.5 rounded-lg border"
                                                 style={{
@@ -892,16 +970,16 @@ export const CartScreen = () => {
                             backgroundColor: theme.colors.card,
                         }}
                     >
-                        <View className="flex-row justify-between items-center mb-4">
-                            <Text className="text-lg font-semibold" style={{ color: theme.colors.text }}>
+                        <View className="flex-row justify-between items-center mb-3">
+                            <Text className="text-sm" style={{ color: theme.colors.subtext }}>
                                 {t.common.subtotal}
                             </Text>
-                            <Text className="text-2xl font-bold" style={{ color: theme.colors.primary }}>
-                                €{total.toFixed(2)}
+                            <Text className="text-lg font-bold" style={{ color: theme.colors.primary }}>
+                                {formatCurrency(total)}
                             </Text>
                         </View>
                         <AnimatedTouchable
-                            className="py-4 rounded-xl items-center flex-row justify-center gap-2"
+                            className="py-4 rounded-2xl items-center flex-row justify-center gap-2"
                             style={{
                                 backgroundColor: theme.colors.primary,
                                 opacity: pulseAnim,
@@ -909,8 +987,9 @@ export const CartScreen = () => {
                             activeOpacity={0.8}
                             onPress={() => goToStep(2)}
                         >
+                            <Ionicons name="location-outline" size={20} color="white" />
                             <Text className="text-white font-bold text-lg">{t.cart.choose_address}</Text>
-                            <Ionicons name="arrow-forward" size={20} color="white" />
+                            <Ionicons name="arrow-forward" size={18} color="white" />
                         </AnimatedTouchable>
                     </View>
                 </>
@@ -970,33 +1049,120 @@ export const CartScreen = () => {
                             </TouchableOpacity>
                         )}
 
-                        {/* Order Items (compact) */}
+                        {/* Delivery Speed */}
+                        <View className="rounded-2xl border p-4 mb-4" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
+                            <View className="flex-row items-center gap-2 mb-3">
+                                <Ionicons name="timer-outline" size={16} color={theme.colors.subtext} />
+                                <Text className="text-xs uppercase font-semibold" style={{ color: theme.colors.subtext }}>
+                                    {t.cart.delivery_type}
+                                </Text>
+                            </View>
+                            <View className="flex-row gap-3">
+                                <TouchableOpacity
+                                    activeOpacity={0.7}
+                                    className="flex-1 rounded-xl p-3"
+                                    style={{
+                                        backgroundColor: !isPriority ? theme.colors.primary + '12' : theme.colors.background,
+                                        borderWidth: 1.5,
+                                        borderColor: !isPriority ? theme.colors.primary : theme.colors.border,
+                                    }}
+                                    onPress={() => setIsPriority(false)}
+                                >
+                                    <View className="flex-row items-center gap-2 mb-1.5">
+                                        <View className="w-7 h-7 rounded-full items-center justify-center" style={{ backgroundColor: !isPriority ? theme.colors.primary + '20' : theme.colors.border }}>
+                                            <Ionicons name="time-outline" size={14} color={!isPriority ? theme.colors.primary : theme.colors.subtext} />
+                                        </View>
+                                        <Text className="text-sm font-bold" style={{ color: !isPriority ? theme.colors.primary : theme.colors.text }}>
+                                            {t.cart.standard_delivery}
+                                        </Text>
+                                    </View>
+                                    <Text className="text-xs mb-1" style={{ color: theme.colors.subtext }}>
+                                        {t.cart.estimated_time_standard}
+                                    </Text>
+                                    <Text className="text-xs font-semibold" style={{ color: !isPriority ? theme.colors.primary : theme.colors.subtext }}>
+                                        {t.cart.included}
+                                    </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    activeOpacity={0.7}
+                                    className="flex-1 rounded-xl p-3"
+                                    style={{
+                                        backgroundColor: isPriority ? theme.colors.primary + '12' : theme.colors.background,
+                                        borderWidth: 1.5,
+                                        borderColor: isPriority ? theme.colors.primary : theme.colors.border,
+                                    }}
+                                    onPress={() => { setIsPriority(true); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                                >
+                                    <View className="flex-row items-center gap-2 mb-1.5">
+                                        <View className="w-7 h-7 rounded-full items-center justify-center" style={{ backgroundColor: isPriority ? theme.colors.primary + '20' : theme.colors.border }}>
+                                            <Ionicons name="flash" size={14} color={isPriority ? theme.colors.primary : theme.colors.subtext} />
+                                        </View>
+                                        <Text className="text-sm font-bold" style={{ color: isPriority ? theme.colors.primary : theme.colors.text }}>
+                                            {t.cart.priority_delivery}
+                                        </Text>
+                                    </View>
+                                    <Text className="text-xs mb-1" style={{ color: theme.colors.subtext }}>
+                                        {t.cart.estimated_time_priority}
+                                    </Text>
+                                    <Text className="text-xs font-semibold" style={{ color: isPriority ? theme.colors.primary : theme.colors.subtext }}>
+                                        +{formatCurrency(PRIORITY_SURCHARGE)}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        {/* Order Items */}
                         <View className="rounded-2xl border mb-4 overflow-hidden" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
-                            <Text className="text-xs uppercase font-semibold px-4 pt-3 pb-2" style={{ color: theme.colors.subtext }}>
-                                {t.cart.title} ({items.length})
-                            </Text>
+                            <View className="flex-row items-center justify-between px-4 pt-3 pb-2">
+                                <Text className="text-xs uppercase font-semibold" style={{ color: theme.colors.subtext }}>
+                                    {t.cart.your_items} ({items.length})
+                                </Text>
+                                <TouchableOpacity onPress={() => goToStep(1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                                    <Text className="text-xs font-semibold" style={{ color: theme.colors.primary }}>
+                                        {t.cart.edit_cart}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
                             {items.map((item, idx) => (
                                 <View
                                     key={item.cartItemId}
                                     className="flex-row items-center px-4 py-2.5"
                                     style={idx < items.length - 1 ? { borderBottomWidth: 1, borderBottomColor: theme.colors.border } : undefined}
                                 >
+                                    {item.imageUrl ? (
+                                        <Image
+                                            source={{ uri: item.imageUrl }}
+                                            className="w-10 h-10 rounded-lg mr-3"
+                                            resizeMode="cover"
+                                        />
+                                    ) : (
+                                        <View
+                                            className="w-10 h-10 rounded-lg mr-3 items-center justify-center"
+                                            style={{ backgroundColor: theme.colors.border }}
+                                        >
+                                            <Ionicons name="fast-food-outline" size={16} color={theme.colors.subtext} />
+                                        </View>
+                                    )}
                                     <View className="flex-1">
-                                        <Text className="text-sm" numberOfLines={1} style={{ color: theme.colors.text }}>
+                                        <Text className="text-sm font-medium" numberOfLines={1} style={{ color: theme.colors.text }}>
                                             {item.name}
                                         </Text>
                                         {item.selectedOptions.length > 0 && (
-                                            <Text className="text-xs" numberOfLines={2} style={{ color: theme.colors.subtext }}>
+                                            <Text className="text-xs" numberOfLines={1} style={{ color: theme.colors.subtext }}>
                                                 {item.selectedOptions.map((opt) => opt.name).join(', ')}
                                             </Text>
                                         )}
                                     </View>
-                                    <Text className="text-xs mx-2" style={{ color: theme.colors.subtext }}>
-                                        ×{item.quantity}
-                                    </Text>
-                                    <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
-                                        €{(calculateItemUnitTotal(item) * item.quantity).toFixed(2)}
-                                    </Text>
+                                    <View className="items-end ml-2">
+                                        <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
+                                            {formatCurrency(calculateItemUnitTotal(item) * item.quantity)}
+                                        </Text>
+                                        {item.quantity > 1 && (
+                                            <Text className="text-xs" style={{ color: theme.colors.subtext }}>
+                                                ×{item.quantity}
+                                            </Text>
+                                        )}
+                                    </View>
                                 </View>
                             ))}
                         </View>
@@ -1005,7 +1171,7 @@ export const CartScreen = () => {
                         <View className="rounded-2xl border p-4 mb-4" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
                             <View className="flex-row justify-between items-center mb-2">
                                 <Text className="text-sm" style={{ color: theme.colors.subtext }}>{t.common.subtotal}</Text>
-                                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>€{total.toFixed(2)}</Text>
+                                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>{formatCurrency(total)}</Text>
                             </View>
                             <View className="flex-row justify-between items-center mb-2">
                                 <View className="flex-row items-center gap-1">
@@ -1015,9 +1181,20 @@ export const CartScreen = () => {
                                     )}
                                 </View>
                                 <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
-                                    {deliveryPriceLoading ? '...' : freeDeliveryApplied ? t.common.free : `€${appliedDeliveryPrice.toFixed(2)}`}
+                                    {deliveryPriceLoading ? '...' : freeDeliveryApplied ? t.common.free : formatCurrency(baseDeliveryPrice)}
                                 </Text>
                             </View>
+                            {isPriority && (
+                                <View className="flex-row justify-between items-center mb-2">
+                                    <View className="flex-row items-center gap-1">
+                                        <Ionicons name="flash" size={12} color={theme.colors.primary} />
+                                        <Text className="text-sm" style={{ color: theme.colors.subtext }}>{t.cart.priority_fee}</Text>
+                                    </View>
+                                    <Text className="text-sm font-semibold" style={{ color: theme.colors.primary }}>
+                                        +{formatCurrency(PRIORITY_SURCHARGE)}
+                                    </Text>
+                                </View>
+                            )}
                             {(appliedDiscount > 0 || freeDeliveryApplied) && (
                                 <View className="flex-row justify-between items-center mb-2">
                                     <Text className="text-sm" style={{ color: theme.colors.subtext }}>{t.cart.promo}</Text>
@@ -1029,7 +1206,7 @@ export const CartScreen = () => {
                             <View className="h-px my-2" style={{ backgroundColor: theme.colors.border }} />
                             <View className="flex-row justify-between items-center">
                                 <Text className="text-base font-bold" style={{ color: theme.colors.text }}>{t.common.total}</Text>
-                                <Text className="text-xl font-bold" style={{ color: theme.colors.primary }}>€{finalTotal.toFixed(2)}</Text>
+                                <Text className="text-xl font-bold" style={{ color: theme.colors.primary }}>{formatCurrency(finalTotal)}</Text>
                             </View>
                         </View>
 
@@ -1091,13 +1268,13 @@ export const CartScreen = () => {
                             <View className="flex-row items-center gap-2 mb-2">
                                 <Ionicons name="chatbubble-outline" size={16} color={theme.colors.subtext} />
                                 <Text className="text-xs uppercase font-semibold" style={{ color: theme.colors.subtext }}>
-                                    {t.cart.driver_notes || "Notes for Driver"}
+                                    {t.cart.driver_notes}
                                 </Text>
                             </View>
                             <TextInput
                                 value={driverNotes}
                                 onChangeText={setDriverNotes}
-                                placeholder={t.cart.driver_notes_placeholder || "e.g., Ring the doorbell twice"}
+                                placeholder={t.cart.driver_notes_placeholder}
                                 placeholderTextColor={theme.colors.subtext}
                                 className="px-3 py-2 rounded-xl text-sm"
                                 style={{
@@ -1110,15 +1287,45 @@ export const CartScreen = () => {
                                 numberOfLines={3}
                                 maxLength={300}
                             />
+                            {driverNotes.length > 0 && (
+                                <Text className="text-xs mt-1 text-right" style={{ color: theme.colors.subtext }}>
+                                    {driverNotes.length}/300
+                                </Text>
+                            )}
+                        </View>
+
+                        {/* Payment Method */}
+                        <View className="rounded-2xl border p-4 mb-4" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
+                            <View className="flex-row items-center gap-2 mb-2">
+                                <Ionicons name="wallet-outline" size={16} color={theme.colors.subtext} />
+                                <Text className="text-xs uppercase font-semibold" style={{ color: theme.colors.subtext }}>
+                                    {t.cart.payment_method}
+                                </Text>
+                            </View>
+                            <View className="flex-row items-center gap-3 px-3 py-2.5 rounded-xl" style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border }}>
+                                <View
+                                    className="w-9 h-9 rounded-xl items-center justify-center"
+                                    style={{ backgroundColor: theme.colors.income + '15' }}
+                                >
+                                    <Ionicons name="cash-outline" size={18} color={theme.colors.income} />
+                                </View>
+                                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
+                                    {t.cart.cash_on_delivery}
+                                </Text>
+                            </View>
                         </View>
 
                         <View style={{ height: 16 }} />
                     </ScrollView>
 
                     {/* Footer */}
-                    <View className="p-4 border-t" style={{ borderTopColor: theme.colors.border, backgroundColor: theme.colors.card }}>
+                    <View className="px-4 pt-3 pb-4 border-t" style={{ borderTopColor: theme.colors.border, backgroundColor: theme.colors.card }}>
+                        <View className="flex-row justify-between items-center mb-3">
+                            <Text className="text-sm" style={{ color: theme.colors.subtext }}>{t.common.total}</Text>
+                            <Text className="text-lg font-bold" style={{ color: theme.colors.primary }}>{formatCurrency(finalTotal)}</Text>
+                        </View>
                         <TouchableOpacity
-                            className="py-3.5 rounded-xl items-center"
+                            className="py-4 rounded-2xl items-center"
                             style={{
                                 backgroundColor: isProcessing ? theme.colors.border : theme.colors.primary,
                                 opacity: isProcessing ? 0.6 : 1,
@@ -1134,8 +1341,8 @@ export const CartScreen = () => {
                                 </View>
                             ) : (
                                 <View className="flex-row items-center gap-2">
-                                    <Text className="text-white font-bold text-base">{t.cart.confirm_order}</Text>
-                                    <Ionicons name="checkmark-circle" size={20} color="white" />
+                                    <Ionicons name="shield-checkmark" size={20} color="white" />
+                                    <Text className="text-white font-bold text-lg">{t.cart.confirm_order}</Text>
                                 </View>
                             )}
                         </TouchableOpacity>
@@ -1323,6 +1530,14 @@ export const CartScreen = () => {
                     </View>
                 </BlurView>
             </Modal>
+
+            {/* Promo celebration overlay */}
+            <PromoAppliedCelebration
+                visible={showCelebration}
+                message={celebrationMessage}
+                savingsText={celebrationSavings}
+                onComplete={() => setShowCelebration(false)}
+            />
 
             {/* Top-floating notifier (auto-apply success) - rendered last so it overlays everything */}
             {notifier && (

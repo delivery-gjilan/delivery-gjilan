@@ -1,9 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Pressable, Text, View } from 'react-native';
+import { Animated, Pressable, Text, View, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMutation } from '@apollo/client/react';
 import { MARK_BUSINESS_MESSAGES_READ_BUSINESS } from '@/graphql/messages';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
 export type AlertType = 'INFO' | 'WARNING' | 'URGENT';
 
@@ -57,46 +59,49 @@ const ALERT_CONFIG: Record<AlertType, {
     },
 };
 
-const DOUBLE_TAP_DELAY = 350;
-
 export default function BusinessMessageBanner({ senderName, body, alertType, adminId, onDismiss }: BusinessMessageBannerProps) {
     const router = useRouter();
-    const translateY = useRef(new Animated.Value(-200)).current;
+    const scale = useRef(new Animated.Value(0.82)).current;
     const opacity = useRef(new Animated.Value(0)).current;
+    const backdropOpacity = useRef(new Animated.Value(0)).current;
     const config = ALERT_CONFIG[alertType] ?? ALERT_CONFIG.INFO;
-    const lastTapRef = useRef<number>(0);
-    const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [markRead] = useMutation(MARK_BUSINESS_MESSAGES_READ_BUSINESS);
 
     useEffect(() => {
         Animated.parallel([
-            Animated.spring(translateY, {
-                toValue: 0,
+            Animated.spring(scale, {
+                toValue: 1,
                 useNativeDriver: true,
-                tension: 70,
-                friction: 11,
+                tension: 80,
+                friction: 10,
             }),
             Animated.timing(opacity, {
+                toValue: 1,
+                duration: 220,
+                useNativeDriver: true,
+            }),
+            Animated.timing(backdropOpacity, {
                 toValue: 1,
                 duration: 200,
                 useNativeDriver: true,
             }),
         ]).start();
-
-        autoTimerRef.current = setTimeout(() => dismiss(), 10000);
-        return () => { if (autoTimerRef.current) clearTimeout(autoTimerRef.current); };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const dismiss = () => {
-        if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
         Animated.parallel([
-            Animated.timing(translateY, {
-                toValue: -200,
-                duration: 260,
+            Animated.timing(scale, {
+                toValue: 0.88,
+                duration: 220,
                 useNativeDriver: true,
             }),
             Animated.timing(opacity, {
+                toValue: 0,
+                duration: 200,
+                useNativeDriver: true,
+            }),
+            Animated.timing(backdropOpacity, {
                 toValue: 0,
                 duration: 200,
                 useNativeDriver: true,
@@ -105,115 +110,128 @@ export default function BusinessMessageBanner({ senderName, body, alertType, adm
     };
 
     const handleTap = () => {
-        const now = Date.now();
-        if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
-            // Double tap — mark read then dismiss
-            if (adminId) {
-                markRead({ variables: { otherUserId: adminId } });
-            }
-            dismiss();
-            return;
+        // Tap card — mark read + open messages
+        if (adminId) {
+            markRead({ variables: { otherUserId: adminId } });
         }
-        lastTapRef.current = now;
-        // Single tap — open messages
         dismiss();
         router.push('/(tabs)/messages');
     };
 
     return (
-        <Animated.View
+        <Pressable
+            onPress={dismiss}
             style={{
                 position: 'absolute',
                 top: 0,
                 left: 0,
                 right: 0,
+                bottom: 0,
                 zIndex: 1000,
-                transform: [{ translateY }],
-                opacity,
+                justifyContent: 'center',
+                alignItems: 'center',
             }}
         >
-            <Pressable onPress={handleTap}>
-                <View
-                    style={{
-                        marginHorizontal: 10,
-                        marginTop: 10,
-                        borderRadius: 18,
-                        overflow: 'hidden',
-                        borderWidth: 1,
-                        borderColor: config.border,
-                        backgroundColor: config.bg,
-                        shadowColor: config.accent,
-                        shadowOpacity: 0.35,
-                        shadowRadius: 16,
-                        shadowOffset: { width: 0, height: 6 },
-                        elevation: 12,
-                        flexDirection: 'row',
-                    }}
-                >
-                    {/* Left accent bar */}
-                    <View style={{ width: 4, backgroundColor: config.accent }} />
+            {/* Backdrop */}
+            <Animated.View
+                style={{
+                    position: 'absolute',
+                    inset: 0,
+                    backgroundColor: 'rgba(0,0,0,0.65)',
+                    opacity: backdropOpacity,
+                }}
+            />
 
-                    <View style={{ flex: 1, padding: 14, gap: 8 }}>
-                        {/* Top row: icon + sender + label badge + dismiss */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {/* Card */}
+            <Animated.View
+                style={{
+                    width: SCREEN_WIDTH * 0.88,
+                    borderRadius: 24,
+                    overflow: 'hidden',
+                    borderWidth: 1.5,
+                    borderColor: config.border,
+                    backgroundColor: config.bg,
+                    shadowColor: config.accent,
+                    shadowOpacity: 0.45,
+                    shadowRadius: 32,
+                    shadowOffset: { width: 0, height: 12 },
+                    elevation: 20,
+                    transform: [{ scale }],
+                    opacity,
+                }}
+            >
+                {/* Top accent bar */}
+                <View style={{ height: 4, backgroundColor: config.accent }} />
+
+                <Pressable onPress={handleTap}>
+                    <View style={{ padding: 24, gap: 16 }}>
+                        {/* Header: alert badge + dismiss */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                             <View
                                 style={{
-                                    width: 32,
-                                    height: 32,
-                                    borderRadius: 10,
+                                    paddingHorizontal: 10,
+                                    paddingVertical: 4,
+                                    borderRadius: 8,
                                     backgroundColor: config.labelBg,
+                                    borderWidth: 1,
+                                    borderColor: config.border,
+                                    flexDirection: 'row',
                                     alignItems: 'center',
-                                    justifyContent: 'center',
+                                    gap: 6,
                                 }}
                             >
-                                <Ionicons name={config.iconName as any} size={18} color={config.iconColor} />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={{ color: '#e5e7eb', fontSize: 13, fontWeight: '700', letterSpacing: 0.1 }}>
-                                    {senderName}
+                                <Ionicons name={config.iconName as any} size={14} color={config.iconColor} />
+                                <Text style={{ color: config.labelText, fontSize: 11, fontWeight: '800', letterSpacing: 0.8 }}>
+                                    {config.label}
                                 </Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
-                                    <View
-                                        style={{
-                                            paddingHorizontal: 6,
-                                            paddingVertical: 1,
-                                            borderRadius: 4,
-                                            backgroundColor: config.labelBg,
-                                        }}
-                                    >
-                                        <Text style={{ color: config.labelText, fontSize: 10, fontWeight: '800', letterSpacing: 0.5 }}>
-                                            {config.label}
-                                        </Text>
-                                    </View>
-                                </View>
                             </View>
-                            <Pressable onPress={dismiss} hitSlop={12} style={{ padding: 2 }}>
-                                <Ionicons name="close" size={18} color="#4b5563" />
+
+                            <Pressable onPress={dismiss} hitSlop={14} style={{ padding: 4 }}>
+                                <View
+                                    style={{
+                                        width: 28,
+                                        height: 28,
+                                        borderRadius: 8,
+                                        backgroundColor: 'rgba(255,255,255,0.07)',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                >
+                                    <Ionicons name="close" size={16} color="#6b7280" />
+                                </View>
                             </Pressable>
                         </View>
 
-                        {/* Message body */}
+                        {/* Message body — big */}
                         <Text
-                            style={{ color: '#d1d5db', fontSize: 14, fontWeight: '400', lineHeight: 21 }}
-                            numberOfLines={5}
+                            style={{ color: '#f3f4f6', fontSize: 22, fontWeight: '600', lineHeight: 32 }}
+                            numberOfLines={8}
                         >
                             {body}
                         </Text>
 
-                        {/* Hint row */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                <Ionicons name="finger-print" size={12} color="#4b5563" />
-                                <Text style={{ color: '#4b5563', fontSize: 10, fontWeight: '500' }}>Tap to open</Text>
+                        {/* Action hints */}
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                paddingTop: 4,
+                                gap: 8,
+                            }}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Ionicons name="chatbubble-outline" size={14} color={config.iconColor} />
+                                <Text style={{ color: config.labelText, fontSize: 12, fontWeight: '600' }}>Tap to open chat</Text>
                             </View>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                <Ionicons name="checkmark-done" size={12} color="#4b5563" />
-                                <Text style={{ color: '#4b5563', fontSize: 10, fontWeight: '500' }}>Double-tap to mark read</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Ionicons name="close-circle-outline" size={14} color="#6b7280" />
+                                <Text style={{ color: '#6b7280', fontSize: 12, fontWeight: '500' }}>Tap outside to close</Text>
                             </View>
                         </View>
                     </View>
-                </View>
-            </Pressable>
-        </Animated.View>
+                </Pressable>
+            </Animated.View>
+        </Pressable>
     );
 }

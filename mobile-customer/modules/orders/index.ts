@@ -3,6 +3,7 @@ export { OrdersFloatingBar } from './components/OrdersFloatingBar';
 export { ActiveOrdersList } from './components/ActiveOrdersList';
 export { OrderDetails, SafeOrderDetails } from './components/OrderDetails';
 export { OrderHistoryList } from './components/OrderHistoryList';
+export { OrderSummarySheet } from './components/OrderSummarySheet';
 
 // Hooks
 export { useOrders, useOrder, useOrdersByStatus } from './hooks/useOrders';

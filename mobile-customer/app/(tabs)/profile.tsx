@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Alert, Modal, Pressable, Animated, PanResponder } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,80 +13,139 @@ import { useTranslations } from '@/hooks/useTranslations';
 import { DELETE_MY_ACCOUNT_MUTATION, SET_MY_PREFERRED_LANGUAGE_MUTATION } from '@/graphql/operations/auth';
 import { AppLanguage } from '@/gql/graphql';
 
+const SLIDER_TRACK_WIDTH = 272;
+const THUMB_SIZE = 52;
+const MAX_SLIDE = SLIDER_TRACK_WIDTH - THUMB_SIZE - 8;
+
+function SlideToDelete({ onConfirmed }: { onConfirmed: () => void }) {
+    const pan = useRef(new Animated.Value(0)).current;
+    const confirmed = useRef(false);
+
+    const panResponder = PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onPanResponderMove: (_, g) => {
+            pan.setValue(Math.max(0, Math.min(g.dx, MAX_SLIDE)));
+        },
+        onPanResponderRelease: (_, g) => {
+            if (g.dx >= MAX_SLIDE * 0.8 && !confirmed.current) {
+                confirmed.current = true;
+                Animated.spring(pan, { toValue: MAX_SLIDE, useNativeDriver: false }).start();
+                onConfirmed();
+            } else {
+                Animated.spring(pan, { toValue: 0, useNativeDriver: false }).start();
+            }
+        },
+    });
+
+    const trackFill = pan.interpolate({ inputRange: [0, MAX_SLIDE], outputRange: ['rgba(239,68,68,0.12)', 'rgba(239,68,68,0.45)'], extrapolate: 'clamp' });
+
+    return (
+        <View style={{ alignItems: 'center', marginTop: 24 }}>
+            <Text style={{ color: 'rgba(239,68,68,0.55)', fontSize: 11, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10 }}>
+                Slide to confirm
+            </Text>
+            <Animated.View style={{
+                width: SLIDER_TRACK_WIDTH,
+                height: THUMB_SIZE + 8,
+                borderRadius: 999,
+                backgroundColor: trackFill,
+                borderWidth: 1.5,
+                borderColor: 'rgba(239,68,68,0.3)',
+                justifyContent: 'center',
+                overflow: 'hidden',
+            }}>
+                {/* ghost text */}
+                <Animated.Text style={{
+                    position: 'absolute',
+                    alignSelf: 'center',
+                    color: '#EF4444',
+                    opacity: pan.interpolate({ inputRange: [0, MAX_SLIDE * 0.4], outputRange: [0.45, 0], extrapolate: 'clamp' }),
+                    fontSize: 13,
+                    fontWeight: '600',
+                    letterSpacing: 0.3,
+                }}>
+                    Delete Account
+                </Animated.Text>
+                {/* thumb */}
+                <Animated.View
+                    {...panResponder.panHandlers}
+                    style={{
+                        position: 'absolute',
+                        left: 4,
+                        width: THUMB_SIZE,
+                        height: THUMB_SIZE,
+                        borderRadius: THUMB_SIZE / 2,
+                        backgroundColor: '#EF4444',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        shadowColor: '#EF4444',
+                        shadowOffset: { width: 0, height: 3 },
+                        shadowOpacity: 0.4,
+                        shadowRadius: 6,
+                        elevation: 4,
+                        transform: [{ translateX: pan }],
+                    }}
+                >
+                    <Ionicons name="chevron-forward" size={22} color="#fff" />
+                </Animated.View>
+            </Animated.View>
+        </View>
+    );
+}
+
+const AVATAR_COLORS = ['#7C3AED', '#2563EB', '#DB2777', '#EA580C', '#16A34A', '#0891B2'];
+
+function getAvatarColor(seed: string): string {
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+    return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
 export default function Profile() {
     const theme = useTheme();
     const router = useRouter();
     const { logout } = useAuth();
     const user = useAuthStore((state) => state.user);
-    // Read from Apollo cache only — the root subscription already keeps it fresh
     const { data: ordersData } = useQuery(GET_ORDERS, { fetchPolicy: 'cache-only' });
     const orders: any[] = (ordersData as any)?.orders ?? [];
+    const deliveredOrders = orders.filter((o: any) => o.status === 'DELIVERED');
 
-    // Get user initials
-    const getInitials = () => {
-        if (!user?.email) return 'U';
-        return user.email.substring(0, 2).toUpperCase();
-    };
+    const firstName = user?.firstName ?? '';
+    const lastName = user?.lastName ?? '';
+    const fullName = [firstName, lastName].filter(Boolean).join(' ');
+    const displayName = fullName || user?.email?.split('@')[0] || 'User';
+    const initials = firstName && lastName
+        ? `${firstName[0]}${lastName[0]}`.toUpperCase()
+        : (user?.email?.substring(0, 2) ?? 'U').toUpperCase();
+    const avatarColor = getAvatarColor(user?.id ?? user?.email ?? 'user');
 
-    // Get greeting name
-    const getUserName = () => {
-        if (user?.email) {
-            return user.email.split('@')[0];
-        }
-        return t.profile.user_fallback;
-    };
-
-    const handleLogout = () => {
-        logout();
-    };
+    const handleLogout = () => { logout(); };
 
     const [deleteMyAccount, { loading: deletingAccount }] = useMutation(DELETE_MY_ACCOUNT_MUTATION);
     const [setMyPreferredLanguage] = useMutation(SET_MY_PREFERRED_LANGUAGE_MUTATION);
+    const [deleteModalStep, setDeleteModalStep] = useState<0 | 1 | 2>(0);
 
-    const handleDeleteAccount = () => {
-        Alert.alert(
-            profileText.delete_account_title || 'Delete account',
-            profileText.delete_account_message || 'Are you sure you want to delete your account?',
-            [
-                { text: t.common?.cancel || 'Cancel', style: 'cancel' },
-                {
-                    text: profileText.delete_account_confirm || 'Delete',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await deleteMyAccount();
-                            logout();
-                        } catch (error) {
-                            Alert.alert(
-                                t.common?.error || 'Error',
-                                profileText.delete_account_error || 'Failed to delete account'
-                            );
-                        }
-                    },
-                },
-            ]
-        );
-    };
+    const handleDeleteAccount = () => setDeleteModalStep(1);
 
-    const { t, languageChoice, setLanguageChoice } = useTranslations();
-    const profileText = t.profile as any;
-
-    const handleLanguageChoice = async (choice: 'en' | 'al') => {
-        setLanguageChoice(choice);
-
+    const handleDeleteConfirmed = async () => {
+        setDeleteModalStep(0);
         try {
-            await setMyPreferredLanguage({
-                variables: {
-                    language: choice === 'al' ? AppLanguage.Al : AppLanguage.En,
-                },
-            });
-        } catch (error) {
-            console.error('[Profile] Failed to sync language preference:', error);
+            await deleteMyAccount();
+            logout();
+        } catch {
+            Alert.alert(t.common?.error || 'Error', (t.profile as any).delete_account_error || 'Failed to delete account');
         }
     };
 
-    const handleOrderHistoryPress = () => {
-        router.push('/orders/history');
+    const { t, languageChoice, setLanguageChoice } = useTranslations();
+
+    const handleLanguageChoice = async (choice: 'en' | 'al') => {
+        setLanguageChoice(choice);
+        try {
+            await setMyPreferredLanguage({
+                variables: { language: choice === 'al' ? AppLanguage.Al : AppLanguage.En },
+            });
+        } catch {}
     };
 
     const ordersSubtitle =
@@ -93,140 +153,258 @@ export default function Profile() {
             ? `${orders.length} ${orders.length !== 1 ? t.profile.order_count_plural : t.profile.order_count}`
             : t.profile.no_orders;
 
-    const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
-
     return (
         <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }} edges={['top']}>
             <ScrollView showsVerticalScrollIndicator={false}>
-                {/* Header Section */}
-                <View className="px-5 pt-6 pb-6">
-                    <Text style={{ color: theme.colors.text, fontSize: 32, fontWeight: '700' }}>
-                        Hi {getUserName()}!
+
+                {/* ── Avatar + Name Header ──────────────────────────── */}
+                <View style={{ paddingHorizontal: 20, paddingTop: 28, paddingBottom: 24, alignItems: 'center' }}>
+                    {/* Avatar */}
+                    <View
+                        style={{
+                            width: 84,
+                            height: 84,
+                            borderRadius: 42,
+                            backgroundColor: avatarColor,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginBottom: 14,
+                            shadowColor: avatarColor,
+                            shadowOffset: { width: 0, height: 6 },
+                            shadowOpacity: 0.35,
+                            shadowRadius: 10,
+                            elevation: 8,
+                        }}
+                    >
+                        <Text style={{ color: '#fff', fontSize: 30, fontWeight: '800', letterSpacing: -0.5 }}>
+                            {initials}
+                        </Text>
+                    </View>
+
+                    {/* Name */}
+                    <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.5, textAlign: 'center' }}>
+                        {displayName}
                     </Text>
+                    {/* Email */}
+                    {user?.email ? (
+                        <Text style={{ color: theme.colors.subtext, fontSize: 13, marginTop: 3, textAlign: 'center' }}>
+                            {user.email}
+                        </Text>
+                    ) : null}
+
+                    {/* Stats row */}
+                    <View style={{ flexDirection: 'row', marginTop: 20, gap: 12 }}>
+                        <View style={{
+                            backgroundColor: theme.colors.card,
+                            borderRadius: 14,
+                            paddingVertical: 12,
+                            paddingHorizontal: 20,
+                            alignItems: 'center',
+                            borderWidth: 1,
+                            borderColor: theme.colors.border,
+                            minWidth: 100,
+                        }}>
+                            <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '800' }}>
+                                {orders.length}
+                            </Text>
+                            <Text style={{ color: theme.colors.subtext, fontSize: 11, fontWeight: '600', marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+                                Orders
+                            </Text>
+                        </View>
+                        <View style={{
+                            backgroundColor: theme.colors.card,
+                            borderRadius: 14,
+                            paddingVertical: 12,
+                            paddingHorizontal: 20,
+                            alignItems: 'center',
+                            borderWidth: 1,
+                            borderColor: theme.colors.border,
+                            minWidth: 100,
+                        }}>
+                            <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '800' }}>
+                                {deliveredOrders.length}
+                            </Text>
+                            <Text style={{ color: theme.colors.subtext, fontSize: 11, fontWeight: '600', marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+                                Delivered
+                            </Text>
+                        </View>
+                    </View>
                 </View>
 
-                {/* Main Actions List */}
-                <View className="mb-6">
-                    <ProfileRow 
-                        title={t.profile.order_history} 
-                        subtitle={ordersSubtitle} 
-                        icon="receipt-outline" 
-                        onPress={handleOrderHistoryPress} 
-                    />
-                    <ProfileRow 
-                        title={t.profile.credits} 
-                        icon="wallet-outline" 
-                        onPress={() => {}} 
+                {/* ── Orders Section ──────────────────────────────────── */}
+                <View style={{ marginHorizontal: 16, marginBottom: 14, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
+                    <ProfileRow
+                        title={t.profile.order_history}
+                        subtitle={ordersSubtitle}
+                        icon="receipt-outline"
+                        onPress={() => router.push('/orders/history')}
                         showDivider={false}
                     />
                 </View>
 
-                {/* Admin Portal — only for ADMIN / SUPER_ADMIN */}
-                {isAdmin && (
-                    <View className="mb-6">
-                        <ProfileRow
-                            title="Admin Portal"
-                            subtitle="Manage orders, drivers & more"
-                            icon="shield-checkmark-outline"
-                            onPress={() => router.push('/admin' as any)}
-                            showDivider={false}
-                        />
-                    </View>
-                )}
+                {/* ── Account Section ─────────────────────────────────── */}
+                <View style={{ marginHorizontal: 16, marginBottom: 14, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
+                    <ProfileRow title={t.profile.my_addresses} icon="location-outline" onPress={() => router.push('/addresses')} />
+                    <ProfileRow title={t.profile.contact_support} icon="chatbubble-outline" onPress={() => {}} showDivider={false} />
+                </View>
 
-                {/* Language Selection */}
-                <View className="px-5 mb-6">
-                    <Text style={{ color: theme.colors.text, fontSize: 15, fontWeight: '600', marginBottom: 12 }}>
+                {/* ── Language ─────────────────────────────────────────── */}
+                <View style={{ marginHorizontal: 16, marginBottom: 14 }}>
+                    <Text style={{ color: theme.colors.subtext, fontSize: 11, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginLeft: 4 }}>
                         Language / Gjuha
                     </Text>
                     <View style={{ flexDirection: 'row', gap: 10 }}>
-                        <TouchableOpacity
-                            onPress={() => handleLanguageChoice('en')}
-                            style={{
-                                flex: 1,
-                                paddingVertical: 12,
-                                borderRadius: 8,
-                                backgroundColor: 'transparent',
-                                borderWidth: 1.5,
-                                borderColor: languageChoice === 'en' ? '#22C55E' : '#2A2A2A',
-                                alignItems: 'center',
-                                flexDirection: 'row',
-                                justifyContent: 'center',
-                                gap: 6,
-                            }}
-                        >
-                            <Text style={{ fontSize: 18 }}>🇬🇧</Text>
-                            <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>
-                                English
-                            </Text>
-                            {languageChoice === 'en' && (
-                                <Ionicons name="checkmark-circle" size={16} color="#22C55E" />
-                            )}
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => handleLanguageChoice('al')}
-                            style={{
-                                flex: 1,
-                                paddingVertical: 12,
-                                borderRadius: 8,
-                                backgroundColor: 'transparent',
-                                borderWidth: 1.5,
-                                borderColor: languageChoice === 'al' ? '#22C55E' : '#2A2A2A',
-                                alignItems: 'center',
-                                flexDirection: 'row',
-                                justifyContent: 'center',
-                                gap: 6,
-                            }}
-                        >
-                            <Text style={{ fontSize: 18 }}>🇦🇱</Text>
-                            <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>
-                                Shqip
-                            </Text>
-                            {languageChoice === 'al' && (
-                                <Ionicons name="checkmark-circle" size={16} color="#22C55E" />
-                            )}
-                        </TouchableOpacity>
+                        {(['en', 'al'] as const).map((lang) => {
+                            const active = languageChoice === lang;
+                            return (
+                                <TouchableOpacity
+                                    key={lang}
+                                    onPress={() => handleLanguageChoice(lang)}
+                                    activeOpacity={0.75}
+                                    style={{
+                                        flex: 1,
+                                        paddingVertical: 12,
+                                        borderRadius: 14,
+                                        borderWidth: active ? 2 : 1.5,
+                                        borderColor: active ? theme.colors.primary : theme.colors.border,
+                                        backgroundColor: active ? theme.colors.primary + '15' : theme.colors.card,
+                                        alignItems: 'center',
+                                        flexDirection: 'row',
+                                        justifyContent: 'center',
+                                        gap: 6,
+                                    }}
+                                >
+                                    <Text style={{ fontSize: 18 }}>{lang === 'en' ? '🇬🇧' : '🇦🇱'}</Text>
+                                    <Text style={{ color: active ? theme.colors.primary : theme.colors.text, fontSize: 14, fontWeight: active ? '700' : '500' }}>
+                                        {lang === 'en' ? 'English' : 'Shqip'}
+                                    </Text>
+                                    {active && <Ionicons name="checkmark-circle" size={16} color={theme.colors.primary} />}
+                                </TouchableOpacity>
+                            );
+                        })}
                     </View>
                 </View>
 
-                {/* Quick Links */}
-                <View className="mb-6">
-                    <ProfileRow title={t.profile.my_addresses} icon="location-outline" onPress={() => router.push('/addresses')} />
-                    <ProfileRow title={t.profile.invite_friends} icon="gift-outline" onPress={() => router.push('/invite-friends')} />
-                    <ProfileRow title={t.profile.redeem_code} icon="ticket-outline" onPress={() => {}} />
-                    <ProfileRow title={t.profile.contact_support} icon="chatbubble-outline" onPress={() => {}} />
-                    <ProfileRow title="🐛 Debug Notifications" icon="bug-outline" onPress={() => router.push('/debug-notifications')} showDivider={false} />
-                </View>
-
-                {/* Account Actions */}
-                <View className="mb-6">
+                {/* ── Danger Zone ──────────────────────────────────────── */}
+                <View style={{ marginHorizontal: 16, marginBottom: 14, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#EF444430', backgroundColor: theme.colors.card }}>
                     <ProfileRow
-                        title={profileText.delete_account || 'Delete account'}
+                        title={(t.profile as any).delete_account || 'Delete Account'}
                         icon="trash-outline"
                         onPress={handleDeleteAccount}
                         showDivider={false}
                     />
                 </View>
 
-                {/* Logout Button */}
-                <View className="px-5 pb-8">
+                {/* ── Logout ────────────────────────────────────────────── */}
+                <View style={{ marginHorizontal: 16, marginBottom: 36 }}>
                     <TouchableOpacity
                         onPress={handleLogout}
+                        activeOpacity={0.8}
                         style={{
-                            paddingVertical: 14,
-                            borderRadius: 8,
+                            paddingVertical: 15,
+                            borderRadius: 14,
                             alignItems: 'center',
-                            backgroundColor: 'transparent',
-                            borderWidth: 1,
-                            borderColor: '#2A2A2A',
+                            backgroundColor: '#EF444415',
+                            borderWidth: 1.5,
+                            borderColor: '#EF444440',
+                            flexDirection: 'row',
+                            justifyContent: 'center',
+                            gap: 8,
                         }}
                     >
-                        <Text style={{ color: theme.colors.text, fontSize: 15, fontWeight: '600' }}>
+                        <Ionicons name="log-out-outline" size={18} color="#EF4444" />
+                        <Text style={{ color: '#EF4444', fontSize: 15, fontWeight: '700' }}>
                             {t.profile.logout}
                         </Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>
+
+            {/* ── Delete Account Modal ── */}
+            <Modal
+                visible={deleteModalStep > 0}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setDeleteModalStep(0)}
+            >
+                <Pressable
+                    style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}
+                    onPress={() => setDeleteModalStep(0)}
+                >
+                    <Pressable
+                        onPress={(e) => e.stopPropagation()}
+                        style={{
+                            backgroundColor: theme.colors.card,
+                            borderTopLeftRadius: 28,
+                            borderTopRightRadius: 28,
+                            paddingHorizontal: 24,
+                            paddingTop: 12,
+                            paddingBottom: 40,
+                            borderTopWidth: 1,
+                            borderColor: theme.colors.border,
+                        }}
+                    >
+                        {/* Drag handle */}
+                        <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: theme.colors.border, alignSelf: 'center', marginBottom: 24 }} />
+
+                        {/* Icon */}
+                        <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: '#EF444418', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 16 }}>
+                            <Ionicons name="trash-outline" size={34} color="#EF4444" />
+                        </View>
+
+                        <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '800', textAlign: 'center', letterSpacing: -0.4 }}>
+                            Delete Account?
+                        </Text>
+                        <Text style={{ color: theme.colors.subtext, fontSize: 14, textAlign: 'center', marginTop: 10, lineHeight: 21 }}>
+                            This will permanently erase your account, order history, and all personal data. This cannot be undone.
+                        </Text>
+
+                        {deleteModalStep === 1 ? (
+                            <View style={{ marginTop: 28, gap: 12 }}>
+                                <TouchableOpacity
+                                    onPress={() => setDeleteModalStep(2)}
+                                    activeOpacity={0.8}
+                                    style={{
+                                        backgroundColor: '#EF444415',
+                                        borderRadius: 14,
+                                        paddingVertical: 15,
+                                        alignItems: 'center',
+                                        borderWidth: 1.5,
+                                        borderColor: '#EF444440',
+                                    }}
+                                >
+                                    <Text style={{ color: '#EF4444', fontSize: 16, fontWeight: '700' }}>I understand, continue</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={() => setDeleteModalStep(0)}
+                                    activeOpacity={0.7}
+                                    style={{
+                                        backgroundColor: theme.colors.background,
+                                        borderRadius: 14,
+                                        paddingVertical: 15,
+                                        alignItems: 'center',
+                                        borderWidth: 1,
+                                        borderColor: theme.colors.border,
+                                    }}
+                                >
+                                    <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '600' }}>Cancel</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            <>
+                                <SlideToDelete onConfirmed={handleDeleteConfirmed} />
+                                <TouchableOpacity
+                                    onPress={() => setDeleteModalStep(0)}
+                                    activeOpacity={0.7}
+                                    style={{ marginTop: 16, paddingVertical: 14, alignItems: 'center' }}
+                                >
+                                    <Text style={{ color: theme.colors.subtext, fontSize: 15, fontWeight: '600' }}>Cancel</Text>
+                                </TouchableOpacity>
+                            </>
+                        )}
+                    </Pressable>
+                </Pressable>
+            </Modal>
         </SafeAreaView>
     );
 }

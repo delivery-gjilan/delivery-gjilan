@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';import {
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import {
     View,
     Text,
     TextInput,
@@ -7,8 +8,13 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';import {
     KeyboardAvoidingView,
     Platform,
     ActivityIndicator,
+    Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const CLEAR_STORAGE_KEY = 'driver_chat_cleared_at';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useMutation, useQuery, useSubscription } from '@apollo/client/react';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
@@ -32,10 +38,10 @@ interface DriverMessage {
     createdAt: string;
 }
 
-const ALERT_CONFIG: Record<AlertType, { bg: string; border: string; textColor: string; labelColor: string }> = {
-    INFO: { bg: '#1e3a5f22', border: '#3b82f644', textColor: '#93c5fd', labelColor: '#60a5fa' },
-    WARNING: { bg: '#451a0322', border: '#f59e0b44', textColor: '#fcd34d', labelColor: '#f59e0b' },
-    URGENT: { bg: '#450a0a22', border: '#ef444444', textColor: '#fca5a5', labelColor: '#ef4444' },
+const ALERT_CONFIG: Record<AlertType, { bg: string; border: string; textColor: string; labelColor: string; labelText: string }> = {
+    INFO: { bg: '#1e3a5f22', border: '#3b82f644', textColor: '#93c5fd', labelColor: '#60a5fa', labelText: 'Message' },
+    WARNING: { bg: '#451a0322', border: '#f59e0b44', textColor: '#fcd34d', labelColor: '#f59e0b', labelText: 'Warning' },
+    URGENT: { bg: '#450a0a22', border: '#ef444444', textColor: '#fca5a5', labelColor: '#ef4444', labelText: 'Urgent' },
 };
 
 /** Parses both ISO-8601 and PostgreSQL's "2026-03-24 10:30:00+00" format safely on iOS */
@@ -83,9 +89,18 @@ function buildListItems(messages: DriverMessage[]): ListItem[] {
 
 export default function MessagesScreen() {
     const theme = useTheme();
+    const router = useRouter();
     const [extraMessages, setExtraMessages] = useState<DriverMessage[]>([]);
     const [replyText, setReplyText] = useState('');
+    const [clearedAt, setClearedAt] = useState<number | null>(null);
     const flatListRef = useRef<FlatList>(null);
+
+    // Load persisted clear timestamp
+    useEffect(() => {
+        AsyncStorage.getItem(CLEAR_STORAGE_KEY).then((val) => {
+            if (val) setClearedAt(parseInt(val, 10));
+        });
+    }, []);
 
     const { loading, data: queryData } = useQuery<{ myDriverMessages: DriverMessage[] }>(MY_DRIVER_MESSAGES, {
         variables: { limit: 100 },
@@ -96,17 +111,16 @@ export default function MessagesScreen() {
     const baseMessages = queryData?.myDriverMessages ?? [];
     const adminId = baseMessages.find((m) => m.senderRole === 'ADMIN')?.adminId ?? null;
 
-    // Merge base messages with any extras that arrived via subscription/mutation
-    // after the last query fetch, deduplicating by id
+    // Merge base messages with any extras that arrived via subscription/mutation, filtered by clearedAt
     const messages = React.useMemo(() => {
         const byId = new Map(baseMessages.map((m) => [m.id, m]));
         for (const m of extraMessages) {
             if (!byId.has(m.id)) byId.set(m.id, m);
         }
-        return Array.from(byId.values()).sort(
-            (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-        );
-    }, [baseMessages, extraMessages]);
+        return Array.from(byId.values())
+            .filter((m) => !clearedAt || parseDate(m.createdAt).getTime() > clearedAt)
+            .sort((a, b) => parseDate(a.createdAt).getTime() - parseDate(b.createdAt).getTime());
+    }, [baseMessages, extraMessages, clearedAt]);
 
     const [markRead] = useMutation(MARK_DRIVER_MESSAGES_READ_DRIVER);
     const [reply, { loading: replying }] = useMutation(REPLY_TO_DRIVER_MESSAGE, {
@@ -154,6 +168,25 @@ export default function MessagesScreen() {
         await reply({ variables: { adminId, body } });
     };
 
+    const handleClearChat = () => {
+        Alert.alert(
+            'Clear Chat',
+            'This will hide all current messages. New messages will still appear.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Clear',
+                    style: 'destructive',
+                    onPress: async () => {
+                        const now = Date.now();
+                        await AsyncStorage.setItem(CLEAR_STORAGE_KEY, now.toString());
+                        setClearedAt(now);
+                    },
+                },
+            ],
+        );
+    };
+
     const listItems = buildListItems(messages);
 
     const renderItem = ({ item }: { item: ListItem }) => {
@@ -198,7 +231,7 @@ export default function MessagesScreen() {
                 >
                     {!isDriver && (
                         <Text style={{ color: alertCfg.labelColor, fontSize: 10, fontWeight: '700', marginBottom: 3 }}>
-                            {msg.alertType}
+                            {alertCfg.labelText}
                         </Text>
                     )}
                     <Text style={{ color: theme.colors.text, fontSize: 14, lineHeight: 20 }}>{msg.body}</Text>
@@ -227,8 +260,20 @@ export default function MessagesScreen() {
                     gap: 10,
                 }}
             >
+                <Pressable onPress={() => router.back()} hitSlop={12}>
+                    <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
+                </Pressable>
                 <Ionicons name="chatbubbles-outline" size={22} color={theme.colors.primary} />
-                <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text }}>Messages</Text>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text, flex: 1 }}>Messages</Text>
+                {messages.length > 0 && (
+                    <Pressable
+                        onPress={handleClearChat}
+                        hitSlop={8}
+                        style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, padding: 4 })}
+                    >
+                        <Ionicons name="trash-outline" size={20} color={theme.colors.subtext} />
+                    </Pressable>
+                )}
             </View>
 
             <KeyboardAvoidingView

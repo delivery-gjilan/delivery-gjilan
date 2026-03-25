@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { View, Text, ScrollView, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -48,6 +48,8 @@ export default function Discover() {
     const theme = useTheme();
     const router = useRouter();
     const { businesses, loading, error, refetch } = useBusinesses();
+    // Only play entering animations on the very first render, not on re-focus
+    const hasAnimated = useRef(false);
         useFocusEffect(
             React.useCallback(() => {
                 void refetch();
@@ -144,7 +146,7 @@ export default function Discover() {
             return (
                 <Animated.View
                     key={item.id}
-                    entering={FadeInDown.delay(index * 70).duration(400).springify()}
+                    entering={hasAnimated.current ? undefined : FadeInDown.delay(index * 70).duration(400).springify()}
                 >
                     <CompactRestaurantCard
                         id={item.id}
@@ -217,17 +219,17 @@ export default function Discover() {
                 ) : (
                     <ScrollView showsVerticalScrollIndicator={false}>
                         {/* Category Icons */}
-                        <Animated.View entering={FadeIn.duration(500)} style={{ marginBottom: 20, marginTop: 4 }}>
+                        <Animated.View entering={hasAnimated.current ? undefined : FadeIn.duration(500)} style={{ marginBottom: 20, marginTop: 4 }}>
                             <CategoryIcons categories={categories} />
                         </Animated.View>
 
                         {/* Promo Banners */}
-                        <Animated.View entering={FadeInDown.delay(100).duration(500)} style={{ marginBottom: 20 }}>
+                        <Animated.View entering={hasAnimated.current ? undefined : FadeInDown.delay(100).duration(500)} style={{ marginBottom: 20 }}>
                             <PromoSlider banners={promoBanners} />
                         </Animated.View>
 
                         {/* Popular Right Now */}
-                        <Animated.View entering={FadeInDown.delay(200).duration(500)}>
+                        <Animated.View entering={hasAnimated.current ? undefined : FadeInDown.delay(200).duration(500)}>
                             <DiscoverSection
                                 title={t.home.popular_now}
                                 seeAllLabel={t.home.see_all}
@@ -239,7 +241,7 @@ export default function Discover() {
 
                         {/* Active Promotions Section */}
                         {promoRestaurants.length > 0 && (
-                            <Animated.View entering={FadeInDown.delay(300).duration(500)}>
+                            <Animated.View entering={hasAnimated.current ? undefined : FadeInDown.delay(300).duration(500)}>
                                 <DiscoverSection
                                     title={t.home.active_discounts}
                                     seeAllLabel={t.home.see_all}
@@ -252,7 +254,7 @@ export default function Discover() {
 
                         {/* Open Now */}
                         {openNowRestaurants.length > 0 && (
-                            <Animated.View entering={FadeInDown.delay(400).duration(500)}>
+                            <Animated.View entering={hasAnimated.current ? undefined : FadeInDown.delay(400).duration(500)}>
                                 <DiscoverSection
                                     title={t.home.open_now}
                                     seeAllLabel={t.home.see_all}
@@ -264,7 +266,7 @@ export default function Discover() {
                         )}
 
                         {/* Bottom spacing */}
-                        <View style={{ height: 32 }} />
+                        <View style={{ height: 32 }} onLayout={() => { hasAnimated.current = true; }} />
                     </ScrollView>
                 )}
             </View>

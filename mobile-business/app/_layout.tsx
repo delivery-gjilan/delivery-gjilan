@@ -14,6 +14,7 @@ import InfoBanner from '@/components/InfoBanner';
 import type { InfoBannerType } from '@/components/InfoBanner';
 import BusinessMessageBanner from '@/components/BusinessMessageBanner';
 import type { AlertType } from '@/components/BusinessMessageBanner';
+import StoreClosedOverlay from '@/components/StoreClosedOverlay';
 import { GET_STORE_STATUS } from '@/graphql/store';
 import { BUSINESS_MESSAGE_RECEIVED_SUB } from '@/graphql/messages';
 
@@ -110,6 +111,7 @@ function AppContent() {
                 <Stack.Screen name="login" />
                 <Stack.Screen name="(tabs)" />
             </Stack>
+            {isAuthenticated && <StoreClosedOverlay />}
         </>
     );
 }

@@ -15,11 +15,26 @@ import { CREATE_PROMOTION, UPDATE_PROMOTION, DELETE_PROMOTION } from "@/graphql/
 import type { PromotionType, PromotionTarget, GetPromotionsQuery } from "@/gql/graphql";
 
 const promotionTypeLabels: Record<PromotionType, string> = {
-    FIXED_AMOUNT: "Fixed amount",
+    FIXED_AMOUNT: "Fixed Amount",
     PERCENTAGE: "Percentage",
-    FREE_DELIVERY: "Free delivery",
-    WALLET_CREDIT: "Wallet credit",
+    FREE_DELIVERY: "Free Delivery",
+    SPEND_X_FIXED: "Spend X, Get €Y Off",
+    SPEND_X_PERCENT: "Spend X, Get Y% Off",
+    SPEND_X_GET_FREE: "Spend X, Get Free Delivery",
 };
+
+/** Which fields are relevant per promotion type */
+const typeFieldVisibility = {
+    FIXED_AMOUNT:     { discountValue: true,  maxDiscountCap: false, spendThreshold: false, thresholdReward: false },
+    PERCENTAGE:       { discountValue: true,  maxDiscountCap: true,  spendThreshold: false, thresholdReward: false },
+    FREE_DELIVERY:    { discountValue: false, maxDiscountCap: false, spendThreshold: false, thresholdReward: false },
+    SPEND_X_FIXED:    { discountValue: true,  maxDiscountCap: false, spendThreshold: true,  thresholdReward: false },
+    SPEND_X_PERCENT:  { discountValue: true,  maxDiscountCap: true,  spendThreshold: true,  thresholdReward: false },
+    SPEND_X_GET_FREE: { discountValue: false, maxDiscountCap: false, spendThreshold: true,  thresholdReward: true  },
+} as const;
+
+const isSpendType = (t: string) => t.startsWith("SPEND_X_");
+const isPercentType = (t: string) => t === "PERCENTAGE" || t === "SPEND_X_PERCENT";
 
 const promotionTargetLabels: Record<PromotionTarget, string> = {
     ALL_USERS: "All users",
@@ -40,6 +55,8 @@ type PromotionFormState = {
     spendThreshold: string;
     thresholdRewardType: "FIXED_AMOUNT" | "PERCENTAGE" | "FREE_DELIVERY";
     thresholdRewardValue: string;
+    maxGlobalUsage: string;
+    maxUsagePerUser: string;
     isStackable: string;
     priority: string;
     isActive: string;
@@ -60,6 +77,8 @@ const emptyForm: PromotionFormState = {
     spendThreshold: "",
     thresholdRewardType: "FIXED_AMOUNT",
     thresholdRewardValue: "",
+    maxGlobalUsage: "",
+    maxUsagePerUser: "",
     isStackable: "false",
     priority: "50",
     isActive: "true",
@@ -149,6 +168,8 @@ export default function PromotionsPage() {
             spendThreshold: promotion.spendThreshold ? String(promotion.spendThreshold) : "",
             thresholdRewardType,
             thresholdRewardValue,
+            maxGlobalUsage: promotion.maxGlobalUsage ? String(promotion.maxGlobalUsage) : "",
+            maxUsagePerUser: promotion.maxUsagePerUser ? String(promotion.maxUsagePerUser) : "",
             isStackable: promotion.isStackable ? "true" : "false",
             priority: String(promotion.priority),
             isActive: promotion.isActive ? "true" : "false",
@@ -179,18 +200,23 @@ export default function PromotionsPage() {
     };
 
     const handleSave = async () => {
-        // Construct thresholdReward JSON if target is CONDITIONAL
+        // Construct thresholdReward JSON for types/targets that need it
         let thresholdReward: string | undefined = undefined;
-        if (formData.target === "CONDITIONAL" && formData.spendThreshold.trim()) {
+
+        if (formData.type === "SPEND_X_GET_FREE") {
+            // Always free delivery for this type
+            thresholdReward = JSON.stringify({ type: "FREE_DELIVERY" });
+        } else if (formData.target === "CONDITIONAL" && formData.spendThreshold.trim()) {
             const rewardObj: { type: string; value?: number } = {
                 type: formData.thresholdRewardType,
             };
-            // Add value only if it's not FREE_DELIVERY and has a value
             if (formData.thresholdRewardType !== "FREE_DELIVERY" && formData.thresholdRewardValue.trim()) {
                 rewardObj.value = Number(formData.thresholdRewardValue);
             }
             thresholdReward = JSON.stringify(rewardObj);
         }
+
+        const vis = typeFieldVisibility[formData.type];
         
         const payload = {
             name: formData.name.trim(),
@@ -198,11 +224,13 @@ export default function PromotionsPage() {
             code: formData.code.trim().toUpperCase() || undefined,
             type: formData.type,
             target: formData.target,
-            discountValue: toOptionalNumber(formData.discountValue),
-            maxDiscountCap: toOptionalNumber(formData.maxDiscountCap),
+            discountValue: vis.discountValue ? toOptionalNumber(formData.discountValue) : undefined,
+            maxDiscountCap: vis.maxDiscountCap ? toOptionalNumber(formData.maxDiscountCap) : undefined,
             minOrderAmount: toOptionalNumber(formData.minOrderAmount),
-            spendThreshold: toOptionalNumber(formData.spendThreshold),
+            spendThreshold: vis.spendThreshold ? toOptionalNumber(formData.spendThreshold) : undefined,
             thresholdReward: thresholdReward,
+            maxGlobalUsage: toOptionalNumber(formData.maxGlobalUsage) ? Math.round(Number(formData.maxGlobalUsage)) : undefined,
+            maxUsagePerUser: toOptionalNumber(formData.maxUsagePerUser) ? Math.round(Number(formData.maxUsagePerUser)) : undefined,
             isStackable: formData.isStackable === "true",
             priority: Number(formData.priority),
             isActive: formData.isActive === "true",
@@ -299,7 +327,13 @@ export default function PromotionsPage() {
                                                     ? `${promotion.discountValue}%`
                                                     : promotion.type === "FREE_DELIVERY"
                                                         ? "Free delivery"
-                                                        : `â‚¬${promotion.discountValue?.toFixed(2) || "0.00"}`}
+                                                        : promotion.type === "SPEND_X_GET_FREE"
+                                                            ? `Spend €${promotion.spendThreshold?.toFixed(2) || "?"} → free delivery`
+                                                            : promotion.type === "SPEND_X_PERCENT"
+                                                                ? `Spend €${promotion.spendThreshold?.toFixed(2) || "?"} → ${promotion.discountValue}% off`
+                                                                : promotion.type === "SPEND_X_FIXED"
+                                                                    ? `Spend €${promotion.spendThreshold?.toFixed(2) || "?"} → €${promotion.discountValue?.toFixed(2) || "0"} off`
+                                                                    : `€${promotion.discountValue?.toFixed(2) || "0.00"}`}
                                             </div>
                                             {promotion.maxDiscountCap && (
                                                 <div className="text-xs text-zinc-500">
@@ -373,13 +407,13 @@ export default function PromotionsPage() {
                     <div className="text-center mb-4">
                         <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
                             {wizardStep === 1 && "Step 1: Basic Information"}
-                            {wizardStep === 2 && "Step 2: Discount & Conditions"}
-                            {wizardStep === 3 && "Step 3: Advanced Settings"}
+                            {wizardStep === 2 && "Step 2: Configure the Deal"}
+                            {wizardStep === 3 && "Step 3: Limits, Schedule & Review"}
                         </h3>
                         <p className="text-sm text-zinc-500 mt-1">
                             {wizardStep === 1 && "Set up the basic details of your promotion"}
-                            {wizardStep === 2 && "Configure discount values and eligibility"}
-                            {wizardStep === 3 && "Configure priority, schedule, and status"}
+                            {wizardStep === 2 && "Configure discount values and business eligibility"}
+                            {wizardStep === 3 && "Set usage limits, schedule, and review your promotion"}
                         </p>
                     </div>
 
@@ -423,18 +457,35 @@ export default function PromotionsPage() {
                                         <Select
                                             label="Promotion Type *"
                                             value={formData.type}
-                                            onChange={(e) => setFormData({ ...formData, type: e.target.value as PromotionType })}
+                                            onChange={(e) => {
+                                                const newType = e.target.value as PromotionType;
+                                                const updates: Partial<PromotionFormState> = { type: newType };
+                                                const vis = typeFieldVisibility[newType];
+                                                if (!vis.discountValue) { updates.discountValue = ""; }
+                                                if (!vis.maxDiscountCap) { updates.maxDiscountCap = ""; }
+                                                if (!vis.spendThreshold) { updates.spendThreshold = ""; updates.thresholdRewardValue = ""; }
+                                                if (newType === "SPEND_X_GET_FREE") { updates.thresholdRewardType = "FREE_DELIVERY"; updates.thresholdRewardValue = ""; }
+                                                setFormData((prev) => ({ ...prev, ...updates }));
+                                            }}
                                         >
-                                            <option value="FIXED_AMOUNT">ðŸ’µ Fixed Amount (e.g., $5 off)</option>
-                                            <option value="PERCENTAGE">ðŸ“Š Percentage (e.g., 20% off)</option>
-                                            <option value="FREE_DELIVERY">ðŸšš Free Delivery</option>
-                                            <option value="WALLET_CREDIT">ðŸ’³ Wallet Credit</option>
+                                            <optgroup label="Simple Discounts">
+                                                <option value="FIXED_AMOUNT">Fixed Amount (e.g., &euro;5 off)</option>
+                                                <option value="PERCENTAGE">Percentage (e.g., 20% off)</option>
+                                                <option value="FREE_DELIVERY">Free Delivery</option>
+                                            </optgroup>
+                                            <optgroup label="Spend Threshold Deals">
+                                                <option value="SPEND_X_FIXED">Spend &euro;X, Get &euro;Y Off</option>
+                                                <option value="SPEND_X_PERCENT">Spend &euro;X, Get Y% Off</option>
+                                                <option value="SPEND_X_GET_FREE">Spend &euro;X, Get Free Delivery</option>
+                                            </optgroup>
                                         </Select>
                                         <div className="text-xs text-zinc-600 mt-1">
-                                            {formData.type === "FIXED_AMOUNT" && "Subtract a fixed dollar amount"}
-                                            {formData.type === "PERCENTAGE" && "Discount by percentage of order total"}
-                                            {formData.type === "FREE_DELIVERY" && "Waive delivery fees"}
-                                            {formData.type === "WALLET_CREDIT" && "Add credit to user's wallet"}
+                                            {formData.type === "FIXED_AMOUNT" && "Subtract a fixed euro amount from the order"}
+                                            {formData.type === "PERCENTAGE" && "Discount by percentage of order subtotal"}
+                                            {formData.type === "FREE_DELIVERY" && "Waive the delivery fee entirely"}
+                                            {formData.type === "SPEND_X_FIXED" && "Customer spends a minimum, gets a fixed discount"}
+                                            {formData.type === "SPEND_X_PERCENT" && "Customer spends a minimum, gets a percentage discount"}
+                                            {formData.type === "SPEND_X_GET_FREE" && "Customer spends a minimum, gets free delivery"}
                                         </div>
                                     </div>
                                     <div>
@@ -443,10 +494,10 @@ export default function PromotionsPage() {
                                             value={formData.target}
                                             onChange={(e) => setFormData({ ...formData, target: e.target.value as PromotionTarget })}
                                         >
-                                            <option value="ALL_USERS">ðŸ‘¥ All Users</option>
-                                            <option value="SPECIFIC_USERS">ðŸŽ Specific Users</option>
-                                            <option value="FIRST_ORDER">ðŸ†• First Order Only</option>
-                                            <option value="CONDITIONAL">ðŸ’° Conditional (Spend X Get Y)</option>
+                                            <option value="ALL_USERS">All Users</option>
+                                            <option value="SPECIFIC_USERS">Specific Users</option>
+                                            <option value="FIRST_ORDER">First Order Only</option>
+                                            <option value="CONDITIONAL">Conditional (Spend Threshold)</option>
                                         </Select>
                                         <div className="text-xs text-zinc-600 mt-1">
                                             {formData.target === "ALL_USERS" && "Anyone can use this promo"}
@@ -456,72 +507,35 @@ export default function PromotionsPage() {
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Type-specific info banner */}
+                                {isSpendType(formData.type) && (
+                                    <div className="bg-violet-900/15 border border-violet-700/30 rounded-lg p-3 text-xs text-violet-200 mt-4">
+                                        <strong>How it works:</strong>{" "}
+                                        {formData.type === "SPEND_X_FIXED" && "Customer sees a progress bar in the cart. When their subtotal reaches the threshold, a fixed euro discount is automatically applied."}
+                                        {formData.type === "SPEND_X_PERCENT" && "Customer sees a progress bar in the cart. When their subtotal reaches the threshold, a percentage discount is automatically applied."}
+                                        {formData.type === "SPEND_X_GET_FREE" && "Customer sees a progress bar in the cart. When their subtotal reaches the threshold, delivery becomes free automatically."}
+                                    </div>
+                                )}
+                                {formData.type === "FREE_DELIVERY" && (
+                                    <div className="bg-green-900/15 border border-green-700/30 rounded-lg p-3 text-xs text-green-200 mt-4">
+                                        <strong>Free Delivery:</strong> The delivery fee will be waived entirely. No discount amount needed.
+                                    </div>
+                                )}
                             </div>
                         )}
 
-                        {/* STEP 2: Discount & Conditions */}
+                        {/* STEP 2: Configure the Deal */}
                         {wizardStep === 2 && (
                             <div className="space-y-6">
-                                {/* Discount Settings */}
-                                <div className="space-y-4">
-                                    <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-zinc-800 pb-2">
-                                        ðŸ’¸ Discount Configuration
-                                    </h3>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <Input
-                                                label={formData.type === "PERCENTAGE" ? "Discount Percentage *" : "Discount Amount *"}
-                                                type="number"
-                                                step="0.01"
-                                                value={formData.discountValue}
-                                                onChange={(e) => setFormData({ ...formData, discountValue: e.target.value })}
-                                                placeholder={formData.type === "PERCENTAGE" ? "20" : "5.00"}
-                                            />
-                                            <div className="text-xs text-zinc-600 mt-1">
-                                                {formData.type === "PERCENTAGE" ? "Enter value as number (e.g., 20 for 20%)" : "Enter dollar amount (e.g., 5 for $5 off)"}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <Input
-                                                label="Max Discount Cap"
-                                                type="number"
-                                                step="0.01"
-                                                value={formData.maxDiscountCap}
-                                                onChange={(e) => setFormData({ ...formData, maxDiscountCap: e.target.value })}
-                                                placeholder="50.00"
-                                            />
-                                            <div className="text-xs text-zinc-600 mt-1">
-                                                Maximum discount amount (optional)
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <Input
-                                        label="Minimum Order Amount"
-                                        type="number"
-                                        step="0.01"
-                                        value={formData.minOrderAmount}
-                                        onChange={(e) => setFormData({ ...formData, minOrderAmount: e.target.value })}
-                                        placeholder="20.00"
-                                    />
-                                    <div className="text-xs text-zinc-600 -mt-2">
-                                        Order must be at least this amount to qualify (optional)
-                                    </div>
-                                </div>
-
-                                {/* Spend Threshold Progress Bar (for ALL_USERS and CONDITIONAL) */}
-                                {(formData.target === "ALL_USERS" || formData.target === "CONDITIONAL") && (
-                                    <div className="space-y-4 bg-blue-900/10 border border-blue-700/30 rounded-lg p-4">
-                                        <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-blue-700/30 pb-2">
-                                            ðŸ“Š Progress Bar Threshold (Optional)
+                                {/* --- Spend Threshold (SPEND_X_* types) --- */}
+                                {typeFieldVisibility[formData.type].spendThreshold && (
+                                    <div className="space-y-4">
+                                        <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-zinc-800 pb-2">
+                                            Spend Threshold
                                         </h3>
-                                        <div className="bg-blue-900/20 border border-blue-700/20 rounded p-3 text-xs text-blue-200">
-                                            <strong>ðŸ’¡ Progress Bar:</strong> If you set a spend threshold, customers will see a progress bar showing how close they are to unlocking this promotion.
-                                            {formData.target === "ALL_USERS" && " Perfect for \"Spend â‚¬20, get free delivery\" type promotions for all users!"}
-                                        </div>
-                                        
                                         <Input
-                                            label="Spend Threshold (Optional)"
+                                            label="Minimum Spend to Unlock *"
                                             type="number"
                                             step="0.01"
                                             value={formData.spendThreshold}
@@ -529,21 +543,111 @@ export default function PromotionsPage() {
                                             placeholder="20.00"
                                         />
                                         <div className="text-xs text-zinc-600 -mt-2">
-                                            The amount customers need to spend to unlock this promotion (e.g., â‚¬20)
+                                            Customers must spend at least &euro;{formData.spendThreshold || "?"} to unlock this deal. A progress bar is shown in the cart.
                                         </div>
                                     </div>
                                 )}
 
-                                {/* Conditional Promotion: Reward Configuration */}
-                                {formData.target === "CONDITIONAL" && formData.spendThreshold.trim() && (
+                                {/* --- Discount Value (not for FREE_DELIVERY / SPEND_X_GET_FREE) --- */}
+                                {typeFieldVisibility[formData.type].discountValue && (
+                                    <div className="space-y-4">
+                                        <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-zinc-800 pb-2">
+                                            Discount Configuration
+                                        </h3>
+                                        <div className={`grid gap-4 ${typeFieldVisibility[formData.type].maxDiscountCap ? "grid-cols-2" : "grid-cols-1"}`}>
+                                            <div>
+                                                <Input
+                                                    label={isPercentType(formData.type) ? "Discount Percentage (%) *" : "Discount Amount (\u20ac) *"}
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={formData.discountValue}
+                                                    onChange={(e) => setFormData({ ...formData, discountValue: e.target.value })}
+                                                    placeholder={isPercentType(formData.type) ? "20" : "5.00"}
+                                                />
+                                                <div className="text-xs text-zinc-600 mt-1">
+                                                    {isPercentType(formData.type)
+                                                        ? "Enter as a number (e.g., 20 for 20% off)"
+                                                        : "Enter euro amount (e.g., 5 for \u20ac5 off)"}
+                                                </div>
+                                            </div>
+                                            {/* Max discount cap — only for percentage types */}
+                                            {typeFieldVisibility[formData.type].maxDiscountCap && (
+                                                <div>
+                                                    <Input
+                                                        label="Max Discount Cap (\u20ac)"
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={formData.maxDiscountCap}
+                                                        onChange={(e) => setFormData({ ...formData, maxDiscountCap: e.target.value })}
+                                                        placeholder="50.00"
+                                                    />
+                                                    <div className="text-xs text-zinc-600 mt-1">
+                                                        Maximum discount (e.g., 20% off but never more than &euro;50)
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* --- FREE_DELIVERY / SPEND_X_GET_FREE — no discount fields, just a note --- */}
+                                {formData.type === "FREE_DELIVERY" && (
+                                    <div className="bg-green-900/10 border border-green-700/30 rounded-lg p-4 text-sm text-green-200">
+                                        No discount amount needed &mdash; the delivery fee will be set to &euro;0.
+                                    </div>
+                                )}
+                                {formData.type === "SPEND_X_GET_FREE" && (
+                                    <div className="bg-green-900/10 border border-green-700/30 rounded-lg p-4 text-sm text-green-200">
+                                        When customers spend &euro;{formData.spendThreshold || "?"}, delivery becomes free automatically.
+                                    </div>
+                                )}
+
+                                {/* --- Min Order Amount (simple types only — SPEND_X uses threshold instead) --- */}
+                                {!isSpendType(formData.type) && (
+                                    <div className="space-y-2">
+                                        <Input
+                                            label="Minimum Order Amount (\u20ac)"
+                                            type="number"
+                                            step="0.01"
+                                            value={formData.minOrderAmount}
+                                            onChange={(e) => setFormData({ ...formData, minOrderAmount: e.target.value })}
+                                            placeholder="10.00"
+                                        />
+                                        <div className="text-xs text-zinc-600">
+                                            Order subtotal must be at least this amount to qualify (optional)
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* --- Spend Threshold for Progress Bar (non-SPEND_X types but CONDITIONAL/ALL_USERS target) --- */}
+                                {!isSpendType(formData.type) && (formData.target === "ALL_USERS" || formData.target === "CONDITIONAL") && (
+                                    <div className="space-y-4 bg-blue-900/10 border border-blue-700/30 rounded-lg p-4">
+                                        <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-blue-700/30 pb-2">
+                                            Progress Bar Threshold (Optional)
+                                        </h3>
+                                        <div className="bg-blue-900/20 border border-blue-700/20 rounded p-3 text-xs text-blue-200">
+                                            If you set a spend threshold, customers will see a progress bar in the cart showing how close they are to unlocking this promotion.
+                                        </div>
+                                        <Input
+                                            label="Spend Threshold (\u20ac)"
+                                            type="number"
+                                            step="0.01"
+                                            value={formData.spendThreshold}
+                                            onChange={(e) => setFormData({ ...formData, spendThreshold: e.target.value })}
+                                            placeholder="20.00"
+                                        />
+                                    </div>
+                                )}
+
+                                {/* --- Conditional Threshold Reward (non-SPEND_X types with CONDITIONAL target) --- */}
+                                {!isSpendType(formData.type) && formData.target === "CONDITIONAL" && formData.spendThreshold.trim() && (
                                     <div className="space-y-4 bg-purple-900/10 border border-purple-700/30 rounded-lg p-4">
                                         <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-purple-700/30 pb-2">
-                                            ðŸŽ Threshold Reward
+                                            Threshold Reward
                                         </h3>
                                         <div className="bg-purple-900/20 border border-purple-700/20 rounded p-3 text-xs text-purple-200">
-                                            <strong>How it works:</strong> When user spends the threshold amount, they automatically receive the reward you configure below.
+                                            When a user spends the threshold amount, they automatically receive this reward.
                                         </div>
-                                        
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
                                                 <Select
@@ -551,9 +655,9 @@ export default function PromotionsPage() {
                                                     value={formData.thresholdRewardType}
                                                     onChange={(e) => setFormData({ ...formData, thresholdRewardType: e.target.value as "FIXED_AMOUNT" | "PERCENTAGE" | "FREE_DELIVERY" })}
                                                 >
-                                                    <option value="FIXED_AMOUNT">ðŸ’µ Fixed Amount Off</option>
-                                                    <option value="PERCENTAGE">ðŸ“Š Percentage Off</option>
-                                                    <option value="FREE_DELIVERY">ðŸšš Free Delivery</option>
+                                                    <option value="FIXED_AMOUNT">Fixed Amount Off</option>
+                                                    <option value="PERCENTAGE">Percentage Off</option>
+                                                    <option value="FREE_DELIVERY">Free Delivery</option>
                                                 </Select>
                                             </div>
                                             {formData.thresholdRewardType !== "FREE_DELIVERY" && (
@@ -572,10 +676,10 @@ export default function PromotionsPage() {
                                     </div>
                                 )}
 
-                                {/* Eligible Businesses */}
+                                {/* --- Eligible Businesses --- */}
                                 <div className="space-y-4">
                                     <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-zinc-800 pb-2">
-                                        ðŸ¬ Eligible Businesses (Optional)
+                                        Eligible Businesses (Optional)
                                     </h3>
                                     <div className="text-xs text-zinc-600">
                                         Select which businesses this promotion applies to. Leave empty for all businesses.
@@ -621,12 +725,46 @@ export default function PromotionsPage() {
                             </div>
                         )}
 
-                        {/* STEP 3: Advanced Settings */}
+                        {/* STEP 3: Limits, Schedule & Review */}
                         {wizardStep === 3 && (
                             <div className="space-y-6">
+                                {/* Usage Limits */}
                                 <div className="space-y-4">
                                     <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-zinc-800 pb-2">
-                                        âš™ï¸ Advanced Settings
+                                        Usage Limits
+                                    </h3>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <Input
+                                                label="Max Total Uses"
+                                                type="number"
+                                                value={formData.maxGlobalUsage}
+                                                onChange={(e) => setFormData({ ...formData, maxGlobalUsage: e.target.value })}
+                                                placeholder="Unlimited"
+                                            />
+                                            <div className="text-xs text-zinc-600 mt-1">
+                                                How many times this promo can be used in total (leave empty for unlimited)
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <Input
+                                                label="Max Uses Per User"
+                                                type="number"
+                                                value={formData.maxUsagePerUser}
+                                                onChange={(e) => setFormData({ ...formData, maxUsagePerUser: e.target.value })}
+                                                placeholder="Unlimited"
+                                            />
+                                            <div className="text-xs text-zinc-600 mt-1">
+                                                How many times each user can use it (leave empty for unlimited)
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Priority & Stacking */}
+                                <div className="space-y-4">
+                                    <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-zinc-800 pb-2">
+                                        Priority &amp; Stacking
                                     </h3>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
@@ -647,8 +785,8 @@ export default function PromotionsPage() {
                                                 value={formData.isStackable}
                                                 onChange={(e) => setFormData({ ...formData, isStackable: e.target.value })}
                                             >
-                                                <option value="false">âŒ No - Exclusive</option>
-                                                <option value="true">âœ… Yes - Stackable</option>
+                                                <option value="false">No &mdash; Exclusive</option>
+                                                <option value="true">Yes &mdash; Stackable</option>
                                             </Select>
                                             <div className="text-xs text-zinc-600 mt-1">
                                                 Allow combining with other promotions
@@ -657,9 +795,10 @@ export default function PromotionsPage() {
                                     </div>
                                 </div>
 
+                                {/* Schedule & Status */}
                                 <div className="space-y-4">
                                     <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-zinc-800 pb-2">
-                                        ðŸ“… Schedule & Status
+                                        Schedule &amp; Status
                                     </h3>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
@@ -691,17 +830,17 @@ export default function PromotionsPage() {
                                         value={formData.isActive}
                                         onChange={(e) => setFormData({ ...formData, isActive: e.target.value })}
                                     >
-                                        <option value="true">âœ… Active</option>
-                                        <option value="false">â¸ï¸ Inactive</option>
+                                        <option value="true">Active</option>
+                                        <option value="false">Inactive</option>
                                     </Select>
                                     <div className="text-xs text-zinc-600 -mt-2">
-                                        Inactive promotions won't be applied even if dates are valid
+                                        Inactive promotions won&apos;t be applied even if dates are valid
                                     </div>
                                 </div>
 
                                 {/* Summary Preview */}
                                 <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 space-y-2">
-                                    <h4 className="text-white font-semibold text-sm mb-3">ðŸ“‹ Promotion Summary</h4>
+                                    <h4 className="text-white font-semibold text-sm mb-3">Promotion Summary</h4>
                                     <div className="grid grid-cols-2 gap-2 text-xs">
                                         <div className="text-zinc-500">Name:</div>
                                         <div className="text-white">{formData.name || "-"}</div>
@@ -712,17 +851,27 @@ export default function PromotionsPage() {
                                         <div className="text-zinc-500">Target:</div>
                                         <div className="text-white">{promotionTargetLabels[formData.target]}</div>
                                         
-                                        <div className="text-zinc-500">Discount:</div>
+                                        <div className="text-zinc-500">Deal:</div>
                                         <div className="text-white">
-                                            {formData.type === "PERCENTAGE" 
-                                                ? `${formData.discountValue || "0"}%` 
-                                                : `â‚¬${formData.discountValue || "0"}`}
+                                            {formData.type === "FIXED_AMOUNT" && `\u20ac${formData.discountValue || "0"} off`}
+                                            {formData.type === "PERCENTAGE" && `${formData.discountValue || "0"}% off${formData.maxDiscountCap ? ` (max \u20ac${formData.maxDiscountCap})` : ""}`}
+                                            {formData.type === "FREE_DELIVERY" && "Free delivery"}
+                                            {formData.type === "SPEND_X_FIXED" && `Spend \u20ac${formData.spendThreshold || "?"}, get \u20ac${formData.discountValue || "?"} off`}
+                                            {formData.type === "SPEND_X_PERCENT" && `Spend \u20ac${formData.spendThreshold || "?"}, get ${formData.discountValue || "?"}% off${formData.maxDiscountCap ? ` (max \u20ac${formData.maxDiscountCap})` : ""}`}
+                                            {formData.type === "SPEND_X_GET_FREE" && `Spend \u20ac${formData.spendThreshold || "?"}, get free delivery`}
                                         </div>
                                         
-                                        {formData.spendThreshold && (
+                                        {formData.code && (
                                             <>
-                                                <div className="text-zinc-500">Spend Threshold:</div>
-                                                <div className="text-violet-400">â‚¬{formData.spendThreshold}</div>
+                                                <div className="text-zinc-500">Code:</div>
+                                                <div className="text-violet-400 font-mono">{formData.code.toUpperCase()}</div>
+                                            </>
+                                        )}
+                                        
+                                        {!isSpendType(formData.type) && formData.minOrderAmount && (
+                                            <>
+                                                <div className="text-zinc-500">Min Order:</div>
+                                                <div className="text-white">&euro;{formData.minOrderAmount}</div>
                                             </>
                                         )}
                                         
@@ -732,6 +881,17 @@ export default function PromotionsPage() {
                                                 ? `${formData.eligibleBusinessIds.length} selected` 
                                                 : "All businesses"}
                                         </div>
+
+                                        {(formData.maxGlobalUsage || formData.maxUsagePerUser) && (
+                                            <>
+                                                <div className="text-zinc-500">Limits:</div>
+                                                <div className="text-white">
+                                                    {formData.maxGlobalUsage ? `${formData.maxGlobalUsage} total` : "Unlimited"}
+                                                    {" / "}
+                                                    {formData.maxUsagePerUser ? `${formData.maxUsagePerUser} per user` : "Unlimited per user"}
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -750,7 +910,7 @@ export default function PromotionsPage() {
                                 }
                             }}
                         >
-                            {wizardStep === 1 ? "Cancel" : "â† Back"}
+                            {wizardStep === 1 ? "Cancel" : "\u2190 Back"}
                         </Button>
                         
                         <div className="text-xs text-zinc-500">
@@ -762,10 +922,11 @@ export default function PromotionsPage() {
                                 onClick={() => setWizardStep(wizardStep + 1)}
                                 disabled={
                                     (wizardStep === 1 && !formData.name.trim()) ||
-                                    (wizardStep === 2 && !formData.discountValue.trim())
+                                    (wizardStep === 2 && typeFieldVisibility[formData.type].discountValue && !formData.discountValue.trim()) ||
+                                    (wizardStep === 2 && typeFieldVisibility[formData.type].spendThreshold && !formData.spendThreshold.trim())
                                 }
                             >
-                                Next â†’
+                                Next &rarr;
                             </Button>
                         ) : (
                             <Button 

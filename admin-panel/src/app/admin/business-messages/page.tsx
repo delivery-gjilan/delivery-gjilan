@@ -297,21 +297,24 @@ export default function BusinessMessagesPage() {
                     onClick={() => { setShowUserPicker(false); setUserSearch(''); }}
                 >
                     <div
-                        className="bg-[#18181b] border border-white/10 rounded-2xl w-80 shadow-2xl overflow-hidden"
+                        className="bg-[#18181b] border border-white/10 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-                            <span className="text-sm font-semibold text-white">Choose a business user</span>
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+                            <div className="flex items-center gap-2">
+                                <Building2 size={18} className="text-purple-400" />
+                                <span className="text-base font-semibold text-white">Choose a business user</span>
+                            </div>
                             <button
                                 onClick={() => { setShowUserPicker(false); setUserSearch(''); }}
-                                className="text-zinc-500 hover:text-white transition-colors"
+                                className="text-zinc-500 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/5"
                             >
-                                <X size={16} />
+                                <X size={18} />
                             </button>
                         </div>
-                        <div className="px-3 py-2 border-b border-white/10">
-                            <div className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2">
-                                <Search size={14} className="text-zinc-500 flex-shrink-0" />
+                        <div className="px-4 py-3 border-b border-white/10">
+                            <div className="flex items-center gap-2 bg-white/5 rounded-xl px-4 py-2.5">
+                                <Search size={16} className="text-zinc-500 flex-shrink-0" />
                                 <input
                                     autoFocus
                                     type="text"
@@ -322,9 +325,12 @@ export default function BusinessMessagesPage() {
                                 />
                             </div>
                         </div>
-                        <div className="max-h-64 overflow-y-auto">
+                        <div className="max-h-[420px] overflow-y-auto">
                             {filteredUsers.length === 0 && (
-                                <p className="text-center text-zinc-500 text-sm py-6">No business users found</p>
+                                <div className="flex flex-col items-center justify-center py-12 gap-2">
+                                    <Building2 size={28} className="text-zinc-700" />
+                                    <p className="text-center text-zinc-500 text-sm">No business users found</p>
+                                </div>
                             )}
                             {filteredUsers.map((user) => {
                                 const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim() || user.email;
@@ -332,19 +338,24 @@ export default function BusinessMessagesPage() {
                                     <button
                                         key={user.id}
                                         onClick={() => handleStartNewConversation(user)}
-                                        className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
+                                        className="w-full text-left flex items-center gap-4 px-6 py-4 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
                                     >
-                                        <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0">
-                                            <span className="text-xs font-bold text-purple-300">
+                                        <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                                            <span className="text-sm font-bold text-purple-300">
                                                 {name.charAt(0).toUpperCase()}
                                             </span>
                                         </div>
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-medium text-white truncate">{name}</p>
-                                            <p className="text-xs text-zinc-500 truncate">
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-semibold text-white truncate">{name}</p>
+                                            <p className="text-xs text-zinc-500 truncate mt-0.5">
                                                 {user.business?.name ? `${user.business.name} · ` : ''}{user.email}
                                             </p>
                                         </div>
+                                        {user.business?.name && (
+                                            <span className="text-[10px] font-semibold text-purple-300 bg-purple-500/10 border border-purple-500/20 rounded-full px-2.5 py-1 flex-shrink-0">
+                                                {user.business.name}
+                                            </span>
+                                        )}
                                     </button>
                                 );
                             })}
