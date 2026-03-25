@@ -97,14 +97,19 @@ export default function BusinessMessagesPage() {
 
     const { data: usersData } = useQuery<{ users: UserItem[] }>(USERS_QUERY);
 
-    const { loading: messagesLoading, refetch: refetchMessages } =
+    const { loading: messagesLoading } =
         useQuery<{ businessMessages: BusinessMessage[] }>(
             GET_BUSINESS_MESSAGES,
             {
                 variables: { businessUserId: selectedUserId, limit: 100 },
                 skip: !selectedUserId,
                 onCompleted: (data) => {
-                    setMessages(data.businessMessages ?? []);
+                    const incoming = data.businessMessages ?? [];
+                    setMessages((prev) => {
+                        const ids = new Set(prev.map((m) => m.id));
+                        const merged = [...prev, ...incoming.filter((m) => !ids.has(m.id))];
+                        return merged.sort((a, b) => new Date(a.createdAt.replace(' ', 'T')).getTime() - new Date(b.createdAt.replace(' ', 'T')).getTime());
+                    });
                 },
             }
         );
@@ -112,7 +117,10 @@ export default function BusinessMessagesPage() {
     const [sendMessage, { loading: sending }] = useMutation(SEND_BUSINESS_MESSAGE, {
         onCompleted: (data) => {
             if (data?.sendBusinessMessage) {
-                setMessages((prev) => [...prev, data.sendBusinessMessage]);
+                setMessages((prev) => {
+                    if (prev.some((m) => m.id === data.sendBusinessMessage.id)) return prev;
+                    return [...prev, data.sendBusinessMessage];
+                });
                 refetchThreads();
             }
         },
@@ -138,6 +146,11 @@ export default function BusinessMessagesPage() {
         },
     });
 
+    // Clear messages when switching threads
+    useEffect(() => {
+        setMessages([]);
+    }, [selectedUserId]);
+
     // Scroll to bottom on new messages
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -152,18 +165,14 @@ export default function BusinessMessagesPage() {
     const handleSelectThread = (thread: BusinessMessageThread) => {
         setSelectedUserId(thread.businessUserId);
         setSelectedUserName(thread.businessUserName);
-        setMessages([]);
-        refetchMessages();
     };
 
     const handleStartNewConversation = (user: UserItem) => {
         const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim() || user.email;
         setSelectedUserId(user.id);
         setSelectedUserName(name);
-        setMessages([]);
         setShowUserPicker(false);
         setUserSearch('');
-        refetchMessages();
     };
 
     const handleSend = async () => {

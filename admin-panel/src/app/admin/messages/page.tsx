@@ -57,12 +57,12 @@ const ALERT_STYLES: Record<AlertType, { badge: string; border: string; bg: strin
 };
 
 function formatTime(iso: string) {
-    const d = new Date(iso);
+    const d = new Date(iso.replace(' ', 'T'));
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 function formatDate(iso: string) {
-    const d = new Date(iso);
+    const d = new Date(iso.replace(' ', 'T'));
     const today = new Date();
     if (d.toDateString() === today.toDateString()) return 'Today';
     const yesterday = new Date(today);
@@ -107,7 +107,7 @@ export default function MessagesPage() {
                         const ids = new Set(prev.map((m) => m.id));
                         const merged = [...prev, ...incoming.filter((m) => !ids.has(m.id))];
                         // sort by createdAt to keep order correct
-                        return merged.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                        return merged.sort((a, b) => new Date(a.createdAt.replace(' ', 'T')).getTime() - new Date(b.createdAt.replace(' ', 'T')).getTime());
                     });
                 },
             }
