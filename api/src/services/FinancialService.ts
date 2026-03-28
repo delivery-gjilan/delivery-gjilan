@@ -111,6 +111,30 @@ export class FinancialService {
         }
     }
 
+    async cancelDriverSettlementsForOrder(orderId: string): Promise<void> {
+        try {
+            const deleted = await this.settlementRepo.deletePendingByOrderIdForDriver(orderId);
+            if (deleted > 0) {
+                log.info({ orderId, count: deleted }, 'settlement:cancel:driver:voided');
+            }
+        } catch (error) {
+            log.error({ err: error, orderId }, 'settlement:cancel:driver:error');
+            throw error;
+        }
+    }
+
+    async cancelBusinessSettlementsForOrder(orderId: string): Promise<void> {
+        try {
+            const deleted = await this.settlementRepo.deletePendingByOrderIdForBusiness(orderId);
+            if (deleted > 0) {
+                log.info({ orderId, count: deleted }, 'settlement:cancel:business:voided');
+            }
+        } catch (error) {
+            log.error({ err: error, orderId }, 'settlement:cancel:business:error');
+            throw error;
+        }
+    }
+
     private async normalizeDriverId(driverId: string | null): Promise<string | null> {
         if (!driverId) return null;
 

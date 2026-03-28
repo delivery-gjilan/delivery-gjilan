@@ -3,12 +3,13 @@ import { DbType } from '@/database';
 import { users, DbUser } from '@/database/schema/users';
 import { drivers, DbDriver } from '@/database/schema/drivers';
 import { orderPromotions, DbOrderPromotion } from '@/database/schema/orderPromotions';
+import { promotions } from '@/database/schema/promotions';
 import { optionGroups, DbOptionGroup } from '@/database/schema/optionGroups';
 import { options, DbOption } from '@/database/schema/options';
 import { products, DbProduct } from '@/database/schema/products';
 import { orderItems, DbOrderItem } from '@/database/schema/orderItems';
 import { orderItemOptions, DbOrderItemOption } from '@/database/schema/orderItemOptions';
-import { inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 
 /**
  * Batch-loads users by their IDs.
@@ -40,20 +41,32 @@ export function createDriverByUserIdLoader(db: DbType) {
     });
 }
 
+export type DbOrderPromotionWithCode = DbOrderPromotion & { promoCode: string | null };
+
 /**
- * Batch-loads order promotions by orderId.
+ * Batch-loads order promotions by orderId, including the promotion code.
  * Resolves N+1 in Order.orderPromotions field resolver.
  */
 export function createOrderPromotionsLoader(db: DbType) {
-    return new DataLoader<string, DbOrderPromotion[]>(async (orderIds) => {
+    return new DataLoader<string, DbOrderPromotionWithCode[]>(async (orderIds) => {
         const rows = await db
-            .select()
+            .select({
+                id: orderPromotions.id,
+                orderId: orderPromotions.orderId,
+                promotionId: orderPromotions.promotionId,
+                appliesTo: orderPromotions.appliesTo,
+                discountAmount: orderPromotions.discountAmount,
+                createdAt: orderPromotions.createdAt,
+                updatedAt: orderPromotions.updatedAt,
+                promoCode: promotions.code,
+            })
             .from(orderPromotions)
+            .leftJoin(promotions, eq(promotions.id, orderPromotions.promotionId))
             .where(inArray(orderPromotions.orderId, [...orderIds]));
-        const map = new Map<string, DbOrderPromotion[]>();
+        const map = new Map<string, DbOrderPromotionWithCode[]>();
         for (const row of rows) {
             const arr = map.get(row.orderId) ?? [];
-            arr.push(row);
+            arr.push({ ...row, promoCode: row.promoCode ?? null });
             map.set(row.orderId, arr);
         }
         return orderIds.map((id) => map.get(id) ?? []);
@@ -167,7 +180,7 @@ export function createChildItemsByParentOrderItemIdLoader(db: DbType) {
 export interface DataLoaders {
     userLoader: DataLoader<string, DbUser | null>;
     driverByUserIdLoader: DataLoader<string, DbDriver | null>;
-    orderPromotionsLoader: DataLoader<string, DbOrderPromotion[]>;
+    orderPromotionsLoader: DataLoader<string, DbOrderPromotionWithCode[]>;
     optionGroupsByProductIdLoader: DataLoader<string, DbOptionGroup[]>;
     optionsByOptionGroupIdLoader: DataLoader<string, DbOption[]>;
     variantsByGroupIdLoader: DataLoader<string, DbProduct[]>;

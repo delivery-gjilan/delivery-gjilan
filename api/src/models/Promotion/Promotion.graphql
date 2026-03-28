@@ -226,7 +226,7 @@ type Query {
   getUserPromotions(userId: ID!): [UserPromotion!]!
   
   # Get promotion usage history
-  getPromotionUsage(promotionId: ID!): [PromotionUsage!]!
+  getPromotionUsage(promotionId: ID!, limit: Int, offset: Int): [PromotionUsage!]!
   
   # Get user's promo metadata (first order status, savings)
   getUserPromoMetadata(userId: ID!): UserPromoMetadata
@@ -267,4 +267,7 @@ type Mutation {
   
   # Mark first order used (called after order created)
   markFirstOrderUsed(userId: ID!): UserPromoMetadata!
+
+  # Grant the user a free delivery on their next order (one-time courtesy comp)
+  grantFreeDelivery(userId: ID!, orderId: ID!): Boolean!
 }

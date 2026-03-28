@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
     View,
     Text,
@@ -16,7 +16,6 @@ import Animated, {
     withTiming,
     Easing,
 } from 'react-native-reanimated';
-import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation } from '@apollo/client/react';
 import {
@@ -83,30 +82,8 @@ export default function StoreClosedOverlay() {
 
     const [updateBusinessOps] = useMutation(UPDATE_BUSINESS_OPERATIONS);
 
-    // Sound ref for beep
-    const soundRef = useRef<Audio.Sound | null>(null);
     const reminderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const closedSinceRef = useRef<number | null>(null);
-
-    // Load beep sound
-    useEffect(() => {
-        Audio.Sound.createAsync(require('@/assets/beep.wav'))
-            .then(({ sound }) => {
-                soundRef.current = sound;
-            })
-            .catch(() => {});
-        return () => {
-            soundRef.current?.unloadAsync();
-        };
-    }, []);
-
-    // Play beep pattern (3 beeps)
-    const playBeep = useCallback(() => {
-        const beep = () => soundRef.current?.replayAsync().catch(() => {});
-        beep();
-        setTimeout(beep, 800);
-        setTimeout(beep, 1600);
-    }, []);
 
     // Start / stop the 30-min reminder timer when closed state changes
     useEffect(() => {
@@ -152,7 +129,6 @@ export default function StoreClosedOverlay() {
 
     const fireReminder = () => {
         setReminderVisible(true);
-        playBeep();
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     };
 

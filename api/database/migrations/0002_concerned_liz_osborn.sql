@@ -1,1 +1,0 @@
-ALTER TABLE "store_settings" ADD COLUMN IF NOT EXISTS "dispatch_mode_enabled" boolean DEFAULT false NOT NULL;

@@ -4,14 +4,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { MapboxNavigationView } from '@badatgil/expo-mapbox-navigation';
-import { useApolloClient, useMutation, useQuery, useSubscription } from '@apollo/client/react';
-import { GET_ORDERS, ALL_ORDERS_UPDATED, UPDATE_ORDER_STATUS, DRIVER_NOTIFY_CUSTOMER, ASSIGN_DRIVER_TO_ORDER } from '@/graphql/operations/orders';
+import { useMutation, useQuery, useSubscription } from '@apollo/client/react';
+import { GET_ORDERS, UPDATE_ORDER_STATUS, DRIVER_NOTIFY_CUSTOMER } from '@/graphql/operations/orders';
 import { GET_MY_DRIVER_METRICS } from '@/graphql/operations/driver';
 import { useNavigationStore } from '@/store/navigationStore';
 import { useAuthStore } from '@/store/authStore';
 import { useNavigationLocationStore } from '@/store/navigationLocationStore';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
-import { OrderAcceptSheet } from '@/components/OrderAcceptSheet';
 import DriverMessageBanner from '@/components/DriverMessageBanner';
 import type { AlertType } from '@/components/DriverMessageBanner';
 import { DRIVER_MESSAGE_RECEIVED_SUB } from '@/graphql/operations/driverMessages';
@@ -21,9 +20,9 @@ import type { NavigationPhase } from '@/store/navigationStore';
 /* ─── Constants ─── */
 const STATUS_COLORS: Record<string, string> = {
     PENDING: '#F59E0B',
-    PREPARING: '#06B6D4',
+    PREPARING: '#F97316',
     READY: '#3B82F6',
-    OUT_FOR_DELIVERY: '#8B5CF6',
+    OUT_FOR_DELIVERY: '#22C55E',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -40,12 +39,14 @@ const PICKUP_THUMB = 52;
 function PickupSlider({
     businessName,
     etaMins,
+    prepMinsLeft,
     insetBottom,
     onConfirm,
     onCancel,
 }: {
     businessName: string;
     etaMins: number | null;
+    prepMinsLeft: number | null;
     insetBottom: number;
     onConfirm: () => Promise<void>;
     onCancel: () => void;
@@ -170,10 +171,22 @@ function PickupSlider({
                 )}
             </View>
 
-            {/* Slide track */}
+                {/* Prep ETA row — shown when food is still being prepared */}
+                {prepMinsLeft != null && (
+                    <View style={pickupStyles.prepRow}>
+                        <Ionicons name="restaurant-outline" size={14} color="#06b6d4" />
+                        <Text style={pickupStyles.prepText}>
+                            {prepMinsLeft === 0
+                                ? 'Food is almost ready — standby'
+                                : `Food ready in ~${prepMinsLeft} min — standby`}
+                        </Text>
+                    </View>
+                )}
+
+            {/* ── Slide-to-confirm track ── */}
             <View
                 style={pickupStyles.track}
-                onLayout={(e) => { trackWidth.current = e.nativeEvent.layout.width; }}
+                onLayout={e => { trackWidth.current = e.nativeEvent.layout.width; }}
             >
                 <Animated.View style={[pickupStyles.fill, { opacity: fillOpacity }]} />
                 <Animated.Text style={[pickupStyles.trackLabel, { opacity: labelOpacity }]}>
@@ -183,14 +196,16 @@ function PickupSlider({
                     style={[pickupStyles.thumb, done && pickupStyles.thumbDone, { transform: [{ translateX }] }]}
                     {...pan.panHandlers}
                 >
-                    <Ionicons name={done ? 'checkmark' : 'bicycle-outline'} size={24} color="#fff" />
+                    <Ionicons name={done ? 'checkmark' : 'bag-check'} size={26} color="#fff" />
                 </Animated.View>
             </View>
 
-            {/* End navigation link */}
-            <Pressable style={pickupStyles.secondary} onPress={onCancel}>
-                <Text style={pickupStyles.secondaryText}>End Navigation</Text>
-            </Pressable>
+            {/* Cancel / not yet ready */}
+            {!done && (
+                <Pressable style={pickupStyles.secondary} onPress={onCancel}>
+                    <Text style={pickupStyles.secondaryText}>Cancel navigation</Text>
+                </Pressable>
+            )}
 
             {/* ── Pickup-confirmed splash overlay ── */}
             {splashVisible && (
@@ -271,6 +286,24 @@ const pickupStyles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.12)',
         alignSelf: 'center',
         marginBottom: 14,
+    },
+    prepRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: 'rgba(6,182,212,0.08)',
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        marginBottom: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(6,182,212,0.2)',
+    },
+    prepText: {
+        color: '#22d3ee',
+        fontSize: 13,
+        fontWeight: '700',
+        flex: 1,
     },
     header: {
         flexDirection: 'row',
@@ -464,6 +497,7 @@ function DeliverySlider({
     onPingAgain,
     onConfirm,
     onCancel,
+    onDismiss,
     onSuccessAnimStart,
 }: {
     customerName: string;
@@ -480,6 +514,7 @@ function DeliverySlider({
     onPingAgain: () => void;
     onConfirm: () => Promise<void>;
     onCancel: (reason: string) => void;
+    onDismiss?: () => void;
     onSuccessAnimStart?: () => void;
 }) {
     const trackWidth = useRef(0);
@@ -577,6 +612,11 @@ function DeliverySlider({
 
                         {/* Header */}
                         <View style={sliderStyles.header}>
+                            {onDismiss && (
+                                <Pressable style={sliderStyles.dismissBtn} onPress={onDismiss} hitSlop={10}>
+                                    <Ionicons name="close" size={18} color="#64748b" />
+                                </Pressable>
+                            )}
                             <View style={sliderStyles.iconRing}>
                                 <Ionicons name="checkmark-circle-outline" size={22} color="#22c55e" />
                             </View>
@@ -770,6 +810,15 @@ const sliderStyles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.12)',
         alignSelf: 'center',
         marginBottom: 14,
+    },
+    dismissBtn: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 4,
     },
     header: {
         flexDirection: 'row',
@@ -1035,7 +1084,6 @@ const sliderStyles = StyleSheet.create({
 });
 
 export default function NavigationScreen() {
-    const apolloClient = useApolloClient();
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const lastProgressRef = useRef(0);
@@ -1086,15 +1134,13 @@ export default function NavigationScreen() {
     // the mutation on every 2 s progress tick once below the threshold.
     const etaNotificationSentRef = useRef<Set<string>>(new Set());
     const [markingPickedUpIds, setMarkingPickedUpIds] = useState<Set<string>>(new Set());
+    const [nowTs, setNowTs] = useState(() => Date.now());
+    useEffect(() => {
+        const id = setInterval(() => setNowTs(Date.now()), 10_000);
+        return () => clearInterval(id);
+    }, []);
     const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS);
     const [driverNotifyCustomer] = useMutation(DRIVER_NOTIFY_CUSTOMER);
-    const [assignDriver] = useMutation(ASSIGN_DRIVER_TO_ORDER);
-
-    /* ── Accept-sheet state (ring during navigation) ── */
-    const [acceptSheetOrder, setAcceptSheetOrder] = useState<any>(null);
-    const [accepting, setAccepting] = useState(false);
-    const [acceptAutoCountdown, setAcceptAutoCountdown] = useState(true);
-    const skippedIds = useRef(new Set<string>());
 
     /* ── Store ── */
     const {
@@ -1113,50 +1159,17 @@ export default function NavigationScreen() {
     const isOnline = useAuthStore((state) => state.isOnline);
     const { dispatchModeEnabled } = useStoreStatus();
 
-    /* ── Driver metrics: maxActiveOrders capacity check ── */
+    /* ── Driver metrics ── */
     const { data: metricsData } = useQuery(GET_MY_DRIVER_METRICS, {
         fetchPolicy: 'cache-and-network',
         pollInterval: 60_000,
     });
-    const maxActiveOrders: number = (metricsData as any)?.myDriverMetrics?.maxActiveOrders ?? 1;
 
-    /* ── Orders query + real-time subscription ── */
-    const { data, refetch } = useQuery(GET_ORDERS, {
+    /* ── Orders query ── */
+    const { data } = useQuery(GET_ORDERS, {
         fetchPolicy: 'cache-and-network',
         nextFetchPolicy: 'cache-first',
     });
-
-    useSubscription(ALL_ORDERS_UPDATED, {
-        onData: ({ data }) => {
-            const incomingOrders = data.data?.allOrdersUpdated as any[] | undefined;
-            if (!incomingOrders || incomingOrders.length === 0) {
-                refetch();
-                return;
-            }
-
-            apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
-                const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
-                const byId = new Map(currentOrders.map((order: any) => [String(order?.id), order]));
-
-                incomingOrders.forEach((order: any) => {
-                    const existingOrder = byId.get(String(order?.id));
-                    byId.set(String(order?.id), { ...existingOrder, ...order });
-                });
-
-                return {
-                    ...(existing ?? {}),
-                    orders: Array.from(byId.values()),
-                };
-            });
-        },
-    });
-
-    /* ── Available (unassigned READY) orders ── */
-    const availableOrders = useMemo(() => {
-        if (dispatchModeEnabled) return [];
-        const orders = (data as any)?.orders ?? [];
-        return orders.filter((o: any) => o.status === 'READY' && !o.driver?.id);
-    }, [data, dispatchModeEnabled]);
 
     /* ── Filter assigned orders ── */
     const assignedOrders = useMemo(() => {
@@ -1166,40 +1179,6 @@ export default function NavigationScreen() {
             return o.driver?.id === currentDriverId;
         });
     }, [data, currentDriverId]);
-
-    /* ── Auto-present accept sheet if driver has capacity for more orders ── */
-    useEffect(() => {
-        if (!isOnline || acceptSheetOrder || dispatchModeEnabled) return;
-        if (assignedOrders.length >= maxActiveOrders) return;
-        const next = availableOrders.find((o: any) => !skippedIds.current.has(o.id));
-        if (!next) return;
-        setAcceptAutoCountdown(true);
-        setAcceptSheetOrder(next);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [availableOrders.length, isOnline, assignedOrders.length, maxActiveOrders]);
-
-    /* ── Accept order handler ── */
-    const handleAcceptOrder = useCallback(async (orderId: string) => {
-        if (!currentDriverId) return;
-        setAccepting(true);
-        try {
-            await assignDriver({ variables: { id: orderId, driverId: currentDriverId } });
-            // Order is now assigned — it will appear in assignedOrders via subscription.
-            // We stay on the current navigation; the driver can switch orders from the bottom bar.
-            setAcceptSheetOrder(null);
-        } catch {
-            // Silently dismiss — next render cycle will re-present if still available
-            setAcceptSheetOrder(null);
-        } finally {
-            setAccepting(false);
-        }
-    }, [currentDriverId, assignDriver]);
-
-    /* ── Skip order handler ── */
-    const handleSkipOrder = useCallback(() => {
-        if (acceptSheetOrder) skippedIds.current.add(acceptSheetOrder.id);
-        setAcceptSheetOrder(null);
-    }, [acceptSheetOrder]);
 
     /* ── Build coordinates for MapboxNavigationView ── */
     // Use the stored origin only — the Navigation SDK tracks GPS internally.
@@ -1266,8 +1245,15 @@ export default function NavigationScreen() {
     const reassignedAlertShownRef = useRef(false);
     useEffect(() => {
         if (!order?.id || !isNavigating) return;
-        const stillAssigned = assignedOrders.some((o: any) => o.id === order.id);
-        if (!stillAssigned && !reassignedAlertShownRef.current) {
+        const allOrders = (data as any)?.orders ?? [];
+        const rawOrder = allOrders.find((o: any) => o.id === order.id);
+        // If the order is DELIVERED or CANCELLED by us, don't show the alert —
+        // the onConfirm / onCancel handlers already call stopNavigation and navigate away.
+        if (!rawOrder) return; // not yet in cache — wait
+        if (rawOrder.status === 'DELIVERED' || rawOrder.status === 'CANCELLED') return;
+        // Only alert if the order was genuinely re-assigned to a different driver
+        const reassignedAway = rawOrder.driver?.id && rawOrder.driver.id !== currentDriverId;
+        if (reassignedAway && !reassignedAlertShownRef.current) {
             reassignedAlertShownRef.current = true;
             Alert.alert(
                 'Order Reassigned',
@@ -1282,7 +1268,7 @@ export default function NavigationScreen() {
                 { cancelable: false },
             );
         }
-    }, [assignedOrders, order?.id, isNavigating, clearNavigationLocation, stopNavigation, router]);
+    }, [data, order?.id, isNavigating, currentDriverId, clearNavigationLocation, stopNavigation, router]);
 
     /* ── Auto-notify customer when driver is < 3 min away (to_dropoff only) ── */
     useEffect(() => {        if (
@@ -1324,7 +1310,7 @@ export default function NavigationScreen() {
     const handleCancelNavigation = useCallback(() => {
         clearNavigationLocation(); // Stop providing location to heartbeat
         stopNavigation();
-        router.back();
+        router.replace('/(tabs)/map' as any);
     }, [clearNavigationLocation, stopNavigation, router]);
 
     const handleWaypointArrival = useCallback(
@@ -1488,17 +1474,6 @@ export default function NavigationScreen() {
                 </Pressable>
             </View>
 
-            {/* ═══ Accept sheet (ring) — shown when driver has capacity ═══ */}
-            {acceptSheetOrder && (
-                <OrderAcceptSheet
-                    order={acceptSheetOrder}
-                    onAccept={handleAcceptOrder}
-                    onSkip={handleSkipOrder}
-                    accepting={accepting}
-                    autoCountdown={acceptAutoCountdown}
-                />
-            )}
-
             {/* ═══ Driver message banner ═══ */}
             {navIncomingMessage && (
                 <DriverMessageBanner
@@ -1543,6 +1518,21 @@ export default function NavigationScreen() {
                 );
             })()}
 
+            {/* ═══ ETA pill (live from nav SDK) ═══ */}
+            {durationRemainingS != null && !showPickupPanel && !showDeliveryPanel && (
+                <View style={[styles.etaPill, { top: insets.top + 12 }]}>
+                    <Ionicons name="time-outline" size={13} color="#38bdf8" />
+                    <Text style={styles.etaPillText}>
+                        {durationRemainingS < 60
+                            ? '<1 min'
+                            : `${Math.ceil(durationRemainingS / 60)} min`}
+                    </Text>
+                    <Text style={styles.etaPillLabel}>
+                        {phase === 'to_pickup' ? 'to pickup' : 'to dropoff'}
+                    </Text>
+                </View>
+            )}
+
             {/* ═══ Order cards bar (bottom) ═══ */}
             {assignedOrders.length >= 1 && (
                 <View style={[styles.bottomBar, { bottom: insets.bottom + 8 }]}>
@@ -1550,7 +1540,7 @@ export default function NavigationScreen() {
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.barContent}
-                        snapToInterval={225}
+                        snapToInterval={250}
                         snapToAlignment="start"
                         decelerationRate="fast"
                     >
@@ -1563,7 +1553,13 @@ export default function NavigationScreen() {
                             const dropAddress = o.dropOffLocation?.address ?? '';
                             const shortDrop = dropAddress.split(',')[0] || '';
                             const isReady = o.status === 'READY';
+                            const isPreparing = o.status === 'PREPARING';
                             const isPickingUp = markingPickedUpIds.has(o.id);
+                            const prepMinsLeft = (() => {
+                                if (!isPreparing || !o.estimatedReadyAt) return null;
+                                const diff = Math.ceil((new Date(o.estimatedReadyAt).getTime() - nowTs) / 60000);
+                                return diff > 0 ? diff : 0;
+                            })();
 
                             return (
                                 <Pressable
@@ -1607,13 +1603,27 @@ export default function NavigationScreen() {
                                                     disabled={isPickingUp}
                                                 >
                                                     {isPickingUp
-                                                        ? <ActivityIndicator size={10} color="#fff" />
-                                                        : <Ionicons name="checkmark-outline" size={13} color="#fff" />
+                                                        ? <ActivityIndicator size={12} color="#fff" />
+                                                        : <Ionicons name="checkmark-outline" size={16} color="#fff" />
                                                     }
                                                 </Pressable>
                                             )}
                                         </View>
                                     </View>
+
+                                    {/* Row 3: preparing countdown */}
+                                    {isPreparing && (
+                                        <View style={styles.prepRow}>
+                                            <Ionicons name="restaurant-outline" size={11} color="#06b6d4" />
+                                            <Text style={styles.prepText}>
+                                                {prepMinsLeft === null
+                                                    ? 'Preparing…'
+                                                    : prepMinsLeft === 0
+                                                    ? 'Almost ready'
+                                                    : `Ready in ~${prepMinsLeft} min`}
+                                            </Text>
+                                        </View>
+                                    )}
                                 </Pressable>
                             );
                         })}
@@ -1640,23 +1650,31 @@ export default function NavigationScreen() {
             {/* ═══ Pickup arrival panel ═══ */}
             {showPickupPanel && (() => {
                 const etaMins = durationRemainingS != null ? Math.ceil(durationRemainingS / 60) : null;
+                // Look up live order data to get prep ETA
+                const liveOrder = assignedOrders.find((o: any) => o.id === order?.id);
+                const pickupPrepMins = (() => {
+                    if (liveOrder?.status !== 'PREPARING' || !liveOrder?.estimatedReadyAt) return null;
+                    const diff = Math.ceil((new Date(liveOrder.estimatedReadyAt).getTime() - nowTs) / 60_000);
+                    return diff > 0 ? diff : 0;
+                })();
                 return (
                     <PickupSlider
                         businessName={order?.businessName ?? ''}
                         etaMins={etaMins}
+                        prepMinsLeft={pickupPrepMins}
                         insetBottom={insets.bottom}
                         onConfirm={async () => {
                             try {
                                 await updateOrderStatus({ variables: { id: order?.id, status: 'OUT_FOR_DELIVERY' } });
                             } catch { /* may already be updated */ }
-                            setShowPickupPanel(false);
                             advanceToDropoff();
+                            setShowPickupPanel(false);
                         }}
                         onCancel={() => {
                             setShowPickupPanel(false);
                             clearNavigationLocation();
                             stopNavigation();
-                            router.back();
+                            router.replace('/(tabs)/map' as any);
                         }}
                     />
                 );
@@ -1756,6 +1774,7 @@ export default function NavigationScreen() {
                         driverNotifyCustomer({ variables: { orderId: order.id, kind: 'ARRIVED_WAITING' } })
                             .catch(() => {});
                     }}
+                    onDismiss={() => setShowDeliveryPanel(false)}
                     onConfirm={async () => {
                         try {
                             await updateOrderStatus({ variables: { id: order?.id, status: 'DELIVERED' } });
@@ -1776,7 +1795,7 @@ export default function NavigationScreen() {
                         if (remaining.length > 0) {
                             switchToOrder(remaining[0]);
                         } else {
-                            router.back();
+                            router.replace('/(tabs)/map' as any);
                         }
                     }}
                     onSuccessAnimStart={() => {
@@ -1833,7 +1852,7 @@ export default function NavigationScreen() {
                         if (remaining.length > 0) {
                             switchToOrder(remaining[0]);
                         } else {
-                            router.back();
+                            router.replace('/(tabs)/map' as any);
                         }
                     }}
                 />
@@ -2049,7 +2068,7 @@ const styles = StyleSheet.create({
         alignItems: 'stretch',
     },
     barCard: {
-        width: 215,
+        width: 240,
         borderRadius: 14,
         backgroundColor: 'rgba(10,12,24,0.88)',
         borderLeftWidth: 3,
@@ -2137,9 +2156,9 @@ const styles = StyleSheet.create({
         gap: 5,
     },
     barActionBtn: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -2147,7 +2166,21 @@ const styles = StyleSheet.create({
         backgroundColor: '#16a34a',
     },
 
-    /* ── Arrival panels ── */
+    prepRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: 'rgba(6,182,212,0.1)',
+        borderRadius: 6,
+        paddingHorizontal: 7,
+        paddingVertical: 4,
+        alignSelf: 'flex-start',
+    },
+    prepText: {
+        color: '#06b6d4',
+        fontSize: 10,
+        fontWeight: '700',
+    },
     arrivalPanel: {
         position: 'absolute',
         bottom: 0,
@@ -2283,5 +2316,36 @@ const styles = StyleSheet.create({
         color: '#94a3b8',
         fontSize: 12,
         fontWeight: '700',
+    },
+
+    /* ── ETA floating pill ── */
+    etaPill: {
+        position: 'absolute',
+        left: 16,
+        zIndex: 60,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: 'rgba(10,12,24,0.88)',
+        borderRadius: 20,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderWidth: 1,
+        borderColor: 'rgba(56,189,248,0.25)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.4,
+        shadowRadius: 8,
+        elevation: 10,
+    },
+    etaPillText: {
+        color: '#38bdf8',
+        fontSize: 13,
+        fontWeight: '800',
+    },
+    etaPillLabel: {
+        color: 'rgba(255,255,255,0.45)',
+        fontSize: 11,
+        fontWeight: '600',
     },
 });

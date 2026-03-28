@@ -8,7 +8,7 @@ import {
     DbPromotion,
     NewDbPromotion,
 } from '@/database/schema';
-import { eq, and, or, isNull, lte, gte, ne } from 'drizzle-orm';
+import { eq, and, or, isNull, lte, gte, ne, desc } from 'drizzle-orm';
 
 export interface PromotionFilters {
     isActive?: boolean;
@@ -150,6 +150,16 @@ export class PromotionRepository {
         
         const [result] = await query.limit(1);
         return !!result;
+    }
+
+    async getUsageByPromotion(promotionId: string, limit = 500, offset = 0): Promise<any[]> {
+        return await this.db
+            .select()
+            .from(promotionUsage)
+            .where(eq(promotionUsage.promotionId, promotionId))
+            .orderBy(desc(promotionUsage.createdAt))
+            .limit(limit)
+            .offset(offset);
     }
 
     async recordUsage(

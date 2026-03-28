@@ -160,7 +160,7 @@ type Query {
     me: User
     myBehavior: UserBehavior
     userBehavior(userId: ID!): UserBehavior
-    users: [User!]!
+    users(limit: Int, offset: Int): [User!]!
     drivers: [User!]!
     myReferralStats: ReferralStats!
 }

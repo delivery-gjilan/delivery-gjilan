@@ -399,8 +399,8 @@ export class AuthService {
     /**
      * Fetch all users
      */
-    async getAllUsers(): Promise<DbUser[]> {
-        return this.authRepository.findAllUsers();
+    async getAllUsers(limit = 2000, offset = 0): Promise<DbUser[]> {
+        return this.authRepository.findAllUsers(limit, offset);
     }
 
     /**

@@ -1,6 +1,6 @@
 # Testing Pipeline
 
-<!-- MDS:O8 | Domain: Operations | Updated: 2026-03-18 -->
+<!-- MDS:O8 | Domain: Operations | Updated: 2026-03-26 -->
 <!-- Depends-On: O7, B2, BL1 -->
 <!-- Depended-By: O9 -->
 <!-- Nav: Preflight changes → update B2 (Order Creation), BL1 (Settlements). CI layers → review O7 (Environments). Load testing → review O9 (Docker). -->
@@ -62,9 +62,11 @@ What to cover next:
 - auth flows: login, refresh, logout
 - order creation and order status transitions
 - promotion validation logic
-- settlement-rule authorization checks
+- settlement-rule authorization checks — including the new `settleDriver` / `settleBusiness` flags on `adminCancelOrder`
+- `grantFreeDelivery` — promo creation, `user_promotions` row, `maxUsagePerUser: 1` enforcement
 - store-status updates
 - driver heartbeat mutation behavior
+- cancellation flow with and without settlement opt-in
 
 Tests should validate business behavior, not only resolver signatures.
 
@@ -158,6 +160,61 @@ Run daily or nightly:
 3. add Playwright for admin-panel
 4. add release checklists for your tester
 5. add mobile smoke automation later
+
+## Where To Start Right Now
+
+The repo has no vitest/jest setup yet and no `.github/workflows`. The fastest useful path is:
+
+### Step 1 — Wire vitest into the API
+
+```bash
+cd api
+npm install -D vitest @vitest/coverage-v8
+```
+
+Add to `api/package.json` scripts:
+```json
+"test:unit": "vitest run",
+"test:unit:watch": "vitest",
+"test:unit:coverage": "vitest run --coverage"
+```
+
+Create `api/vitest.config.ts`:
+```ts
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    environment: 'node',
+    globals: true,
+    include: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
+  },
+});
+```
+
+### Step 2 — Start with pure-logic unit tests (no DB required)
+
+Good first targets inside the existing service layer:
+
+- `FinancialService` settlement math — input/output assertions on amount calculations
+- `PromotionEngine` discount logic — codeless FREE_DELIVERY, maxUsagePerUser
+- `PricingService` zone/tier/haversine math
+- `OrderService` price validation (`epsilon` checks)
+
+These have zero external dependencies and can be tested by directly importing the service.
+
+### Step 3 — Add integration tests with supertest
+
+```bash
+npm install -D supertest @types/supertest
+```
+
+Target the HTTP layer for:
+- `POST /auth/login` happy and unhappy paths
+- `POST /auth/refresh` - expired/missing token
+- `GET /health` and `GET /ready` static assertions
+- GraphQL mutation smoke tests via `POST /graphql`
+
+Step 3 can come after unit tests are green and committed.
 
 ## My Recommendation
 

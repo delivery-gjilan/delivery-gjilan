@@ -2,14 +2,14 @@ import type { QueryResolvers } from '@/generated/types.generated';
 import { GraphQLError } from 'graphql';
 import { toUserParent } from '../utils/toUserParent';
 
-export const users: NonNullable<QueryResolvers['users']> = async (_parent, _arg, { authService, userData }) => {
+export const users: NonNullable<QueryResolvers['users']> = async (_parent, { limit, offset }, { authService, userData }) => {
     if (!userData.userId || !userData.role) {
         throw new GraphQLError('Unauthorized: You must be logged in to view users', {
             extensions: { code: 'UNAUTHORIZED' },
         });
     }
 
-    const allUsers = await authService.getAllUsers();
+    const allUsers = await authService.getAllUsers(limit ?? undefined, offset ?? undefined);
 
     let visibleUsers = allUsers;
     if (userData.role === 'SUPER_ADMIN' || userData.role === 'ADMIN') {

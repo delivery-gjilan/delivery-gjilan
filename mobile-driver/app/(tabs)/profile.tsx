@@ -20,17 +20,17 @@ export default function Profile() {
     const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim();
 
     const handleLogout = () => {
-        Alert.alert('Log out', 'Are you sure you want to log out?', [
-            { text: 'Cancel', style: 'cancel' },
+        Alert.alert(t.profile.logout_title, t.profile.logout_confirm, [
+            { text: t.common.cancel, style: 'cancel' },
             {
-                text: 'Log out',
+                text: t.profile.logout,
                 style: 'destructive',
                 onPress: async () => {
                     try {
                         await logout();
                         router.replace('/login');
                     } catch {
-                        Alert.alert('Error', 'Failed to log out. Please try again.');
+                        Alert.alert(t.common.error, t.profile.logout_error);
                     }
                 },
             },
@@ -80,7 +80,7 @@ export default function Profile() {
                         style={{ backgroundColor: theme.colors.primary + '20' }}
                     >
                         <Text className="text-xs font-semibold uppercase" style={{ color: theme.colors.primary }}>
-                            Driver
+                            {t.profile.driver_badge}
                         </Text>
                     </View>
                 </View>
@@ -91,7 +91,7 @@ export default function Profile() {
                     style={{ backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border }}
                 >
                     <Text className="text-xs font-semibold uppercase mb-3" style={{ color: theme.colors.subtext }}>
-                        Language
+                        {t.profile.language_section}
                     </Text>
                     <Button
                         title={t.profile.language_toggle}
@@ -116,7 +116,7 @@ export default function Profile() {
                     ]}
                 >
                     <Ionicons name="log-out-outline" size={20} color="#ef4444" />
-                    <Text style={{ color: '#ef4444', fontSize: 15, fontWeight: '700' }}>Log out</Text>
+                    <Text style={{ color: '#ef4444', fontSize: 15, fontWeight: '700' }}>{t.profile.logout}</Text>
                 </Pressable>
             </ScrollView>
         </SafeAreaView>

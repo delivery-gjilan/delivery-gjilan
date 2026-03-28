@@ -12,22 +12,15 @@ const superAdminOnlyPrefixes = [
     "/dashboard/users",
     "/dashboard/notifications",
     "/dashboard/realtime",
+    "/dashboard/ops-wall",
     "/dashboard/logs",
-    "/dashboard/simulation",
     "/admin",
 ];
 
 const businessUserAllowedPrefixes = [
     "/dashboard/orders",
-    "/dashboard/business-settlements",
     "/dashboard/categories",
     "/dashboard/products",
-    "/dashboard/statistics",
-    "/dashboard/settings",
-];
-
-const businessEmployeeDeniedPrefixes = [
-    "/dashboard/settings",
 ];
 
 function pathStartsWithAny(pathname: string, prefixes: string[]): boolean {
@@ -43,16 +36,8 @@ export function canAccessAdminPanelPath(role: AdminPanelRole, pathname: string):
         return !pathStartsWithAny(pathname, superAdminOnlyPrefixes);
     }
 
-    if (role === "BUSINESS_OWNER") {
+    if (role === "BUSINESS_OWNER" || role === "BUSINESS_EMPLOYEE") {
         return pathname === "/dashboard" || pathStartsWithAny(pathname, businessUserAllowedPrefixes);
-    }
-
-    if (role === "BUSINESS_EMPLOYEE") {
-        if (!(pathname === "/dashboard" || pathStartsWithAny(pathname, businessUserAllowedPrefixes))) {
-            return false;
-        }
-
-        return !pathStartsWithAny(pathname, businessEmployeeDeniedPrefixes);
     }
 
     return false;

@@ -9,17 +9,22 @@ import {
 import { useMutation, useQuery } from '@apollo/client/react';
 import { useActiveOrdersStore } from '../store/activeOrdersStore';
 import { useAuthStore } from '@/store/authStore';
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
+
+const ORDERS_PAGE_SIZE = 30;
 
 export function useOrders() {
     const setActiveOrders = useActiveOrdersStore((state) => state.setActiveOrders);
     const userId = useAuthStore((state) => state.user?.id);
     
     // Show cached data immediately, refresh in background
-    const { data, loading, error, refetch } = useQuery(GET_ORDERS, {
+    const { data, loading, error, refetch, fetchMore } = useQuery(GET_ORDERS, {
+        variables: { limit: ORDERS_PAGE_SIZE, offset: 0 },
         fetchPolicy: 'cache-and-network',
         nextFetchPolicy: 'cache-first',
     });
+
+    const orders: any[] = (data as any)?.orders || [];
 
     // Update store when query data changes (subscription updates are handled by useOrdersSubscription)
     useEffect(() => {
@@ -34,11 +39,26 @@ export function useOrders() {
         }
     }, [data, userId, setActiveOrders]);
 
+    const loadMore = useCallback(async () => {
+        await fetchMore({
+            variables: { limit: ORDERS_PAGE_SIZE, offset: orders.length },
+            updateQuery: (prev: any, { fetchMoreResult }: any) => {
+                if (!fetchMoreResult?.orders?.length) return prev;
+                return {
+                    ...prev,
+                    orders: [...prev.orders, ...fetchMoreResult.orders],
+                };
+            },
+        });
+    }, [fetchMore, orders.length]);
+
     return {
-        orders: (data as any)?.orders || [],
+        orders,
         loading,
         error,
         refetch,
+        loadMore,
+        hasMore: orders.length > 0 && orders.length % ORDERS_PAGE_SIZE === 0,
     };
 }
 

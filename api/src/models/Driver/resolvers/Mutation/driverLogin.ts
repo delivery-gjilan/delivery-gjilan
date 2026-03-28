@@ -15,6 +15,7 @@ export const driverLogin: NonNullable<MutationResolvers['driverLogin']> = async 
 
         return {
             token: result.token,
+            refreshToken: result.refreshToken,
             driver: {
                 id: result.driver.id,
                 email: result.driver.email,

@@ -18,6 +18,7 @@ export function useCreateOrder() {
         totalPrice: number,
         promoCode?: string | null,
         driverNotes?: string | null,
+        prioritySurcharge?: number,
     ) => {
         // Keep this as UX guidance only; backend remains source of truth.
         if (hasActiveOrders) {
@@ -63,6 +64,7 @@ export function useCreateOrder() {
                         },
                         deliveryPrice,
                         totalPrice,
+                        prioritySurcharge: prioritySurcharge ?? 0,
                         promoCode: promoCode || null,
                         driverNotes: driverNotes || null,
                     },

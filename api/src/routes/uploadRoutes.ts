@@ -37,6 +37,9 @@ function requireAuth(req: Request, res: Response, next: () => void) {
  * - image: File (required)
  * - folder: 'businesses' | 'products' | 'categories' (required)
  */
+const ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN'];
+const BUSINESS_ROLES = ['ADMIN', 'SUPER_ADMIN', 'BUSINESS_OWNER', 'BUSINESS_EMPLOYEE'];
+
 router.post('/image', requireAuth, uploadMiddleware.single('image'), async (req: Request, res: Response) => {
     try {
         // Validate file
@@ -53,6 +56,23 @@ router.post('/image', requireAuth, uploadMiddleware.single('image'), async (req:
             return res.status(400).json({
                 success: false,
                 error: 'Invalid folder. Must be one of: businesses, products, categories',
+            });
+        }
+
+        // Enforce role-based folder access:
+        // - businesses/ → ADMIN and SUPER_ADMIN only (business creation is admin-only)
+        // - products/ and categories/ → all business roles (owner + employee can manage products)
+        const userRole = (req as any).userRole as string;
+        if (folder === 'businesses' && !ADMIN_ROLES.includes(userRole)) {
+            return res.status(403).json({
+                success: false,
+                error: 'Only admins can upload business images',
+            });
+        }
+        if (!BUSINESS_ROLES.includes(userRole)) {
+            return res.status(403).json({
+                success: false,
+                error: 'Insufficient permissions to upload images',
             });
         }
 
@@ -90,6 +110,15 @@ router.post('/image', requireAuth, uploadMiddleware.single('image'), async (req:
  */
 router.delete('/image', requireAuth, async (req: Request, res: Response) => {
     try {
+        // Only business roles can delete images
+        const userRole = (req as any).userRole as string;
+        if (!BUSINESS_ROLES.includes(userRole)) {
+            return res.status(403).json({
+                success: false,
+                error: 'Insufficient permissions to delete images',
+            });
+        }
+
         const { imageUrl } = req.body;
 
         if (!imageUrl) {

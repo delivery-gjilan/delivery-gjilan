@@ -6,13 +6,16 @@ import {
     markDriverCustomerNotificationSent,
     notifyCustomerFromDriver,
 } from '@/services/orderNotifications';
+import { emitOrderEvent } from '@/repositories/OrderEventRepository';
+import { orders as ordersTable } from '@/database/schema';
+import { eq } from 'drizzle-orm';
 
 export const driverNotifyCustomer: NonNullable<MutationResolvers['driverNotifyCustomer']> = async (
     _parent,
     { orderId, kind },
     context,
 ) => {
-    const { userData, orderService, notificationService, authService } = context;
+    const { userData, orderService, notificationService, authService, db } = context;
 
     if (!userData?.userId || userData.role !== 'DRIVER') {
         throw AppError.forbidden('Only drivers can notify customers');
@@ -41,6 +44,24 @@ export const driverNotifyCustomer: NonNullable<MutationResolvers['driverNotifyCu
         }
 
         await markDriverCustomerNotificationSent(orderId, kind as DriverCustomerNotificationKind);
+    }
+
+    // Persist driver arrival timestamp and emit analytics event (first ARRIVED_WAITING only)
+    if (kind === 'ARRIVED_WAITING' && !dbOrder.driverArrivedAtPickup) {
+        const arrivedAt = new Date().toISOString();
+        await db.update(ordersTable)
+            .set({ driverArrivedAtPickup: arrivedAt })
+            .where(eq(ordersTable.id, orderId));
+
+        emitOrderEvent({
+            orderId,
+            eventType: 'DRIVER_ARRIVED_PICKUP',
+            eventTs: arrivedAt,
+            actorType: 'DRIVER',
+            actorId: userData.userId,
+            driverId: userData.userId,
+            metadata: { previousReadyAt: dbOrder.readyAt },
+        });
     }
 
     const customer = await authService.authRepository.findById(dbOrder.userId);

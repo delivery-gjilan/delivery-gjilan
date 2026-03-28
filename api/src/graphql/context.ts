@@ -11,6 +11,7 @@ import { DriverAuthService } from '@/services/DriverAuthService';
 import { PubSub } from '@/lib/pubsub';
 import type { Logger } from '@/lib/logger';
 import { NotificationService } from '@/services/NotificationService';
+import { PromotionService } from '@/services/PromotionService';
 import { DataLoaders } from './dataloaders';
 
 export interface ApiContextInterface {
@@ -37,6 +38,7 @@ export interface ApiContextInterface {
     driverAuthService?: DriverAuthService;
     driverService?: DriverService;
     notificationService: NotificationService;
+    promotionService: PromotionService;
     pubsub: PubSub;
     loaders: DataLoaders;
 }

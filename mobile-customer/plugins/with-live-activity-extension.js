@@ -295,15 +295,15 @@ struct DeliveryLiveActivityWidget: Widget {
   private func statusTint(_ status: String) -> Color {
     switch statusKey(status) {
     case "pending":
-      return .orange
-    case "accepted", "ready", "ready_for_pickup":
-      return .blue
+      return Color(red: 0.918, green: 0.620, blue: 0.043) // #EAB308 yellow
     case "preparing":
-      return .indigo
+      return Color(red: 0.976, green: 0.451, blue: 0.086) // #F97316 orange
+    case "accepted", "ready", "ready_for_pickup":
+      return Color(red: 0.231, green: 0.510, blue: 0.965) // #3B82F6 blue
     case "picked_up", "on_the_way", "out_for_delivery":
-      return .cyan
+      return Color(red: 0.133, green: 0.773, blue: 0.369) // #22C55E green
     case "delivered":
-      return .green
+      return Color(red: 0.133, green: 0.773, blue: 0.369) // #22C55E green
     case "cancelled", "canceled":
       return .red
     default:

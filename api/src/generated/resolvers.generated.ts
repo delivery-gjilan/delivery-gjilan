@@ -5,15 +5,18 @@ import    { auditLogs as Query_auditLogs } from './../models/AuditLog/resolvers/
 import    { business as Query_business } from './../models/Business/resolvers/Query/business';
 import    { businessBalance as Query_businessBalance } from './../models/Settlement/resolvers/Query/businessBalance';
 import    { businessDeviceHealth as Query_businessDeviceHealth } from './../models/Notification/resolvers/Query/businessDeviceHealth';
+import    { businessKPIs as Query_businessKPIs } from './../models/Analytics/resolvers/Query/businessKPIs';
 import    { businessMessageThreads as Query_businessMessageThreads } from './../models/BusinessMessage/resolvers/Query/businessMessageThreads';
 import    { businessMessages as Query_businessMessages } from './../models/BusinessMessage/resolvers/Query/businessMessages';
 import    { businesses as Query_businesses } from './../models/Business/resolvers/Query/businesses';
 import    { calculateDeliveryPrice as Query_calculateDeliveryPrice } from './../models/DeliveryPricing/resolvers/Query/calculateDeliveryPrice';
+import    { cancelledOrders as Query_cancelledOrders } from './../models/Order/resolvers/Query/cancelledOrders';
 import    { deliveryPricingConfig as Query_deliveryPricingConfig } from './../models/DeliveryPricing/resolvers/Query/deliveryPricingConfig';
 import    { deliveryPricingTiers as Query_deliveryPricingTiers } from './../models/DeliveryPricing/resolvers/Query/deliveryPricingTiers';
 import    { deliveryZones as Query_deliveryZones } from './../models/DeliveryZone/resolvers/Query/deliveryZones';
 import    { deviceTokens as Query_deviceTokens } from './../models/Notification/resolvers/Query/deviceTokens';
 import    { driverBalance as Query_driverBalance } from './../models/Settlement/resolvers/Query/driverBalance';
+import    { driverKPIs as Query_driverKPIs } from './../models/Analytics/resolvers/Query/driverKPIs';
 import    { driverMessageThreads as Query_driverMessageThreads } from './../models/DriverMessage/resolvers/Query/driverMessageThreads';
 import    { driverMessages as Query_driverMessages } from './../models/DriverMessage/resolvers/Query/driverMessages';
 import    { drivers as Query_drivers } from './../models/User/resolvers/Query/drivers';
@@ -40,9 +43,11 @@ import    { myReferralStats as Query_myReferralStats } from './../models/User/re
 import    { notificationCampaign as Query_notificationCampaign } from './../models/Notification/resolvers/Query/notificationCampaign';
 import    { notificationCampaigns as Query_notificationCampaigns } from './../models/Notification/resolvers/Query/notificationCampaigns';
 import    { offers as Query_offers } from './../models/Product/resolvers/Query/offers';
+import    { operationalKPIs as Query_operationalKPIs } from './../models/Analytics/resolvers/Query/operationalKPIs';
 import    { order as Query_order } from './../models/Order/resolvers/Query/order';
 import    { orders as Query_orders } from './../models/Order/resolvers/Query/orders';
 import    { ordersByStatus as Query_ordersByStatus } from './../models/Order/resolvers/Query/ordersByStatus';
+import    { peakHourAnalysis as Query_peakHourAnalysis } from './../models/Analytics/resolvers/Query/peakHourAnalysis';
 import    { previewCampaignAudience as Query_previewCampaignAudience } from './../models/Notification/resolvers/Query/previewCampaignAudience';
 import    { product as Query_product } from './../models/Product/resolvers/Query/product';
 import    { productCategories as Query_productCategories } from './../models/ProductCategory/resolvers/Query/productCategories';
@@ -66,8 +71,10 @@ import    { userBehavior as Query_userBehavior } from './../models/User/resolver
 import    { users as Query_users } from './../models/User/resolvers/Query/users';
 import    { validatePromotions as Query_validatePromotions } from './../models/Promotion/resolvers/Query/validatePromotions';
 import    { addUserAddress as Mutation_addUserAddress } from './../models/UserAddress/resolvers/Mutation/addUserAddress';
+import    { adminCancelOrder as Mutation_adminCancelOrder } from './../models/Order/resolvers/Mutation/adminCancelOrder';
 import    { adminSendPttSignal as Mutation_adminSendPttSignal } from './../models/Driver/resolvers/Mutation/adminSendPttSignal';
 import    { adminSetDriverConnectionStatus as Mutation_adminSetDriverConnectionStatus } from './../models/Driver/resolvers/Mutation/adminSetDriverConnectionStatus';
+import    { adminSetShiftDrivers as Mutation_adminSetShiftDrivers } from './../models/Driver/resolvers/Mutation/adminSetShiftDrivers';
 import    { adminSimulateDriverHeartbeat as Mutation_adminSimulateDriverHeartbeat } from './../models/Driver/resolvers/Mutation/adminSimulateDriverHeartbeat';
 import    { adminUpdateDriverLocation as Mutation_adminUpdateDriverLocation } from './../models/User/resolvers/Mutation/adminUpdateDriverLocation';
 import    { adminUpdateDriverSettings as Mutation_adminUpdateDriverSettings } from './../models/Driver/resolvers/Mutation/adminUpdateDriverSettings';
@@ -114,9 +121,12 @@ import    { deleteSettlementRule as Mutation_deleteSettlementRule } from './../m
 import    { deleteUser as Mutation_deleteUser } from './../models/User/resolvers/Mutation/deleteUser';
 import    { deleteUserAddress as Mutation_deleteUserAddress } from './../models/UserAddress/resolvers/Mutation/deleteUserAddress';
 import    { driverHeartbeat as Mutation_driverHeartbeat } from './../models/Driver/resolvers/Mutation/driverHeartbeat';
+import    { driverLogin as Mutation_driverLogin } from './../models/Driver/resolvers/Mutation/driverLogin';
 import    { driverNotifyCustomer as Mutation_driverNotifyCustomer } from './../models/Order/resolvers/Mutation/driverNotifyCustomer';
+import    { driverRegister as Mutation_driverRegister } from './../models/Driver/resolvers/Mutation/driverRegister';
 import    { driverUpdateBatteryStatus as Mutation_driverUpdateBatteryStatus } from './../models/Driver/resolvers/Mutation/driverUpdateBatteryStatus';
 import    { generateReferralCode as Mutation_generateReferralCode } from './../models/User/resolvers/Mutation/generateReferralCode';
+import    { grantFreeDelivery as Mutation_grantFreeDelivery } from './../models/Promotion/resolvers/Mutation/grantFreeDelivery';
 import    { initiateSignup as Mutation_initiateSignup } from './../models/User/resolvers/Mutation/initiateSignup';
 import    { login as Mutation_login } from './../models/User/resolvers/Mutation/login';
 import    { logoutAllSessions as Mutation_logoutAllSessions } from './../models/User/resolvers/Mutation/logoutAllSessions';
@@ -144,6 +154,7 @@ import    { setBusinessSchedule as Mutation_setBusinessSchedule } from './../mod
 import    { setDefaultAddress as Mutation_setDefaultAddress } from './../models/UserAddress/resolvers/Mutation/setDefaultAddress';
 import    { setDeliveryPricingTiers as Mutation_setDeliveryPricingTiers } from './../models/DeliveryPricing/resolvers/Mutation/setDeliveryPricingTiers';
 import    { setMyPreferredLanguage as Mutation_setMyPreferredLanguage } from './../models/User/resolvers/Mutation/setMyPreferredLanguage';
+import    { setOrderAdminNote as Mutation_setOrderAdminNote } from './../models/Order/resolvers/Mutation/setOrderAdminNote';
 import    { setUserPermissions as Mutation_setUserPermissions } from './../models/User/resolvers/Mutation/setUserPermissions';
 import    { settleWithBusiness as Mutation_settleWithBusiness } from './../models/Settlement/resolvers/Mutation/settleWithBusiness';
 import    { settleWithDriver as Mutation_settleWithDriver } from './../models/Settlement/resolvers/Mutation/settleWithDriver';
@@ -201,27 +212,35 @@ import    { Banner } from './../models/Banner/resolvers/Banner';
 import    { Business } from './../models/Business/resolvers/Business';
 import    { BusinessDayHours } from './../models/General/resolvers/BusinessDayHours';
 import    { BusinessDeviceHealth } from './../models/Notification/resolvers/BusinessDeviceHealth';
+import    { BusinessKPI } from './../models/Analytics/resolvers/BusinessKPI';
 import    { BusinessMessage } from './../models/BusinessMessage/resolvers/BusinessMessage';
 import    { BusinessMessageThread } from './../models/BusinessMessage/resolvers/BusinessMessageThread';
 import    { BusinessMessageUser } from './../models/BusinessMessage/resolvers/BusinessMessageUser';
 import    { BusinessPromotion } from './../models/Business/resolvers/BusinessPromotion';
 import    { CreateBusinessWithOwnerPayload } from './../models/Business/resolvers/CreateBusinessWithOwnerPayload';
+import    { DayOfWeekDistribution } from './../models/Analytics/resolvers/DayOfWeekDistribution';
+import    { DayVolume } from './../models/Analytics/resolvers/DayVolume';
 import    { DeliveryPriceResult } from './../models/DeliveryPricing/resolvers/DeliveryPriceResult';
 import    { DeliveryPricingConfig } from './../models/DeliveryPricing/resolvers/DeliveryPricingConfig';
 import    { DeliveryPricingTier } from './../models/DeliveryPricing/resolvers/DeliveryPricingTier';
 import    { DeliveryZone } from './../models/DeliveryZone/resolvers/DeliveryZone';
 import    { DeliveryZoneMatch } from './../models/DeliveryZone/resolvers/DeliveryZoneMatch';
 import    { DeviceToken } from './../models/Notification/resolvers/DeviceToken';
+import    { DriverAuthResult } from './../models/Driver/resolvers/DriverAuthResult';
+import    { DriverBasicInfo } from './../models/Driver/resolvers/DriverBasicInfo';
 import    { DriverConnection } from './../models/Driver/resolvers/DriverConnection';
 import    { DriverDailyMetrics } from './../models/Driver/resolvers/DriverDailyMetrics';
 import    { DriverHeartbeatResult } from './../models/Driver/resolvers/DriverHeartbeatResult';
+import    { DriverKPI } from './../models/Analytics/resolvers/DriverKPI';
 import    { DriverMessage } from './../models/DriverMessage/resolvers/DriverMessage';
 import    { DriverMessageThread } from './../models/DriverMessage/resolvers/DriverMessageThread';
 import    { DriverMessageUser } from './../models/DriverMessage/resolvers/DriverMessageUser';
 import    { DriverPttSignal } from './../models/Driver/resolvers/DriverPttSignal';
+import    { HourlyDistribution } from './../models/Analytics/resolvers/HourlyDistribution';
 import    { Location } from './../models/General/resolvers/Location';
 import    { Notification } from './../models/Notification/resolvers/Notification';
 import    { NotificationCampaign } from './../models/Notification/resolvers/NotificationCampaign';
+import    { OperationalKPIs } from './../models/Analytics/resolvers/OperationalKPIs';
 import    { Option } from './../models/Product/resolvers/Option';
 import    { OptionGroup } from './../models/Product/resolvers/OptionGroup';
 import    { Order } from './../models/Order/resolvers/Order';
@@ -230,6 +249,7 @@ import    { OrderDriverLiveTracking } from './../models/Order/resolvers/OrderDri
 import    { OrderItem } from './../models/Order/resolvers/OrderItem';
 import    { OrderItemOption } from './../models/Order/resolvers/OrderItemOption';
 import    { OrderPromotion } from './../models/Order/resolvers/OrderPromotion';
+import    { PeakHourAnalysis } from './../models/Analytics/resolvers/PeakHourAnalysis';
 import    { PolygonPoint } from './../models/DeliveryZone/resolvers/PolygonPoint';
 import    { Product } from './../models/Product/resolvers/Product';
 import    { ProductCard } from './../models/Product/resolvers/ProductCard';
@@ -268,8 +288,8 @@ import    { UserPromotion } from './../models/Promotion/resolvers/UserPromotion'
 import    { WorkingHours } from './../models/General/resolvers/WorkingHours';
 import    { DateResolver,DateTimeResolver,JSONResolver } from 'graphql-scalars';
     export const resolvers: Resolvers = {
-      Query: { auditLog: Query_auditLog,auditLogs: Query_auditLogs,business: Query_business,businessBalance: Query_businessBalance,businessDeviceHealth: Query_businessDeviceHealth,businessMessageThreads: Query_businessMessageThreads,businessMessages: Query_businessMessages,businesses: Query_businesses,calculateDeliveryPrice: Query_calculateDeliveryPrice,deliveryPricingConfig: Query_deliveryPricingConfig,deliveryPricingTiers: Query_deliveryPricingTiers,deliveryZones: Query_deliveryZones,deviceTokens: Query_deviceTokens,driverBalance: Query_driverBalance,driverMessageThreads: Query_driverMessageThreads,driverMessages: Query_driverMessages,drivers: Query_drivers,getActiveGlobalPromotions: Query_getActiveGlobalPromotions,getAgoraRtcCredentials: Query_getAgoraRtcCredentials,getAllPromotions: Query_getAllPromotions,getApplicablePromotions: Query_getApplicablePromotions,getBanner: Query_getBanner,getBanners: Query_getBanners,getPromotion: Query_getPromotion,getPromotionAnalytics: Query_getPromotionAnalytics,getPromotionThresholds: Query_getPromotionThresholds,getPromotionUsage: Query_getPromotionUsage,getStoreStatus: Query_getStoreStatus,getUserPromoMetadata: Query_getUserPromoMetadata,getUserPromotions: Query_getUserPromotions,me: Query_me,myAddresses: Query_myAddresses,myBehavior: Query_myBehavior,myBusinessMessages: Query_myBusinessMessages,myDriverMessages: Query_myDriverMessages,myDriverMetrics: Query_myDriverMetrics,myReferralStats: Query_myReferralStats,notificationCampaign: Query_notificationCampaign,notificationCampaigns: Query_notificationCampaigns,offers: Query_offers,order: Query_order,orders: Query_orders,ordersByStatus: Query_ordersByStatus,previewCampaignAudience: Query_previewCampaignAudience,product: Query_product,productCategories: Query_productCategories,productCategory: Query_productCategory,productSubcategories: Query_productSubcategories,productSubcategoriesByBusiness: Query_productSubcategoriesByBusiness,products: Query_products,pushTelemetryEvents: Query_pushTelemetryEvents,pushTelemetrySummary: Query_pushTelemetrySummary,settlementPayment: Query_settlementPayment,settlementPayments: Query_settlementPayments,settlementRequests: Query_settlementRequests,settlementRule: Query_settlementRule,settlementRules: Query_settlementRules,settlementScenarioDefinitions: Query_settlementScenarioDefinitions,settlementSummary: Query_settlementSummary,settlements: Query_settlements,uncompletedOrders: Query_uncompletedOrders,unsettledBalance: Query_unsettledBalance,userBehavior: Query_userBehavior,users: Query_users,validatePromotions: Query_validatePromotions },
-      Mutation: { addUserAddress: Mutation_addUserAddress,adminSendPttSignal: Mutation_adminSendPttSignal,adminSetDriverConnectionStatus: Mutation_adminSetDriverConnectionStatus,adminSimulateDriverHeartbeat: Mutation_adminSimulateDriverHeartbeat,adminUpdateDriverLocation: Mutation_adminUpdateDriverLocation,adminUpdateDriverSettings: Mutation_adminUpdateDriverSettings,assignDriverToOrder: Mutation_assignDriverToOrder,assignPromotionToUsers: Mutation_assignPromotionToUsers,backfillSettlementsForDeliveredOrders: Mutation_backfillSettlementsForDeliveredOrders,businessDeviceHeartbeat: Mutation_businessDeviceHeartbeat,businessDeviceOrderSignal: Mutation_businessDeviceOrderSignal,cancelOrder: Mutation_cancelOrder,cancelSettlementRequest: Mutation_cancelSettlementRequest,changeMyPassword: Mutation_changeMyPassword,createBanner: Mutation_createBanner,createBusiness: Mutation_createBusiness,createBusinessWithOwner: Mutation_createBusinessWithOwner,createCampaign: Mutation_createCampaign,createDeliveryPricingTier: Mutation_createDeliveryPricingTier,createDeliveryZone: Mutation_createDeliveryZone,createOption: Mutation_createOption,createOptionGroup: Mutation_createOptionGroup,createOrder: Mutation_createOrder,createProduct: Mutation_createProduct,createProductCategory: Mutation_createProductCategory,createProductSubcategory: Mutation_createProductSubcategory,createProductVariantGroup: Mutation_createProductVariantGroup,createPromotion: Mutation_createPromotion,createSettlementRequest: Mutation_createSettlementRequest,createSettlementRule: Mutation_createSettlementRule,createTestOrder: Mutation_createTestOrder,createUser: Mutation_createUser,deleteBanner: Mutation_deleteBanner,deleteBusiness: Mutation_deleteBusiness,deleteCampaign: Mutation_deleteCampaign,deleteDeliveryPricingTier: Mutation_deleteDeliveryPricingTier,deleteDeliveryZone: Mutation_deleteDeliveryZone,deleteMyAccount: Mutation_deleteMyAccount,deleteOption: Mutation_deleteOption,deleteOptionGroup: Mutation_deleteOptionGroup,deleteProduct: Mutation_deleteProduct,deleteProductCategory: Mutation_deleteProductCategory,deleteProductSubcategory: Mutation_deleteProductSubcategory,deleteProductVariantGroup: Mutation_deleteProductVariantGroup,deletePromotion: Mutation_deletePromotion,deleteSettlementRule: Mutation_deleteSettlementRule,deleteUser: Mutation_deleteUser,deleteUserAddress: Mutation_deleteUserAddress,driverHeartbeat: Mutation_driverHeartbeat,driverNotifyCustomer: Mutation_driverNotifyCustomer,driverUpdateBatteryStatus: Mutation_driverUpdateBatteryStatus,generateReferralCode: Mutation_generateReferralCode,initiateSignup: Mutation_initiateSignup,login: Mutation_login,logoutAllSessions: Mutation_logoutAllSessions,logoutCurrentSession: Mutation_logoutCurrentSession,markBusinessMessagesRead: Mutation_markBusinessMessagesRead,markDriverMessagesRead: Mutation_markDriverMessagesRead,markFirstOrderUsed: Mutation_markFirstOrderUsed,markSettlementAsPaid: Mutation_markSettlementAsPaid,markSettlementAsPartiallyPaid: Mutation_markSettlementAsPartiallyPaid,markSettlementsAsPaid: Mutation_markSettlementsAsPaid,refreshToken: Mutation_refreshToken,registerDeviceToken: Mutation_registerDeviceToken,registerLiveActivityToken: Mutation_registerLiveActivityToken,removeUserFromPromotion: Mutation_removeUserFromPromotion,replyToBusinessMessage: Mutation_replyToBusinessMessage,replyToDriverMessage: Mutation_replyToDriverMessage,resendEmailVerification: Mutation_resendEmailVerification,respondToSettlementRequest: Mutation_respondToSettlementRequest,runSettlementScenarioHarness: Mutation_runSettlementScenarioHarness,sendBusinessMessage: Mutation_sendBusinessMessage,sendCampaign: Mutation_sendCampaign,sendDriverMessage: Mutation_sendDriverMessage,sendPushNotification: Mutation_sendPushNotification,setBusinessSchedule: Mutation_setBusinessSchedule,setDefaultAddress: Mutation_setDefaultAddress,setDeliveryPricingTiers: Mutation_setDeliveryPricingTiers,setMyPreferredLanguage: Mutation_setMyPreferredLanguage,setUserPermissions: Mutation_setUserPermissions,settleWithBusiness: Mutation_settleWithBusiness,settleWithDriver: Mutation_settleWithDriver,startPreparing: Mutation_startPreparing,submitPhoneNumber: Mutation_submitPhoneNumber,trackPushTelemetry: Mutation_trackPushTelemetry,unregisterDeviceToken: Mutation_unregisterDeviceToken,unsettleSettlement: Mutation_unsettleSettlement,updateBanner: Mutation_updateBanner,updateBannerOrder: Mutation_updateBannerOrder,updateBusiness: Mutation_updateBusiness,updateDeliveryPricingTier: Mutation_updateDeliveryPricingTier,updateDeliveryZone: Mutation_updateDeliveryZone,updateDriverLocation: Mutation_updateDriverLocation,updateDriverOnlineStatus: Mutation_updateDriverOnlineStatus,updateOption: Mutation_updateOption,updateOptionGroup: Mutation_updateOptionGroup,updateOrderStatus: Mutation_updateOrderStatus,updatePreparationTime: Mutation_updatePreparationTime,updateProduct: Mutation_updateProduct,updateProductCategoriesOrder: Mutation_updateProductCategoriesOrder,updateProductCategory: Mutation_updateProductCategory,updateProductSubcategory: Mutation_updateProductSubcategory,updateProductsOrder: Mutation_updateProductsOrder,updatePromotion: Mutation_updatePromotion,updateSettlementRule: Mutation_updateSettlementRule,updateStoreStatus: Mutation_updateStoreStatus,updateUser: Mutation_updateUser,updateUserAddress: Mutation_updateUserAddress,updateUserNote: Mutation_updateUserNote,verifyEmail: Mutation_verifyEmail,verifyPhone: Mutation_verifyPhone },
+      Query: { auditLog: Query_auditLog,auditLogs: Query_auditLogs,business: Query_business,businessBalance: Query_businessBalance,businessDeviceHealth: Query_businessDeviceHealth,businessKPIs: Query_businessKPIs,businessMessageThreads: Query_businessMessageThreads,businessMessages: Query_businessMessages,businesses: Query_businesses,calculateDeliveryPrice: Query_calculateDeliveryPrice,cancelledOrders: Query_cancelledOrders,deliveryPricingConfig: Query_deliveryPricingConfig,deliveryPricingTiers: Query_deliveryPricingTiers,deliveryZones: Query_deliveryZones,deviceTokens: Query_deviceTokens,driverBalance: Query_driverBalance,driverKPIs: Query_driverKPIs,driverMessageThreads: Query_driverMessageThreads,driverMessages: Query_driverMessages,drivers: Query_drivers,getActiveGlobalPromotions: Query_getActiveGlobalPromotions,getAgoraRtcCredentials: Query_getAgoraRtcCredentials,getAllPromotions: Query_getAllPromotions,getApplicablePromotions: Query_getApplicablePromotions,getBanner: Query_getBanner,getBanners: Query_getBanners,getPromotion: Query_getPromotion,getPromotionAnalytics: Query_getPromotionAnalytics,getPromotionThresholds: Query_getPromotionThresholds,getPromotionUsage: Query_getPromotionUsage,getStoreStatus: Query_getStoreStatus,getUserPromoMetadata: Query_getUserPromoMetadata,getUserPromotions: Query_getUserPromotions,me: Query_me,myAddresses: Query_myAddresses,myBehavior: Query_myBehavior,myBusinessMessages: Query_myBusinessMessages,myDriverMessages: Query_myDriverMessages,myDriverMetrics: Query_myDriverMetrics,myReferralStats: Query_myReferralStats,notificationCampaign: Query_notificationCampaign,notificationCampaigns: Query_notificationCampaigns,offers: Query_offers,operationalKPIs: Query_operationalKPIs,order: Query_order,orders: Query_orders,ordersByStatus: Query_ordersByStatus,peakHourAnalysis: Query_peakHourAnalysis,previewCampaignAudience: Query_previewCampaignAudience,product: Query_product,productCategories: Query_productCategories,productCategory: Query_productCategory,productSubcategories: Query_productSubcategories,productSubcategoriesByBusiness: Query_productSubcategoriesByBusiness,products: Query_products,pushTelemetryEvents: Query_pushTelemetryEvents,pushTelemetrySummary: Query_pushTelemetrySummary,settlementPayment: Query_settlementPayment,settlementPayments: Query_settlementPayments,settlementRequests: Query_settlementRequests,settlementRule: Query_settlementRule,settlementRules: Query_settlementRules,settlementScenarioDefinitions: Query_settlementScenarioDefinitions,settlementSummary: Query_settlementSummary,settlements: Query_settlements,uncompletedOrders: Query_uncompletedOrders,unsettledBalance: Query_unsettledBalance,userBehavior: Query_userBehavior,users: Query_users,validatePromotions: Query_validatePromotions },
+      Mutation: { addUserAddress: Mutation_addUserAddress,adminCancelOrder: Mutation_adminCancelOrder,adminSendPttSignal: Mutation_adminSendPttSignal,adminSetDriverConnectionStatus: Mutation_adminSetDriverConnectionStatus,adminSetShiftDrivers: Mutation_adminSetShiftDrivers,adminSimulateDriverHeartbeat: Mutation_adminSimulateDriverHeartbeat,adminUpdateDriverLocation: Mutation_adminUpdateDriverLocation,adminUpdateDriverSettings: Mutation_adminUpdateDriverSettings,assignDriverToOrder: Mutation_assignDriverToOrder,assignPromotionToUsers: Mutation_assignPromotionToUsers,backfillSettlementsForDeliveredOrders: Mutation_backfillSettlementsForDeliveredOrders,businessDeviceHeartbeat: Mutation_businessDeviceHeartbeat,businessDeviceOrderSignal: Mutation_businessDeviceOrderSignal,cancelOrder: Mutation_cancelOrder,cancelSettlementRequest: Mutation_cancelSettlementRequest,changeMyPassword: Mutation_changeMyPassword,createBanner: Mutation_createBanner,createBusiness: Mutation_createBusiness,createBusinessWithOwner: Mutation_createBusinessWithOwner,createCampaign: Mutation_createCampaign,createDeliveryPricingTier: Mutation_createDeliveryPricingTier,createDeliveryZone: Mutation_createDeliveryZone,createOption: Mutation_createOption,createOptionGroup: Mutation_createOptionGroup,createOrder: Mutation_createOrder,createProduct: Mutation_createProduct,createProductCategory: Mutation_createProductCategory,createProductSubcategory: Mutation_createProductSubcategory,createProductVariantGroup: Mutation_createProductVariantGroup,createPromotion: Mutation_createPromotion,createSettlementRequest: Mutation_createSettlementRequest,createSettlementRule: Mutation_createSettlementRule,createTestOrder: Mutation_createTestOrder,createUser: Mutation_createUser,deleteBanner: Mutation_deleteBanner,deleteBusiness: Mutation_deleteBusiness,deleteCampaign: Mutation_deleteCampaign,deleteDeliveryPricingTier: Mutation_deleteDeliveryPricingTier,deleteDeliveryZone: Mutation_deleteDeliveryZone,deleteMyAccount: Mutation_deleteMyAccount,deleteOption: Mutation_deleteOption,deleteOptionGroup: Mutation_deleteOptionGroup,deleteProduct: Mutation_deleteProduct,deleteProductCategory: Mutation_deleteProductCategory,deleteProductSubcategory: Mutation_deleteProductSubcategory,deleteProductVariantGroup: Mutation_deleteProductVariantGroup,deletePromotion: Mutation_deletePromotion,deleteSettlementRule: Mutation_deleteSettlementRule,deleteUser: Mutation_deleteUser,deleteUserAddress: Mutation_deleteUserAddress,driverHeartbeat: Mutation_driverHeartbeat,driverLogin: Mutation_driverLogin,driverNotifyCustomer: Mutation_driverNotifyCustomer,driverRegister: Mutation_driverRegister,driverUpdateBatteryStatus: Mutation_driverUpdateBatteryStatus,generateReferralCode: Mutation_generateReferralCode,grantFreeDelivery: Mutation_grantFreeDelivery,initiateSignup: Mutation_initiateSignup,login: Mutation_login,logoutAllSessions: Mutation_logoutAllSessions,logoutCurrentSession: Mutation_logoutCurrentSession,markBusinessMessagesRead: Mutation_markBusinessMessagesRead,markDriverMessagesRead: Mutation_markDriverMessagesRead,markFirstOrderUsed: Mutation_markFirstOrderUsed,markSettlementAsPaid: Mutation_markSettlementAsPaid,markSettlementAsPartiallyPaid: Mutation_markSettlementAsPartiallyPaid,markSettlementsAsPaid: Mutation_markSettlementsAsPaid,refreshToken: Mutation_refreshToken,registerDeviceToken: Mutation_registerDeviceToken,registerLiveActivityToken: Mutation_registerLiveActivityToken,removeUserFromPromotion: Mutation_removeUserFromPromotion,replyToBusinessMessage: Mutation_replyToBusinessMessage,replyToDriverMessage: Mutation_replyToDriverMessage,resendEmailVerification: Mutation_resendEmailVerification,respondToSettlementRequest: Mutation_respondToSettlementRequest,runSettlementScenarioHarness: Mutation_runSettlementScenarioHarness,sendBusinessMessage: Mutation_sendBusinessMessage,sendCampaign: Mutation_sendCampaign,sendDriverMessage: Mutation_sendDriverMessage,sendPushNotification: Mutation_sendPushNotification,setBusinessSchedule: Mutation_setBusinessSchedule,setDefaultAddress: Mutation_setDefaultAddress,setDeliveryPricingTiers: Mutation_setDeliveryPricingTiers,setMyPreferredLanguage: Mutation_setMyPreferredLanguage,setOrderAdminNote: Mutation_setOrderAdminNote,setUserPermissions: Mutation_setUserPermissions,settleWithBusiness: Mutation_settleWithBusiness,settleWithDriver: Mutation_settleWithDriver,startPreparing: Mutation_startPreparing,submitPhoneNumber: Mutation_submitPhoneNumber,trackPushTelemetry: Mutation_trackPushTelemetry,unregisterDeviceToken: Mutation_unregisterDeviceToken,unsettleSettlement: Mutation_unsettleSettlement,updateBanner: Mutation_updateBanner,updateBannerOrder: Mutation_updateBannerOrder,updateBusiness: Mutation_updateBusiness,updateDeliveryPricingTier: Mutation_updateDeliveryPricingTier,updateDeliveryZone: Mutation_updateDeliveryZone,updateDriverLocation: Mutation_updateDriverLocation,updateDriverOnlineStatus: Mutation_updateDriverOnlineStatus,updateOption: Mutation_updateOption,updateOptionGroup: Mutation_updateOptionGroup,updateOrderStatus: Mutation_updateOrderStatus,updatePreparationTime: Mutation_updatePreparationTime,updateProduct: Mutation_updateProduct,updateProductCategoriesOrder: Mutation_updateProductCategoriesOrder,updateProductCategory: Mutation_updateProductCategory,updateProductSubcategory: Mutation_updateProductSubcategory,updateProductsOrder: Mutation_updateProductsOrder,updatePromotion: Mutation_updatePromotion,updateSettlementRule: Mutation_updateSettlementRule,updateStoreStatus: Mutation_updateStoreStatus,updateUser: Mutation_updateUser,updateUserAddress: Mutation_updateUserAddress,updateUserNote: Mutation_updateUserNote,verifyEmail: Mutation_verifyEmail,verifyPhone: Mutation_verifyPhone },
       Subscription: { adminBusinessMessageReceived: Subscription_adminBusinessMessageReceived,adminMessageReceived: Subscription_adminMessageReceived,allOrdersUpdated: Subscription_allOrdersUpdated,auditLogCreated: Subscription_auditLogCreated,businessMessageReceived: Subscription_businessMessageReceived,driverConnectionStatusChanged: Subscription_driverConnectionStatusChanged,driverMessageReceived: Subscription_driverMessageReceived,driverPttSignal: Subscription_driverPttSignal,driversUpdated: Subscription_driversUpdated,orderDriverLiveTracking: Subscription_orderDriverLiveTracking,orderStatusUpdated: Subscription_orderStatusUpdated,settlementCreated: Subscription_settlementCreated,settlementStatusChanged: Subscription_settlementStatusChanged,storeStatusUpdated: Subscription_storeStatusUpdated,userOrdersUpdated: Subscription_userOrdersUpdated },
       AgoraRtcCredentials: AgoraRtcCredentials,
 ApplicablePromotion: ApplicablePromotion,
@@ -281,27 +301,35 @@ Banner: Banner,
 Business: Business,
 BusinessDayHours: BusinessDayHours,
 BusinessDeviceHealth: BusinessDeviceHealth,
+BusinessKPI: BusinessKPI,
 BusinessMessage: BusinessMessage,
 BusinessMessageThread: BusinessMessageThread,
 BusinessMessageUser: BusinessMessageUser,
 BusinessPromotion: BusinessPromotion,
 CreateBusinessWithOwnerPayload: CreateBusinessWithOwnerPayload,
+DayOfWeekDistribution: DayOfWeekDistribution,
+DayVolume: DayVolume,
 DeliveryPriceResult: DeliveryPriceResult,
 DeliveryPricingConfig: DeliveryPricingConfig,
 DeliveryPricingTier: DeliveryPricingTier,
 DeliveryZone: DeliveryZone,
 DeliveryZoneMatch: DeliveryZoneMatch,
 DeviceToken: DeviceToken,
+DriverAuthResult: DriverAuthResult,
+DriverBasicInfo: DriverBasicInfo,
 DriverConnection: DriverConnection,
 DriverDailyMetrics: DriverDailyMetrics,
 DriverHeartbeatResult: DriverHeartbeatResult,
+DriverKPI: DriverKPI,
 DriverMessage: DriverMessage,
 DriverMessageThread: DriverMessageThread,
 DriverMessageUser: DriverMessageUser,
 DriverPttSignal: DriverPttSignal,
+HourlyDistribution: HourlyDistribution,
 Location: Location,
 Notification: Notification,
 NotificationCampaign: NotificationCampaign,
+OperationalKPIs: OperationalKPIs,
 Option: Option,
 OptionGroup: OptionGroup,
 Order: Order,
@@ -310,6 +338,7 @@ OrderDriverLiveTracking: OrderDriverLiveTracking,
 OrderItem: OrderItem,
 OrderItemOption: OrderItemOption,
 OrderPromotion: OrderPromotion,
+PeakHourAnalysis: PeakHourAnalysis,
 PolygonPoint: PolygonPoint,
 Product: Product,
 ProductCard: ProductCard,

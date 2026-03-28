@@ -50,10 +50,17 @@ export interface UseCancelOrderResult {
     error?: string;
 }
 
-export function useOrders(): UseOrdersResult {
+export interface UseOrdersOptions {
+    limit?: number;
+    offset?: number;
+}
+
+export function useOrders(options: UseOrdersOptions = {}): UseOrdersResult {
+    const { limit = 100, offset = 0 } = options;
     const apolloClient = useApolloClient();
     // Initial query to load data - use network-only to avoid stale cache
     const { data, loading, error, refetch } = useQuery(GET_ORDERS, {
+        variables: { limit, offset },
         fetchPolicy: 'network-only', // Changed from 'cache-and-network' to always fetch fresh data
     });
 
@@ -108,7 +115,7 @@ export function useOrders(): UseOrdersResult {
                 return;
             }
 
-            apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
+            apolloClient.cache.updateQuery({ query: GET_ORDERS, variables: { limit, offset } }, (existing: any) => {
                 const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
                 const byId = new Map(currentOrders.map((order: any) => [String(order?.id), order]));
 
@@ -129,7 +136,7 @@ export function useOrders(): UseOrdersResult {
         orders: (data as any)?.orders || [],
         loading,
         error: error?.message,
-        refetch: () => refetch(),
+        refetch: () => refetch({ limit, offset }),
     };
 }
 

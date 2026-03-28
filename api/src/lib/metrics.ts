@@ -1,4 +1,4 @@
-import { collectDefaultMetrics, Registry, Histogram, Counter } from 'prom-client';
+import { collectDefaultMetrics, Registry, Histogram, Counter, Gauge } from 'prom-client';
 import type { Request, Response, NextFunction } from 'express';
 
 export const register = new Registry();
@@ -125,3 +125,82 @@ export async function metricsEndpoint(_req: Request, res: Response) {
 	res.set('Content-Type', register.contentType);
 	res.end(await register.metrics());
 }
+
+// ── Fleet & pipeline gauges (updated by /health/ops-wall on each poll) ──────
+
+export const driversByConnectionStatusGauge = new Gauge({
+	name: 'drivers_by_connection_status',
+	help: 'Number of drivers by connection status (CONNECTED, STALE, LOST, DISCONNECTED)',
+	labelNames: ['status'],
+	registers: [register],
+});
+
+export const businessDevicesByOnlineStatusGauge = new Gauge({
+	name: 'business_devices_by_online_status',
+	help: 'Number of business devices by online status (ONLINE, STALE, OFFLINE)',
+	labelNames: ['status'],
+	registers: [register],
+});
+
+export const ordersByStatusGauge = new Gauge({
+	name: 'orders_by_status',
+	help: 'Number of active and recently completed orders by status',
+	labelNames: ['status'],
+	registers: [register],
+});
+
+export const ordersStuckGauge = new Gauge({
+	name: 'orders_stuck_total',
+	help: 'Number of stuck orders by type (pending_no_assignment, ready_no_pickup, out_for_delivery_too_long)',
+	labelNames: ['type'],
+	registers: [register],
+});
+
+export const wsActiveUsersByRoleGauge = new Gauge({
+	name: 'ws_active_users_by_role',
+	help: 'Number of active WebSocket connections by user role (CUSTOMER, DRIVER, BUSINESS_OWNER, BUSINESS_EMPLOYEE, ADMIN, SUPER_ADMIN, anonymous)',
+	labelNames: ['role'],
+	registers: [register],
+});
+
+export const pushNotificationsSentTotal = new Counter({
+	name: 'push_notifications_sent_total',
+	help: 'Total push notification delivery attempts by app type and platform',
+	labelNames: ['app_type', 'platform'],
+	registers: [register],
+});
+
+export const pushNotificationsProviderAcceptedTotal = new Counter({
+	name: 'push_notifications_provider_accepted_total',
+	help: 'Total push notifications accepted by provider (Firebase/APNs bridge)',
+	labelNames: ['app_type', 'platform'],
+	registers: [register],
+});
+
+export const pushNotificationsProviderFailedTotal = new Counter({
+	name: 'push_notifications_provider_failed_total',
+	help: 'Total push notifications rejected/failed by provider',
+	labelNames: ['app_type', 'platform', 'reason'],
+	registers: [register],
+});
+
+export const pushTelemetryEventsTotal = new Counter({
+	name: 'push_telemetry_events_total',
+	help: 'Total client push telemetry events',
+	labelNames: ['app_type', 'platform', 'event_type'],
+	registers: [register],
+});
+
+export const pushNotificationsOpenedTotal = new Counter({
+	name: 'push_notifications_opened_total',
+	help: 'Total client-reported push open events',
+	labelNames: ['app_type', 'platform'],
+	registers: [register],
+});
+
+export const pushNotificationsActionedTotal = new Counter({
+	name: 'push_notifications_actioned_total',
+	help: 'Total client-reported push action tap events',
+	labelNames: ['app_type', 'platform', 'action_id'],
+	registers: [register],
+});

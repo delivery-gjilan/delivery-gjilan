@@ -223,6 +223,28 @@ enum BusinessDeviceOnlineStatus {
   STALE
 }
 
+type BusinessKPI {
+  """Median minutes driver waited at pickup after arriving"""
+  avgDriverWaitMin: Float
+  avgPrepTimeMin: Float
+  businessId: ID!
+  businessName: String!
+  cancellationRate: Float!
+  completedOrders: Int!
+
+  """Orders where driver arrived before restaurant pressed Ready"""
+  fakeReadyCount: Int!
+  fakeReadyRate: Float
+  p90PrepTimeMin: Float
+
+  """
+  % of orders where restaurant pressed Ready before prep time was 50% elapsed
+  """
+  prematureReadyRate: Float
+  prepOverrunRate: Float
+  totalOrders: Int!
+}
+
 type BusinessMessage {
   admin: BusinessMessageUser
   adminId: ID!
@@ -377,6 +399,7 @@ input CreateOrderInput {
   dropOffLocation: LocationInput!
   items: [CreateOrderItemInput!]!
   paymentCollection: OrderPaymentCollection
+  prioritySurcharge: Float
   promoCode: String
   totalPrice: Float!
 }
@@ -475,6 +498,19 @@ scalar Date
 
 scalar DateTime
 
+type DayOfWeekDistribution {
+  """0 = Sunday, 6 = Saturday"""
+  dow: Int!
+  orderCount: Int!
+  revenue: Float!
+}
+
+type DayVolume {
+  date: String!
+  orderCount: Int!
+  revenue: Float!
+}
+
 type DeliveryPriceResult {
   distanceKm: Float!
   price: Float!
@@ -540,6 +576,29 @@ type DeviceToken {
   token: String!
   updatedAt: DateTime!
   userId: ID!
+}
+
+"""Result of driverLogin / driverRegister mutations"""
+type DriverAuthResult {
+  driver: DriverBasicInfo!
+  message: String!
+  refreshToken: String
+  token: String!
+}
+
+"""Basic driver profile returned by driverLogin / driverRegister"""
+type DriverBasicInfo {
+  connectionStatus: DriverConnectionStatus!
+  driverLat: Float
+  driverLng: Float
+  email: String!
+  firstName: String!
+  id: ID!
+  lastHeartbeatAt: Date
+  lastLocationUpdate: Date
+  lastName: String!
+  onlinePreference: Boolean!
+  phoneNumber: String
 }
 
 type DriverConnection {
@@ -645,6 +704,25 @@ type DriverHeartbeatResult {
   success: Boolean!
 }
 
+type DriverKPI {
+  """Minutes from OUT_FOR_DELIVERY to DELIVERED"""
+  avgDeliveryTimeMin: Float
+
+  """Minutes from driver assignment to picking up (travel + wait)"""
+  avgPickupTimeMin: Float
+
+  """Minutes driver waited at restaurant after arriving"""
+  avgWaitAtPickupMin: Float
+  driverId: ID!
+  driverName: String!
+  totalDeliveries: Int!
+}
+
+input DriverLoginInput {
+  email: String!
+  password: String!
+}
+
 type DriverMessage {
   admin: DriverMessageUser
   adminId: ID!
@@ -687,6 +765,14 @@ enum DriverPttSignalAction {
   UNMUTE
 }
 
+input DriverRegisterInput {
+  email: String!
+  firstName: String!
+  lastName: String!
+  password: String!
+  phoneNumber: String
+}
+
 enum EntityType {
   BUSINESS
   CATEGORY
@@ -697,6 +783,13 @@ enum EntityType {
   SETTLEMENT
   SUBCATEGORY
   USER
+}
+
+type HourlyDistribution {
+  avgDeliveryTimeMin: Float
+  hour: Int!
+  orderCount: Int!
+  revenue: Float!
 }
 
 input InitiateSignupInput {
@@ -734,6 +827,7 @@ enum MessageAlertType {
 
 type Mutation {
   addUserAddress(input: AddUserAddressInput!): UserAddress!
+  adminCancelOrder(id: ID!, reason: String!, settleBusiness: Boolean, settleDriver: Boolean): Order!
 
   """Admin sends push-to-talk signaling state to one or multiple drivers"""
   adminSendPttSignal(action: DriverPttSignalAction!, channelName: String!, driverIds: [ID!]!, muted: Boolean): Boolean!
@@ -742,6 +836,13 @@ type Mutation {
   Admin mutation to manually set connection status (for testing/recovery)
   """
   adminSetDriverConnectionStatus(driverId: ID!, status: DriverConnectionStatus!): User!
+
+  """
+  Admin mutation to set which drivers are on the current shift.
+  Only on-shift drivers will receive new-order dispatch notifications.
+  Pass an empty list to clear the shift restriction (all eligible drivers receive notifications).
+  """
+  adminSetShiftDrivers(driverIds: [ID!]!): Boolean!
 
   """
   Admin simulation heartbeat — wraps processHeartbeat for SUPER_ADMIN.
@@ -818,11 +919,20 @@ type Mutation {
   Location is throttled: only written if >10s since last write OR moved >5m.
   """
   driverHeartbeat(activeOrderId: ID, latitude: Float!, longitude: Float!, navigationPhase: String, remainingEtaSeconds: Int): DriverHeartbeatResult!
+
+  """Driver login — returns short-lived access token + refresh token"""
+  driverLogin(input: DriverLoginInput!): DriverAuthResult!
   driverNotifyCustomer(kind: DriverCustomerNotificationKind!, orderId: ID!): Boolean!
+
+  """
+  Driver self-registration — creates user (role=DRIVER) + driver profile row
+  """
+  driverRegister(input: DriverRegisterInput!): DriverAuthResult!
 
   """Driver battery telemetry update (recommended every 5-10 minutes)"""
   driverUpdateBatteryStatus(isCharging: Boolean, level: Int!, optIn: Boolean!): DriverConnection!
   generateReferralCode: String!
+  grantFreeDelivery(orderId: ID!, userId: ID!): Boolean!
   initiateSignup(input: InitiateSignupInput!): AuthResponse!
   login(input: LoginInput!): AuthResponse!
   logoutAllSessions: Boolean!
@@ -864,6 +974,7 @@ type Mutation {
   setDefaultAddress(id: ID!): Boolean!
   setDeliveryPricingTiers(input: SetDeliveryPricingTiersInput!): [DeliveryPricingTier!]!
   setMyPreferredLanguage(language: AppLanguage!): User!
+  setOrderAdminNote(id: ID!, note: String): Order!
   setUserPermissions(permissions: [UserPermission!]!, userId: ID!): User!
 
   """
@@ -944,6 +1055,21 @@ enum NotificationType {
   PROMOTIONAL
 }
 
+type OperationalKPIs {
+  aov: Float!
+  avgDeliveryTimeMin: Float
+  avgDriverWaitAtPickupMin: Float
+  avgPrepTimeMin: Float
+  cancellationRate: Float!
+  cancelledOrders: Int!
+  completedOrders: Int!
+  dailyVolume: [DayVolume!]!
+  fakeReadyRate: Float
+  gmv: Float!
+  prepOverrunRate: Float
+  totalOrders: Int!
+}
+
 type Option {
   displayOrder: Int!
   extraPrice: Float!
@@ -965,11 +1091,16 @@ type OptionGroup {
 }
 
 type Order {
+  adminNote: String
   businesses: [OrderBusiness!]!
+  cancellationReason: String
+  cancelledAt: Date
   deliveredAt: Date
   deliveryPrice: Float!
   displayId: String!
   driver: User
+  driverArrivedAtPickup: Date
+  driverAssignedAt: Date
   driverNotes: String
   dropOffLocation: Location!
   estimatedReadyAt: Date
@@ -1039,6 +1170,7 @@ type OrderPromotion {
   appliesTo: PromotionAppliesTo!
   discountAmount: Float!
   id: ID!
+  promoCode: String
   promotionId: ID!
 }
 
@@ -1049,6 +1181,13 @@ enum OrderStatus {
   PENDING
   PREPARING
   READY
+}
+
+type PeakHourAnalysis {
+  byDayOfWeek: [DayOfWeekDistribution!]!
+  hourly: [HourlyDistribution!]!
+  peakDow: Int!
+  peakHour: Int!
 }
 
 type PolygonPoint {
@@ -1263,6 +1402,7 @@ type Query {
   business(id: ID!): Business
   businessBalance(businessId: ID!): SettlementSummary!
   businessDeviceHealth(hours: Int): [BusinessDeviceHealth!]!
+  businessKPIs(businessId: ID, endDate: String!, startDate: String!): [BusinessKPI!]!
 
   """Admin: list of all business user threads with unread counts"""
   businessMessageThreads: [BusinessMessageThread!]!
@@ -1271,11 +1411,13 @@ type Query {
   businessMessages(businessUserId: ID!, limit: Int, offset: Int): [BusinessMessage!]!
   businesses: [Business!]!
   calculateDeliveryPrice(businessId: ID!, dropoffLat: Float!, dropoffLng: Float!): DeliveryPriceResult!
+  cancelledOrders(limit: Int, offset: Int): [Order!]!
   deliveryPricingConfig: DeliveryPricingConfig!
   deliveryPricingTiers: [DeliveryPricingTier!]!
   deliveryZones: [DeliveryZone!]!
   deviceTokens(userId: ID): [DeviceToken!]!
   driverBalance(driverId: ID!): SettlementSummary!
+  driverKPIs(driverId: ID, endDate: String!, startDate: String!): [DriverKPI!]!
 
   """Admin: list of all driver threads with unread counts"""
   driverMessageThreads: [DriverMessageThread!]!
@@ -1294,7 +1436,7 @@ type Query {
   getPromotion(id: ID!): Promotion
   getPromotionAnalytics(promotionId: ID!): PromotionAnalyticsResult!
   getPromotionThresholds(cart: CartContextInput!): [PromotionThreshold!]!
-  getPromotionUsage(promotionId: ID!): [PromotionUsage!]!
+  getPromotionUsage(limit: Int, offset: Int, promotionId: ID!): [PromotionUsage!]!
   getStoreStatus(url: String): StoreStatus!
   getUserPromoMetadata(userId: ID!): UserPromoMetadata
   getUserPromotions(userId: ID!): [UserPromotion!]!
@@ -1314,9 +1456,11 @@ type Query {
   notificationCampaign(id: ID!): NotificationCampaign
   notificationCampaigns: [NotificationCampaign!]!
   offers(businessId: ID!): [Product!]!
+  operationalKPIs(businessId: ID, endDate: String!, startDate: String!): OperationalKPIs!
   order(id: ID!): Order
-  orders: [Order!]!
-  ordersByStatus(status: OrderStatus!): [Order!]!
+  orders(limit: Int, offset: Int): [Order!]!
+  ordersByStatus(limit: Int, offset: Int, status: OrderStatus!): [Order!]!
+  peakHourAnalysis(businessId: ID, endDate: String!, startDate: String!): PeakHourAnalysis!
   previewCampaignAudience(query: JSON!): AudiencePreview!
   product(id: ID!): Product
   productCategories(businessId: ID!): [ProductCategory!]!
@@ -1337,7 +1481,7 @@ type Query {
   uncompletedOrders: [Order!]!
   unsettledBalance(entityId: ID!, entityType: SettlementType!): Float!
   userBehavior(userId: ID!): UserBehavior
-  users: [User!]!
+  users(limit: Int, offset: Int): [User!]!
   validatePromotions(cart: CartContextInput!, manualCode: String): PromotionResult!
 }
 

@@ -9,7 +9,8 @@ import Dropdown from "@/components/ui/Dropdown";
 import Input from "@/components/ui/Input";
 import { useOrders, useUpdateOrderStatus } from "@/lib/hooks/useOrders";
 import { useAuth } from "@/lib/auth-context";
-import { ASSIGN_DRIVER_TO_ORDER, CREATE_TEST_ORDER, START_PREPARING, UPDATE_PREPARATION_TIME } from "@/graphql/operations/orders";
+import { ASSIGN_DRIVER_TO_ORDER, CREATE_TEST_ORDER, START_PREPARING, UPDATE_PREPARATION_TIME, ADMIN_CANCEL_ORDER } from "@/graphql/operations/orders";
+import { GRANT_FREE_DELIVERY } from "@/graphql/operations/promotions/mutations";
 import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
 import { Package, Store, Search, ArrowRight, Eye, EyeOff, MapPin, User, Plus, ChefHat, Timer, Copy, Check, Phone, Hash, MessageSquare } from "lucide-react";
 import { toast } from 'sonner';
@@ -19,6 +20,7 @@ import { toast } from 'sonner';
 --------------------------------------------------------- */
 
 type OrderStatus = "PENDING" | "PREPARING" | "READY" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED";
+type CompletedStatusFilter = "ALL" | "DELIVERED" | "CANCELLED";
 
 interface OrderItem {
     productId: string;
@@ -76,7 +78,28 @@ interface Order {
         email: string;
         commissionPercentage?: number;
     } | null;
+    cancellationReason?: string | null;
+    cancelledAt?: string | null;
+    adminNote?: string | null;
 }
+
+function parseAdminNote(adminNote?: string | null): { tag: string; note: string } | null {
+    if (!adminNote) return null;
+    try {
+        const p = JSON.parse(adminNote);
+        if (p && typeof p === 'object' && (p.tag || p.note)) return { tag: p.tag || '', note: p.note || '' };
+    } catch {}
+    return null;
+}
+
+const INCIDENT_TAG_LABELS: Record<string, string> = {
+    late_prep: 'Late Prep',
+    driver_delay: 'Driver Delay',
+    handoff_issue: 'Handoff Issue',
+    customer_issue: 'Customer Issue',
+    wrong_order: 'Wrong Order',
+    other: 'Other',
+};
 
 interface OrderEarningsBreakdown {
     total: number;
@@ -293,8 +316,11 @@ function CopyableId({ displayId }: { displayId: string }) {
    PAGE
 --------------------------------------------------------- */
 
+const ORDERS_PAGE_SIZE = 100;
+
 export default function OrdersPage() {
-    const { orders, loading } = useOrders();
+    const [ordersPage, setOrdersPage] = useState(0);
+    const { orders, loading } = useOrders({ limit: ORDERS_PAGE_SIZE, offset: ordersPage * ORDERS_PAGE_SIZE });
     const { update: updateStatus, loading: updateLoading } = useUpdateOrderStatus();
     const { admin } = useAuth();
     const { data: driversData } = useQuery(DRIVERS_QUERY, { pollInterval: 10000 });
@@ -302,17 +328,24 @@ export default function OrdersPage() {
     const [createTestOrder, { loading: creatingTestOrder }] = useMutation(CREATE_TEST_ORDER);
     const [startPreparingMut, { loading: startPreparingLoading }] = useMutation(START_PREPARING, { refetchQueries: ['GetOrders'] });
     const [updatePrepTimeMut] = useMutation(UPDATE_PREPARATION_TIME, { refetchQueries: ['GetOrders'] });
+    const [adminCancelOrderMut, { loading: cancellingOrder }] = useMutation(ADMIN_CANCEL_ORDER, { refetchQueries: ['GetOrders'] });
+    const [grantFreeDeliveryMut, { loading: grantingFreeDelivery }] = useMutation(GRANT_FREE_DELIVERY);
 
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [showCompleted, setShowCompleted] = useState(false);
+    const [completedStatusFilter, setCompletedStatusFilter] = useState<CompletedStatusFilter>("ALL");
     const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
     const [assigningDriverOrderId, setAssigningDriverOrderId] = useState<string | null>(null);
     const [prepTimeModalOrder, setPrepTimeModalOrder] = useState<Order | null>(null);
     const [prepTimeMinutes, setPrepTimeMinutes] = useState<string>("20");
     const [editPrepTimeOrder, setEditPrepTimeOrder] = useState<Order | null>(null);
     const [editPrepTimeMinutes, setEditPrepTimeMinutes] = useState<string>("");
+    const [cancelModalOrder, setCancelModalOrder] = useState<Order | null>(null);
+    const [cancelReason, setCancelReason] = useState<string>("");
+    const [cancelSettleDriver, setCancelSettleDriver] = useState<boolean>(false);
+    const [cancelSettleBusiness, setCancelSettleBusiness] = useState<boolean>(false);
 
     const { data: settlementRulesData } = useQuery(GET_BUSINESS_SETTLEMENT_RULES, {
         variables: { filter: { entityType: 'BUSINESS' } },
@@ -330,6 +363,7 @@ export default function OrdersPage() {
     ], [drivers]);
 
     const isSuperAdmin = admin?.role === "SUPER_ADMIN";
+    const isAdmin = admin?.role === "ADMIN" || admin?.role === "SUPER_ADMIN";
     const isBusinessOwner = admin?.role === "BUSINESS_OWNER";
     const isBusinessEmployee = admin?.role === "BUSINESS_EMPLOYEE";
     const isBusinessUser = isBusinessOwner || isBusinessEmployee;
@@ -368,6 +402,11 @@ export default function OrdersPage() {
         filteredOrders.filter(o => o.status === 'DELIVERED' || o.status === 'CANCELLED'),
         [filteredOrders]
     );
+
+    const filteredCompletedOrders = useMemo(() => {
+        if (completedStatusFilter === "ALL") return completedOrders;
+        return completedOrders.filter((order) => order.status === completedStatusFilter);
+    }, [completedOrders, completedStatusFilter]);
 
     const selectedOrderEarnings = useMemo(() => {
         if (!selectedOrder) return null;
@@ -442,6 +481,11 @@ export default function OrdersPage() {
             setPrepTimeMinutes("20");
             return;
         }
+        if (newStatus === "CANCELLED") {
+            setCancelModalOrder(order);
+            setCancelReason("");
+            return;
+        }
         setUpdatingOrderId(order.id);
         const result = await updateStatus(order.id, newStatus as OrderStatus);
         setUpdatingOrderId(null);
@@ -460,6 +504,27 @@ export default function OrdersPage() {
     };
 
     const openDetails = (order: Order) => { setSelectedOrder(order); setDetailsOpen(true); };
+
+    const handleAdminCancel = async () => {
+        if (!cancelModalOrder) return;
+        const trimmed = cancelReason.trim();
+        if (!trimmed) { toast.warning("Please provide a cancellation reason."); return; }
+        try {
+            await adminCancelOrderMut({ variables: {
+                id: cancelModalOrder.id,
+                reason: trimmed,
+                settleDriver: cancelSettleDriver,
+                settleBusiness: cancelSettleBusiness,
+            } });
+            toast.success("Order cancelled successfully.");
+            setCancelModalOrder(null);
+            setCancelReason("");
+            setCancelSettleDriver(false);
+            setCancelSettleBusiness(false);
+        } catch (err: any) {
+            toast.error(err.message || "Failed to cancel order.");
+        }
+    };
 
     /* ---- Loading ---- */
 
@@ -700,6 +765,16 @@ export default function OrdersPage() {
                                                         className="min-w-[130px]"
                                                     />
                                                 )}
+                                                {isAdmin && order.status !== 'CANCELLED' && order.status !== 'DELIVERED' && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => { setCancelModalOrder(order); setCancelReason(""); setCancelSettleDriver(false); setCancelSettleBusiness(false); }}
+                                                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                                    >
+                                                        Cancel
+                                                    </Button>
+                                                )}
                                                 <Button variant="ghost" size="sm" onClick={() => openDetails(order)}>Details</Button>
                                             </div>
                                         </div>
@@ -713,87 +788,191 @@ export default function OrdersPage() {
             {/* ════════════════ COMPLETED ORDERS ════════════════ */}
             {showCompleted && (
                 <div className="mb-8">
-                    <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-3">Completed Orders</h2>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                        {completedOrders.length === 0 ? (
-                            <div className="col-span-full text-center text-zinc-600 py-12">
-                                {searchQuery ? "No completed orders matching your search" : "No completed orders yet"}
-                            </div>
-                        ) : (
-                            completedOrders.map((order) => {
-                                const businessNames = getOrderBusinessesSafe(order).map(b => b.business.name).join(", ");
-                                const earnings = !isBusinessUser ? computeOrderEarnings(order, businessSettlementRules) : null;
-                                return (
-                                    <div key={order.id} className={`bg-[#111113] border rounded-xl p-4 opacity-75 hover:opacity-100 transition-all ${STATUS_COLORS[order.status].border}`}>
-                                        {/* Header */}
-                                        <div className="flex items-start justify-between mb-3">
-                                            <div>
-                                                <CopyableId displayId={order.displayId} />
-                                                <div className="text-xs text-zinc-600 mt-1">
-                                                    {new Date(order.orderDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                                                </div>
-                                            </div>
-                                            {isSuperAdmin ? (
-                                                <Dropdown
-                                                    value={order.status}
-                                                    onChange={(val) => handleStatusChange(order, val)}
-                                                    options={STATUS_OPTIONS}
-                                                    disabled={updateLoading && updatingOrderId === order.id}
-                                                    className="min-w-[130px]"
-                                                />
-                                            ) : (
-                                                <StatusBadge status={order.status} />
-                                            )}
-                                        </div>
+                    <div className="flex items-center justify-between mb-3">
+                        <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Completed Orders</h2>
+                        <div className="flex items-center gap-1.5">
+                            <Button
+                                size="sm"
+                                variant={completedStatusFilter === "ALL" ? "outline" : "ghost"}
+                                onClick={() => setCompletedStatusFilter("ALL")}
+                                className="h-8 px-3 text-xs"
+                            >
+                                All ({completedOrders.length})
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant={completedStatusFilter === "DELIVERED" ? "outline" : "ghost"}
+                                onClick={() => setCompletedStatusFilter("DELIVERED")}
+                                className="h-8 px-3 text-xs text-green-400"
+                            >
+                                Delivered
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant={completedStatusFilter === "CANCELLED" ? "outline" : "ghost"}
+                                onClick={() => setCompletedStatusFilter("CANCELLED")}
+                                className="h-8 px-3 text-xs text-red-400"
+                            >
+                                Cancelled
+                            </Button>
+                        </div>
+                    </div>
 
-                                        {/* Customer + Business */}
-                                        <div className="mb-3 pb-3 border-b border-zinc-800/60 space-y-1.5">
-                                            {order.user && (
-                                                <div className="flex items-center gap-2">
-                                                    <User size={14} className="text-zinc-500" />
-                                                    <span className="text-sm text-white font-medium">
-                                                        {order.user.firstName} {order.user.lastName}
-                                                    </span>
-                                                </div>
-                                            )}
-                                            <div className="flex items-center gap-2">
-                                                <Store size={14} className="text-violet-500" />
-                                                <span className="text-sm text-zinc-300">{businessNames}</span>
-                                            </div>
-                                            {order.driver && (
-                                                <div className="flex items-center gap-2">
-                                                    <Package size={14} className="text-zinc-500" />
-                                                    <span className="text-sm text-zinc-400">
-                                                        {order.driver.firstName} {order.driver.lastName}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Footer */}
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <div className="text-lg font-bold text-white">${order.totalPrice.toFixed(2)}</div>
-                                                {earnings && (
-                                                    <div className="group relative">
-                                                        <span className="inline-flex items-center rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
-                                                            +${earnings.total.toFixed(2)}
-                                                        </span>
-                                                        <div className="pointer-events-none absolute left-0 bottom-full z-[120] mb-2 w-56 rounded-md border border-zinc-700 bg-[#0a0a0d] p-2 text-left text-[11px] text-zinc-300 opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
-                                                            <div className="font-semibold text-zinc-200 mb-1">Earnings breakdown</div>
-                                                            <div className="flex justify-between"><span className="text-zinc-500">Delivery</span><span>+${(earnings.deliveryIncluded ? earnings.deliveryCommission : earnings.deliveryCommissionPotential).toFixed(2)}</span></div>
-                                                            <div className="flex justify-between"><span className="text-zinc-500">Restaurant</span><span>+${earnings.restaurantCommission.toFixed(2)}</span></div>
-                                                            <div className="flex justify-between"><span className="text-zinc-500">Markup</span><span>+${earnings.markup.toFixed(2)}</span></div>
+                    <div className="overflow-x-auto rounded-xl border border-zinc-800 bg-[#0d0d0f]">
+                        <table className="w-full text-sm">
+                            <thead className="bg-zinc-900/70 border-b border-zinc-800">
+                                <tr className="text-left text-[11px] uppercase tracking-wider text-zinc-500">
+                                    <th className="px-3 py-2.5 font-medium">Order</th>
+                                    <th className="px-3 py-2.5 font-medium">Customer</th>
+                                    <th className="px-3 py-2.5 font-medium">Business</th>
+                                    <th className="px-3 py-2.5 font-medium">Status</th>
+                                    <th className="px-3 py-2.5 font-medium">Total</th>
+                                    {!isBusinessUser && <th className="px-3 py-2.5 font-medium">Earnings</th>}
+                                    <th className="px-3 py-2.5 font-medium">Incident</th>
+                                    <th className="px-3 py-2.5 font-medium text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredCompletedOrders.length === 0 ? (
+                                    <tr>
+                                        <td
+                                            colSpan={isBusinessUser ? 7 : 8}
+                                            className="px-3 py-12 text-center text-zinc-600"
+                                        >
+                                            {searchQuery
+                                                ? "No completed orders matching your search"
+                                                : completedStatusFilter === "ALL"
+                                                    ? "No completed orders yet"
+                                                    : `No ${completedStatusFilter.toLowerCase()} orders found`}
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    filteredCompletedOrders.map((order) => {
+                                        const businessNames = getOrderBusinessesSafe(order).map((b) => b.business.name).join(", ");
+                                        const earnings = !isBusinessUser ? computeOrderEarnings(order, businessSettlementRules) : null;
+                                        return (
+                                            <tr key={order.id} className="border-b border-zinc-800/70 hover:bg-zinc-900/40">
+                                                <td className="px-3 py-3 align-top">
+                                                    <div className="space-y-1">
+                                                        <CopyableId displayId={order.displayId} />
+                                                        <div className="text-xs text-zinc-600">
+                                                            {new Date(order.orderDate).toLocaleString([], {
+                                                                month: "short",
+                                                                day: "2-digit",
+                                                                hour: "2-digit",
+                                                                minute: "2-digit",
+                                                            })}
                                                         </div>
                                                     </div>
+                                                </td>
+                                                <td className="px-3 py-3 align-top">
+                                                    {order.user ? (
+                                                        <div>
+                                                            <div className="text-zinc-200">
+                                                                {order.user.firstName} {order.user.lastName}
+                                                            </div>
+                                                            {order.user.phoneNumber && (
+                                                                <div className="text-xs text-zinc-500">{order.user.phoneNumber}</div>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-zinc-600">-</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-3 align-top">
+                                                    <div className="text-zinc-300 max-w-[300px] truncate" title={businessNames || "-"}>
+                                                        {businessNames || "-"}
+                                                    </div>
+                                                    {order.driver && (
+                                                        <div className="text-xs text-zinc-500 mt-1">
+                                                            Driver: {order.driver.firstName} {order.driver.lastName}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-3 align-top">
+                                                    {isSuperAdmin ? (
+                                                        <Dropdown
+                                                            value={order.status}
+                                                            onChange={(val) => handleStatusChange(order, val)}
+                                                            options={STATUS_OPTIONS}
+                                                            disabled={updateLoading && updatingOrderId === order.id}
+                                                            className="min-w-[130px]"
+                                                        />
+                                                    ) : (
+                                                        <StatusBadge status={order.status} />
+                                                    )}
+                                                    {order.status === "CANCELLED" && order.cancellationReason && (
+                                                        <div className="text-xs text-red-400/80 mt-1 max-w-[220px] truncate" title={order.cancellationReason}>
+                                                            {order.cancellationReason}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-3 align-top font-semibold text-white">
+                                                    ${order.totalPrice.toFixed(2)}
+                                                </td>
+                                                {!isBusinessUser && (
+                                                    <td className="px-3 py-3 align-top">
+                                                        {earnings ? (
+                                                            <span className="inline-flex items-center rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
+                                                                +${earnings.total.toFixed(2)}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-zinc-600">-</span>
+                                                        )}
+                                                    </td>
                                                 )}
-                                            </div>
-                                            <Button variant="ghost" size="sm" onClick={() => openDetails(order)}>Details</Button>
-                                        </div>
-                                    </div>
-                                );
-                            })
-                        )}
+                                                <td className="px-3 py-3 align-top max-w-[160px]">
+                                                    {(() => {
+                                                        const inc = parseAdminNote(order.adminNote);
+                                                        if (!inc) return <span className="text-zinc-700 text-xs">—</span>;
+                                                        return (
+                                                            <div className="space-y-0.5">
+                                                                <span className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 font-semibold uppercase tracking-wide">
+                                                                    {INCIDENT_TAG_LABELS[inc.tag] ?? inc.tag}
+                                                                </span>
+                                                                {inc.note && (
+                                                                    <div className="text-xs text-zinc-400 line-clamp-2" title={inc.note}>{inc.note}</div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </td>
+                                                <td className="px-3 py-3 align-top text-right">
+                                                    <Button variant="ghost" size="sm" onClick={() => openDetails(order)}>Details</Button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* ════════════════ PAGINATION ════════════════ */}
+            {!searchQuery && (
+                <div className="flex items-center justify-between py-4 border-t border-zinc-800 mb-8">
+                    <span className="text-xs text-zinc-500">
+                        Page {ordersPage + 1} · showing {ORDERS_PAGE_SIZE} orders per page
+                    </span>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setOrdersPage(p => Math.max(0, p - 1))}
+                            disabled={ordersPage === 0 || loading}
+                        >
+                            ← Prev
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setOrdersPage(p => p + 1)}
+                            disabled={orders.length < ORDERS_PAGE_SIZE || loading}
+                        >
+                            Next →
+                        </Button>
                     </div>
                 </div>
             )}
@@ -846,6 +1025,21 @@ export default function OrdersPage() {
                                 )}
                             </div>
                         </div>
+
+                        {/* Cancellation info */}
+                        {selectedOrder.status === 'CANCELLED' && (selectedOrder.cancellationReason || selectedOrder.cancelledAt) && (
+                            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3">
+                                <div className="text-[10px] text-red-400 uppercase tracking-wider mb-1.5 font-semibold">Cancellation</div>
+                                {selectedOrder.cancelledAt && (
+                                    <div className="text-xs text-zinc-500 mb-1">
+                                        {new Date(selectedOrder.cancelledAt).toLocaleString()}
+                                    </div>
+                                )}
+                                {selectedOrder.cancellationReason && (
+                                    <div className="text-sm text-red-200">{selectedOrder.cancellationReason}</div>
+                                )}
+                            </div>
+                        )}
 
                         {/* Delivery address */}
                         <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-3">
@@ -988,6 +1182,28 @@ export default function OrdersPage() {
                                 </div>
                             </div>
                         )}
+
+                        {/* Comp delivery action — only available for non-cancelled/delivered orders where there is a user */}
+                        {isAdmin && selectedOrder.user && selectedOrder.status !== 'DELIVERED' && selectedOrder.status !== 'CANCELLED' && (
+                            <div className="pt-2 border-t border-zinc-800">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={grantingFreeDelivery}
+                                    onClick={async () => {
+                                        try {
+                                            await grantFreeDeliveryMut({ variables: { userId: selectedOrder.user!.id, orderId: selectedOrder.id } });
+                                            toast.success(`Free delivery granted for ${selectedOrder.user!.firstName}'s next order.`);
+                                        } catch (err: any) {
+                                            toast.error(err.message || 'Failed to grant free delivery.');
+                                        }
+                                    }}
+                                    className="w-full border-sky-500/30 text-sky-400 hover:bg-sky-500/10"
+                                >
+                                    {grantingFreeDelivery ? 'Granting...' : '🎁 Comp next delivery (free delivery on next order)'}
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 )}
             </Modal>
@@ -1072,6 +1288,133 @@ export default function OrdersPage() {
                         </div>
                     </div>
                 )}
+            </Modal>
+
+            {/* ════════════════ CANCEL ORDER MODAL ════════════════ */}
+            <Modal isOpen={!!cancelModalOrder} onClose={() => { setCancelModalOrder(null); setCancelReason(""); setCancelSettleDriver(false); setCancelSettleBusiness(false); }} title="Cancel Order">
+                {cancelModalOrder && (() => {
+                    const earnings = !isBusinessUser ? computeOrderEarnings(cancelModalOrder, businessSettlementRules) : null;
+                    const hasDriver = !!cancelModalOrder.driver;
+                    return (
+                        <div className="space-y-4">
+                            {/* Order summary */}
+                            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+                                <div className="font-medium text-red-400">Order {cancelModalOrder.displayId}</div>
+                                {cancelModalOrder.user && (
+                                    <div className="text-sm text-zinc-400 mt-0.5">
+                                        {cancelModalOrder.user.firstName} {cancelModalOrder.user.lastName}
+                                    </div>
+                                )}
+                                <div className="text-sm text-zinc-500 mt-1">${cancelModalOrder.totalPrice.toFixed(2)}</div>
+                            </div>
+
+                            {/* Financial impact */}
+                            {earnings && (
+                                <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-3 space-y-2">
+                                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Settlement on Cancellation</div>
+                                    <div className="text-[10px] text-zinc-600 mb-1">Check to create a settlement for that party even though the order is cancelled.</div>
+                                    <div className="space-y-2">
+                                        {/* Business → Platform */}
+                                        <label className="flex items-center justify-between gap-3 cursor-pointer group">
+                                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={cancelSettleBusiness}
+                                                    onChange={(e) => setCancelSettleBusiness(e.target.checked)}
+                                                    className="w-4 h-4 shrink-0 rounded border-zinc-600 bg-zinc-800 accent-sky-400 cursor-pointer"
+                                                />
+                                                <span className="text-xs text-zinc-400 select-none">
+                                                    <span className="text-sky-400 font-medium">Business</span>
+                                                    <span className="text-zinc-600 mx-1">→</span>
+                                                    <span className="text-zinc-300">Platform</span>
+                                                    <span className="text-zinc-600 ml-1 text-[10px]">(commission + markup)</span>
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <span className={`font-semibold text-sm transition-colors ${
+                                                    cancelSettleBusiness ? "text-sky-300" : "text-zinc-500"
+                                                }`}>
+                                                    ~${(earnings.restaurantCommission + earnings.markup).toFixed(2)}
+                                                </span>
+                                                <span className={`text-[10px] font-normal ${
+                                                    cancelSettleBusiness ? "text-sky-400" : "text-zinc-600"
+                                                }`}>
+                                                    {cancelSettleBusiness ? "settle" : "skip"}
+                                                </span>
+                                            </div>
+                                        </label>
+
+                                        {/* Platform → Driver */}
+                                        <label className={`flex items-center justify-between gap-3 ${
+                                            hasDriver ? "cursor-pointer" : "cursor-not-allowed opacity-40"
+                                        }`}>
+                                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={cancelSettleDriver}
+                                                    onChange={(e) => setCancelSettleDriver(e.target.checked)}
+                                                    disabled={!hasDriver}
+                                                    className="w-4 h-4 shrink-0 rounded border-zinc-600 bg-zinc-800 accent-amber-400 cursor-pointer disabled:cursor-not-allowed"
+                                                />
+                                                <span className="text-xs text-zinc-400 select-none">
+                                                    <span className="text-zinc-300">Platform</span>
+                                                    <span className="text-zinc-600 mx-1">→</span>
+                                                    <span className={hasDriver ? "text-amber-400 font-medium" : "text-zinc-500"}>
+                                                        {hasDriver
+                                                            ? `Driver (${cancelModalOrder.driver!.firstName} ${cancelModalOrder.driver!.lastName})`
+                                                            : "Driver (no driver assigned)"}
+                                                    </span>
+                                                    <span className="text-zinc-600 ml-1 text-[10px]">(delivery commission)</span>
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <span className={`font-semibold text-sm transition-colors ${
+                                                    hasDriver
+                                                        ? cancelSettleDriver ? "text-amber-300" : "text-zinc-500"
+                                                        : "text-zinc-600"
+                                                }`}>
+                                                    ~${earnings.deliveryCommissionPotential.toFixed(2)}
+                                                </span>
+                                                <span className={`text-[10px] font-normal ${
+                                                    !hasDriver ? "text-zinc-600" :
+                                                    cancelSettleDriver ? "text-amber-400" : "text-zinc-600"
+                                                }`}>
+                                                    {!hasDriver ? "n/a" : cancelSettleDriver ? "settle" : "skip"}
+                                                </span>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Reason */}
+                            <div>
+                                <label className="block text-sm text-zinc-400 mb-2">
+                                    Cancellation Reason <span className="text-red-400">*</span>
+                                </label>
+                                <textarea
+                                    value={cancelReason}
+                                    onChange={(e) => setCancelReason(e.target.value)}
+                                    placeholder="e.g. Customer requested cancellation by phone, restaurant closed early..."
+                                    rows={3}
+                                    className="w-full rounded-lg bg-[#09090b] border border-zinc-800 text-white text-sm px-3 py-2.5 placeholder:text-zinc-600 focus:outline-none focus:border-red-500/50 resize-none"
+                                />
+                            </div>
+                            <div className="flex gap-3 pt-2">
+                                <Button variant="outline" className="flex-1" onClick={() => { setCancelModalOrder(null); setCancelReason(""); setCancelSettleDriver(false); setCancelSettleBusiness(false); }}>
+                                    Go Back
+                                </Button>
+                                <Button
+                                    className="flex-1 bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30"
+                                    onClick={handleAdminCancel}
+                                    disabled={cancellingOrder || !cancelReason.trim()}
+                                >
+                                    {cancellingOrder ? "Cancelling..." : "Confirm Cancel"}
+                                </Button>
+                            </div>
+                        </div>
+                    );
+                })()}
             </Modal>
         </div>
     );

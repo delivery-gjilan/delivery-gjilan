@@ -49,11 +49,16 @@ interface CreateUserResponse {
     };
 }
 
+const USERS_PAGE_SIZE = 100;
+
 export default function AdminsPage() {
     const { admin } = useAuth();
     const isSuperAdmin = admin?.role === "SUPER_ADMIN";
+    const [usersPage, setUsersPage] = useState(0);
 
-    const { data, loading, error, refetch } = useQuery<UsersResponse>(USERS_QUERY);
+    const { data, loading, error, refetch } = useQuery<UsersResponse>(USERS_QUERY, {
+        variables: { limit: USERS_PAGE_SIZE, offset: usersPage * USERS_PAGE_SIZE },
+    });
     const { data: businessesData } = useQuery<BusinessesResponse>(GET_BUSINESSES);
     
     const [createUser, { loading: creating }] = useMutation<CreateUserResponse>(CREATE_USER_MUTATION, {
@@ -368,6 +373,31 @@ export default function AdminsPage() {
                     )}
                 </tbody>
             </Table>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between py-4 border-t border-zinc-800 mt-2">
+                <span className="text-xs text-gray-500">
+                    Page {usersPage + 1} · showing up to {USERS_PAGE_SIZE} users per page
+                </span>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setUsersPage(p => Math.max(0, p - 1))}
+                        disabled={usersPage === 0 || loading}
+                    >
+                        ← Prev
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setUsersPage(p => p + 1)}
+                        disabled={(data?.users?.length ?? 0) < USERS_PAGE_SIZE || loading}
+                    >
+                        Next →
+                    </Button>
+                </div>
+            </div>
 
             {/* Modal for Create/Edit Admin */}
             {showModal && (

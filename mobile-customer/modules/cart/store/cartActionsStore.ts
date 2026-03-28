@@ -54,6 +54,10 @@ export const useCartActionsStore = create<CartActionsStore>((set) => ({
                 const existingItem = newItems[existingItemIndex];
                 if (existingItem) {
                     existingItem.quantity += item.quantity;
+                    // Backfill imageUrl if the existing persisted item was missing it
+                    if (!existingItem.imageUrl && item.imageUrl) {
+                        existingItem.imageUrl = item.imageUrl;
+                    }
                 }
                 return { items: newItems };
             }

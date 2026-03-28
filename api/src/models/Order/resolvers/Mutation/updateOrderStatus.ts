@@ -10,6 +10,7 @@ import { getDispatchService } from '@/services/driverServices.init';
 import { AppError } from '@/lib/errors';
 import { parseDbTimestamp } from '@/lib/dateTime';
 import { getLiveDriverEta } from '@/lib/driverEtaCache';
+import { emitOrderEvent } from '@/repositories/OrderEventRepository';
 
 export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus']> = async (
     _parent,
@@ -226,6 +227,25 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
         }
     }
     
+    // Emit order lifecycle event for analytics
+    const statusToEventType: Record<string, string> = {
+        READY: 'ORDER_READY',
+        OUT_FOR_DELIVERY: 'ORDER_PICKED_UP',
+        DELIVERED: 'ORDER_DELIVERED',
+        CANCELLED: 'ORDER_CANCELLED',
+    };
+    const analyticsEvent = statusToEventType[status];
+    if (analyticsEvent) {
+        emitOrderEvent({
+            orderId: id,
+            eventType: analyticsEvent as any,
+            actorType: isDriver ? 'DRIVER' : isBusinessAdmin ? 'RESTAURANT' : isSuperAdmin ? 'ADMIN' : 'SYSTEM',
+            actorId: userData?.userId,
+            driverId: isDriver ? userData?.userId : (dbOrder.driverId ?? undefined),
+            metadata: { previousStatus: currentStatus },
+        });
+    }
+
     // Log the status change
     const auditLog = createAuditLogger(db, context);
     await auditLog.log({

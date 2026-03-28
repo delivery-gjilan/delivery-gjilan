@@ -131,6 +131,16 @@ The reconnection architecture is well-designed:
 
 **Result:** DB load per publish: O(N orders × M items) → O(1 order × M items). The original `publishUserOrders` is kept for any future full-snapshot needs.
 
+### F10 — Startup GraphQL compatibility guard
+
+The app bootstrap paths (`GetOrders`, `GetOrdersByStatus`, `UserOrdersUpdated`) avoid optional lifecycle fields that are not guaranteed on every deployed API schema variant.
+
+Current rule for startup safety:
+- Keep these startup documents on the conservative, widely-supported order field set.
+- Restrict richer lifecycle fields to detail-oriented flows (`GetOrder`) where needed.
+
+This keeps app launch resilient when mobile bundles and API deployments are temporarily out of sync.
+
 ---
 
 ## 5. Stability Assessment
@@ -146,6 +156,7 @@ The reconnection architecture is well-designed:
 | Skip logic | ✅ Good | Live tracking only active during delivery phase |
 | Server guards | ✅ Good | Rate limiting on subscription ops, role-based resolver auth |
 | Lazy connection | ✅ Correct | `lazy: true` — WS only connects when first subscription mounts |
+| Startup schema compatibility | ✅ Guarded | Startup order docs use conservative field set to reduce schema drift crashes |
 
 ### What could be improved
 
@@ -274,3 +285,14 @@ When modifying subscriptions:
 5. For new broadcast subscriptions, assess fan-out impact at target user scale.
 6. Run codegen after schema changes to keep typed document nodes aligned.
 7. Verify `_layout.tsx` global hooks don't duplicate with screen-level hooks.
+
+---
+
+## 10. Live Activity ETA Source (Current State)
+
+For `OUT_FOR_DELIVERY`, customer Live Activity state is derived in `useBackgroundLiveActivity` with this priority:
+
+1. Driver live ETA from `driver.driverConnection.remainingEtaSeconds` when `navigationPhase === 'to_dropoff'` and `activeOrderId` matches the order.
+2. Fallback inferred countdown anchored from `outForDeliveryAt` (not `updatedAt`) when live ETA is not yet available.
+
+The out-for-delivery branch must not use a fixed `15` minute value as the primary source, otherwise foreground/background sync can pin Dynamic Island ETA to 15 and overwrite backend minute updates.

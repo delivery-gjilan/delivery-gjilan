@@ -174,3 +174,38 @@ npm run db:studio     # open Drizzle Studio at https://local.drizzle.studio
 | Soft delete | `deleted_at` timestamp (currently: users, businesses) |
 | Hard delete | product categories, subcategories, products, orders |
 | Enums | Defined in schema file, exported, aligned with GraphQL generated types |
+
+---
+
+## Database Seed
+
+File: `api/database/seed.ts` — idempotent, skip-if-exists pattern.
+
+**Credentials (dev/staging only):**
+
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | `admin@admin.com` | `12345678` |
+| Cima Business Admin | `cima@gmail.com` | `asdasdasd` |
+| Customer | `artshabani2002@gmail.com` | `12345678` |
+| Driver 1 | `driver1@demo.com` | `12345678` |
+| Driver 2 | `driver2@demo.com` | `12345678` |
+| Driver 3 | `driver3@demo.com` | `12345678` |
+
+**Seeded businesses:**
+
+| Name | Type | Coords | Products |
+|------|------|--------|---------|
+| Cima | RESTAURANT | 42.466873, 21.460266 | Hamburger €2, Chicken Burger €2 |
+| Arti Market | MARKET | random Gjilan | Produce (fruits/vegetables), Dairy, Beverages, Snacks & Sweets |
+
+**Seeded settlement rules:**
+- Cima: 20% commission on subtotal (`settlement_rules` table, `entityType=BUSINESS`, `amountType=PERCENT`, `appliesTo=SUBTOTAL`)
+
+**Seeded promotions:**
+- First Order Free Delivery (auto-applied, `FREE_DELIVERY`, `FIRST_ORDER`)
+- WELCOME20: 20% off, up to €50
+- EURO3OFF: €3 off orders over €10 (stackable)
+- BIZ10: 10% off for a specific business (business-scoped)
+
+> No test orders or settlement records are seeded — start fresh from real orders.

@@ -1,3 +1,7 @@
+
+## Operations Analytics
+
+- `docs/OPERATIONS/KPI_ANALYTICS.md` - KPI formulas, fake-ready and premature-ready definitions, GraphQL queries, and event emission map.
 # MDS Master Index
 
 > **Machine-readable project documentation index.**
@@ -13,7 +17,7 @@
 | A1 | [ARCHITECTURE.md](ARCHITECTURE.md) | System | Monorepo shape, layers, realtime topology |
 | B1 | [BACKEND/API.md](BACKEND/API.md) | Backend | Express, Yoga, graphql-ws, Drizzle, auth model |
 | B2 | [BACKEND/ORDER_CREATION.md](BACKEND/ORDER_CREATION.md) | Backend | OrderService, payment collection, preflight gate |
-| B3 | [BACKEND/ORDER_TOTAL_PRICE_VALIDATION.md](BACKEND/ORDER_TOTAL_PRICE_VALIDATION.md) | Backend | Price integrity, epsilon, promo application |
+| B3 | [BACKEND/ORDER_TOTAL_PRICE_VALIDATION.md](BACKEND/ORDER_TOTAL_PRICE_VALIDATION.md) | Backend | Price integrity, epsilon, promo application, one-directional delivery validation |
 | B4 | [BACKEND/WATCHDOG_HEARTBEAT.md](BACKEND/WATCHDOG_HEARTBEAT.md) | Backend | DriverHeartbeatHandler, DriverWatchdogService, connection states |
 | B5 | [BACKEND/AUTH_AND_USERS.md](BACKEND/AUTH_AND_USERS.md) | Backend | JWT model, signup steps, token rotation, roles, password rules |
 | B6 | [BACKEND/DELIVERY_AND_PRODUCT_PRICING.md](BACKEND/DELIVERY_AND_PRODUCT_PRICING.md) | Backend | PricingService, delivery zones, distance tiers, haversine/Mapbox |
@@ -48,8 +52,11 @@
 | O8 | [OPERATIONS/TESTING_PIPELINE.md](OPERATIONS/TESTING_PIPELINE.md) | Operations | CI layers, preflight gate, E2E strategy |
 | O9 | [OPERATIONS/DOCKER_AND_STRESS_TESTING.md](OPERATIONS/DOCKER_AND_STRESS_TESTING.md) | Operations | Containerization, k6 load testing |
 | O10 | [OPERATIONS/APP_STORE_RELEASE.md](OPERATIONS/APP_STORE_RELEASE.md) | Operations | iOS submission checklist, compliance |
+| O11 | [OPERATIONS/ANALYTICS.md](OPERATIONS/ANALYTICS.md) | Operations | Analytics roadmap, event tracking, dashboard phases |
 | O11 | [OPERATIONS/ANALYTICS.md](OPERATIONS/ANALYTICS.md) | Operations | KPIs, dashboards, metric calculations |
 | O12 | [OPERATIONS/DRIVER_TRACKING_SMOOTHNESS.md](OPERATIONS/DRIVER_TRACKING_SMOOTHNESS.md) | Operations | End-to-end driver position pipeline, animation tuning, dead-reckoning, route-snap |
+| O13 | [OPERATIONS/PAGINATION_AUDIT.md](OPERATIONS/PAGINATION_AUDIT.md) | Operations | Full pagination audit: what is paginated, unbounded queries by risk level, fix order |
+| O14 | [OPERATIONS/MONITORING_FUTURE_PLAN.md](OPERATIONS/MONITORING_FUTURE_PLAN.md) | Operations | Forward monitoring roadmap: dispatch, freshness, SLOs, integrity, business-impact signals |
 | UI1 | [ADMIN_MOBILEBUSINESS_UI_CONTEXT.md](ADMIN_MOBILEBUSINESS_UI_CONTEXT.md) | UI | Product types, variant groups, admin/mobile-business UX |
 | UI2 | [ADMIN_PANEL_BUSINESS_SETTLEMENTS.md](ADMIN_PANEL_BUSINESS_SETTLEMENTS.md) | UI | Business-facing settlements semantics, filters, lazy order details |
 
@@ -106,7 +113,8 @@ ARCHITECTURE (A1)
 │
 └── OPERATIONS
     ├── MONITORING (O1)
-    │   └── OBSERVABILITY (O2)
+    │   ├── OBSERVABILITY (O2)
+    │   └── MONITORING_FUTURE_PLAN (O14) ← O1, O2, O11, B4
     ├── NOTIFICATIONS (O3)
     │   └── PUSH_NOTIFICATIONS_AUDIT (O4)
     ├── SECURITY (O5) ← B5
@@ -201,6 +209,7 @@ ARCHITECTURE (A1)
 | Concern | MDS Files |
 |---------|-----------|
 | Monitoring | O1, O2 |
+| Monitoring roadmap | O14, O1, O2, O11 |
 | Observability stack | O2, PKG5 |
 | Environments | O7 |
 | CI/CD | O7, O8 |
@@ -302,17 +311,19 @@ ARCHITECTURE (A1)
 | `src/app/dashboard/market/page.tsx` | UI1 |
 | `src/app/dashboard/finances/page.tsx` | BL1 |
 | `src/app/dashboard/notifications/page.tsx` | O3 |
+| `src/app/dashboard/notifications/devices/page.tsx` | O4 — 1 row/business; deduped by latest heartbeat; joined with business name via GET_BUSINESSES |
 | `src/app/dashboard/categories/page.tsx` | UI1, B5 |
 | `src/app/dashboard/businesses/page.tsx` | B5, BL2, UI1 |
 | `src/app/dashboard/layout.tsx` | B5, UI1 |
 | `src/app/admin/layout.tsx` | B5, UI1 |
+| `src/app/admin/messages/page.tsx` | O3 — tabbed Driver + Business messages merged page |
 | `src/components/businesses/ProductsBlock.tsx` | UI1 |
 | `src/lib/auth-context.tsx` | B5 |
 | `src/lib/route-access.ts` | B5 |
 | `src/lib/utils/mapbox.ts` | B1, O5 |
-| `src/app/dashboard/map/page.tsx` | O12 |
+| `src/app/dashboard/map/page.tsx` | O12 — includes BIZ tab, freshness badge (bottom-left), chat bubbles |
 | `src/app/api/directions/route.ts` | B1, B8, O5 |
-| `src/components/dashboard/sidebar.tsx` | UI1, B5 |
+| `src/components/dashboard/sidebar.tsx` | UI1, B5 — collapsible sections, auto-open on active route |
 | `src/lib/hooks/useProducts.ts` | UI1 |
 | `src/graphql/operations/products/` | UI1 |
 | `src/graphql/operations/businesses/mutations.ts` | B5, UI1 |
@@ -342,6 +353,7 @@ ARCHITECTURE (A1)
 ### Mobile Driver (mobile-driver/)
 | File | Referenced By |
 |------|--------------|
+| `app/(tabs)/messages.tsx` | M8 — driver↔admin chat; extraMessages persisted to AsyncStorage (key: driver_chat_extra_messages) |
 | `utils/secureTokenStore.ts` | O6 |
 | `utils/mapbox.ts` | B1, O5 |
 | `utils/route.ts` | B1, O5 |
@@ -357,7 +369,7 @@ ARCHITECTURE (A1)
 
 | Field | Value |
 |-------|-------|
-| Last full scan | 2026-03-22 (periodic heartbeat Live Activity ETA pushes in B4, M3, M8) |
+| Last full scan | 2026-03-28 (admin map BIZ tab + freshness fixes; merged messages page; sidebar collapsible; driver chat persistence; business devices page refactor) |
 | Total MDS files | 50 |
 | Total docs/ files | 35 |
 | Broken links found | 0 |

@@ -29,6 +29,7 @@ import {
     notifyDriversOrderExpanded,
 } from '@/services/orderNotifications';
 import { cache } from '@/lib/cache';
+import { SHIFT_DRIVERS_CACHE_KEY } from '@/models/Driver/resolvers/Mutation/adminSetShiftDrivers';
 import logger from '@/lib/logger';
 
 const log = logger.child({ service: 'OrderDispatch' });
@@ -98,45 +99,61 @@ export class OrderDispatchService {
                 return;
             }
 
-            // 2. Get all eligible (CONNECTED + onlinePreference) drivers with a known location.
+            // 2. Get all eligible drivers.
+            //    - "connected": actively CONNECTED with known GPS → participate in proximity sorting.
+            //    - "pushOnly": onlinePreference=true but app killed/offline → always get wave-1 push
+            //      (they need to open the app to accept anyway, so proximity doesn't matter for them).
             const allDrivers = await this.driverRepository.getAllDrivers();
-            const eligible = allDrivers.filter(
+            const shiftIds = await this._getShiftDriverIds();
+            const onlineDrivers = allDrivers.filter(
+                (d) => d.onlinePreference && (shiftIds === null || shiftIds.has(d.userId)),
+            );
+            if (shiftIds !== null) {
+                log.info({ orderId, shiftSize: shiftIds.size }, 'dispatch:shiftFilter — restricting to on-shift drivers');
+            }
+
+            const connected = onlineDrivers.filter(
                 (d) =>
-                    d.onlinePreference &&
                     d.connectionStatus === 'CONNECTED' &&
                     d.driverLat != null &&
                     d.driverLng != null,
             );
+            const pushOnly = onlineDrivers.filter(
+                (d) => d.connectionStatus !== 'CONNECTED',
+            );
+            const pushOnlyIds = pushOnly.map((d) => d.userId);
 
-            if (eligible.length === 0) {
+            if (connected.length === 0 && pushOnlyIds.length === 0) {
                 log.info({ orderId }, 'dispatch:noEligibleDrivers');
                 return;
             }
 
-            // 3. Sort by straight-line distance from the pickup point.
-            const sorted = eligible
+            // 3. Sort connected drivers by straight-line distance from the pickup point.
+            const sorted = connected
                 .map((d) => ({
                     userId: d.userId,
                     distanceKm: haversineKm(d.driverLat!, d.driverLng!, pickup.lat, pickup.lng),
                 }))
                 .sort((a, b) => a.distanceKm - b.distanceKm);
 
-            // 4. Build the first wave: everyone within radius, but at least FIRST_WAVE_MIN_DRIVERS.
+            // 4. Build the first wave: closest connected drivers + all push-only (offline-online) drivers.
             const inRadius = sorted.filter((d) => d.distanceKm <= FIRST_WAVE_RADIUS_KM);
-            const firstWave =
+            const connectedFirstWave =
                 inRadius.length >= FIRST_WAVE_MIN_DRIVERS
                     ? inRadius
                     : sorted.slice(0, Math.min(FIRST_WAVE_MIN_DRIVERS, sorted.length));
 
-            const firstWaveIds = firstWave.map((d) => d.userId);
+            const firstWaveIds = [...connectedFirstWave.map((d) => d.userId), ...pushOnlyIds];
 
             log.info(
                 {
                     orderId,
                     pickupLat: pickup.lat,
                     pickupLng: pickup.lng,
-                    firstWaveCount: firstWaveIds.length,
-                    totalEligible: eligible.length,
+                    connectedFirstWave: connectedFirstWave.length,
+                    pushOnly: pushOnlyIds.length,
+                    totalFirstWave: firstWaveIds.length,
+                    totalConnected: connected.length,
                     nearestKm: sorted[0]?.distanceKm?.toFixed(2),
                 },
                 'dispatch:firstWave',
@@ -145,8 +162,8 @@ export class OrderDispatchService {
             // 5. Notify wave-1 drivers immediately.
             notifyDriversOrderReady(notificationService, firstWaveIds, orderId, pickup.businessName);
 
-            // 6. If all eligible drivers are already in wave 1, no expansion needed.
-            if (firstWaveIds.length >= eligible.length) {
+            // 6. If all connected drivers are already in wave 1, no expansion needed.
+            if (connectedFirstWave.length >= connected.length) {
                 return;
             }
 
@@ -202,10 +219,13 @@ export class OrderDispatchService {
         }
 
         const allDrivers = await this.driverRepository.getAllDrivers();
+        const shiftIds = await this._getShiftDriverIds();
+        // Wave 2: all online-preference on-shift drivers not already notified in wave 1.
+        // No connectionStatus restriction — push works even if the app is killed.
         const remaining = allDrivers.filter(
             (d) =>
                 d.onlinePreference &&
-                d.connectionStatus === 'CONNECTED' &&
+                (shiftIds === null || shiftIds.has(d.userId)) &&
                 !state.firstWaveIds.includes(d.userId),
         );
 
@@ -227,24 +247,35 @@ export class OrderDispatchService {
         );
     }
 
-    /** Notify all currently CONNECTED+willing drivers, excluding a given set. */
+    /** Notify all willing on-shift drivers (regardless of connection status), excluding a given set. */
     private async _notifyAll(
         orderId: string,
         notificationService: NotificationService,
         excludeIds: string[],
     ): Promise<void> {
         const allDrivers = await this.driverRepository.getAllDrivers();
+        const shiftIds = await this._getShiftDriverIds();
         const ids = allDrivers
             .filter(
                 (d) =>
                     d.onlinePreference &&
-                    d.connectionStatus === 'CONNECTED' &&
+                    (shiftIds === null || shiftIds.has(d.userId)) &&
                     !excludeIds.includes(d.userId),
             )
             .map((d) => d.userId);
 
         if (ids.length === 0) return;
         notifyDriversOrderReady(notificationService, ids, orderId, undefined);
+    }
+
+    /**
+     * Returns the set of driver userIds currently on shift.
+     * If no shift is configured (empty set), returns null — meaning all drivers are eligible.
+     */
+    private async _getShiftDriverIds(): Promise<Set<string> | null> {
+        const ids = await cache.get<string[]>(SHIFT_DRIVERS_CACHE_KEY);
+        if (!ids || ids.length === 0) return null;
+        return new Set(ids);
     }
 
     /** Fetch the lat/lng + name of the first business attached to this order. */

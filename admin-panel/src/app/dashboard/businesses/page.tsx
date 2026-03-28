@@ -133,15 +133,20 @@ export default function BusinessesPage() {
      Handlers
   --------------------------- */
 
+    // Resolved API base URL (strips /graphql suffix if present)
+    const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/graphql').replace(/\/graphql$/, '');
+
     // Image upload handler
     async function uploadImage(file: File, folder: string): Promise<string | null> {
         const formData = new FormData();
         formData.append('image', file);
         formData.append('folder', folder);
 
+        const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
         try {
-            const response = await fetch('http://localhost:4000/api/upload/image', {
+            const response = await fetch(`${apiBase}/api/upload/image`, {
                 method: 'POST',
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
                 body: formData,
             });
 
@@ -154,6 +159,22 @@ export default function BusinessesPage() {
             console.error('Image upload error:', error);
             toast.error('Failed to upload image');
             return null;
+        }
+    }
+
+    async function deleteImage(imageUrl: string): Promise<void> {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+        try {
+            await fetch(`${apiBase}/api/upload/image`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify({ imageUrl }),
+            });
+        } catch {
+            console.warn('Failed to delete old image from S3:', imageUrl);
         }
     }
 
@@ -317,8 +338,11 @@ export default function BusinessesPage() {
         setUploadingImage(true);
         let imageUrl = editForm.imageUrl;
 
-        // Upload new image if file is selected
+        // Upload new image if file is selected; delete old S3 image first
         if (editImageFile) {
+            if (editForm.imageUrl) {
+                await deleteImage(editForm.imageUrl);
+            }
             const uploadedUrl = await uploadImage(editImageFile, 'businesses');
             if (uploadedUrl) {
                 imageUrl = uploadedUrl;

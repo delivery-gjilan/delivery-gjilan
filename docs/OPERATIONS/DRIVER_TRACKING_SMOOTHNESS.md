@@ -1,6 +1,6 @@
 # Driver Tracking Smoothness
 
-<!-- MDS:O12 | Domain: Operations | Updated: 2026-03-22 -->
+<!-- MDS:O12 | Domain: Operations | Updated: 2026-03-28 -->
 <!-- Depends-On: B4, B1, M8, A1 -->
 <!-- Depended-By: — -->
 <!-- Nav: Heartbeat cadence changes → update B4. Admin map animation changes → update this doc. Customer interpolation changes → update this doc. -->
@@ -67,6 +67,38 @@ This eliminates jitter where dead-reckoning overshoots corners or GPS noise push
 Previously the admin received position updates only when the DB throttle gate passed (10 s elapsed OR 5 m moved). For a slow-moving or stationary OFD driver this meant up to 10 s gaps.
 
 The API now bypasses the publish throttle for active deliveries (`!!etaPayload?.activeOrderId`), delivering 2 s position updates to the admin subscription. Combined with the 30 fps commit rate and dead-reckoning, the resulting marker movement is smooth and responsive.
+
+### Operational Overlays and Guardrails
+
+The admin map includes additional business-oriented operational layers on top of the tracking pipeline:
+
+1. SLA heat hotspots
+- Orders exceeding stage thresholds are grouped into geographic buckets and rendered as hotspot markers.
+- Buckets expose warning/critical counts, top business in that area, and p95 delay minutes.
+
+2. Realtime freshness status
+- A freshness badge is pinned to the **bottom-left** of the map (`bottom-3`).
+- It surfaces stream age for drivers/orders and indicates when driver data is in polling fallback mode.
+- Badge severity (🔴/🟡) only triggers on finite ages — `Number.isFinite(age)` guards prevent false positives from the initial Infinity state before the first heartbeat arrives.
+
+3. BIZ right-panel tab
+- The map right panel has a dedicated **BIZ** tab alongside the drivers tab.
+- Rows list each business device with status (ONLINE/STALE/OFFLINE), battery level, and "not receiving orders" flag.
+- Sorted by priority: OFFLINE first, STALE second, ONLINE last; within a group, low-battery devices float up.
+- "Not receiving" flag is shown only when `onlineStatus === 'ONLINE' && receivingOrders === false` — a business that is OFFLINE/STALE never shows a redundant "not receiving" warning.
+- Each row has a chat bubble button that opens the Admin ↔ Business message overlay.
+
+4. Chat bubbles
+- Admin-side outgoing messages: solid `bg-sky-500 text-white` pill with `rounded-2xl rounded-tr-sm` tail.
+- Incoming business messages: `bg-zinc-800 text-zinc-100` pill with `rounded-2xl rounded-tl-sm` tail.
+
+5. Margin estimate surface
+- Order cards and detail panel show estimated dispatch economics (`margin`, `platform revenue`, `driver cost`, promo split estimate).
+- Values are estimates intended for triage and prioritisation, not accounting exports.
+
+6. Exception workflow actions
+- Detail panel includes quick actions for reassigning nearest driver and sending dispatch alerts to driver/business channels.
+- Incident tag and root-cause notes persist locally in admin browser storage for shift continuity.
 
 ---
 

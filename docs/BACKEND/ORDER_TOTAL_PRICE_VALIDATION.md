@@ -1,6 +1,6 @@
 # Order Total Price Validation
 
-<!-- MDS:B3 | Domain: Backend | Updated: 2026-03-18 -->
+<!-- MDS:B3 | Domain: Backend | Updated: 2025-07-21 -->
 <!-- Depends-On: B2 -->
 <!-- Depended-By: M4, M5, BL1 -->
 <!-- Nav: Epsilon/rule changes → update M4 (Mobile Audit), M5 (Input Flow). Promo interaction → update BL1 (Settlements). -->
@@ -35,9 +35,9 @@ From backend calculation:
 - `promoResult.finalDeliveryPrice`
 - `promoResult.finalTotal`
 
-## Delivery Fee Validation (Strict)
+## Delivery Fee Validation (One-Directional)
 
-Before promotions are applied, backend validates `input.deliveryPrice` against
+Before promotions are applied, the backend validates `input.deliveryPrice` against
 server delivery pricing rules:
 
 - pricing anchor: first cart item's business (current single-fee order model)
@@ -46,18 +46,27 @@ server delivery pricing rules:
 - distance tiers fallback
 - default fallback if no tiers exist
 
-If mismatch (epsilon `0.01`):
+The check is **one-directional**: the client may send a value ≤ `expectedDeliveryPrice`
+(e.g. `0` when a free-delivery promo has been pre-applied client-side), but
+may not send a value **higher** than `expectedDeliveryPrice`.
+
+If `input.deliveryPrice - expectedDeliveryPrice > 0.01`:
 
 - reject with `Delivery price mismatch: Calculated X, provided Y`
 
-This means delivery fee is not trusted from the client.
+**The promo engine always receives `expectedDeliveryPrice`** (server-authoritative),
+not `input.deliveryPrice`, so promotion discounts are computed consistently
+regardless of what the client sent.
+
+The stored `originalDeliveryPrice` on the order (the pre-discount delivery fee) is
+derived from `expectedDeliveryPrice`, not `input.deliveryPrice`.
 
 ## Validation Rules
 
 Let:
 
-- `effectiveTotal = promoResult.finalTotal`
-- `undiscountedTotal = calculatedItemsTotal + input.deliveryPrice`
+- `effectiveTotal = promoResult.finalTotal` (computed from `expectedDeliveryPrice`, not `input.deliveryPrice`)
+- `undiscountedTotal = calculatedItemsTotal + expectedDeliveryPrice`
 
 The backend accepts the request if either condition below is true:
 
@@ -93,7 +102,9 @@ Comparison epsilon is `0.01` to avoid floating-point noise.
 
 Clients should send:
 
-- `deliveryPrice`: exactly what backend delivery pricing endpoint returns
-- `totalPrice`: either effective final total, or undiscounted total when no manual promo is provided
-
-If they cannot pre-apply auto promotions, they may send undiscounted total when no manual promo code is used; backend still validates and normalizes persisted values from server-calculated pricing.
+- `deliveryPrice`: the raw delivery price returned by the backend delivery pricing
+  endpoint (pre-promo). Values **lower** than expected (including `0` when a
+  free-delivery promo was pre-applied) are also accepted. Values **higher** than
+  expected are rejected.
+- `totalPrice`: either effective final total (post-promo), or undiscounted total
+  when no manual promo code is used.

@@ -4,6 +4,7 @@ import logger from '@/lib/logger';
 import { notifyCustomerOrderStatus, updateLiveActivity } from '@/services/orderNotifications';
 import { AppError } from '@/lib/errors';
 import { parseDbTimestamp } from '@/lib/dateTime';
+import { emitOrderEvent } from '@/repositories/OrderEventRepository';
 
 export const startPreparing: NonNullable<MutationResolvers['startPreparing']> = async (
     _parent,
@@ -60,6 +61,15 @@ export const startPreparing: NonNullable<MutationResolvers['startPreparing']> = 
         await orderService.publishAllOrders();
 
         notifyCustomerOrderStatus(context.notificationService, dbOrder.userId, id, 'PREPARING');
+
+        emitOrderEvent({
+            orderId: id,
+            eventType: 'ORDER_PREPARING',
+            actorType: isBusinessAdmin ? 'RESTAURANT' : 'ADMIN',
+            actorId: userData?.userId,
+            businessId: userData?.businessId ?? undefined,
+            metadata: { preparationMinutes },
+        });
 
         // Update Live Activity with preparation time
         updateLiveActivity(

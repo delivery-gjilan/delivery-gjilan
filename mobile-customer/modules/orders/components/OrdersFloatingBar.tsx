@@ -76,18 +76,24 @@ export const OrdersFloatingBar = () => {
                     icon: 'time-outline' as const,
                 };
             case 'PREPARING':
+                return {
+                    label: t.orders.status.preparing,
+                    message: t.orders.status_messages.preparing,
+                    bgColor: '#F97316', // Orange
+                    icon: 'restaurant-outline' as const,
+                };
             case 'READY':
                 return {
                     label: t.orders.status.preparing,
                     message: t.orders.status_messages.preparing,
-                    bgColor: '#7C3AED', // Purple
-                    icon: 'restaurant-outline' as const,
+                    bgColor: '#3B82F6', // Blue
+                    icon: 'bag-check-outline' as const,
                 };
             case 'OUT_FOR_DELIVERY':
                 return {
                     label: t.orders.status.out_for_delivery,
                     message: t.orders.status_messages.out_for_delivery,
-                    bgColor: '#7C3AED', // Purple
+                    bgColor: '#22C55E', // Green
                     icon: 'bicycle-outline' as const,
                 };
             case 'CANCELLED':

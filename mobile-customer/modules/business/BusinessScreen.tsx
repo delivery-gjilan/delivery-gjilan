@@ -895,7 +895,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                 </View>
             )}
             {/* ═══ Bottom Action Panel — View Cart + Progress Bar ═══ */}
-            {businessCartItems.length > 0 && applicableThreshold && thresholdSpend && (
+            {businessCartItems.length > 0 && (
                 <Animated.View
                     entering={FadeInDown.duration(280)}
                     style={{

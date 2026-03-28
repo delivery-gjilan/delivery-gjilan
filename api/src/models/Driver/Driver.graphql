@@ -12,6 +12,50 @@ enum DriverConnectionStatus {
     DISCONNECTED
 }
 
+"""Basic driver profile returned by driverLogin / driverRegister"""
+type DriverBasicInfo {
+    id: ID!
+    email: String!
+    firstName: String!
+    lastName: String!
+    phoneNumber: String
+    onlinePreference: Boolean!
+    connectionStatus: DriverConnectionStatus!
+    lastHeartbeatAt: Date
+    lastLocationUpdate: Date
+    driverLat: Float
+    driverLng: Float
+}
+
+"""Result of driverLogin / driverRegister mutations"""
+type DriverAuthResult {
+    token: String!
+    refreshToken: String
+    driver: DriverBasicInfo!
+    message: String!
+}
+
+input DriverLoginInput {
+    email: String!
+    password: String!
+}
+
+input DriverRegisterInput {
+    email: String!
+    password: String!
+    firstName: String!
+    lastName: String!
+    phoneNumber: String
+}
+
+extend type Mutation {
+    """Driver login — returns short-lived access token + refresh token"""
+    driverLogin(input: DriverLoginInput!): DriverAuthResult! @skipAuth
+
+    """Driver self-registration — creates user (role=DRIVER) + driver profile row"""
+    driverRegister(input: DriverRegisterInput!): DriverAuthResult! @skipAuth
+}
+
 type DriverConnection {
     """User's preference: "I want to work" toggle"""
     onlinePreference: Boolean!
@@ -174,6 +218,13 @@ extend type Mutation {
         action: DriverPttSignalAction!
         muted: Boolean
     ): Boolean!
+
+    """
+    Admin mutation to set which drivers are on the current shift.
+    Only on-shift drivers will receive new-order dispatch notifications.
+    Pass an empty list to clear the shift restriction (all eligible drivers receive notifications).
+    """
+    adminSetShiftDrivers(driverIds: [ID!]!): Boolean!
 
     """
     Admin simulation heartbeat — wraps processHeartbeat for SUPER_ADMIN.

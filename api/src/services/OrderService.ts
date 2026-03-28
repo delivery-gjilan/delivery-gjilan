@@ -470,7 +470,20 @@ export class OrderService {
             dropoffLng: input.dropOffLocation.longitude,
         });
 
-        if (Math.abs(expectedDeliveryPrice - input.deliveryPrice) > 0.01) {
+        // prioritySurcharge is an opt-in fee the customer pays on top of the base
+        // delivery fee for expedited handling.  It is validated and stored
+        // separately from zone/tier-based delivery pricing.
+        const prioritySurcharge = input.prioritySurcharge ?? 0;
+        if (prioritySurcharge < 0) {
+            throw AppError.badInput('Priority surcharge cannot be negative');
+        }
+
+        // Allow the client to send a value ≤ expectedDeliveryPrice (e.g. 0 when a
+        // free-delivery promo was pre-applied on the client).  Only reject if the
+        // client is trying to inflate the base delivery price beyond what the server
+        // calculated — that would indicate tampering.  Priority surcharge is handled
+        // separately and is not subject to this zone/tier check.
+        if (input.deliveryPrice - expectedDeliveryPrice > 0.01) {
             throw AppError.badInput(
                 `Delivery price mismatch: Calculated ${expectedDeliveryPrice}, provided ${input.deliveryPrice}`,
             );
@@ -478,10 +491,13 @@ export class OrderService {
 
         // 3. Apply PromotionEngine (server-side validation)
         const promotionEngine = new PromotionEngine(await getDB());
+        // Always use the server-calculated delivery price in the promo engine so
+        // that promotion discounts are computed against the authoritative base fee,
+        // regardless of what the client sent (which may be 0 for a free-delivery promo).
         const cartContext = {
             items: cartItems,
             subtotal: calculatedItemsTotal,
-            deliveryPrice: input.deliveryPrice,
+            deliveryPrice: expectedDeliveryPrice,
             businessIds: Array.from(businessIds),
         };
 
@@ -494,7 +510,7 @@ export class OrderService {
         const effectiveOrderPrice = promoResult.finalSubtotal;
         const effectiveDeliveryPrice = promoResult.finalDeliveryPrice;
         const totalOrderPrice = promoResult.finalTotal;
-        const undiscountedTotal = calculatedItemsTotal + input.deliveryPrice;
+        const undiscountedTotal = calculatedItemsTotal + expectedDeliveryPrice + prioritySurcharge;
 
         // Verify total price matches client input (allow small float error).
         // When no explicit promoCode is supplied, we allow either:
@@ -502,8 +518,9 @@ export class OrderService {
         // 2) undiscounted total (items + delivery) for clients that don't pre-apply auto promos.
         // If no promo code is provided, tolerate a client total that matches the
         // undiscounted total because server-side auto-promotions may still apply.
-        const matchesEffectiveTotal = Math.abs(totalOrderPrice - input.totalPrice) <= 0.01;
-        const matchesUndiscountedTotal = Math.abs(undiscountedTotal - input.totalPrice) <= 0.01;
+        // Priority surcharge is layered on top of the promo-engine totals.
+        const matchesEffectiveTotal = Math.abs((totalOrderPrice + prioritySurcharge) - input.totalPrice) <= 0.01;
+        const matchesUndiscountedTotal = Math.abs((undiscountedTotal + prioritySurcharge) - input.totalPrice) <= 0.01;
 
         if (!matchesEffectiveTotal) {
             const allowUndiscountedForAutoPromotions = !input.promoCode && matchesUndiscountedTotal;
@@ -516,15 +533,17 @@ export class OrderService {
             displayId: this.generateDisplayId(),
             price: effectiveOrderPrice,
             userId,
-            deliveryPrice: effectiveDeliveryPrice,
+            // Fold priority surcharge into the stored delivery price so that
+            // order totals (price + deliveryPrice) always equal what the customer paid.
+            deliveryPrice: effectiveDeliveryPrice + prioritySurcharge,
             paymentCollection: input.paymentCollection ?? 'CASH_TO_DRIVER',
             originalPrice:
                 Math.abs(calculatedItemsTotal - effectiveOrderPrice) > 0.01
                     ? Number(calculatedItemsTotal.toFixed(2))
                     : undefined,
             originalDeliveryPrice:
-                Math.abs(input.deliveryPrice - effectiveDeliveryPrice) > 0.01
-                    ? Number(input.deliveryPrice.toFixed(2))
+                Math.abs(expectedDeliveryPrice - effectiveDeliveryPrice) > 0.01
+                    ? Number((expectedDeliveryPrice + prioritySurcharge).toFixed(2))
                     : undefined,
             status: 'PENDING' as const,
             dropoffLat: input.dropOffLocation.latitude,
@@ -881,6 +900,9 @@ export class OrderService {
             readyAt: parseDbTimestamp(dbOrder.readyAt) ?? undefined,
             outForDeliveryAt: parseDbTimestamp(dbOrder.outForDeliveryAt) ?? undefined,
             deliveredAt: parseDbTimestamp(dbOrder.deliveredAt) ?? undefined,
+            cancelledAt: parseDbTimestamp(dbOrder.cancelledAt) ?? undefined,
+            cancellationReason: dbOrder.cancellationReason ?? undefined,
+            adminNote: (dbOrder as any).adminNote ?? undefined,
             driver: driverUser
                 ? {
                       id: driverUser.id,
@@ -920,8 +942,8 @@ export class OrderService {
         return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
     }
 
-    async getAllOrders(limit = 500): Promise<Order[]> {
-        const dbOrders = await this.orderRepository.findAll(limit);
+    async getAllOrders(limit = 500, offset = 0): Promise<Order[]> {
+        const dbOrders = await this.orderRepository.findAll(limit, offset);
         return Promise.all(dbOrders.map((order) => this.mapToOrder(order)));
     }
 
@@ -936,13 +958,13 @@ export class OrderService {
         return this.mapToOrder(dbOrder);
     }
 
-    async getOrdersByStatus(status: OrderStatus): Promise<Order[]> {
-        const dbOrders = await this.orderRepository.findByStatus(status);
+    async getOrdersByStatus(status: OrderStatus, limit = 500, offset = 0): Promise<Order[]> {
+        const dbOrders = await this.orderRepository.findByStatus(status, limit, offset);
         return Promise.all(dbOrders.map((order) => this.mapToOrder(order)));
     }
 
-    async getOrdersByUserId(userId: string, limit = 100): Promise<Order[]> {
-        const dbOrders = await this.orderRepository.findByUserId(userId, limit);
+    async getOrdersByUserId(userId: string, limit = 100, offset = 0): Promise<Order[]> {
+        const dbOrders = await this.orderRepository.findByUserId(userId, limit, offset);
         return Promise.all(dbOrders.map((order) => this.mapToOrder(order)));
     }
 
@@ -956,8 +978,8 @@ export class OrderService {
         return Promise.all(dbOrders.map((order) => this.mapToOrder(order)));
     }
 
-    async getOrdersForDriver(driverId: string): Promise<Order[]> {
-        const dbOrders = await this.orderRepository.findForDriver(driverId);
+    async getOrdersForDriver(driverId: string, limit = 200): Promise<Order[]> {
+        const dbOrders = await this.orderRepository.findForDriver(driverId, limit);
         return Promise.all(dbOrders.map((order) => this.mapToOrder(order)));
     }
 
@@ -1076,6 +1098,55 @@ export class OrderService {
             dbOrder.orderDate || null,
         );
         return order;
+    }
+
+    async adminCancelOrder(id: string, reason: string, settleDriver = false, settleBusiness = false): Promise<Order> {
+        const dbOrder = await this.orderRepository.findById(id);
+        if (!dbOrder) {
+            throw AppError.notFound('Order');
+        }
+
+        if (dbOrder.status === 'CANCELLED') {
+            throw AppError.businessRule('Order is already cancelled');
+        }
+        if (dbOrder.status === 'DELIVERED') {
+            throw AppError.businessRule('Cannot cancel a delivered order');
+        }
+
+        const db = await getDB();
+
+        const updated = await this.orderRepository.cancelWithReason(id, reason);
+        if (!updated) {
+            throw AppError.notFound('Order');
+        }
+
+        // Reverse promotion usage
+        const promotionEngine = new PromotionEngine(db);
+        await promotionEngine.reverseUsage(id, dbOrder.userId);
+
+        // Void any pending financial settlements — skip entities admin chose to honour
+        const financialService = new FinancialService(db);
+        if (settleDriver || settleBusiness) {
+            // Create settlements as if the order was delivered, then void the ones not honoured
+            const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, id));
+            await financialService.createOrderSettlements(updated, items, updated.driverId);
+            if (!settleDriver) await financialService.cancelDriverSettlementsForOrder(id);
+            if (!settleBusiness) await financialService.cancelBusinessSettlementsForOrder(id);
+        } else {
+            // Default: void any existing pending settlements (defensive noop since settlements are
+            // only created on DELIVERED, but keeps invariant clean)
+            await financialService.cancelOrderSettlements(id);
+        }
+
+        await this.updateUserBehaviorOnStatusChange(
+            dbOrder.userId,
+            dbOrder.status as OrderStatus,
+            'CANCELLED',
+            dbOrder.price + dbOrder.deliveryPrice,
+            dbOrder.orderDate || null,
+        );
+
+        return this.mapToOrder(updated);
     }
 
     async updateUserBehaviorOnStatusChange(

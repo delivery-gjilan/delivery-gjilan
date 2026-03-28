@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
+import { useTranslations } from '@/hooks/useTranslations';
 import { useAuthStore } from '@/store/authStore';
 import { UPDATE_DRIVER_ONLINE_STATUS } from '@/graphql/operations/driverLocation';
 import { GET_MY_DRIVER_METRICS } from '@/graphql/operations/driver';
@@ -68,6 +69,7 @@ function MetricTile({
 
 export default function Home() {
     const theme = useTheme();
+    const { t } = useTranslations();
     const isOnline = useAuthStore((state) => state.isOnline);
     const setOnline = useAuthStore((state) => state.setOnline);
     const setUser = useAuthStore((state) => state.setUser);
@@ -111,13 +113,13 @@ export default function Home() {
             if (updatedUser) setUser(updatedUser);
         } catch {
             setOnline(!newStatus);
-            Alert.alert('Error', 'Failed to update status. Try again.');
+            Alert.alert(t.common.error, t.home.error_update_status);
         }
     };
 
     const hour = new Date().getHours();
     const greeting =
-        hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+        hour < 12 ? t.home.greeting_morning : hour < 17 ? t.home.greeting_afternoon : t.home.greeting_evening;
 
     const connColor =
         connectionStatus === 'CONNECTED'
@@ -128,12 +130,12 @@ export default function Home() {
 
     const connLabel =
         connectionStatus === 'CONNECTED'
-            ? 'Signal good'
+            ? t.home.signal_good
             : connectionStatus === 'STALE'
-            ? 'Weak signal'
+            ? t.home.signal_weak
             : connectionStatus === 'LOST'
-            ? 'Signal lost'
-            : 'Offline';
+            ? t.home.signal_lost
+            : t.home.offline;
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
@@ -195,7 +197,7 @@ export default function Home() {
                                 color: isOnline ? '#15803d' : theme.colors.subtext,
                             }}
                         >
-                            {isOnline ? 'Online' : 'Offline'}
+                            {isOnline ? t.home.online : t.home.offline}
                         </Text>
                         <Switch
                             value={isOnline}
@@ -227,10 +229,10 @@ export default function Home() {
                         <Ionicons name="car-outline" size={16} color="#92400e" />
                         <View style={{ flex: 1 }}>
                             <Text style={{ fontSize: 13, fontWeight: '700', color: '#92400e' }}>
-                                Admin is dispatching orders
+                                {t.home.dispatch_mode_title}
                             </Text>
                             <Text style={{ fontSize: 11, color: '#b45309', marginTop: 1 }}>
-                                Wait for assignment — orders will be sent to you directly
+                                {t.home.dispatch_mode_sub}
                             </Text>
                         </View>
                     </View>
@@ -257,7 +259,7 @@ export default function Home() {
                             marginBottom: 10,
                         }}
                     >
-                        Today's Earnings
+                        {t.home.earnings_today}
                     </Text>
 
                     <View
@@ -273,7 +275,7 @@ export default function Home() {
                                 €{netToday.toFixed(2)}
                             </Text>
                             <Text style={{ fontSize: 13, color: theme.colors.subtext, marginTop: 2 }}>
-                                your take · €{grossToday.toFixed(2)} gross
+                                {t.home.your_take} · €{grossToday.toFixed(2)} {t.home.gross}
                             </Text>
                         </View>
                         {metricsLoading && !m && (
@@ -294,12 +296,12 @@ export default function Home() {
                             >
                                 <Text style={{ color: '#92400e', fontSize: 11, fontWeight: '700' }}>
                                     {commissionPct > 0
-                                        ? `${commissionPct.toFixed(0)}% commission`
-                                        : `€${commissionTaken.toFixed(2)} commission`}
+                                        ? `${commissionPct.toFixed(0)}% ${t.home.commission}`
+                                        : `€${commissionTaken.toFixed(2)} ${t.home.commission}`}
                                 </Text>
                             </View>
                             <Text style={{ color: theme.colors.subtext, fontSize: 11 }}>
-                                −€{commissionTaken.toFixed(2)} deducted
+                                −€{commissionTaken.toFixed(2)} {t.home.deducted}
                             </Text>
                         </View>
                     )}
@@ -312,14 +314,14 @@ export default function Home() {
                         iconColor="#3b82f6"
                         iconBg="#eff6ff"
                         value={String(deliveredToday)}
-                        label="Delivered Today"
+                        label={t.home.delivered_today}
                     />
                     <MetricTile
                         icon="trending-up-outline"
                         iconColor="#22c55e"
                         iconBg="#f0fdf4"
                         value={deliveredToday > 0 ? `€${avgPerDelivery.toFixed(2)}` : '—'}
-                        label="Avg per Delivery"
+                        label={t.home.avg_per_delivery}
                     />
                 </View>
 
@@ -343,7 +345,7 @@ export default function Home() {
                         }}
                     >
                         <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.text }}>
-                            Active Orders
+                            {t.home.active_orders}
                         </Text>
                         <Text style={{ fontSize: 14, fontWeight: '800', color: theme.colors.text }}>
                             {activeOrders} / {maxOrders}
@@ -373,10 +375,10 @@ export default function Home() {
                     </View>
                     <Text style={{ fontSize: 11, color: theme.colors.subtext, marginTop: 6 }}>
                         {activeOrders === 0
-                            ? 'No active orders — ready for new ones'
+                            ? t.home.no_active_orders
                             : capacityPct >= 1
-                            ? 'At max capacity'
-                            : `${maxOrders - activeOrders} slot${maxOrders - activeOrders !== 1 ? 's' : ''} available`}
+                            ? t.home.at_max_capacity
+                            : `${maxOrders - activeOrders} ${maxOrders - activeOrders !== 1 ? t.home.slots_available : t.home.slot_available}`}
                     </Text>
                 </View>
 
@@ -402,11 +404,11 @@ export default function Home() {
                         }}
                     />
                     <Text style={{ fontSize: 12, fontWeight: '600', color: theme.colors.subtext }}>
-                        Heartbeat: <Text style={{ color: connColor }}>{connLabel}</Text>
+                        {t.home.heartbeat}: <Text style={{ color: connColor }}>{connLabel}</Text>
                     </Text>
                     {connectionStatus === 'STALE' && (
                         <Text style={{ fontSize: 11, color: theme.colors.subtext }}>
-                            — check signal
+                            — {t.home.check_signal}
                         </Text>
                     )}
                 </View>

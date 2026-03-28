@@ -3,9 +3,10 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import messaging from '@react-native-firebase/messaging';
-import { useMutation } from '@apollo/client/react';
+import { useApolloClient, useMutation } from '@apollo/client/react';
 import { useAuthStore } from '@/store/authStore';
 import { REGISTER_DEVICE_TOKEN, UNREGISTER_DEVICE_TOKEN, TRACK_PUSH_TELEMETRY } from '@/graphql/operations/notifications';
+import { GET_ORDERS } from '@/graphql/operations/orders';
 import { useRouter } from 'expo-router';
 
 // ── Configure foreground notification behavior ─────────────────────
@@ -31,6 +32,7 @@ Notifications.setNotificationHandler({
  * Must be called inside ApolloProvider and after auth is ready.
  */
 export function useNotifications() {
+    const apolloClient = useApolloClient();
     const router = useRouter();
     const { isAuthenticated, token: authToken } = useAuthStore();
     const currentPushToken = useRef<string | null>(null);
@@ -107,6 +109,14 @@ export function useNotifications() {
 
         setup();
 
+        // Handle cold-start notification taps before listeners are attached.
+        void Notifications.getLastNotificationResponseAsync().then((response) => {
+            const data = response?.notification?.request?.content?.data;
+            if (data) {
+                void handleNotificationTap(data as Record<string, unknown>);
+            }
+        });
+
         const unsubscribeTokenRefresh = messaging().onTokenRefresh(async (newToken) => {
             if (!mounted || newToken === currentPushToken.current) {
                 return;
@@ -156,7 +166,7 @@ export function useNotifications() {
                     actionId: actionIdentifier,
                 },
             );
-            handleNotificationTap(data);
+            void handleNotificationTap(data as Record<string, unknown>);
         });
 
         return () => {
@@ -197,8 +207,21 @@ export function useNotifications() {
      * Navigate to the appropriate screen when a notification is tapped.
      * Driver-specific: handles order assignment navigation.
      */
-    function handleNotificationTap(data: Record<string, unknown>) {
+    async function handleNotificationTap(data: Record<string, unknown>) {
         if (!data) return;
+
+        // Force a fresh order snapshot before navigating from a push-open path.
+        try {
+            await Promise.race([
+                apolloClient.query({
+                    query: GET_ORDERS,
+                    fetchPolicy: 'network-only',
+                }),
+                new Promise((resolve) => setTimeout(resolve, 1500)),
+            ]);
+        } catch {
+            // Keep navigation responsive even if refresh fails.
+        }
 
         const type = data.type as string | undefined;
         const orderId = data.orderId as string | undefined;

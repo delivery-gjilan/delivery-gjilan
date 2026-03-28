@@ -1,5 +1,5 @@
 {
-  "id": "d7f14ca5-08ec-4c75-901d-79b6185ac4ed",
+  "id": "5b6fc742-73d3-4a19-9f8f-ce45d9bea8df",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -442,6 +442,99 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.business_messages": {
+      "name": "business_messages",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "admin_id": {
+          "name": "admin_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "business_user_id": {
+          "name": "business_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sender_role": {
+          "name": "sender_role",
+          "type": "business_message_sender_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "alert_type": {
+          "name": "alert_type",
+          "type": "message_alert_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'INFO'"
+        },
+        "read_at": {
+          "name": "read_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "business_messages_admin_id_users_id_fk": {
+          "name": "business_messages_admin_id_users_id_fk",
+          "tableFrom": "business_messages",
+          "tableTo": "users",
+          "columnsFrom": [
+            "admin_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "business_messages_business_user_id_users_id_fk": {
+          "name": "business_messages_business_user_id_users_id_fk",
+          "tableFrom": "business_messages",
+          "tableTo": "users",
+          "columnsFrom": [
+            "business_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.delivery_pricing_tiers": {
       "name": "delivery_pricing_tiers",
       "schema": "",
@@ -683,6 +776,99 @@
           "tableTo": "users",
           "columnsFrom": [
             "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.driver_messages": {
+      "name": "driver_messages",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "admin_id": {
+          "name": "admin_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "driver_id": {
+          "name": "driver_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sender_role": {
+          "name": "sender_role",
+          "type": "message_sender_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "alert_type": {
+          "name": "alert_type",
+          "type": "message_alert_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'INFO'"
+        },
+        "read_at": {
+          "name": "read_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "driver_messages_admin_id_users_id_fk": {
+          "name": "driver_messages_admin_id_users_id_fk",
+          "tableFrom": "driver_messages",
+          "tableTo": "users",
+          "columnsFrom": [
+            "admin_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "driver_messages_driver_id_users_id_fk": {
+          "name": "driver_messages_driver_id_users_id_fk",
+          "tableFrom": "driver_messages",
+          "tableTo": "users",
+          "columnsFrom": [
+            "driver_id"
           ],
           "columnsTo": [
             "id"
@@ -942,6 +1128,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "cancellation_reason": {
+          "name": "cancellation_reason",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancelled_at": {
+          "name": "cancelled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "preparation_minutes": {
           "name": "preparation_minutes",
           "type": "integer",
@@ -974,6 +1172,18 @@
         },
         "delivered_at": {
           "name": "delivered_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "driver_assigned_at": {
+          "name": "driver_assigned_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "driver_arrived_at_pickup": {
+          "name": "driver_arrived_at_pickup",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -1288,6 +1498,199 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.order_events": {
+      "name": "order_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "order_id": {
+          "name": "order_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event_type": {
+          "name": "event_type",
+          "type": "order_event_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event_ts": {
+          "name": "event_ts",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recorded_at": {
+          "name": "recorded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "actor_type": {
+          "name": "actor_type",
+          "type": "order_event_actor_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "business_id": {
+          "name": "business_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "driver_id": {
+          "name": "driver_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_order_events_order_id": {
+          "name": "idx_order_events_order_id",
+          "columns": [
+            {
+              "expression": "order_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_order_events_event_type": {
+          "name": "idx_order_events_event_type",
+          "columns": [
+            {
+              "expression": "event_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_order_events_event_ts": {
+          "name": "idx_order_events_event_ts",
+          "columns": [
+            {
+              "expression": "event_ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_order_events_business_id": {
+          "name": "idx_order_events_business_id",
+          "columns": [
+            {
+              "expression": "business_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_order_events_driver_id": {
+          "name": "idx_order_events_driver_id",
+          "columns": [
+            {
+              "expression": "driver_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "order_events_order_id_orders_id_fk": {
+          "name": "order_events_order_id_orders_id_fk",
+          "tableFrom": "order_events",
+          "tableTo": "orders",
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "order_events_business_id_businesses_id_fk": {
+          "name": "order_events_business_id_businesses_id_fk",
+          "tableFrom": "order_events",
+          "tableTo": "businesses",
+          "columnsFrom": [
+            "business_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "order_events_driver_id_users_id_fk": {
+          "name": "order_events_driver_id_users_id_fk",
+          "tableFrom": "order_events",
+          "tableTo": "users",
+          "columnsFrom": [
+            "driver_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -1964,10 +2367,22 @@
           "name": "order_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "rule_id": {
           "name": "rule_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "settlement_payment_id": {
+          "name": "settlement_payment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_payment_id": {
+          "name": "source_payment_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -1992,6 +2407,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'PENDING'"
+        },
+        "is_settled": {
+          "name": "is_settled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "paid_at": {
           "name": "paid_at",
@@ -2087,6 +2509,21 @@
           "method": "btree",
           "with": {}
         },
+        "idx_settlements_is_settled": {
+          "name": "idx_settlements_is_settled",
+          "columns": [
+            {
+              "expression": "is_settled",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "idx_settlements_type_direction": {
           "name": "idx_settlements_type_direction",
           "columns": [
@@ -2155,6 +2592,32 @@
           "tableTo": "settlement_rules",
           "columnsFrom": [
             "rule_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "settlements_settlement_payment_id_settlement_payments_id_fk": {
+          "name": "settlements_settlement_payment_id_settlement_payments_id_fk",
+          "tableFrom": "settlements",
+          "tableTo": "settlement_payments",
+          "columnsFrom": [
+            "settlement_payment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "settlements_source_payment_id_settlement_payments_id_fk": {
+          "name": "settlements_source_payment_id_settlement_payments_id_fk",
+          "tableFrom": "settlements",
+          "tableTo": "settlement_payments",
+          "columnsFrom": [
+            "source_payment_id"
           ],
           "columnsTo": [
             "id"
@@ -2475,6 +2938,196 @@
           "tableTo": "users",
           "columnsFrom": [
             "responded_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.settlement_payments": {
+      "name": "settlement_payments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "entity_type": {
+          "name": "entity_type",
+          "type": "settlement_entity_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "driver_id": {
+          "name": "driver_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "business_id": {
+          "name": "business_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "direction": {
+          "name": "direction",
+          "type": "settlement_payment_direction",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "total_balance_at_time": {
+          "name": "total_balance_at_time",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payment_method": {
+          "name": "payment_method",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "payment_reference": {
+          "name": "payment_reference",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "idx_settlement_payments_entity_type": {
+          "name": "idx_settlement_payments_entity_type",
+          "columns": [
+            {
+              "expression": "entity_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_settlement_payments_driver_id": {
+          "name": "idx_settlement_payments_driver_id",
+          "columns": [
+            {
+              "expression": "driver_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_settlement_payments_business_id": {
+          "name": "idx_settlement_payments_business_id",
+          "columns": [
+            {
+              "expression": "business_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_settlement_payments_created_at": {
+          "name": "idx_settlement_payments_created_at",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "settlement_payments_driver_id_drivers_id_fk": {
+          "name": "settlement_payments_driver_id_drivers_id_fk",
+          "tableFrom": "settlement_payments",
+          "tableTo": "drivers",
+          "columnsFrom": [
+            "driver_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "settlement_payments_business_id_businesses_id_fk": {
+          "name": "settlement_payments_business_id_businesses_id_fk",
+          "tableFrom": "settlement_payments",
+          "tableTo": "businesses",
+          "columnsFrom": [
+            "business_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "settlement_payments_created_by_user_id_users_id_fk": {
+          "name": "settlement_payments_created_by_user_id_users_id_fk",
+          "tableFrom": "settlement_payments",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by_user_id"
           ],
           "columnsTo": [
             "id"
@@ -3631,6 +4284,13 @@
           "notNull": true,
           "default": "'info'"
         },
+        "dispatch_mode_enabled": {
+          "name": "dispatch_mode_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "updated_at": {
           "name": "updated_at",
           "type": "timestamp",
@@ -4223,6 +4883,18 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "title_al": {
+          "name": "title_al",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "body_al": {
+          "name": "body_al",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "data": {
           "name": "data",
@@ -5470,6 +6142,23 @@
         "RESTAURANT"
       ]
     },
+    "public.business_message_sender_role": {
+      "name": "business_message_sender_role",
+      "schema": "public",
+      "values": [
+        "ADMIN",
+        "BUSINESS"
+      ]
+    },
+    "public.message_alert_type": {
+      "name": "message_alert_type",
+      "schema": "public",
+      "values": [
+        "INFO",
+        "WARNING",
+        "URGENT"
+      ]
+    },
     "public.device_app_type": {
       "name": "device_app_type",
       "schema": "public",
@@ -5486,6 +6175,14 @@
       "values": [
         "IOS",
         "ANDROID"
+      ]
+    },
+    "public.message_sender_role": {
+      "name": "message_sender_role",
+      "schema": "public",
+      "values": [
+        "ADMIN",
+        "DRIVER"
       ]
     },
     "public.driver_connection_status": {
@@ -5516,6 +6213,33 @@
         "OUT_FOR_DELIVERY",
         "DELIVERED",
         "CANCELLED"
+      ]
+    },
+    "public.order_event_actor_type": {
+      "name": "order_event_actor_type",
+      "schema": "public",
+      "values": [
+        "SYSTEM",
+        "RESTAURANT",
+        "DRIVER",
+        "CUSTOMER",
+        "ADMIN"
+      ]
+    },
+    "public.order_event_type": {
+      "name": "order_event_type",
+      "schema": "public",
+      "values": [
+        "ORDER_CREATED",
+        "ORDER_PREPARING",
+        "ORDER_READY",
+        "ORDER_PICKED_UP",
+        "ORDER_DELIVERED",
+        "ORDER_CANCELLED",
+        "DRIVER_ASSIGNED",
+        "DRIVER_ARRIVED_PICKUP",
+        "DISPATCH_SENT",
+        "PREP_TIME_UPDATED"
       ]
     },
     "public.signup_step": {
@@ -5606,6 +6330,14 @@
         "DISPUTED",
         "EXPIRED",
         "CANCELLED"
+      ]
+    },
+    "public.settlement_payment_direction": {
+      "name": "settlement_payment_direction",
+      "schema": "public",
+      "values": [
+        "ENTITY_TO_PLATFORM",
+        "PLATFORM_TO_ENTITY"
       ]
     },
     "public.promotion_creator_type": {

@@ -1,11 +1,14 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { createHash, randomUUID } from 'crypto';
 import { AuthRepository } from '@/repositories/AuthRepository';
 import { DriverRepository } from '@/repositories/DriverRepository';
+import { DriverConnectionStatusType } from '@/database/schema/drivers';
 import { AppError } from '@/lib/errors';
 
 export interface DriverAuthResult {
     token: string;
+    refreshToken: string;
     driver: {
         id: string;
         email: string;
@@ -13,7 +16,7 @@ export interface DriverAuthResult {
         lastName: string;
         phoneNumber: string | null;
         onlinePreference: boolean;
-        connectionStatus: string;
+        connectionStatus: DriverConnectionStatusType;
         lastHeartbeatAt: string | null;
         lastLocationUpdate: string | null;
         driverLat: number | null;
@@ -34,6 +37,40 @@ export class DriverAuthService {
             throw new Error('JWT_SECRET is not defined in environment variables');
         }
         return secret;
+    }
+
+    private getRefreshSecret(): string {
+        const secret = process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET;
+        if (!secret) {
+            throw new Error('REFRESH_TOKEN_SECRET is not defined in environment variables');
+        }
+        return secret;
+    }
+
+    private hashToken(token: string): string {
+        return createHash('sha256').update(token).digest('hex');
+    }
+
+    private async generateTokenPair(userId: string, role: string, businessId: string | null) {
+        const token = jwt.sign(
+            { userId, role, businessId },
+            this.getJwtSecret(),
+            { expiresIn: '15m' }
+        );
+        const refreshToken = jwt.sign(
+            { userId, type: 'refresh', jti: randomUUID() },
+            this.getRefreshSecret(),
+            { algorithm: 'HS256', expiresIn: '30d' }
+        );
+        const refreshTokenHash = this.hashToken(refreshToken);
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 30);
+        await this.authRepository.createRefreshTokenSession(
+            userId,
+            refreshTokenHash,
+            expiresAt.toISOString()
+        );
+        return { token, refreshToken };
     }
 
     private buildDriverResponse(user: { id: string; email: string; firstName: string; lastName: string; phoneNumber: string | null }, driver: { onlinePreference: boolean; connectionStatus: string; lastHeartbeatAt: string | null; lastLocationUpdate: string | null; driverLat: number | null; driverLng: number | null }) {
@@ -83,14 +120,11 @@ export class DriverAuthService {
 
         const driverProfile = await this.driverRepository.createDriver(user.id);
 
-        const token = jwt.sign(
-            { userId: user.id, role: user.role, businessId: user.businessId },
-            this.getJwtSecret(),
-            { expiresIn: '7d' }
-        );
+        const { token, refreshToken } = await this.generateTokenPair(user.id, user.role, user.businessId ?? null);
 
         return {
             token,
+            refreshToken,
             driver: this.buildDriverResponse(user, driverProfile),
             message: 'Driver registered successfully',
         };
@@ -109,14 +143,11 @@ export class DriverAuthService {
 
         const driverProfile = await this.driverRepository.createDriver(user.id);
 
-        const token = jwt.sign(
-            { userId: user.id, role: user.role, businessId: user.businessId },
-            this.getJwtSecret(),
-            { expiresIn: '7d' }
-        );
+        const { token, refreshToken } = await this.generateTokenPair(user.id, user.role, user.businessId ?? null);
 
         return {
             token,
+            refreshToken,
             driver: this.buildDriverResponse(user, driverProfile),
             message: 'Driver login successful',
         };

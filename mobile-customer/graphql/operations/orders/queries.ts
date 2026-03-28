@@ -1,8 +1,8 @@
 import { graphql } from '@/gql';
 
 export const GET_ORDERS = graphql(`
-    query GetOrders {
-        orders {
+    query GetOrders($limit: Int, $offset: Int) {
+        orders(limit: $limit, offset: $offset) {
             id
             displayId
             userId
@@ -185,6 +185,7 @@ export const GET_ORDER = graphql(`
                 promotionId
                 appliesTo
                 discountAmount
+                promoCode
             }
         }
     }
@@ -306,6 +307,7 @@ export const UNCOMPLETED_ORDERS = graphql(`
             preparationMinutes
             estimatedReadyAt
             preparingAt
+            outForDeliveryAt
             dropOffLocation {
                 latitude
                 longitude

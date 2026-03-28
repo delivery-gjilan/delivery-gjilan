@@ -1,6 +1,6 @@
 import { Counter, Gauge } from 'prom-client';
 import logger from '@/lib/logger';
-import { register } from '@/lib/metrics';
+import { register, wsActiveUsersByRoleGauge } from '@/lib/metrics';
 
 type EventLevel = 'info' | 'warn' | 'error';
 type EventType =
@@ -364,6 +364,18 @@ class RealtimeMonitor {
 
         const status = totalSubscriptionErrors > 0 || totalPubsubFailures > 0 ? 'attention' : 'healthy';
 
+        // Count active WebSocket connections by user role
+        const activeByRole: Record<string, number> = {};
+        for (const conn of this.connections.values()) {
+            const role = conn.role ?? 'anonymous';
+            activeByRole[role] = (activeByRole[role] ?? 0) + 1;
+        }
+        // Update Prometheus gauge
+        wsActiveUsersByRoleGauge.reset();
+        for (const [role, count] of Object.entries(activeByRole)) {
+            wsActiveUsersByRoleGauge.set({ role }, count);
+        }
+
         const explanation = [
             `There are currently ${activeConnections} websocket connection(s) and ${activeSubscriptions} active subscription(s).`,
             totalRejectedSubscriptions > 0
@@ -380,6 +392,7 @@ class RealtimeMonitor {
         return {
             status,
             timestamp: new Date().toISOString(),
+            activeByRole,
             overview: {
                 activeConnections,
                 activeSubscriptions,
@@ -400,6 +413,16 @@ class RealtimeMonitor {
             recentEvents: this.recentEvents.slice(0, 20),
             explanation,
         };
+    }
+
+    getActiveConnections(): Array<{ socketId: string; userId?: string; role?: string; connectedAt: number; ip?: string }> {
+        return Array.from(this.connections.entries()).map(([socketId, state]) => ({
+            socketId,
+            userId: state.userId,
+            role: state.role,
+            connectedAt: state.connectedAt,
+            ip: state.ip,
+        }));
     }
 
     private touchConnection(socketId: string): void {

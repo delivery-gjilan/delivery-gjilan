@@ -55,7 +55,7 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="add"
                 options={{
-                    title: 'Earnings',
+                    title: t.tabs.earnings,
                     tabBarIcon: ({ color, size }) => <Ionicons name="cash-outline" size={size} color={color} />,
                 }}
             />
@@ -63,7 +63,7 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="messages"
                 options={{
-                    title: 'Messages',
+                    title: t.tabs.messages,
                     tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles-outline" size={size} color={color} />,
                 }}
             />

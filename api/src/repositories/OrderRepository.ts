@@ -1,18 +1,25 @@
 import { getDB } from '@/database';
 import { orders as ordersTable, orderItems as orderItemsTable } from '@/database/schema';
-import { and, desc, eq, inArray, isNull, notInArray, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, notInArray, or, sql } from 'drizzle-orm';
 import type { DbOrder } from '@/database/schema/orders';
 import type { NewDbOrderItem } from '@/database/schema/orderItems';
 import { OrderStatus } from '@/generated/types.generated';
 
 export class OrderRepository {
-    async findAll(limit = 500): Promise<DbOrder[]> {
+    async findAll(limit = 500, offset = 0): Promise<DbOrder[]> {
         const db = await getDB();
         return await db
             .select()
             .from(ordersTable)
             .orderBy(desc(ordersTable.orderDate))
-            .limit(limit);
+            .limit(limit)
+            .offset(offset);
+    }
+
+    async countAll(): Promise<number> {
+        const db = await getDB();
+        const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(ordersTable);
+        return row?.count ?? 0;
     }
 
     async findById(id: string): Promise<DbOrder | null> {
@@ -21,13 +28,24 @@ export class OrderRepository {
         return result[0] || null;
     }
 
-    async findByStatus(status: OrderStatus): Promise<DbOrder[]> {
+    async findByStatus(status: OrderStatus, limit = 500, offset = 0): Promise<DbOrder[]> {
         const db = await getDB();
         return await db
             .select()
             .from(ordersTable)
             .where(eq(ordersTable.status, status))
-            .orderBy(desc(ordersTable.createdAt));
+            .orderBy(desc(ordersTable.createdAt))
+            .limit(limit)
+            .offset(offset);
+    }
+
+    async countByStatus(status: OrderStatus): Promise<number> {
+        const db = await getDB();
+        const [row] = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(ordersTable)
+            .where(eq(ordersTable.status, status));
+        return row?.count ?? 0;
     }
 
     async findByIds(ids: string[]): Promise<DbOrder[]> {
@@ -36,14 +54,15 @@ export class OrderRepository {
         return await db.select().from(ordersTable).where(inArray(ordersTable.id, ids));
     }
 
-    async findByUserId(userId: string, limit = 100): Promise<DbOrder[]> {
+    async findByUserId(userId: string, limit = 100, offset = 0): Promise<DbOrder[]> {
         const db = await getDB();
         return await db
             .select()
             .from(ordersTable)
             .where(eq(ordersTable.userId, userId))
             .orderBy(desc(ordersTable.orderDate))
-            .limit(limit);
+            .limit(limit)
+            .offset(offset);
     }
 
     async findActiveByUserId(userId: string): Promise<DbOrder[]> {
@@ -71,8 +90,9 @@ export class OrderRepository {
 
     /**
      * Orders visible to a driver: assigned to them OR still active (pickable).
+     * Limited to avoid unbounded growth as historical orders accumulate.
      */
-    async findForDriver(driverId: string): Promise<DbOrder[]> {
+    async findForDriver(driverId: string, limit = 200): Promise<DbOrder[]> {
         const db = await getDB();
         return await db
             .select()
@@ -83,7 +103,8 @@ export class OrderRepository {
                     inArray(ordersTable.status, ['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'] as OrderStatus[]),
                 ),
             )
-            .orderBy(desc(ordersTable.createdAt));
+            .orderBy(desc(ordersTable.createdAt))
+            .limit(limit);
     }
 
     async findForDriverByStatus(driverId: string, status: OrderStatus): Promise<DbOrder[]> {
@@ -139,7 +160,7 @@ export class OrderRepository {
             : eq(ordersTable.id, id);
         const result = await db
             .update(ordersTable)
-            .set({ driverId })
+            .set({ driverId, ...(driverId ? { driverAssignedAt: new Date().toISOString() } : {}) })
             .where(whereClause)
             .returning();
         return result[0] || null;
@@ -215,6 +236,20 @@ export class OrderRepository {
         const result = await db
             .update(ordersTable)
             .set({ status, [timestampField]: new Date().toISOString() })
+            .where(eq(ordersTable.id, id))
+            .returning();
+        return result[0] || null;
+    }
+
+    async cancelWithReason(id: string, reason: string): Promise<DbOrder | null> {
+        const db = await getDB();
+        const result = await db
+            .update(ordersTable)
+            .set({
+                status: 'CANCELLED' as OrderStatus,
+                cancellationReason: reason,
+                cancelledAt: new Date().toISOString(),
+            })
             .where(eq(ordersTable.id, id))
             .returning();
         return result[0] || null;

@@ -3,7 +3,7 @@
 <!-- MDS:O1 | Domain: Operations | Updated: 2026-03-18 -->
 <!-- Depends-On: A1, B4 -->
 <!-- Depended-By: O2 -->
-<!-- Nav: Metrics changes → update O2 (Observability). Watchdog counters → review B4 (Watchdog). Dashboard phases → review O11 (Analytics). -->
+<!-- Nav: Metrics changes → update O2 (Observability). Watchdog counters → review B4 (Watchdog). Dashboard phases → review O11 (Analytics). Ops Wall → see O1#ops-wall-endpoint. -->
 
 ## Current State In This Repo
 
@@ -68,6 +68,9 @@ The current baseline includes:
 - subscription attempts, rejects, completions, and runtime errors
 - active subscriptions by operation name
 - pubsub publish totals and pubsub publish failures by topic family
+- push send attempts by app type and platform
+- push provider accepted vs failed totals (including failure reason labels)
+- push client telemetry totals by event type (received/opened/actioned)
 
 The API also now exposes `/health/realtime`, which is designed for human monitoring rather than scraping. It gives you:
 
@@ -82,6 +85,17 @@ The next step is to add more delivery-specific counters for:
 - push send failures
 - settlement failures
 - auth lockouts
+
+Push notification monitoring is now available in the Ops Wall Grafana dashboard with:
+
+- push provider throughput (sent/accepted/failed)
+- push 5-minute failure rate stat with thresholds
+- push opened/actioned activity trend
+
+Grafana alerting now includes push-specific rules for:
+
+- sustained push failure-rate spikes
+- no accepted deliveries while sends are active
 
 ### 3. Configure Real Alert Destinations
 
@@ -167,3 +181,97 @@ The correct order is:
 4. tracing later if needed
 
 That gets you from "we have local observability" to "we can safely operate production."
+
+---
+
+## Ops Wall
+
+### `/health/ops-wall` Endpoint
+
+`GET /health/ops-wall` — requires `ADMIN` or `SUPER_ADMIN` JWT. Returns a unified snapshot of the four operational domains, refreshed on every call (no cache).
+
+**Response shape:**
+
+```jsonc
+{
+  "timestamp": "ISO-8601",
+  "sloStatus": "ok" | "degraded" | "critical",
+  "driverFleet": {
+    "byStatus": { "CONNECTED": 4, "STALE": 1, "LOST": 0, "DISCONNECTED": 12 },
+    "staleLocationCount": 2,
+    "avgHeartbeatAgeSeconds": 28,
+    "recentDisconnects": [{ "driverName": "…", "phoneNumber": "…", "disconnectedAt": "…" }]
+  },
+  "businessFleet": {
+    "devices": [{ "businessName": "…", "businessPhoneNumber": "…", "platform": "android"|"ios", "status": "ONLINE"|"STALE"|"OFFLINE", "batteryLevel": 0-100, "subscriptionAlive": bool }],
+    "byStatus": { "ONLINE": 3, "STALE": 1, "OFFLINE": 0 }
+  },
+  "orderPipeline": {
+    "byStatus": { "PENDING": 2, "PREPARING": 5, "READY": 1, "OUT_FOR_DELIVERY": 3 },
+    "stuckOrders": [{ "type": "stuck_pending"|"stuck_ready"|"stuck_ofd", "count": 1 }],
+    "avgAssignmentLagSeconds": 45,
+    "avgDeliveryTimeSeconds": 1820,
+    "todayDelivered": 38,
+    "todayCancelled": 2
+  },
+  "realtime": { /* realtimeMonitor.getSummary() shape */ }
+}
+```
+
+`liveUsers` in this endpoint is constrained to connected users with role `CUSTOMER`.
+
+**SLO status computation** (in `api/src/routes/opsWall.ts`):
+- `critical` if any LOST drivers > 0, pubsub failures > 5/min, or stuck orders > 4
+- `degraded` if STALE drivers > 2, offline business devices > 20% of total, or stuck orders > 1
+- `ok` otherwise
+
+### Admin Panel: `/dashboard/ops-wall`
+
+`SUPER_ADMIN`-only page polling the endpoint every 10 seconds. Features:
+- 5 SLO indicator pills (API, Realtime, Drivers, Business, Orders)
+- Driver Fleet card with status bar visualization and recent disconnects
+- Recent disconnect rows include driver phone number when present
+- Order Pipeline card with funnel bars, stuck orders table, and avg timing
+- Push Health card with sent/received/opened/action metrics and app-type breakdown
+- Business Fleet card with ONLINE/STALE/OFFLINE pills and one latest device row per business (including phone number)
+- Who's Online card lists customers only
+- Realtime Feed card with stat boxes and scrollable event log
+- Kiosk mode (full-screen, hides sidebar, shows clock) — press ESC to exit
+
+Current admin-wall layout:
+
+- Row 1: Driver Fleet, Who's Online, Business Devices
+- Row 2: Order Pipeline, Push Health
+- Row 3: Realtime Feed
+- Sound chime on SLO worsening (mutable)
+
+### Prometheus Fleet Gauges
+
+Four new gauges exported from `api/src/lib/metrics.ts`, populated by every `/health/ops-wall` call:
+
+| Metric | Labels | Description |
+|---|---|---|
+| `drivers_by_connection_status` | `status` | Count of drivers per connection state |
+| `business_devices_by_online_status` | `status` | Count of business devices per online state |
+| `orders_by_status` | `status` | Count of active orders per order status |
+| `orders_stuck_total` | `type` | Count of orders exceeding SLO threshold by type |
+
+### Grafana Ops Wall Dashboard
+
+Pre-provisioned at `observability/grafana/dashboards/ops-wall.json` (UID: `ops-wall-v1`). Refreshes every 10 s. Panels:
+
+- Global SLO Stats row: 6 stat panels
+- Driver Fleet row: connection status time series + donut pie
+- Order Pipeline row: horizontal bar gauge by status + stuck orders stat panels
+- Business Device Fleet row: online status time series + donut pie
+- Realtime & API Health row: WS connections, error/rejection rates, API error %, p95 latency
+
+### Alert Rules (fleet-specific)
+
+Three rules added to the `delivery-api-alerts` group in `observability/grafana/provisioning/alerting/rules.yml`:
+
+| UID | Condition | For | Severity |
+|---|---|---|---|
+| `all-drivers-lost` | `drivers_by_connection_status{status="CONNECTED"} < 1` | 5 m | critical |
+| `business-offline-spike` | offline device ratio > 20% | 3 m | warning |
+| `order-stuck-pipeline` | `sum(orders_stuck_total) > 3` | 5 m | critical |

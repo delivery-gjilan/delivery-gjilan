@@ -1389,13 +1389,16 @@ function ProductModal({
     };
 
     const uploadImage = async (file: File): Promise<string | null> => {
+        const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/graphql').replace(/\/graphql$/, '');
         const formData = new FormData();
         formData.append('image', file);
         formData.append('folder', 'products');
 
+        const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
         try {
-            const response = await fetch('http://localhost:4000/api/upload/image', {
+            const response = await fetch(`${apiBase}/api/upload/image`, {
                 method: 'POST',
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
                 body: formData,
             });
 
@@ -1407,6 +1410,23 @@ function ProductModal({
         } catch (error) {
             console.error('Image upload error:', error);
             return null;
+        }
+    };
+
+    const deleteImage = async (imageUrl: string): Promise<void> => {
+        const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/graphql').replace(/\/graphql$/, '');
+        const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+        try {
+            await fetch(`${apiBase}/api/upload/image`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify({ imageUrl }),
+            });
+        } catch {
+            console.warn('Failed to delete old image from S3:', imageUrl);
         }
     };
 
@@ -1422,6 +1442,10 @@ function ProductModal({
         let imageUrl = form.imageUrl;
 
         if (imageFile) {
+            // Delete old S3 image before uploading replacement
+            if (modal.mode === 'edit' && form.imageUrl) {
+                await deleteImage(form.imageUrl);
+            }
             setUploadingImage(true);
             const uploadedUrl = await uploadImage(imageFile);
             setUploadingImage(false);

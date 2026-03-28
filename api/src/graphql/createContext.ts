@@ -25,6 +25,7 @@ import { getDriverServices, initializeDriverServices } from '@/services/driverSe
 import logger from '@/lib/logger';
 import { NotificationRepository } from '@/repositories/NotificationRepository';
 import { NotificationService } from '@/services/NotificationService';
+import { PromotionService } from '@/services/PromotionService';
 
 /**
  * Extracts and verifies JWT token from request Authorization header or WebSocket connection params
@@ -79,6 +80,7 @@ let cachedServices: {
     driverAuthService: DriverAuthService;
     orderService: OrderService;
     notificationService: NotificationService;
+    promotionService: PromotionService;
 } | null = null;
 
 async function getOrCreateServices(db: any) {
@@ -101,6 +103,7 @@ async function getOrCreateServices(db: any) {
         driverAuthService: new DriverAuthService(authRepository, new DriverRepository(db)),
         orderService: new OrderService(orderRepository, authRepository, productRepository, pubsub),
         notificationService: new NotificationService(new NotificationRepository(db)),
+        promotionService: new PromotionService(db),
     };
     return cachedServices;
 }

@@ -87,6 +87,26 @@ export const ASSIGN_DRIVER_TO_ORDER = graphql(`
     }
 `);
 
+export const ADMIN_CANCEL_ORDER = graphql(`
+    mutation AdminCancelOrder($id: ID!, $reason: String!, $settleDriver: Boolean, $settleBusiness: Boolean) {
+        adminCancelOrder(id: $id, reason: $reason, settleDriver: $settleDriver, settleBusiness: $settleBusiness) {
+            id
+            status
+            cancellationReason
+            cancelledAt
+        }
+    }
+`);
+
+export const SET_ORDER_ADMIN_NOTE = graphql(`
+    mutation SetOrderAdminNote($id: ID!, $note: String) {
+        setOrderAdminNote(id: $id, note: $note) {
+            id
+            adminNote
+        }
+    }
+`);
+
 export const CREATE_TEST_ORDER = graphql(`
     mutation CreateTestOrder {
         createTestOrder {

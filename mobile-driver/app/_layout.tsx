@@ -14,6 +14,8 @@ import DriverMessageBanner from '@/components/DriverMessageBanner';
 import type { AlertType } from '@/components/DriverMessageBanner';
 import { useSubscription } from '@apollo/client/react';
 import { DRIVER_MESSAGE_RECEIVED_SUB } from '@/graphql/operations/driverMessages';
+import { useGlobalOrderAccept } from '@/hooks/useGlobalOrderAccept';
+import { OrderAcceptSheet } from '@/components/OrderAcceptSheet';
 import Mapbox from '@rnmapbox/maps';
 import { MAPBOX_TOKEN } from '@/utils/mapbox';
 
@@ -22,6 +24,8 @@ function AppContent() {
     useDriverTracking();
     useNotifications();
     const { isAdminTalking } = useDriverPttReceiver();
+    const { pendingOrder, autoCountdown, accepting, handleAcceptOrder, handleSkipOrder, handleAcceptAndNavigate } =
+        useGlobalOrderAccept();
 
     const { bannerEnabled, bannerMessage, bannerType } = useStoreStatus();
     const [bannerDismissed, setBannerDismissed] = useState(false);
@@ -69,6 +73,16 @@ function AppContent() {
                     alertType={incomingMessage.alertType}
                     adminId={incomingMessage.adminId}
                     onDismiss={() => setIncomingMessage(null)}
+                />
+            )}
+            {pendingOrder && (
+                <OrderAcceptSheet
+                    order={pendingOrder}
+                    onAccept={handleAcceptOrder}
+                    onAcceptAndNavigate={handleAcceptAndNavigate}
+                    onSkip={handleSkipOrder}
+                    accepting={accepting}
+                    autoCountdown={autoCountdown}
                 />
             )}
             <Stack screenOptions={{ headerShown: false }}>

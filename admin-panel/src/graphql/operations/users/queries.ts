@@ -2,8 +2,8 @@ import { gql } from '@apollo/client';
 import { graphql } from '@/gql';
 
 export const USERS_QUERY = graphql(`
-  query Users {
-    users {
+  query Users($limit: Int, $offset: Int) {
+    users(limit: $limit, offset: $offset) {
       id
       email
       firstName

@@ -125,6 +125,36 @@ Business roles (`BUSINESS_OWNER`, `BUSINESS_EMPLOYEE`) require a non-null `busin
 
 ---
 
+## Driver Architecture (Two-Table Model)
+
+Drivers are **not** a standalone entity — they are users with `role = 'DRIVER'` **plus** a row in the `drivers` table linked by `userId` (unique FK, cascade-delete).
+
+| Table | Responsibility |
+|-------|---------------|
+| `users` | Identity, auth, role, email, name, phone |
+| `drivers` | Location, heartbeat, connection status, commission, vehicle flag, battery, ETA |
+
+The `drivers` table is **required** for driver operation — `driverHeartbeat`, `updateDriverLocation`, and all other driver mutations query it by `userId`. You cannot remove this table.
+
+**To promote an existing user to driver:** update `users.role = 'DRIVER'` + insert a `drivers` row with that `userId`. No mutation exists for this yet — requires a DB operation or an `adminPromoteToDriver` mutation.
+
+**Current auth flows:**
+- **Mobile-driver app** uses the standard `login` mutation (returns 15-min JWT + 30-day refresh token, stored in SecureStore)
+- **`driverLogin` / `driverRegister` mutations** are registered in the schema and also return proper 15-min tokens + refresh tokens (via `DriverAuthService` using `AuthRepository.createRefreshTokenSession`)
+
+`driverRegister` creates both rows atomically:
+1. Inserts `users` row with `role = 'DRIVER'` via `AuthRepository.createUserWithRole`
+2. Inserts `drivers` row via `DriverRepository.createDriver(userId)`
+
+**Key files:**
+- `api/src/services/DriverAuthService.ts`
+- `api/src/repositories/DriverRepository.ts`
+- `api/database/schema/drivers.ts`
+- `api/src/models/Driver/resolvers/Mutation/driverRegister.ts`
+- `api/src/models/Driver/Driver.graphql` — defines `DriverAuthResult`, `DriverBasicInfo`, `DriverLoginInput`, `DriverRegisterInput`
+
+---
+
 ## User Schema Fields (Notable)
 
 | Field | Type | Notes |

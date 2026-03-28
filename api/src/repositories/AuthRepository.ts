@@ -142,8 +142,8 @@ export class AuthRepository {
         return user;
     }
 
-    async findAllUsers(): Promise<DbUser[]> {
-        return this.db.select().from(users).where(isNull(users.deletedAt));
+    async findAllUsers(limit = 2000, offset = 0): Promise<DbUser[]> {
+        return this.db.select().from(users).where(isNull(users.deletedAt)).limit(limit).offset(offset);
     }
 
     async findDrivers(): Promise<DbUser[]> {

@@ -4,9 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Mapbox from '@rnmapbox/maps';
 
-import { useApolloClient, useMutation, useQuery, useSubscription } from '@apollo/client/react';
-import { GET_ORDERS, ALL_ORDERS_UPDATED, ASSIGN_DRIVER_TO_ORDER, UPDATE_ORDER_STATUS } from '@/graphql/operations/orders';
-import { OrderAcceptSheet } from '@/components/OrderAcceptSheet';
+import { useApolloClient, useMutation, useQuery } from '@apollo/client/react';
+import { GET_ORDERS, UPDATE_ORDER_STATUS } from '@/graphql/operations/orders';
 import { OrderDetailSheet } from '@/components/OrderDetailSheet';
 import { OrderPoolSheet } from '@/components/OrderPoolSheet';
 import { useDriverLocation } from '@/hooks/useDriverLocation';
@@ -17,6 +16,7 @@ import { useStoreStatus } from '@/hooks/useStoreStatus';
 import type { NavigationPhase } from '@/store/navigationStore';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchRouteGeometry } from '@/utils/mapbox';
+import { useOrderAcceptStore } from '@/store/orderAcceptStore';
 import type { Feature, LineString } from 'geojson';
 
 /* ─── Constants ─── */
@@ -66,15 +66,16 @@ export default function MapScreen() {
     const connectionStatus = useAuthStore((state) => state.connectionStatus);
     const { dispatchModeEnabled } = useStoreStatus();
 
-    const [acceptSheetOrder, setAcceptSheetOrder] = useState<any>(null);
-    const [acceptSheetHeight, setAcceptSheetHeight] = useState(0);
     const [markingPickedUpIds, setMarkingPickedUpIds] = useState<Set<string>>(new Set());
-    const [acceptAutoCountdown, setAcceptAutoCountdown] = useState(true);
-    const skippedIds = useRef(new Set<string>());
-    const [accepting, setAccepting] = useState(false);
+    const [nowTs, setNowTs] = useState(() => Date.now());
+    useEffect(() => {
+        const id = setInterval(() => setNowTs(Date.now()), 10_000);
+        return () => clearInterval(id);
+    }, []);
     const [poolOpen, setPoolOpen] = useState(false);
-    const [assignDriver] = useMutation(ASSIGN_DRIVER_TO_ORDER);
     const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS);
+    const pendingOrder = useOrderAcceptStore((s) => s.pendingOrder);
+    const pendingAutoCountdown = useOrderAcceptStore((s) => s.autoCountdown);
 
     // ── Route state ──
     const [routeCoords, setRouteCoords] = useState<Array<[number, number]> | null>(null);
@@ -89,31 +90,6 @@ export default function MapScreen() {
     const { data, loading, refetch } = useQuery(GET_ORDERS, {
         fetchPolicy: 'cache-and-network',
         nextFetchPolicy: 'cache-first',
-    });
-
-    useSubscription(ALL_ORDERS_UPDATED, {
-        onData: ({ data }) => {
-            const incomingOrders = data.data?.allOrdersUpdated as any[] | undefined;
-            if (!incomingOrders || incomingOrders.length === 0) {
-                refetch();
-                return;
-            }
-
-            apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
-                const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
-                const byId = new Map(currentOrders.map((order: any) => [String(order?.id), order]));
-
-                incomingOrders.forEach((order: any) => {
-                    const existingOrder = byId.get(String(order?.id));
-                    byId.set(String(order?.id), { ...existingOrder, ...order });
-                });
-
-                return {
-                    ...(existing ?? {}),
-                    orders: Array.from(byId.values()),
-                };
-            });
-        },
     });
 
     // ── Filter orders ──
@@ -342,69 +318,43 @@ export default function MapScreen() {
         }
     }, [followDriver, location, hasActiveNavigation]);
 
-    // ── Accept an available order ──
-    const handleAcceptOrder = useCallback(async (orderId: string) => {
-        if (!currentDriverId) return;
-        setAccepting(true);
-        try {
-            await assignDriver({ variables: { id: orderId, driverId: currentDriverId } });
-            const order = acceptSheetOrder;
-            const bizLoc = order?.businesses?.[0]?.business?.location;
-            const dropLoc = order?.dropOffLocation;
-            const pickup = bizLoc
-                ? {
-                    latitude: Number(bizLoc.latitude),
-                    longitude: Number(bizLoc.longitude),
-                    label: order.businesses?.[0]?.business?.name ?? 'Pickup',
-                  }
-                : null;
-            const dropoff = dropLoc
-                ? {
-                    latitude: Number(dropLoc.latitude),
-                    longitude: Number(dropLoc.longitude),
-                    label: dropLoc.address ?? 'Drop-off',
-                  }
-                : null;
-            if (pickup && location) {
-                const navOrder = {
-                    id: orderId,
-                    status: 'READY',
-                    businessName: order.businesses?.[0]?.business?.name ?? '',
-                    customerName: order.user ? `${order.user.firstName} ${order.user.lastName}` : 'Customer',
-                    pickup,
-                    dropoff,
-                };
-                startNavigation(navOrder, 'to_pickup', location);
-            }
-            setAcceptSheetOrder(null);
-            setAcceptSheetHeight(0);
-        } catch {
-            Alert.alert('Error', 'Failed to accept order. Please try again.');
-        } finally {
-            setAccepting(false);
-        }
-    }, [acceptSheetOrder, currentDriverId, location, assignDriver, startNavigation, router]);
-
-    const handleSkipOrder = useCallback(() => {
-        if (acceptSheetOrder && acceptAutoCountdown) {
-            skippedIds.current.add(acceptSheetOrder.id);
-        }
-        setAcceptSheetOrder(null);
-        setAcceptSheetHeight(0);
-    }, [acceptSheetOrder, acceptAutoCountdown]);
-
     const handleMarkPickedUp = useCallback(async (orderId?: string) => {
         const targetId = orderId ?? focusedOrder?.id;
         if (!targetId) return;
         setMarkingPickedUpIds(prev => new Set(prev).add(targetId));
         try {
             await updateOrderStatus({ variables: { id: targetId, status: 'OUT_FOR_DELIVERY' } });
+            // Immediately launch turn-by-turn navigation to dropoff
+            const order = allMapOrders.find((o: any) => o.id === targetId);
+            if (order && location) {
+                const bizLoc = order.businesses?.[0]?.business?.location;
+                const dropLoc = order.dropOffLocation;
+                if (bizLoc) {
+                    const pickup = {
+                        latitude: Number(bizLoc.latitude),
+                        longitude: Number(bizLoc.longitude),
+                        label: order.businesses?.[0]?.business?.name ?? 'Pickup',
+                    };
+                    const dropoff = dropLoc
+                        ? { latitude: Number(dropLoc.latitude), longitude: Number(dropLoc.longitude), label: dropLoc.address ?? 'Drop-off' }
+                        : null;
+                    const customerName = order.user
+                        ? `${order.user.firstName} ${order.user.lastName}`
+                        : 'Customer';
+                    startNavigation(
+                        { id: order.id, status: 'OUT_FOR_DELIVERY', businessName: order.businesses?.[0]?.business?.name ?? 'Business', customerName, customerPhone: order.user?.phoneNumber ?? null, pickup, dropoff },
+                        'to_dropoff',
+                        { latitude: location.latitude, longitude: location.longitude },
+                    );
+                    router.push('/navigation' as any);
+                }
+            }
         } catch {
             Alert.alert('Error', 'Could not update order status. Please try again.');
         } finally {
             setMarkingPickedUpIds(prev => { const next = new Set(prev); next.delete(targetId); return next; });
         }
-    }, [focusedOrder?.id, updateOrderStatus]);
+    }, [focusedOrder?.id, updateOrderStatus, allMapOrders, location, startNavigation, router]);
 
     // ── Pool handlers ──
     const handlePoolOpen = useCallback(() => {
@@ -418,8 +368,7 @@ export default function MapScreen() {
 
     const handlePoolSelectOrder = useCallback((order: any) => {
         setPoolOpen(false);
-        setAcceptAutoCountdown(false);
-        setAcceptSheetOrder(order);
+        useOrderAcceptStore.getState().setPendingOrder(order, false);
         const bizLoc = order.businesses?.[0]?.business?.location;
         if (!bizLoc || !cameraRef.current) return;
         if (location) {
@@ -438,14 +387,10 @@ export default function MapScreen() {
         }
     }, [location]);
 
-    // ── Auto-present the accept sheet when a new available order appears ──
+    // ── Camera fit when global accept sheet auto-presents a new order ──
     useEffect(() => {
-        if (!isOnline || acceptSheetOrder || dispatchModeEnabled || poolOpen) return;
-        const next = availableOrders.find((o: any) => !skippedIds.current.has(o.id));
-        if (!next) return;
-        setAcceptAutoCountdown(true);
-        setAcceptSheetOrder(next);
-        const bizLoc = next.businesses?.[0]?.business?.location;
+        if (!pendingOrder || !pendingAutoCountdown || poolOpen) return;
+        const bizLoc = pendingOrder.businesses?.[0]?.business?.location;
         if (!bizLoc || !cameraRef.current) return;
         if (location) {
             const lats = [Number(bizLoc.latitude), location.latitude];
@@ -462,7 +407,7 @@ export default function MapScreen() {
             });
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [availableOrders.length, isOnline]);
+    }, [pendingOrder?.id, pendingAutoCountdown]);
 
     // ── Launch Mapbox Navigation SDK ──
     const handleStartNavigation = useCallback((targetOrder?: any) => {
@@ -545,7 +490,7 @@ export default function MapScreen() {
                     maxBounds={{ ne: GJILAN_NE, sw: GJILAN_SW }}
                     minZoomLevel={12}
                     padding={{
-                        paddingTop: acceptSheetOrder && !focusedOrder ? acceptSheetHeight : 0,
+                        paddingTop: 0,
                         paddingBottom: assignedOrders.length > 0 ? BOTTOM_BAR_HEIGHT : 0,
                         paddingLeft: 0,
                         paddingRight: 0,
@@ -698,18 +643,17 @@ export default function MapScreen() {
                                 <Mapbox.PointAnnotation
                                     id={`dropoff-${order.id}`}
                                     coordinate={[Number(dropLoc.longitude), Number(dropLoc.latitude)]}
-                                    anchor={{ x: 0.5, y: 0.5 }}
+                                    anchor={{ x: 0.5, y: 1 }}
                                     onSelected={() => focusOrder(order)}
                                 >
-                                    <View style={[
-                                        styles.dropoffMarker,
-                                        {
-                                            backgroundColor: statusColor,
-                                            borderWidth: isFocused ? 3 : 2,
-                                            transform: [{ scale: isFocused ? 1.15 : 1 }],
-                                        },
-                                    ]}>
-                                        <Ionicons name="cube" size={12} color="#fff" />
+                                    <View style={[styles.dropoffPin, { transform: [{ scale: isFocused ? 1.2 : 1 }] }]}>
+                                        <View style={[
+                                            styles.dropoffPinHead,
+                                            isFocused && styles.dropoffPinHeadFocused,
+                                        ]}>
+                                            <Ionicons name="flag" size={12} color="#fff" />
+                                        </View>
+                                        <View style={styles.dropoffPinTip} />
                                     </View>
                                 </Mapbox.PointAnnotation>
                             )}
@@ -720,8 +664,27 @@ export default function MapScreen() {
 
             {/* ═══ Right-side buttons ═══ */}
             <View style={[styles.rightButtons, { bottom: (assignedOrders.length > 0 ? BOTTOM_BAR_HEIGHT + 12 : 20 + insets.bottom) }]}>
+                {/* Arrived at pickup shortcut */}
+                {(() => {
+                    const t = assignedOrders.length === 1
+                        ? assignedOrders[0]
+                        : assignedOrders.find((o: any) => o.id === focusedOrderId) ?? null;
+                    if (t?.status !== 'READY') return null;
+                    return (
+                        <Pressable
+                            style={[styles.mapBtn, styles.mapBtnArrived]}
+                            onPress={() => handleMarkPickedUp(t.id)}
+                            disabled={markingPickedUpIds.has(t.id)}
+                        >
+                            {markingPickedUpIds.has(t.id)
+                                ? <ActivityIndicator size={16} color="#fff" />
+                                : <Ionicons name="checkmark-circle" size={22} color="#fff" />
+                            }
+                        </Pressable>
+                    );
+                })()}
                 {/* Available orders pool button */}
-                {!dispatchModeEnabled && isOnline && !acceptSheetOrder && availableOrders.length > 0 && (
+                {!dispatchModeEnabled && isOnline && !pendingOrder && availableOrders.length > 0 && (
                     <Pressable
                         style={[styles.mapBtn, styles.mapBtnPool]}
                         onPress={handlePoolOpen}
@@ -790,20 +753,6 @@ export default function MapScreen() {
 
 
 
-            {/* ═══ Accept sheet ═══ */}
-            {acceptSheetOrder && (
-                <OrderAcceptSheet
-                    order={acceptSheetOrder}
-                    onAccept={handleAcceptOrder}
-                    onSkip={handleSkipOrder}
-                    accepting={accepting}
-                    autoCountdown={acceptAutoCountdown}
-                    onHeightChange={setAcceptSheetHeight}
-                />
-            )}
-
-            {/* ═══ Order Pool pill — REMOVED (moved to right button column) ═══ */}
-
             {/* ═══ Order Pool Sheet ═══ */}
             {poolOpen && (
                 <OrderPoolSheet
@@ -837,7 +786,13 @@ export default function MapScreen() {
                         const dropAddress = order.dropOffLocation?.address ?? '';
                         const shortDrop = dropAddress.split(',')[0] || '';
                         const isReady = order.status === 'READY';
+                        const isPreparing = order.status === 'PREPARING';
                         const isPickingUp = markingPickedUpIds.has(order.id);
+                        const prepMinsLeft = (() => {
+                            if (!isPreparing || !order.estimatedReadyAt) return null;
+                            const diff = Math.ceil((new Date(order.estimatedReadyAt).getTime() - nowTs) / 60000);
+                            return diff > 0 ? diff : 0;
+                        })();
 
                         return (
                             <Pressable
@@ -865,7 +820,7 @@ export default function MapScreen() {
                                     </View>
                                 </View>
 
-                                {/* Row 2: status badge + action buttons */}
+                                {/* Row 2: status badge + action buttons (hidden when focused — show info instead) */}
                                 <View style={styles.barCardBottom}>
                                     <View style={[styles.barStatusBadge, { backgroundColor: statusColor + '22' }]}>
                                         <View style={[styles.barStatusDot, { backgroundColor: statusColor }]} />
@@ -873,27 +828,72 @@ export default function MapScreen() {
                                             {STATUS_LABELS[order.status] ?? order.status}
                                         </Text>
                                     </View>
-                                    <View style={styles.barActions}>
-                                        {isReady && (
+                                    {!isFocused && (
+                                        <View style={styles.barActions}>
                                             <Pressable
-                                                style={[styles.barActionBtn, styles.barPickupBtn]}
-                                                onPress={() => handleMarkPickedUp(order.id)}
-                                                disabled={isPickingUp}
+                                                style={[styles.barActionBtn, styles.barNavBtn]}
+                                                onPress={() => handleStartNavigation(order)}
                                             >
-                                                {isPickingUp
-                                                    ? <ActivityIndicator size={10} color="#fff" />
-                                                    : <Ionicons name="checkmark-outline" size={13} color="#fff" />
-                                                }
+                                                <Ionicons name="navigate-outline" size={16} color="#fff" />
                                             </Pressable>
-                                        )}
-                                        <Pressable
-                                            style={[styles.barActionBtn, styles.barNavBtn]}
-                                            onPress={() => handleStartNavigation(order)}
-                                        >
-                                            <Ionicons name="navigate-outline" size={13} color="#fff" />
-                                        </Pressable>
-                                    </View>
+                                        </View>
+                                    )}
                                 </View>
+
+                                {/* When focused: show ETA info only (no action buttons) */}
+                                {isFocused && (
+                                    <View style={styles.focusedEtaRow}>
+                                        {isPreparing && (
+                                            <View style={styles.focusedEtaChip}>
+                                                <Ionicons name="restaurant-outline" size={11} color="#06b6d4" />
+                                                <Text style={[styles.focusedEtaText, { color: '#06b6d4' }]}>
+                                                    {prepMinsLeft === null ? 'Preparing' : prepMinsLeft === 0 ? 'Almost ready' : `Ready ~${prepMinsLeft} min`}
+                                                </Text>
+                                            </View>
+                                        )}
+                                        {routeInfo != null && focusedOrderId === order.id && (
+                                            <View style={styles.focusedEtaChip}>
+                                                <Ionicons name="navigate-outline" size={11} color="#818cf8" />
+                                                <Text style={[styles.focusedEtaText, { color: '#818cf8' }]}>
+                                                    {order.status === 'OUT_FOR_DELIVERY'
+                                                        ? `~${Math.ceil(routeInfo.durationMin)} min to drop`
+                                                        : `~${Math.ceil(routeInfo.durationMin)} min to pickup`}
+                                                </Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                )}
+
+                                {/* Row 3: Arrived at Pickup — only for READY orders when NOT focused */}
+                                {isReady && !isFocused && (
+                                    <Pressable
+                                        style={styles.arrivedBtn}
+                                        onPress={() => handleMarkPickedUp(order.id)}
+                                        disabled={isPickingUp}
+                                    >
+                                        {isPickingUp
+                                            ? <ActivityIndicator size={14} color="#fff" />
+                                            : <>
+                                                <Ionicons name="checkmark-circle" size={14} color="#fff" />
+                                                <Text style={styles.arrivedBtnText}>Arrived at Pickup</Text>
+                                              </>
+                                        }
+                                    </Pressable>
+                                )}
+
+                                {/* Row 3 (alt): Preparing countdown — only when NOT focused */}
+                                {isPreparing && !isFocused && (
+                                    <View style={styles.prepRow}>
+                                        <Ionicons name="restaurant-outline" size={11} color="#06b6d4" />
+                                        <Text style={styles.prepText}>
+                                            {prepMinsLeft === null
+                                                ? 'Preparing…'
+                                                : prepMinsLeft === 0
+                                                ? 'Almost ready'
+                                                : `Ready in ~${prepMinsLeft} min`}
+                                        </Text>
+                                    </View>
+                                )}
                             </Pressable>
                         );
                     })}
@@ -977,18 +977,38 @@ const styles = StyleSheet.create({
         height: 30,
         borderRadius: 15,
     },
-    dropoffMarker: {
-        width: 22,
-        height: 22,
-        borderRadius: 11,
-        borderColor: '#fff',
+    dropoffPin: {
+        alignItems: 'center',
+        width: 28,
+        height: 38,
+    },
+    dropoffPinHead: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: '#f97316',
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.35,
+        shadowColor: '#f97316',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.55,
         shadowRadius: 5,
-        elevation: 6,
+        elevation: 7,
+    },
+    dropoffPinHeadFocused: {
+        borderWidth: 2.5,
+        borderColor: '#fff',
+    },
+    dropoffPinTip: {
+        width: 0,
+        height: 0,
+        borderLeftWidth: 5,
+        borderRightWidth: 5,
+        borderTopWidth: 9,
+        borderLeftColor: 'transparent',
+        borderRightColor: 'transparent',
+        borderTopColor: '#f97316',
+        marginTop: -1,
     },
 
     /* ── Right-side buttons ── */
@@ -1022,6 +1042,9 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(34,211,238,0.35)',
         backgroundColor: 'rgba(34,211,238,0.08)',
     },
+    mapBtnArrived: {
+        backgroundColor: '#16a34a',
+    },
     poolBadge: {
         position: 'absolute',
         top: 6,
@@ -1054,7 +1077,7 @@ const styles = StyleSheet.create({
         alignItems: 'stretch',
     },
     barCard: {
-        width: 215,
+        width: 240,
         borderRadius: 14,
         backgroundColor: 'rgba(10,12,24,0.88)',
         borderLeftWidth: 3,
@@ -1142,9 +1165,9 @@ const styles = StyleSheet.create({
         gap: 5,
     },
     barActionBtn: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -1153,6 +1176,53 @@ const styles = StyleSheet.create({
     },
     barNavBtn: {
         backgroundColor: '#4f46e5',
+    },
+    arrivedBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 5,
+        backgroundColor: '#16a34a',
+        borderRadius: 8,
+        paddingVertical: 7,
+    },
+    arrivedBtnText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    prepRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: 'rgba(6,182,212,0.1)',
+        borderRadius: 6,
+        paddingHorizontal: 7,
+        paddingVertical: 4,
+        alignSelf: 'flex-start',
+    },
+    prepText: {
+        color: '#06b6d4',
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    focusedEtaRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 5,
+    },
+    focusedEtaChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        borderRadius: 6,
+        paddingHorizontal: 7,
+        paddingVertical: 4,
+    },
+    focusedEtaText: {
+        fontSize: 10,
+        fontWeight: '700',
     },
 
     /* ── Loading ── */

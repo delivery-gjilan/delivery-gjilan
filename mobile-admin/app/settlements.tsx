@@ -10,7 +10,7 @@ import { formatCurrency, formatDate } from '@/utils/helpers';
 
 export default function SettlementsScreen() {
     const theme = useTheme();
-    const { data, loading, refetch }: any = useQuery(GET_SETTLEMENTS);
+    const { data, loading, refetch }: any = useQuery(GET_SETTLEMENTS, { variables: { limit: 200 } });
     const [markPaid] = useMutation(MARK_SETTLEMENT_PAID);
     const settlements = data?.settlements || [];
 

@@ -97,7 +97,37 @@ Configured with Multer. Handles multipart parsing and puts the file in `req.file
 
 The `requireAuth` middleware is defined locally in `uploadRoutes.ts` (not the shared GraphQL context middleware). It decodes the JWT via `decodeJwtToken()` from `api/src/lib/utils/authUtils.ts` and sets `req.userId` and `req.userRole` on the request.
 
-**Important:** `requireAuth` only validates that the token is present and valid. It does **not** enforce role restrictions or ownership checks (e.g., a customer could upload to `businesses/`). This is a known security gap documented in [O6](../OPERATIONS/SECURITY_AUDIT_2026-03-13.md).
+## Auth on Upload Routes
+
+The `requireAuth` middleware is defined locally in `uploadRoutes.ts` (not the shared GraphQL context middleware). It decodes the JWT via `decodeJwtToken()` from `api/src/lib/utils/authUtils.ts` and sets `req.userId` and `req.userRole` on the request.
+
+**Role restrictions (enforced):**
+
+| Folder | Allowed roles |
+|--------|--------------|
+| `businesses` | `ADMIN`, `SUPER_ADMIN` |
+| `products` | `ADMIN`, `SUPER_ADMIN`, `BUSINESS_OWNER`, `BUSINESS_EMPLOYEE` |
+| `categories` | `ADMIN`, `SUPER_ADMIN`, `BUSINESS_OWNER`, `BUSINESS_EMPLOYEE` |
+
+DELETE is allowed by all business roles.
+
+---
+
+## Caller Patterns (Admin Panel)
+
+Upload calls in the admin panel use `process.env.NEXT_PUBLIC_API_URL` as the base URL (stripping the `/graphql` suffix) with `http://localhost:4000` as fallback. The `authToken` from `localStorage` is forwarded as `Authorization: Bearer <token>`. Three call sites:
+
+- `admin-panel/src/components/businesses/ProductsBlock.tsx` (`uploadImage` / `deleteImage`)
+- `admin-panel/src/app/dashboard/businesses/page.tsx` (`uploadImage` / `deleteImage`)
+- `admin-panel/src/app/dashboard/market/page.tsx` (inside `ProductModal`)
+
+**Old image cleanup:** When a product or business image is replaced, `deleteImage` is called on the old S3 URL before uploading the new one. This prevents orphaned S3 objects.
+
+---
+
+## Old Image Cleanup Gap
+
+~~When a business or product image is **replaced**, the old S3 object is never deleted.~~ **Fixed:** all three admin panel upload sites now call `DELETE /api/upload/image` on the old URL before uploading a replacement.
 
 ---
 

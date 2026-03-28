@@ -1,6 +1,6 @@
 import { Database } from '@/database';
 import { settlements, drivers, businesses, orders as ordersTable } from '@/database/schema';
-import { eq, and, gte, lte, sql, inArray } from 'drizzle-orm';
+import { eq, and, gte, lte, sql, inArray, isNotNull } from 'drizzle-orm';
 import { DbSettlement } from '@/database/schema/settlements';
 
 export interface SettlementFilters {
@@ -298,6 +298,34 @@ export class SettlementRepository {
                 and(
                     eq(settlements.orderId, orderId),
                     eq(settlements.status, 'PENDING'),
+                ),
+            )
+            .returning({ id: settlements.id });
+        return deleted.length;
+    }
+
+    async deletePendingByOrderIdForDriver(orderId: string): Promise<number> {
+        const deleted = await this.db
+            .delete(settlements)
+            .where(
+                and(
+                    eq(settlements.orderId, orderId),
+                    eq(settlements.status, 'PENDING'),
+                    isNotNull(settlements.driverId),
+                ),
+            )
+            .returning({ id: settlements.id });
+        return deleted.length;
+    }
+
+    async deletePendingByOrderIdForBusiness(orderId: string): Promise<number> {
+        const deleted = await this.db
+            .delete(settlements)
+            .where(
+                and(
+                    eq(settlements.orderId, orderId),
+                    eq(settlements.status, 'PENDING'),
+                    isNotNull(settlements.businessId),
                 ),
             )
             .returning({ id: settlements.id });

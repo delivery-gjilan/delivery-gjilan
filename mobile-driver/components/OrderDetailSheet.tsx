@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+    ActivityIndicator,
     Animated,
     PanResponder,
     Pressable,
@@ -13,9 +14,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const STATUS_COLORS: Record<string, string> = {
     PENDING: '#f59e0b',
-    PREPARING: '#06b6d4',
+    PREPARING: '#f97316',
     READY: '#3b82f6',
-    OUT_FOR_DELIVERY: '#8b5cf6',
+    OUT_FOR_DELIVERY: '#22c55e',
 };
 const STATUS_LABELS: Record<string, string> = {
     PENDING: 'Pending',
@@ -53,12 +54,21 @@ export function OrderDetailSheet({
 }: Props) {
     const insets = useSafeAreaInsets();
     const slideY = useRef(new Animated.Value(-300)).current;
+    const [itemsExpanded, setItemsExpanded] = useState(false);
+    const [markingPickedUp, setMarkingPickedUp] = useState(false);
+    const [nowTs, setNowTs] = useState(() => Date.now());
+
+    useEffect(() => {
+        const id = setInterval(() => setNowTs(Date.now()), 20_000);
+        return () => clearInterval(id);
+    }, []);
 
     const handleLayout = useCallback((e: any) => {
         onHeightChange?.(e.nativeEvent.layout.height);
     }, [onHeightChange]);
 
     useEffect(() => {
+        setItemsExpanded(false);
         slideY.setValue(-300);
         Animated.spring(slideY, {
             toValue: 0,
@@ -109,43 +119,56 @@ export function OrderDetailSheet({
     const totalItems = items.reduce((s: number, i: any) => s + (i.quantity || 1), 0);
     const deliveryPrice = Number(order.deliveryPrice ?? 0).toFixed(2);
     const isDelivering = order.status === 'OUT_FOR_DELIVERY';
-    const isReady = order.status === 'READY' || order.status === 'PREPARING';
+    const isPreparing = order.status === 'PREPARING';
+    const isReady = order.status === 'READY';
 
+    // Drive-time ETAs
     const etaToPickup =
-        isReady && routeInfo
+        (isReady || isPreparing) && routeInfo
             ? { km: routeInfo.distanceKm, min: Math.round(routeInfo.durationMin) }
             : null;
     const etaToCustomer = (() => {
         if (isDelivering && routeInfo)
             return { km: routeInfo.distanceKm, min: Math.round(routeInfo.durationMin) };
-        if (isReady && previewRouteInfo)
+        if ((isReady || isPreparing) && previewRouteInfo)
             return { km: previewRouteInfo.distanceKm, min: Math.round(previewRouteInfo.durationMin) };
         return null;
     })();
 
+    // Food prep countdown
+    const prepMinsLeft = isPreparing && order.estimatedReadyAt
+        ? (() => {
+            const diff = Math.ceil((new Date(order.estimatedReadyAt).getTime() - nowTs) / 60_000);
+            return diff > 0 ? diff : 0;
+          })()
+        : null;
+
+    const handleMarkPickedUpPress = useCallback(async () => {
+        if (!onMarkPickedUp) return;
+        setMarkingPickedUp(true);
+        try { await onMarkPickedUp(); } finally { setMarkingPickedUp(false); }
+    }, [onMarkPickedUp]);
+
     return (
         <Animated.View style={[styles.root, { transform: [{ translateY: slideY }] }]}>
             <View style={[styles.sheet, { paddingTop: insets.top + 6 }]} onLayout={handleLayout}>
-                {/* Colored accent line */}
+                {/* Colored accent bar */}
                 <View style={[styles.accentLine, { backgroundColor: statusColor }]} />
 
                 <View {...panResponder.panHandlers} style={styles.body}>
-                    {/* Row 1: status pill + order # + earnings + close */}
+                    {/* Row 1: status pill + order # + close */}
                     <View style={styles.topRow}>
                         <View style={[styles.statusPill, { backgroundColor: `${statusColor}20`, borderColor: `${statusColor}40` }]}>
                             <Ionicons name={statusIcon as any} size={11} color={statusColor} />
                             <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
                         </View>
-                        <Text style={styles.orderNum}>#{order.displayId ?? '—'}</Text>
-                        <View style={styles.earningsBadge}>
-                            <Text style={styles.earningsText}>€{deliveryPrice}</Text>
-                        </View>
+                        <Text style={styles.orderNum}>#{order.displayId ?? '\u2014'}</Text>
                         <Pressable onPress={onClose} hitSlop={12} style={styles.closeBtn}>
                             <Ionicons name="close" size={16} color="#475569" />
                         </Pressable>
                     </View>
 
-                    {/* Row 2: biz + customer */}
+                    {/* Row 2: biz avatar + name + customer + earnings */}
                     <View style={styles.infoRow}>
                         <View style={[styles.bizDot, { backgroundColor: statusColor }]}>
                             <Text style={styles.bizDotText}>{bizName.charAt(0).toUpperCase()}</Text>
@@ -154,14 +177,34 @@ export function OrderDetailSheet({
                             <Text style={styles.bizName} numberOfLines={1}>{bizName}</Text>
                             {customerName ? <Text style={styles.customerName} numberOfLines={1}>{customerName}</Text> : null}
                         </View>
-                        {/* Item count */}
-                        <View style={styles.itemCountBadge}>
-                            <Ionicons name="bag-outline" size={11} color="#64748b" />
-                            <Text style={styles.itemCountText}>{totalItems}</Text>
+                        {/* Driver earnings */}
+                        <View style={styles.earningsBadge}>
+                            <Text style={styles.earningsLabel}>earn</Text>
+                            <Text style={styles.earningsText}>{'\u20ac'}{deliveryPrice}</Text>
                         </View>
                     </View>
 
-                    {/* Row 3: address */}
+                    {/* Prep countdown chip — only when PREPARING */}
+                    {isPreparing && (
+                        <View style={styles.prepChip}>
+                            <Ionicons name="restaurant-outline" size={13} color="#06b6d4" />
+                            <Text style={styles.prepChipText}>
+                                {prepMinsLeft === null
+                                    ? 'Preparing'
+                                    : prepMinsLeft === 0
+                                    ? 'Almost ready'
+                                    : `Food ready in ~${prepMinsLeft} min`}
+                            </Text>
+                            {prepMinsLeft != null && prepMinsLeft > 0 && (
+                                <View style={styles.prepMinsBadge}>
+                                    <Text style={styles.prepMinsNum}>{prepMinsLeft}</Text>
+                                    <Text style={styles.prepMinsLabel}>min</Text>
+                                </View>
+                            )}
+                        </View>
+                    )}
+
+                    {/* Address */}
                     {dropAddress ? (
                         <View style={styles.addressRow}>
                             <Ionicons name="location-outline" size={12} color="#a78bfa" />
@@ -169,7 +212,7 @@ export function OrderDetailSheet({
                         </View>
                     ) : null}
 
-                    {/* Row 4: ETA chips */}
+                    {/* Drive-time ETA chips */}
                     {(etaToPickup || etaToCustomer) && (
                         <View style={styles.etaRow}>
                             {etaToPickup && (
@@ -177,7 +220,7 @@ export function OrderDetailSheet({
                                     <Ionicons name="storefront-outline" size={11} color="#3b82f6" />
                                     <Text style={styles.etaText}>
                                         <Text style={styles.etaBold}>{etaToPickup.km.toFixed(1)} km</Text>
-                                        {'  '}~{etaToPickup.min} min
+                                        {'  '}~{etaToPickup.min} min to pickup
                                     </Text>
                                 </View>
                             )}
@@ -186,10 +229,86 @@ export function OrderDetailSheet({
                                     <Ionicons name="cube-outline" size={11} color="#8b5cf6" />
                                     <Text style={styles.etaText}>
                                         <Text style={styles.etaBold}>{etaToCustomer.km.toFixed(1)} km</Text>
-                                        {'  '}~{etaToCustomer.min} min
+                                        {'  '}~{etaToCustomer.min} min total
                                     </Text>
                                 </View>
                             )}
+                        </View>
+                    )}
+
+                    {/* Items toggle + expanded list */}
+                    {items.length > 0 && (
+                        <>
+                            <Pressable
+                                style={[styles.itemsToggle, itemsExpanded && styles.itemsToggleOpen]}
+                                onPress={() => setItemsExpanded(v => !v)}
+                            >
+                                <View style={styles.itemsToggleLeft}>
+                                    <Ionicons name="bag-outline" size={13} color="#64748b" />
+                                    <Text style={styles.itemsToggleText}>
+                                        {totalItems} {totalItems === 1 ? 'item' : 'items'}
+                                    </Text>
+                                </View>
+                                <Ionicons
+                                    name={itemsExpanded ? 'chevron-up' : 'chevron-down'}
+                                    size={13}
+                                    color="#475569"
+                                />
+                            </Pressable>
+
+                            {itemsExpanded && (
+                                <View style={styles.itemsList}>
+                                    {items.slice(0, 10).map((item: any, idx: number) => (
+                                        <View
+                                            key={idx}
+                                            style={[
+                                                styles.itemRow,
+                                                idx < Math.min(items.length, 10) - 1 && styles.itemRowBorder,
+                                            ]}
+                                        >
+                                            <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                                            <View style={styles.itemQtyBadge}>
+                                                <Text style={styles.itemQtyText}>x{item.quantity}</Text>
+                                            </View>
+                                        </View>
+                                    ))}
+                                    {items.length > 10 && (
+                                        <Text style={styles.itemsMore}>+{items.length - 10} more items</Text>
+                                    )}
+                                </View>
+                            )}
+                        </>
+                    )}
+
+                    {/* CTA row */}
+                    {isAssignedToMe && (
+                        <View style={styles.ctaRow}>
+                            {isReady && onMarkPickedUp && (
+                                <Pressable
+                                    style={[styles.pickupBtn, markingPickedUp && { opacity: 0.65 }]}
+                                    onPress={handleMarkPickedUpPress}
+                                    disabled={markingPickedUp}
+                                >
+                                    {markingPickedUp ? (
+                                        <ActivityIndicator size={14} color="#fff" />
+                                    ) : (
+                                        <>
+                                            <Ionicons name="checkmark-circle" size={15} color="#fff" />
+                                            <Text style={styles.pickupBtnText}>Picked Up</Text>
+                                        </>
+                                    )}
+                                </Pressable>
+                            )}
+                            <Pressable
+                                style={styles.navBtn}
+                                onPress={() => {
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                    onStartNavigation();
+                                }}
+                            >
+                                <Ionicons name="navigate" size={16} color="#fff" />
+                                <Text style={styles.navBtnText}>Navigate</Text>
+                            </Pressable>
                         </View>
                     )}
                 </View>
@@ -222,10 +341,7 @@ const styles = StyleSheet.create({
     },
     accentLine: {
         height: 2,
-        marginHorizontal: 16,
-        borderRadius: 1,
-        marginBottom: 8,
-        opacity: 0.7,
+        opacity: 0.85,
     },
     body: {
         paddingHorizontal: 14,
@@ -233,11 +349,12 @@ const styles = StyleSheet.create({
         paddingBottom: 4,
     },
 
-    /* ── Top row ── */
+    /* top row */
     topRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 7,
+        paddingTop: 10,
     },
     statusPill: {
         flexDirection: 'row',
@@ -258,19 +375,6 @@ const styles = StyleSheet.create({
         fontSize: 11,
         fontWeight: '600',
     },
-    earningsBadge: {
-        backgroundColor: 'rgba(74,222,128,0.12)',
-        borderRadius: 8,
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderWidth: 1,
-        borderColor: 'rgba(74,222,128,0.2)',
-    },
-    earningsText: {
-        color: '#4ade80',
-        fontSize: 12,
-        fontWeight: '800',
-    },
     closeBtn: {
         width: 26,
         height: 26,
@@ -280,54 +384,101 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
 
-    /* ── Info row ── */
+    /* info row */
     infoRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
     },
     bizDot: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
         flexShrink: 0,
     },
     bizDotText: {
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: '900',
         color: '#fff',
     },
     infoText: {
         flex: 1,
-        gap: 1,
+        gap: 2,
     },
     bizName: {
         color: '#f1f5f9',
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: '800',
     },
     customerName: {
         color: '#64748b',
         fontSize: 11,
     },
-    itemCountBadge: {
-        flexDirection: 'row',
+    earningsBadge: {
+        backgroundColor: 'rgba(74,222,128,0.10)',
+        borderRadius: 10,
+        paddingHorizontal: 9,
+        paddingVertical: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(74,222,128,0.2)',
         alignItems: 'center',
-        gap: 3,
-        backgroundColor: 'rgba(255,255,255,0.06)',
-        borderRadius: 8,
-        paddingHorizontal: 7,
-        paddingVertical: 3,
     },
-    itemCountText: {
-        color: '#64748b',
-        fontSize: 11,
+    earningsLabel: {
+        color: 'rgba(74,222,128,0.6)',
+        fontSize: 8,
         fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        lineHeight: 10,
+    },
+    earningsText: {
+        color: '#4ade80',
+        fontSize: 13,
+        fontWeight: '900',
     },
 
-    /* ── Address ── */
+    /* prep countdown chip */
+    prepChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 7,
+        backgroundColor: 'rgba(6,182,212,0.08)',
+        borderRadius: 10,
+        paddingHorizontal: 11,
+        paddingVertical: 7,
+        borderWidth: 1,
+        borderColor: 'rgba(6,182,212,0.22)',
+    },
+    prepChipText: {
+        color: '#22d3ee',
+        fontSize: 12,
+        fontWeight: '700',
+        flex: 1,
+    },
+    prepMinsBadge: {
+        backgroundColor: '#06b6d4',
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        alignItems: 'center',
+    },
+    prepMinsNum: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '900',
+        lineHeight: 16,
+    },
+    prepMinsLabel: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 8,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+
+    /* address */
     addressRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -343,7 +494,7 @@ const styles = StyleSheet.create({
         fontSize: 11,
     },
 
-    /* ── ETA chips ── */
+    /* ETA chips */
     etaRow: {
         flexDirection: 'row',
         gap: 6,
@@ -368,7 +519,125 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
 
-    /* ── Drag handle ── */
+    /* items toggle */
+    itemsToggle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: 'rgba(255,255,255,0.04)',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.06)',
+    },
+    itemsToggleOpen: {
+        borderColor: 'rgba(255,255,255,0.12)',
+        backgroundColor: 'rgba(255,255,255,0.06)',
+    },
+    itemsToggleLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    itemsToggleText: {
+        color: '#64748b',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+
+    /* items expanded */
+    itemsList: {
+        backgroundColor: 'rgba(255,255,255,0.02)',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 3,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
+    },
+    itemRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 6,
+    },
+    itemRowBorder: {
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255,255,255,0.04)',
+    },
+    itemName: {
+        color: '#94a3b8',
+        fontSize: 12,
+        flex: 1,
+    },
+    itemQtyBadge: {
+        backgroundColor: 'rgba(255,255,255,0.07)',
+        borderRadius: 6,
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+        marginLeft: 10,
+    },
+    itemQtyText: {
+        color: '#94a3b8',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    itemsMore: {
+        color: '#475569',
+        fontSize: 11,
+        paddingVertical: 5,
+        textAlign: 'center',
+    },
+
+    /* CTAs */
+    ctaRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginTop: 2,
+        paddingBottom: 2,
+    },
+    pickupBtn: {
+        flex: 1,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: '#3b82f6',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: 6,
+        shadowColor: '#3b82f6',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.4,
+        shadowRadius: 8,
+        elevation: 6,
+    },
+    pickupBtnText: {
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: '800',
+    },
+    navBtn: {
+        flex: 1,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: '#8b5cf6',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: 6,
+        shadowColor: '#7c3aed',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.4,
+        shadowRadius: 8,
+        elevation: 6,
+    },
+    navBtnText: {
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: '800',
+    },
+
+    /* handle */
     handle: {
         width: 32,
         height: 3,

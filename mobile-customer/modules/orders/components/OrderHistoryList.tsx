@@ -18,9 +18,9 @@ type StatusStyles = {
 const getStatusStyles = (status: string, fallback: string): StatusStyles => {
     switch (status) {
         case 'PENDING': return { color: '#F59E0B', background: '#F59E0B18' };
-        case 'PREPARING':
-        case 'READY':
-        case 'OUT_FOR_DELIVERY': return { color: '#3B82F6', background: '#3B82F618' };
+        case 'PREPARING': return { color: '#F97316', background: '#F9731618' };
+        case 'READY': return { color: '#3B82F6', background: '#3B82F618' };
+        case 'OUT_FOR_DELIVERY': return { color: '#22C55E', background: '#22C55E18' };
         case 'DELIVERED': return { color: '#22C55E', background: '#22C55E18' };
         case 'CANCELLED': return { color: '#EF4444', background: '#EF444418' };
         default: return { color: fallback, background: `${fallback}18` };
@@ -204,7 +204,7 @@ export const OrderHistoryList = () => {
     const router = useRouter();
     const theme = useTheme();
     const { t } = useTranslations();
-    const { orders, loading } = useOrders();
+    const { orders, loading, loadMore, hasMore } = useOrders();
     const [summaryOrderId, setSummaryOrderId] = useState<string | null>(null);
 
     const handleOrderPress = (order: Order) => {
@@ -315,6 +315,15 @@ export const OrderHistoryList = () => {
                     </View>
                 )}
                 ListHeaderComponent={header}
+                ListFooterComponent={
+                    loading && orders.length > 0 ? (
+                        <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                            <ActivityIndicator size="small" color={theme.colors.primary} />
+                        </View>
+                    ) : null
+                }
+                onEndReached={() => { if (hasMore && !loading) loadMore(); }}
+                onEndReachedThreshold={0.3}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ paddingBottom: 32 }}
                 stickySectionHeadersEnabled={false}

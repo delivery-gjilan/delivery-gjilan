@@ -40,6 +40,8 @@ The apps are separate packages, but they share a set of conventions:
 - order history and active order tracking
 - store-status banner and store-closed handling
 
+In `mobile-customer` business detail, the bottom cart action panel (item count + total + "View Cart") is shown whenever the current business has cart items, while the promotion progression bar in that panel appears only when a spend-threshold promotion is available for that business.
+
 Bottom tab UX uses a stronger active state with dynamic icon fill and an animated underline marker aligned to the customer theme primary color.
 
 Customer checkout/cart UI now uses a three-step flow shell (cart, address, review) with localized step labels and notifier/error copy so both supported languages render the same flow language. Step 3 review shows a payment method card (cash on delivery), total in the confirm button, and character counter on driver notes. Duplicate translation keys cleaned up.

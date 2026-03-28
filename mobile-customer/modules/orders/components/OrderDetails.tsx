@@ -228,8 +228,8 @@ const STATUS_CONFIG: Record<string, {
     icon: keyof typeof Ionicons.glyphMap;
 }> = {
     PENDING: { color: '#F59E0B', bgColor: '#FEF3C7', textColor: '#92400E', icon: 'time' },
-    PREPARING: { color: '#7C3AED', bgColor: '#EDE9FE', textColor: '#5B21B6', icon: 'restaurant' },
-    READY: { color: '#7C3AED', bgColor: '#EDE9FE', textColor: '#5B21B6', icon: 'restaurant' },
+    PREPARING: { color: '#F97316', bgColor: '#FFEDD5', textColor: '#9A3412', icon: 'restaurant' },
+    READY: { color: '#3B82F6', bgColor: '#DBEAFE', textColor: '#1E40AF', icon: 'restaurant' },
     OUT_FOR_DELIVERY: { color: '#22C55E', bgColor: '#DCFCE7', textColor: '#166534', icon: 'bicycle' },
     DELIVERED: { color: '#22C55E', bgColor: '#DCFCE7', textColor: '#166534', icon: 'checkmark-done-circle' },
     CANCELLED: { color: '#EF4444', bgColor: '#FEE2E2', textColor: '#991B1B', icon: 'close-circle' },
@@ -1643,34 +1643,45 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                             );
                         })()}
 
-                        {/* Promo / discount rows */}
+                        {/* Promo / coupon rows */}
                         {(() => {
                             const promos: any[] = (order as any).orderPromotions ?? [];
                             if (!promos.length) return null;
-                            const totalDiscount = promos.reduce((acc: number, p: any) => acc + (p.discountAmount ?? 0), 0);
                             return (
-                                <View style={{
-                                    marginHorizontal: 0,
-                                    marginBottom: 10,
-                                    paddingHorizontal: 14,
-                                    paddingVertical: 10,
-                                    backgroundColor: '#22C55E12',
-                                    borderRadius: 10,
-                                    borderWidth: 1,
-                                    borderColor: '#22C55E30',
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                        <Ionicons name="pricetag-outline" size={14} color="#22C55E" />
-                                        <Text style={{ fontSize: 13, color: '#22C55E', fontWeight: '700' }}>
-                                            Promo{promos.length > 1 ? ` (×${promos.length})` : ''} applied
-                                        </Text>
-                                    </View>
-                                    <Text style={{ fontSize: 14, color: '#22C55E', fontWeight: '800' }}>
-                                        −€{formatCurrency(totalDiscount)}
-                                    </Text>
+                                <View style={{ marginBottom: 10, gap: 6 }}>
+                                    {promos.map((p: any, i: number) => {
+                                        const isFreeDelivery = p.appliesTo === 'DELIVERY' && p.discountAmount > 0;
+                                        const label = isFreeDelivery ? 'Free delivery' : 'Discount applied';
+                                        return (
+                                            <View key={p.id ?? i} style={{
+                                                paddingHorizontal: 14,
+                                                paddingVertical: 10,
+                                                backgroundColor: '#22C55E12',
+                                                borderRadius: 10,
+                                                borderWidth: 1,
+                                                borderColor: '#22C55E30',
+                                            }}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                        <Ionicons name="pricetag-outline" size={14} color="#22C55E" />
+                                                        <View>
+                                                            {p.promoCode ? (
+                                                                <Text style={{ fontSize: 12, color: '#22C55E', fontWeight: '800', letterSpacing: 0.5 }}>
+                                                                    {p.promoCode}
+                                                                </Text>
+                                                            ) : null}
+                                                            <Text style={{ fontSize: 12, color: '#22C55E', fontWeight: '600', opacity: p.promoCode ? 0.85 : 1 }}>
+                                                                {label}
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+                                                    <Text style={{ fontSize: 14, color: '#22C55E', fontWeight: '800' }}>
+                                                        −€{formatCurrency(p.discountAmount)}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        );
+                                    })}
                                 </View>
                             );
                         })()}
@@ -2014,7 +2025,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                     <View style={{ paddingHorizontal: 20 }}>
 
                         {/* ── Status row: avatar + message + ETA ── */}
-                        <Animated.View entering={fadeInEnter} style={{
+                        <View style={{
                             flexDirection: 'row', alignItems: 'center', marginBottom: 16,
                         }}>
                             {/* Avatar (driver or default) */}
@@ -2076,15 +2087,12 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                     </Text>
                                 </View>
                             )}
-                        </Animated.View>
+                        </View>
 
                         {/* ── Pending approval / timeline (smooth transition) ───────────────── */}
                         <View style={{ marginBottom: 16 }}>
                             {isPendingApproval ? (
-                                <Animated.View
-                                    key="pending-approval"
-                                    entering={fadeInDown320}
-                                    exiting={fadeOut220}
+                                <View
                                     style={{
                                         borderRadius: 16,
                                         borderWidth: 1,
@@ -2115,21 +2123,17 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                             </Text>
                                         </View>
                                     </View>
-                                </Animated.View>
+                                </View>
                             ) : (
-                                <Animated.View
-                                    key="full-timeline"
-                                    entering={fadeInDown320}
-                                    exiting={fadeOut220}
-                                >
+                                <View>
                                     <IconStepper status={customerVisibleStatus} color={config.color} theme={theme} t={t} businessType={primaryBusinessType} />
-                                </Animated.View>
+                                </View>
                             )}
                         </View>
 
                         {/* ── Driver Card ──────────────────── */}
                         {(isDeliveryPhase || (driver && (status === 'READY' || isCompleted))) && (
-                            <Animated.View entering={fadeInDown300Delay50} style={{
+                            <View style={{
                                 backgroundColor: theme.dark ? '#ffffff08' : '#00000005',
                                 borderRadius: 16, padding: 14, marginBottom: 12,
                                 flexDirection: 'row', alignItems: 'center',
@@ -2161,7 +2165,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                 }}>
                                     <Ionicons name="call" size={18} color="white" />
                                 </TouchableOpacity>
-                            </Animated.View>
+                            </View>
                         )}
 
                         {/* ── Show Order Summary Button ────── */}
@@ -2243,6 +2247,22 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                     marginTop: 8, paddingTop: 10,
                                     gap: 6,
                                 }}>
+                                    {/* Promo rows inside active summary */}
+                                    {((order as any).orderPromotions ?? []).map((p: any, i: number) => {
+                                        const isFreeDelivery = p.appliesTo === 'DELIVERY' && p.discountAmount > 0;
+                                        const label = isFreeDelivery ? 'Free delivery' : 'Discount';
+                                        return (
+                                            <View key={p.id ?? i} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                                    <Ionicons name="pricetag-outline" size={11} color="#22C55E" />
+                                                    <Text style={{ color: '#22C55E', fontSize: 12, fontWeight: '700' }}>
+                                                        {p.promoCode ? `${p.promoCode} · ` : ''}{label}
+                                                    </Text>
+                                                </View>
+                                                <Text style={{ color: '#22C55E', fontSize: 12, fontWeight: '700' }}>−€{formatCurrency(p.discountAmount)}</Text>
+                                            </View>
+                                        );
+                                    })}
                                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <Text style={{ color: '#22C55E', fontSize: 12, fontWeight: '600' }}>
                                             {t.common.delivery_fee || 'Delivery fee'}

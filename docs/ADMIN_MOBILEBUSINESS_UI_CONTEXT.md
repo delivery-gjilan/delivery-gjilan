@@ -136,6 +136,18 @@ This document is a fast context handoff for future UI changes across `admin-pane
   - do not assume flat product fields at top level
   - read product details from `ProductCard.product`
 
+## Order Card Contact Visibility (Current State)
+
+- Admin panel orders page (`/dashboard/orders`) active order cards display customer name and customer phone when available.
+- Admin panel map page (`/dashboard/map`) left sidebar order cards display customer name and customer phone when available.
+- Mobile-business orders tab (`app/(tabs)/index.tsx`) order cards display customer name and customer phone when available in a dedicated customer block.
+
+## Orders Page Completed Section (Current State)
+
+- Admin panel orders page (`/dashboard/orders`) shows completed orders in a table view (not cards).
+- Completed table supports quick status filtering with `All`, `Delivered`, and `Cancelled` filter controls.
+- Completed rows include order id/time, customer (including phone when present), business, status, total, and details action.
+
 ## Dev Workflow (Safe)
 
 1. Update GraphQL documents first (`admin-panel/src/graphql/operations/...`)

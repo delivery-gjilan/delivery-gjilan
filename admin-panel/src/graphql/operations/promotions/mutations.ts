@@ -59,3 +59,9 @@ export const DELETE_PROMOTION = graphql(`
         deletePromotion(id: $id)
     }
 `);
+
+export const GRANT_FREE_DELIVERY = graphql(`
+    mutation GrantFreeDelivery($userId: ID!, $orderId: ID!) {
+        grantFreeDelivery(userId: $userId, orderId: $orderId)
+    }
+`);

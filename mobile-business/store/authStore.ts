@@ -118,7 +118,9 @@ export const useAuthStore = create<AuthStore>()(
             }),
             onRehydrateStorage: () => (state) => {
                 if (!state) {
-                    console.log('[AuthStore] Hydration failed');
+                    console.log('[AuthStore] Hydration failed - no persisted state (first launch)');
+                    // First launch or cleared storage — still mark as hydrated so the app can proceed
+                    useAuthStore.setState({ hasHydrated: true });
                     return;
                 }
 

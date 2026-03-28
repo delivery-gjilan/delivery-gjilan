@@ -1,4 +1,5 @@
-import type   { OrderPromotionResolvers } from './../../../generated/types.generated';
-    export const OrderPromotion: OrderPromotionResolvers = {
-    /* Implement OrderPromotion resolver logic here */
-  };
+import type { OrderPromotionResolvers } from './../../../generated/types.generated';
+
+export const OrderPromotion: OrderPromotionResolvers = {
+    promoCode: (parent) => (parent as any).promoCode ?? null,
+};

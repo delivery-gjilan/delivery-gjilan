@@ -304,3 +304,232 @@ groups:
         annotations:
           summary: "Pubsub publish failure detected"
           description: "At least one pubsub publish failure occurred in the last 5 minutes. Check Redis bridge health and the realtime event feed immediately."
+
+      # ────────────────────────────────────────────
+      # 10. All Connected Drivers Lost
+      # ────────────────────────────────────────────
+      - uid: all-drivers-lost
+        title: "All Connected Drivers Lost"
+        condition: drivers_lost_check
+        data:
+          - refId: connected
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: drivers_by_connection_status{status="CONNECTED"}
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: connected
+          - refId: drivers_lost_check
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: "$connected"
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+                  operator: { type: and }
+                  reducer: { type: last }
+        for: 5m
+        labels:
+          severity: critical
+          service: fleet
+        annotations:
+          summary: "Zero connected drivers"
+          description: "No drivers have been in CONNECTED state for 5 minutes. Check driver app and WebSocket server health."
+
+      # ────────────────────────────────────────────
+      # 11. Business Device Offline Spike (>20%)
+      # ────────────────────────────────────────────
+      - uid: business-offline-spike
+        title: "Business Device Offline Spike (>20%)"
+        condition: offline_spike_check
+        data:
+          - refId: offline
+            relativeTimeRange: { from: 180, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: business_devices_by_online_status{status="OFFLINE"}
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: offline
+          - refId: total
+            relativeTimeRange: { from: 180, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: sum(business_devices_by_online_status)
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: total
+          - refId: offline_ratio
+            datasourceUid: "__expr__"
+            model:
+              type: math
+              expression: "$offline / $total * 100"
+              refId: offline_ratio
+          - refId: offline_spike_check
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: "$offline_ratio"
+              conditions:
+                - evaluator: { type: gt, params: [20] }
+                  operator: { type: and }
+                  reducer: { type: last }
+        for: 3m
+        labels:
+          severity: warning
+          service: fleet
+        annotations:
+          summary: "More than 20% of business devices are offline"
+          description: "Over 20% of registered business devices have not sent a heartbeat in more than 5 minutes. Possible connectivity issue."
+
+      # ────────────────────────────────────────────
+      # 12. Stuck Order Pipeline (>3 stuck orders)
+      # ────────────────────────────────────────────
+      - uid: order-stuck-pipeline
+        title: "Stuck Order Pipeline (>3)"
+        condition: stuck_check
+        data:
+          - refId: stuck
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: sum(orders_stuck_total)
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: stuck
+          - refId: stuck_check
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: "$stuck"
+              conditions:
+                - evaluator: { type: gt, params: [3] }
+                  operator: { type: and }
+                  reducer: { type: last }
+        for: 5m
+        labels:
+          severity: critical
+          service: orders
+        annotations:
+          summary: "Order pipeline is stuck (>3 stuck orders)"
+          description: "More than 3 orders have been stuck in PENDING/READY/OUT_FOR_DELIVERY beyond their SLO thresholds for 5 minutes. Check business devices and driver availability."
+
+      # ────────────────────────────────────────────
+      # 13. Push Failure Rate Spike (>20%)
+      # ────────────────────────────────────────────
+      - uid: push-failure-rate-spike
+        title: "Push Failure Rate Spike (>20%)"
+        condition: push_failure_rate_check
+        data:
+          - refId: push_failed
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: sum(increase(push_notifications_provider_failed_total[5m]))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: push_failed
+          - refId: push_sent
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: sum(increase(push_notifications_sent_total[5m]))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: push_sent
+          - refId: push_failure_rate
+            datasourceUid: "__expr__"
+            model:
+              type: math
+              expression: "$push_failed / max($push_sent, 1) * 100"
+              refId: push_failure_rate
+          - refId: push_failure_rate_check
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: "$push_failure_rate"
+              conditions:
+                - evaluator: { type: gt, params: [20] }
+                  operator: { type: and }
+                  reducer: { type: last }
+        for: 5m
+        labels:
+          severity: warning
+          service: notifications
+        annotations:
+          summary: "Push failure rate is above 20%"
+          description: "Provider push failures exceeded 20% for 5 minutes. Check FCM/APNs health, invalid token churn, and payload integrity."
+
+      # ────────────────────────────────────────────
+      # 14. Push Delivery Lost (0 accepted while sending)
+      # ────────────────────────────────────────────
+      - uid: push-delivery-lost
+        title: "Push Delivery Lost (0 accepted while sending)"
+        condition: push_delivery_lost_check
+        data:
+          - refId: push_sent
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: sum(increase(push_notifications_sent_total[5m]))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: push_sent
+          - refId: push_accepted
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: sum(increase(push_notifications_provider_accepted_total[5m]))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: push_accepted
+          - refId: push_sending_present
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: "$push_sent"
+              conditions:
+                - evaluator: { type: gt, params: [10] }
+                  operator: { type: and }
+                  reducer: { type: last }
+          - refId: push_delivery_lost_check
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: "$push_accepted"
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+                  operator: { type: and }
+                  reducer: { type: last }
+        for: 3m
+        labels:
+          severity: critical
+          service: notifications
+        annotations:
+          summary: "Push sends have no accepted deliveries"
+          description: "Push sends are happening but none are being accepted by the provider in the last 5 minutes. Check provider auth keys and outbound networking."

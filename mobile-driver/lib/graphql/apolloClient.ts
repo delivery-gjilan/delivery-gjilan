@@ -19,13 +19,13 @@ function getApiUrl(): string | null {
 
 /**
  * Exponential backoff configuration for WebSocket reconnection
- * Pattern: 1s → 2s → 5s → 10s (infinite retry)
+ * Pattern: 0.5s → 1s → 2s → 5s (infinite retry)
  */
-const RECONNECT_DELAYS = [1000, 2000, 5000, 10000];
+const RECONNECT_DELAYS = [500, 1000, 2000, 5000];
 
 function getNextReconnectDelay(retries: number): number {
   const index = Math.min(retries, RECONNECT_DELAYS.length - 1);
-    return RECONNECT_DELAYS[index] ?? 10000;
+        return RECONNECT_DELAYS[index] ?? 5000;
 }
 
 const logLink = new ApolloLink((operation, forward) => {

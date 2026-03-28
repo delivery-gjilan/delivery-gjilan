@@ -3,7 +3,7 @@ import { GraphQLError } from 'graphql';
 
 export const ordersByStatus: NonNullable<QueryResolvers['ordersByStatus']> = async (
     _parent,
-    { status },
+    { status, limit, offset },
     { orderService, userData },
 ) => {
     if (!userData.userId) {
@@ -15,7 +15,7 @@ export const ordersByStatus: NonNullable<QueryResolvers['ordersByStatus']> = asy
     switch (userData.role) {
         case 'SUPER_ADMIN':
         case 'ADMIN':
-            return orderService.getOrdersByStatus(status);
+            return orderService.getOrdersByStatus(status, limit ?? undefined, offset ?? undefined);
 
         case 'DRIVER':
             return orderService.getOrdersForDriverByStatus(userData.userId, status);

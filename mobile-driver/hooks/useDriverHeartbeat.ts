@@ -381,6 +381,9 @@ export function useDriverHeartbeat() {
       const location = await getCurrentLocation(); // Now always returns a location
 
       lastLocationRef.current = location;
+      // Keep the global store up-to-date so other screens can access the
+      // driver's current position without needing their own location hook.
+      useNavigationLocationStore.getState().setLastKnownCoords(location);
 
       const result = await sendHeartbeat({
         variables: {

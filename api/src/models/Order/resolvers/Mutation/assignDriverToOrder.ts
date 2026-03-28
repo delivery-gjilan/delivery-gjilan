@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import { notifyDriverOrderAssigned, notifyDriverOrderReassigned } from '@/services/orderNotifications';
 import { getDispatchService } from '@/services/driverServices.init';
 import { AppError } from '@/lib/errors';
+import { emitOrderEvent } from '@/repositories/OrderEventRepository';
 
 export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToOrder']> = async (
     _parent,
@@ -140,6 +141,17 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
         );
     }
     
+    if (effectiveDriverId) {
+        emitOrderEvent({
+            orderId: id,
+            eventType: 'DRIVER_ASSIGNED',
+            actorType: isSuperAdmin ? 'ADMIN' : 'DRIVER',
+            actorId: userData?.userId,
+            driverId: effectiveDriverId,
+            metadata: { previousDriverId, driverName },
+        });
+    }
+
     // Log the action
     const auditLog = createAuditLogger(db, context);
     await auditLog.log({

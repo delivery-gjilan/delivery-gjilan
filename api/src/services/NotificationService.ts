@@ -2,10 +2,19 @@ import { getMessaging } from '@/lib/firebase';
 import { NotificationRepository } from '@/repositories/NotificationRepository';
 import { NotificationType, PushTelemetryEventType } from '@/database/schema/notifications';
 import { DeviceAppType, DevicePlatform } from '@/database/schema/deviceTokens';
+import type { DbDeviceToken } from '@/database/schema/deviceTokens';
 import logger from '@/lib/logger';
 import type { Message, MulticastMessage } from 'firebase-admin/messaging';
 import { LiveActivityTokenRepository } from '@/repositories/LiveActivityTokenRepository';
 import { cache } from '@/lib/cache';
+import {
+    pushNotificationsActionedTotal,
+    pushNotificationsOpenedTotal,
+    pushNotificationsProviderAcceptedTotal,
+    pushNotificationsProviderFailedTotal,
+    pushNotificationsSentTotal,
+    pushTelemetryEventsTotal,
+} from '@/lib/metrics';
 
 const LIVE_ACTIVITY_MIN_UPDATE_INTERVAL_SECONDS = Number(
     process.env.LIVE_ACTIVITY_MIN_UPDATE_INTERVAL_SECONDS ?? 15,
@@ -74,6 +83,11 @@ export interface BusinessDeviceHeartbeatPayload {
 export class NotificationService {
     constructor(public readonly repo: NotificationRepository) {}
 
+    private normalizePushReason(code?: string): string {
+        if (!code) return 'unknown';
+        return code.length > 64 ? code.slice(0, 64) : code;
+    }
+
     private normalizeLocale(locale?: string): string {
         return locale === 'al' ? 'al' : 'en';
     }
@@ -135,6 +149,23 @@ export class NotificationService {
     }
 
     async trackPushTelemetry(userId: string, payload: PushTelemetryPayload) {
+        pushTelemetryEventsTotal.inc({
+            app_type: payload.appType,
+            platform: payload.platform,
+            event_type: payload.eventType,
+        });
+
+        if (payload.eventType === 'OPENED') {
+            pushNotificationsOpenedTotal.inc({ app_type: payload.appType, platform: payload.platform });
+        }
+        if (payload.eventType === 'ACTION_TAPPED') {
+            pushNotificationsActionedTotal.inc({
+                app_type: payload.appType,
+                platform: payload.platform,
+                action_id: payload.actionId ?? 'unknown',
+            });
+        }
+
         const event = await this.repo.createPushTelemetryEvent({
             userId,
             appType: payload.appType,
@@ -218,8 +249,7 @@ export class NotificationService {
         }
 
         logger.info({ userId, tokenCount: tokens.length, platforms: tokens.map(t => t.platform) }, 'notification:sendToUser — found tokens, sending multicast');
-        const tokenStrings = tokens.map((t) => t.token);
-        const result = await this.sendMulticast(tokenStrings, localizedPayload);
+        const result = await this.sendMulticast(tokens, localizedPayload);
 
         // Log the notification
         await this.repo.createNotification({
@@ -247,8 +277,7 @@ export class NotificationService {
             return { successCount: 0, failureCount: 0, staleTokens: [] };
         }
 
-        const tokenStrings = tokens.map((t) => t.token);
-        const result = await this.sendMulticast(tokenStrings, localizedPayload);
+        const result = await this.sendMulticast(tokens, localizedPayload);
 
         await this.repo.createNotification({
             userId,
@@ -290,8 +319,7 @@ export class NotificationService {
                 continue;
             }
 
-            const tokenStrings = allTokens.map((t) => t.token);
-            const result = await this.sendMulticast(tokenStrings, localizedPayload);
+            const result = await this.sendMulticast(allTokens, localizedPayload);
             results.push(result);
 
             const notificationRecords = localeUserIds.map((uid) => ({
@@ -334,8 +362,7 @@ export class NotificationService {
                 continue;
             }
 
-            const tokenStrings = allTokens.map((t) => t.token);
-            const result = await this.sendMulticast(tokenStrings, localizedPayload);
+            const result = await this.sendMulticast(allTokens, localizedPayload);
             results.push(result);
 
             const notificationRecords = localeUserIds.map((uid) => ({
@@ -392,7 +419,7 @@ export class NotificationService {
     // Low-level multicast with stale-token cleanup
     // ────────────────────────────────────────────────────────────────
 
-    private async sendMulticast(tokens: string[], payload: NotificationPayload): Promise<SendResult> {
+    private async sendMulticast(tokens: DbDeviceToken[], payload: NotificationPayload): Promise<SendResult> {
         if (tokens.length === 0) return { successCount: 0, failureCount: 0, staleTokens: [] };
 
         logger.info(
@@ -410,9 +437,14 @@ export class NotificationService {
         // Send in batches (Firebase limit is 500 tokens per call)
         for (let i = 0; i < tokens.length; i += BATCH_SIZE) {
             const batch = tokens.slice(i, i + BATCH_SIZE);
+            const batchTokenStrings = batch.map((t) => t.token);
+
+            for (const token of batch) {
+                pushNotificationsSentTotal.inc({ app_type: token.appType, platform: token.platform });
+            }
 
             const multicastMessage: MulticastMessage = {
-                tokens: batch,
+                tokens: batchTokenStrings,
                 notification: {
                     title: payload.title,
                     body: payload.body,
@@ -454,18 +486,28 @@ export class NotificationService {
 
             // Detect stale tokens
             response.responses.forEach((resp, idx) => {
-                const token = batch[idx];
-                if (!token) return;
+                const tokenMeta = batch[idx];
+                if (!tokenMeta) return;
                 if (resp.error) {
                     const code = resp.error.code;
+                    pushNotificationsProviderFailedTotal.inc({
+                        app_type: tokenMeta.appType,
+                        platform: tokenMeta.platform,
+                        reason: this.normalizePushReason(code),
+                    });
                     if (
                         code === 'messaging/registration-token-not-registered' ||
                         code === 'messaging/invalid-registration-token'
                     ) {
-                        staleTokens.push(token);
+                        staleTokens.push(tokenMeta.token);
                     } else {
-                        logger.warn({ token, errorCode: code }, 'notification:sendMulticast — FCM send error');
+                        logger.warn({ token: tokenMeta.token, errorCode: code }, 'notification:sendMulticast — FCM send error');
                     }
+                } else {
+                    pushNotificationsProviderAcceptedTotal.inc({
+                        app_type: tokenMeta.appType,
+                        platform: tokenMeta.platform,
+                    });
                 }
             });
         }

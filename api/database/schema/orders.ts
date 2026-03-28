@@ -29,12 +29,17 @@ export const orders = pgTable('orders', {
     dropoffLng: doublePrecision('dropoff_lng').notNull(),
     dropoffAddress: varchar('dropoff_address', { length: 500 }).notNull(),
     driverNotes: varchar('driver_notes', { length: 500 }),
+    cancellationReason: varchar('cancellation_reason', { length: 500 }),
+    adminNote: varchar('admin_note', { length: 2000 }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true, mode: 'string' }),
     preparationMinutes: integer('preparation_minutes'),
     estimatedReadyAt: timestamp('estimated_ready_at', { withTimezone: true, mode: 'string' }),
     preparingAt: timestamp('preparing_at', { withTimezone: true, mode: 'string' }),
     readyAt: timestamp('ready_at', { withTimezone: true, mode: 'string' }),
     outForDeliveryAt: timestamp('out_for_delivery_at', { withTimezone: true, mode: 'string' }),
     deliveredAt: timestamp('delivered_at', { withTimezone: true, mode: 'string' }),
+    driverAssignedAt: timestamp('driver_assigned_at', { withTimezone: true, mode: 'string' }),
+    driverArrivedAtPickup: timestamp('driver_arrived_at_pickup', { withTimezone: true, mode: 'string' }),
     orderDate: timestamp('order_date', { withTimezone: true, mode: 'string' }).defaultNow(),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
         .default(sql`CURRENT_TIMESTAMP`)

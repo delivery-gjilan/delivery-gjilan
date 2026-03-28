@@ -83,27 +83,27 @@ interface Order {
 
 const STATUS_COLORS: Record<OrderStatus, string> = {
     PENDING: '#f59e0b',
-    PREPARING: '#3b82f6',
-    READY: '#10b981',
-    OUT_FOR_DELIVERY: '#8b5cf6',
+    PREPARING: '#f97316',
+    READY: '#22c55e',
+    OUT_FOR_DELIVERY: '#22c55e',
     DELIVERED: '#6b7280',
     CANCELLED: '#ef4444',
 };
 
 const STATUS_BG: Record<OrderStatus, string> = {
     PENDING: '#f59e0b22',
-    PREPARING: '#3b82f622',
-    READY: '#10b98122',
-    OUT_FOR_DELIVERY: '#8b5cf622',
+    PREPARING: '#f9731622',
+    READY: '#22c55e22',
+    OUT_FOR_DELIVERY: '#22c55e22',
     DELIVERED: '#6b728022',
     CANCELLED: '#ef444422',
 };
 
 const STATUS_CARD_BG: Record<OrderStatus, string> = {
     PENDING: '#f59e0b14',
-    PREPARING: '#3b82f614',
-    READY: '#10b98114',
-    OUT_FOR_DELIVERY: '#8b5cf614',
+    PREPARING: '#f9731614',
+    READY: '#22c55e14',
+    OUT_FOR_DELIVERY: '#22c55e14',
     DELIVERED: '#6b728012',
     CANCELLED: '#ef444412',
 };
@@ -581,6 +581,10 @@ export default function OrdersScreen() {
             ? businessOrder.items.slice(0, maxCollapsedItems)
             : businessOrder.items;
         const hiddenItemsCount = businessOrder.items.length - visibleItems.length;
+        const customerName = order.user
+            ? `${order.user.firstName} ${order.user.lastName}`.trim()
+            : t('orders.customer', 'Customer');
+        const customerPhone = order.user?.phoneNumber?.trim();
 
         const elapsedText =
             (order.status === 'PENDING' && getElapsedTime(order.orderDate)) ||
@@ -703,6 +707,26 @@ export default function OrdersScreen() {
                             </View>
                         )}
 
+                    </View>
+
+                    {/* ── Customer ── */}
+                    <View className="px-3 pb-2">
+                        <View className="rounded-xl px-2.5 py-2" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
+                            <View className="flex-row items-center">
+                                <Ionicons name="person-outline" size={14} color="#cbd5e1" />
+                                <Text className={`text-text font-semibold ml-1.5 ${isTablet ? 'text-sm' : 'text-xs'}`} numberOfLines={1}>
+                                    {customerName}
+                                </Text>
+                            </View>
+                            {customerPhone ? (
+                                <View className="flex-row items-center mt-1">
+                                    <Ionicons name="call-outline" size={12} color="#94a3b8" />
+                                    <Text className={`text-subtext ml-1.5 ${isTablet ? 'text-sm' : 'text-xs'}`} numberOfLines={1}>
+                                        {customerPhone}
+                                    </Text>
+                                </View>
+                            ) : null}
+                        </View>
                     </View>
 
                     {/* ── Items - Compact ── */}

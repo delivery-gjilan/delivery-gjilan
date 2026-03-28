@@ -3,6 +3,7 @@ import { createAuditLogger } from '@/services/AuditLogger';
 import logger from '@/lib/logger';
 import { AppError } from '@/lib/errors';
 import { updateLiveActivity } from '@/services/orderNotifications';
+import { emitOrderEvent } from '@/repositories/OrderEventRepository';
 
 export const updatePreparationTime: NonNullable<MutationResolvers['updatePreparationTime']> = async (
     _parent,
@@ -56,6 +57,18 @@ export const updatePreparationTime: NonNullable<MutationResolvers['updatePrepara
                 dbOrder.preparingAt ? new Date(dbOrder.preparingAt).getTime() : Date.now(),
             );
         }
+
+        emitOrderEvent({
+            orderId: id,
+            eventType: 'PREP_TIME_UPDATED',
+            actorType: isBusinessAdmin ? 'RESTAURANT' : 'ADMIN',
+            actorId: userData?.userId,
+            businessId: userData?.businessId ?? undefined,
+            metadata: {
+                newPreparationMinutes: preparationMinutes,
+                previousEstimatedReadyAt: dbOrder?.estimatedReadyAt,
+            },
+        });
 
         const auditLog = createAuditLogger(db, context);
         await auditLog.log({

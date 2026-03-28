@@ -1,4 +1,5 @@
 import { graphql } from '@/gql';
+import { gql } from '@apollo/client';
 
 export const CREATE_USER_MUTATION = graphql(`
   mutation CreateUser(
@@ -102,6 +103,13 @@ export const ADMIN_UPDATE_DRIVER_LOCATION = graphql(`
     }
   }
 `);
+
+export const ADMIN_SET_SHIFT_DRIVERS = gql`
+  mutation AdminSetShiftDrivers($driverIds: [ID!]!) {
+    adminSetShiftDrivers(driverIds: $driverIds)
+  }
+`;
+
 export const UPDATE_DRIVER_ONLINE_STATUS = graphql(`
   mutation UpdateDriverOnlineStatus($isOnline: Boolean!) {
     updateDriverOnlineStatus(isOnline: $isOnline) {

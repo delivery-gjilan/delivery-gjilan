@@ -1,7 +1,7 @@
 import type { QueryResolvers } from './../../../../generated/types.generated';
 import { GraphQLError } from 'graphql';
 
-export const orders: NonNullable<QueryResolvers['orders']> = async (_parent, _args, { orderService, userData }) => {
+export const orders: NonNullable<QueryResolvers['orders']> = async (_parent, { limit, offset }, { orderService, userData }) => {
     if (!userData.userId) {
         throw new GraphQLError('Unauthorized: You must be logged in to view orders', {
             extensions: { code: 'UNAUTHORIZED' },
@@ -11,13 +11,13 @@ export const orders: NonNullable<QueryResolvers['orders']> = async (_parent, _ar
     switch (userData.role) {
         case 'SUPER_ADMIN':
         case 'ADMIN':
-            return orderService.getAllOrders();
+            return orderService.getAllOrders(limit ?? undefined, offset ?? undefined);
 
         case 'DRIVER':
-            return orderService.getOrdersForDriver(userData.userId);
+            return orderService.getOrdersForDriver(userData.userId, limit ?? undefined);
 
         case 'CUSTOMER':
-            return orderService.getOrdersByUserId(userData.userId);
+            return orderService.getOrdersByUserId(userData.userId, limit ?? undefined, offset ?? undefined);
 
         case 'BUSINESS_OWNER':
         case 'BUSINESS_EMPLOYEE':

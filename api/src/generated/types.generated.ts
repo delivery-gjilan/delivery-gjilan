@@ -249,6 +249,25 @@ export type BusinessDeviceOnlineStatus =
   | 'ONLINE'
   | 'STALE';
 
+export type BusinessKPI = {
+  __typename?: 'BusinessKPI';
+  /** Median minutes driver waited at pickup after arriving */
+  avgDriverWaitMin?: Maybe<Scalars['Float']['output']>;
+  avgPrepTimeMin?: Maybe<Scalars['Float']['output']>;
+  businessId: Scalars['ID']['output'];
+  businessName: Scalars['String']['output'];
+  cancellationRate: Scalars['Float']['output'];
+  completedOrders: Scalars['Int']['output'];
+  /** Orders where driver arrived before restaurant pressed Ready */
+  fakeReadyCount: Scalars['Int']['output'];
+  fakeReadyRate?: Maybe<Scalars['Float']['output']>;
+  p90PrepTimeMin?: Maybe<Scalars['Float']['output']>;
+  /** % of orders where restaurant pressed Ready before prep time was 50% elapsed */
+  prematureReadyRate?: Maybe<Scalars['Float']['output']>;
+  prepOverrunRate?: Maybe<Scalars['Float']['output']>;
+  totalOrders: Scalars['Int']['output'];
+};
+
 export type BusinessMessage = {
   __typename?: 'BusinessMessage';
   admin?: Maybe<BusinessMessageUser>;
@@ -406,6 +425,7 @@ export type CreateOrderInput = {
   dropOffLocation: LocationInput;
   items: Array<CreateOrderItemInput>;
   paymentCollection?: InputMaybe<OrderPaymentCollection>;
+  prioritySurcharge?: InputMaybe<Scalars['Float']['input']>;
   promoCode?: InputMaybe<Scalars['String']['input']>;
   totalPrice: Scalars['Float']['input'];
 };
@@ -500,6 +520,21 @@ export type CreateUserInput = {
   role: UserRole;
 };
 
+export type DayOfWeekDistribution = {
+  __typename?: 'DayOfWeekDistribution';
+  /** 0 = Sunday, 6 = Saturday */
+  dow: Scalars['Int']['output'];
+  orderCount: Scalars['Int']['output'];
+  revenue: Scalars['Float']['output'];
+};
+
+export type DayVolume = {
+  __typename?: 'DayVolume';
+  date: Scalars['String']['output'];
+  orderCount: Scalars['Int']['output'];
+  revenue: Scalars['Float']['output'];
+};
+
 export type DeliveryPriceResult = {
   __typename?: 'DeliveryPriceResult';
   distanceKm: Scalars['Float']['output'];
@@ -569,6 +604,31 @@ export type DeviceToken = {
   token: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
   userId: Scalars['ID']['output'];
+};
+
+/** Result of driverLogin / driverRegister mutations */
+export type DriverAuthResult = {
+  __typename?: 'DriverAuthResult';
+  driver: DriverBasicInfo;
+  message: Scalars['String']['output'];
+  refreshToken?: Maybe<Scalars['String']['output']>;
+  token: Scalars['String']['output'];
+};
+
+/** Basic driver profile returned by driverLogin / driverRegister */
+export type DriverBasicInfo = {
+  __typename?: 'DriverBasicInfo';
+  connectionStatus: DriverConnectionStatus;
+  driverLat?: Maybe<Scalars['Float']['output']>;
+  driverLng?: Maybe<Scalars['Float']['output']>;
+  email: Scalars['String']['output'];
+  firstName: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  lastHeartbeatAt?: Maybe<Scalars['Date']['output']>;
+  lastLocationUpdate?: Maybe<Scalars['Date']['output']>;
+  lastName: Scalars['String']['output'];
+  onlinePreference: Scalars['Boolean']['output'];
+  phoneNumber?: Maybe<Scalars['String']['output']>;
 };
 
 export type DriverConnection = {
@@ -651,6 +711,24 @@ export type DriverHeartbeatResult = {
   success: Scalars['Boolean']['output'];
 };
 
+export type DriverKPI = {
+  __typename?: 'DriverKPI';
+  /** Minutes from OUT_FOR_DELIVERY to DELIVERED */
+  avgDeliveryTimeMin?: Maybe<Scalars['Float']['output']>;
+  /** Minutes from driver assignment to picking up (travel + wait) */
+  avgPickupTimeMin?: Maybe<Scalars['Float']['output']>;
+  /** Minutes driver waited at restaurant after arriving */
+  avgWaitAtPickupMin?: Maybe<Scalars['Float']['output']>;
+  driverId: Scalars['ID']['output'];
+  driverName: Scalars['String']['output'];
+  totalDeliveries: Scalars['Int']['output'];
+};
+
+export type DriverLoginInput = {
+  email: Scalars['String']['input'];
+  password: Scalars['String']['input'];
+};
+
 export type DriverMessage = {
   __typename?: 'DriverMessage';
   admin?: Maybe<DriverMessageUser>;
@@ -696,6 +774,14 @@ export type DriverPttSignalAction =
   | 'STOPPED'
   | 'UNMUTE';
 
+export type DriverRegisterInput = {
+  email: Scalars['String']['input'];
+  firstName: Scalars['String']['input'];
+  lastName: Scalars['String']['input'];
+  password: Scalars['String']['input'];
+  phoneNumber?: InputMaybe<Scalars['String']['input']>;
+};
+
 export type EntityType =
   | 'BUSINESS'
   | 'CATEGORY'
@@ -706,6 +792,14 @@ export type EntityType =
   | 'SETTLEMENT'
   | 'SUBCATEGORY'
   | 'USER';
+
+export type HourlyDistribution = {
+  __typename?: 'HourlyDistribution';
+  avgDeliveryTimeMin?: Maybe<Scalars['Float']['output']>;
+  hour: Scalars['Int']['output'];
+  orderCount: Scalars['Int']['output'];
+  revenue: Scalars['Float']['output'];
+};
 
 export type InitiateSignupInput = {
   email: Scalars['String']['input'];
@@ -741,10 +835,17 @@ export type MessageAlertType =
 export type Mutation = {
   __typename?: 'Mutation';
   addUserAddress: UserAddress;
+  adminCancelOrder: Order;
   /** Admin sends push-to-talk signaling state to one or multiple drivers */
   adminSendPttSignal: Scalars['Boolean']['output'];
   /** Admin mutation to manually set connection status (for testing/recovery) */
   adminSetDriverConnectionStatus: User;
+  /**
+   * Admin mutation to set which drivers are on the current shift.
+   * Only on-shift drivers will receive new-order dispatch notifications.
+   * Pass an empty list to clear the shift restriction (all eligible drivers receive notifications).
+   */
+  adminSetShiftDrivers: Scalars['Boolean']['output'];
   /**
    * Admin simulation heartbeat — wraps processHeartbeat for SUPER_ADMIN.
    * Triggers the full heartbeat pipeline (ETA cache, Live Activity, subscriptions).
@@ -804,10 +905,15 @@ export type Mutation = {
    * Location is throttled: only written if >10s since last write OR moved >5m.
    */
   driverHeartbeat: DriverHeartbeatResult;
+  /** Driver login — returns short-lived access token + refresh token */
+  driverLogin: DriverAuthResult;
   driverNotifyCustomer: Scalars['Boolean']['output'];
+  /** Driver self-registration — creates user (role=DRIVER) + driver profile row */
+  driverRegister: DriverAuthResult;
   /** Driver battery telemetry update (recommended every 5-10 minutes) */
   driverUpdateBatteryStatus: DriverConnection;
   generateReferralCode: Scalars['String']['output'];
+  grantFreeDelivery: Scalars['Boolean']['output'];
   initiateSignup: AuthResponse;
   login: AuthResponse;
   logoutAllSessions: Scalars['Boolean']['output'];
@@ -842,6 +948,7 @@ export type Mutation = {
   setDefaultAddress: Scalars['Boolean']['output'];
   setDeliveryPricingTiers: Array<DeliveryPricingTier>;
   setMyPreferredLanguage: User;
+  setOrderAdminNote: Order;
   setUserPermissions: User;
   /** Settle all unsettled settlements for a business. Supports partial payment. */
   settleWithBusiness: SettleResult;
@@ -884,6 +991,14 @@ export type MutationaddUserAddressArgs = {
 };
 
 
+export type MutationadminCancelOrderArgs = {
+  id: Scalars['ID']['input'];
+  reason: Scalars['String']['input'];
+  settleBusiness?: InputMaybe<Scalars['Boolean']['input']>;
+  settleDriver?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
+
 export type MutationadminSendPttSignalArgs = {
   action: DriverPttSignalAction;
   channelName: Scalars['String']['input'];
@@ -895,6 +1010,11 @@ export type MutationadminSendPttSignalArgs = {
 export type MutationadminSetDriverConnectionStatusArgs = {
   driverId: Scalars['ID']['input'];
   status: DriverConnectionStatus;
+};
+
+
+export type MutationadminSetShiftDriversArgs = {
+  driverIds: Array<Scalars['ID']['input']>;
 };
 
 
@@ -1136,9 +1256,19 @@ export type MutationdriverHeartbeatArgs = {
 };
 
 
+export type MutationdriverLoginArgs = {
+  input: DriverLoginInput;
+};
+
+
 export type MutationdriverNotifyCustomerArgs = {
   kind: DriverCustomerNotificationKind;
   orderId: Scalars['ID']['input'];
+};
+
+
+export type MutationdriverRegisterArgs = {
+  input: DriverRegisterInput;
 };
 
 
@@ -1146,6 +1276,12 @@ export type MutationdriverUpdateBatteryStatusArgs = {
   isCharging?: InputMaybe<Scalars['Boolean']['input']>;
   level: Scalars['Int']['input'];
   optIn: Scalars['Boolean']['input'];
+};
+
+
+export type MutationgrantFreeDeliveryArgs = {
+  orderId: Scalars['ID']['input'];
+  userId: Scalars['ID']['input'];
 };
 
 
@@ -1288,6 +1424,12 @@ export type MutationsetDeliveryPricingTiersArgs = {
 
 export type MutationsetMyPreferredLanguageArgs = {
   language: AppLanguage;
+};
+
+
+export type MutationsetOrderAdminNoteArgs = {
+  id: Scalars['ID']['input'];
+  note?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -1515,6 +1657,22 @@ export type NotificationType =
   | 'ORDER_STATUS'
   | 'PROMOTIONAL';
 
+export type OperationalKPIs = {
+  __typename?: 'OperationalKPIs';
+  aov: Scalars['Float']['output'];
+  avgDeliveryTimeMin?: Maybe<Scalars['Float']['output']>;
+  avgDriverWaitAtPickupMin?: Maybe<Scalars['Float']['output']>;
+  avgPrepTimeMin?: Maybe<Scalars['Float']['output']>;
+  cancellationRate: Scalars['Float']['output'];
+  cancelledOrders: Scalars['Int']['output'];
+  completedOrders: Scalars['Int']['output'];
+  dailyVolume: Array<DayVolume>;
+  fakeReadyRate?: Maybe<Scalars['Float']['output']>;
+  gmv: Scalars['Float']['output'];
+  prepOverrunRate?: Maybe<Scalars['Float']['output']>;
+  totalOrders: Scalars['Int']['output'];
+};
+
 export type Option = {
   __typename?: 'Option';
   displayOrder: Scalars['Int']['output'];
@@ -1539,11 +1697,16 @@ export type OptionGroup = {
 
 export type Order = {
   __typename?: 'Order';
+  adminNote?: Maybe<Scalars['String']['output']>;
   businesses: Array<OrderBusiness>;
+  cancellationReason?: Maybe<Scalars['String']['output']>;
+  cancelledAt?: Maybe<Scalars['Date']['output']>;
   deliveredAt?: Maybe<Scalars['Date']['output']>;
   deliveryPrice: Scalars['Float']['output'];
   displayId: Scalars['String']['output'];
   driver?: Maybe<User>;
+  driverArrivedAtPickup?: Maybe<Scalars['Date']['output']>;
+  driverAssignedAt?: Maybe<Scalars['Date']['output']>;
   driverNotes?: Maybe<Scalars['String']['output']>;
   dropOffLocation: Location;
   estimatedReadyAt?: Maybe<Scalars['Date']['output']>;
@@ -1617,6 +1780,7 @@ export type OrderPromotion = {
   appliesTo: PromotionAppliesTo;
   discountAmount: Scalars['Float']['output'];
   id: Scalars['ID']['output'];
+  promoCode?: Maybe<Scalars['String']['output']>;
   promotionId: Scalars['ID']['output'];
 };
 
@@ -1627,6 +1791,14 @@ export type OrderStatus =
   | 'PENDING'
   | 'PREPARING'
   | 'READY';
+
+export type PeakHourAnalysis = {
+  __typename?: 'PeakHourAnalysis';
+  byDayOfWeek: Array<DayOfWeekDistribution>;
+  hourly: Array<HourlyDistribution>;
+  peakDow: Scalars['Int']['output'];
+  peakHour: Scalars['Int']['output'];
+};
 
 export type PolygonPoint = {
   __typename?: 'PolygonPoint';
@@ -1850,17 +2022,20 @@ export type Query = {
   business?: Maybe<Business>;
   businessBalance: SettlementSummary;
   businessDeviceHealth: Array<BusinessDeviceHealth>;
+  businessKPIs: Array<BusinessKPI>;
   /** Admin: list of all business user threads with unread counts */
   businessMessageThreads: Array<BusinessMessageThread>;
   /** Admin: full conversation with a specific business user */
   businessMessages: Array<BusinessMessage>;
   businesses: Array<Business>;
   calculateDeliveryPrice: DeliveryPriceResult;
+  cancelledOrders: Array<Order>;
   deliveryPricingConfig: DeliveryPricingConfig;
   deliveryPricingTiers: Array<DeliveryPricingTier>;
   deliveryZones: Array<DeliveryZone>;
   deviceTokens: Array<DeviceToken>;
   driverBalance: SettlementSummary;
+  driverKPIs: Array<DriverKPI>;
   /** Admin: list of all driver threads with unread counts */
   driverMessageThreads: Array<DriverMessageThread>;
   /** Admin: full conversation with a specific driver */
@@ -1893,9 +2068,11 @@ export type Query = {
   notificationCampaign?: Maybe<NotificationCampaign>;
   notificationCampaigns: Array<NotificationCampaign>;
   offers: Array<Product>;
+  operationalKPIs: OperationalKPIs;
   order?: Maybe<Order>;
   orders: Array<Order>;
   ordersByStatus: Array<Order>;
+  peakHourAnalysis: PeakHourAnalysis;
   previewCampaignAudience: AudiencePreview;
   product?: Maybe<Product>;
   productCategories: Array<ProductCategory>;
@@ -1954,6 +2131,13 @@ export type QuerybusinessDeviceHealthArgs = {
 };
 
 
+export type QuerybusinessKPIsArgs = {
+  businessId?: InputMaybe<Scalars['ID']['input']>;
+  endDate: Scalars['String']['input'];
+  startDate: Scalars['String']['input'];
+};
+
+
 export type QuerybusinessMessagesArgs = {
   businessUserId: Scalars['ID']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -1968,6 +2152,12 @@ export type QuerycalculateDeliveryPriceArgs = {
 };
 
 
+export type QuerycancelledOrdersArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
 export type QuerydeviceTokensArgs = {
   userId?: InputMaybe<Scalars['ID']['input']>;
 };
@@ -1975,6 +2165,13 @@ export type QuerydeviceTokensArgs = {
 
 export type QuerydriverBalanceArgs = {
   driverId: Scalars['ID']['input'];
+};
+
+
+export type QuerydriverKPIsArgs = {
+  driverId?: InputMaybe<Scalars['ID']['input']>;
+  endDate: Scalars['String']['input'];
+  startDate: Scalars['String']['input'];
 };
 
 
@@ -2028,6 +2225,8 @@ export type QuerygetPromotionThresholdsArgs = {
 
 
 export type QuerygetPromotionUsageArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
   promotionId: Scalars['ID']['input'];
 };
 
@@ -2069,13 +2268,35 @@ export type QueryoffersArgs = {
 };
 
 
+export type QueryoperationalKPIsArgs = {
+  businessId?: InputMaybe<Scalars['ID']['input']>;
+  endDate: Scalars['String']['input'];
+  startDate: Scalars['String']['input'];
+};
+
+
 export type QueryorderArgs = {
   id: Scalars['ID']['input'];
 };
 
 
+export type QueryordersArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
 export type QueryordersByStatusArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
   status: OrderStatus;
+};
+
+
+export type QuerypeakHourAnalysisArgs = {
+  businessId?: InputMaybe<Scalars['ID']['input']>;
+  endDate: Scalars['String']['input'];
+  startDate: Scalars['String']['input'];
 };
 
 
@@ -2193,6 +2414,12 @@ export type QueryunsettledBalanceArgs = {
 
 export type QueryuserBehaviorArgs = {
   userId: Scalars['ID']['input'];
+};
+
+
+export type QueryusersArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -2917,6 +3144,7 @@ export type ResolversTypes = {
   BusinessDeviceHealth: ResolverTypeWrapper<Omit<BusinessDeviceHealth, 'onlineStatus' | 'platform'> & { onlineStatus: ResolversTypes['BusinessDeviceOnlineStatus'], platform: ResolversTypes['DevicePlatform'] }>;
   BusinessDeviceHeartbeatInput: BusinessDeviceHeartbeatInput;
   BusinessDeviceOnlineStatus: ResolverTypeWrapper<'ONLINE' | 'STALE' | 'OFFLINE'>;
+  BusinessKPI: ResolverTypeWrapper<BusinessKPI>;
   BusinessMessage: ResolverTypeWrapper<Omit<BusinessMessage, 'alertType'> & { alertType: ResolversTypes['MessageAlertType'] }>;
   BusinessMessageThread: ResolverTypeWrapper<Omit<BusinessMessageThread, 'lastMessage'> & { lastMessage?: Maybe<ResolversTypes['BusinessMessage']> }>;
   BusinessMessageUser: ResolverTypeWrapper<BusinessMessageUser>;
@@ -2948,6 +3176,8 @@ export type ResolversTypes = {
   CreateUserInput: CreateUserInput;
   Date: ResolverTypeWrapper<Scalars['Date']['output']>;
   DateTime: ResolverTypeWrapper<Scalars['DateTime']['output']>;
+  DayOfWeekDistribution: ResolverTypeWrapper<DayOfWeekDistribution>;
+  DayVolume: ResolverTypeWrapper<DayVolume>;
   DeliveryPriceResult: ResolverTypeWrapper<DeliveryPriceResult>;
   DeliveryPricingConfig: ResolverTypeWrapper<DeliveryPricingConfig>;
   DeliveryPricingTier: ResolverTypeWrapper<DeliveryPricingTier>;
@@ -2956,17 +3186,23 @@ export type ResolversTypes = {
   DeviceAppType: ResolverTypeWrapper<'CUSTOMER' | 'DRIVER' | 'BUSINESS' | 'ADMIN'>;
   DevicePlatform: ResolverTypeWrapper<'IOS' | 'ANDROID'>;
   DeviceToken: ResolverTypeWrapper<Omit<DeviceToken, 'appType' | 'platform'> & { appType: ResolversTypes['DeviceAppType'], platform: ResolversTypes['DevicePlatform'] }>;
+  DriverAuthResult: ResolverTypeWrapper<Omit<DriverAuthResult, 'driver'> & { driver: ResolversTypes['DriverBasicInfo'] }>;
+  DriverBasicInfo: ResolverTypeWrapper<Omit<DriverBasicInfo, 'connectionStatus'> & { connectionStatus: ResolversTypes['DriverConnectionStatus'] }>;
   DriverConnection: ResolverTypeWrapper<Omit<DriverConnection, 'connectionStatus'> & { connectionStatus: ResolversTypes['DriverConnectionStatus'] }>;
   DriverConnectionStatus: ResolverTypeWrapper<'CONNECTED' | 'STALE' | 'LOST' | 'DISCONNECTED'>;
   DriverCustomerNotificationKind: ResolverTypeWrapper<'ETA_LT_3_MIN' | 'ARRIVED_WAITING'>;
   DriverDailyMetrics: ResolverTypeWrapper<Omit<DriverDailyMetrics, 'connectionStatus'> & { connectionStatus: ResolversTypes['DriverConnectionStatus'] }>;
   DriverHeartbeatResult: ResolverTypeWrapper<Omit<DriverHeartbeatResult, 'connectionStatus'> & { connectionStatus: ResolversTypes['DriverConnectionStatus'] }>;
+  DriverKPI: ResolverTypeWrapper<DriverKPI>;
+  DriverLoginInput: DriverLoginInput;
   DriverMessage: ResolverTypeWrapper<Omit<DriverMessage, 'alertType'> & { alertType: ResolversTypes['MessageAlertType'] }>;
   DriverMessageThread: ResolverTypeWrapper<Omit<DriverMessageThread, 'lastMessage'> & { lastMessage?: Maybe<ResolversTypes['DriverMessage']> }>;
   DriverMessageUser: ResolverTypeWrapper<DriverMessageUser>;
   DriverPttSignal: ResolverTypeWrapper<Omit<DriverPttSignal, 'action'> & { action: ResolversTypes['DriverPttSignalAction'] }>;
   DriverPttSignalAction: ResolverTypeWrapper<'STARTED' | 'STOPPED' | 'MUTE' | 'UNMUTE'>;
+  DriverRegisterInput: DriverRegisterInput;
   EntityType: ResolverTypeWrapper<'USER' | 'BUSINESS' | 'PRODUCT' | 'ORDER' | 'SETTLEMENT' | 'DRIVER' | 'CATEGORY' | 'SUBCATEGORY' | 'DELIVERY_ZONE'>;
+  HourlyDistribution: ResolverTypeWrapper<HourlyDistribution>;
   InitiateSignupInput: InitiateSignupInput;
   JSON: ResolverTypeWrapper<Scalars['JSON']['output']>;
   Location: ResolverTypeWrapper<Location>;
@@ -2977,6 +3213,7 @@ export type ResolversTypes = {
   Notification: ResolverTypeWrapper<Omit<Notification, 'type'> & { type: ResolversTypes['NotificationType'] }>;
   NotificationCampaign: ResolverTypeWrapper<Omit<NotificationCampaign, 'sender' | 'status'> & { sender?: Maybe<ResolversTypes['User']>, status: ResolversTypes['CampaignStatus'] }>;
   NotificationType: ResolverTypeWrapper<'ORDER_STATUS' | 'ORDER_ASSIGNED' | 'PROMOTIONAL' | 'ADMIN_ALERT'>;
+  OperationalKPIs: ResolverTypeWrapper<OperationalKPIs>;
   Option: ResolverTypeWrapper<Option>;
   OptionGroup: ResolverTypeWrapper<OptionGroup>;
   Order: ResolverTypeWrapper<Omit<Order, 'businesses' | 'driver' | 'orderPromotions' | 'paymentCollection' | 'status' | 'user'> & { businesses: Array<ResolversTypes['OrderBusiness']>, driver?: Maybe<ResolversTypes['User']>, orderPromotions?: Maybe<Array<ResolversTypes['OrderPromotion']>>, paymentCollection: ResolversTypes['OrderPaymentCollection'], status: ResolversTypes['OrderStatus'], user?: Maybe<ResolversTypes['User']> }>;
@@ -2987,6 +3224,7 @@ export type ResolversTypes = {
   OrderPaymentCollection: ResolverTypeWrapper<'CASH_TO_DRIVER' | 'PREPAID_TO_PLATFORM'>;
   OrderPromotion: ResolverTypeWrapper<Omit<OrderPromotion, 'appliesTo'> & { appliesTo: ResolversTypes['PromotionAppliesTo'] }>;
   OrderStatus: ResolverTypeWrapper<'PENDING' | 'PREPARING' | 'READY' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED'>;
+  PeakHourAnalysis: ResolverTypeWrapper<PeakHourAnalysis>;
   PolygonPoint: ResolverTypeWrapper<PolygonPoint>;
   PolygonPointInput: PolygonPointInput;
   Product: ResolverTypeWrapper<Product>;
@@ -3090,6 +3328,7 @@ export type ResolversParentTypes = {
   BusinessDayHoursInput: BusinessDayHoursInput;
   BusinessDeviceHealth: BusinessDeviceHealth;
   BusinessDeviceHeartbeatInput: BusinessDeviceHeartbeatInput;
+  BusinessKPI: BusinessKPI;
   BusinessMessage: BusinessMessage;
   BusinessMessageThread: Omit<BusinessMessageThread, 'lastMessage'> & { lastMessage?: Maybe<ResolversParentTypes['BusinessMessage']> };
   BusinessMessageUser: BusinessMessageUser;
@@ -3119,19 +3358,27 @@ export type ResolversParentTypes = {
   CreateUserInput: CreateUserInput;
   Date: Scalars['Date']['output'];
   DateTime: Scalars['DateTime']['output'];
+  DayOfWeekDistribution: DayOfWeekDistribution;
+  DayVolume: DayVolume;
   DeliveryPriceResult: DeliveryPriceResult;
   DeliveryPricingConfig: DeliveryPricingConfig;
   DeliveryPricingTier: DeliveryPricingTier;
   DeliveryZone: DeliveryZone;
   DeliveryZoneMatch: DeliveryZoneMatch;
   DeviceToken: DeviceToken;
+  DriverAuthResult: Omit<DriverAuthResult, 'driver'> & { driver: ResolversParentTypes['DriverBasicInfo'] };
+  DriverBasicInfo: DriverBasicInfo;
   DriverConnection: DriverConnection;
   DriverDailyMetrics: DriverDailyMetrics;
   DriverHeartbeatResult: DriverHeartbeatResult;
+  DriverKPI: DriverKPI;
+  DriverLoginInput: DriverLoginInput;
   DriverMessage: DriverMessage;
   DriverMessageThread: Omit<DriverMessageThread, 'lastMessage'> & { lastMessage?: Maybe<ResolversParentTypes['DriverMessage']> };
   DriverMessageUser: DriverMessageUser;
   DriverPttSignal: DriverPttSignal;
+  DriverRegisterInput: DriverRegisterInput;
+  HourlyDistribution: HourlyDistribution;
   InitiateSignupInput: InitiateSignupInput;
   JSON: Scalars['JSON']['output'];
   Location: Location;
@@ -3140,6 +3387,7 @@ export type ResolversParentTypes = {
   Mutation: {};
   Notification: Notification;
   NotificationCampaign: Omit<NotificationCampaign, 'sender'> & { sender?: Maybe<ResolversParentTypes['User']> };
+  OperationalKPIs: OperationalKPIs;
   Option: Option;
   OptionGroup: OptionGroup;
   Order: Omit<Order, 'businesses' | 'driver' | 'orderPromotions' | 'user'> & { businesses: Array<ResolversParentTypes['OrderBusiness']>, driver?: Maybe<ResolversParentTypes['User']>, orderPromotions?: Maybe<Array<ResolversParentTypes['OrderPromotion']>>, user?: Maybe<ResolversParentTypes['User']> };
@@ -3148,6 +3396,7 @@ export type ResolversParentTypes = {
   OrderItem: OrderItem;
   OrderItemOption: OrderItemOption;
   OrderPromotion: OrderPromotion;
+  PeakHourAnalysis: PeakHourAnalysis;
   PolygonPoint: PolygonPoint;
   PolygonPointInput: PolygonPointInput;
   Product: Product;
@@ -3357,6 +3606,22 @@ export type BusinessDeviceHealthResolvers<ContextType = GraphQLContext, ParentTy
 
 export type BusinessDeviceOnlineStatusResolvers = EnumResolverSignature<{ OFFLINE?: any, ONLINE?: any, STALE?: any }, ResolversTypes['BusinessDeviceOnlineStatus']>;
 
+export type BusinessKPIResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['BusinessKPI'] = ResolversParentTypes['BusinessKPI']> = {
+  avgDriverWaitMin?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  avgPrepTimeMin?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  businessId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  businessName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  cancellationRate?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  completedOrders?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  fakeReadyCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  fakeReadyRate?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  p90PrepTimeMin?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  prematureReadyRate?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  prepOverrunRate?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  totalOrders?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
 export type BusinessMessageResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['BusinessMessage'] = ResolversParentTypes['BusinessMessage']> = {
   admin?: Resolver<Maybe<ResolversTypes['BusinessMessageUser']>, ParentType, ContextType>;
   adminId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
@@ -3412,6 +3677,20 @@ export interface DateScalarConfig extends GraphQLScalarTypeConfig<ResolversTypes
 export interface DateTimeScalarConfig extends GraphQLScalarTypeConfig<ResolversTypes['DateTime'], any> {
   name: 'DateTime';
 }
+
+export type DayOfWeekDistributionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['DayOfWeekDistribution'] = ResolversParentTypes['DayOfWeekDistribution']> = {
+  dow?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  orderCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  revenue?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type DayVolumeResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['DayVolume'] = ResolversParentTypes['DayVolume']> = {
+  date?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  orderCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  revenue?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
 
 export type DeliveryPriceResultResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['DeliveryPriceResult'] = ResolversParentTypes['DeliveryPriceResult']> = {
   distanceKm?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
@@ -3474,6 +3753,29 @@ export type DeviceTokenResolvers<ContextType = GraphQLContext, ParentType extend
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
+export type DriverAuthResultResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['DriverAuthResult'] = ResolversParentTypes['DriverAuthResult']> = {
+  driver?: Resolver<ResolversTypes['DriverBasicInfo'], ParentType, ContextType>;
+  message?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  refreshToken?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  token?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type DriverBasicInfoResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['DriverBasicInfo'] = ResolversParentTypes['DriverBasicInfo']> = {
+  connectionStatus?: Resolver<ResolversTypes['DriverConnectionStatus'], ParentType, ContextType>;
+  driverLat?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  driverLng?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  email?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  firstName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  lastHeartbeatAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
+  lastLocationUpdate?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
+  lastName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  onlinePreference?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  phoneNumber?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
 export type DriverConnectionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['DriverConnection'] = ResolversParentTypes['DriverConnection']> = {
   activeOrderId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   batteryLevel?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
@@ -3512,6 +3814,16 @@ export type DriverHeartbeatResultResolvers<ContextType = GraphQLContext, ParentT
   lastHeartbeatAt?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
   locationUpdated?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   success?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type DriverKPIResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['DriverKPI'] = ResolversParentTypes['DriverKPI']> = {
+  avgDeliveryTimeMin?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  avgPickupTimeMin?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  avgWaitAtPickupMin?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  driverId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  driverName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  totalDeliveries?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -3558,6 +3870,14 @@ export type DriverPttSignalActionResolvers = EnumResolverSignature<{ MUTE?: any,
 
 export type EntityTypeResolvers = EnumResolverSignature<{ BUSINESS?: any, CATEGORY?: any, DELIVERY_ZONE?: any, DRIVER?: any, ORDER?: any, PRODUCT?: any, SETTLEMENT?: any, SUBCATEGORY?: any, USER?: any }, ResolversTypes['EntityType']>;
 
+export type HourlyDistributionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['HourlyDistribution'] = ResolversParentTypes['HourlyDistribution']> = {
+  avgDeliveryTimeMin?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  hour?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  orderCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  revenue?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
 export interface JSONScalarConfig extends GraphQLScalarTypeConfig<ResolversTypes['JSON'], any> {
   name: 'JSON';
 }
@@ -3573,8 +3893,10 @@ export type MessageAlertTypeResolvers = EnumResolverSignature<{ INFO?: any, URGE
 
 export type MutationResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Mutation'] = ResolversParentTypes['Mutation']> = {
   addUserAddress?: Resolver<ResolversTypes['UserAddress'], ParentType, ContextType, RequireFields<MutationaddUserAddressArgs, 'input'>>;
+  adminCancelOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationadminCancelOrderArgs, 'id' | 'reason'>>;
   adminSendPttSignal?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationadminSendPttSignalArgs, 'action' | 'channelName' | 'driverIds'>>;
   adminSetDriverConnectionStatus?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationadminSetDriverConnectionStatusArgs, 'driverId' | 'status'>>;
+  adminSetShiftDrivers?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationadminSetShiftDriversArgs, 'driverIds'>>;
   adminSimulateDriverHeartbeat?: Resolver<ResolversTypes['DriverHeartbeatResult'], ParentType, ContextType, RequireFields<MutationadminSimulateDriverHeartbeatArgs, 'driverId' | 'latitude' | 'longitude'>>;
   adminUpdateDriverLocation?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationadminUpdateDriverLocationArgs, 'driverId' | 'latitude' | 'longitude'>>;
   adminUpdateDriverSettings?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationadminUpdateDriverSettingsArgs, 'driverId'>>;
@@ -3621,9 +3943,12 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   deleteUser?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteUserArgs, 'id'>>;
   deleteUserAddress?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteUserAddressArgs, 'id'>>;
   driverHeartbeat?: Resolver<ResolversTypes['DriverHeartbeatResult'], ParentType, ContextType, RequireFields<MutationdriverHeartbeatArgs, 'latitude' | 'longitude'>>;
+  driverLogin?: Resolver<ResolversTypes['DriverAuthResult'], ParentType, ContextType, RequireFields<MutationdriverLoginArgs, 'input'>>;
   driverNotifyCustomer?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdriverNotifyCustomerArgs, 'kind' | 'orderId'>>;
+  driverRegister?: Resolver<ResolversTypes['DriverAuthResult'], ParentType, ContextType, RequireFields<MutationdriverRegisterArgs, 'input'>>;
   driverUpdateBatteryStatus?: Resolver<ResolversTypes['DriverConnection'], ParentType, ContextType, RequireFields<MutationdriverUpdateBatteryStatusArgs, 'level' | 'optIn'>>;
   generateReferralCode?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  grantFreeDelivery?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationgrantFreeDeliveryArgs, 'orderId' | 'userId'>>;
   initiateSignup?: Resolver<ResolversTypes['AuthResponse'], ParentType, ContextType, RequireFields<MutationinitiateSignupArgs, 'input'>>;
   login?: Resolver<ResolversTypes['AuthResponse'], ParentType, ContextType, RequireFields<MutationloginArgs, 'input'>>;
   logoutAllSessions?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
@@ -3651,6 +3976,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   setDefaultAddress?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationsetDefaultAddressArgs, 'id'>>;
   setDeliveryPricingTiers?: Resolver<Array<ResolversTypes['DeliveryPricingTier']>, ParentType, ContextType, RequireFields<MutationsetDeliveryPricingTiersArgs, 'input'>>;
   setMyPreferredLanguage?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationsetMyPreferredLanguageArgs, 'language'>>;
+  setOrderAdminNote?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationsetOrderAdminNoteArgs, 'id'>>;
   setUserPermissions?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationsetUserPermissionsArgs, 'permissions' | 'userId'>>;
   settleWithBusiness?: Resolver<ResolversTypes['SettleResult'], ParentType, ContextType, RequireFields<MutationsettleWithBusinessArgs, 'amount' | 'businessId'>>;
   settleWithDriver?: Resolver<ResolversTypes['SettleResult'], ParentType, ContextType, RequireFields<MutationsettleWithDriverArgs, 'driverId'>>;
@@ -3722,6 +4048,22 @@ export type NotificationCampaignResolvers<ContextType = GraphQLContext, ParentTy
 
 export type NotificationTypeResolvers = EnumResolverSignature<{ ADMIN_ALERT?: any, ORDER_ASSIGNED?: any, ORDER_STATUS?: any, PROMOTIONAL?: any }, ResolversTypes['NotificationType']>;
 
+export type OperationalKPIsResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['OperationalKPIs'] = ResolversParentTypes['OperationalKPIs']> = {
+  aov?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  avgDeliveryTimeMin?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  avgDriverWaitAtPickupMin?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  avgPrepTimeMin?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  cancellationRate?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  cancelledOrders?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  completedOrders?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  dailyVolume?: Resolver<Array<ResolversTypes['DayVolume']>, ParentType, ContextType>;
+  fakeReadyRate?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  gmv?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  prepOverrunRate?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  totalOrders?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
 export type OptionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Option'] = ResolversParentTypes['Option']> = {
   displayOrder?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   extraPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
@@ -3745,11 +4087,16 @@ export type OptionGroupResolvers<ContextType = GraphQLContext, ParentType extend
 };
 
 export type OrderResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Order'] = ResolversParentTypes['Order']> = {
+  adminNote?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   businesses?: Resolver<Array<ResolversTypes['OrderBusiness']>, ParentType, ContextType>;
+  cancellationReason?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  cancelledAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   deliveredAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   deliveryPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   displayId?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   driver?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
+  driverArrivedAtPickup?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
+  driverAssignedAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   driverNotes?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   dropOffLocation?: Resolver<ResolversTypes['Location'], ParentType, ContextType>;
   estimatedReadyAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
@@ -3821,11 +4168,20 @@ export type OrderPromotionResolvers<ContextType = GraphQLContext, ParentType ext
   appliesTo?: Resolver<ResolversTypes['PromotionAppliesTo'], ParentType, ContextType>;
   discountAmount?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  promoCode?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   promotionId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
 export type OrderStatusResolvers = EnumResolverSignature<{ CANCELLED?: any, DELIVERED?: any, OUT_FOR_DELIVERY?: any, PENDING?: any, PREPARING?: any, READY?: any }, ResolversTypes['OrderStatus']>;
+
+export type PeakHourAnalysisResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PeakHourAnalysis'] = ResolversParentTypes['PeakHourAnalysis']> = {
+  byDayOfWeek?: Resolver<Array<ResolversTypes['DayOfWeekDistribution']>, ParentType, ContextType>;
+  hourly?: Resolver<Array<ResolversTypes['HourlyDistribution']>, ParentType, ContextType>;
+  peakDow?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  peakHour?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
 
 export type PolygonPointResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PolygonPoint'] = ResolversParentTypes['PolygonPoint']> = {
   lat?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
@@ -4015,15 +4371,18 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   business?: Resolver<Maybe<ResolversTypes['Business']>, ParentType, ContextType, RequireFields<QuerybusinessArgs, 'id'>>;
   businessBalance?: Resolver<ResolversTypes['SettlementSummary'], ParentType, ContextType, RequireFields<QuerybusinessBalanceArgs, 'businessId'>>;
   businessDeviceHealth?: Resolver<Array<ResolversTypes['BusinessDeviceHealth']>, ParentType, ContextType, Partial<QuerybusinessDeviceHealthArgs>>;
+  businessKPIs?: Resolver<Array<ResolversTypes['BusinessKPI']>, ParentType, ContextType, RequireFields<QuerybusinessKPIsArgs, 'endDate' | 'startDate'>>;
   businessMessageThreads?: Resolver<Array<ResolversTypes['BusinessMessageThread']>, ParentType, ContextType>;
   businessMessages?: Resolver<Array<ResolversTypes['BusinessMessage']>, ParentType, ContextType, RequireFields<QuerybusinessMessagesArgs, 'businessUserId'>>;
   businesses?: Resolver<Array<ResolversTypes['Business']>, ParentType, ContextType>;
   calculateDeliveryPrice?: Resolver<ResolversTypes['DeliveryPriceResult'], ParentType, ContextType, RequireFields<QuerycalculateDeliveryPriceArgs, 'businessId' | 'dropoffLat' | 'dropoffLng'>>;
+  cancelledOrders?: Resolver<Array<ResolversTypes['Order']>, ParentType, ContextType, Partial<QuerycancelledOrdersArgs>>;
   deliveryPricingConfig?: Resolver<ResolversTypes['DeliveryPricingConfig'], ParentType, ContextType>;
   deliveryPricingTiers?: Resolver<Array<ResolversTypes['DeliveryPricingTier']>, ParentType, ContextType>;
   deliveryZones?: Resolver<Array<ResolversTypes['DeliveryZone']>, ParentType, ContextType>;
   deviceTokens?: Resolver<Array<ResolversTypes['DeviceToken']>, ParentType, ContextType, Partial<QuerydeviceTokensArgs>>;
   driverBalance?: Resolver<ResolversTypes['SettlementSummary'], ParentType, ContextType, RequireFields<QuerydriverBalanceArgs, 'driverId'>>;
+  driverKPIs?: Resolver<Array<ResolversTypes['DriverKPI']>, ParentType, ContextType, RequireFields<QuerydriverKPIsArgs, 'endDate' | 'startDate'>>;
   driverMessageThreads?: Resolver<Array<ResolversTypes['DriverMessageThread']>, ParentType, ContextType>;
   driverMessages?: Resolver<Array<ResolversTypes['DriverMessage']>, ParentType, ContextType, RequireFields<QuerydriverMessagesArgs, 'driverId'>>;
   drivers?: Resolver<Array<ResolversTypes['User']>, ParentType, ContextType>;
@@ -4050,9 +4409,11 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   notificationCampaign?: Resolver<Maybe<ResolversTypes['NotificationCampaign']>, ParentType, ContextType, RequireFields<QuerynotificationCampaignArgs, 'id'>>;
   notificationCampaigns?: Resolver<Array<ResolversTypes['NotificationCampaign']>, ParentType, ContextType>;
   offers?: Resolver<Array<ResolversTypes['Product']>, ParentType, ContextType, RequireFields<QueryoffersArgs, 'businessId'>>;
+  operationalKPIs?: Resolver<ResolversTypes['OperationalKPIs'], ParentType, ContextType, RequireFields<QueryoperationalKPIsArgs, 'endDate' | 'startDate'>>;
   order?: Resolver<Maybe<ResolversTypes['Order']>, ParentType, ContextType, RequireFields<QueryorderArgs, 'id'>>;
-  orders?: Resolver<Array<ResolversTypes['Order']>, ParentType, ContextType>;
+  orders?: Resolver<Array<ResolversTypes['Order']>, ParentType, ContextType, Partial<QueryordersArgs>>;
   ordersByStatus?: Resolver<Array<ResolversTypes['Order']>, ParentType, ContextType, RequireFields<QueryordersByStatusArgs, 'status'>>;
+  peakHourAnalysis?: Resolver<ResolversTypes['PeakHourAnalysis'], ParentType, ContextType, RequireFields<QuerypeakHourAnalysisArgs, 'endDate' | 'startDate'>>;
   previewCampaignAudience?: Resolver<ResolversTypes['AudiencePreview'], ParentType, ContextType, RequireFields<QuerypreviewCampaignAudienceArgs, 'query'>>;
   product?: Resolver<Maybe<ResolversTypes['Product']>, ParentType, ContextType, RequireFields<QueryproductArgs, 'id'>>;
   productCategories?: Resolver<Array<ResolversTypes['ProductCategory']>, ParentType, ContextType, RequireFields<QueryproductCategoriesArgs, 'businessId'>>;
@@ -4073,7 +4434,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   uncompletedOrders?: Resolver<Array<ResolversTypes['Order']>, ParentType, ContextType>;
   unsettledBalance?: Resolver<ResolversTypes['Float'], ParentType, ContextType, RequireFields<QueryunsettledBalanceArgs, 'entityId' | 'entityType'>>;
   userBehavior?: Resolver<Maybe<ResolversTypes['UserBehavior']>, ParentType, ContextType, RequireFields<QueryuserBehaviorArgs, 'userId'>>;
-  users?: Resolver<Array<ResolversTypes['User']>, ParentType, ContextType>;
+  users?: Resolver<Array<ResolversTypes['User']>, ParentType, ContextType, Partial<QueryusersArgs>>;
   validatePromotions?: Resolver<ResolversTypes['PromotionResult'], ParentType, ContextType, RequireFields<QueryvalidatePromotionsArgs, 'cart'>>;
 };
 
@@ -4404,6 +4765,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   BusinessDayHours?: BusinessDayHoursResolvers<ContextType>;
   BusinessDeviceHealth?: BusinessDeviceHealthResolvers<ContextType>;
   BusinessDeviceOnlineStatus?: BusinessDeviceOnlineStatusResolvers;
+  BusinessKPI?: BusinessKPIResolvers<ContextType>;
   BusinessMessage?: BusinessMessageResolvers<ContextType>;
   BusinessMessageThread?: BusinessMessageThreadResolvers<ContextType>;
   BusinessMessageUser?: BusinessMessageUserResolvers<ContextType>;
@@ -4413,6 +4775,8 @@ export type Resolvers<ContextType = GraphQLContext> = {
   CreateBusinessWithOwnerPayload?: CreateBusinessWithOwnerPayloadResolvers<ContextType>;
   Date?: GraphQLScalarType;
   DateTime?: GraphQLScalarType;
+  DayOfWeekDistribution?: DayOfWeekDistributionResolvers<ContextType>;
+  DayVolume?: DayVolumeResolvers<ContextType>;
   DeliveryPriceResult?: DeliveryPriceResultResolvers<ContextType>;
   DeliveryPricingConfig?: DeliveryPricingConfigResolvers<ContextType>;
   DeliveryPricingTier?: DeliveryPricingTierResolvers<ContextType>;
@@ -4421,17 +4785,21 @@ export type Resolvers<ContextType = GraphQLContext> = {
   DeviceAppType?: DeviceAppTypeResolvers;
   DevicePlatform?: DevicePlatformResolvers;
   DeviceToken?: DeviceTokenResolvers<ContextType>;
+  DriverAuthResult?: DriverAuthResultResolvers<ContextType>;
+  DriverBasicInfo?: DriverBasicInfoResolvers<ContextType>;
   DriverConnection?: DriverConnectionResolvers<ContextType>;
   DriverConnectionStatus?: DriverConnectionStatusResolvers;
   DriverCustomerNotificationKind?: DriverCustomerNotificationKindResolvers;
   DriverDailyMetrics?: DriverDailyMetricsResolvers<ContextType>;
   DriverHeartbeatResult?: DriverHeartbeatResultResolvers<ContextType>;
+  DriverKPI?: DriverKPIResolvers<ContextType>;
   DriverMessage?: DriverMessageResolvers<ContextType>;
   DriverMessageThread?: DriverMessageThreadResolvers<ContextType>;
   DriverMessageUser?: DriverMessageUserResolvers<ContextType>;
   DriverPttSignal?: DriverPttSignalResolvers<ContextType>;
   DriverPttSignalAction?: DriverPttSignalActionResolvers;
   EntityType?: EntityTypeResolvers;
+  HourlyDistribution?: HourlyDistributionResolvers<ContextType>;
   JSON?: GraphQLScalarType;
   Location?: LocationResolvers<ContextType>;
   MessageAlertType?: MessageAlertTypeResolvers;
@@ -4439,6 +4807,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   Notification?: NotificationResolvers<ContextType>;
   NotificationCampaign?: NotificationCampaignResolvers<ContextType>;
   NotificationType?: NotificationTypeResolvers;
+  OperationalKPIs?: OperationalKPIsResolvers<ContextType>;
   Option?: OptionResolvers<ContextType>;
   OptionGroup?: OptionGroupResolvers<ContextType>;
   Order?: OrderResolvers<ContextType>;
@@ -4449,6 +4818,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   OrderPaymentCollection?: OrderPaymentCollectionResolvers;
   OrderPromotion?: OrderPromotionResolvers<ContextType>;
   OrderStatus?: OrderStatusResolvers;
+  PeakHourAnalysis?: PeakHourAnalysisResolvers<ContextType>;
   PolygonPoint?: PolygonPointResolvers<ContextType>;
   Product?: ProductResolvers<ContextType>;
   ProductCard?: ProductCardResolvers<ContextType>;

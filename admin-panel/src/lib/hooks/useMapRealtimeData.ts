@@ -42,6 +42,12 @@ export function useMapRealtimeData() {
     const { data: orderData, refetch: refetchOrders } = useQuery(GET_ORDERS);
 
     const [driversLive, setDriversLive] = useState<any[]>([]);
+    const [realtimeHealth, setRealtimeHealth] = useState({
+        driverLastSubAtMs: 0,
+        orderLastSubAtMs: 0,
+        driverPollingFallback: true,
+        orderFallbackRefetchAtMs: 0,
+    });
     const lastSubscriptionRefetchMsRef = useRef(0);
     const lastDriverSubscriptionMsRef = useRef(0);
     const isDriverPollingRef = useRef(false);
@@ -57,15 +63,18 @@ export function useMapRealtimeData() {
             if (subAlive && isDriverPollingRef.current) {
                 stopPolling();
                 isDriverPollingRef.current = false;
+                setRealtimeHealth((prev) => ({ ...prev, driverPollingFallback: false }));
             } else if (!subAlive && !isDriverPollingRef.current) {
                 startPolling(DRIVER_POLL_MS);
                 isDriverPollingRef.current = true;
+                setRealtimeHealth((prev) => ({ ...prev, driverPollingFallback: true }));
             }
         }, 5000);
 
         // Start polling initially until the first subscription event arrives
         startPolling(DRIVER_POLL_MS);
         isDriverPollingRef.current = true;
+        setRealtimeHealth((prev) => ({ ...prev, driverPollingFallback: true }));
 
         return () => {
             clearInterval(interval);
@@ -86,6 +95,7 @@ export function useMapRealtimeData() {
         onData: ({ data: subscriptionData }) => {
             const incomingOrders = (subscriptionData.data as any)?.allOrdersUpdated as any[] | undefined;
             if (incomingOrders && incomingOrders.length > 0) {
+                setRealtimeHealth((prev) => ({ ...prev, orderLastSubAtMs: Date.now() }));
                 apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
                     const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
                     const byId = new globalThis.Map<string, any>(
@@ -110,6 +120,7 @@ export function useMapRealtimeData() {
                 return;
             }
             lastSubscriptionRefetchMsRef.current = now;
+            setRealtimeHealth((prev) => ({ ...prev, orderFallbackRefetchAtMs: now }));
             refetchOrders();
         },
     });
@@ -122,6 +133,7 @@ export function useMapRealtimeData() {
             if (!incoming || incoming.length === 0) return;
 
             lastDriverSubscriptionMsRef.current = Date.now();
+            setRealtimeHealth((prev) => ({ ...prev, driverLastSubAtMs: Date.now(), driverPollingFallback: false }));
             if (isDriverPollingRef.current) {
                 stopPolling();
                 isDriverPollingRef.current = false;
@@ -142,5 +154,6 @@ export function useMapRealtimeData() {
         businesses,
         orders,
         drivers,
+        realtimeHealth,
     };
 }

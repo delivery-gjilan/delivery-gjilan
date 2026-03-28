@@ -4,18 +4,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
+import { useTranslations } from '@/hooks/useTranslations';
 import { useQuery } from '@apollo/client/react';
 import { GET_MY_SETTLEMENTS, GET_MY_SETTLEMENT_SUMMARY } from '@/graphql/operations/driver';
 import { format, startOfMonth, startOfWeek, subMonths } from 'date-fns';
 
 type Period = 'week' | 'month' | 'last_month' | 'all';
-
-const PERIODS: { key: Period; label: string }[] = [
-    { key: 'week', label: 'This Week' },
-    { key: 'month', label: 'This Month' },
-    { key: 'last_month', label: 'Last Month' },
-    { key: 'all', label: 'All Time' },
-];
 
 function getPeriodDates(period: Period): { startDate?: string; endDate?: string } {
     const now = new Date();
@@ -52,7 +46,15 @@ function formatDate(dateStr?: string | null) {
 
 export default function EarningsScreen() {
     const theme = useTheme();
+    const { t } = useTranslations();
     const [period, setPeriod] = useState<Period>('month');
+
+    const PERIODS: { key: Period; label: string }[] = [
+        { key: 'week', label: t.earnings.period_week },
+        { key: 'month', label: t.earnings.period_month },
+        { key: 'last_month', label: t.earnings.period_last_month },
+        { key: 'all', label: t.earnings.period_all },
+    ];
     const [refreshing, setRefreshing] = useState(false);
 
     const { startDate, endDate } = getPeriodDates(period);
@@ -98,8 +100,8 @@ export default function EarningsScreen() {
             >
                 {/* Header */}
                 <View className="px-4 pt-4 pb-2">
-                    <Text className="text-2xl font-bold" style={{ color: theme.colors.text }}>Earnings</Text>
-                    <Text className="text-sm mt-1" style={{ color: theme.colors.subtext }}>Your delivery income & settlements</Text>
+                    <Text className="text-2xl font-bold" style={{ color: theme.colors.text }}>{t.earnings.title}</Text>
+                    <Text className="text-sm mt-1" style={{ color: theme.colors.subtext }}>{t.earnings.subtitle}</Text>
                 </View>
 
                 {/* Period Selector */}
@@ -138,32 +140,32 @@ export default function EarningsScreen() {
                                 style={{ backgroundColor: theme.colors.income + '20', borderWidth: 1, borderColor: theme.colors.income + '40' }}
                             >
                                 <Text className="text-xs font-bold uppercase tracking-wide" style={{ color: theme.colors.income }}>
-                                    NET EARNINGS
+                                    {t.earnings.net_earnings}
                                 </Text>
                                 <Text className="text-5xl font-bold mt-2" style={{ color: theme.colors.text }}>
                                     {formatCurrency(summary?.totalAmount ?? 0)}
                                 </Text>
                                 <Text className="text-sm mt-1" style={{ color: theme.colors.subtext }}>
-                                    {summary?.count ?? 0} {(summary?.count ?? 0) === 1 ? 'delivery' : 'deliveries'}
+                                    {summary?.count ?? 0} {(summary?.count ?? 0) === 1 ? t.earnings.delivery : t.earnings.deliveries}
                                 </Text>
                             </View>
 
                             {/* Paid / Pending split */}
                             <View className="flex-row gap-3">
                                 <View className="flex-1 rounded-2xl p-4" style={{ backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border }}>
-                                    <Text className="text-xs font-semibold" style={{ color: theme.colors.subtext }}>PAID</Text>
+                                    <Text className="text-xs font-semibold" style={{ color: theme.colors.subtext }}>{t.earnings.paid}</Text>
                                     <Text className="text-2xl font-bold mt-1" style={{ color: theme.colors.income }}>
                                         {formatCurrency(summary?.totalPaid ?? 0)}
                                     </Text>
                                 </View>
                                 <View className="flex-1 rounded-2xl p-4" style={{ backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border }}>
-                                    <Text className="text-xs font-semibold" style={{ color: theme.colors.subtext }}>PENDING</Text>
+                                    <Text className="text-xs font-semibold" style={{ color: theme.colors.subtext }}>{t.earnings.pending}</Text>
                                     <Text className="text-2xl font-bold mt-1" style={{ color: '#f59e0b' }}>
                                         {formatCurrency(summary?.totalPending ?? 0)}
                                     </Text>
                                     {(summary?.pendingCount ?? 0) > 0 && (
                                         <Text className="text-xs mt-0.5" style={{ color: theme.colors.subtext }}>
-                                            {summary.pendingCount} unsettled
+                                            {summary.pendingCount} {t.earnings.unsettled}
                                         </Text>
                                     )}
                                 </View>
@@ -176,13 +178,13 @@ export default function EarningsScreen() {
                                     style={{ backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, gap: 10 }}
                                 >
                                     <Text className="text-xs font-bold uppercase tracking-wide" style={{ color: theme.colors.subtext }}>
-                                        Pending Balance
+                                        {t.earnings.pending_balance}
                                     </Text>
                                     {pendingPayable > 0 && (
                                         <View className="flex-row items-center justify-between">
                                             <View className="flex-row items-center" style={{ gap: 8 }}>
                                                 <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#22c55e' }} />
-                                                <Text className="text-sm" style={{ color: theme.colors.subtext }}>Platform owes you</Text>
+                                                <Text className="text-sm" style={{ color: theme.colors.subtext }}>{t.earnings.platform_owes_you}</Text>
                                             </View>
                                             <Text className="font-bold" style={{ color: '#22c55e', fontSize: 15 }}>
                                                 {formatCurrency(pendingPayable)}
@@ -193,7 +195,7 @@ export default function EarningsScreen() {
                                         <View className="flex-row items-center justify-between">
                                             <View className="flex-row items-center" style={{ gap: 8 }}>
                                                 <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#f59e0b' }} />
-                                                <Text className="text-sm" style={{ color: theme.colors.subtext }}>You owe platform</Text>
+                                                <Text className="text-sm" style={{ color: theme.colors.subtext }}>{t.earnings.you_owe_platform}</Text>
                                             </View>
                                             <Text className="font-bold" style={{ color: '#f59e0b', fontSize: 15 }}>
                                                 {formatCurrency(pendingReceivable)}
@@ -203,7 +205,7 @@ export default function EarningsScreen() {
                                     {pendingPayable > 0 && pendingReceivable > 0 && (
                                         <View style={{ borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: 8 }}>
                                             <View className="flex-row items-center justify-between">
-                                                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>Net pending</Text>
+                                                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>{t.earnings.net_pending}</Text>
                                                 <Text className="font-bold" style={{
                                                     color: pendingPayable >= pendingReceivable ? '#22c55e' : '#f59e0b',
                                                     fontSize: 15,
@@ -222,7 +224,7 @@ export default function EarningsScreen() {
                 {/* Delivery list */}
                 <View className="px-4 mt-6">
                     <Text className="text-sm font-bold mb-3" style={{ color: theme.colors.text }}>
-                        Deliveries
+                        {t.earnings.deliveries_list}
                     </Text>
 
                     {settlementsLoading ? (
@@ -230,8 +232,8 @@ export default function EarningsScreen() {
                     ) : settlements.length === 0 ? (
                         <View className="items-center py-12">
                             <Text className="text-4xl mb-3">💰</Text>
-                            <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>No earnings yet</Text>
-                            <Text className="text-sm mt-1" style={{ color: theme.colors.subtext }}>Complete deliveries to see them here.</Text>
+                            <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>{t.earnings.no_earnings_title}</Text>
+                            <Text className="text-sm mt-1" style={{ color: theme.colors.subtext }}>{t.earnings.no_earnings_sub}</Text>
                         </View>
                     ) : (
                         <View style={{ gap: 8 }}>
@@ -239,7 +241,7 @@ export default function EarningsScreen() {
                                 const businessNames = s.order?.businesses?.map((b: any) => b.business.name).join(', ') ?? '—';
                                 const isPaid = s.status === 'PAID';
                                 const isPayable = s.direction === 'PAYABLE';
-                                const directionLabel = isPayable ? 'Platform owes you' : 'Commission';
+                                const directionLabel = isPayable ? t.earnings.platform_owes_you : t.earnings.commission;
                                 const directionColor = isPayable ? '#22c55e' : '#f59e0b';
                                 return (
                                     <View
@@ -284,12 +286,12 @@ export default function EarningsScreen() {
                                                     style={{ backgroundColor: isPaid ? theme.colors.income + '20' : '#f59e0b20' }}
                                                 >
                                                     <Text className="text-xs font-semibold" style={{ color: isPaid ? theme.colors.income : '#f59e0b' }}>
-                                                        {isPaid ? 'PAID' : 'PENDING'}
+                                                        {isPaid ? t.earnings.paid : t.earnings.pending}
                                                     </Text>
                                                 </View>
                                                 {isPaid && s.paidAt && (
                                                     <Text className="text-xs mt-0.5" style={{ color: theme.colors.subtext }}>
-                                                        Paid {formatDate(s.paidAt)}
+                                                        {t.earnings.paid_on} {formatDate(s.paidAt)}
                                                     </Text>
                                                 )}
                                             </View>

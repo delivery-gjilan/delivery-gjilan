@@ -7,6 +7,7 @@ export const GET_ORDERS = gql`
             displayId
             orderDate
             status
+            estimatedReadyAt
             orderPrice
             deliveryPrice
             totalPrice
@@ -130,6 +131,7 @@ export const ALL_ORDERS_UPDATED = gql`
             displayId
             orderDate
             status
+            estimatedReadyAt
             orderPrice
             deliveryPrice
             totalPrice

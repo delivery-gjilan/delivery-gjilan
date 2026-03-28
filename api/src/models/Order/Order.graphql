@@ -55,6 +55,7 @@ type OrderPromotion {
     promotionId: ID!
     appliesTo: PromotionAppliesTo!
     discountAmount: Float!
+    promoCode: String
 }
 
 type OrderDriverLiveTracking {
@@ -92,19 +93,25 @@ type Order {
     readyAt: Date
     outForDeliveryAt: Date
     deliveredAt: Date
+    cancelledAt: Date
+    driverAssignedAt: Date
+    driverArrivedAtPickup: Date
+    cancellationReason: String
     user: User
     driver: User
     dropOffLocation: Location!
     pickupLocations: [Location!]!
     driverNotes: String
+    adminNote: String
     businesses: [OrderBusiness!]!
     orderPromotions: [OrderPromotion!]
 }
 
 type Query {
-    orders: [Order!]!
+    orders(limit: Int, offset: Int): [Order!]!
     order(id: ID!): Order
-    ordersByStatus(status: OrderStatus!): [Order!]!
+    ordersByStatus(status: OrderStatus!, limit: Int, offset: Int): [Order!]!
+    cancelledOrders(limit: Int, offset: Int): [Order!]!
     uncompletedOrders: [Order!]!
 }
 
@@ -115,6 +122,8 @@ type Mutation {
     assignDriverToOrder(id: ID!, driverId: ID): Order!
     driverNotifyCustomer(orderId: ID!, kind: DriverCustomerNotificationKind!): Boolean!
     cancelOrder(id: ID!): Order!
+    adminCancelOrder(id: ID!, reason: String!, settleDriver: Boolean, settleBusiness: Boolean): Order!
+    setOrderAdminNote(id: ID!, note: String): Order!
     createOrder(input: CreateOrderInput!): Order!
     createTestOrder: Order!
 }
@@ -150,6 +159,7 @@ input CreateOrderInput {
     dropOffLocation: LocationInput!
     deliveryPrice: Float!
     totalPrice: Float!
+    prioritySurcharge: Float
     paymentCollection: OrderPaymentCollection
     promoCode: String
     driverNotes: String

@@ -64,6 +64,7 @@ export default function FinancesDashboard() {
             businessId: selectedBusinessId || undefined,
             startDate: dateStart || undefined,
             endDate: dateEnd || undefined,
+            limit: 1000,
         },
     });
 

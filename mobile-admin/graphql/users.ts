@@ -4,7 +4,7 @@ import { gql } from '@apollo/client';
 
 export const GET_USERS = gql`
     query GetUsers {
-        users {
+        users(limit: 500) {
             id
             email
             firstName

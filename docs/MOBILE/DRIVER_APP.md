@@ -1,6 +1,6 @@
 # Mobile Driver App
 
-<!-- MDS:M8 | Domain: Mobile | Updated: 2026-03-22 -->
+<!-- MDS:M8 | Domain: Mobile | Updated: 2026-03-28 -->
 <!-- Depends-On: A1, B1, B4, B5, B7, BL1 -->
 <!-- Depended-By: M1, O4 -->
 <!-- Nav: Heartbeat changes → also update B4 (Watchdog). Auth changes → also update B5. Subscription shape changes → verify map.tsx and navigation.tsx cache update logic. -->
@@ -26,6 +26,7 @@ mobile-driver/
 │       ├── home.tsx            # Online/offline toggle
 │       ├── map.tsx             # Live order map with Mapbox
 │       ├── add.tsx             # Earnings & settlements
+│       ├── messages.tsx        # Driver ↔ Admin chat, persisted to AsyncStorage
 │       └── profile.tsx         # User info, language toggle
 ├── components/
 │   ├── navigation/             # FloatingMapButtons, InstructionBanner, NavigationBottomPanel, RecenterButton
@@ -86,6 +87,7 @@ index.tsx
                  ├── useNotifications()    → FCM token registration
                  ├── useDriverPttReceiver() → Agora RTC PTT listener
                  ├── useStoreStatus()      → GET_STORE_STATUS poll (30s)
+                 ├── useGlobalOrderAccept() → single ALL_ORDERS_UPDATED subscription + OrderAcceptSheet
                  └── <Stack> screens
 ```
 
@@ -143,11 +145,13 @@ createClient({
   connectionParams: async () => ({ Authorization: `Bearer ${token}` }),
   shouldRetry: () => true,
   retryAttempts: Infinity,
-  retryWait: exponentialBackoff([1s, 2s, 5s, 10s]),
+  retryWait: exponentialBackoff([0.5s, 1s, 2s, 5s]),
   keepAlive: 30_000,
   lazy: true,   ← only connects when first subscription is registered
 })
 ```
+
+The reconnect ladder is intentionally front-loaded so drivers returning from background recover realtime subscriptions faster before falling back to longer waits.
 
 ### Cache Policies
 
@@ -259,8 +263,8 @@ The map is the primary operational view. It shows all active/available orders an
 
 **Data layer:**
 - `GET_ORDERS` query (`cache-and-network` → `cache-first`)
-- `ALL_ORDERS_UPDATED` subscription — each payload merges into the Apollo cache using a `byId` Map to prevent duplicates
-- If subscription payload is empty, falls back to `refetch()`
+- `ALL_ORDERS_UPDATED` subscription runs once globally in `useGlobalOrderAccept` (mounted in `AppContent`), merging payloads into the Apollo cache so all active `GET_ORDERS` queries auto-update
+- If subscription payload is empty, the global hook falls back to `refetch()`
 
 **Order filtering:**
 - `assignedOrders`: `order.driver.id === currentDriverId` AND not `DELIVERED`/`CANCELLED`
@@ -284,8 +288,11 @@ The map is the primary operational view. It shows all active/available orders an
 **Dispatch mode gating:**
 When `dispatchModeEnabled` is `true` (broadcast via `storeStatusUpdated` subscription, exposed by `useStoreStatus`):
 - `availableOrders` useMemo returns `[]` — unassigned orders are hidden from the map
-- The auto-present-accept-sheet effect is suppressed (`if (!isOnline || acceptSheetOrder || dispatchModeEnabled) return`)
-- An amber "Admin is dispatching orders" pill appears on the home screen instead
+- The global `useGlobalOrderAccept` hook suppresses auto-present
+- An amber “Admin is dispatching orders” pill appears on the home screen
+
+**Order accept sheet:**
+The `OrderAcceptSheet` is rendered globally in `AppContent` (`_layout.tsx`), not in map.tsx or navigation.tsx. When a driver selects an order from the pool FAB, `map.tsx` calls `useOrderAcceptStore.getState().setPendingOrder(order, false)` directly. Camera-fit runs in a local `useEffect` in `map.tsx` watching `pendingOrder?.id`.
 
 ---
 
@@ -328,7 +335,7 @@ When a new order is assigned to the driver during active navigation (dispatch mo
 
 ### Real-time Subscription
 
-The navigation screen also maintains `ALL_ORDERS_UPDATED` subscription and applies the same cache merge logic as map.tsx — because status changes from business/admin must reflect immediately in the driver's assigned order list.
+The navigation screen does not maintain its own `ALL_ORDERS_UPDATED` subscription. The single global subscription in `useGlobalOrderAccept` (mounted at `AppContent`) keeps the Apollo cache updated; `navigation.tsx` reads from the cache via its own `GET_ORDERS` query with `cache-and-network`.
 
 ### Heartbeat Integration
 
@@ -390,8 +397,28 @@ The driver can receive real-time voice broadcasts from admin via **Agora RTC**.
 - On iOS: APNs token fetched via `getAPNSTokenAsync()` first, then FCM registration
 - Device token registered with `REGISTER_DEVICE_TOKEN(input: { token, platform, appType: 'DRIVER', deviceId })`
 - On logout: `UNREGISTER_DEVICE_TOKEN(token)` fires
-- Background tap: notification data is inspected for `data.orderId` or `data.screen` and router navigates accordingly
+- Background tap: notification data is inspected for `data.orderId` or `data.screen`; the app performs a `GET_ORDERS` network fetch (bounded to ~1.5s) before routing so order status/ETA is current on open
+- Cold-start open path also consumes `getLastNotificationResponseAsync()` so launch-from-push follows the same refresh-first behavior
 - All lifecycle events emit `TRACK_PUSH_TELEMETRY`: `TOKEN_REGISTERED`, `TOKEN_REFRESHED`, `TOKEN_UNREGISTERED`, `RECEIVED`, `OPENED`
+
+---
+
+## Messages Screen (`app/(tabs)/messages.tsx`)
+
+Driver ↔ Admin real-time chat screen.
+
+**Queries:**
+- `MY_DRIVER_MESSAGES(limit: 100)` — initial load of server-stored messages.
+
+**Subscriptions:**
+- `DRIVER_MESSAGE_RECEIVED` — incoming messages from admin arrive in real-time.
+
+**Persistence model:**
+- Server messages arrive from the query/subscription.
+- Outbound admin replies generated directly in this app (`extraMessages`) are persisted to AsyncStorage under key `driver_chat_extra_messages`.
+- On mount, both `clearedAt` (timestamp) and `extraMessages` are restored from AsyncStorage — messages sent before `clearedAt` are filtered out.
+- The "Clear" action wipes both `clearedAt` and `extraMessages` from AsyncStorage simultaneously, ensuring the cleared state survives navigation and app restart.
+- Without persistence, clearing and navigating away would restore the full message list on re-mount.
 
 ---
 
@@ -464,9 +491,11 @@ When `dispatchModeEnabled` is `true` and the driver is online, an amber pill is 
 
 | Subscription | File | Where Used |
 |--------------|------|-----------|
-| `allOrdersUpdated` | `orders.ts` | map.tsx, navigation.tsx |
+| `allOrdersUpdated` | `orders.ts` | `useGlobalOrderAccept` only (single global instance in `AppContent`); includes `estimatedReadyAt` for cache parity with `GET_ORDERS` |
 | `storeStatusUpdated` | `store.ts` | `useStoreStatus` (real-time dispatch mode + banner updates) |
 | `driverPttSignal(driverId)` | `driverTelemetry.ts` | `useDriverPttReceiver` |
+
+`useGlobalOrderAccept` also refetches `GET_ORDERS` on app foreground and on active session attach, with a short throttle guard, to backfill any events missed while backgrounded.
 
 ---
 
@@ -476,8 +505,7 @@ When `dispatchModeEnabled` is `true` and the driver is online, an amber pill is 
 |-------|-----------|-----------|
 | `authStore` | Yes (AsyncStorage) | `token`, `user`, `isAuthenticated`, `isOnline` |
 | `navigationStore` | No | `isNavigating`, `phase`, `order`, `destination`, `durationRemainingS` |
-| `navigationLocationStore` | No | SDK location feed, freshness check (10s max age) |
-| `driverLocationOverrideStore` | No | Simulation mode location override |
+| `navigationLocationStore` | No | SDK location feed, freshness check (10s max age) || `orderAcceptStore` | No | `pendingOrder`, `autoCountdown`, `accepting`, `skippedIds` (mutate-in-place Set) || `driverLocationOverrideStore` | No | Simulation mode location override |
 | `useLocaleStore` | Yes | `languageChoice` ('en' \| 'al') |
 | `useThemeStore` | Yes | `theme` ('light' \| 'dark' \| 'system') |
 
@@ -497,6 +525,7 @@ When `dispatchModeEnabled` is `true` and the driver is online, an amber pill is 
 | `useDriverPttReceiver` | `_layout.tsx` | Agora PTT subscription + engine |
 | `useNotifications` | `_layout.tsx` | FCM token lifecycle |
 | `useStoreStatus` | `_layout.tsx`, `map.tsx`, `home.tsx` | Store banner poll + real-time subscription; exposes `dispatchModeEnabled` |
+| `useGlobalOrderAccept` | `_layout.tsx` | Single `ALL_ORDERS_UPDATED` subscription + capacity-aware auto-present + accept/skip handlers; renders `OrderAcceptSheet` globally |
 | `useTheme` | Many | Theme token access |
 | `useSyncTheme` | `useAppSetup` | System theme listener |
 | `useTranslations` | Many | i18n strings + language switch |

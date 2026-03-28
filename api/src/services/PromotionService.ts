@@ -218,6 +218,10 @@ export class PromotionService {
         return { valid: true, promotion: promo };
     }
 
+    async getPromotionUsage(promotionId: string, limit = 500, offset = 0): Promise<any[]> {
+        return this.repository.getUsageByPromotion(promotionId, limit, offset);
+    }
+
     async recordPromotionUsage(
         promotionId: string,
         userId: string,

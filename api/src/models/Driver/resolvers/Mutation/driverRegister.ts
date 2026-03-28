@@ -21,6 +21,7 @@ export const driverRegister: NonNullable<MutationResolvers['driverRegister']> = 
 
         return {
             token: result.token,
+            refreshToken: result.refreshToken,
             driver: {
                 id: result.driver.id,
                 email: result.driver.email,

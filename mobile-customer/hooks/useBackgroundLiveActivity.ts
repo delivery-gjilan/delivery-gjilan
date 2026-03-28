@@ -74,7 +74,16 @@ export function useBackgroundLiveActivity() {
 
         const preparingStartedAtMs = toMs(candidateOrder.preparingAt);
         const pendingStartedAtMs = toMs(candidateOrder.orderDate);
-        const outForDeliveryStartedAtMs = toMs(candidateOrder.updatedAt);
+        const outForDeliveryStartedAtMs =
+            toMs(candidateOrder.outForDeliveryAt) ?? toMs(candidateOrder.updatedAt);
+
+        const liveConnection = candidateOrder.driver?.driverConnection;
+        const liveEtaSecondsRaw = Number(liveConnection?.remainingEtaSeconds);
+        const hasLiveDropoffEta =
+            Number.isFinite(liveEtaSecondsRaw) &&
+            liveEtaSecondsRaw > 0 &&
+            liveConnection?.navigationPhase === 'to_dropoff' &&
+            String(liveConnection?.activeOrderId ?? '') === String(candidateOrder.id);
 
         const inferredPrepRemaining = estimatedReadyAtMs
             ? Math.max(0, Math.ceil((estimatedReadyAtMs - nowMs) / 60000))
@@ -100,11 +109,27 @@ export function useBackgroundLiveActivity() {
             };
         }
 
+        const deliveryPhaseStartedAt = outForDeliveryStartedAtMs ?? nowMs;
+
+        if (hasLiveDropoffEta) {
+            const liveEtaMinutes = Math.max(1, Math.ceil(liveEtaSecondsRaw / 60));
+            const elapsedMinutes = Math.max(0, Math.floor((nowMs - deliveryPhaseStartedAt) / 60000));
+            return {
+                driverName: 'Your driver',
+                estimatedMinutes: liveEtaMinutes,
+                phaseInitialMinutes: Math.max(1, liveEtaMinutes + elapsedMinutes),
+                phaseStartedAt: deliveryPhaseStartedAt,
+                status: mappedStatus,
+            };
+        }
+
+        const elapsedMinutesFallback = Math.max(0, Math.floor((nowMs - deliveryPhaseStartedAt) / 60000));
+        const fallbackInitialMinutes = 15;
         return {
             driverName: 'Your driver',
-            estimatedMinutes: 15,
-            phaseInitialMinutes: 15,
-            phaseStartedAt: outForDeliveryStartedAtMs ?? nowMs,
+            estimatedMinutes: Math.max(1, fallbackInitialMinutes - elapsedMinutesFallback),
+            phaseInitialMinutes: fallbackInitialMinutes,
+            phaseStartedAt: deliveryPhaseStartedAt,
             status: mappedStatus,
         };
     }, [candidateOrder, mappedStatus]);

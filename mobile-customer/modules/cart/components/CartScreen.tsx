@@ -653,7 +653,13 @@ export const CartScreen = () => {
         setIsProcessing(true);
         showLoading('order_created');
         try {
-            const order = await createOrder(selectedLocation, appliedDeliveryPrice, finalTotal, promoResult?.code, driverNotes);
+            // Send the raw (pre-promo) base delivery price to the API.
+            // The backend validates deliveryPrice against server-calculated zones/tiers
+            // BEFORE applying any promotion discounts.  Priority surcharge is passed
+            // separately via prioritySurcharge so the backend can fold it into the
+            // stored deliveryPrice while keeping zone/tier validation intact.
+            const apiDeliveryPrice = deliveryPrice;
+            const order = await createOrder(selectedLocation, apiDeliveryPrice, finalTotal, promoResult?.code, driverNotes, prioritySurcharge);
             const orderId = order?.id || null;
             
             console.log('[CartScreen] Order created:', orderId);

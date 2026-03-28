@@ -1,5 +1,7 @@
 import type { SubscriptionResolvers } from './../../../../generated/types.generated';
 import { AppError } from '@/lib/errors';
+import { cache } from '@/lib/cache';
+import { SHIFT_DRIVERS_CACHE_KEY } from '@/models/Driver/resolvers/Mutation/adminSetShiftDrivers';
 
 export const allOrdersUpdated: NonNullable<SubscriptionResolvers['allOrdersUpdated']> = {
     subscribe: async (_parent, _args, { orderService, userData }) => {
@@ -14,8 +16,15 @@ export const allOrdersUpdated: NonNullable<SubscriptionResolvers['allOrdersUpdat
 
         switch (userData.role) {
             case 'SUPER_ADMIN':
-            case 'DRIVER':
+            case 'DRIVER': {
+                // If a shift is active and this driver is not on it, strip READY
+                // unassigned orders so the accept modal never surfaces for them.
+                const shiftIds = await cache.get<string[]>(SHIFT_DRIVERS_CACHE_KEY);
+                if (shiftIds && shiftIds.length > 0 && userData.userId && !shiftIds.includes(userData.userId)) {
+                    return allOrders.filter((o: any) => !(o.status === 'READY' && !o.driver?.id));
+                }
                 return allOrders;
+            }
 
             case 'BUSINESS_OWNER':
             case 'BUSINESS_EMPLOYEE':

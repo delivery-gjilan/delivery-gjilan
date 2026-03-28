@@ -4,15 +4,11 @@ import { businessHours } from './schema/businessHours';
 import { productCategories, NewDbProductCategory } from './schema/productCategories';
 import { productSubcategories, NewDbProductSubcategory } from './schema/productSubcategories';
 import { products, NewDbProduct } from './schema/products';
-import { productVariantGroups } from './schema/productVariantGroups';
-import { optionGroups } from './schema/optionGroups';
-import { options } from './schema/options';
-import { orders, NewDbOrder } from './schema/orders';
-import { orderItems, NewDbOrderItem } from './schema/orderItems';
+
 import { users } from './schema/users';
 import { drivers } from './schema/drivers';
 import { promotions, userPromotions, promotionBusinessEligibility, userPromoMetadata } from './schema/promotions';
-import { settlements } from './schema/settlements';
+import { settlementRules } from './schema/settlementRules';
 import { hashPassword } from '@/lib/utils/authUtils';
 import { sql, eq } from 'drizzle-orm';
 
@@ -22,121 +18,17 @@ const CLOSE_11_59_PM = 1439; // 11:59 PM
 // Restaurant data with curated products and realistic images
 const RESTAURANTS_DATA = [
     {
-        name: 'Casbas Pizza',
+        name: 'Cima',
         type: 'RESTAURANT' as const,
-        image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&q=80',
-        opensAt: 600, // 10:00
-        closesAt: 1380, // 23:00
-        categories: [
-            {
-                name: 'Pizza',
-                products: [
-                    { name: 'Margherita Pizza', price: 8.99, image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=800&q=80', desc: 'Classic tomato, mozzarella, basil' },
-                    { name: 'Pepperoni Pizza', price: 10.99, image: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?w=800&q=80', desc: 'Spicy pepperoni, mozzarella, tomato sauce' },
-                    { name: 'Hawaiian Pizza', price: 11.49, image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80', desc: 'Ham, pineapple, cheese' },
-                    { name: 'Quattro Formaggi', price: 12.99, image: 'https://images.unsplash.com/photo-1571997478779-2adcbbe9ab2f?w=800&q=80', desc: 'Four cheese blend' },
-                    { name: 'Vegetarian Pizza', price: 10.49, image: 'https://images.unsplash.com/photo-1511689660979-10d2b1aada49?w=800&q=80', desc: 'Fresh vegetables, cheese' },
-                    { name: 'BBQ Chicken Pizza', price: 13.49, image: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=800&q=80', desc: 'Grilled chicken, BBQ sauce, red onions' },
-                    { name: 'Diavola Pizza', price: 11.99, image: 'https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?w=800&q=80', desc: 'Spicy salami, chili flakes' },
-                    { name: 'Seafood Pizza', price: 14.99, image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&q=80', desc: 'Shrimp, calamari, mussels' },
-                    { name: 'Truffle Pizza', price: 16.99, image: 'https://images.unsplash.com/photo-1571407970349-bc81e7e96a47?w=800&q=80', desc: 'Truffle oil, mushrooms, mozzarella' },
-                    { name: 'Meat Lovers Pizza', price: 14.49, image: 'https://images.unsplash.com/photo-1534308983496-4fabb1a015ee?w=800&q=80', desc: 'Pepperoni, sausage, bacon, ham' },
-                ],
-            },
-        ],
-    },
-    {
-        name: 'Pano Gourmet',
-        type: 'RESTAURANT' as const,
-        image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&q=80',
-        opensAt: 480, // 08:00
-        closesAt: 1320, // 22:00
+        image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&q=80',
+        lat: 42.466873,
+        lng: 21.460266,
         categories: [
             {
                 name: 'Burgers',
                 products: [
-                    { name: 'Classic Burger', price: 9.99, image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&q=80', desc: 'Beef patty, lettuce, tomato, onion' },
-                    { name: 'Cheeseburger', price: 10.99, image: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=800&q=80', desc: 'Double cheese, special sauce' },
-                    { name: 'Bacon Burger', price: 12.49, image: 'https://images.unsplash.com/photo-1553979459-d2229ba7433b?w=800&q=80', desc: 'Crispy bacon, cheddar cheese' },
-                    { name: 'Veggie Burger', price: 9.49, image: 'https://images.unsplash.com/photo-1520072959219-c595dc870360?w=800&q=80', desc: 'Plant-based patty, fresh veggies' },
-                    { name: 'BBQ Burger', price: 11.99, image: 'https://images.unsplash.com/photo-1572802419224-296b0aeee0d9?w=800&q=80', desc: 'BBQ sauce, onion rings, bacon' },
-                    { name: 'Chicken Burger', price: 10.49, image: 'https://images.unsplash.com/photo-1606755962773-d324e0a13086?w=800&q=80', desc: 'Grilled chicken, mayo, lettuce' },
-                    { name: 'Mushroom Swiss Burger', price: 11.49, image: 'https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?w=800&q=80', desc: 'Sautéed mushrooms, Swiss cheese' },
-                    { name: 'Spicy Jalapeño Burger', price: 11.99, image: 'https://images.unsplash.com/photo-1561758033-d89a9ad46330?w=800&q=80', desc: 'Jalapeños, pepper jack cheese' },
-                    { name: 'Double Patty Burger', price: 14.99, image: 'https://images.unsplash.com/photo-1551615593-ef5fe247e8f7?w=800&q=80', desc: 'Two beef patties, double cheese' },
-                    { name: 'Gourmet Truffle Burger', price: 16.99, image: 'https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=800&q=80', desc: 'Truffle aioli, arugula, parmesan' },
-                ],
-            },
-        ],
-    },
-    {
-        name: 'Sushi Garden',
-        type: 'RESTAURANT' as const,
-        image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=800&q=80',
-        opensAt: 660, // 11:00
-        closesAt: 1380, // 23:00
-        categories: [
-            {
-                name: 'Sushi Rolls',
-                products: [
-                    { name: 'California Roll', price: 8.99, image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=800&q=80', desc: 'Crab, avocado, cucumber' },
-                    { name: 'Spicy Tuna Roll', price: 9.99, image: 'https://images.unsplash.com/photo-1617196035040-8f0d5c001683?w=800&q=80', desc: 'Tuna, spicy mayo, cucumber' },
-                    { name: 'Philadelphia Roll', price: 10.49, image: 'https://images.unsplash.com/photo-1611143669185-af224c5e3252?w=800&q=80', desc: 'Salmon, cream cheese, avocado' },
-                    { name: 'Dragon Roll', price: 13.99, image: 'https://images.unsplash.com/photo-1563612116625-3012372fccce?w=800&q=80', desc: 'Eel, avocado, cucumber, eel sauce' },
-                    { name: 'Rainbow Roll', price: 14.49, image: 'https://images.unsplash.com/photo-1599084993091-1cb5c0721cc6?w=800&q=80', desc: 'Assorted fish over California roll' },
-                    { name: 'Salmon Avocado Roll', price: 9.49, image: 'https://images.unsplash.com/photo-1607247098731-5bf6416d2e08?w=800&q=80', desc: 'Fresh salmon, avocado' },
-                    { name: 'Tempura Shrimp Roll', price: 11.99, image: 'https://images.unsplash.com/photo-1582450871972-ab5ca641643d?w=800&q=80', desc: 'Crispy shrimp tempura, avocado' },
-                    { name: 'Vegetable Roll', price: 7.99, image: 'https://images.unsplash.com/photo-1580822184713-fc5400e7fe10?w=800&q=80', desc: 'Cucumber, avocado, carrot' },
-                    { name: 'Spicy Salmon Roll', price: 10.99, image: 'https://images.unsplash.com/photo-1615361200141-f45040d2a75d?w=800&q=80', desc: 'Salmon, spicy mayo, scallions' },
-                    { name: 'Eel Avocado Roll', price: 12.49, image: 'https://images.unsplash.com/photo-1564489563601-c53cfc451e93?w=800&q=80', desc: 'Grilled eel, avocado, sesame' },
-                ],
-            },
-        ],
-    },
-    {
-        name: 'Pasta House',
-        type: 'RESTAURANT' as const,
-        image: 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=800&q=80',
-        opensAt: 660, // 11:00
-        closesAt: 1380, // 23:00
-        categories: [
-            {
-                name: 'Pasta',
-                products: [
-                    { name: 'Spaghetti Carbonara', price: 12.99, image: 'https://images.unsplash.com/photo-1612874742237-6526221588e3?w=800&q=80', desc: 'Creamy sauce, bacon, parmesan' },
-                    { name: 'Fettuccine Alfredo', price: 11.99, image: 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=800&q=80', desc: 'Rich cream sauce, butter, parmesan' },
-                    { name: 'Penne Arrabbiata', price: 10.99, image: 'https://images.unsplash.com/photo-1598866594230-a7c12756260f?w=800&q=80', desc: 'Spicy tomato sauce, garlic' },
-                    { name: 'Lasagna Bolognese', price: 13.99, image: 'https://images.unsplash.com/photo-1574894709920-11b28e7367e3?w=800&q=80', desc: 'Layers of pasta, meat sauce, cheese' },
-                    { name: 'Pesto Pasta', price: 11.49, image: 'https://images.unsplash.com/photo-1622973536968-3ead9e780960?w=800&q=80', desc: 'Basil pesto, pine nuts, parmesan' },
-                    { name: 'Seafood Linguine', price: 15.99, image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800&q=80', desc: 'Shrimp, mussels, white wine sauce' },
-                    { name: 'Ravioli', price: 12.49, image: 'https://images.unsplash.com/photo-1587740896339-96a76170508d?w=800&q=80', desc: 'Ricotta filled, marinara sauce' },
-                    { name: 'Aglio e Olio', price: 9.99, image: 'https://images.unsplash.com/photo-1621647061270-96c4c5916d37?w=800&q=80', desc: 'Garlic, olive oil, chili flakes' },
-                    { name: 'Truffle Pasta', price: 17.99, image: 'https://images.unsplash.com/photo-1473093295043-cdd812d0e601?w=800&q=80', desc: 'Black truffle, cream, mushrooms' },
-                    { name: 'Gnocchi Sorrentina', price: 13.49, image: 'https://images.unsplash.com/photo-1558030006-450675393462?w=800&q=80', desc: 'Potato dumplings, tomato, mozzarella' },
-                ],
-            },
-        ],
-    },
-    {
-        name: 'Taco Fiesta',
-        type: 'RESTAURANT' as const,
-        image: 'https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=800&q=80',
-        opensAt: 660, // 11:00
-        closesAt: 1380, // 23:00
-        categories: [
-            {
-                name: 'Tacos',
-                products: [
-                    { name: 'Beef Tacos', price: 8.99, image: 'https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=800&q=80', desc: 'Seasoned beef, lettuce, cheese' },
-                    { name: 'Chicken Tacos', price: 8.49, image: 'https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?w=800&q=80', desc: 'Grilled chicken, salsa, cilantro' },
-                    { name: 'Fish Tacos', price: 10.99, image: 'https://images.unsplash.com/photo-1599974336143-5da6ab4e6160?w=800&q=80', desc: 'Crispy fish, cabbage slaw, lime' },
-                    { name: 'Carnitas Tacos', price: 9.99, image: 'https://images.unsplash.com/photo-1624300629298-e9de39c13be5?w=800&q=80', desc: 'Slow-cooked pork, onions, cilantro' },
-                    { name: 'Shrimp Tacos', price: 11.49, image: 'https://images.unsplash.com/photo-1613514785940-daed07799d9b?w=800&q=80', desc: 'Grilled shrimp, chipotle mayo' },
-                    { name: 'Veggie Tacos', price: 7.99, image: 'https://images.unsplash.com/photo-1512838243191-e81e8f66f1fd?w=800&q=80', desc: 'Black beans, corn, avocado' },
-                    { name: 'Al Pastor Tacos', price: 9.49, image: 'https://images.unsplash.com/photo-1595295333158-4742f28fbd85?w=800&q=80', desc: 'Marinated pork, pineapple' },
-                    { name: 'Barbacoa Tacos', price: 10.49, image: 'https://images.unsplash.com/photo-1599974551050-4be19960b97c?w=800&q=80', desc: 'Tender beef, consommé' },
-                    { name: 'Chorizo Tacos', price: 9.99, image: 'https://images.unsplash.com/photo-1584208633869-e080a1f4f49c?w=800&q=80', desc: 'Spicy sausage, potatoes' },
-                    { name: 'Baja Tacos', price: 11.99, image: 'https://images.unsplash.com/photo-1552332386-f8dd00dc2f85?w=800&q=80', desc: 'Beer-battered fish, cabbage' },
+                    { name: 'Hamburger', price: 2.00, image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&q=80', desc: 'Classic hamburger' },
+                    { name: 'Chicken Burger', price: 2.00, image: 'https://images.unsplash.com/photo-1606755962773-d324e0a13086?w=800&q=80', desc: 'Crispy chicken burger' },
                 ],
             },
         ],
@@ -282,11 +174,11 @@ async function seed() {
         signupStep: 'COMPLETED',
     });
 
-    console.log('👤 Admin user ready (admin@admin.com / 12345678)');
+    console.log('👤 Admin user ready (admin@admin.com / asdasdasd)');
 
     // Create specific customer user for testing
     const specificCustomerId = faker.string.uuid();
-    const specificCustomerPassword = await hashPassword('12345678');
+    const specificCustomerPassword = await hashPassword('asdasdasd');
     await upsertUser({
         id: specificCustomerId,
         firstName: 'Art',
@@ -299,13 +191,13 @@ async function seed() {
         signupStep: 'COMPLETED',
     });
 
-    console.log('👤 Test customer ready (artshabani2002@gmail.com / 12345678)');
+    console.log('👤 Test customer ready (artshabani2002@gmail.com / asdasdasd)');
 
     // Create additional test customer users
     const customerUsers = [specificCustomerId]; // Include the specific customer
     for (let i = 0; i < 2; i++) {
         const customerId = faker.string.uuid();
-        const customerPassword = await hashPassword('12345678');
+        const customerPassword = await hashPassword('asdasdasd');
         const email = `testcustomer${i + 1}@demo.com`;
         const user = await upsertUser({
             id: customerId,
@@ -332,7 +224,7 @@ async function seed() {
 
     for (const [index, driverSeed] of seededDrivers.entries()) {
         const driverUserId = faker.string.uuid();
-        const driverPassword = await hashPassword('12345678');
+        const driverPassword = await hashPassword('asdasdasd');
 
         const user = await upsertUser({
             id: driverUserId,
@@ -382,8 +274,8 @@ async function seed() {
             name: restaurantData.name,
             imageUrl: restaurantData.image,
             businessType: restaurantData.type,
-            locationLat: 42.4604 + (Math.random() - 0.5) * 0.025, // Gjilan city ~1.4km spread
-            locationLng: 21.4694 + (Math.random() - 0.5) * 0.035,
+            locationLat: restaurantData.lat,
+            locationLng: restaurantData.lng,
             locationAddress: faker.location.streetAddress() + ', Gjilan',
             opensAt: OPEN_12_AM,
             closesAt: CLOSE_11_59_PM,
@@ -545,24 +437,24 @@ async function seed() {
         });
     }
 
-    // Create a business admin assigned to Casbas Pizza
-    const casbasBusiness = createdBusinesses.find((business) => business.name === 'Casbas Pizza');
-    if (casbasBusiness) {
-        const casbasAdminPassword = await hashPassword('asdasdasd');
+    // Create a business admin assigned to Cima
+    const cimaBusiness = createdBusinesses.find((business) => business.name === 'Cima');
+    if (cimaBusiness) {
+        const cimaAdminPassword = await hashPassword('asdasdasd');
         await upsertUser({
             id: faker.string.uuid(),
-            firstName: 'Casbas',
+            firstName: 'Cima',
             lastName: 'Admin',
-            email: 'casbas@gmail.com',
-            password: casbasAdminPassword,
+            email: 'cima@gmail.com',
+            password: cimaAdminPassword,
             role: 'BUSINESS_OWNER',
-            businessId: casbasBusiness.id,
+            businessId: cimaBusiness.id,
             emailVerified: true,
             phoneVerified: true,
             signupStep: 'COMPLETED',
         });
 
-        console.log('👤 Casbas business admin ready (casbas@gmail.com / asdasdasd)');
+        console.log('👤 Cima business admin ready (cima@gmail.com / asdasdasd)');
     }
 
     // ------------------------------
@@ -703,289 +595,36 @@ async function seed() {
     }
 
     // ------------------------------
-    // Seed product variants and option groups (Casbas Pizza)
+    // Seed settlement rule for Cima (20% commission)
     // ------------------------------
     try {
-        const casbasBusiness = createdBusinesses[0]; // Casbas Pizza
-        if (casbasBusiness) {
-            // Check if variants already exist for this business
-            const existingVariantGroups = await db.select().from(productVariantGroups).where(eq(productVariantGroups.businessId, casbasBusiness.id)).limit(1);
-            if (existingVariantGroups.length > 0) {
-                console.log('[SEED] Product variants already exist — skipping');
-            } else {
-            const [pizzaCategory] = await db
+        const cimaEntry = createdBusinesses.find((biz) => biz.name === 'Cima');
+        if (cimaEntry) {
+            const existingRule = await db
                 .select()
-                .from(productCategories)
-                .where(eq(productCategories.businessId, casbasBusiness.id))
+                .from(settlementRules)
+                .where(eq(settlementRules.businessId, cimaEntry.id))
                 .limit(1);
-
-            if (pizzaCategory) {
-                // --- Variant Group: Pizza Base Type (3 products sharing a groupId) ---
-                const [variantGroup] = await db.insert(productVariantGroups).values({
-                    businessId: casbasBusiness.id,
-                    name: 'Pizza Base Type',
-                }).returning();
-
-                for (const vp of [
-                    { name: 'Pizza Base - Traditional', price: 8.99 },
-                    { name: 'Pizza Base - Thin Crust', price: 8.99 },
-                    { name: 'Pizza Base - Stuffed Crust', price: 10.99 },
-                ]) {
-                    const [p] = await db.insert(products).values({
-                        businessId: casbasBusiness.id,
-                        categoryId: pizzaCategory.id,
-                        groupId: variantGroup.id,
-                        name: vp.name,
-                        description: `${vp.name} – choose your preferred base style`,
-                        imageUrl: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=800&q=80',
-                        basePrice: vp.price,
-                        isAvailable: true,
-                        isOffer: false,
-                        isOnSale: false,
-                        salePrice: null,
-                    }).returning();
-                }
-                console.log('  🍕 Added variant group "Pizza Base Type" with 3 variants to Casbas Pizza');
-
-                // --- Build Your Own Pizza (option groups, NOT an offer) ---
-                const [buildYourOwn] = await db.insert(products).values({
-                    businessId: casbasBusiness.id,
-                    categoryId: pizzaCategory.id,
-                    name: 'Build Your Own Pizza',
-                    description: 'Customize your pizza with your choice of sauce and toppings',
-                    imageUrl: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80',
-                    basePrice: 9.99,
-                    isAvailable: true,
-                    isOffer: false,
-                    isOnSale: false,
-                    salePrice: null,
-                }).returning();
-
-                const [sauceGroup] = await db.insert(optionGroups).values({
-                    productId: buildYourOwn.id,
-                    name: 'Sauce',
-                    minSelections: 1,
-                    maxSelections: 1,
-                    displayOrder: 0,
-                }).returning();
-                await db.insert(options).values([
-                    { optionGroupId: sauceGroup.id, name: 'Tomato Sauce', extraPrice: 0, displayOrder: 0 },
-                    { optionGroupId: sauceGroup.id, name: 'BBQ Sauce', extraPrice: 0.5, displayOrder: 1 },
-                    { optionGroupId: sauceGroup.id, name: 'White Cream Sauce', extraPrice: 0.5, displayOrder: 2 },
-                ]);
-
-                const [toppingsGroup] = await db.insert(optionGroups).values({
-                    productId: buildYourOwn.id,
-                    name: 'Extra Toppings',
-                    minSelections: 0,
-                    maxSelections: 3,
-                    displayOrder: 1,
-                }).returning();
-                await db.insert(options).values([
-                    { optionGroupId: toppingsGroup.id, name: 'Mushrooms', extraPrice: 0.5, displayOrder: 0 },
-                    { optionGroupId: toppingsGroup.id, name: 'Olives', extraPrice: 0.5, displayOrder: 1 },
-                    { optionGroupId: toppingsGroup.id, name: 'Jalapeños', extraPrice: 0.5, displayOrder: 2 },
-                ]);
-                console.log('  🍕 Added "Build Your Own Pizza" with option groups to Casbas Pizza');
-
-                // --- Pizza Meal Deal (option groups, IS an offer) ---
-                const [mealDeal] = await db.insert(products).values({
-                    businessId: casbasBusiness.id,
-                    categoryId: pizzaCategory.id,
-                    name: 'Pizza Meal Deal',
-                    description: 'Pick a pizza and a side – great value combo!',
-                    imageUrl: 'https://images.unsplash.com/photo-1534308983496-4fabb1a015ee?w=800&q=80',
-                    basePrice: 14.99,
-                    isAvailable: true,
-                    isOffer: true,
-                    isOnSale: false,
-                    salePrice: null,
-                }).returning();
-
-                const [choosePizzaGroup] = await db.insert(optionGroups).values({
-                    productId: mealDeal.id,
-                    name: 'Choose Your Pizza',
-                    minSelections: 1,
-                    maxSelections: 1,
-                    displayOrder: 0,
-                }).returning();
-                await db.insert(options).values([
-                    { optionGroupId: choosePizzaGroup.id, name: 'Margherita', extraPrice: 0, displayOrder: 0 },
-                    { optionGroupId: choosePizzaGroup.id, name: 'Pepperoni', extraPrice: 2, displayOrder: 1 },
-                    { optionGroupId: choosePizzaGroup.id, name: 'BBQ Chicken', extraPrice: 3, displayOrder: 2 },
-                ]);
-
-                const [chooseSideGroup] = await db.insert(optionGroups).values({
-                    productId: mealDeal.id,
-                    name: 'Choose Your Side',
-                    minSelections: 1,
-                    maxSelections: 1,
-                    displayOrder: 1,
-                }).returning();
-                await db.insert(options).values([
-                    { optionGroupId: chooseSideGroup.id, name: 'Garlic Bread', extraPrice: 0, displayOrder: 0 },
-                    { optionGroupId: chooseSideGroup.id, name: 'Garden Salad', extraPrice: 0, displayOrder: 1 },
-                    { optionGroupId: chooseSideGroup.id, name: 'Coleslaw', extraPrice: 0, displayOrder: 2 },
-                ]);
-                console.log('  🎁 Added "Pizza Meal Deal" (offer) with option groups to Casbas Pizza');
-            }
-            } // close else (variants don't exist)
-        }
-        console.log('[SEED] Product variants and option groups seeded.');
-    } catch (err) {
-        console.warn('[SEED] Variants/options seed skipped or error:', err);
-    }
-
-    // Create test orders and settlements
-    try {
-        const businessList = await db.select().from(businesses).limit(10);
-        const driverList = await db.select().from(drivers).limit(5);
-        const customerList = await db.select().from(users).where(sql`${users.role} = 'CUSTOMER'`).limit(5);
-
-        if (businessList.length > 0 && driverList.length > 0 && customerList.length > 0) {
-            // Create delivered orders + matching settlements
-            let createdOrderCount = 0;
-            for (let i = 0; i < 15; i++) {
-                const displayId = `GJ-S${String(i + 1).padStart(3, '0')}`;
-                const existingOrder = await db.select().from(orders).where(eq(orders.displayId, displayId)).limit(1);
-                if (existingOrder.length > 0) continue;
-
-                const randomBusiness = businessList[Math.floor(Math.random() * businessList.length)];
-                const randomDriver = driverList[Math.floor(Math.random() * driverList.length)];
-                const randomCustomer = customerList[Math.floor(Math.random() * customerList.length)];
-
-                if (!randomBusiness || !randomDriver || !randomCustomer) {
-                    continue;
-                }
-
-                const orderAmount = Number((20 + Math.random() * 80).toFixed(2));
-                const deliveryFee = 3.5;
-                const createdAt = new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString();
-
-                const [newOrder] = await db.insert(orders).values({
-                    displayId,
-                    userId: randomCustomer.id,
-                    driverId: randomDriver.userId,
-                    price: orderAmount,
-                    deliveryPrice: deliveryFee,
-                    status: 'DELIVERED',
-                    dropoffLat: 42.4635,
-                    dropoffLng: 21.4694,
-                    dropoffAddress: 'Gjilan, Kosovo',
-                    deliveredAt: createdAt,
-                    orderDate: createdAt,
-                }).returning();
-
-                if (!newOrder) {
-                    continue;
-                }
-                createdOrderCount++;
-
-                // Business settlement (platform receivable)
-                const businessPlatformMarkup = Number((orderAmount * 0.15).toFixed(2));
-                const businessPaid = Math.random() > 0.6;
-                await db.insert(settlements).values({
-                    type: 'BUSINESS',
+            if (existingRule.length === 0) {
+                await db.insert(settlementRules).values({
+                    name: '20% commission on subtotal',
+                    entityType: 'BUSINESS',
                     direction: 'RECEIVABLE',
-                    businessId: randomBusiness.id,
-                    orderId: newOrder.id,
-                    amount: businessPlatformMarkup,
-                    status: businessPaid ? 'PAID' : 'PENDING',
-                    createdAt,
-                    paidAt: businessPaid ? new Date(Date.now() - Math.random() * 10 * 24 * 60 * 60 * 1000).toISOString() : null,
-                    paymentReference: businessPaid ? `PAY-${Date.now()}-${i}` : null,
-                    paymentMethod: businessPaid ? 'BANK_TRANSFER' : null,
-                    ruleSnapshot: {
-                        appliedRules: [
-                            {
-                                ruleId: 'platform-markup',
-                                ruleType: 'PLATFORM_MARKUP',
-                                config: { percentage: 15 },
-                                activeSince: createdAt,
-                                capturedAt: createdAt,
-                            },
-                        ],
-                    },
-                    calculationDetails: {
-                        orderSubtotal: orderAmount,
-                        deliveryFee,
-                        itemsBreakdown: [],
-                        rulesApplied: [
-                            {
-                                ruleType: 'PLATFORM_MARKUP',
-                                description: '15% platform markup',
-                                baseAmount: orderAmount,
-                                percentage: 15,
-                                amount: businessPlatformMarkup,
-                                direction: 'RECEIVABLE',
-                            },
-                        ],
-                        totalReceivable: businessPlatformMarkup,
-                        totalPayable: 0,
-                        netAmount: businessPlatformMarkup,
-                        currency: 'EUR',
-                    },
+                    amountType: 'PERCENT',
+                    amount: '20',
+                    appliesTo: 'SUBTOTAL',
+                    businessId: cimaEntry.id,
+                    isActive: true,
+                    notes: 'Platform commission for Cima restaurant',
                 });
-
-                // Driver settlement (platform receivable from delivery fee share)
-                const driverCommission = Number((deliveryFee * 0.8).toFixed(2));
-                const driverPaid = Math.random() > 0.5;
-                await db.insert(settlements).values({
-                    type: 'DRIVER',
-                    direction: 'RECEIVABLE',
-                    driverId: randomDriver.id,
-                    orderId: newOrder.id,
-                    amount: driverCommission,
-                    status: driverPaid ? 'PAID' : 'PENDING',
-                    createdAt,
-                    paidAt: driverPaid ? new Date(Date.now() - Math.random() * 10 * 24 * 60 * 60 * 1000).toISOString() : null,
-                    paymentReference: driverPaid ? `DRV-${Date.now()}-${i}` : null,
-                    paymentMethod: driverPaid ? 'WALLET' : null,
-                    ruleSnapshot: {
-                        appliedRules: [
-                            {
-                                ruleId: 'driver-commission',
-                                ruleType: 'DRIVER_COMMISSION',
-                                config: { percentage: 80 },
-                                activeSince: createdAt,
-                                capturedAt: createdAt,
-                            },
-                        ],
-                    },
-                    calculationDetails: {
-                        orderSubtotal: orderAmount,
-                        deliveryFee,
-                        itemsBreakdown: [],
-                        rulesApplied: [
-                            {
-                                ruleType: 'DRIVER_COMMISSION',
-                                description: '80% driver commission',
-                                baseAmount: deliveryFee,
-                                percentage: 80,
-                                amount: driverCommission,
-                                direction: 'RECEIVABLE',
-                            },
-                        ],
-                        totalReceivable: driverCommission,
-                        totalPayable: 0,
-                        netAmount: driverCommission,
-                        currency: 'EUR',
-                    },
-                });
-            }
-
-            if (createdOrderCount === 0) {
-                console.log('[SEED] ⏭️  Orders already exist, skipped.');
+                console.log('[SEED] ✅ Created 20% commission settlement rule for Cima');
             } else {
-                console.log(`[SEED] ✅ Created ${createdOrderCount} delivered orders with settlements`);
-                console.log(`[SEED]   - ${createdOrderCount} business settlements`);
-                console.log(`[SEED]   - ${createdOrderCount} driver settlements`);
+                console.log('[SEED] ⏭️  Settlement rule for Cima already exists — skipping');
             }
-        } else {
-            console.warn('[SEED] Settlements skipped: missing businesses, drivers, or customers');
         }
+        console.log('[SEED] Settlement rule for Cima seeded.');
     } catch (err) {
-        console.warn('[SEED] Settlements seed skipped or error:', err);
+        console.warn('[SEED] Settlement rule seed skipped or error:', err);
     }
 
     console.log('\n✅ Database seeded successfully!');
@@ -1001,10 +640,10 @@ async function seed() {
     console.log(`  - Total products: ${totalProducts}`);
     console.log(`  - 3 test customer users created`);
     console.log('\n🔐 Credentials:');
-    console.log('  Admin: admin@admin.com / 12345678');
-    console.log('  Casbas Business Admin: casbas@gmail.com / asdasdasd');
-    console.log('  Customer: artshabani2002@gmail.com / 12345678');
-    console.log('  Drivers: driver1@demo.com, driver2@demo.com, driver3@demo.com / 12345678\n');
+    console.log('  Admin: admin@admin.com / asdasdasd');
+    console.log('  Cima Business Admin: cima@gmail.com / asdasdasd');
+    console.log('  Customer: artshabani2002@gmail.com / asdasdasd');
+    console.log('  Drivers: driver1@demo.com, driver2@demo.com, driver3@demo.com / asdasdasd\n');
 }
 
 seed()

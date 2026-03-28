@@ -17,7 +17,14 @@ interface NavigationLocationState {
      * Timestamp of last location update (ms since epoch)
      */
     lastUpdate: number | null;
-    
+
+    /**
+     * Last known GPS coords from the driver heartbeat (always up-to-date, persists
+     * even when navigation is not active). Use this when you need the driver's
+     * current position outside of map.tsx (e.g. Accept & Navigate flow).
+     */
+    lastKnownCoords: { latitude: number; longitude: number } | null;
+
     /**
      * Set location from Navigation SDK
      */
@@ -32,6 +39,11 @@ interface NavigationLocationState {
      * Check if location is fresh (less than 10 seconds old)
      */
     isFresh: () => boolean;
+
+    /**
+     * Update the last known GPS coords (called from useDriverHeartbeat).
+     */
+    setLastKnownCoords: (coords: { latitude: number; longitude: number }) => void;
 }
 
 const MAX_AGE_MS = 10000; // 10 seconds
@@ -39,6 +51,7 @@ const MAX_AGE_MS = 10000; // 10 seconds
 export const useNavigationLocationStore = create<NavigationLocationState>((set, get) => ({
     location: null,
     lastUpdate: null,
+    lastKnownCoords: null,
     
     setLocation: (location) => {
         set({
@@ -58,5 +71,9 @@ export const useNavigationLocationStore = create<NavigationLocationState>((set, 
         const state = get();
         if (!state.location || !state.lastUpdate) return false;
         return Date.now() - state.lastUpdate < MAX_AGE_MS;
+    },
+
+    setLastKnownCoords: (coords) => {
+        set({ lastKnownCoords: coords });
     },
 }));

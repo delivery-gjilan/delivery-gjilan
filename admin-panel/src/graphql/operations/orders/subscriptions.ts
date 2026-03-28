@@ -70,6 +70,7 @@ export const ALL_ORDERS_SUBSCRIPTION = gql(`
             orderDate
             updatedAt
             status
+            adminNote
             user {
                 id
                 firstName
