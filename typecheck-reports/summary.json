@@ -1,0 +1,51 @@
+﻿[
+    {
+        "Project":  ".",
+        "HasTypecheck":  false,
+        "ExitCode":  "N/A",
+        "Log":  "",
+        "Note":  "typecheck script missing"
+    },
+    {
+        "Project":  "api",
+        "HasTypecheck":  true,
+        "ExitCode":  2,
+        "Log":  "typecheck-reports\\api.log",
+        "Note":  ""
+    },
+    {
+        "Project":  "admin-panel",
+        "HasTypecheck":  true,
+        "ExitCode":  1,
+        "Log":  "typecheck-reports\\admin-panel.log",
+        "Note":  ""
+    },
+    {
+        "Project":  "mobile-admin",
+        "HasTypecheck":  true,
+        "ExitCode":  0,
+        "Log":  "typecheck-reports\\mobile-admin.log",
+        "Note":  ""
+    },
+    {
+        "Project":  "mobile-business",
+        "HasTypecheck":  true,
+        "ExitCode":  2,
+        "Log":  "typecheck-reports\\mobile-business.log",
+        "Note":  ""
+    },
+    {
+        "Project":  "mobile-customer",
+        "HasTypecheck":  true,
+        "ExitCode":  2,
+        "Log":  "typecheck-reports\\mobile-customer.log",
+        "Note":  ""
+    },
+    {
+        "Project":  "mobile-driver",
+        "HasTypecheck":  true,
+        "ExitCode":  2,
+        "Log":  "typecheck-reports\\mobile-driver.log",
+        "Note":  ""
+    }
+]

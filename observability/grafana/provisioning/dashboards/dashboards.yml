@@ -1,0 +1,13 @@
+# Grafana dashboard provisioning — loads JSON dashboard files on startup
+apiVersion: 1
+
+providers:
+  - name: delivery-dashboards
+    orgId: 1
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

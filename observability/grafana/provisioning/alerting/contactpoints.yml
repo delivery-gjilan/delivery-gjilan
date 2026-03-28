@@ -1,0 +1,36 @@
+# Grafana alert provisioning — contact points and notification policies
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: delivery-alerts
+    receivers:
+      # Uncomment and configure when ready:
+      #
+      # - uid: slack-alerts
+      #   type: slack
+      #   settings:
+      #     url: ${SLACK_WEBHOOK_URL}
+      #     recipient: "#delivery-alerts"
+      #     title: |
+      #       {{ template "slack.default.title" . }}
+      #     text: |
+      #       {{ template "slack.default.text" . }}
+      #
+      # - uid: email-alerts
+      #   type: email
+      #   settings:
+      #     addresses: ops@delivery-gjilan.com
+      #     singleEmail: true
+      - uid: default-log
+        type: "victorops"
+        disableResolveMessage: true
+        settings: {}
+
+policies:
+  - orgId: 1
+    receiver: delivery-alerts
+    group_by: ["alertname", "service"]
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h

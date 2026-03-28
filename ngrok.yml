@@ -1,0 +1,18 @@
+version: 3
+authtoken: ${NGROK_AUTHTOKEN}
+
+tunnels:
+  api:
+    addr: http://localhost:4000
+    proto: http
+    domain: ${NGROK_DOMAIN_API}
+
+  metro-customer:
+    addr: http://localhost:8082
+    proto: http
+    domain: ${NGROK_DOMAIN_CUSTOMER}
+
+  metro-driver:
+    addr: http://localhost:8083
+    proto: http
+    domain: ${NGROK_DOMAIN_DRIVER}
