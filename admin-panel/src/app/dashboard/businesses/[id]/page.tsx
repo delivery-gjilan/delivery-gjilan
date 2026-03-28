@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useQuery, useMutation } from '@apollo/client/react';
 import { useParams } from 'next/navigation';
@@ -20,6 +20,7 @@ import { GET_BUSINESS, UPDATE_BUSINESS } from '@/graphql/operations/businesses';
 interface Business {
     id: string;
     name: string;
+    phoneNumber?: string | null;
     imageUrl?: string | null;
     businessType: string;
     isActive: boolean;
@@ -51,10 +52,12 @@ export default function BusinessDetailsPage() {
 
     const [editForm, setEditForm] = useState<{
         name: string;
+        phoneNumber: string;
         businessType: BusinessType;
         imageUrl: string;
     }>({
         name: '',
+        phoneNumber: '',
         businessType: BusinessType.Restaurant,
         imageUrl: '',
     });
@@ -62,6 +65,7 @@ export default function BusinessDetailsPage() {
     function openEditModal(b: Business) {
         setEditForm({
             name: b.name,
+            phoneNumber: b.phoneNumber || '',
             businessType: BusinessType.Restaurant,
             imageUrl: b.imageUrl || '',
         });
@@ -75,6 +79,7 @@ export default function BusinessDetailsPage() {
                 id: businessId,
                 input: {
                     name: editForm.name,
+                    phoneNumber: editForm.phoneNumber.trim() || null,
                     businessType: editForm.businessType,
                     imageUrl: editForm.imageUrl || null,
                 },
@@ -119,6 +124,11 @@ export default function BusinessDetailsPage() {
                         </p>
 
                         <p>
+                            <span className="text-gray-400">Phone:</span>{' '}
+                            <span className="font-semibold">{b.phoneNumber || '-'}</span>
+                        </p>
+
+                        <p>
                             <span className="text-gray-400">Type:</span>{' '}
                             <span className="font-semibold">{b.businessType}</span>
                         </p>
@@ -146,7 +156,7 @@ export default function BusinessDetailsPage() {
             {/* ------------------------------------
           EDIT MODAL
       ------------------------------------ */}
-            <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Edit Business">
+            <Modal isOpen={editOpen} onClose={() => setEditOpen(false)} title="Edit Business">
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-400 mb-1">Business Name</label>
@@ -157,6 +167,20 @@ export default function BusinessDetailsPage() {
                                 setEditForm({
                                     ...editForm,
                                     name: e.target.value,
+                                })
+                            }
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Phone Number</label>
+                        <Input
+                            placeholder="e.g., +383 44 123 456"
+                            value={editForm.phoneNumber}
+                            onChange={(e) =>
+                                setEditForm({
+                                    ...editForm,
+                                    phoneNumber: e.target.value,
                                 })
                             }
                         />

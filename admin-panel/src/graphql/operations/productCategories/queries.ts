@@ -5,6 +5,7 @@ export const GET_CATEGORIES = graphql(`
         productCategories(businessId: $businessId) {
             id
             name
+            sortOrder
             isActive
         }
     }

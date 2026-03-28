@@ -1,7 +1,7 @@
 import { User } from '@/gql/graphql';
 import { useMutation } from '@apollo/client/react';
 import { useAuthStore } from '@/store/authStore';
-import { saveToken, deleteToken } from '@/utils/secureTokenStore';
+import { saveRefreshToken, saveToken } from '@/utils/secureTokenStore';
 import { useRouter } from 'expo-router';
 import {
     INITIATE_SIGNUP_MUTATION,
@@ -34,15 +34,16 @@ export const useAuth = () => {
         RESEND_EMAIL_VERIFICATION_MUTATION,
     );
 
-    const initiateSignup = async (email: string, password: string, firstName: string, lastName: string) => {
+    const initiateSignup = async (email: string, password: string, firstName: string, lastName: string, referralCode?: string) => {
         const { data } = await initiateSignupMutation({
             variables: {
-                input: { email, password, firstName, lastName },
+                input: { email, password, firstName, lastName, referralCode },
             },
         });
 
         if (data?.initiateSignup) {
             const { token, user } = data.initiateSignup;
+            console.log('[Auth] Signup successful, saving token');
             await saveToken(token);
             storeLogin(token, user as User);
         }
@@ -98,8 +99,12 @@ export const useAuth = () => {
         });
 
         if (data?.login) {
-            const { token, user } = data.login;
+            const { token, refreshToken, user } = data.login;
+            console.log('[Auth] Login successful, saving token for user:', user.email);
             await saveToken(token);
+            if (refreshToken) {
+                await saveRefreshToken(refreshToken);
+            }
             storeLogin(token, user as User);
         }
 
@@ -121,7 +126,7 @@ export const useAuth = () => {
 
     const logout = async () => {
         try {
-            await deleteToken();
+            console.log('[Auth] Logging out, clearing tokens');
             storeLogout();
             // Force navigation to auth selection screen
             if (typeof window !== 'undefined') {
@@ -129,7 +134,7 @@ export const useAuth = () => {
                 router.replace('/auth-selection');
             }
         } catch (error) {
-            console.error('Logout error:', error);
+            console.error('[Auth] Logout error:', error);
             // Still logout even if there's an error
             storeLogout();
         }

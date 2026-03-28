@@ -1,15 +1,27 @@
 import { Tabs, useRouter } from 'expo-router';
-import { View, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Pressable } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslations } from '@/hooks/useTranslations';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function TabLayout() {
     const theme = useTheme();
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { t } = useTranslations();
+    const { logout } = useAuth();
+
+    const handleLogout = async () => {
+        try {
+            await logout();
+            router.replace('/login');
+        } catch (err) {
+            console.error('[Logout] Failed:', err);
+        }
+    };
+
 
     return (
         <Tabs
@@ -33,20 +45,26 @@ export default function TabLayout() {
             />
 
             <Tabs.Screen
+                name="map"
+                options={{
+                    title: t.tabs.map,
+                    tabBarIcon: ({ color, size }) => <Ionicons name="map" size={size} color={color} />,
+                }}
+            />
+
+            <Tabs.Screen
                 name="add"
                 options={{
-                    title: t.tabs.create,
-                    tabBarButton: () => (
-                        <View className="items-center justify-center -mt-8">
-                            <TouchableOpacity
-                                onPress={() => router.push('/create-transaction')}
-                                className="bg-primary w-16 h-16 rounded-full items-center justify-center shadow-lg"
-                                activeOpacity={0.9}
-                            >
-                                <Ionicons name="add" size={32} color="white" />
-                            </TouchableOpacity>
-                        </View>
-                    ),
+                    title: t.tabs.earnings,
+                    tabBarIcon: ({ color, size }) => <Ionicons name="cash-outline" size={size} color={color} />,
+                }}
+            />
+
+            <Tabs.Screen
+                name="messages"
+                options={{
+                    title: t.tabs.messages,
+                    tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles-outline" size={size} color={color} />,
                 }}
             />
 

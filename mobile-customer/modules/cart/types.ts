@@ -1,13 +1,28 @@
+export interface CartItemOption {
+    optionGroupId: string;
+    optionId: string;
+    name: string;
+    extraPrice: number;
+}
+
 export interface CartItem {
+    cartItemId: string; // Unique identifier for this specific configuration in the cart
     productId: string;
     quantity: number;
-    // We store minimal product info needed for display/logic without fetching again immediately
-    // Ideally we fetch fresh data on cart view, but this is good for instant feedback
-    price: number;
+    unitPrice: number; // Price of the base product at the time of adding to cart
     originalPrice?: number; // Base price if on sale
     name: string;
     imageUrl?: string;
     businessId: string; // To group by business or validate single-business orders if needed
+    businessType?: 'RESTAURANT' | 'MARKET' | 'PHARMACY'; // Needed for multi-restaurant validation
+    notes?: string; // Special instructions for this item
+    selectedOptions: CartItemOption[];
+    childItems?: {
+        productId: string;
+        name: string;
+        imageUrl?: string;
+        selectedOptions: CartItemOption[];
+    }[];
 }
 
 export type CartStoreState = {
@@ -15,8 +30,9 @@ export type CartStoreState = {
 };
 
 export type CartActions = {
-    addItem: (item: CartItem) => void;
-    removeItem: (productId: string) => void;
-    updateQuantity: (productId: string, quantity: number) => void;
+    addItem: (item: CartItem) => string | null; // returns error message or null
+    removeItem: (cartItemId: string) => void;
+    updateQuantity: (cartItemId: string, quantity: number) => void;
+    updateItemNotes: (cartItemId: string, notes: string) => void;
     clearCart: () => void;
 };

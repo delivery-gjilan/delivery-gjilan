@@ -1,20 +1,54 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
+import { GraphQLError } from 'graphql';
+import { createAuditLogger } from '@/services/AuditLogger';
+import { notifyCustomerOrderStatus } from '@/services/orderNotifications';
+import logger from '@/lib/logger';
 
 export const cancelOrder: NonNullable<MutationResolvers['cancelOrder']> = async (
     _parent,
     { id },
-    { orderService, userData },
+    context,
 ) => {
-    const order = await orderService.cancelOrder(id);
-    
-    // Find the order to get the user ID
-    const dbOrder = await orderService.orderRepository.findById(id);
-    if (dbOrder) {
-        await orderService.publishUserOrders(dbOrder.userId);
+    const { orderService, userData, db } = context;
+
+    if (!userData.userId) {
+        throw new GraphQLError('Unauthorized', { extensions: { code: 'UNAUTHORIZED' } });
     }
-    
-    // Publish to all admins for real-time updates
+
+    // Fetch order first to check ownership and current status
+    const dbOrder = await orderService.orderRepository.findById(id);
+    if (!dbOrder) {
+        throw new GraphQLError('Order not found', { extensions: { code: 'NOT_FOUND' } });
+    }
+
+    // Ownership check: only the order owner or SUPER_ADMIN can cancel
+    if (userData.role !== 'SUPER_ADMIN' && dbOrder.userId !== userData.userId) {
+        throw new GraphQLError('Not authorized to cancel this order', { extensions: { code: 'FORBIDDEN' } });
+    }
+
+    // Status guard: cannot cancel already finalized orders
+    if (dbOrder.status === 'DELIVERED') {
+        throw new GraphQLError('Cannot cancel a delivered order', { extensions: { code: 'BAD_REQUEST' } });
+    }
+    if (dbOrder.status === 'CANCELLED') {
+        throw new GraphQLError('Order is already cancelled', { extensions: { code: 'BAD_REQUEST' } });
+    }
+
+    const order = await orderService.cancelOrder(id);
+
+    await orderService.publishSingleUserOrder(dbOrder.userId, id);
     await orderService.publishAllOrders();
-    
+
+    // Push notification to customer (fire-and-forget)
+    notifyCustomerOrderStatus(context.notificationService, dbOrder.userId, id, 'CANCELLED');
+
+    const logger = createAuditLogger(db, context);
+    await logger.log({
+        action: 'ORDER_CANCELLED',
+        entityType: 'ORDER',
+        entityId: id,
+        metadata: { orderId: id, previousStatus: dbOrder.status },
+    });
+
     return order;
 };

@@ -6,62 +6,59 @@ import {
     GET_ORDERS_BY_STATUS,
     UPDATE_ORDER_STATUS,
 } from '@/graphql/operations/orders';
-import { USER_ORDERS_UPDATED } from '@/graphql/operations/orders/subscriptions';
-import { useMutation, useQuery, useSubscription } from '@apollo/client/react';
-import { useAuthStore } from '@/store/authStore';
+import { useMutation, useQuery } from '@apollo/client/react';
 import { useActiveOrdersStore } from '../store/activeOrdersStore';
-import { useEffect } from 'react';
+import { useAuthStore } from '@/store/authStore';
+import { useCallback, useEffect } from 'react';
+
+const ORDERS_PAGE_SIZE = 30;
 
 export function useOrders() {
-    const token = useAuthStore((state) => state.token);
     const setActiveOrders = useActiveOrdersStore((state) => state.setActiveOrders);
+    const userId = useAuthStore((state) => state.user?.id);
     
-    // Initial query to load data
-    const { data, loading, error, refetch } = useQuery(GET_ORDERS, {
+    // Show cached data immediately, refresh in background
+    const { data, loading, error, refetch, fetchMore } = useQuery(GET_ORDERS, {
+        variables: { limit: ORDERS_PAGE_SIZE, offset: 0 },
         fetchPolicy: 'cache-and-network',
+        nextFetchPolicy: 'cache-first',
     });
 
-    // Real-time subscription for updates - automatically updates cache AND store
-    useSubscription(USER_ORDERS_UPDATED, {
-        variables: { input: { token: token || '' } },
-        skip: !token,
-        onData: ({ client, data: subData }) => {
-            if (subData?.data?.userOrdersUpdated) {
-                const orders = subData.data.userOrdersUpdated;
-                console.log('[useOrders] Subscription received orders:', orders.length);
-                
-                // Update Apollo cache
-                client.writeQuery({
-                    query: GET_ORDERS,
-                    data: { orders },
-                });
+    const orders: any[] = (data as any)?.orders || [];
 
-                // Update Zustand store with active orders
-                const activeOrders = orders.filter(
-                    (order: any) => order.status !== 'DELIVERED' && order.status !== 'CANCELLED'
-                );
-                console.log('[useOrders] Filtered active orders:', activeOrders.length);
-                setActiveOrders(activeOrders);
-            }
-        },
-    });
-
-    // Update store when data changes
+    // Update store when query data changes (subscription updates are handled by useOrdersSubscription)
     useEffect(() => {
-        if (data?.orders) {
+        if (data?.orders && userId) {
             const activeOrders = (data.orders as any[]).filter(
-                (order) => order.status !== 'DELIVERED' && order.status !== 'CANCELLED'
+                (order) => 
+                    order.userId === userId && 
+                    order.status !== 'DELIVERED' && 
+                    order.status !== 'CANCELLED'
             );
-            console.log('[useOrders] Query data - Total orders:', data.orders.length, 'Active:', activeOrders.length);
-            setActiveOrders(activeOrders);
+            setActiveOrders(activeOrders as unknown as any);
         }
-    }, [data, setActiveOrders]);
+    }, [data, userId, setActiveOrders]);
+
+    const loadMore = useCallback(async () => {
+        await fetchMore({
+            variables: { limit: ORDERS_PAGE_SIZE, offset: orders.length },
+            updateQuery: (prev: any, { fetchMoreResult }: any) => {
+                if (!fetchMoreResult?.orders?.length) return prev;
+                return {
+                    ...prev,
+                    orders: [...prev.orders, ...fetchMoreResult.orders],
+                };
+            },
+        });
+    }, [fetchMore, orders.length]);
 
     return {
-        orders: (data as any)?.orders || [],
+        orders,
         loading,
         error,
         refetch,
+        loadMore,
+        hasMore: orders.length > 0 && orders.length % ORDERS_PAGE_SIZE === 0,
     };
 }
 
@@ -69,7 +66,37 @@ export function useOrder(id: string) {
     const { data, loading, error, refetch } = useQuery(GET_ORDER, {
         variables: { id },
         skip: !id,
+        fetchPolicy: 'network-only', // Always fetch fresh data for individual orders
+        nextFetchPolicy: 'cache-first', // But allow cache for subsequent reads on same screen
     });
+
+    useEffect(() => {
+        if (!id) {
+            console.warn('[useOrder] skipped: empty id');
+            return;
+        }
+
+        if (loading) {
+            console.log('[useOrder] loading', { id });
+            return;
+        }
+
+        if (error) {
+            const graphQLErrors = (error as any)?.graphQLErrors;
+            console.warn('[useOrder] error', {
+                id,
+                message: error.message,
+                graphQLErrors: graphQLErrors?.map((e: any) => e.message),
+            });
+            return;
+        }
+
+        console.log('[useOrder] success', {
+            id,
+            found: Boolean(data?.order),
+            status: (data as any)?.order?.status,
+        });
+    }, [id, loading, error, data]);
 
     return {
         order: data?.order || null,
@@ -95,12 +122,22 @@ export function useOrdersByStatus(status: OrderStatus) {
 
 export function useUpdateOrderStatus() {
     const [updateOrderStatus, { loading, error }] = useMutation(UPDATE_ORDER_STATUS);
+    const removeOrder = useActiveOrdersStore((state) => state.removeOrder);
 
     const update = async (id: string, status: OrderStatus) => {
         try {
             const result = await updateOrderStatus({
                 variables: { id, status },
                 refetchQueries: [{ query: GET_ORDERS }, { query: GET_ORDERS_BY_STATUS, variables: { status } }],
+                awaitRefetchQueries: true, // Wait for refetch before resolving
+                update: (cache, { data }) => {
+                    // If order is now completed, evict it from cache
+                    if (data?.updateOrderStatus?.status === 'DELIVERED' || data?.updateOrderStatus?.status === 'CANCELLED') {
+                        cache.evict({ id: cache.identify({ __typename: 'Order', id }) });
+                        cache.gc(); // Garbage collect orphaned references
+                        removeOrder(id); // Remove from Zustand store
+                    }
+                },
             });
             return {
                 data: result.data?.updateOrderStatus || null,
@@ -123,6 +160,7 @@ export function useUpdateOrderStatus() {
 
 export function useCancelOrder() {
     const [cancelOrder, { loading, error }] = useMutation(CANCEL_ORDER);
+    const removeOrder = useActiveOrdersStore((state) => state.removeOrder);
 
     const cancel = async (id: string) => {
         try {
@@ -132,6 +170,13 @@ export function useCancelOrder() {
                     { query: GET_ORDERS },
                     { query: GET_ORDERS_BY_STATUS, variables: { status: 'CANCELLED' } },
                 ],
+                awaitRefetchQueries: true, // Wait for refetch before resolving
+                update: (cache) => {
+                    // Immediately evict cancelled order from cache
+                    cache.evict({ id: cache.identify({ __typename: 'Order', id }) });
+                    cache.gc(); // Garbage collect orphaned references
+                    removeOrder(id); // Remove from Zustand store
+                },
             });
             return {
                 data: result.data?.cancelOrder || null,

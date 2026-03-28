@@ -1,0 +1,252 @@
+"""
+Connection status for drivers:
+- CONNECTED: Actively sending heartbeats
+- STALE: No heartbeat for 45 seconds (warning state)
+- LOST: No heartbeat for 90 seconds (offline state)
+- DISCONNECTED: Subscription closed or never connected
+"""
+enum DriverConnectionStatus {
+    CONNECTED
+    STALE
+    LOST
+    DISCONNECTED
+}
+
+"""Basic driver profile returned by driverLogin / driverRegister"""
+type DriverBasicInfo {
+    id: ID!
+    email: String!
+    firstName: String!
+    lastName: String!
+    phoneNumber: String
+    onlinePreference: Boolean!
+    connectionStatus: DriverConnectionStatus!
+    lastHeartbeatAt: Date
+    lastLocationUpdate: Date
+    driverLat: Float
+    driverLng: Float
+}
+
+"""Result of driverLogin / driverRegister mutations"""
+type DriverAuthResult {
+    token: String!
+    refreshToken: String
+    driver: DriverBasicInfo!
+    message: String!
+}
+
+input DriverLoginInput {
+    email: String!
+    password: String!
+}
+
+input DriverRegisterInput {
+    email: String!
+    password: String!
+    firstName: String!
+    lastName: String!
+    phoneNumber: String
+}
+
+extend type Mutation {
+    """Driver login — returns short-lived access token + refresh token"""
+    driverLogin(input: DriverLoginInput!): DriverAuthResult! @skipAuth
+
+    """Driver self-registration — creates user (role=DRIVER) + driver profile row"""
+    driverRegister(input: DriverRegisterInput!): DriverAuthResult! @skipAuth
+}
+
+type DriverConnection {
+    """User's preference: "I want to work" toggle"""
+    onlinePreference: Boolean!
+    
+    """System-calculated: current connection state"""
+    connectionStatus: DriverConnectionStatus!
+    
+    """Last timestamp when driver sent a heartbeat (every 5s)"""
+    lastHeartbeatAt: Date
+    
+    """Last timestamp when location was written to DB (throttled to every 10s)"""
+    lastLocationUpdate: Date
+    
+    """Timestamp when driver was marked as DISCONNECTED"""
+    disconnectedAt: Date
+
+    """Current navigation order this ETA belongs to"""
+    activeOrderId: ID
+
+    """Current navigation phase reported by the driver"""
+    navigationPhase: String
+
+    """Driver-reported remaining ETA in seconds"""
+    remainingEtaSeconds: Int
+
+    """When the ETA payload was last refreshed"""
+    etaUpdatedAt: Date
+
+    """Most recently reported battery level percentage from driver device"""
+    batteryLevel: Int
+
+    """Whether driver opted in to battery telemetry sharing"""
+    batteryOptIn: Boolean!
+
+    """When battery telemetry was last refreshed"""
+    batteryUpdatedAt: Date
+
+    """Whether device reported it is currently charging"""
+    isCharging: Boolean
+}
+
+enum DriverPttSignalAction {
+    STARTED
+    STOPPED
+    MUTE
+    UNMUTE
+}
+
+type DriverPttSignal {
+    driverId: ID!
+    adminId: ID!
+    channelName: String!
+    action: DriverPttSignalAction!
+    muted: Boolean!
+    timestamp: DateTime!
+}
+
+enum AgoraRtcRole {
+    PUBLISHER
+    SUBSCRIBER
+}
+
+type AgoraRtcCredentials {
+    appId: String!
+    channelName: String!
+    uid: Int!
+    token: String!
+    expiresAt: DateTime!
+}
+
+"""Result of driver heartbeat mutation"""
+type DriverHeartbeatResult {
+    """Whether heartbeat was processed successfully"""
+    success: Boolean!
+    
+    """Current connection status after processing"""
+    connectionStatus: DriverConnectionStatus!
+    
+    """Whether location was actually written to DB (throttled)"""
+    locationUpdated: Boolean!
+    
+    """Server timestamp when heartbeat was processed"""
+    lastHeartbeatAt: Date!
+}
+
+# Extended User type with new driver connection data
+extend type User {
+    driverConnection: DriverConnection
+    commissionPercentage: Float
+    maxActiveOrders: Int
+    hasOwnVehicle: Boolean
+}
+
+type DriverDailyMetrics {
+    """Number of active (uncompleted) orders this driver currently has"""
+    activeOrdersCount: Int!
+
+    """Driver's personal maximum active orders limit"""
+    maxActiveOrders: Int!
+
+    """Number of orders delivered today"""
+    deliveredTodayCount: Int!
+
+    """Total delivery earnings today (before commission deduction)"""
+    grossEarningsToday: Float!
+
+    """Commission rate as a percentage (e.g. 10.0 for 10%)"""
+    commissionPercentage: Float!
+
+    """Driver's net earnings today (after commission deduction)"""
+    netEarningsToday: Float!
+
+    """Whether the driver is currently online (online preference)"""
+    isOnline: Boolean!
+
+    """Driver's current connection status"""
+    connectionStatus: DriverConnectionStatus!
+}
+
+extend type Query {
+    """Get live metrics for the authenticated driver"""
+    myDriverMetrics: DriverDailyMetrics!
+
+    """Get Agora RTC credentials for the current authenticated user"""
+    getAgoraRtcCredentials(channelName: String!, role: AgoraRtcRole!): AgoraRtcCredentials!
+}
+
+extend type Mutation {
+    """
+    Driver heartbeat - call every 5 seconds while online.
+    Updates lastHeartbeatAt and connectionStatus to CONNECTED.
+    Location is throttled: only written if >10s since last write OR moved >5m.
+    """
+    driverHeartbeat(
+        latitude: Float!
+        longitude: Float!
+        activeOrderId: ID
+        navigationPhase: String
+        remainingEtaSeconds: Int
+    ): DriverHeartbeatResult!
+    
+    """Admin mutation to manually set connection status (for testing/recovery)"""
+    adminSetDriverConnectionStatus(driverId: ID!, status: DriverConnectionStatus!): User!
+
+    """Admin mutation to update per-driver settings (commission %, max active orders, vehicle ownership)"""
+    adminUpdateDriverSettings(
+        driverId: ID!
+        commissionPercentage: Float
+        maxActiveOrders: Int
+        hasOwnVehicle: Boolean
+    ): User!
+
+    """Driver battery telemetry update (recommended every 5-10 minutes)"""
+    driverUpdateBatteryStatus(level: Int!, optIn: Boolean!, isCharging: Boolean): DriverConnection!
+
+    """Admin sends push-to-talk signaling state to one or multiple drivers"""
+    adminSendPttSignal(
+        driverIds: [ID!]!
+        channelName: String!
+        action: DriverPttSignalAction!
+        muted: Boolean
+    ): Boolean!
+
+    """
+    Admin mutation to set which drivers are on the current shift.
+    Only on-shift drivers will receive new-order dispatch notifications.
+    Pass an empty list to clear the shift restriction (all eligible drivers receive notifications).
+    """
+    adminSetShiftDrivers(driverIds: [ID!]!): Boolean!
+
+    """
+    Admin simulation heartbeat — wraps processHeartbeat for SUPER_ADMIN.
+    Triggers the full heartbeat pipeline (ETA cache, Live Activity, subscriptions).
+    Non-production only.
+    """
+    adminSimulateDriverHeartbeat(
+        driverId: ID!
+        latitude: Float!
+        longitude: Float!
+        activeOrderId: ID
+        navigationPhase: String
+        remainingEtaSeconds: Int
+        """When true, also sets the driver's onlinePreference to true"""
+        setOnline: Boolean
+    ): DriverHeartbeatResult!
+}
+
+# Per-driver subscription (optional - for more granular updates)
+extend type Subscription {
+    driverConnectionStatusChanged(driverId: ID!): DriverConnection! @skipAuth
+
+    """Per-driver push-to-talk signal stream (start/stop/mute/unmute)"""
+    driverPttSignal(driverId: ID!): DriverPttSignal! @skipAuth
+}

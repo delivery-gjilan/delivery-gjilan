@@ -15,6 +15,7 @@ interface Admin {
 interface AuthContextType {
     admin: Admin | null;
     loading: boolean;
+    authCheckComplete: boolean;
     login: (email: string, password: string) => Promise<void>;
     logout: () => void;
     isAuthenticated: boolean;
@@ -25,6 +26,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [admin, setAdmin] = useState<Admin | null>(null);
     const [loading, setLoading] = useState(true);
+    const [authCheckComplete, setAuthCheckComplete] = useState(false);
     const [loginMutation] = useMutation(LOGIN_MUTATION);
 
     // Check if user is already logged in on mount
@@ -40,9 +42,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } catch (error) {
                 console.error("Auth check failed:", error);
                 localStorage.removeItem("authToken");
+                localStorage.removeItem("refreshToken");
                 localStorage.removeItem("adminData");
             } finally {
                 setLoading(false);
+                setAuthCheckComplete(true);
             }
         };
 
@@ -63,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             // Only allow admins to access admin panel
             const userRole = loginResult.user?.role;
-            if (userRole !== "BUSINESS_ADMIN" && userRole !== "SUPER_ADMIN") {
+            if (userRole !== "BUSINESS_OWNER" && userRole !== "BUSINESS_EMPLOYEE" && userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
                 throw new Error("Access denied. Only administrators can access this panel.");
             }
 
@@ -78,6 +82,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             };
 
             localStorage.setItem("authToken", loginResult.token);
+            if (loginResult.refreshToken) {
+                localStorage.setItem("refreshToken", loginResult.refreshToken);
+            }
             localStorage.setItem("adminData", JSON.stringify(adminData));
             setAdmin(adminData);
         } finally {
@@ -87,6 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const logout = () => {
         localStorage.removeItem("authToken");
+        localStorage.removeItem("refreshToken");
         localStorage.removeItem("adminData");
         setAdmin(null);
     };
@@ -96,6 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             value={{
                 admin,
                 loading,
+                authCheckComplete,
                 login,
                 logout,
                 isAuthenticated: !!admin,

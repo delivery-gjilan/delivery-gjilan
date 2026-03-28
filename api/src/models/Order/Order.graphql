@@ -1,9 +1,25 @@
 enum OrderStatus {
     PENDING
-    ACCEPTED
+    PREPARING
+    READY
     OUT_FOR_DELIVERY
     DELIVERED
     CANCELLED
+}
+
+enum OrderPaymentCollection {
+    CASH_TO_DRIVER
+    PREPAID_TO_PLATFORM
+}
+
+enum PromotionAppliesTo {
+    PRICE
+    DELIVERY
+}
+
+enum DriverCustomerNotificationKind {
+    ETA_LT_3_MIN
+    ARRIVED_WAITING
 }
 
 type OrderBusiness {
@@ -11,54 +27,140 @@ type OrderBusiness {
     items: [OrderItem!]!
 }
 
+type OrderItemOption {
+    id: ID!
+    optionGroupId: ID!
+    optionGroupName: String!
+    optionId: ID!
+    optionName: String!
+    priceAtOrder: Float!
+}
+
 type OrderItem {
+    id: ID!
     productId: ID!
     name: String!
     imageUrl: String
     quantity: Int!
-    price: Float!
+    basePrice: Float
+    unitPrice: Float!
+    notes: String
+    selectedOptions: [OrderItemOption!]!
+    childItems: [OrderItem!]!
+    parentOrderItemId: ID
+}
+
+type OrderPromotion {
+    id: ID!
+    promotionId: ID!
+    appliesTo: PromotionAppliesTo!
+    discountAmount: Float!
+    promoCode: String
+}
+
+type OrderDriverLiveTracking {
+    orderId: ID!
+    driverId: ID!
+    latitude: Float!
+    longitude: Float!
+    navigationPhase: String
+    remainingEtaSeconds: Int
+    etaUpdatedAt: Date!
+}
+
+# Backward-compatibility shim for older mobile clients that still send
+# a subscription input argument. The token field is ignored.
+input SubscriptionInput {
+    token: String
 }
 
 type Order {
     id: ID!
+    displayId: String!
+    userId: ID!
     orderPrice: Float!
     deliveryPrice: Float!
+    originalPrice: Float
+    originalDeliveryPrice: Float
     totalPrice: Float!
     orderDate: Date!
+    updatedAt: Date!
     status: OrderStatus!
+    paymentCollection: OrderPaymentCollection!
+    preparationMinutes: Int
+    estimatedReadyAt: Date
+    preparingAt: Date
+    readyAt: Date
+    outForDeliveryAt: Date
+    deliveredAt: Date
+    cancelledAt: Date
+    driverAssignedAt: Date
+    driverArrivedAtPickup: Date
+    cancellationReason: String
     user: User
+    driver: User
     dropOffLocation: Location!
+    pickupLocations: [Location!]!
+    driverNotes: String
+    adminNote: String
     businesses: [OrderBusiness!]!
+    orderPromotions: [OrderPromotion!]
 }
 
 type Query {
-    orders: [Order!]!
+    orders(limit: Int, offset: Int): [Order!]!
     order(id: ID!): Order
-    ordersByStatus(status: OrderStatus!): [Order!]!
+    ordersByStatus(status: OrderStatus!, limit: Int, offset: Int): [Order!]!
+    cancelledOrders(limit: Int, offset: Int): [Order!]!
     uncompletedOrders: [Order!]!
 }
 
 type Mutation {
     updateOrderStatus(id: ID!, status: OrderStatus!): Order!
+    startPreparing(id: ID!, preparationMinutes: Int!): Order!
+    updatePreparationTime(id: ID!, preparationMinutes: Int!): Order!
+    assignDriverToOrder(id: ID!, driverId: ID): Order!
+    driverNotifyCustomer(orderId: ID!, kind: DriverCustomerNotificationKind!): Boolean!
     cancelOrder(id: ID!): Order!
+    adminCancelOrder(id: ID!, reason: String!, settleDriver: Boolean, settleBusiness: Boolean): Order!
+    setOrderAdminNote(id: ID!, note: String): Order!
     createOrder(input: CreateOrderInput!): Order!
+    createTestOrder: Order!
 }
 
 type Subscription {
     orderStatusUpdated(orderId: ID!): Order! @skipAuth
-    userOrdersUpdated(input: SubscriptionInput!): [Order!]! @skipAuth
+    userOrdersUpdated(input: SubscriptionInput): [Order!]! @skipAuth
+    orderDriverLiveTracking(orderId: ID!, input: SubscriptionInput): OrderDriverLiveTracking! @skipAuth
     allOrdersUpdated: [Order!]! @skipAuth
+}
+
+input CreateOrderItemOptionInput {
+    optionGroupId: ID!
+    optionId: ID!
+}
+
+input CreateOrderChildItemInput {
+    productId: ID!
+    selectedOptions: [CreateOrderItemOptionInput!]!
+}
+
+input CreateOrderItemInput {
+    productId: ID!
+    quantity: Int!
+    price: Float!
+    notes: String
+    selectedOptions: [CreateOrderItemOptionInput!]!
+    childItems: [CreateOrderChildItemInput!]
 }
 
 input CreateOrderInput {
     items: [CreateOrderItemInput!]!
     dropOffLocation: LocationInput!
     deliveryPrice: Float!
-    totalPrice: Float! # For validation/check
-}
-
-input CreateOrderItemInput {
-    productId: ID!
-    quantity: Int!
-    price: Float! # For validation/check
+    totalPrice: Float!
+    prioritySurcharge: Float
+    paymentCollection: OrderPaymentCollection
+    promoCode: String
+    driverNotes: String
 }

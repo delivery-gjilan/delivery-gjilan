@@ -3,24 +3,34 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import Sidebar from "@/components/dashboard/sidebar";
 import Topbar from "@/components/dashboard/topbar";
 import { useAuth } from "@/lib/auth-context";
 import { ReactNode } from "react";
+import { canAccessAdminPanelPath } from "@/lib/route-access";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const { isAuthenticated, loading } = useAuth();
+  const pathname = usePathname();
+  const { isAuthenticated, loading, authCheckComplete, admin } = useAuth();
 
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      router.push("/login");
-    }
-  }, [isAuthenticated, loading, router]);
+    if (!authCheckComplete || loading) return;
 
-  if (loading) {
+    if (!isAuthenticated) {
+      router.push("/login");
+      return;
+    }
+
+    if (isAuthenticated && !canAccessAdminPanelPath(admin?.role, pathname)) {
+      router.push("/dashboard");
+    }
+  }, [isAuthenticated, loading, authCheckComplete, router, admin?.role, pathname]);
+
+  if (loading || !authCheckComplete) {
     return (
-      <div className="flex items-center justify-center h-screen bg-[#0a0a0a]">
+      <div className="flex items-center justify-center h-screen bg-[#09090b]">
         <div className="text-white">Loading...</div>
       </div>
     );
@@ -30,17 +40,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     return null;
   }
 
+  if (!canAccessAdminPanelPath(admin?.role, pathname)) {
+    return null;
+  }
+
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-[#0a0a0a]">
-      {/* Sidebar */}
+    <div className="flex h-screen w-full bg-[#09090b]">
       <Sidebar />
-
       <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Topbar */}
         <Topbar />
-
-        {/* Main content */}
-        <main className="flex-1 overflow-y-auto p-6 bg-[#0a0a0a]">
+        <main className="flex-1 overflow-y-auto p-5 bg-[#09090b]">
           {children}
         </main>
       </div>

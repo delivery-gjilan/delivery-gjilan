@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, timestamp, index } from 'drizzle-orm/pg-core';
 import { productCategories } from './productCategories';
 import { relations, sql } from 'drizzle-orm';
 import { products } from './products';
@@ -16,7 +16,9 @@ export const productSubcategories = pgTable('product_subcategories', {
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull()
         .$onUpdate(() => sql`CURRENT_TIMESTAMP`),
-});
+}, (t) => ([
+    index('idx_product_subcategories_category_id').on(t.categoryId),
+]));
 
 export const productSubcategoriesRelations = relations(productSubcategories, ({ one, many }) => ({
     products: many(products),

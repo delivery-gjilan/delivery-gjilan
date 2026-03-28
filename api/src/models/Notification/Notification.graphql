@@ -1,0 +1,239 @@
+enum DevicePlatform {
+    IOS
+    ANDROID
+}
+
+enum DeviceAppType {
+    CUSTOMER
+    DRIVER
+    BUSINESS
+    ADMIN
+}
+
+enum NotificationType {
+    ORDER_STATUS
+    ORDER_ASSIGNED
+    PROMOTIONAL
+    ADMIN_ALERT
+}
+
+enum CampaignStatus {
+    DRAFT
+    SENDING
+    SENT
+    FAILED
+}
+
+enum PushTelemetryEventType {
+    RECEIVED
+    OPENED
+    ACTION_TAPPED
+    TOKEN_REGISTERED
+    TOKEN_REFRESHED
+    TOKEN_UNREGISTERED
+}
+
+enum BusinessDeviceOnlineStatus {
+    ONLINE
+    STALE
+    OFFLINE
+}
+
+type DeviceToken {
+    id: ID!
+    userId: ID!
+    token: String!
+    platform: DevicePlatform!
+    deviceId: String!
+    appType: DeviceAppType!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+}
+
+type Notification {
+    id: ID!
+    userId: ID
+    title: String!
+    body: String!
+    data: JSON
+    type: NotificationType!
+    campaignId: ID
+    sentAt: DateTime!
+}
+
+type NotificationCampaign {
+    id: ID!
+    title: String!
+    body: String!
+    titleAl: String
+    bodyAl: String
+    data: JSON
+    imageUrl: String
+    timeSensitive: Boolean!
+    category: String
+    relevanceScore: Float
+    query: JSON
+    targetCount: Int!
+    sentCount: Int!
+    failedCount: Int!
+    status: CampaignStatus!
+    sentBy: ID
+    sender: User
+    createdAt: DateTime!
+    sentAt: DateTime
+}
+
+type AudiencePreview {
+    count: Int!
+    sampleUsers: [User!]!
+}
+
+type SendNotificationResult {
+    success: Boolean!
+    successCount: Int!
+    failureCount: Int!
+}
+
+type PushTelemetryEvent {
+    id: ID!
+    userId: ID!
+    appType: DeviceAppType!
+    platform: DevicePlatform!
+    eventType: PushTelemetryEventType!
+    token: String
+    deviceId: String
+    notificationTitle: String
+    notificationBody: String
+    campaignId: ID
+    orderId: ID
+    actionId: String
+    metadata: JSON
+    createdAt: DateTime!
+}
+
+type TelemetryCount {
+    key: String!
+    count: Int!
+}
+
+type PushTelemetrySummary {
+    totalEvents: Int!
+    byEvent: [TelemetryCount!]!
+    byAppType: [TelemetryCount!]!
+    byPlatform: [TelemetryCount!]!
+}
+
+type BusinessDeviceHealth {
+    id: ID!
+    userId: ID!
+    businessId: ID!
+    deviceId: String!
+    platform: DevicePlatform!
+    appVersion: String
+    appState: String
+    networkType: String
+    batteryLevel: Int
+    isCharging: Boolean
+    subscriptionAlive: Boolean!
+    lastHeartbeatAt: DateTime!
+    lastOrderSignalAt: DateTime
+    lastPushReceivedAt: DateTime
+    lastOrderId: ID
+    metadata: JSON
+    createdAt: DateTime!
+    updatedAt: DateTime!
+    onlineStatus: BusinessDeviceOnlineStatus!
+    receivingOrders: Boolean!
+}
+
+# ── Inputs ────────────────────────────────────────────────────────
+
+input RegisterDeviceTokenInput {
+    token: String!
+    platform: DevicePlatform!
+    deviceId: String!
+    appType: DeviceAppType!
+}
+
+input SendPushNotificationInput {
+    userIds: [ID!]!
+    title: String!
+    body: String!
+    titleAl: String
+    bodyAl: String
+    data: JSON
+    imageUrl: String
+    timeSensitive: Boolean
+    category: String
+    relevanceScore: Float
+}
+
+input CreateCampaignInput {
+    title: String!
+    body: String!
+    titleAl: String
+    bodyAl: String
+    data: JSON
+    imageUrl: String
+    timeSensitive: Boolean
+    category: String
+    relevanceScore: Float
+    query: JSON!
+}
+
+input TrackPushTelemetryInput {
+    appType: DeviceAppType!
+    platform: DevicePlatform!
+    eventType: PushTelemetryEventType!
+    token: String
+    deviceId: String
+    notificationTitle: String
+    notificationBody: String
+    campaignId: ID
+    orderId: ID
+    actionId: String
+    metadata: JSON
+}
+
+input BusinessDeviceHeartbeatInput {
+    deviceId: String!
+    platform: DevicePlatform!
+    appVersion: String
+    appState: String
+    networkType: String
+    batteryLevel: Int
+    isCharging: Boolean
+    subscriptionAlive: Boolean!
+    metadata: JSON
+}
+
+# ── Operations ────────────────────────────────────────────────────
+
+type Query {
+    notificationCampaigns: [NotificationCampaign!]!
+    notificationCampaign(id: ID!): NotificationCampaign
+    previewCampaignAudience(query: JSON!): AudiencePreview!
+    deviceTokens(userId: ID): [DeviceToken!]!
+    pushTelemetrySummary(hours: Int): PushTelemetrySummary!
+    pushTelemetryEvents(
+        hours: Int
+        limit: Int
+        appType: DeviceAppType
+        platform: DevicePlatform
+        eventType: PushTelemetryEventType
+    ): [PushTelemetryEvent!]!
+    businessDeviceHealth(hours: Int): [BusinessDeviceHealth!]!
+}
+
+type Mutation {
+    registerDeviceToken(input: RegisterDeviceTokenInput!): Boolean!
+    unregisterDeviceToken(token: String!): Boolean!
+    registerLiveActivityToken(token: String!, activityId: String!, orderId: ID!): Boolean!
+    sendPushNotification(input: SendPushNotificationInput!): SendNotificationResult!
+    createCampaign(input: CreateCampaignInput!): NotificationCampaign!
+    sendCampaign(id: ID!): NotificationCampaign!
+    deleteCampaign(id: ID!): Boolean!
+    trackPushTelemetry(input: TrackPushTelemetryInput!): Boolean!
+    businessDeviceHeartbeat(input: BusinessDeviceHeartbeatInput!): Boolean!
+    businessDeviceOrderSignal(deviceId: String!, orderId: ID): Boolean!
+}

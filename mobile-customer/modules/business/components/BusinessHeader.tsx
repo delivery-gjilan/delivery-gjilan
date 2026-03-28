@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Platform, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Image } from 'react-native';
 import Animated, {
     useAnimatedStyle,
     interpolate,
@@ -11,310 +11,125 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Business } from '@/gql/graphql';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 
-export function BusinessHeader({ business, scrollY }: { business: Business; scrollY?: SharedValue<number> }) {
+export const HERO_HEIGHT = 220;
+const LOGO_SIZE = 80;
+const LOGO_OVERLAP = LOGO_SIZE / 2;
+
+export function BusinessHeader({ business, scrollY }: { business: Partial<Business>; scrollY?: SharedValue<number> }) {
     const theme = useTheme();
     const router = useRouter();
     const insets = useSafeAreaInsets();
 
-    // Wolt-style constants
-    const HERO_HEIGHT = 280;
-    const COLLAPSED_HEIGHT = 90 + insets.top;
-    const SCROLL_RANGE = HERO_HEIGHT - COLLAPSED_HEIGHT;
-
-    // Hero container height - smoothly interpolates
-    const headerAnimatedStyle = useAnimatedStyle(() => {
-        if (!scrollY) return { height: HERO_HEIGHT };
-        
+    // Parallax on the image
+    const imageStyle = useAnimatedStyle(() => {
+        const translateY = scrollY
+            ? interpolate(scrollY.value, [-100, 0, HERO_HEIGHT], [-30, 0, HERO_HEIGHT * 0.35], Extrapolate.CLAMP)
+            : 0;
+        const scale = scrollY
+            ? interpolate(scrollY.value, [-200, 0], [1.4, 1], Extrapolate.CLAMP)
+            : 1;
         return {
-            height: interpolate(
-                scrollY.value,
-                [0, SCROLL_RANGE],
-                [HERO_HEIGHT, COLLAPSED_HEIGHT],
-                Extrapolate.CLAMP
-            ),
-        };
-    });
-
-    // Dark overlay opacity
-    const overlayAnimatedStyle = useAnimatedStyle(() => {
-        if (!scrollY) return { opacity: 0 };
-        
-        return {
-            opacity: interpolate(
-                scrollY.value,
-                [0, SCROLL_RANGE],
-                [0, 0.65],
-                Extrapolate.CLAMP
-            ),
-        };
-    });
-
-    // Large title in hero - moves up and fades
-    const heroTitleAnimatedStyle = useAnimatedStyle(() => {
-        if (!scrollY) return { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }] };
-        
-        return {
-            opacity: interpolate(
-                scrollY.value,
-                [0, SCROLL_RANGE * 0.5],
-                [1, 0],
-                Extrapolate.CLAMP
-            ),
             transform: [
-                {
-                    translateY: interpolate(
-                        scrollY.value,
-                        [0, SCROLL_RANGE],
-                        [0, -50],
-                        Extrapolate.CLAMP
-                    ),
-                },
-                {
-                    scale: interpolate(
-                        scrollY.value,
-                        [0, SCROLL_RANGE * 0.5],
-                        [1, 0.85],
-                        Extrapolate.CLAMP
-                    ),
-                },
+                { translateY },
+                { scale },
             ],
-        };
-    });
-
-    // Search bar - morphs from center to top and stays visible
-    const searchBarAnimatedStyle = useAnimatedStyle(() => {
-        if (!scrollY) return { opacity: 0, transform: [{ translateY: 0 }, { scale: 1 }] };
-        
-        return {
-            opacity: interpolate(
-                scrollY.value,
-                [SCROLL_RANGE * 0.2, SCROLL_RANGE * 0.5],
-                [0, 1],
-                Extrapolate.CLAMP
-            ),
-            transform: [
-                {
-                    translateY: interpolate(
-                        scrollY.value,
-                        [0, SCROLL_RANGE],
-                        [0, -80],
-                        Extrapolate.CLAMP
-                    ),
-                },
-                {
-                    scale: interpolate(
-                        scrollY.value,
-                        [SCROLL_RANGE * 0.2, SCROLL_RANGE * 0.5],
-                        [0.95, 1],
-                        Extrapolate.CLAMP
-                    ),
-                },
-            ],
-        };
-    });
-
-    // Sticky top bar - fades in when collapsed
-    const stickyBarAnimatedStyle = useAnimatedStyle(() => {
-        if (!scrollY) return { opacity: 0, transform: [{ translateY: -10 }] };
-        
-        return {
-            opacity: interpolate(
-                scrollY.value,
-                [SCROLL_RANGE * 0.7, SCROLL_RANGE],
-                [0, 1],
-                Extrapolate.CLAMP
-            ),
-            transform: [
-                {
-                    translateY: interpolate(
-                        scrollY.value,
-                        [SCROLL_RANGE * 0.7, SCROLL_RANGE],
-                        [-10, 0],
-                        Extrapolate.CLAMP
-                    ),
-                },
-            ],
-        };
-    });
+        } as any;
+    }) as any;
 
     return (
-        <Animated.View style={[{ overflow: 'visible' }, headerAnimatedStyle]}>
-            {/* Layer 1: Fixed Hero Image */}
-            <View
-                style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: HERO_HEIGHT,
-                    overflow: 'hidden',
-                }}
-            >
-                {business.imageUrl ? (
-                    <Image
-                        source={{ uri: business.imageUrl }}
-                        style={{ width: '100%', height: '100%' }}
-                        resizeMode="cover"
-                    />
-                ) : (
-                    <View
-                        className="w-full h-full items-center justify-center"
-                        style={{ backgroundColor: theme.colors.card }}
-                    >
-                        <Ionicons name="restaurant-outline" size={64} color={theme.colors.subtext} />
-                    </View>
-                )}
-            </View>
+        <View style={{ height: HERO_HEIGHT + LOGO_OVERLAP, overflow: 'visible' }}>
+            {/* Hero image container */}
+            <View style={{ height: HERO_HEIGHT, overflow: 'hidden' }}>
+                {/* Parallax Image */}
+                <Animated.View style={[{ position: 'absolute', top: -30, left: 0, right: 0, bottom: -30 }, imageStyle as any]}>
+                    {business.imageUrl ? (
+                        <Image
+                            source={{ uri: business.imageUrl }}
+                            style={{ width: '100%', height: '100%' }}
+                            resizeMode="cover"
+                        />
+                    ) : (
+                        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.card }}>
+                            <Ionicons name="restaurant-outline" size={64} color={theme.colors.subtext} />
+                        </View>
+                    )}
+                </Animated.View>
 
-            {/* Layer 2: Dark Overlay */}
-            <Animated.View
-                style={[
-                    {
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        height: HERO_HEIGHT,
-                        backgroundColor: '#000',
-                    },
-                    overlayAnimatedStyle,
-                ]}
-            />
+                {/* Bottom gradient */}
+                <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.45)']}
+                    style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: HERO_HEIGHT * 0.55 }}
+                />
 
-            {/* Layer 3: Hero Title (Large) */}
-            <Animated.View
-                style={[
-                    {
-                        position: 'absolute',
-                        bottom: 100,
-                        left: 16,
-                        right: 16,
-                    },
-                    heroTitleAnimatedStyle,
-                ]}
-            >
-                <Text className="text-4xl font-bold text-white mb-2">{business.name}</Text>
-                <Text className="text-base text-white/90 capitalize">
-                    {business.businessType.toLowerCase().replace('_', ' ')}
-                </Text>
-            </Animated.View>
-
-            {/* Layer 4: Search Bar - Positioned at Bottom of Hero */}
-            <Animated.View
-                style={[
-                    {
-                        position: 'absolute',
-                        bottom: 16,
-                        left: 16,
-                        right: 16,
-                    },
-                    searchBarAnimatedStyle,
-                ]}
-            >
-                <View
-                    className="flex-row items-center px-4 py-3.5 rounded-xl"
-                    style={{
-                        backgroundColor: theme.colors.card,
-                        ...(Platform.OS === 'ios' && {
-                            shadowColor: '#000',
-                            shadowOffset: { width: 0, height: 2 },
-                            shadowOpacity: 0.12,
-                            shadowRadius: 8,
-                        }),
-                        ...(Platform.OS === 'android' && {
-                            elevation: 4,
-                        }),
-                    }}
-                >
-                    <Ionicons name="search-outline" size={22} color={theme.colors.subtext} />
-                    <Text className="ml-3 text-base" style={{ color: theme.colors.subtext }}>
-                        Search menu items...
-                    </Text>
-                </View>
-            </Animated.View>
-
-            {/* Layer 5: Sticky Top Bar (Appears When Collapsed) */}
-            <Animated.View
-                style={[
-                    {
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        height: COLLAPSED_HEIGHT,
-                        paddingTop: insets.top,
-                        backgroundColor: theme.colors.card,
-                        borderBottomWidth: 1,
-                        borderBottomColor: theme.colors.background,
-                        ...(Platform.OS === 'ios' && {
-                            shadowColor: '#000',
-                            shadowOffset: { width: 0, height: 2 },
-                            shadowOpacity: 0.08,
-                            shadowRadius: 4,
-                        }),
-                        ...(Platform.OS === 'android' && {
-                            elevation: 4,
-                        }),
-                    },
-                    stickyBarAnimatedStyle,
-                ]}
-            >
-                <View className="flex-1 flex-row items-center px-4">
+                {/* Floating Back Button */}
+                <View style={{ position: 'absolute', top: insets.top + 8, left: 16, zIndex: 10 }}>
                     <TouchableOpacity
                         onPress={() => router.back()}
-                        className="w-10 h-10 rounded-full items-center justify-center mr-3"
-                        style={{ backgroundColor: theme.colors.background }}
+                        activeOpacity={0.7}
+                        style={{
+                            width: 38, height: 38, borderRadius: 19,
+                            backgroundColor: 'rgba(0,0,0,0.35)',
+                            alignItems: 'center', justifyContent: 'center',
+                        }}
                     >
-                        <Ionicons name="arrow-back" size={22} color={theme.colors.text} />
+                        <Ionicons name="arrow-back" size={20} color="#fff" />
                     </TouchableOpacity>
-
-                    <View className="flex-1">
-                        <Text
-                            className="text-lg font-bold"
-                            style={{ color: theme.colors.text }}
-                            numberOfLines={1}
-                        >
-                            {business.name}
-                        </Text>
-                    </View>
-
-                    <View
-                        className="px-2.5 py-1 rounded-md"
-                        style={{ backgroundColor: business.isOpen ? '#10b981' : '#ef4444' }}
-                    >
-                        <Text className="text-white text-xs font-semibold">
-                            {business.isOpen ? 'Open' : 'Closed'}
-                        </Text>
-                    </View>
                 </View>
-            </Animated.View>
 
-            {/* Floating Back Button (Always Visible Over Hero) */}
+                {/* Floating Heart Button */}
+                <View style={{ position: 'absolute', top: insets.top + 8, right: 16, zIndex: 10 }}>
+                    <TouchableOpacity
+                        activeOpacity={0.7}
+                        style={{
+                            width: 38, height: 38, borderRadius: 19,
+                            backgroundColor: 'rgba(0,0,0,0.35)',
+                            alignItems: 'center', justifyContent: 'center',
+                        }}
+                    >
+                        <Ionicons name="heart-outline" size={20} color="#fff" />
+                    </TouchableOpacity>
+                </View>
+            </View>
+
+            {/* Centered Logo – overlaps the hero bottom edge */}
             <View
                 style={{
                     position: 'absolute',
-                    top: Math.max(insets.top + 12, 16),
-                    left: 16,
-                    zIndex: 100,
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    alignItems: 'center',
+                    zIndex: 20,
                 }}
             >
-                <TouchableOpacity
-                    onPress={() => router.back()}
-                    className="w-11 h-11 rounded-full items-center justify-center"
+                <View
                     style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                        ...(Platform.OS === 'ios' && {
-                            shadowColor: '#000',
-                            shadowOffset: { width: 0, height: 2 },
-                            shadowOpacity: 0.15,
-                            shadowRadius: 6,
-                        }),
+                        width: LOGO_SIZE,
+                        height: LOGO_SIZE,
+                        borderRadius: 18,
+                        backgroundColor: '#fff',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 3 },
+                        shadowOpacity: 0.18,
+                        shadowRadius: 6,
+                        elevation: 6,
                     }}
                 >
-                    <Ionicons name="arrow-back" size={24} color="#1f2937" />
-                </TouchableOpacity>
+                    {business.imageUrl ? (
+                        <Image
+                            source={{ uri: business.imageUrl }}
+                            style={{ width: LOGO_SIZE - 8, height: LOGO_SIZE - 8, borderRadius: 14 }}
+                            resizeMode="cover"
+                        />
+                    ) : (
+                        <Ionicons name="restaurant" size={36} color={theme.colors.subtext} />
+                    )}
+                </View>
             </View>
-        </Animated.View>
+        </View>
     );
 }

@@ -1,60 +1,197 @@
 import { View, Text, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
+import { useTranslations } from '@/hooks/useTranslations';
 import { useActiveOrdersStore } from '../store/activeOrdersStore';
+import { toast } from '@/store/toastStore';
 
 export const OrdersFloatingBar = () => {
     const router = useRouter();
+    const pathname = usePathname();
     const theme = useTheme();
+    const { t } = useTranslations();
 
     const { hasActiveOrders, activeOrders } = useActiveOrdersStore();
 
     if (!hasActiveOrders || activeOrders.length === 0) return null;
 
-    // Since we only support 1 active order, take the first one
-    const activeOrder = activeOrders[0];
+    const activeOrderCount = activeOrders.length;
+    // For multiple active orders, we highlight the first one for status coloring
+    // and route users to the active-orders list.
+    const activeOrder = activeOrders[0] as any;
+    const activeOrderId = activeOrder?.id === null || activeOrder?.id === undefined ? null : String(activeOrder.id);
+    const customerVisibleStatus = activeOrder.status === 'READY' ? 'PREPARING' : activeOrder.status;
 
     // Get business names
-    const businessNames = activeOrder.businesses.map(b => b.business.name).join(', ');
-    const displayBusinessName = businessNames.length > 25 ? businessNames.substring(0, 25) + '...' : businessNames;
+    const orderBusinesses = Array.isArray(activeOrder?.businesses) ? activeOrder.businesses : [];
+    const businessNames = orderBusinesses
+        .map((b: any) => (typeof b?.business?.name === 'string' ? b.business.name : ''))
+        .filter(Boolean)
+        .join(', ');
+    const displayBusinessName = businessNames
+        ? businessNames.length > 30
+            ? businessNames.substring(0, 30) + '...'
+            : businessNames
+        : t.orders.active_bar;
 
-    // Determine status text and color
+    const liveEtaSeconds = activeOrder?.driver?.driverConnection?.remainingEtaSeconds;
+    const liveEtaUpdatedAt = activeOrder?.driver?.driverConnection?.etaUpdatedAt;
+    const liveEtaMs = liveEtaUpdatedAt ? new Date(liveEtaUpdatedAt).getTime() : 0;
+    const liveEtaFresh =
+        customerVisibleStatus === 'OUT_FOR_DELIVERY' &&
+        typeof liveEtaSeconds === 'number' &&
+        Number.isFinite(liveEtaSeconds) &&
+        liveEtaMs > 0 &&
+        Date.now() - liveEtaMs <= 20_000;
+
+    const prepEta = (() => {
+        if (customerVisibleStatus !== 'PREPARING') return null;
+        const prepTotal = Number(activeOrder.preparationMinutes ?? 0);
+        if (!Number.isFinite(prepTotal) || prepTotal <= 0) return null;
+        const prepStart = activeOrder.preparingAt || activeOrder.orderDate;
+        const prepStartMs = prepStart ? new Date(prepStart).getTime() : 0;
+        if (!prepStartMs || Number.isNaN(prepStartMs)) return Math.max(1, Math.round(prepTotal));
+        const elapsedMin = Math.max(0, (Date.now() - prepStartMs) / 60000);
+        return Math.max(1, Math.ceil(prepTotal - elapsedMin));
+    })();
+
+    const deliveryEta = (() => {
+        if (!liveEtaFresh) return null;
+        if (liveEtaSeconds <= 0) return 0;
+        return Math.max(1, Math.round(liveEtaSeconds / 60));
+    })();
+
+    const etaMinutes = customerVisibleStatus === 'PREPARING' ? prepEta : customerVisibleStatus === 'OUT_FOR_DELIVERY' ? deliveryEta : null;
+    const etaLabel = customerVisibleStatus === 'PREPARING' ? t.orders.details.est_ready : customerVisibleStatus === 'OUT_FOR_DELIVERY' ? t.orders.details.est_delivery : '';
+
+    // Determine status info with stronger colors
     const getStatusInfo = (status: string) => {
         switch (status) {
             case 'PENDING':
-                return { text: 'PENDING', color: '#F59E0B' }; // Amber
-            case 'ACCEPTED':
-                return { text: 'ACCEPTED', color: '#3B82F6' }; // Blue
+                return {
+                    label: t.orders.status.pending,
+                    message: t.orders.status_messages.pending,
+                    bgColor: '#F59E0B', // Amber
+                    icon: 'time-outline' as const,
+                };
+            case 'PREPARING':
+                return {
+                    label: t.orders.status.preparing,
+                    message: t.orders.status_messages.preparing,
+                    bgColor: '#F97316', // Orange
+                    icon: 'restaurant-outline' as const,
+                };
+            case 'READY':
+                return {
+                    label: t.orders.status.preparing,
+                    message: t.orders.status_messages.preparing,
+                    bgColor: '#3B82F6', // Blue
+                    icon: 'bag-check-outline' as const,
+                };
             case 'OUT_FOR_DELIVERY':
-                return { text: 'OUT FOR DELIVERY', color: '#8B5CF6' }; // Purple
+                return {
+                    label: t.orders.status.out_for_delivery,
+                    message: t.orders.status_messages.out_for_delivery,
+                    bgColor: '#22C55E', // Green
+                    icon: 'bicycle-outline' as const,
+                };
+            case 'CANCELLED':
+                return {
+                    label: t.orders.status.cancelled,
+                    message: t.orders.status_messages.cancelled,
+                    bgColor: '#EF4444', // Red
+                    icon: 'close-circle-outline' as const,
+                };
+            case 'DELIVERED':
+                return {
+                    label: t.orders.status.delivered,
+                    message: t.orders.status_messages.delivered,
+                    bgColor: '#10B981', // Green
+                    icon: 'checkmark-done-outline' as const,
+                };
             default:
-                return { text: 'IN PROGRESS', color: theme.colors.income }; // Green
+                return {
+                    label: t.orders.status.in_progress,
+                    message: t.orders.in_progress_message,
+                    bgColor: theme.colors.primary,
+                    icon: 'hourglass-outline' as const,
+                };
         }
     };
 
-    const statusInfo = getStatusInfo(activeOrder.status);
+    const statusInfo = getStatusInfo(customerVisibleStatus);
+    const activeOrderTitle =
+        activeOrderCount > 1 ? `${activeOrderCount} ${t.orders.active_orders}` : t.orders.active_bar;
+    const activeOrderSubtitle =
+        activeOrderCount > 1 ? t.orders.multiple_active_cta : displayBusinessName;
+    const activeOrderHint =
+        activeOrderCount > 1 ? t.orders.multiple_active_subtitle : statusInfo.message;
+
+    const handlePress = async () => {
+        if (!activeOrderId) {
+            console.warn('[OrdersFloatingBar] Press ignored: missing activeOrderId', {
+                pathname,
+                hasActiveOrders,
+                activeOrdersCount: activeOrders.length,
+            });
+            toast.warning(t.common.error, t.orders.banner_unavailable);
+            return;
+        }
+
+        console.log('[OrdersFloatingBar] Press -> navigate', {
+            pathname,
+            activeOrderId,
+            status: activeOrder?.status,
+            activeOrderCount,
+        });
+
+        if (activeOrderCount > 1) {
+            router.push('/orders/active');
+            return;
+        }
+
+        router.push({
+            pathname: '/orders/[orderId]',
+            params: { orderId: activeOrderId },
+        } as never);
+    };
 
     return (
         <TouchableOpacity
             activeOpacity={0.9}
-            onPress={() => router.push(`/orders/${activeOrder.id}`)}
-            className="flex-row items-center justify-between p-4 rounded-2xl shadow-lg elevation-5"
-            style={{ backgroundColor: statusInfo.color }}
+            onPress={() => {
+                void handlePress();
+            }}
+            className="flex-row items-center justify-between p-4 rounded-2xl w-full"
+            style={{ backgroundColor: statusInfo.bgColor }}
         >
-            <View className="flex-row items-center space-x-3 gap-3">
+            <View className="flex-row items-center gap-3 flex-1">
                 <View className="bg-white/20 p-2 rounded-full">
-                    <Ionicons name="receipt-outline" size={20} color="white" />
+                    <Ionicons name={statusInfo.icon} size={20} color="white" />
                 </View>
                 <View className="flex-1">
-                    <Text className="text-white font-semibold text-base">Active Order</Text>
-                    <Text className="text-white/80 text-xs" numberOfLines={1}>{displayBusinessName}</Text>
+                    <Text className="text-white font-semibold text-base">
+                        {activeOrderTitle}
+                    </Text>
+                    <Text className="text-white/80 text-xs" numberOfLines={1}>
+                        {activeOrderSubtitle}
+                    </Text>
+                    <Text className="text-white/70 text-xs mt-0.5" numberOfLines={1}>
+                        {activeOrderHint}
+                    </Text>
                 </View>
             </View>
-            <View className="flex-row items-center space-x-1">
+            <View className="flex-row items-center gap-1 ml-2">
                 <View className="bg-white/20 px-2 py-1 rounded-full">
-                    <Text className="text-white text-xs font-semibold">{statusInfo.text}</Text>
+                    <Text className="text-white text-xs font-semibold">{statusInfo.label}</Text>
                 </View>
+                {etaMinutes !== null && (
+                    <View className="bg-white/20 px-2 py-1 rounded-full">
+                        <Text className="text-white text-xs font-semibold">~{etaMinutes} {t.orders.details.min_short}</Text>
+                        <Text className="text-white/80 text-[10px] leading-3">{etaLabel}</Text>
+                    </View>
+                )}
                 <Ionicons name="chevron-forward" size={20} color="white" />
             </View>
         </TouchableOpacity>

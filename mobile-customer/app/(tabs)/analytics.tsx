@@ -1,15 +1,22 @@
 import { View, Text, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
+import { GET_ORDERS } from '@/graphql/operations/orders';
+import { useQuery } from '@apollo/client/react';
 import { ProfileRow } from '@/components/ProfileRow';
 import { useAuthStore } from '@/store/authStore';
 
 export default function Profile() {
     const theme = useTheme();
+    const router = useRouter();
     const { logout } = useAuth();
     const user = useAuthStore((state) => state.user);
+    // Read from Apollo cache only — the root subscription already keeps it fresh
+    const { data: ordersData } = useQuery(GET_ORDERS, { fetchPolicy: 'cache-only' });
+    const orders: any[] = (ordersData as any)?.orders ?? [];
 
     // Get user initials
     const getInitials = () => {
@@ -29,6 +36,15 @@ export default function Profile() {
         logout();
     };
 
+    const handleOrderHistoryPress = () => {
+        router.push('/orders/history');
+    };
+
+    const ordersSubtitle =
+        orders.length > 0
+            ? `${orders.length} order${orders.length !== 1 ? 's' : ''}`
+            : 'No orders';
+
     return (
         <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }} edges={['top']}>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -43,12 +59,12 @@ export default function Profile() {
                                 width: 48,
                                 height: 48,
                                 borderRadius: 24,
-                                backgroundColor: '#E8DCC4',
+                                backgroundColor: theme.colors.primary + '30',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                             }}
                         >
-                            <Text className="text-lg font-bold text-black">{getInitials()}</Text>
+                            <Text className="text-lg font-bold" style={{ color: theme.colors.primary }}>{getInitials()}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity>
                             <Ionicons name="chevron-down" size={24} color={theme.colors.subtext} />
@@ -63,11 +79,11 @@ export default function Profile() {
                         style={{
                             backgroundColor: theme.colors.card,
                             borderWidth: 1,
-                            borderColor: 'rgba(255,255,255,0.1)',
+                            borderColor: theme.colors.border,
                         }}
                     >
                         <View className="px-4">
-                            <ProfileRow title="Order history" subtitle="No orders" onPress={() => {}} />
+                            <ProfileRow title="Order history" subtitle={ordersSubtitle} onPress={handleOrderHistoryPress} />
                             <ProfileRow title="Credits" onPress={() => {}} />
                             <ProfileRow title="Buy gift card" onPress={() => {}} showDivider={false} />
                         </View>
@@ -89,7 +105,7 @@ export default function Profile() {
                                 style={{
                                     width: 120,
                                     height: 120,
-                                    backgroundColor: '#2C3E50',
+                                    backgroundColor: theme.colors.card,
                                     borderRadius: 12,
                                     alignItems: 'center',
                                     justifyContent: 'center',
@@ -112,7 +128,7 @@ export default function Profile() {
                                         top: 20,
                                         width: 80,
                                         height: 20,
-                                        backgroundColor: '#00D4FF',
+                                        backgroundColor: theme.colors.primary,
                                         borderTopLeftRadius: 8,
                                         borderTopRightRadius: 8,
                                     }}
@@ -127,7 +143,7 @@ export default function Profile() {
                                     width: 36,
                                     height: 36,
                                     borderRadius: 18,
-                                    backgroundColor: '#EF4444',
+                                    backgroundColor: theme.colors.expense,
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                 }}
@@ -142,9 +158,10 @@ export default function Profile() {
                 <View className="px-4 mb-6">
                     <Text className="text-2xl font-bold text-white mb-4">Quick links</Text>
                     <View>
+                        <ProfileRow title="Invite Friends" icon="gift" onPress={() => router.push('/invite-friends')} />
                         <ProfileRow title="Redeem code" onPress={() => {}} />
                         <ProfileRow title="Contact Support" onPress={() => {}} />
-                        <ProfileRow title="Order history" onPress={() => {}} showDivider={false} />
+                        <ProfileRow title="Order history" onPress={handleOrderHistoryPress} showDivider={false} />
                     </View>
                 </View>
 
@@ -152,6 +169,7 @@ export default function Profile() {
                 <View className="px-4 mb-8">
                     <Text className="text-2xl font-bold text-white mb-4">Settings</Text>
                     <View>
+                        <ProfileRow title="My Addresses" icon="location" onPress={() => router.push('/addresses')} />
                         <ProfileRow title="Account" onPress={() => {}} showDivider={false} />
                     </View>
                 </View>
@@ -161,9 +179,9 @@ export default function Profile() {
                     <TouchableOpacity
                         onPress={handleLogout}
                         className="py-4 rounded-xl items-center"
-                        style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)' }}
+                        style={{ backgroundColor: theme.colors.expense + '1A' }}
                     >
-                        <Text className="text-base font-semibold" style={{ color: '#EF4444' }}>
+                        <Text className="text-base font-semibold" style={{ color: theme.colors.expense }}>
                             Logout
                         </Text>
                     </TouchableOpacity>

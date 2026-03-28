@@ -1,0 +1,33 @@
+{
+  "cli": {
+    "version": ">= 18.0.1",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://colloquial-deadra-cursorily.ngrok-free.dev",
+        "EXPO_PUBLIC_WS_URL": "wss://colloquial-deadra-cursorily.ngrok-free.dev"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://colloquial-deadra-cursorily.ngrok-free.dev",
+        "EXPO_PUBLIC_WS_URL": "wss://colloquial-deadra-cursorily.ngrok-free.dev"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

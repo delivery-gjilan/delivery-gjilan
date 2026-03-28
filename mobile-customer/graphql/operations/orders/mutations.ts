@@ -4,6 +4,7 @@ export const CREATE_ORDER = graphql(`
     mutation CreateOrder($input: CreateOrderInput!) {
         createOrder(input: $input) {
             id
+            displayId
             orderPrice
             deliveryPrice
             totalPrice
@@ -27,11 +28,37 @@ export const CREATE_ORDER = graphql(`
                     }
                 }
                 items {
+                    id
                     productId
                     name
                     imageUrl
                     quantity
-                    price
+                    unitPrice
+                    parentOrderItemId
+                    selectedOptions {
+                        id
+                        optionGroupId
+                        optionGroupName
+                        optionId
+                        optionName
+                        priceAtOrder
+                    }
+                    childItems {
+                        id
+                        productId
+                        name
+                        imageUrl
+                        quantity
+                        unitPrice
+                        selectedOptions {
+                            id
+                            optionGroupId
+                            optionGroupName
+                            optionId
+                            optionName
+                            priceAtOrder
+                        }
+                    }
                 }
             }
         }
@@ -42,6 +69,7 @@ export const UPDATE_ORDER_STATUS = graphql(`
     mutation UpdateOrderStatus($id: ID!, $status: OrderStatus!) {
         updateOrderStatus(id: $id, status: $status) {
             id
+            displayId
             orderPrice
             deliveryPrice
             totalPrice
@@ -70,11 +98,37 @@ export const UPDATE_ORDER_STATUS = graphql(`
                     }
                 }
                 items {
+                    id
                     productId
                     name
                     imageUrl
                     quantity
-                    price
+                    unitPrice
+                    parentOrderItemId
+                    selectedOptions {
+                        id
+                        optionGroupId
+                        optionGroupName
+                        optionId
+                        optionName
+                        priceAtOrder
+                    }
+                    childItems {
+                        id
+                        productId
+                        name
+                        imageUrl
+                        quantity
+                        unitPrice
+                        selectedOptions {
+                            id
+                            optionGroupId
+                            optionGroupName
+                            optionId
+                            optionName
+                            priceAtOrder
+                        }
+                    }
                 }
             }
         }
@@ -85,6 +139,7 @@ export const CANCEL_ORDER = graphql(`
     mutation CancelOrder($id: ID!) {
         cancelOrder(id: $id) {
             id
+            displayId
             orderPrice
             deliveryPrice
             totalPrice
@@ -113,11 +168,37 @@ export const CANCEL_ORDER = graphql(`
                     }
                 }
                 items {
+                    id
                     productId
                     name
                     imageUrl
                     quantity
-                    price
+                    unitPrice
+                    parentOrderItemId
+                    selectedOptions {
+                        id
+                        optionGroupId
+                        optionGroupName
+                        optionId
+                        optionName
+                        priceAtOrder
+                    }
+                    childItems {
+                        id
+                        productId
+                        name
+                        imageUrl
+                        quantity
+                        unitPrice
+                        selectedOptions {
+                            id
+                            optionGroupId
+                            optionGroupName
+                            optionId
+                            optionName
+                            priceAtOrder
+                        }
+                    }
                 }
             }
         }

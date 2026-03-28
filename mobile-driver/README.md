@@ -1,6 +1,6 @@
-# Finance Tracker Mobile App
+# Mobile Driver - Delivery Gjilan
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Driver app with heartbeat, navigation, and delivery execution flows, built with Expo and React Native.
 
 ## Get started
 

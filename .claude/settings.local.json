@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep:*)",
+      "Bash(grep -n \"case ''CUSTOM''\" /c/projects/delivery-gjilan/api/src/services/SettlementCalculationEngine.ts)",
+      "Bash(grep -n \"case ''DRIVER_VEHICLE_BONUS''\" /c/projects/delivery-gjilan/api/src/services/SettlementCalculationEngine.ts -A 10)",
+      "Bash(grep -r \"driverProfileId\\\\|driver.*settlement\" /c/projects/delivery-gjilan/api/src/models --include=*.graphql)",
+      "Bash(npm run:*)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}

@@ -5,6 +5,7 @@ export const CREATE_CATEGORY = graphql(`
         createProductCategory(input: $input) {
             id
             name
+            sortOrder
             isActive
         }
     }
@@ -18,8 +19,18 @@ export const UPDATE_CATEGORY = graphql(`
         updateProductCategory(id: $id, input: $input) {
             id
             name
+            sortOrder
             isActive
         }
+    }
+`);
+
+export const UPDATE_CATEGORIES_ORDER = graphql(`
+    mutation UpdateProductCategoriesOrder(
+        $businessId: ID!
+        $categories: [ProductCategoryOrderInput!]!
+    ) {
+        updateProductCategoriesOrder(businessId: $businessId, categories: $categories)
     }
 `);
 

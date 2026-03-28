@@ -1,6 +1,24 @@
-"use client";
+﻿"use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useMutation, useQuery } from "@apollo/client/react";
+import {
+    DndContext,
+    closestCenter,
+    type DragEndEvent,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+} from "@dnd-kit/core";
+import {
+    SortableContext,
+    useSortable,
+    verticalListSortingStrategy,
+    arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical } from "lucide-react";
 
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -12,8 +30,23 @@ import {
     useCreateProduct,
     useUpdateProduct,
     useDeleteProduct,
+    useUpdateProductsOrder,
+    useCreateProductVariantGroup,
+    useDeleteProductVariantGroup,
 } from "@/lib/hooks/useProducts";
+import { useProductSubcategories } from "@/lib/hooks/useProductSubcategories";
 import type { CreateProductInput, UpdateProductInput } from "@/gql/graphql";
+import { toast } from 'sonner';
+import {
+    CREATE_OPTION,
+    CREATE_OPTION_GROUP,
+    DELETE_OPTION,
+    DELETE_OPTION_GROUP,
+    GET_PRODUCT_WITH_OPTIONS,
+    UPDATE_OPTION_GROUP,
+    UPDATE_OPTION,
+} from "@/graphql/operations/products";
+import { useAuth } from "@/lib/auth-context";
 
 /* ===============================================
    TYPES
@@ -27,13 +60,18 @@ interface Category {
 interface Product {
     id: string;
     categoryId: string;
+    subcategoryId?: string | null;
+    variantGroupId?: string | null;
+    variantGroupName?: string | null;
     name: string;
     description?: string | null;
     price: number;
     imageUrl?: string | null;
+    isOffer?: boolean;
     isOnSale: boolean;
     salePrice?: number | null;
     isAvailable: boolean;
+    sortOrder: number;
 }
 
 /* ===============================================
@@ -41,10 +79,22 @@ interface Product {
 =============================================== */
 
 export default function ProductsBlock({ businessId }: { businessId: string }) {
+    const { admin } = useAuth();
+    const isPlatformAdminRole = admin?.role === "SUPER_ADMIN" || admin?.role === "ADMIN";
     const { products, categories, loading, error, refetch } = useProducts(businessId);
+    const { subcategories } = useProductSubcategories(businessId);
     const { create: createProduct, loading: createLoading, error: createError } = useCreateProduct();
     const { update: updateProduct, loading: updateLoading, error: updateError } = useUpdateProduct();
     const { delete: deleteProduct, loading: deleteLoading, error: deleteError } = useDeleteProduct();
+    const { updateOrder: updateProductsOrder, loading: updateOrderLoading } = useUpdateProductsOrder();
+    const { createVariantGroup, loading: createVariantGroupLoading } = useCreateProductVariantGroup();
+    const { deleteVariantGroup } = useDeleteProductVariantGroup();
+    const [createOptionGroup] = useMutation(CREATE_OPTION_GROUP);
+    const [deleteOptionGroup] = useMutation(DELETE_OPTION_GROUP);
+    const [updateOptionGroup] = useMutation(UPDATE_OPTION_GROUP);
+    const [createOption] = useMutation(CREATE_OPTION);
+    const [updateOption] = useMutation(UPDATE_OPTION);
+    const [deleteOption] = useMutation(DELETE_OPTION);
 
     /* ===============================================
      UI STATE
@@ -52,8 +102,45 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
 
     const [createOpen, setCreateOpen] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
-    const [deleteId, setDeleteId] = useState<string | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<{
+        id: string;
+        name: string;
+        isOffer?: boolean;
+        variantGroupId?: string;
+        variantGroupName?: string;
+        variantGroupCount?: number;
+        deleteWholeVariantGroup?: boolean;
+    } | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
+    const [sortMode, setSortMode] = useState(false);
+    const [orderByCategory, setOrderByCategory] = useState<Record<string, string[]>>({});
+    const [variantModalOpen, setVariantModalOpen] = useState(false);
+    const [newVariantGroupName, setNewVariantGroupName] = useState("");
+    const [variantGroupError, setVariantGroupError] = useState("");
+    const [editVariantModalOpen, setEditVariantModalOpen] = useState(false);
+    const [newEditVariantGroupName, setNewEditVariantGroupName] = useState("");
+    const [editVariantGroupError, setEditVariantGroupError] = useState("");
+    const [optionsModal, setOptionsModal] = useState<{ open: boolean; productId: string; productName: string }>({
+        open: false,
+        productId: "",
+        productName: "",
+    });
+    const [newOptionGroupName, setNewOptionGroupName] = useState("");
+    const [newOptionGroupMin, setNewOptionGroupMin] = useState(0);
+    const [newOptionGroupMax, setNewOptionGroupMax] = useState(1);
+    const [newOptionItems, setNewOptionItems] = useState<Array<{ name: string; extraPrice: number }>>([
+        { name: "", extraPrice: 0 },
+    ]);
+    const [optionsError, setOptionsError] = useState("");
+    const [optionsLoading, setOptionsLoading] = useState(false);
+    const [newOptionByGroup, setNewOptionByGroup] = useState<Record<string, { name: string; extraPrice: number }>>({});
+    const [optionGroupDrafts, setOptionGroupDrafts] = useState<Record<string, { name: string; min: number; max: number }>>({});
+    const [optionDrafts, setOptionDrafts] = useState<Record<string, { name: string; extraPrice: number }>>({});
+    const [optionsDeleteTarget, setOptionsDeleteTarget] = useState<
+        | { kind: "group"; id: string; name: string }
+        | { kind: "option"; id: string; name: string }
+        | null
+    >(null);
 
     /* ===============================================
      UPLOAD STATE
@@ -72,6 +159,9 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
     const [createForm, setCreateForm] = useState<CreateProductInput & { id?: string }>({
         businessId,
         categoryId: "",
+        subcategoryId: undefined,
+        variantGroupId: undefined,
+        isOffer: false,
         name: "",
         description: "",
         imageUrl: "",
@@ -83,6 +173,9 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
     const [editForm, setEditForm] = useState<UpdateProductInput & { id: string }>({
         id: "",
         categoryId: "",
+        subcategoryId: undefined,
+        variantGroupId: undefined,
+        isOffer: false,
         name: "",
         description: "",
         imageUrl: "",
@@ -90,6 +183,12 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         isOnSale: false,
         salePrice: undefined,
         isAvailable: true,
+    });
+
+    const { data: productOptionsData, refetch: refetchProductOptions } = useQuery(GET_PRODUCT_WITH_OPTIONS, {
+        variables: { id: optionsModal.productId },
+        skip: !optionsModal.open || !optionsModal.productId,
+        fetchPolicy: "network-only",
     });
 
     /* ===============================================
@@ -109,7 +208,8 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             return (
                 p.name.toLowerCase().includes(query) ||
                 p.description?.toLowerCase().includes(query) ||
-                categories.find(c => c.id === p.categoryId)?.name.toLowerCase().includes(query)
+                categories.find(c => c.id === p.categoryId)?.name.toLowerCase().includes(query) ||
+                subcategories.find((s: any) => s.id === p.subcategoryId)?.name.toLowerCase().includes(query)
             );
         });
 
@@ -119,11 +219,46 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         });
 
         return groups;
-    }, [products, categories, searchQuery]);
+    }, [products, categories, searchQuery, subcategories]);
+
+    const variantGroups = useMemo(() => {
+        const deduped = new Map<string, { id: string; name: string }>();
+        products.forEach((p) => {
+            if (!p.variantGroupId) return;
+            if (deduped.has(p.variantGroupId)) return;
+            deduped.set(p.variantGroupId, {
+                id: p.variantGroupId,
+                name: p.variantGroupName || `Variant Group ${p.variantGroupId.slice(0, 6)}`,
+            });
+        });
+        return Array.from(deduped.values()).sort((a, b) => a.name.localeCompare(b.name));
+    }, [products]);
+
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor)
+    );
+
+    useEffect(() => {
+        if (!sortMode) return;
+
+        const nextOrders: Record<string, string[]> = {};
+        categories.forEach((category) => {
+            const items = (grouped[category.id] || [])
+                .slice()
+                .sort((a, b) => a.sortOrder - b.sortOrder)
+                .map((item) => item.id);
+            nextOrders[category.id] = items;
+        });
+
+        setOrderByCategory(nextOrders);
+    }, [categories, grouped, sortMode]);
 
     /* ===============================================
      HANDLERS
     =============================================== */
+
+    const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/graphql').replace(/\/graphql$/, '');
 
     // Image upload handler
     async function uploadImage(file: File, folder: string): Promise<string | null> {
@@ -131,9 +266,11 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         formData.append('image', file);
         formData.append('folder', folder);
 
+        const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
         try {
-            const response = await fetch('http://localhost:4000/api/upload/image', {
+            const response = await fetch(`${apiBase}/api/upload/image`, {
                 method: 'POST',
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
                 body: formData,
             });
 
@@ -144,8 +281,24 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             throw new Error(data.error || 'Upload failed');
         } catch (error) {
             console.error('Image upload error:', error);
-            alert('Failed to upload image');
+            toast.error('Failed to upload image');
             return null;
+        }
+    }
+
+    async function deleteImage(imageUrl: string): Promise<void> {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+        try {
+            await fetch(`${apiBase}/api/upload/image`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify({ imageUrl }),
+            });
+        } catch {
+            console.warn('Failed to delete old image from S3:', imageUrl);
         }
     }
 
@@ -175,7 +328,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
 
     const handleCreate = async () => {
         if (!createForm.categoryId || !createForm.name || !createForm.price) {
-            alert("Please fill in all required fields");
+            toast.warning("Please fill in all required fields");
             return;
         }
 
@@ -195,6 +348,9 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         const input: CreateProductInput = {
             businessId,
             categoryId: createForm.categoryId,
+            subcategoryId: createForm.subcategoryId || undefined,
+            variantGroupId: createForm.variantGroupId || undefined,
+            isOffer: isPlatformAdminRole ? createForm.isOffer : false,
             name: createForm.name,
             description: createForm.description || undefined,
             imageUrl: imageUrl || undefined,
@@ -203,7 +359,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             salePrice: createForm.isOnSale ? Number(createForm.salePrice) : undefined,
         };
 
-        const { success, error } = await createProduct(input);
+        const { success, error, data } = await createProduct(input);
 
         if (success) {
             await refetch();
@@ -211,6 +367,9 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             setCreateForm({
                 businessId,
                 categoryId: "",
+                subcategoryId: undefined,
+                variantGroupId: undefined,
+                isOffer: false,
                 name: "",
                 description: "",
                 imageUrl: "",
@@ -220,15 +379,315 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             });
             setCreateImageFile(null);
             setCreateImagePreview(null);
+            setVariantModalOpen(false);
+            setNewVariantGroupName("");
+            setVariantGroupError("");
+
+            const createdId = data?.createProduct?.id;
+            if (createForm.isOffer && createdId) {
+                setOptionsModal({
+                    open: true,
+                    productId: createdId,
+                    productName: createForm.name,
+                });
+            }
         } else {
-            alert(`Error creating product: ${error}`);
+            toast.error(`Error creating product: ${error}`);
         }
+    };
+
+    const openOptionsModal = (product: Product) => {
+        if (!product.isOffer) {
+            toast.warning("Questions / options are available only for deals/offers.");
+            return;
+        }
+
+        setOptionsError("");
+        setNewOptionGroupName("");
+        setNewOptionGroupMin(0);
+        setNewOptionGroupMax(1);
+        setNewOptionItems([{ name: "", extraPrice: 0 }]);
+        setNewOptionByGroup({});
+        setOptionGroupDrafts({});
+        setOptionDrafts({});
+        setOptionsModal({
+            open: true,
+            productId: product.id,
+            productName: product.name,
+        });
+    };
+
+    const handleCreateOptionGroup = async () => {
+        if (!optionsModal.productId) return;
+        if (!newOptionGroupName.trim()) {
+            setOptionsError("Option group name is required");
+            return;
+        }
+
+        const cleanedOptions = newOptionItems
+            .map((item, index) => ({
+                name: item.name.trim(),
+                extraPrice: Number(item.extraPrice) || 0,
+                displayOrder: index,
+            }))
+            .filter((item) => item.name.length > 0);
+
+        if (cleanedOptions.length === 0) {
+            setOptionsError("Add at least one option");
+            return;
+        }
+
+        if (newOptionGroupMax < newOptionGroupMin) {
+            setOptionsError("Max selections must be greater than or equal to min selections");
+            return;
+        }
+
+        setOptionsLoading(true);
+        setOptionsError("");
+
+        try {
+            await createOptionGroup({
+                variables: {
+                    input: {
+                        productId: optionsModal.productId,
+                        name: newOptionGroupName.trim(),
+                        minSelections: newOptionGroupMin,
+                        maxSelections: newOptionGroupMax,
+                        displayOrder: (productOptionsData?.product?.optionGroups?.length || 0) + 1,
+                        options: cleanedOptions,
+                    },
+                },
+            });
+
+            setNewOptionGroupName("");
+            setNewOptionGroupMin(0);
+            setNewOptionGroupMax(1);
+            setNewOptionItems([{ name: "", extraPrice: 0 }]);
+            await refetchProductOptions();
+        } catch (error) {
+            setOptionsError((error as Error).message || "Failed to create option group");
+        } finally {
+            setOptionsLoading(false);
+        }
+    };
+
+    const handleDeleteOptionGroup = async (id: string) => {
+        setOptionsLoading(true);
+        setOptionsError("");
+        try {
+            await deleteOptionGroup({ variables: { id } });
+            await refetchProductOptions();
+        } catch (error) {
+            setOptionsError((error as Error).message || "Failed to delete option group");
+        } finally {
+            setOptionsLoading(false);
+        }
+    };
+
+    const handleSaveOptionGroup = async (
+        groupId: string,
+        fallbackName: string,
+        fallbackMin: number,
+        fallbackMax: number
+    ) => {
+        const draft = optionGroupDrafts[groupId] || {
+            name: fallbackName,
+            min: fallbackMin,
+            max: fallbackMax,
+        };
+
+        const name = draft.name.trim();
+        if (!name) {
+            setOptionsError("Question title is required");
+            return;
+        }
+        if (draft.max < draft.min) {
+            setOptionsError("Question max selections must be greater than or equal to min selections");
+            return;
+        }
+
+        setOptionsLoading(true);
+        setOptionsError("");
+        try {
+            await updateOptionGroup({
+                variables: {
+                    id: groupId,
+                    input: {
+                        name,
+                        minSelections: Number(draft.min) || 0,
+                        maxSelections: Number(draft.max) || 0,
+                    },
+                },
+            });
+            await refetchProductOptions();
+        } catch (error) {
+            setOptionsError((error as Error).message || "Failed to update question");
+        } finally {
+            setOptionsLoading(false);
+        }
+    };
+
+    const handleCreateOption = async (optionGroupId: string) => {
+        const draft = newOptionByGroup[optionGroupId] || { name: "", extraPrice: 0 };
+        const name = draft.name.trim();
+
+        if (!name) {
+            setOptionsError("Answer text is required");
+            return;
+        }
+
+        const group = productOptionsData?.product?.optionGroups?.find((g) => g.id === optionGroupId);
+        const displayOrder = group?.options?.length || 0;
+
+        setOptionsLoading(true);
+        setOptionsError("");
+        try {
+            await createOption({
+                variables: {
+                    optionGroupId,
+                    input: {
+                        name,
+                        extraPrice: Number(draft.extraPrice) || 0,
+                        displayOrder,
+                    },
+                },
+            });
+
+            setNewOptionByGroup((prev) => ({
+                ...prev,
+                [optionGroupId]: { name: "", extraPrice: 0 },
+            }));
+            await refetchProductOptions();
+        } catch (error) {
+            setOptionsError((error as Error).message || "Failed to add answer");
+        } finally {
+            setOptionsLoading(false);
+        }
+    };
+
+    const handleSaveOption = async (optionId: string, fallbackName: string, fallbackExtraPrice: number) => {
+        const draft = optionDrafts[optionId] || { name: fallbackName, extraPrice: fallbackExtraPrice };
+        const name = draft.name.trim();
+
+        if (!name) {
+            setOptionsError("Answer text is required");
+            return;
+        }
+
+        setOptionsLoading(true);
+        setOptionsError("");
+        try {
+            await updateOption({
+                variables: {
+                    id: optionId,
+                    input: {
+                        name,
+                        extraPrice: Number(draft.extraPrice) || 0,
+                    },
+                },
+            });
+            await refetchProductOptions();
+        } catch (error) {
+            setOptionsError((error as Error).message || "Failed to update answer");
+        } finally {
+            setOptionsLoading(false);
+        }
+    };
+
+    const handleDeleteOption = async (optionId: string) => {
+        setOptionsLoading(true);
+        setOptionsError("");
+        try {
+            await deleteOption({ variables: { id: optionId } });
+            await refetchProductOptions();
+        } catch (error) {
+            setOptionsError((error as Error).message || "Failed to delete answer");
+        } finally {
+            setOptionsLoading(false);
+        }
+    };
+
+    const requestDeleteOptionGroup = (id: string, name: string) => {
+        setOptionsDeleteTarget({ kind: "group", id, name });
+    };
+
+    const requestDeleteOption = (id: string, name: string) => {
+        setOptionsDeleteTarget({ kind: "option", id, name });
+    };
+
+    const confirmDeleteOptionEntity = async () => {
+        if (!optionsDeleteTarget) return;
+
+        if (optionsDeleteTarget.kind === "group") {
+            await handleDeleteOptionGroup(optionsDeleteTarget.id);
+        } else {
+            await handleDeleteOption(optionsDeleteTarget.id);
+        }
+
+        setOptionsDeleteTarget(null);
+    };
+
+    const handleCreateVariantGroup = async () => {
+        if (!newVariantGroupName.trim()) {
+            setVariantGroupError("Variant group name is required");
+            return;
+        }
+
+        setVariantGroupError("");
+        const result = await createVariantGroup({
+            businessId,
+            name: newVariantGroupName.trim(),
+        });
+
+        if (!result.success || !result.data?.id) {
+            setVariantGroupError(result.error || "Failed to create variant group");
+            return;
+        }
+
+        await refetch();
+        setCreateForm((prev) => ({
+            ...prev,
+            variantGroupId: result.data.id,
+            isOffer: false,
+        }));
+        setNewVariantGroupName("");
+        setVariantModalOpen(false);
+    };
+
+    const handleCreateEditVariantGroup = async () => {
+        if (!newEditVariantGroupName.trim()) {
+            setEditVariantGroupError("Variant group name is required");
+            return;
+        }
+
+        setEditVariantGroupError("");
+        const result = await createVariantGroup({
+            businessId,
+            name: newEditVariantGroupName.trim(),
+        });
+
+        if (!result.success || !result.data?.id) {
+            setEditVariantGroupError(result.error || "Failed to create variant group");
+            return;
+        }
+
+        await refetch();
+        setEditForm((prev) => ({
+            ...prev,
+            variantGroupId: result.data.id,
+            isOffer: false,
+        }));
+        setNewEditVariantGroupName("");
+        setEditVariantModalOpen(false);
     };
 
     const openEditModal = (p: Product) => {
         setEditForm({
             id: p.id,
             categoryId: p.categoryId,
+            subcategoryId: p.subcategoryId ?? undefined,
+            variantGroupId: p.variantGroupId ?? undefined,
+            isOffer: p.isOffer ?? false,
             name: p.name,
             description: p.description || "",
             imageUrl: p.imageUrl || "",
@@ -244,15 +703,18 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
 
     const handleEdit = async () => {
         if (!editForm.categoryId || !editForm.name || !editForm.price) {
-            alert("Please fill in all required fields");
+            toast.warning("Please fill in all required fields");
             return;
         }
 
         setUploadingImage(true);
         let imageUrl = editForm.imageUrl;
 
-        // Upload new image if file is selected
+        // Upload new image if file is selected; delete old S3 image first
         if (editImageFile) {
+            if (editForm.imageUrl) {
+                await deleteImage(editForm.imageUrl);
+            }
             const uploadedUrl = await uploadImage(editImageFile, 'products');
             if (uploadedUrl) {
                 imageUrl = uploadedUrl;
@@ -264,6 +726,9 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         const { id, ...input } = editForm;
         const updateInput: UpdateProductInput = {
             categoryId: input.categoryId,
+            subcategoryId: input.subcategoryId || undefined,
+            variantGroupId: input.variantGroupId || undefined,
+            isOffer: isPlatformAdminRole ? input.isOffer : undefined,
             name: input.name,
             description: input.description || undefined,
             imageUrl: imageUrl || undefined,
@@ -279,21 +744,66 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             await refetch();
             setEditOpen(false);
         } else {
-            alert(`Error updating product: ${error}`);
+            toast.error(`Error updating product: ${error}`);
         }
     };
 
-    const handleDelete = async () => {
-        if (!deleteId) return;
+    const handleDelete = async (options?: { deleteWholeVariantGroup?: boolean }) => {
+        if (!deleteTarget) return;
 
-        const { success, error } = await deleteProduct(deleteId);
+        const deleteWholeVariantGroup = Boolean(options?.deleteWholeVariantGroup);
+        const result = deleteWholeVariantGroup && deleteTarget.variantGroupId
+            ? await deleteVariantGroup(deleteTarget.variantGroupId)
+            : await deleteProduct(deleteTarget.id);
 
-        if (success) {
+        if (result.success) {
             await refetch();
-            setDeleteId(null);
+            setDeleteTarget(null);
         } else {
-            alert(`Error deleting product: ${error}`);
+            toast.error(`Error deleting product: ${result.error}`);
         }
+    };
+
+    const toggleSortMode = () => {
+        if (!sortMode) {
+            const initialOrders: Record<string, string[]> = {};
+            categories.forEach((category) => {
+                const items = (grouped[category.id] || [])
+                    .slice()
+                    .sort((a, b) => a.sortOrder - b.sortOrder)
+                    .map((item) => item.id);
+                initialOrders[category.id] = items;
+            });
+            setOrderByCategory(initialOrders);
+        }
+
+        setSortMode((prev) => !prev);
+    };
+
+    const handleDragEnd = async (categoryId: string, event: DragEndEvent) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+
+        const currentOrder = orderByCategory[categoryId] || [];
+        const oldIndex = currentOrder.indexOf(String(active.id));
+        const newIndex = currentOrder.indexOf(String(over.id));
+        if (oldIndex < 0 || newIndex < 0) return;
+
+        const nextOrder = arrayMove(currentOrder, oldIndex, newIndex);
+        setOrderByCategory((prev) => ({
+            ...prev,
+            [categoryId]: nextOrder,
+        }));
+
+        const payload = nextOrder.map((id, index) => ({ id, sortOrder: index }));
+        const result = await updateProductsOrder(businessId, payload);
+        if (!result.success) {
+            toast.error(result.error || "Failed to update product order.");
+            await refetch();
+            return;
+        }
+
+        await refetch();
     };
 
     /* ===============================================
@@ -312,15 +822,29 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-semibold">Products</h2>
-
-                <Button 
-                    variant="primary" 
-                    onClick={() => setCreateOpen(true)}
-                    disabled={createLoading}
-                >
-                    {createLoading ? "Adding..." : "+ Add Product"}
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant={sortMode ? "primary" : "outline"}
+                        onClick={toggleSortMode}
+                        disabled={updateOrderLoading}
+                    >
+                        {sortMode ? "Done Sorting" : "Sort Items"}
+                    </Button>
+                    <Button
+                        variant="primary"
+                        onClick={() => setCreateOpen(true)}
+                        disabled={createLoading}
+                    >
+                        {createLoading ? "Adding..." : "+ Add Product"}
+                    </Button>
+                </div>
             </div>
+
+            {sortMode && (
+                <p className="text-xs text-gray-400 mb-4">
+                    Sorting is applied inside each category. Use arrow controls to move items up or down.
+                </p>
+            )}
 
             {/* SEARCH BAR */}
             <div className="mb-6">
@@ -337,6 +861,17 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
 
             {categories.map((cat) => {
                 const items = grouped[cat.id] || [];
+                const sortedItems = (() => {
+                    if (!sortMode) return items;
+                    const order = orderByCategory[cat.id] || [];
+                    if (order.length === 0) return items;
+                    const orderMap = new Map(order.map((id, index) => [id, index]));
+                    return [...items].sort((a, b) => {
+                        const aOrder = orderMap.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+                        const bOrder = orderMap.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+                        return aOrder - bOrder;
+                    });
+                })();
 
                 return (
                     <div key={cat.id} className="mb-10">
@@ -344,26 +879,38 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                             {cat.name}
                         </h3>
 
-                        {items.length === 0 ? (
+                        {sortedItems.length === 0 ? (
                             <p className="text-gray-500 text-sm">
                                 No products here.
                             </p>
                         ) : (
-                            <Table>
-                                <thead>
-                                    <tr>
-                                        <Th>Image</Th>
-                                        <Th>Name</Th>
-                                        <Th>Price</Th>
-                                        <Th>Sale</Th>
-                                        <Th>Status</Th>
-                                        <Th>Actions</Th>
-                                    </tr>
-                                </thead>
+                            <DndContext
+                                sensors={sensors}
+                                collisionDetection={closestCenter}
+                                onDragEnd={(event) => handleDragEnd(cat.id, event)}
+                            >
+                                <Table>
+                                    <thead>
+                                        <tr>
+                                            {sortMode && <Th></Th>}
+                                            <Th>Image</Th>
+                                            <Th>Name</Th>
+                                            <Th>Subcategory</Th>
+                                            <Th>Price</Th>
+                                            <Th>Sale</Th>
+                                            <Th>Status</Th>
+                                            <Th>Actions</Th>
+                                        </tr>
+                                    </thead>
 
-                                <tbody>
-                                    {items.map((p) => (
-                                        <tr key={p.id}>
+                                    <SortableContext
+                                        items={sortedItems.map((p) => p.id)}
+                                        strategy={verticalListSortingStrategy}
+                                        disabled={!sortMode}
+                                    >
+                                        <tbody>
+                                    {sortedItems.map((p) => (
+                                        <SortableProductRow key={p.id} id={p.id} sortMode={sortMode}>
                                             <Td>
                                                 {p.imageUrl ? (
                                                     <img
@@ -379,6 +926,10 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                             </Td>
 
                                             <Td>{p.name}</Td>
+
+                                            <Td>
+                                                {subcategories.find((s: any) => s.id === p.subcategoryId)?.name || "-"}
+                                            </Td>
 
                                             <Td>${p.price.toFixed(2)}</Td>
 
@@ -401,7 +952,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                     </span>
                                                 ) : (
                                                     <span className="text-red-400">
-                                                        $
+                                                        Unavailable
                                                     </span>
                                                 )}
                                             </Td>
@@ -419,22 +970,45 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                         Edit
                                                     </Button>
 
+                                                    {p.isOffer && (
+                                                        <Button
+                                                            variant="outline"
+                                                            className="text-xs px-3"
+                                                            onClick={() => openOptionsModal(p)}
+                                                        >
+                                                            Questions / Options
+                                                        </Button>
+                                                    )}
+
                                                     <Button
                                                         variant="danger"
                                                         className="text-xs px-3"
-                                                        onClick={() =>
-                                                            setDeleteId(p.id)
-                                                        }
+                                                        onClick={() => {
+                                                            const variantGroupCount = p.variantGroupId
+                                                                ? items.filter((item) => item.variantGroupId === p.variantGroupId).length
+                                                                : 0;
+
+                                                            setDeleteTarget({
+                                                                id: p.id,
+                                                                name: p.name,
+                                                                isOffer: p.isOffer,
+                                                                variantGroupId: p.variantGroupId || undefined,
+                                                                variantGroupName: p.variantGroupName || undefined,
+                                                                variantGroupCount,
+                                                            });
+                                                        }}
                                                         disabled={deleteLoading}
                                                     >
                                                         Delete
                                                     </Button>
                                                 </div>
                                             </Td>
-                                        </tr>
+                                        </SortableProductRow>
                                     ))}
                                 </tbody>
-                            </Table>
+                                    </SortableContext>
+                                </Table>
+                            </DndContext>
                         )}
                     </div>
                 );
@@ -445,7 +1019,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             =============================================== */}
 
             <Modal
-                open={createOpen}
+                isOpen={createOpen}
                 onClose={() => setCreateOpen(false)}
                 title="Create Product"
             >
@@ -460,6 +1034,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                 setCreateForm({
                                     ...createForm,
                                     categoryId: e.target.value,
+                                    subcategoryId: undefined,
                                 })
                             }
                         >
@@ -469,6 +1044,31 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                     {c.name}
                                 </option>
                             ))}
+                        </Select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                            Subcategory
+                        </label>
+                        <Select
+                            value={createForm.subcategoryId ?? ""}
+                            onChange={(e) =>
+                                setCreateForm({
+                                    ...createForm,
+                                    subcategoryId: e.target.value || undefined,
+                                })
+                            }
+                            disabled={!createForm.categoryId}
+                        >
+                            <option value="">No subcategory</option>
+                            {subcategories
+                                .filter((s: any) => s.categoryId === createForm.categoryId)
+                                .map((s: any) => (
+                                    <option key={s.id} value={s.id}>
+                                        {s.name}
+                                    </option>
+                                ))}
                         </Select>
                     </div>
 
@@ -543,6 +1143,65 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                         />
                     </div>
 
+                    {isPlatformAdminRole && (
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id="createIsOffer"
+                                checked={createForm.isOffer ?? false}
+                                onChange={(e) =>
+                                    setCreateForm({
+                                        ...createForm,
+                                        isOffer: e.target.checked,
+                                        variantGroupId: e.target.checked ? undefined : createForm.variantGroupId,
+                                    })
+                                }
+                            />
+                            <label htmlFor="createIsOffer" className="text-gray-300">
+                                Create as Deal / Offer
+                            </label>
+                        </div>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="checkbox"
+                            id="createIsVariant"
+                            checked={Boolean(createForm.variantGroupId)}
+                            onChange={(e) => {
+                                const checked = e.target.checked;
+                                if (checked) {
+                                    setVariantModalOpen(true);
+                                    setCreateForm({
+                                        ...createForm,
+                                        isOffer: false,
+                                    });
+                                } else {
+                                    setCreateForm({
+                                        ...createForm,
+                                        variantGroupId: undefined,
+                                    });
+                                }
+                            }}
+                        />
+                        <label htmlFor="createIsVariant" className="text-gray-300">
+                            Add as Variant
+                        </label>
+                    </div>
+
+                    {Boolean(createForm.variantGroupId) && (
+                        <div className="rounded-lg border border-violet-500/40 bg-violet-500/10 p-3 text-sm text-violet-200 w-full">
+                            Variant group: {variantGroups.find((g) => g.id === createForm.variantGroupId)?.name || createForm.variantGroupId}
+                            <Button
+                                variant="outline"
+                                className="w-full mt-2"
+                                onClick={() => setVariantModalOpen(true)}
+                            >
+                                Change Variant Group
+                            </Button>
+                        </div>
+                    )}
+
                     <div className="flex items-center gap-2">
                         <input
                             type="checkbox"
@@ -585,10 +1244,77 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                         variant="primary"
                         className="w-full"
                         onClick={handleCreate}
-                        disabled={createLoading || uploadingImage}
+                        disabled={createLoading || uploadingImage || (Boolean(createForm.variantGroupId) && !createForm.variantGroupId)}
                     >
                         {uploadingImage ? "Uploading..." : createLoading ? "Saving..." : "Save"}
                     </Button>
+
+                    {isPlatformAdminRole && createForm.isOffer && (
+                        <p className="text-xs text-gray-400">
+                            Tip: after saving this offer, you can configure option groups and choices in the Options modal.
+                        </p>
+                    )}
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={variantModalOpen}
+                onClose={() => {
+                    setVariantModalOpen(false);
+                    setVariantGroupError("");
+                }}
+                title="Select or Create Variant Group"
+            >
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-2">Existing Variant Groups</label>
+                        {variantGroups.length === 0 ? (
+                            <p className="text-sm text-gray-500">No variant groups yet. Create one below.</p>
+                        ) : (
+                            <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                                {variantGroups.map((group) => (
+                                    <button
+                                        key={group.id}
+                                        type="button"
+                                        onClick={() => {
+                                            setCreateForm((prev) => ({
+                                                ...prev,
+                                                variantGroupId: group.id,
+                                                isOffer: false,
+                                            }));
+                                            setVariantModalOpen(false);
+                                        }}
+                                        className={`w-full text-left rounded-lg border px-3 py-2 text-sm transition-colors ${
+                                            createForm.variantGroupId === group.id
+                                                ? 'border-violet-400 bg-violet-500/20 text-violet-100'
+                                                : 'border-gray-700 bg-gray-800 text-gray-200 hover:border-violet-500/50'
+                                        }`}
+                                    >
+                                        {group.name}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="border-t border-gray-700 pt-4 space-y-2">
+                        <label className="block text-sm font-medium text-gray-400">Create New Variant Group</label>
+                        <Input
+                            placeholder="e.g., Burger Sizes"
+                            value={newVariantGroupName}
+                            onChange={(e) => setNewVariantGroupName(e.target.value)}
+                        />
+                        <Button
+                            variant="primary"
+                            className="w-full"
+                            onClick={handleCreateVariantGroup}
+                            disabled={createVariantGroupLoading}
+                        >
+                            {createVariantGroupLoading ? "Creating..." : "Create and Select"}
+                        </Button>
+                    </div>
+
+                    {variantGroupError && <p className="text-red-400 text-sm">{variantGroupError}</p>}
                 </div>
             </Modal>
 
@@ -597,7 +1323,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             =============================================== */}
 
             <Modal
-                open={editOpen}
+                isOpen={editOpen}
                 onClose={() => setEditOpen(false)}
                 title="Edit Product"
             >
@@ -612,6 +1338,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                 setEditForm({
                                     ...editForm,
                                     categoryId: e.target.value,
+                                    subcategoryId: undefined,
                                 })
                             }
                         >
@@ -620,6 +1347,31 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                     {c.name}
                                 </option>
                             ))}
+                        </Select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                            Subcategory
+                        </label>
+                        <Select
+                            value={editForm.subcategoryId ?? ""}
+                            onChange={(e) =>
+                                setEditForm({
+                                    ...editForm,
+                                    subcategoryId: e.target.value || undefined,
+                                })
+                            }
+                            disabled={!editForm.categoryId}
+                        >
+                            <option value="">No subcategory</option>
+                            {subcategories
+                                .filter((s: any) => s.categoryId === editForm.categoryId)
+                                .map((s: any) => (
+                                    <option key={s.id} value={s.id}>
+                                        {s.name}
+                                    </option>
+                                ))}
                         </Select>
                     </div>
 
@@ -694,6 +1446,65 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                         />
                     </div>
 
+                    {isPlatformAdminRole && (
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id="editIsOffer"
+                                checked={editForm.isOffer ?? false}
+                                onChange={(e) =>
+                                    setEditForm({
+                                        ...editForm,
+                                        isOffer: e.target.checked,
+                                        variantGroupId: e.target.checked ? undefined : editForm.variantGroupId,
+                                    })
+                                }
+                            />
+                            <label htmlFor="editIsOffer" className="text-gray-300">
+                                Mark as Deal / Offer
+                            </label>
+                        </div>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="checkbox"
+                            id="editIsVariant"
+                            checked={Boolean(editForm.variantGroupId)}
+                            onChange={(e) => {
+                                const checked = e.target.checked;
+                                if (checked) {
+                                    setEditVariantModalOpen(true);
+                                    setEditForm({
+                                        ...editForm,
+                                        isOffer: false,
+                                    });
+                                } else {
+                                    setEditForm({
+                                        ...editForm,
+                                        variantGroupId: undefined,
+                                    });
+                                }
+                            }}
+                        />
+                        <label htmlFor="editIsVariant" className="text-gray-300">
+                            Part of Variant Group
+                        </label>
+                    </div>
+
+                    {Boolean(editForm.variantGroupId) && (
+                        <div className="rounded-lg border border-violet-500/40 bg-violet-500/10 p-3 text-sm text-violet-200 w-full">
+                            Variant group: {variantGroups.find((g) => g.id === editForm.variantGroupId)?.name || editForm.variantGroupId}
+                            <Button
+                                variant="outline"
+                                className="w-full mt-2"
+                                onClick={() => setEditVariantModalOpen(true)}
+                            >
+                                Change Variant Group
+                            </Button>
+                        </div>
+                    )}
+
                     <div className="flex items-center gap-2">
                         <input
                             type="checkbox"
@@ -757,18 +1568,108 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                 </div>
             </Modal>
 
+            <Modal
+                isOpen={editVariantModalOpen}
+                onClose={() => {
+                    setEditVariantModalOpen(false);
+                    setEditVariantGroupError("");
+                }}
+                title="Select or Create Variant Group"
+            >
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-2">Existing Variant Groups</label>
+                        {variantGroups.length === 0 ? (
+                            <p className="text-sm text-gray-500">No variant groups yet. Create one below.</p>
+                        ) : (
+                            <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                                {variantGroups.map((group) => (
+                                    <button
+                                        key={group.id}
+                                        type="button"
+                                        onClick={() => {
+                                            setEditForm((prev) => ({
+                                                ...prev,
+                                                variantGroupId: group.id,
+                                                isOffer: false,
+                                            }));
+                                            setEditVariantModalOpen(false);
+                                        }}
+                                        className={`w-full text-left rounded-lg border px-3 py-2 text-sm transition-colors ${
+                                            editForm.variantGroupId === group.id
+                                                ? 'border-violet-400 bg-violet-500/20 text-violet-100'
+                                                : 'border-gray-700 bg-gray-800 text-gray-200 hover:border-violet-500/50'
+                                        }`}
+                                    >
+                                        {group.name}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="border-t border-gray-700 pt-4 space-y-2">
+                        <label className="block text-sm font-medium text-gray-400">Create New Variant Group</label>
+                        <Input
+                            placeholder="e.g., Pizza Sizes"
+                            value={newEditVariantGroupName}
+                            onChange={(e) => setNewEditVariantGroupName(e.target.value)}
+                        />
+                        <Button
+                            variant="primary"
+                            className="w-full"
+                            onClick={handleCreateEditVariantGroup}
+                            disabled={createVariantGroupLoading}
+                        >
+                            {createVariantGroupLoading ? "Creating..." : "Create and Select"}
+                        </Button>
+                    </div>
+
+                    {editVariantGroupError && <p className="text-red-400 text-sm">{editVariantGroupError}</p>}
+                </div>
+            </Modal>
+
             {/* ===============================================
              DELETE MODAL
             =============================================== */}
 
             <Modal
-                open={deleteId !== null}
-                onClose={() => setDeleteId(null)}
+                isOpen={deleteTarget !== null}
+                onClose={() => setDeleteTarget(null)}
                 title="Delete Product"
             >
                 <p className="text-gray-300 mb-4">
-                    Are you sure you want to delete this product?
+                    Are you sure you want to delete <strong>{deleteTarget?.name}</strong>?
                 </p>
+
+                {deleteTarget?.isOffer && (
+                    <p className="text-sm text-amber-300 mb-3">This item is currently marked as an offer/deal.</p>
+                )}
+
+                {deleteTarget?.variantGroupId && (
+                    <div className="mb-4 rounded-lg border border-violet-500/40 bg-violet-500/10 p-3">
+                        <p className="text-sm text-violet-200 mb-2">
+                            This item belongs to variant group <strong>{deleteTarget.variantGroupName || deleteTarget.variantGroupId}</strong>
+                            {deleteTarget.variantGroupCount
+                                ? ` (${deleteTarget.variantGroupCount} variant${deleteTarget.variantGroupCount === 1 ? '' : 's'})`
+                                : ''}.
+                        </p>
+                        <label className="flex items-center gap-2 text-sm text-violet-100">
+                            <input
+                                type="checkbox"
+                                checked={Boolean(deleteTarget?.deleteWholeVariantGroup)}
+                                onChange={(e) =>
+                                    setDeleteTarget((prev) =>
+                                        prev
+                                            ? { ...prev, deleteWholeVariantGroup: e.target.checked }
+                                            : prev
+                                    )
+                                }
+                            />
+                            Delete entire variant group instead of only this variant
+                        </label>
+                    </div>
+                )}
 
                 {deleteError && (
                     <p className="text-red-400 text-sm mb-4">{deleteError}</p>
@@ -777,20 +1678,419 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                 <div className="flex justify-end gap-3">
                     <Button 
                         variant="outline" 
-                        onClick={() => setDeleteId(null)}
+                        onClick={() => setDeleteTarget(null)}
                         disabled={deleteLoading}
                     >
                         Cancel
                     </Button>
                     <Button 
                         variant="danger" 
-                        onClick={handleDelete}
+                        onClick={() =>
+                            handleDelete({
+                                deleteWholeVariantGroup: Boolean(deleteTarget?.deleteWholeVariantGroup),
+                            })
+                        }
                         disabled={deleteLoading}
                     >
                         {deleteLoading ? "Deleting..." : "Delete"}
                     </Button>
                 </div>
             </Modal>
+
+            <Modal
+                isOpen={optionsModal.open}
+                onClose={() => setOptionsModal({ open: false, productId: "", productName: "" })}
+                title={`Manage Questions & Answers - ${optionsModal.productName}`}
+            >
+                <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+                    <p className="text-xs text-gray-400">
+                        Use questions for sections (for example: "Choose Size") and answers for selectable choices (for example: "Large", "+$1.50").
+                    </p>
+
+                    <div className="flex justify-end">
+                        <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => {
+                                const section = document.getElementById("add-new-question-section");
+                                if (section) {
+                                    section.scrollIntoView({ behavior: "smooth", block: "start" });
+                                }
+                            }}
+                        >
+                            Add New Question
+                        </Button>
+                    </div>
+
+                    <div className="rounded-lg border border-gray-700 bg-gray-800/60 p-3">
+                        <p className="text-sm font-medium text-gray-200 mb-2">Current Questions & Answers</p>
+                        {productOptionsData?.product?.optionGroups?.length ? (
+                            <div className="space-y-2">
+                                {productOptionsData.product.optionGroups.map((group) => (
+                                    <div key={group.id} className="rounded border border-gray-700 p-2">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="flex-1 space-y-2">
+                                                <label className="block text-xs text-gray-400">Question title</label>
+                                                <Input
+                                                    value={optionGroupDrafts[group.id]?.name ?? group.name}
+                                                    onChange={(e) =>
+                                                        setOptionGroupDrafts((prev) => ({
+                                                            ...prev,
+                                                            [group.id]: {
+                                                                name: e.target.value,
+                                                                min: prev[group.id]?.min ?? group.minSelections,
+                                                                max: prev[group.id]?.max ?? group.maxSelections,
+                                                            },
+                                                        }))
+                                                    }
+                                                />
+                                                <p className="text-[11px] text-gray-500">Example: Choose Size, Pick a Drink, Select Extra Toppings</p>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <label className="block text-xs text-gray-400 mb-1">Min selections</label>
+                                                    <Input
+                                                        type="number"
+                                                        value={optionGroupDrafts[group.id]?.min ?? group.minSelections}
+                                                        onChange={(e) =>
+                                                            setOptionGroupDrafts((prev) => ({
+                                                                ...prev,
+                                                                [group.id]: {
+                                                                    name: prev[group.id]?.name ?? group.name,
+                                                                    min: Number(e.target.value) || 0,
+                                                                    max: prev[group.id]?.max ?? group.maxSelections,
+                                                                },
+                                                            }))
+                                                        }
+                                                    />
+                                                    <p className="text-[11px] text-gray-500 mt-1">Minimum answers required</p>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs text-gray-400 mb-1">Max selections</label>
+                                                    <Input
+                                                        type="number"
+                                                        value={optionGroupDrafts[group.id]?.max ?? group.maxSelections}
+                                                        onChange={(e) =>
+                                                            setOptionGroupDrafts((prev) => ({
+                                                                ...prev,
+                                                                [group.id]: {
+                                                                    name: prev[group.id]?.name ?? group.name,
+                                                                    min: prev[group.id]?.min ?? group.minSelections,
+                                                                    max: Number(e.target.value) || 0,
+                                                                },
+                                                            }))
+                                                        }
+                                                    />
+                                                    <p className="text-[11px] text-gray-500 mt-1">Maximum answers allowed</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        handleSaveOptionGroup(
+                                                            group.id,
+                                                            group.name,
+                                                            group.minSelections,
+                                                            group.maxSelections
+                                                        )
+                                                    }
+                                                    disabled={optionsLoading}
+                                                >
+                                                    Save Question
+                                                </Button>
+                                                <Button
+                                                    variant="danger"
+                                                    size="sm"
+                                                    onClick={() => requestDeleteOptionGroup(group.id, group.name)}
+                                                    disabled={optionsLoading}
+                                                >
+                                                    Delete Group
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <div className="mt-2 space-y-1">
+                                            {group.options.map((opt) => (
+                                                <div key={opt.id} className="grid grid-cols-[1fr_110px_auto_auto] gap-2 items-center">
+                                                    <div>
+                                                        <label className="block text-xs text-gray-400 mb-1">Answer text</label>
+                                                        <Input
+                                                            value={optionDrafts[opt.id]?.name ?? opt.name}
+                                                            onChange={(e) =>
+                                                                setOptionDrafts((prev) => ({
+                                                                    ...prev,
+                                                                    [opt.id]: {
+                                                                        name: e.target.value,
+                                                                        extraPrice: prev[opt.id]?.extraPrice ?? opt.extraPrice,
+                                                                    },
+                                                                }))
+                                                            }
+                                                        />
+                                                        <p className="text-[11px] text-gray-500 mt-1">Example: Large, No Onions, Extra Cheese</p>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs text-gray-400 mb-1">Extra price</label>
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={optionDrafts[opt.id]?.extraPrice ?? opt.extraPrice}
+                                                            onChange={(e) =>
+                                                                setOptionDrafts((prev) => ({
+                                                                    ...prev,
+                                                                    [opt.id]: {
+                                                                        name: prev[opt.id]?.name ?? opt.name,
+                                                                        extraPrice: Number(e.target.value) || 0,
+                                                                    },
+                                                                }))
+                                                            }
+                                                        />
+                                                        <p className="text-[11px] text-gray-500 mt-1">Use 0 for no extra cost</p>
+                                                    </div>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleSaveOption(opt.id, opt.name, opt.extraPrice)}
+                                                        disabled={optionsLoading}
+                                                    >
+                                                        Save
+                                                    </Button>
+                                                    <Button
+                                                        variant="danger"
+                                                        size="sm"
+                                                        onClick={() => requestDeleteOption(opt.id, opt.name)}
+                                                        disabled={optionsLoading}
+                                                    >
+                                                        Delete
+                                                    </Button>
+                                                </div>
+                                            ))}
+
+                                            <div className="grid grid-cols-[1fr_110px_auto] gap-2 items-center border-t border-gray-700 pt-2 mt-2">
+                                                <div>
+                                                    <label className="block text-xs text-gray-400 mb-1">New answer text</label>
+                                                    <Input
+                                                        placeholder="Add answer"
+                                                        value={newOptionByGroup[group.id]?.name ?? ""}
+                                                        onChange={(e) =>
+                                                            setNewOptionByGroup((prev) => ({
+                                                                ...prev,
+                                                                [group.id]: {
+                                                                    name: e.target.value,
+                                                                    extraPrice: prev[group.id]?.extraPrice ?? 0,
+                                                                },
+                                                            }))
+                                                        }
+                                                    />
+                                                    <p className="text-[11px] text-gray-500 mt-1">Example: Medium, Coke, Add Ketchup</p>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs text-gray-400 mb-1">Extra price</label>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        placeholder="Extra"
+                                                        value={newOptionByGroup[group.id]?.extraPrice ?? 0}
+                                                        onChange={(e) =>
+                                                            setNewOptionByGroup((prev) => ({
+                                                                ...prev,
+                                                                [group.id]: {
+                                                                    name: prev[group.id]?.name ?? "",
+                                                                    extraPrice: Number(e.target.value) || 0,
+                                                                },
+                                                            }))
+                                                        }
+                                                    />
+                                                    <p className="text-[11px] text-gray-500 mt-1">Enter amount added to base price</p>
+                                                </div>
+                                                <Button
+                                                    variant="primary"
+                                                    size="sm"
+                                                    onClick={() => handleCreateOption(group.id)}
+                                                    disabled={optionsLoading}
+                                                >
+                                                    Add Answer
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-gray-500">No option groups yet.</p>
+                        )}
+                    </div>
+
+                    <div id="add-new-question-section" className="rounded-lg border border-violet-500/30 bg-violet-500/10 p-3 space-y-3">
+                        <p className="text-sm font-medium text-violet-100">Add New Question</p>
+                        <label className="block text-xs text-violet-200">Question title</label>
+                        <Input
+                            placeholder="Question title (e.g., Choose Sauce)"
+                            value={newOptionGroupName}
+                            onChange={(e) => setNewOptionGroupName(e.target.value)}
+                        />
+                        <p className="text-[11px] text-violet-200/80">This is what customer sees before choosing answers</p>
+                        <div className="grid grid-cols-2 gap-2">
+                            <div>
+                                <label className="block text-xs text-violet-200 mb-1">Min selections</label>
+                                <Input
+                                    type="number"
+                                    placeholder="Min selections"
+                                    value={newOptionGroupMin}
+                                    onChange={(e) => setNewOptionGroupMin(Number(e.target.value) || 0)}
+                                />
+                                <p className="text-[11px] text-violet-200/80 mt-1">Set 0 if optional</p>
+                            </div>
+                            <div>
+                                <label className="block text-xs text-violet-200 mb-1">Max selections</label>
+                                <Input
+                                    type="number"
+                                    placeholder="Max selections"
+                                    value={newOptionGroupMax}
+                                    onChange={(e) => setNewOptionGroupMax(Number(e.target.value) || 0)}
+                                />
+                                <p className="text-[11px] text-violet-200/80 mt-1">Set 1 for single-choice</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            {newOptionItems.map((item, idx) => (
+                                <div key={idx} className="grid grid-cols-[1fr_120px_auto] gap-2">
+                                    <div>
+                                        <label className="block text-xs text-violet-200 mb-1">Answer {idx + 1}</label>
+                                        <Input
+                                            placeholder={`Answer ${idx + 1} text`}
+                                            value={item.name}
+                                            onChange={(e) => {
+                                                const next = [...newOptionItems];
+                                                next[idx] = { ...next[idx], name: e.target.value };
+                                                setNewOptionItems(next);
+                                            }}
+                                        />
+                                        <p className="text-[11px] text-violet-200/80 mt-1">Visible choice label</p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs text-violet-200 mb-1">Extra price</label>
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="Extra"
+                                            value={item.extraPrice}
+                                            onChange={(e) => {
+                                                const next = [...newOptionItems];
+                                                next[idx] = { ...next[idx], extraPrice: Number(e.target.value) || 0 };
+                                                setNewOptionItems(next);
+                                            }}
+                                        />
+                                        <p className="text-[11px] text-violet-200/80 mt-1">Additional amount for this answer</p>
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => {
+                                            setNewOptionItems((prev) => prev.filter((_, i) => i !== idx));
+                                        }}
+                                        disabled={newOptionItems.length <= 1}
+                                    >
+                                        Remove
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+
+                        <Button
+                            variant="outline"
+                            onClick={() => setNewOptionItems((prev) => [...prev, { name: "", extraPrice: 0 }])}
+                        >
+                            Add Option Row
+                        </Button>
+
+                        <Button
+                            variant="primary"
+                            className="w-full"
+                            onClick={handleCreateOptionGroup}
+                            disabled={optionsLoading}
+                        >
+                            {optionsLoading ? "Saving..." : "Save Option Group"}
+                        </Button>
+
+                        {optionsError && <p className="text-sm text-red-400">{optionsError}</p>}
+                    </div>
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={optionsDeleteTarget !== null}
+                onClose={() => setOptionsDeleteTarget(null)}
+                title={optionsDeleteTarget?.kind === "group" ? "Delete Question" : "Delete Answer"}
+            >
+                <p className="text-gray-300 mb-4">
+                    Are you sure you want to delete <strong>{optionsDeleteTarget?.name}</strong>?
+                </p>
+
+                <div className="flex justify-end gap-3">
+                    <Button
+                        variant="outline"
+                        onClick={() => setOptionsDeleteTarget(null)}
+                        disabled={optionsLoading}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="danger"
+                        onClick={confirmDeleteOptionEntity}
+                        disabled={optionsLoading}
+                    >
+                        {optionsLoading ? "Deleting..." : "Delete"}
+                    </Button>
+                </div>
+            </Modal>
         </div>
+    );
+}
+
+function SortableProductRow({
+    id,
+    sortMode,
+    children,
+}: {
+    id: string;
+    sortMode: boolean;
+    children: React.ReactNode;
+}) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+    };
+
+    return (
+        <tr
+            ref={setNodeRef}
+            style={style}
+            className={isDragging ? "opacity-60" : ""}
+        >
+            {sortMode && (
+                <Td>
+                    <button
+                        type="button"
+                        {...attributes}
+                        {...listeners}
+                        className="inline-flex items-center justify-center rounded border border-violet-500/30 bg-violet-500/10 p-1 text-violet-300 hover:bg-violet-500/20"
+                        aria-label="Reorder product"
+                    >
+                        <GripVertical size={14} />
+                    </button>
+                </Td>
+            )}
+            {children}
+        </tr>
     );
 }

@@ -17,16 +17,16 @@ export const uncompletedOrders: NonNullable<QueryResolvers['uncompletedOrders']>
     switch (userData.role) {
         case 'SUPER_ADMIN':
         case 'DRIVER':
-            // Super admins and drivers can see all uncompleted orders
-            const allOrders = await orderService.getAllOrders();
-            return allOrders.filter(order => order.status !== 'DELIVERED' && order.status !== 'CANCELLED');
+            // Use DB-level filter instead of fetching all orders and filtering in memory
+            return orderService.getUncompletedOrders();
 
         case 'CUSTOMER':
             // Customers can only see their own uncompleted orders
             return orderService.getUserUncompletedOrders(userData.userId);
 
-        case 'BUSINESS_ADMIN':
-            // Business admins can only see uncompleted orders that contain items from their business
+        case 'BUSINESS_OWNER':
+        case 'BUSINESS_EMPLOYEE':
+            // Business users can only see uncompleted orders that contain items from their business
             if (!userData.businessId) {
                 throw new GraphQLError('Business admin must be associated with a business', {
                     extensions: { code: 'FORBIDDEN' },

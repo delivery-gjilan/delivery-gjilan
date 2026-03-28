@@ -4,16 +4,39 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useActiveOrdersStore } from '../store/activeOrdersStore';
 import { useTheme } from '@/hooks/useTheme';
+import { useTranslations } from '@/hooks/useTranslations';
 import { Order } from '@/gql/graphql';
 
 const OrderStatusBadge = ({ status }: { status: string }) => {
     const theme = useTheme();
+    const { t } = useTranslations();
+
+    const getStatusLabel = () => {
+        switch (status) {
+            case 'PENDING':
+                return t.orders.status.pending;
+            case 'PREPARING':
+                return t.orders.status.preparing;
+            case 'READY':
+                return t.orders.status.ready;
+            case 'OUT_FOR_DELIVERY':
+                return t.orders.status.out_for_delivery;
+            case 'DELIVERED':
+                return t.orders.status.delivered;
+            case 'CANCELLED':
+                return t.orders.status.cancelled;
+            default:
+                return t.orders.status.in_progress;
+        }
+    };
 
     const getStatusColor = () => {
         switch (status) {
             case 'PENDING':
                 return theme.colors.notification;
-            case 'ACCEPTED':
+            case 'PREPARING':
+                return theme.colors.income;
+            case 'READY':
                 return theme.colors.income;
             case 'OUT_FOR_DELIVERY':
                 return theme.colors.income;
@@ -25,7 +48,7 @@ const OrderStatusBadge = ({ status }: { status: string }) => {
     return (
         <View className="px-3 py-1 rounded-full" style={{ backgroundColor: getStatusColor() + '20' }}>
             <Text className="text-xs font-semibold" style={{ color: getStatusColor() }}>
-                {status.replace(/_/g, ' ')}
+                {getStatusLabel()}
             </Text>
         </View>
     );
@@ -34,6 +57,7 @@ const OrderStatusBadge = ({ status }: { status: string }) => {
 const OrderListItem = ({ order }: { order: Order }) => {
     const router = useRouter();
     const theme = useTheme();
+    const { t } = useTranslations();
 
     const totalItems = order.businesses.reduce(
         (sum, business) => sum + business.items.reduce((s, item) => s + item.quantity, 0),
@@ -44,7 +68,7 @@ const OrderListItem = ({ order }: { order: Order }) => {
         <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => router.push(`/orders/${order.id}` as `/orders/${string}`)}
-            className="bg-white dark:bg-gray-800 p-4 rounded-xl mb-3"
+            className="bg-card p-4 rounded-xl mb-3"
             style={{
                 borderWidth: 1,
                 borderColor: theme.colors.border,
@@ -52,10 +76,13 @@ const OrderListItem = ({ order }: { order: Order }) => {
         >
             <View className="flex-row justify-between items-start mb-2">
                 <View className="flex-1">
-                    <Text className="text-lg font-bold text-foreground mb-1">Order #{order.id.slice(-6)}</Text>
+                    <Text className="text-lg font-bold text-foreground mb-1">
+                        {t.orders.order_prefix}
+                        {order.id.slice(-6)}
+                    </Text>
                     <Text className="text-sm text-subtext">
-                        {totalItems} item{totalItems !== 1 ? 's' : ''} from {order.businesses.length} restaurant
-                        {order.businesses.length !== 1 ? 's' : ''}
+                        {totalItems} {totalItems !== 1 ? t.orders.item_plural : t.orders.item_singular} {t.orders.from}{' '}
+                        {order.businesses.length} {order.businesses.length !== 1 ? t.orders.restaurant_plural : t.orders.restaurant_singular}
                     </Text>
                 </View>
                 <OrderStatusBadge status={order.status} />
@@ -63,7 +90,12 @@ const OrderListItem = ({ order }: { order: Order }) => {
 
             <View className="flex-row justify-between items-center mt-2 pt-2 border-t border-border">
                 <Text className="text-base font-semibold text-foreground">€{order.totalPrice.toFixed(2)}</Text>
-                <Ionicons name="chevron-forward" size={20} color={theme.colors.subtext} />
+                <View className="flex-row items-center gap-1">
+                    <Text className="text-xs font-semibold" style={{ color: theme.colors.primary }}>
+                        {t.orders.view_details}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={18} color={theme.colors.primary} />
+                </View>
             </View>
         </TouchableOpacity>
     );
@@ -72,6 +104,7 @@ const OrderListItem = ({ order }: { order: Order }) => {
 export const ActiveOrdersList = () => {
     const router = useRouter();
     const theme = useTheme();
+    const { t } = useTranslations();
     const { activeOrders, hasActiveOrders } = useActiveOrdersStore();
 
     if (!hasActiveOrders) {
@@ -82,14 +115,14 @@ export const ActiveOrdersList = () => {
                         <TouchableOpacity onPress={() => router.back()} className="mr-3">
                             <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                         </TouchableOpacity>
-                        <Text className="text-2xl font-bold text-text">Active Orders</Text>
+                        <Text className="text-2xl font-bold text-text">{t.orders.active_orders}</Text>
                     </View>
 
                     <View className="flex-1 justify-center items-center">
                         <Ionicons name="checkmark-circle-outline" size={80} color={theme.colors.subtext} />
-                        <Text className="text-lg text-subtext mt-4 text-center">No active orders</Text>
+                        <Text className="text-lg text-subtext mt-4 text-center">{t.orders.no_active_orders}</Text>
                         <Text className="text-sm text-subtext mt-2 text-center px-8">
-                            All your orders have been completed or cancelled
+                            {t.orders.no_active_orders_subtitle}
                         </Text>
                     </View>
                 </View>
@@ -104,7 +137,7 @@ export const ActiveOrdersList = () => {
                     <TouchableOpacity onPress={() => router.back()} className="mr-3">
                         <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                     </TouchableOpacity>
-                    <Text className="text-2xl font-bold text-text">Active Orders</Text>
+                    <Text className="text-2xl font-bold text-text">{t.orders.active_orders}</Text>
                 </View>
 
                 <FlatList

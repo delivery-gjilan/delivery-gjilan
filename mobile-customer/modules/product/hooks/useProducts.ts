@@ -5,6 +5,8 @@ export function useProducts(businessId: string) {
     const { data, loading, error, refetch } = useQuery(GET_PRODUCTS, {
         variables: { businessId },
         skip: !businessId,
+        fetchPolicy: 'cache-and-network',
+        nextFetchPolicy: 'cache-first',
     });
 
     return {
@@ -19,6 +21,7 @@ export function useProduct(id: string) {
     const { data, loading, error, refetch } = useQuery(GET_PRODUCT, {
         variables: { id },
         skip: !id,
+        fetchPolicy: 'cache-first',
     });
 
     return {

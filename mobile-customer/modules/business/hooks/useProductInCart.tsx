@@ -1,38 +1,50 @@
-import { useMemo } from 'react';
-import { Product } from '@/gql/graphql';
+import React, { useMemo } from 'react';
+import { Alert } from 'react-native';
+import { Product, BusinessType } from '@/gql/graphql';
 import { useCart } from '@/modules/cart/hooks/useCart';
 import { useCartActions } from '@/modules/cart/hooks/useCartActions';
+import { getEffectiveProductPrice } from '@/modules/product/utils/pricing';
 
-export function useProductInCart(product: Product) {
+export function useProductInCart(product: Partial<Product>, businessType?: BusinessType) {
     const { items } = useCart();
     const { addItem, updateQuantity } = useCartActions();
 
-    // Find the current quantity of this product in the cart
-    const quantity = useMemo(() => {
-        const cartItem = items.find((item) => item.productId === product.id);
-        return cartItem?.quantity || 0;
-    }, [items, product.id]);
+    const id = product.id ?? '';
 
+    // Find the current quantity of this product in the cart (sum of all configurations)
+    const quantity = useMemo(() => items.filter((item) => item.productId === id).reduce((sum, item) => sum + item.quantity, 0), [items, id]);
     const addToCart = () => {
-        const price = product.isOnSale && product.salePrice ? product.salePrice : product.price;
+        if (!id) return;
+        const unitPrice = getEffectiveProductPrice(product);
 
-        addItem({
-            productId: product.id,
-            name: product.name,
-            price,
+        const error = addItem({
+            cartItemId: id, // Simple product (no options) uses productId as cartItemId
+            productId: id,
+            name: product.name ?? 'Unknown',
+            unitPrice,
             quantity: 1,
             imageUrl: product.imageUrl || undefined,
-            businessId: product.businessId,
+            businessId: product.businessId ?? '',
+            businessType: businessType,
             originalPrice: product.isOnSale && product.salePrice ? product.price : undefined,
+            selectedOptions: [],
         });
+
+        if (error) {
+            Alert.alert('Cannot Add Item', error);
+        }
     };
 
     const incrementQuantity = () => {
-        updateQuantity(product.id, quantity + 1);
+        if (!id) return;
+        // Simple case: increment the one with no options (cartItemId === productId)
+        updateQuantity(id, quantity + 1);
     };
 
     const decrementQuantity = () => {
-        updateQuantity(product.id, quantity - 1);
+        if (!id) return;
+        // Simple case: decrement the one with no options
+        updateQuantity(id, quantity - 1);
     };
 
     return {

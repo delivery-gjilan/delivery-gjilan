@@ -9,7 +9,8 @@ import { useEffect } from 'react';
  */
 export function useUncompletedOrders() {
     const { data, loading, error, refetch } = useQuery(UNCOMPLETED_ORDERS, {
-        fetchPolicy: 'network-only', // Always fetch fresh data
+        fetchPolicy: 'cache-and-network',
+        nextFetchPolicy: 'cache-first',
     });
 
     const setActiveOrders = useActiveOrdersStore((state) => state.setActiveOrders);
@@ -17,7 +18,7 @@ export function useUncompletedOrders() {
     // Update the store whenever data changes
     useEffect(() => {
         if (data?.uncompletedOrders) {
-            setActiveOrders(data.uncompletedOrders);
+            setActiveOrders(data.uncompletedOrders as unknown as any);
         }
     }, [data, setActiveOrders]);
 

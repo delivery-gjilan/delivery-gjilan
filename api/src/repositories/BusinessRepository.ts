@@ -1,6 +1,6 @@
 import { DbType } from '@/database';
 import { DbBusiness, NewDbBusiness, businesses } from '@/database/schema/businesses';
-import { eq } from 'drizzle-orm';
+import { eq, and, isNull, sql } from 'drizzle-orm';
 
 export class BusinessRepository {
     constructor(private db: DbType) {}
@@ -11,12 +11,12 @@ export class BusinessRepository {
     }
 
     async findById(id: string): Promise<DbBusiness | undefined> {
-        const [business] = await this.db.select().from(businesses).where(eq(businesses.id, id));
+        const [business] = await this.db.select().from(businesses).where(and(eq(businesses.id, id), isNull(businesses.deletedAt)));
         return business;
     }
 
     async findAll(): Promise<DbBusiness[]> {
-        return this.db.select().from(businesses);
+        return this.db.select().from(businesses).where(isNull(businesses.deletedAt));
     }
 
     async update(id: string, data: Partial<NewDbBusiness>): Promise<DbBusiness | undefined> {
@@ -25,7 +25,11 @@ export class BusinessRepository {
     }
 
     async delete(id: string): Promise<boolean> {
-        const [deletedBusiness] = await this.db.delete(businesses).where(eq(businesses.id, id)).returning();
-        return !!deletedBusiness;
+        const result = await this.db
+            .update(businesses)
+            .set({ deletedAt: sql`CURRENT_TIMESTAMP` })
+            .where(and(eq(businesses.id, id), isNull(businesses.deletedAt)))
+            .returning();
+        return result.length > 0;
     }
 }

@@ -1,71 +1,111 @@
 {
     "language": "Shqip",
     "common": {
-        "ok": "Ok",
+        "ok": "OK",
         "cancel": "Anulo",
         "save": "Ruaj",
         "delete": "Fshij",
         "error": "Gabim",
         "date": "Data",
-        "today": "Sot"
+        "today": "Sot",
+        "back": "Prapa",
+        "loading": "Duke ngarkuar..."
     },
     "auth": {
         "login": {
-            "title": "Hyr",
-            "description": "Ju lutem hyni për të vazhduar",
+            "title": "Hyrje për Shofer",
+            "description": "Hyni për të parë dhe menaxhuar dërgesat",
             "actions": {
-                "login": "Hyr",
-                "need_account": "Nuk keni llogari?"
+                "login": "Hyr"
             }
         }
     },
-    "transactions": {
-        "create": {
-            "title": "Transaksion i Ri",
-            "amount": "Shuma",
-            "expense": "Shpenzim",
-            "income": "Të Ardhura",
-            "description": "Përshkrimi",
-            "description_placeholder": "Për çfarë është kjo?",
-            "tags": "Etiketat",
-            "tags_placeholder": "Shto një etiketë...",
-            "success": "Transaksioni u Ruajt!",
-            "save": "Ruaj Transaksionin"
-        },
-        "list": {
-            "empty_title": "Ende asnjë transaksion",
-            "empty_description": "Filloni duke shtuar transaksionin tuaj të parë!"
-        },
-        "details": {
-            "title": "Detajet e Transaksionit",
-            "not_found": "Transaksioni nuk u gjet",
-            "go_back": "Kthehu",
-            "date_time": "DATA & ORA",
-            "type": "LLOJI",
-            "tags": "ETIKETAT"
-        }
-    },
-    "profile": {
-        "title": "Profili dhe Cilësimet",
-        "seed_db": "Mbush Bazen e te Dhenave (Dev)",
-        "seed_warning": "Kujdes: Kjo do të fshijë të gjitha të dhënat ekzistuese.",
-        "language_toggle": "Ndrysho Gjuhën",
-        "current_language": "Gjuha Aktuale: Shqip"
-    },
     "tabs": {
         "home": "Kreu",
-        "analytics": "Analitika",
-        "create": "Krijo Transaksion",
+        "map": "Harta",
+        "earnings": "Fitimet",
+        "messages": "Mesazhet",
         "profile": "Profili"
     },
     "home": {
-        "title": "Transaksionet",
-        "subtitle": "Aktiviteti juaj financiar i fundit"
+        "greeting_morning": "Mirëmëngjes",
+        "greeting_afternoon": "Mirëdita",
+        "greeting_evening": "Mirëmbrëma",
+        "online": "Online",
+        "offline": "Offline",
+        "signal_good": "Sinjal i mirë",
+        "signal_weak": "Sinjal i dobët",
+        "signal_lost": "Sinjal humbur",
+        "dispatch_mode_title": "Adminitistrata po cakton porositë",
+        "dispatch_mode_sub": "Prisni caktimin — porositë do t'ju dërgohen drejtpërdrejt",
+        "earnings_today": "Fitimet e Sotme",
+        "your_take": "pjesa juaj",
+        "gross": "bruto",
+        "commission": "komision",
+        "deducted": "zbritur",
+        "delivered_today": "Dërguar Sot",
+        "avg_per_delivery": "Mesatare për Dërgesë",
+        "active_orders": "Porositë Aktive",
+        "no_active_orders": "Asnjë porosi aktive — gati për të reja",
+        "at_max_capacity": "Kapaciteti maksimal",
+        "slots_available": "vende të lira",
+        "slot_available": "vend i lirë",
+        "heartbeat": "Gjendja e lidhjes",
+        "check_signal": "kontrolloni sinjalin",
+        "error_update_status": "Ndryshimi i statusit dështoi. Provoni përsëri."
     },
-    "account": {
-        "total_balance": "Bilanci Total",
-        "income": "Të Ardhura",
-        "expenses": "Shpenzime",
-        "vs_last_month": "muajin e kaluar"
+    "map": {
+        "status_pending": "Në pritje",
+        "status_preparing": "Duke u përgatitur",
+        "status_ready": "Gati",
+        "status_delivering": "Duke dërguar"
+    },
+    "earnings": {
+        "title": "Fitimet",
+        "subtitle": "Të ardhurat dhe shlyerjet tuaja",
+        "period_week": "Kjo Javë",
+        "period_month": "Ky Muaj",
+        "period_last_month": "Muaji i Kaluar",
+        "period_all": "Gjithë Kohën",
+        "net_earnings": "FITIMI NETO",
+        "delivery": "dërgesë",
+        "deliveries": "dërgesa",
+        "paid": "PAGUAR",
+        "pending": "NË PRITJE",
+        "unsettled": "të pashlyer",
+        "pending_balance": "Bilanci në Pritje",
+        "platform_owes_you": "Platforma ju detyrohet",
+        "you_owe_platform": "Ju i detyroheni platformës",
+        "net_pending": "Neto në pritje",
+        "deliveries_list": "Dërgesat",
+        "no_earnings_title": "Ende asnjë fitim",
+        "no_earnings_sub": "Kryeni dërgesa për t'i parë këtu.",
+        "commission": "Komision",
+        "paid_on": "Paguar"
+    },
+    "messages": {
+        "type_message": "Mesazh",
+        "type_warning": "Paralajmërim",
+        "type_urgent": "Urgjent",
+        "today": "Sot",
+        "yesterday": "Dje",
+        "placeholder": "Përgjigju...",
+        "send": "Dërgo",
+        "no_messages_title": "Ende asnjë mesazh",
+        "no_messages_sub": "Mesazhet nga dispatcheri do të shfaqen këtu.",
+        "clear": "Pastro",
+        "clear_confirm_title": "Pastro Mesazhet",
+        "clear_confirm_message": "Kjo do të fshehë të gjitha mesazhet. Jeni të sigurt?"
+    },
+    "profile": {
+        "title": "Profili",
+        "driver_badge": "Shofer",
+        "language_section": "Gjuha",
+        "language_toggle": "Ndrysho Gjuhën",
+        "current_language": "Gjuha Aktuale: Shqip",
+        "logout": "Dilni",
+        "logout_title": "Dilni",
+        "logout_confirm": "Jeni të sigurt që dëshironi të dilni?",
+        "logout_error": "Dalja dështoi. Ju lutem provoni përsëri."
     }
 }

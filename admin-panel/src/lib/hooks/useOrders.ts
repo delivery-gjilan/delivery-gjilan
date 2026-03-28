@@ -1,6 +1,7 @@
 'use client';
 
-import { useMutation, useQuery, useSubscription } from '@apollo/client/react';
+import { useApolloClient, useMutation, useQuery, useSubscription } from '@apollo/client/react';
+import { useCallback, useEffect, useRef } from 'react';
 import {
     GET_ORDERS,
     GET_ORDER,
@@ -49,24 +50,85 @@ export interface UseCancelOrderResult {
     error?: string;
 }
 
-export function useOrders(): UseOrdersResult {
+export interface UseOrdersOptions {
+    limit?: number;
+    offset?: number;
+}
+
+export function useOrders(options: UseOrdersOptions = {}): UseOrdersResult {
+    const { limit = 100, offset = 0 } = options;
+    const apolloClient = useApolloClient();
     // Initial query to load data - use network-only to avoid stale cache
     const { data, loading, error, refetch } = useQuery(GET_ORDERS, {
+        variables: { limit, offset },
         fetchPolicy: 'network-only', // Changed from 'cache-and-network' to always fetch fresh data
     });
 
-    // Real-time subscription for updates - automatically updates cache
-    useSubscription(ALL_ORDERS_SUBSCRIPTION, {
-        onData: ({ client, data: subData }) => {
-            if (subData?.data?.allOrdersUpdated) {
-                // Update the cache with new orders data
-                client.writeQuery({
-                    query: GET_ORDERS,
-                    data: {
-                        orders: subData.data.allOrdersUpdated,
-                    },
-                });
+    const refetchCooldownRef = useRef(0);
+    const refetchInFlightRef = useRef(false);
+    const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (refetchTimerRef.current) {
+                clearTimeout(refetchTimerRef.current);
+                refetchTimerRef.current = null;
             }
+        };
+    }, []);
+
+    const scheduleRefetch = useCallback(() => {
+        const now = Date.now();
+        const canRunNow = now - refetchCooldownRef.current >= 1200 && !refetchInFlightRef.current;
+
+        if (!canRunNow) {
+            if (refetchTimerRef.current) {
+                return;
+            }
+            refetchTimerRef.current = setTimeout(() => {
+                refetchTimerRef.current = null;
+                if (refetchInFlightRef.current) {
+                    return;
+                }
+                refetchInFlightRef.current = true;
+                refetchCooldownRef.current = Date.now();
+                refetch().finally(() => {
+                    refetchInFlightRef.current = false;
+                });
+            }, 350);
+            return;
+        }
+
+        refetchInFlightRef.current = true;
+        refetchCooldownRef.current = now;
+        refetch().finally(() => {
+            refetchInFlightRef.current = false;
+        });
+    }, [refetch]);
+
+    // Real-time subscription for updates — refetch on signal
+    useSubscription(ALL_ORDERS_SUBSCRIPTION, {
+        onData: ({ data: subscriptionData }) => {
+            const incomingOrders = (subscriptionData.data as any)?.allOrdersUpdated as any[] | undefined;
+            if (!incomingOrders || incomingOrders.length === 0) {
+                scheduleRefetch();
+                return;
+            }
+
+            apolloClient.cache.updateQuery({ query: GET_ORDERS, variables: { limit, offset } }, (existing: any) => {
+                const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
+                const byId = new Map(currentOrders.map((order: any) => [String(order?.id), order]));
+
+                incomingOrders.forEach((order: any) => {
+                    const existingOrder = byId.get(String(order?.id));
+                    byId.set(String(order?.id), { ...existingOrder, ...order });
+                });
+
+                return {
+                    ...(existing ?? {}),
+                    orders: Array.from(byId.values()),
+                };
+            });
         },
     });
 
@@ -74,7 +136,7 @@ export function useOrders(): UseOrdersResult {
         orders: (data as any)?.orders || [],
         loading,
         error: error?.message,
-        refetch: () => refetch(),
+        refetch: () => refetch({ limit, offset }),
     };
 }
 
@@ -93,7 +155,7 @@ export function useOrder(id: string): UseOrderResult {
 
 export function useOrdersByStatus(status: string): UseOrdersByStatusResult {
     const { data, loading, error, refetch } = useQuery(GET_ORDERS_BY_STATUS, {
-        variables: { status },
+        variables: { status: status as any },
         skip: !status,
     });
 
@@ -111,7 +173,7 @@ export function useUpdateOrderStatus(): UseUpdateOrderStatusResult {
     return {
         update: async (id, status) => {
             try {
-                const result = await mutate({ variables: { id, status } });
+                const result = await mutate({ variables: { id, status: status as any } });
                 return { success: true, data: result.data };
             } catch (err) {
                 return { success: false, error: (err as Error).message };

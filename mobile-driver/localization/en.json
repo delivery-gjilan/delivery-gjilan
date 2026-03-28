@@ -1,71 +1,111 @@
 {
     "language": "English",
     "common": {
-        "ok": "Ok",
+        "ok": "OK",
         "cancel": "Cancel",
         "save": "Save",
         "delete": "Delete",
         "error": "Error",
         "date": "Date",
-        "today": "Today"
+        "today": "Today",
+        "back": "Back",
+        "loading": "Loading..."
     },
     "auth": {
         "login": {
-            "title": "Login",
-            "description": "Please login to continue",
+            "title": "Driver Login",
+            "description": "Sign in to view and manage deliveries",
             "actions": {
-                "login": "Login",
-                "need_account": "Don't have an account?"
+                "login": "Sign In"
             }
         }
     },
-    "transactions": {
-        "create": {
-            "title": "New Transaction",
-            "amount": "Amount",
-            "expense": "Expense",
-            "income": "Income",
-            "description": "Description",
-            "description_placeholder": "What is this for?",
-            "tags": "Tags",
-            "tags_placeholder": "Add a tag...",
-            "success": "Transaction Saved!",
-            "save": "Save Transaction"
-        },
-        "list": {
-            "empty_title": "No transactions yet",
-            "empty_description": "Start by adding your first transaction!"
-        },
-        "details": {
-            "title": "Transaction Details",
-            "not_found": "Transaction not found",
-            "go_back": "Go Back",
-            "date_time": "DATE & TIME",
-            "type": "TYPE",
-            "tags": "TAGS"
-        }
-    },
-    "profile": {
-        "title": "Profile & Settings",
-        "seed_db": "Seed Database (Dev)",
-        "seed_warning": "Warning: This will delete all existing data.",
-        "language_toggle": "Change Language",
-        "current_language": "Current Language: English"
-    },
     "tabs": {
         "home": "Home",
-        "analytics": "Analytics",
-        "create": "Create",
+        "map": "Map",
+        "earnings": "Earnings",
+        "messages": "Messages",
         "profile": "Profile"
     },
     "home": {
-        "title": "Transactions",
-        "subtitle": "Your recent financial activity"
+        "greeting_morning": "Good morning",
+        "greeting_afternoon": "Good afternoon",
+        "greeting_evening": "Good evening",
+        "online": "Online",
+        "offline": "Offline",
+        "signal_good": "Signal good",
+        "signal_weak": "Weak signal",
+        "signal_lost": "Signal lost",
+        "dispatch_mode_title": "Admin is dispatching orders",
+        "dispatch_mode_sub": "Wait for assignment — orders will be sent to you directly",
+        "earnings_today": "Today's Earnings",
+        "your_take": "your take",
+        "gross": "gross",
+        "commission": "commission",
+        "deducted": "deducted",
+        "delivered_today": "Delivered Today",
+        "avg_per_delivery": "Avg per Delivery",
+        "active_orders": "Active Orders",
+        "no_active_orders": "No active orders — ready for new ones",
+        "at_max_capacity": "At max capacity",
+        "slots_available": "slots available",
+        "slot_available": "slot available",
+        "heartbeat": "Heartbeat",
+        "check_signal": "check signal",
+        "error_update_status": "Failed to update status. Try again."
     },
-    "account": {
-        "total_balance": "Total Balance",
-        "income": "Income",
-        "expenses": "Expenses",
-        "vs_last_month": "vs last month"
+    "map": {
+        "status_pending": "Pending",
+        "status_preparing": "Preparing",
+        "status_ready": "Ready",
+        "status_delivering": "Delivering"
+    },
+    "earnings": {
+        "title": "Earnings",
+        "subtitle": "Your delivery income & settlements",
+        "period_week": "This Week",
+        "period_month": "This Month",
+        "period_last_month": "Last Month",
+        "period_all": "All Time",
+        "net_earnings": "NET EARNINGS",
+        "delivery": "delivery",
+        "deliveries": "deliveries",
+        "paid": "PAID",
+        "pending": "PENDING",
+        "unsettled": "unsettled",
+        "pending_balance": "Pending Balance",
+        "platform_owes_you": "Platform owes you",
+        "you_owe_platform": "You owe platform",
+        "net_pending": "Net pending",
+        "deliveries_list": "Deliveries",
+        "no_earnings_title": "No earnings yet",
+        "no_earnings_sub": "Complete deliveries to see them here.",
+        "commission": "Commission",
+        "paid_on": "Paid"
+    },
+    "messages": {
+        "type_message": "Message",
+        "type_warning": "Warning",
+        "type_urgent": "Urgent",
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "placeholder": "Reply...",
+        "send": "Send",
+        "no_messages_title": "No messages yet",
+        "no_messages_sub": "Messages from your dispatcher will appear here.",
+        "clear": "Clear",
+        "clear_confirm_title": "Clear Messages",
+        "clear_confirm_message": "This will hide all messages from view. Are you sure?"
+    },
+    "profile": {
+        "title": "Profile",
+        "driver_badge": "Driver",
+        "language_section": "Language",
+        "language_toggle": "Change Language",
+        "current_language": "Current Language: English",
+        "logout": "Log out",
+        "logout_title": "Log out",
+        "logout_confirm": "Are you sure you want to log out?",
+        "logout_error": "Failed to log out. Please try again."
     }
 }

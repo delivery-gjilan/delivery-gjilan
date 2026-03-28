@@ -1,0 +1,72 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "api:dev",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}/api"
+      },
+      "isBackground": true
+    },
+    {
+      "label": "admin:dev",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}/admin-panel"
+      },
+      "isBackground": true
+    },
+    {
+      "label": "mobile-customer:start",
+      "type": "shell",
+      "command": "npm start -- --port 8082",
+      "options": {
+        "cwd": "${workspaceFolder}/mobile-customer"
+      },
+      "isBackground": true
+    },
+    {
+      "label": "mobile-driver:start",
+      "type": "shell",
+      "command": "npm start -- --port 8083",
+      "options": {
+        "cwd": "${workspaceFolder}/mobile-driver"
+      },
+      "isBackground": true
+    },
+    {
+      "label": "mobile-business:start",
+      "type": "shell",
+      "command": "npm start -- --port 8084",
+      "options": {
+        "cwd": "${workspaceFolder}/mobile-business"
+      },
+      "isBackground": true
+    },
+    {
+      "label": "ngrok:tunnels",
+      "type": "shell",
+      "command": "ngrok start --all",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true
+    },
+  `  {
+      "label": "dev:all",
+      "dependsOn": [
+        "api:dev",
+        "admin:dev",
+        "mobile-customer:start",
+        "mobile-driver:start",
+        "mobile-business:start",
+        "ngrok:tunnels"
+      ],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+   ` }
+  ]
+}

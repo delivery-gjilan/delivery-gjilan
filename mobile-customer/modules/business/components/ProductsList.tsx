@@ -3,9 +3,17 @@ import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { ProductCard } from './ProductCard';
-import { Product } from '@/gql/graphql';
+import { GetProductsQuery, BusinessType } from '@/gql/graphql';
 
-export function ProductsList({ products }: { products: Product[] }) {
+type ProductCardItem = GetProductsQuery['products'][number];
+
+export function ProductsList({
+    products,
+    businessType,
+}: {
+    products: ProductCardItem[];
+    businessType?: BusinessType;
+}) {
     const theme = useTheme();
 
     if (products.length === 0) {
@@ -29,8 +37,8 @@ export function ProductsList({ products }: { products: Product[] }) {
 
     return (
         <View>
-            {products.map((product) => (
-                <ProductCard key={product.id} product={product} />
+            {products.map((productCard) => (
+                <ProductCard key={productCard.id} productCard={productCard} businessType={businessType} />
             ))}
         </View>
     );

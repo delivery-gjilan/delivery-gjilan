@@ -1,0 +1,78 @@
+type DayVolume {
+    date: String!
+    orderCount: Int!
+    revenue: Float!
+}
+
+type OperationalKPIs {
+    totalOrders: Int!
+    completedOrders: Int!
+    cancelledOrders: Int!
+    cancellationRate: Float!
+    gmv: Float!
+    aov: Float!
+    avgDeliveryTimeMin: Float
+    avgPrepTimeMin: Float
+    prepOverrunRate: Float
+    avgDriverWaitAtPickupMin: Float
+    fakeReadyRate: Float
+    dailyVolume: [DayVolume!]!
+}
+
+type BusinessKPI {
+    businessId: ID!
+    businessName: String!
+    totalOrders: Int!
+    completedOrders: Int!
+    cancellationRate: Float!
+    avgPrepTimeMin: Float
+    p90PrepTimeMin: Float
+    prepOverrunRate: Float
+    """% of orders where restaurant pressed Ready before prep time was 50% elapsed"""
+    prematureReadyRate: Float
+    """Median minutes driver waited at pickup after arriving"""
+    avgDriverWaitMin: Float
+    """Orders where driver arrived before restaurant pressed Ready"""
+    fakeReadyCount: Int!
+    fakeReadyRate: Float
+}
+
+type DriverKPI {
+    driverId: ID!
+    driverName: String!
+    totalDeliveries: Int!
+    """Minutes from OUT_FOR_DELIVERY to DELIVERED"""
+    avgDeliveryTimeMin: Float
+    """Minutes from driver assignment to picking up (travel + wait)"""
+    avgPickupTimeMin: Float
+    """Minutes driver waited at restaurant after arriving"""
+    avgWaitAtPickupMin: Float
+}
+
+type HourlyDistribution {
+    hour: Int!
+    orderCount: Int!
+    revenue: Float!
+    avgDeliveryTimeMin: Float
+}
+
+type DayOfWeekDistribution {
+    """0 = Sunday, 6 = Saturday"""
+    dow: Int!
+    orderCount: Int!
+    revenue: Float!
+}
+
+type PeakHourAnalysis {
+    hourly: [HourlyDistribution!]!
+    byDayOfWeek: [DayOfWeekDistribution!]!
+    peakHour: Int!
+    peakDow: Int!
+}
+
+type Query {
+    operationalKPIs(startDate: String!, endDate: String!, businessId: ID): OperationalKPIs!
+    businessKPIs(startDate: String!, endDate: String!, businessId: ID): [BusinessKPI!]!
+    driverKPIs(startDate: String!, endDate: String!, driverId: ID): [DriverKPI!]!
+    peakHourAnalysis(startDate: String!, endDate: String!, businessId: ID): PeakHourAnalysis!
+}

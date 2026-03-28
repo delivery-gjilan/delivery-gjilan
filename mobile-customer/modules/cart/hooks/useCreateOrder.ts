@@ -1,29 +1,28 @@
 import { useMutation } from '@apollo/client/react';
-import { router } from 'expo-router';
-import { Alert } from 'react-native';
 import { CREATE_ORDER } from '@/graphql/operations/orders';
 import { useCart } from './useCart';
-import { useCartActions } from './useCartActions';
-import { useUserLocation } from '@/hooks/useUserLocation';
 import { useActiveOrdersStore } from '@/modules/orders/store/activeOrdersStore';
+import { useTranslations } from '@/hooks/useTranslations';
+import { toast } from '@/store/toastStore';
 
 export function useCreateOrder() {
-    const { items, total } = useCart();
-    const { clearCart } = useCartActions();
-    const { location } = useUserLocation();
+    const { items } = useCart();
     const { hasActiveOrders } = useActiveOrdersStore();
+    const { t } = useTranslations();
 
     const [createOrderMutation, { loading, error }] = useMutation(CREATE_ORDER);
 
-    const createOrder = async () => {
-        // Check if user already has an active order
+    const createOrder = async (
+        location: { latitude: number; longitude: number; address: string } | null,
+        deliveryPrice: number,
+        totalPrice: number,
+        promoCode?: string | null,
+        driverNotes?: string | null,
+        prioritySurcharge?: number,
+    ) => {
+        // Keep this as UX guidance only; backend remains source of truth.
         if (hasActiveOrders) {
-            Alert.alert(
-                '⚠️ Active Order Exists',
-                'You already have an active order. Please wait for it to be delivered before placing a new order.',
-                [{ text: 'OK' }]
-            );
-            throw new Error('Active order exists');
+            toast.warning(t.cart.active_order_exists_title, t.cart.active_order_exists_message);
         }
 
         if (items.length === 0) {
@@ -34,12 +33,23 @@ export function useCreateOrder() {
             throw new Error('Location is required');
         }
 
-        const deliveryPrice = 2.0; // Fixed for now
-
         const orderItems = items.map((item) => ({
             productId: item.productId,
             quantity: item.quantity,
-            price: item.price,
+            price: item.unitPrice,
+            notes: item.notes || null,
+            selectedOptions: item.selectedOptions.map((opt) => ({
+                optionGroupId: opt.optionGroupId,
+                optionId: opt.optionId,
+            })),
+            childItems:
+                item.childItems?.map((child) => ({
+                    productId: child.productId,
+                    selectedOptions: child.selectedOptions.map((opt) => ({
+                        optionGroupId: opt.optionGroupId,
+                        optionId: opt.optionId,
+                    })),
+                })) || [],
         }));
 
         try {
@@ -53,25 +63,13 @@ export function useCreateOrder() {
                             address: location.address,
                         },
                         deliveryPrice,
-                        totalPrice: total + deliveryPrice,
+                        totalPrice,
+                        prioritySurcharge: prioritySurcharge ?? 0,
+                        promoCode: promoCode || null,
+                        driverNotes: driverNotes || null,
                     },
                 },
             });
-
-            // Clear cart after successful order
-            clearCart();
-
-            // Immediately navigate to home to close cart screen
-            router.replace('/(tabs)/home');
-
-            // Show success popup after a brief delay to ensure navigation completes
-            setTimeout(() => {
-                Alert.alert(
-                    '🎉 Order Placed!',
-                    'Your order has been placed successfully. You can track it from the active order banner.',
-                    [{ text: 'OK' }]
-                );
-            }, 300);
 
             return result.data?.createOrder;
         } catch (err) {

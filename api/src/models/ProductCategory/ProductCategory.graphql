@@ -2,6 +2,7 @@ type ProductCategory {
     id: ID!
     businessId: ID!
     name: String!
+    sortOrder: Int!
     isActive: Boolean!
     createdAt: String!
     updatedAt: String!
@@ -14,15 +15,23 @@ type Query {
 input CreateProductCategoryInput {
     businessId: ID!
     name: String!
+    sortOrder: Int
 }
 
 input UpdateProductCategoryInput {
     name: String
     isActive: Boolean
+    sortOrder: Int
+}
+
+input ProductCategoryOrderInput {
+    id: ID!
+    sortOrder: Int!
 }
 
 type Mutation {
     createProductCategory(input: CreateProductCategoryInput!): ProductCategory!
     updateProductCategory(id: ID!, input: UpdateProductCategoryInput!): ProductCategory!
+    updateProductCategoriesOrder(businessId: ID!, categories: [ProductCategoryOrderInput!]!): Boolean!
     deleteProductCategory(id: ID!): Boolean!
 }

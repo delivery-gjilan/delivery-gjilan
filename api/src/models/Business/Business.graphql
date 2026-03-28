@@ -7,14 +7,31 @@ enum BusinessType {
 type Business {
     id: ID!
     name: String!
+    description: String
+    phoneNumber: String
     imageUrl: String
     businessType: BusinessType!
     isActive: Boolean!
     location: Location!
     workingHours: WorkingHours!
+    schedule: [BusinessDayHours!]!
+    avgPrepTimeMinutes: Int!
+    prepTimeOverrideMinutes: Int
+    isTemporarilyClosed: Boolean!
+    temporaryClosureReason: String
+    commissionPercentage: Float!
     isOpen: Boolean!
+    activePromotion: BusinessPromotion
     createdAt: Date!
     updatedAt: Date!
+}
+
+type BusinessPromotion {
+    id: ID!
+    name: String!
+    description: String
+    type: PromotionType!
+    discountValue: Float
 }
 
 type Query {
@@ -24,23 +41,52 @@ type Query {
 
 input CreateBusinessInput {
     name: String!
+    description: String
+    phoneNumber: String
     imageUrl: String
     businessType: BusinessType!
     location: LocationInput!
     workingHours: WorkingHoursInput!
+    avgPrepTimeMinutes: Int
+}
+
+input CreateBusinessOwnerInput {
+    email: String!
+    password: String!
+    firstName: String!
+    lastName: String!
+}
+
+input CreateBusinessWithOwnerInput {
+    business: CreateBusinessInput!
+    owner: CreateBusinessOwnerInput!
+}
+
+type CreateBusinessWithOwnerPayload {
+    business: Business!
+    owner: User!
 }
 
 input UpdateBusinessInput {
     name: String
+    description: String
+    phoneNumber: String
     imageUrl: String
     businessType: BusinessType
     location: LocationInput
     workingHours: WorkingHoursInput
     isActive: Boolean
+    avgPrepTimeMinutes: Int
+    prepTimeOverrideMinutes: Int
+    isTemporarilyClosed: Boolean
+    temporaryClosureReason: String
+    commissionPercentage: Float
 }
 
 type Mutation {
     createBusiness(input: CreateBusinessInput!): Business!
+    createBusinessWithOwner(input: CreateBusinessWithOwnerInput!): CreateBusinessWithOwnerPayload!
     updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
     deleteBusiness(id: ID!): Boolean!
+    setBusinessSchedule(businessId: ID!, schedule: [BusinessDayHoursInput!]!): [BusinessDayHours!]!
 }

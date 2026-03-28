@@ -37,7 +37,15 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# logs
+logs/*
+!logs/.gitkeep
+
 app-example
+
+# Package artifacts
+*.tgz
+package/
 
 # generated native folders
 /ios

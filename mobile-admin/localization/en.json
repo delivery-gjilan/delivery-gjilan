@@ -1,0 +1,132 @@
+{
+    "language": "English",
+    "common": {
+        "ok": "Ok",
+        "cancel": "Cancel",
+        "save": "Save",
+        "delete": "Delete",
+        "error": "Error",
+        "loading": "Loading...",
+        "retry": "Retry",
+        "search": "Search...",
+        "noResults": "No results found",
+        "confirm": "Confirm",
+        "back": "Back",
+        "edit": "Edit",
+        "close": "Close",
+        "refresh": "Refresh"
+    },
+    "auth": {
+        "login": {
+            "title": "Admin Login",
+            "description": "Sign in to manage your delivery platform",
+            "email": "Email",
+            "password": "Password",
+            "actions": {
+                "login": "Sign In",
+                "forgotPassword": "Forgot password?"
+            },
+            "errors": {
+                "invalid": "Invalid email or password",
+                "required": "Please enter email and password",
+                "unauthorized": "Access denied. Admin credentials required."
+            }
+        }
+    },
+    "tabs": {
+        "map": "Map",
+        "orders": "Orders",
+        "dashboard": "Dashboard",
+        "more": "More"
+    },
+    "map": {
+        "title": "Live Map",
+        "filters": {
+            "all": "All",
+            "orders": "Orders",
+            "drivers": "Drivers",
+            "businesses": "Businesses"
+        },
+        "orderStatus": {
+            "all": "All",
+            "pending": "Pending",
+            "preparing": "Preparing",
+            "ready": "Ready",
+            "outForDelivery": "Out for Delivery"
+        },
+        "driverStatus": {
+            "online": "Online",
+            "offline": "Offline",
+            "delivering": "Delivering"
+        },
+        "noDrivers": "No drivers online",
+        "noOrders": "No active orders"
+    },
+    "orders": {
+        "title": "Orders",
+        "empty": "No orders found",
+        "status": {
+            "PENDING": "Pending",
+            "PREPARING": "Preparing",
+            "READY": "Ready",
+            "OUT_FOR_DELIVERY": "Out for Delivery",
+            "DELIVERED": "Delivered",
+            "CANCELLED": "Cancelled"
+        },
+        "detail": {
+            "title": "Order Details",
+            "customer": "Customer",
+            "driver": "Driver",
+            "unassigned": "Unassigned",
+            "business": "Business",
+            "items": "Items",
+            "orderPrice": "Order Price",
+            "deliveryFee": "Delivery Fee",
+            "total": "Total",
+            "prepTime": "Prep Time",
+            "estimatedReady": "Estimated Ready",
+            "assignDriver": "Assign Driver",
+            "startPreparing": "Start Preparing",
+            "markReady": "Mark Ready",
+            "cancel": "Cancel Order"
+        },
+        "prepModal": {
+            "title": "Set Preparation Time",
+            "subtitle": "How long will this order take to prepare?",
+            "minutes": "minutes",
+            "start": "Start Preparing"
+        }
+    },
+    "dashboard": {
+        "title": "Dashboard",
+        "todayOrders": "Today's Orders",
+        "activeOrders": "Active Orders",
+        "revenue": "Revenue",
+        "avgDeliveryTime": "Avg Delivery",
+        "onlineDrivers": "Online Drivers",
+        "recentOrders": "Recent Orders"
+    },
+    "more": {
+        "title": "More",
+        "businesses": "Businesses",
+        "drivers": "Drivers",
+        "users": "Users",
+        "promotions": "Promotions",
+        "notifications": "Notifications",
+        "settlements": "Settlements",
+        "storeStatus": "Store Status",
+        "settings": "Settings",
+        "logout": "Logout"
+    },
+    "profile": {
+        "title": "Settings",
+        "language_toggle": "Change Language",
+        "current_language": "Current Language: English",
+        "theme": "Theme",
+        "themeOptions": {
+            "light": "Light",
+            "dark": "Dark",
+            "system": "System"
+        }
+    }
+}

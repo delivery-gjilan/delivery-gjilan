@@ -5,36 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1767547055404,
-      "tag": "0000_plain_edwin_jarvis",
+      "when": 1774558476421,
+      "tag": "0000_boring_callisto",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1769377283761,
-      "tag": "0001_brown_dorian_gray",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1769378536606,
-      "tag": "0002_misty_texas_twister",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1769443404910,
-      "tag": "0003_ambiguous_meteorite",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1769443924714,
-      "tag": "0004_fixed_storm",
+      "when": 1774657068022,
+      "tag": "0001_powerful_mac_gargan",
       "breakpoints": true
     }
   ]

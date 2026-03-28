@@ -10,18 +10,43 @@ export const ORDER_STATUS_UPDATED = graphql(`
 `);
 
 export const USER_ORDERS_UPDATED = graphql(`
-    subscription UserOrdersUpdated($input: SubscriptionInput!) {
-        userOrdersUpdated(input: $input) {
+    subscription UserOrdersUpdated {
+        userOrdersUpdated {
             id
+            displayId
+            userId
             orderPrice
             deliveryPrice
             totalPrice
             orderDate
+            updatedAt
             status
+            preparationMinutes
+            estimatedReadyAt
+            preparingAt
             dropOffLocation {
                 latitude
                 longitude
                 address
+            }
+            driver {
+                id
+                firstName
+                lastName
+                phoneNumber
+                imageUrl
+                driverLocation {
+                    latitude
+                    longitude
+                    address
+                }
+                driverLocationUpdatedAt
+                driverConnection {
+                    activeOrderId
+                    navigationPhase
+                    remainingEtaSeconds
+                    etaUpdatedAt
+                }
             }
             businesses {
                 business {
@@ -44,13 +69,53 @@ export const USER_ORDERS_UPDATED = graphql(`
                     }
                 }
                 items {
+                    id
                     productId
                     name
                     imageUrl
                     quantity
-                    price
+                    unitPrice
+                    parentOrderItemId
+                    selectedOptions {
+                        id
+                        optionGroupId
+                        optionGroupName
+                        optionId
+                        optionName
+                        priceAtOrder
+                    }
+                    childItems {
+                        id
+                        productId
+                        name
+                        imageUrl
+                        quantity
+                        unitPrice
+                        selectedOptions {
+                            id
+                            optionGroupId
+                            optionGroupName
+                            optionId
+                            optionName
+                            priceAtOrder
+                        }
+                    }
                 }
             }
+        }
+    }
+`);
+
+export const ORDER_DRIVER_LIVE_TRACKING = graphql(`
+    subscription OrderDriverLiveTracking($orderId: ID!) {
+        orderDriverLiveTracking(orderId: $orderId) {
+            orderId
+            driverId
+            latitude
+            longitude
+            navigationPhase
+            remainingEtaSeconds
+            etaUpdatedAt
         }
     }
 `);

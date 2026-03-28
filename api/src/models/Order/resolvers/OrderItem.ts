@@ -1,4 +1,4 @@
 import type { OrderItemResolvers } from './../../../generated/types.generated';
 export const OrderItem: OrderItemResolvers = {
-    /* Implement OrderItem resolver logic here */
+    /* OrderItem fields (selectedOptions, childItems) are pre-populated in OrderService.mapToOrder */
 };

@@ -1,17 +1,58 @@
 {
   "expo": {
-    "name": "finance-tracker",
-    "slug": "finance-tracker",
+    "name": "Zipp Driver",
+    "slug": "zipp-driver",
     "version": "1.0.0",
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "updates": {
+      "url": "https://u.expo.dev/d813bf35-bd14-4516-bc09-b9f11566764f",
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "deliveryapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.zippdelivery.mobiledriver",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow camera access to take and upload delivery proof photos when required.",
+        "NSMicrophoneUsageDescription": "Allow microphone access to receive live push-to-talk voice updates from dispatch.",
+        "NSLocationWhenInUseUsageDescription": "We use your location to show drivers on the map.",
+        "NSLocationAlwaysUsageDescription": "We need your location even when the app is closed to track deliveries.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location in the background to track deliveries in real-time.",
+        "UIBackgroundModes": [
+          "location",
+          "audio",
+          "location",
+          "audio"
+        ],
+        "MBXAccessToken": "pk.eyJ1IjoiYXJ0c2hhYmFuaTIwMDIiLCJhIjoiY21sZjlkbTNxMDIwOTNkc2F0cTZkYmZoeiJ9.C81uu49ST5NrfHZ58N9EXg",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -19,7 +60,9 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.zippdelivery.mobiledriver",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",
@@ -27,11 +70,38 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-router",
+      [
+        "expo-router",
+        {
+          "root": "app"
+        }
+      ],
+      [
+        "@rnmapbox/maps",
+        {
+          "RNMapboxMapsVersion": "11.11.0"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#0ea5e9",
+          "defaultChannel": "default",
+          "enableBackgroundRemoteNotifications": true
+        }
+      ],
+      [
+        "@badatgil/expo-mapbox-navigation",
+        {
+          "accessToken": "pk.eyJ1IjoiYXJ0c2hhYmFuaTIwMDIiLCJhIjoiY21sZjlkbTNxMDIwOTNkc2F0cTZkYmZoeiJ9.C81uu49ST5NrfHZ58N9EXg",
+          "mapboxMapsVersion": "11.11.0"
+        }
+      ],
+      "expo-build-properties",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/splash.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
@@ -40,11 +110,32 @@
           }
         }
       ],
-      "expo-sqlite"
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "We need your location in the background to track deliveries in real-time.",
+          "locationAlwaysPermission": "We need your location even when the app is closed to track deliveries.",
+          "locationWhenInUsePermission": "We use your location to show you on the map during deliveries.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      "@react-native-firebase/app",
+      "./plugins/fix-firebase-modular-headers"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {
+        "root": "app"
+      },
+      "eas": {
+        "projectId": "d813bf35-bd14-4516-bc09-b9f11566764f"
+      }
+    },
+    "owner": "artshabani2002"
   }
 }

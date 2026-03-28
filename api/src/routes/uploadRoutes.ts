@@ -1,8 +1,33 @@
 import { Router, Request, Response } from 'express';
 import { uploadMiddleware } from '../lib/middleware/uploadMiddleware';
 import S3Service from '../services/S3Service';
+import logger from '@/lib/logger';
+import { decodeJwtToken } from '@/lib/utils/authUtils';
 
+const log = logger.child({ service: 'UploadRoutes' });
 const router = Router();
+
+/**
+ * Middleware to verify JWT token on upload routes
+ */
+function requireAuth(req: Request, res: Response, next: () => void) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        res.status(401).json({ success: false, error: 'Authentication required' });
+        return;
+    }
+
+    try {
+        const token = authHeader.substring(7);
+        const decoded = decodeJwtToken(token);
+        (req as any).userId = decoded.userId;
+        (req as any).userRole = decoded.role;
+        next();
+    } catch {
+        res.status(401).json({ success: false, error: 'Invalid or expired token' });
+        return;
+    }
+}
 
 /**
  * POST /api/upload/image
@@ -12,7 +37,10 @@ const router = Router();
  * - image: File (required)
  * - folder: 'businesses' | 'products' | 'categories' (required)
  */
-router.post('/image', uploadMiddleware.single('image'), async (req: Request, res: Response) => {
+const ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN'];
+const BUSINESS_ROLES = ['ADMIN', 'SUPER_ADMIN', 'BUSINESS_OWNER', 'BUSINESS_EMPLOYEE'];
+
+router.post('/image', requireAuth, uploadMiddleware.single('image'), async (req: Request, res: Response) => {
     try {
         // Validate file
         if (!req.file) {
@@ -28,6 +56,23 @@ router.post('/image', uploadMiddleware.single('image'), async (req: Request, res
             return res.status(400).json({
                 success: false,
                 error: 'Invalid folder. Must be one of: businesses, products, categories',
+            });
+        }
+
+        // Enforce role-based folder access:
+        // - businesses/ → ADMIN and SUPER_ADMIN only (business creation is admin-only)
+        // - products/ and categories/ → all business roles (owner + employee can manage products)
+        const userRole = (req as any).userRole as string;
+        if (folder === 'businesses' && !ADMIN_ROLES.includes(userRole)) {
+            return res.status(403).json({
+                success: false,
+                error: 'Only admins can upload business images',
+            });
+        }
+        if (!BUSINESS_ROLES.includes(userRole)) {
+            return res.status(403).json({
+                success: false,
+                error: 'Insufficient permissions to upload images',
             });
         }
 
@@ -48,7 +93,7 @@ router.post('/image', uploadMiddleware.single('image'), async (req: Request, res
             url: result.url,
         });
     } catch (error) {
-        console.error('Upload error:', error);
+        log.error({ err: error }, 'upload:image:error');
         return res.status(500).json({
             success: false,
             error: error instanceof Error ? error.message : 'Internal server error',
@@ -63,8 +108,17 @@ router.post('/image', uploadMiddleware.single('image'), async (req: Request, res
  * Body (JSON):
  * - imageUrl: string (required)
  */
-router.delete('/image', async (req: Request, res: Response) => {
+router.delete('/image', requireAuth, async (req: Request, res: Response) => {
     try {
+        // Only business roles can delete images
+        const userRole = (req as any).userRole as string;
+        if (!BUSINESS_ROLES.includes(userRole)) {
+            return res.status(403).json({
+                success: false,
+                error: 'Insufficient permissions to delete images',
+            });
+        }
+
         const { imageUrl } = req.body;
 
         if (!imageUrl) {
@@ -89,7 +143,7 @@ router.delete('/image', async (req: Request, res: Response) => {
             message: deleted ? 'Image deleted successfully' : 'Failed to delete image',
         });
     } catch (error) {
-        console.error('Delete error:', error);
+        log.error({ err: error }, 'upload:deleteError');
         return res.status(500).json({
             success: false,
             error: error instanceof Error ? error.message : 'Internal server error',

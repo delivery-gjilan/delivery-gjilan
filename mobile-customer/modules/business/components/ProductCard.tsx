@@ -1,27 +1,40 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, Platform, Image } from 'react-native';
 import { router } from 'expo-router';
-import { Product } from '@/gql/graphql';
+import { GetProductsQuery, BusinessType } from '@/gql/graphql';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
+import { useTranslations } from '@/hooks/useTranslations';
 import { CartControls } from './CartControls';
+import { ComplexCartControls } from './ComplexCartControls';
+import { getEffectiveProductPrice } from '@/modules/product/utils/pricing';
+
+type ProductCardItem = GetProductsQuery['products'][number];
 
 interface ProductCardProps {
-    product: Product;
+    productCard: ProductCardItem;
+    businessType?: BusinessType;
 }
 
-export function ProductCard({ product }: ProductCardProps) {
+export function ProductCard({ productCard, businessType }: ProductCardProps) {
     const theme = useTheme();
+    const { t } = useTranslations();
+
+    // Use product from card if single product, otherwise fallback to first variant.
+    const product = productCard.product || productCard.variants[0];
+    const hasVariants = productCard.variants.length > 0;
+    const isComplexProduct = hasVariants || productCard.isOffer || productCard.hasOptionGroups;
+    const targetProductId = productCard.product?.id || productCard.variants[0]?.id;
 
     const handlePress = () => {
-        router.push(`/product/${product.id}`);
+        if (!targetProductId) return;
+        router.push(`/product/${targetProductId}`);
     };
 
-    const effectivePrice = product.isOnSale && product.salePrice ? product.salePrice : product.price;
-    const hasDiscount = product.isOnSale && product.salePrice;
-    const discountPercent = hasDiscount
-        ? Math.round(((product.price - product.salePrice!) / product.price) * 100)
-        : 0;
+    const effectivePrice = product ? getEffectiveProductPrice(product) : (productCard.basePrice ?? 0);
+    const hasDiscount = !!(product?.isOnSale && product?.salePrice);
+    const discountPercent =
+        hasDiscount && product ? Math.round(((product.price - (product.salePrice ?? 0)) / product.price) * 100) : 0;
 
     return (
         <TouchableOpacity
@@ -51,9 +64,9 @@ export function ProductCard({ product }: ProductCardProps) {
                         flexShrink: 0, // Prevent image from shrinking
                     }}
                 >
-                    {product.imageUrl ? (
+                    {productCard.imageUrl || product?.imageUrl ? (
                         <Image
-                            source={{ uri: product.imageUrl }}
+                            source={{ uri: productCard.imageUrl || product?.imageUrl || '' }}
                             style={{ width: 112, height: 112 }}
                             resizeMode="cover"
                         />
@@ -68,15 +81,15 @@ export function ProductCard({ product }: ProductCardProps) {
 
                     {/* Discount Badge */}
                     {hasDiscount && (
-                        <View className="absolute top-2 left-2 bg-red-500 px-2 py-1 rounded-md">
+                        <View className="absolute top-2 left-2 bg-expense px-2 py-1 rounded-md">
                             <Text className="text-white text-xs font-bold">-{discountPercent}%</Text>
                         </View>
                     )}
 
                     {/* Unavailable Overlay */}
-                    {!product.isAvailable && (
+                    {product?.isAvailable === false && (
                         <View className="absolute inset-0 bg-black/60 items-center justify-center">
-                            <Text className="text-white text-xs font-semibold">Unavailable</Text>
+                            <Text className="text-white text-xs font-semibold">{t.common.unavailable}</Text>
                         </View>
                     )}
                 </View>
@@ -91,38 +104,49 @@ export function ProductCard({ product }: ProductCardProps) {
                             numberOfLines={2}
                             ellipsizeMode="tail"
                         >
-                            {product.name}
+                            {productCard.name}
                         </Text>
 
-                        {product.description && (
+                        {productCard.product?.description && (
                             <Text
                                 className="text-xs leading-4"
                                 style={{ color: theme.colors.subtext }}
                                 numberOfLines={2}
                                 ellipsizeMode="tail"
                             >
-                                {product.description}
+                                {productCard.product.description}
                             </Text>
                         )}
                     </View>
 
-                    {/* Price Section and Cart Controls */}
-                    <View className="flex-row items-center justify-between" style={{ marginTop: 8, minHeight: 32 }}>
-                        <View className="flex-row items-baseline" style={{ gap: 8, flexShrink: 1 }}>
-                            <Text className="text-lg font-bold" style={{ color: theme.colors.primary }}>
-                                €{effectivePrice.toFixed(2)}
-                            </Text>
-                            {hasDiscount && (
+                    <View className="flex-row items-center justify-between" style={{ marginTop: 8, minHeight: 40 }}>
+                        <View style={{ flexShrink: 1 }}>
+                            <View className="flex-row items-baseline" style={{ gap: 4 }}>
+                                {hasVariants && !hasDiscount && (
+                                    <Text className="text-xs" style={{ color: theme.colors.subtext }}>from</Text>
+                                )}
+                                <Text className="text-lg font-bold" style={{ color: theme.colors.primary }}>
+                                    €{effectivePrice.toFixed(2)}
+                                </Text>
+                            </View>
+                            {hasDiscount && product && (
                                 <Text className="text-xs line-through" style={{ color: theme.colors.subtext }}>
                                     €{product.price.toFixed(2)}
                                 </Text>
                             )}
                         </View>
 
-                        {/* Cart Controls */}
-                        {product.isAvailable && (
+                        {/* Cart Controls or Customize Button */}
+                        {productCard.product?.isAvailable !== false && (
                             <View style={{ flexShrink: 0, marginLeft: 8 }}>
-                                <CartControls product={product} />
+                                {!isComplexProduct ? (
+                                    <CartControls product={productCard.product!} businessType={businessType} />
+                                ) : targetProductId ? (
+                                    <ComplexCartControls
+                                        productId={targetProductId}
+                                        businessType={businessType}
+                                    />
+                                ) : null}
                             </View>
                         )}
                     </View>

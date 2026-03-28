@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, TouchableOpacity, Pressable, Platform, Image, Dimensions, Animated } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
+import { useFavoritesStore } from '@/store/useFavoritesStore';
+import { useEstimatedDeliveryPrice } from '@/hooks/useEstimatedDeliveryPrice';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IMAGE_HEIGHT = 192; // h-48 equivalent
@@ -33,14 +35,24 @@ interface RestaurantCardProps {
     businessType: string;
     isOpen: boolean;
     onPress: (id: string) => void;
+    locationLat: number;
+    locationLng: number;
     description?: string;
     deliveryFee?: number;
-    deliveryTime?: string;
+    avgPrepTimeMinutes?: number | null;
+    prepTimeOverrideMinutes?: number | null;
     rating?: number;
     priceRange?: string;
     discount?: number;
     isNew?: boolean;
     isSponsored?: boolean;
+    activePromotion?: {
+        id: string;
+        name: string;
+        description?: string | null;
+        type: string;
+        discountValue?: number | null;
+    } | null;
 }
 
 export function RestaurantCard({
@@ -50,17 +62,27 @@ export function RestaurantCard({
     businessType,
     isOpen,
     onPress,
+    locationLat,
+    locationLng,
     description,
-    deliveryFee = 1.1,
-    deliveryTime = '35-45',
+    deliveryFee,
+    avgPrepTimeMinutes,
+    prepTimeOverrideMinutes,
     rating = 8.6,
     priceRange = '$$$$',
     discount,
     isNew,
     isSponsored,
+    activePromotion,
 }: RestaurantCardProps) {
     const theme = useTheme();
-    const [isFavorite, setIsFavorite] = React.useState(false);
+    const isFavorite = useFavoritesStore((state) => state.isFavorite(id));
+    const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
+    const { estimateDeliveryPrice } = useEstimatedDeliveryPrice();
+
+    // Calculate estimated delivery price based on user's location
+    const calculatedDeliveryFee = estimateDeliveryPrice(locationLat, locationLng);
+    const displayDeliveryFee = deliveryFee ?? calculatedDeliveryFee;
 
     // Entrance animations
     const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -89,8 +111,16 @@ export function RestaurantCard({
         ]).start();
     }, [fadeAnim, scaleAnim, slideAnim]);
 
+    const basePrepTime =
+        typeof prepTimeOverrideMinutes === 'number' && prepTimeOverrideMinutes > 0
+            ? prepTimeOverrideMinutes
+            : typeof avgPrepTimeMinutes === 'number' && avgPrepTimeMinutes > 0
+              ? avgPrepTimeMinutes
+              : null;
+    const prepTimeLabel = basePrepTime ? `${basePrepTime}-${basePrepTime + 10}` : '—';
+
     const handleFavoritePress = () => {
-        // Favorite animation
+        // Bounce animation on tap
         Animated.sequence([
             Animated.spring(scaleAnim, {
                 toValue: 1.05,
@@ -105,7 +135,7 @@ export function RestaurantCard({
                 useNativeDriver: true,
             }),
         ]).start();
-        setIsFavorite(!isFavorite);
+        toggleFavorite(id);
     };
 
     return (
@@ -116,10 +146,12 @@ export function RestaurantCard({
             }}
         >
             <TouchableOpacity
-                onPress={() => onPress(id)}
+                onPress={isOpen ? () => onPress(id) : undefined}
+                disabled={!isOpen}
                 className="mb-5"
                 activeOpacity={0.95}
                 style={{
+                    opacity: isOpen ? 1 : 0.6,
                     ...(Platform.OS === 'ios' && {
                         shadowColor: '#000',
                         shadowOffset: { width: 0, height: 2 },
@@ -134,7 +166,7 @@ export function RestaurantCard({
             {/* Image Container with Badges */}
             <View className="relative rounded-2xl overflow-hidden">
                 {/* Restaurant Image */}
-                <View className="h-48 bg-gray-800">
+                <View className="h-48 bg-card">
                     <Image
                         source={{ uri: imageUrl || getPlaceholderImage(id) }}
                         style={{ width: '100%', height: IMAGE_HEIGHT }}
@@ -144,14 +176,28 @@ export function RestaurantCard({
 
                 {/* Top Left Badges */}
                 <View className="absolute top-3 left-3 flex-col gap-2">
+                    {activePromotion && (
+                        <View className="bg-primary px-3 py-1.5 rounded-lg flex-row items-center gap-1.5">
+                            <Ionicons name="pricetag" size={14} color="black" />
+                            <Text className="text-black font-semibold text-xs">
+                                {activePromotion.type === 'PERCENTAGE' && activePromotion.discountValue
+                                    ? `${Math.round(activePromotion.discountValue)}% Zbritje`
+                                    : activePromotion.type === 'FIXED_AMOUNT' && activePromotion.discountValue
+                                      ? `€${activePromotion.discountValue.toFixed(2)} Zbritje`
+                                      : activePromotion.type === 'FREE_DELIVERY'
+                                        ? 'Transporti Falas'
+                                        : activePromotion.name}
+                            </Text>
+                        </View>
+                    )}
                     {discount && (
-                        <View className="bg-cyan-500 px-3 py-1.5 rounded-lg flex-row items-center gap-1.5">
+                        <View className="bg-primary px-3 py-1.5 rounded-lg flex-row items-center gap-1.5">
                             <Ionicons name="pricetag" size={14} color="black" />
                             <Text className="text-black font-semibold text-xs">-{discount}% Item Discount</Text>
                         </View>
                     )}
                     {isNew && (
-                        <View className="bg-cyan-500 px-3 py-1.5 rounded-lg">
+                        <View className="bg-primary px-3 py-1.5 rounded-lg">
                             <Text className="text-black font-semibold text-xs">New</Text>
                         </View>
                     )}
@@ -161,7 +207,7 @@ export function RestaurantCard({
                 <Pressable
                     onPress={handleFavoritePress}
                     className="absolute top-3 right-3 w-9 h-9 rounded-full items-center justify-center"
-                    style={{ backgroundColor: 'rgba(255, 255, 255, 0.95)' }}
+                    style={{ backgroundColor: theme.colors.card }}
                 >
                     <Ionicons
                         name={isFavorite ? 'heart' : 'heart-outline'}
@@ -199,7 +245,7 @@ export function RestaurantCard({
                     {/* Delivery Time Pill */}
                     <View className="px-3 py-1.5 rounded-lg" style={{ backgroundColor: theme.colors.background }}>
                         <Text className="text-sm font-semibold" style={{ color: theme.colors.primary }}>
-                            {deliveryTime} min
+                            {prepTimeLabel} min
                         </Text>
                     </View>
                 </View>
@@ -210,7 +256,7 @@ export function RestaurantCard({
                     <View className="flex-row items-center gap-1">
                         <Ionicons name="bicycle-outline" size={16} color={theme.colors.subtext} />
                         <Text className="text-sm" style={{ color: theme.colors.subtext }}>
-                            €{deliveryFee.toFixed(2)}
+                            €{displayDeliveryFee.toFixed(2)}
                         </Text>
                     </View>
 
@@ -235,8 +281,8 @@ export function RestaurantCard({
                 {/* Open/Closed Status (if closed, show it prominently) */}
                 {!isOpen && (
                     <View className="mt-2 flex-row items-center">
-                        <View className="w-2 h-2 rounded-full bg-red-500 mr-2" />
-                        <Text className="text-xs font-medium text-red-500">Currently Closed</Text>
+                        <View className="w-2 h-2 rounded-full bg-expense mr-2" />
+                        <Text className="text-xs font-medium text-expense">Currently Closed</Text>
                     </View>
                 )}
             </View>

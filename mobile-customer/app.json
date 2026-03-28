@@ -1,17 +1,49 @@
 {
   "expo": {
-    "name": "finance-tracker",
-    "slug": "finance-tracker",
+    "name": "Zipp Go",
+    "slug": "mobile-customer",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
-    "scheme": "deliveryapp",
+    "scheme": ["deliveryapp", "zipp"],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "We use your location to set the delivery address.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSSupportsLiveActivities": true,
+        "UIBackgroundModes": [
+          "remote-notification",
+          "remote-notification",
+          "remote-notification",
+          "remote-notification"
+        ]
+      },
+      "appleTeamId": "87K8YXG5V8",
+      "bundleIdentifier": "com.artshabani.mobilecustomer",
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -19,7 +51,9 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.artshabani.mobilecustomer",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",
@@ -28,6 +62,16 @@
     },
     "plugins": [
       "expo-router",
+      "@rnmapbox/maps",
+      "@react-native-firebase/app",
+      [
+        "expo-notifications",
+        {
+          "color": "#0ea5e9",
+          "defaultChannel": "default",
+          "enableBackgroundRemoteNotifications": true
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -40,11 +84,30 @@
           }
         }
       ],
-      "expo-sqlite"
+      "expo-build-properties",
+      "./plugins/patch-live-activities",
+      "./plugins/with-live-activity-extension",
+      "./plugins/fix-firebase-modular-headers"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e5c04b16-6851-4fce-aa03-e4a183f0becf"
+      }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e5c04b16-6851-4fce-aa03-e4a183f0becf",
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "owner": "artshabani2002"
   }
 }

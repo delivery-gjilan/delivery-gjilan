@@ -1,0 +1,168 @@
+import type { MutationResolvers } from './../../../../generated/types.generated';
+import { randomBytes } from 'crypto';
+import { getDB } from '@/database';
+import { orders, orderItems, deliveryPricingTiers } from '@/database/schema';
+import { businesses as businessesTable, products as productsTable } from '@/database/schema';
+import { users as usersTable } from '@/database/schema';
+import { eq, asc, isNull } from 'drizzle-orm';
+import { AppError } from '@/lib/errors';
+
+export const createTestOrder: NonNullable<MutationResolvers['createTestOrder']> = async (
+    _parent,
+    _args,
+    context,
+) => {
+    const { orderService, userData } = context;
+
+    // Only super admins can create test orders
+    if (!userData?.userId || userData.role !== 'SUPER_ADMIN') {
+        throw AppError.forbidden('Only super admins can create test orders');
+    }
+
+    const db = await getDB();
+
+    // 1. Find businesses that have products and are not deleted.
+    const availableBusinesses = await db
+        .select()
+        .from(businessesTable)
+        .where(isNull(businessesTable.deletedAt));
+
+    if (availableBusinesses.length === 0) {
+        throw new AppError('No businesses found in database.', 'NOT_FOUND');
+    }
+
+    const businessesWithProducts = [] as Array<{
+        id: string;
+        name: string;
+        locationLat: number;
+        locationLng: number;
+        products: Array<any>;
+    }>;
+
+    for (const business of availableBusinesses) {
+        const businessProducts = await db
+            .select()
+            .from(productsTable)
+            .where(eq(productsTable.businessId, business.id));
+
+        if (businessProducts.length > 0) {
+            businessesWithProducts.push({
+                id: business.id,
+                name: business.name,
+                locationLat: business.locationLat,
+                locationLng: business.locationLng,
+                products: businessProducts,
+            });
+        }
+    }
+
+    if (businessesWithProducts.length === 0) {
+        throw new AppError('No products found for any business.', 'NOT_FOUND');
+    }
+
+    const selectedBusiness = businessesWithProducts[Math.floor(Math.random() * businessesWithProducts.length)];
+
+    // 3. Find a random CUSTOMER user
+    const customerUsers = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.role, 'CUSTOMER'));
+
+    if (customerUsers.length === 0) {
+        throw new AppError('No customer users found in database.', 'NOT_FOUND');
+    }
+
+    const randomCustomer = customerUsers[Math.floor(Math.random() * customerUsers.length)];
+
+    // 4. Pick 1-3 random products from a random business
+    const numProducts = Math.floor(Math.random() * 3) + 1;
+    const shuffled = [...selectedBusiness.products].sort(() => Math.random() - 0.5);
+    const selectedProducts = shuffled.slice(0, numProducts);
+
+    // 5. Calculate totals
+    const itemsData = selectedProducts.map((product) => ({
+        productId: product.id,
+        quantity: Math.floor(Math.random() * 2) + 1,
+        price: Number(product.isOnSale && product.salePrice ? product.salePrice : product.basePrice),
+    }));
+
+    const orderPrice = itemsData.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+    // Calculate delivery price from tiers (use test dropoff → business distance)
+    const dropoffLat = 42.4602;
+    const dropoffLng = 21.4691;
+    let deliveryPrice = 1.5; // fallback
+
+    const tiers = await db
+        .select()
+        .from(deliveryPricingTiers)
+        .where(eq(deliveryPricingTiers.isActive, true))
+        .orderBy(asc(deliveryPricingTiers.sortOrder));
+
+    if (tiers.length > 0) {
+        const R = 6371;
+        const dLat = ((dropoffLat - selectedBusiness.locationLat) * Math.PI) / 180;
+        const dLng = ((dropoffLng - selectedBusiness.locationLng) * Math.PI) / 180;
+        const a =
+            Math.sin(dLat / 2) ** 2 +
+            Math.cos((selectedBusiness.locationLat * Math.PI) / 180) *
+                Math.cos((dropoffLat * Math.PI) / 180) *
+                Math.sin(dLng / 2) ** 2;
+        const distanceKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        const matched = tiers.find((t) => {
+            if (t.maxDistanceKm === null) return distanceKm >= t.minDistanceKm;
+            return distanceKm >= t.minDistanceKm && distanceKm < t.maxDistanceKm;
+        });
+        if (matched) deliveryPrice = matched.price;
+        else deliveryPrice = tiers[tiers.length - 1].price;
+    }
+
+    // Generate short display ID
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const bytes = randomBytes(4);
+    let displayId = 'GJ-';
+    for (let i = 0; i < 4; i++) displayId += chars[bytes[i] % chars.length];
+
+    // 6. Create order directly in DB (bypass business hours / promo validation)
+    const [createdOrder] = await db
+        .insert(orders)
+        .values({
+            displayId,
+            userId: randomCustomer.id,
+            price: orderPrice,
+            deliveryPrice,
+            paymentCollection: 'CASH_TO_DRIVER',
+            status: 'PENDING',
+            dropoffLat: 42.4602,
+            dropoffLng: 21.4691,
+            dropoffAddress: 'Rr. Adem Jashari, Gjilan',
+        })
+        .returning();
+
+    // 7. Insert order items
+    await db.insert(orderItems).values(
+        itemsData.map((item) => ({
+            orderId: createdOrder.id,
+            productId: item.productId,
+            quantity: item.quantity,
+            finalAppliedPrice: item.price,
+            basePrice: item.price,
+            salePrice: null,
+            markupPrice: null,
+            nightMarkedupPrice: null,
+        })),
+    );
+
+    // 8. Publish updates for real-time subscriptions
+    await orderService.publishSingleUserOrder(randomCustomer.id, createdOrder.id);
+    await orderService.publishAllOrders();
+
+    // 9. Return the order through the normal mapping
+    const dbOrder = await orderService.orderRepository.findById(createdOrder.id);
+    if (!dbOrder) {
+        throw new AppError('Failed to retrieve created test order.', 'INTERNAL_ERROR');
+    }
+
+    return orderService.mapToOrderPublic(dbOrder);
+};

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "@apollo/client/react";
@@ -11,11 +11,13 @@ import Modal from "@/components/ui/Modal";
 import { Table, Th, Td } from "@/components/ui/Table";
 import {
     CREATE_BUSINESS,
+    CREATE_BUSINESS_WITH_OWNER,
     DELETE_BUSINESS,
-    GET_BUSINESS,
     GET_BUSINESSES,
     UPDATE_BUSINESS,
 } from "@/graphql/operations/businesses";
+import ScheduleEditor from "@/components/businesses/ScheduleEditor";
+import { toast } from 'sonner';
 
 /* ---------------------------------------------------------
    GRAPHQL TYPES
@@ -37,11 +39,13 @@ interface WorkingHours {
 interface Business {
     id: string;
     name: string;
+    phoneNumber?: string | null;
     businessType: BusinessType;
     imageUrl?: string | null;
     isActive: boolean;
     location?: Location;
     workingHours?: WorkingHours;
+    schedule?: Array<{ id: string; dayOfWeek: number; opensAt: string; closesAt: string }>;
 }
 
 interface GetBusinessesData {
@@ -61,10 +65,9 @@ export default function BusinessesPage() {
     const { data, loading, refetch } = useQuery<GetBusinessesData>(GET_BUSINESSES);
 
     const [createBusiness] = useMutation(CREATE_BUSINESS);
+    const [createBusinessWithOwner] = useMutation(CREATE_BUSINESS_WITH_OWNER);
     const [updateBusiness] = useMutation(UPDATE_BUSINESS);
     const [deleteBusiness] = useMutation(DELETE_BUSINESS);
-
-    const [getBusinessDetails] = useMutation(GET_BUSINESS);
 
     /* --------------------------
      UI State
@@ -91,8 +94,14 @@ export default function BusinessesPage() {
 
     const [createForm, setCreateForm] = useState({
         name: "",
+        phoneNumber: "",
         businessType: "RESTAURANT" as BusinessType,
         imageUrl: "",
+        createOwnerNow: true,
+        ownerFirstName: "",
+        ownerLastName: "",
+        ownerEmail: "",
+        ownerPassword: "",
         location: {
             latitude: 0,
             longitude: 0,
@@ -106,6 +115,7 @@ export default function BusinessesPage() {
 
     const [editForm, setEditForm] = useState({
         name: "",
+        phoneNumber: "",
         businessType: "RESTAURANT" as BusinessType,
         imageUrl: "",
         location: {
@@ -123,15 +133,20 @@ export default function BusinessesPage() {
      Handlers
   --------------------------- */
 
+    // Resolved API base URL (strips /graphql suffix if present)
+    const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/graphql').replace(/\/graphql$/, '');
+
     // Image upload handler
     async function uploadImage(file: File, folder: string): Promise<string | null> {
         const formData = new FormData();
         formData.append('image', file);
         formData.append('folder', folder);
 
+        const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
         try {
-            const response = await fetch('http://localhost:4000/api/upload/image', {
+            const response = await fetch(`${apiBase}/api/upload/image`, {
                 method: 'POST',
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
                 body: formData,
             });
 
@@ -142,8 +157,24 @@ export default function BusinessesPage() {
             throw new Error(data.error || 'Upload failed');
         } catch (error) {
             console.error('Image upload error:', error);
-            alert('Failed to upload image');
+            toast.error('Failed to upload image');
             return null;
+        }
+    }
+
+    async function deleteImage(imageUrl: string): Promise<void> {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+        try {
+            await fetch(`${apiBase}/api/upload/image`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify({ imageUrl }),
+            });
+        } catch {
+            console.warn('Failed to delete old image from S3:', imageUrl);
         }
     }
 
@@ -173,8 +204,25 @@ export default function BusinessesPage() {
 
     async function handleCreate() {
         if (!createForm.name.trim() || !createForm.location.address.trim()) {
-            alert("Please fill in all required fields");
+            toast.warning("Please fill in all required fields");
             return;
+        }
+
+        if (createForm.createOwnerNow) {
+            if (
+                !createForm.ownerFirstName.trim() ||
+                !createForm.ownerLastName.trim() ||
+                !createForm.ownerEmail.trim() ||
+                !createForm.ownerPassword
+            ) {
+                toast.warning("Please fill in all owner credential fields");
+                return;
+            }
+
+            if (createForm.ownerPassword.length < 8) {
+                toast.warning("Owner password must be at least 8 characters");
+                return;
+            }
         }
 
         setUploadingImage(true);
@@ -190,32 +238,59 @@ export default function BusinessesPage() {
 
         setUploadingImage(false);
 
-        await createBusiness({
-            variables: {
-                input: {
-                    name: createForm.name,
-                    businessType: createForm.businessType,
-                    imageUrl: imageUrl || null,
-                    location: {
-                        latitude: createForm.location.latitude,
-                        longitude: createForm.location.longitude,
-                        address: createForm.location.address,
-                    },
-                    workingHours: {
-                        opensAt: createForm.workingHours.opensAt,
-                        closesAt: createForm.workingHours.closesAt,
+        const businessInput = {
+            name: createForm.name,
+            phoneNumber: createForm.phoneNumber.trim() || null,
+            businessType: createForm.businessType as any,
+            imageUrl: imageUrl || null,
+            location: {
+                latitude: createForm.location.latitude,
+                longitude: createForm.location.longitude,
+                address: createForm.location.address,
+            },
+            workingHours: {
+                opensAt: createForm.workingHours.opensAt,
+                closesAt: createForm.workingHours.closesAt,
+            },
+        };
+
+        if (createForm.createOwnerNow) {
+            await createBusinessWithOwner({
+                variables: {
+                    input: {
+                        business: businessInput,
+                        owner: {
+                            email: createForm.ownerEmail.trim(),
+                            password: createForm.ownerPassword,
+                            firstName: createForm.ownerFirstName.trim(),
+                            lastName: createForm.ownerLastName.trim(),
+                        },
                     },
                 },
-            },
-        });
+            });
+            toast.success("Business and owner created successfully");
+        } else {
+            await createBusiness({
+                variables: {
+                    input: businessInput,
+                },
+            });
+            toast.success("Business created successfully");
+        }
 
         await refetch();
         setCreateOpen(false);
 
         setCreateForm({
             name: "",
+            phoneNumber: "",
             businessType: "RESTAURANT",
             imageUrl: "",
+            createOwnerNow: true,
+            ownerFirstName: "",
+            ownerLastName: "",
+            ownerEmail: "",
+            ownerPassword: "",
             location: {
                 latitude: 0,
                 longitude: 0,
@@ -234,6 +309,7 @@ export default function BusinessesPage() {
         setSelected(business);
         setEditForm({
             name: business.name,
+            phoneNumber: business.phoneNumber || "",
             businessType: business.businessType,
             imageUrl: business.imageUrl || "",
             location: {
@@ -255,15 +331,18 @@ export default function BusinessesPage() {
         if (!selected) return;
         
         if (!editForm.name.trim() || !editForm.location.address.trim()) {
-            alert("Please fill in all required fields");
+            toast.warning("Please fill in all required fields");
             return;
         }
 
         setUploadingImage(true);
         let imageUrl = editForm.imageUrl;
 
-        // Upload new image if file is selected
+        // Upload new image if file is selected; delete old S3 image first
         if (editImageFile) {
+            if (editForm.imageUrl) {
+                await deleteImage(editForm.imageUrl);
+            }
             const uploadedUrl = await uploadImage(editImageFile, 'businesses');
             if (uploadedUrl) {
                 imageUrl = uploadedUrl;
@@ -277,7 +356,8 @@ export default function BusinessesPage() {
                 id: selected.id,
                 input: {
                     name: editForm.name,
-                    businessType: editForm.businessType,
+                    phoneNumber: editForm.phoneNumber.trim() || null,
+                    businessType: editForm.businessType as any,
                     imageUrl: imageUrl || null,
                     location: {
                         latitude: editForm.location.latitude,
@@ -292,7 +372,10 @@ export default function BusinessesPage() {
             },
         });
 
-        await refetch();
+        const result = await refetch();
+        // Update selected with fresh data so ScheduleEditor re-syncs
+        const freshBusiness = result.data?.businesses?.find((b: Business) => b.id === selected.id);
+        if (freshBusiness) setSelected(freshBusiness);
         setEditOpen(false);
     }
 
@@ -326,10 +409,10 @@ export default function BusinessesPage() {
 
     return (
         <div className="text-white">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-semibold">Businesses</h1>
-                <Button variant="primary" onClick={() => setCreateOpen(true)}>
-                    + Create Business
+            <div className="flex justify-between items-center mb-5">
+                <h1 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Businesses</h1>
+                <Button variant="primary" size="sm" onClick={() => setCreateOpen(true)}>
+                    + Create
                 </Button>
             </div>
 
@@ -444,7 +527,7 @@ export default function BusinessesPage() {
          CREATE MODAL
       ---------------------------------------------------------- */}
             <Modal
-                open={createOpen}
+                isOpen={createOpen}
                 onClose={() => setCreateOpen(false)}
                 title="Create Business"
             >
@@ -467,6 +550,22 @@ export default function BusinessesPage() {
 
                     <div>
                         <label className="block text-sm font-medium text-gray-400 mb-1">
+                            Phone Number
+                        </label>
+                        <Input
+                            placeholder="e.g., +383 44 123 456"
+                            value={createForm.phoneNumber}
+                            onChange={(e) =>
+                                setCreateForm({
+                                    ...createForm,
+                                    phoneNumber: e.target.value,
+                                })
+                            }
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">
                             Business Type *
                         </label>
                         <Select
@@ -482,6 +581,75 @@ export default function BusinessesPage() {
                             <option value="MARKET">Market</option>
                             <option value="PHARMACY">Pharmacy</option>
                         </Select>
+                    </div>
+
+                    <div className="border-t border-gray-700 pt-4 space-y-3">
+                        <label className="flex items-center gap-2 text-sm text-gray-300">
+                            <input
+                                type="checkbox"
+                                checked={createForm.createOwnerNow}
+                                onChange={(e) =>
+                                    setCreateForm({
+                                        ...createForm,
+                                        createOwnerNow: e.target.checked,
+                                    })
+                                }
+                                className="h-4 w-4"
+                            />
+                            Create business owner now
+                        </label>
+
+                        {createForm.createOwnerNow && (
+                            <div className="space-y-3 rounded-md border border-gray-700 bg-gray-900/40 p-3">
+                                <p className="text-xs text-gray-400">
+                                    Owner account will be created as BUSINESS_OWNER and linked to this business.
+                                </p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Input
+                                        placeholder="Owner first name *"
+                                        value={createForm.ownerFirstName}
+                                        onChange={(e) =>
+                                            setCreateForm({
+                                                ...createForm,
+                                                ownerFirstName: e.target.value,
+                                            })
+                                        }
+                                    />
+                                    <Input
+                                        placeholder="Owner last name *"
+                                        value={createForm.ownerLastName}
+                                        onChange={(e) =>
+                                            setCreateForm({
+                                                ...createForm,
+                                                ownerLastName: e.target.value,
+                                            })
+                                        }
+                                    />
+                                </div>
+                                <Input
+                                    type="email"
+                                    placeholder="Owner email *"
+                                    value={createForm.ownerEmail}
+                                    onChange={(e) =>
+                                        setCreateForm({
+                                            ...createForm,
+                                            ownerEmail: e.target.value,
+                                        })
+                                    }
+                                />
+                                <Input
+                                    type="password"
+                                    placeholder="Owner password * (min 8 chars)"
+                                    value={createForm.ownerPassword}
+                                    onChange={(e) =>
+                                        setCreateForm({
+                                            ...createForm,
+                                            ownerPassword: e.target.value,
+                                        })
+                                    }
+                                />
+                            </div>
+                        )}
                     </div>
 
                     <div>
@@ -622,7 +790,11 @@ export default function BusinessesPage() {
                         onClick={handleCreate}
                         disabled={uploadingImage}
                     >
-                        {uploadingImage ? "Uploading..." : "Create Business"}
+                        {uploadingImage
+                            ? "Uploading..."
+                            : createForm.createOwnerNow
+                                ? "Create Business + Owner"
+                                : "Create Business"}
                     </Button>
                 </div>
             </Modal>
@@ -631,90 +803,113 @@ export default function BusinessesPage() {
          EDIT MODAL
       ---------------------------------------------------------- */}
             <Modal
-                open={editOpen}
+                isOpen={editOpen}
                 onClose={() => setEditOpen(false)}
                 title="Edit Business"
             >
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Business Name *
-                        </label>
-                        <Input
-                            placeholder="e.g., My Restaurant"
-                            value={editForm.name}
-                            onChange={(e) =>
-                                setEditForm({ ...editForm, name: e.target.value })
-                            }
-                        />
-                    </div>
+                <div className="space-y-6">
+                    {/* Basic Information Section */}
+                    <div className="space-y-4">
+                        <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Basic Information</h3>
+                        
+                        <div>
+                            <label className="block text-sm font-medium text-gray-400 mb-1">
+                                Business Name *
+                            </label>
+                            <Input
+                                placeholder="e.g., My Restaurant"
+                                value={editForm.name}
+                                onChange={(e) =>
+                                    setEditForm({ ...editForm, name: e.target.value })
+                                }
+                            />
+                        </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Business Type *
-                        </label>
-                        <Select
-                            value={editForm.businessType}
-                            onChange={(e) =>
-                                setEditForm({
-                                    ...editForm,
-                                    businessType: e.target.value as BusinessType,
-                                })
-                            }
-                        >
-                            <option value="RESTAURANT">Restaurant</option>
-                            <option value="MARKET">Market</option>
-                            <option value="PHARMACY">Pharmacy</option>
-                        </Select>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Business Image (optional)
-                        </label>
-                        <input
-                            type="file"
-                            accept="image/jpeg,image/jpg,image/png,image/webp"
-                            onChange={handleEditImageChange}
-                            className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
-                        />
-                        {editImagePreview && (
-                            <div className="mt-2">
-                                <img
-                                    src={editImagePreview}
-                                    alt="Preview"
-                                    className="h-32 w-32 object-cover rounded"
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">
+                                    Phone Number
+                                </label>
+                                <Input
+                                    placeholder="e.g., +383 44 123 456"
+                                    value={editForm.phoneNumber}
+                                    onChange={(e) =>
+                                        setEditForm({
+                                            ...editForm,
+                                            phoneNumber: e.target.value,
+                                        })
+                                    }
                                 />
                             </div>
-                        )}
-                    </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Address *
-                        </label>
-                        <Input
-                            placeholder="e.g., 123 Main Street, City"
-                            value={editForm.location.address}
-                            onChange={(e) =>
-                                setEditForm({
-                                    ...editForm,
-                                    location: {
-                                        ...editForm.location,
-                                        address: e.target.value,
-                                    },
-                                })
-                            }
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-2">
-                            Location Coordinates
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
                             <div>
-                                <label className="block text-xs text-gray-500 mb-1">
+                                <label className="block text-sm font-medium text-gray-400 mb-1">
+                                    Business Type *
+                                </label>
+                                <Select
+                                    value={editForm.businessType}
+                                    onChange={(e) =>
+                                        setEditForm({
+                                            ...editForm,
+                                            businessType: e.target.value as BusinessType,
+                                        })
+                                    }
+                                >
+                                    <option value="RESTAURANT">Restaurant</option>
+                                    <option value="MARKET">Market</option>
+                                    <option value="PHARMACY">Pharmacy</option>
+                                </Select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-400 mb-1">
+                                Business Image (optional)
+                            </label>
+                            <input
+                                type="file"
+                                accept="image/jpeg,image/jpg,image/png,image/webp"
+                                onChange={handleEditImageChange}
+                                className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
+                            />
+                            {editImagePreview && (
+                                <div className="mt-2">
+                                    <img
+                                        src={editImagePreview}
+                                        alt="Preview"
+                                        className="h-32 w-32 object-cover rounded"
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Location Section */}
+                    <div className="border-t border-gray-700 pt-6 space-y-4">
+                        <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Location</h3>
+                        
+                        <div>
+                            <label className="block text-sm font-medium text-gray-400 mb-1">
+                                Address *
+                            </label>
+                            <Input
+                                placeholder="e.g., 123 Main Street, City"
+                                value={editForm.location.address}
+                                onChange={(e) =>
+                                    setEditForm({
+                                        ...editForm,
+                                        location: {
+                                            ...editForm.location,
+                                            address: e.target.value,
+                                        },
+                                    })
+                                }
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">
                                     Latitude
                                 </label>
                                 <Input
@@ -734,7 +929,7 @@ export default function BusinessesPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs text-gray-500 mb-1">
+                                <label className="block text-sm font-medium text-gray-400 mb-1">
                                     Longitude
                                 </label>
                                 <Input
@@ -756,13 +951,14 @@ export default function BusinessesPage() {
                         </div>
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-2">
-                            Working Hours *
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
+                    {/* Operating Hours (Legacy) */}
+                    <div className="border-t border-gray-700 pt-6 space-y-4">
+                        <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Default Hours</h3>
+                        <p className="text-xs text-gray-500">Fallback hours when no daily schedule is set</p>
+                        
+                        <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-xs text-gray-500 mb-1">
+                                <label className="block text-sm font-medium text-gray-400 mb-1">
                                     Opens At
                                 </label>
                                 <Input
@@ -780,7 +976,7 @@ export default function BusinessesPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs text-gray-500 mb-1">
+                                <label className="block text-sm font-medium text-gray-400 mb-1">
                                     Closes At
                                 </label>
                                 <Input
@@ -800,9 +996,24 @@ export default function BusinessesPage() {
                         </div>
                     </div>
 
+                    {/* Per-day Schedule Editor */}
+                    <div className="border-t border-gray-700 pt-6">
+                        {selected && (
+                            <ScheduleEditor
+                                businessId={selected.id}
+                                schedule={selected.schedule ?? []}
+                                onSaved={async () => {
+                                    const result = await refetch();
+                                    const freshBusiness = result.data?.businesses?.find((b: Business) => b.id === selected.id);
+                                    if (freshBusiness) setSelected(freshBusiness);
+                                }}
+                            />
+                        )}
+                    </div>
+
                     <Button
                         variant="primary"
-                        className="w-full mt-2"
+                        className="w-full"
                         onClick={handleEdit}
                         disabled={uploadingImage}
                     >
@@ -815,7 +1026,7 @@ export default function BusinessesPage() {
          DELETE CONFIRMATION
       ---------------------------------------------------------- */}
             <Modal
-                open={deleteId !== null}
+                isOpen={deleteId !== null}
                 onClose={() => setDeleteId(null)}
                 title="Delete Business"
             >

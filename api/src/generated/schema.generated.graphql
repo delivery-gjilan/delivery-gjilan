@@ -1,22 +1,282 @@
 directive @skipAuth on FIELD_DEFINITION
 
+enum ActionType {
+  BUSINESS_APPROVED
+  BUSINESS_CREATED
+  BUSINESS_DELETED
+  BUSINESS_REJECTED
+  BUSINESS_UPDATED
+  CATEGORY_CREATED
+  CATEGORY_DELETED
+  CATEGORY_UPDATED
+  DRIVER_APPROVED
+  DRIVER_CREATED
+  DRIVER_REJECTED
+  DRIVER_STATUS_CHANGED
+  DRIVER_UPDATED
+  ORDER_ASSIGNED
+  ORDER_CANCELLED
+  ORDER_CREATED
+  ORDER_DELIVERED
+  ORDER_STATUS_CHANGED
+  ORDER_UPDATED
+  PASSWORD_CHANGED
+  PASSWORD_RESET
+  PRODUCT_AVAILABILITY_CHANGED
+  PRODUCT_CREATED
+  PRODUCT_DELETED
+  PRODUCT_PRICE_CHANGED
+  PRODUCT_PUBLISHED
+  PRODUCT_UNPUBLISHED
+  PRODUCT_UPDATED
+  SETTLEMENT_CREATED
+  SETTLEMENT_PAID
+  SETTLEMENT_PARTIAL_PAID
+  SETTLEMENT_UNSETTLED
+  SUBCATEGORY_CREATED
+  SUBCATEGORY_DELETED
+  SUBCATEGORY_UPDATED
+  USER_CREATED
+  USER_DELETED
+  USER_LOGIN
+  USER_LOGOUT
+  USER_ROLE_CHANGED
+  USER_UPDATED
+}
+
+enum ActorType {
+  ADMIN
+  BUSINESS
+  CUSTOMER
+  DRIVER
+  SYSTEM
+}
+
+input AddUserAddressInput {
+  addressName: String
+  displayName: String
+  latitude: Float!
+  longitude: Float!
+  priority: Int
+}
+
+type AgoraRtcCredentials {
+  appId: String!
+  channelName: String!
+  expiresAt: DateTime!
+  token: String!
+  uid: Int!
+}
+
+enum AgoraRtcRole {
+  PUBLISHER
+  SUBSCRIBER
+}
+
+enum AppLanguage {
+  AL
+  EN
+}
+
+type ApplicablePromotion {
+  appliedAmount: Float!
+  code: String
+  description: String
+  freeDelivery: Boolean!
+  id: ID!
+  name: String!
+  priority: Int!
+  target: PromotionTarget!
+  type: PromotionType!
+}
+
+input AssignPromotionToUserInput {
+  expiresAt: String
+  promotionId: ID!
+  userIds: [ID!]!
+}
+
+type AudiencePreview {
+  count: Int!
+  sampleUsers: [User!]!
+}
+
+type AuditLog {
+  action: ActionType!
+  actor: User
+  actorId: ID
+  actorType: ActorType!
+  createdAt: DateTime!
+  entityId: ID
+  entityType: EntityType!
+  id: ID!
+  ipAddress: String
+  metadata: JSON
+  userAgent: String
+}
+
+type AuditLogConnection {
+  hasMore: Boolean!
+  logs: [AuditLog!]!
+  total: Int!
+}
+
 type AuthResponse {
   message: String!
+  refreshToken: String
   token: String!
   user: User!
 }
 
+type Banner {
+  createdAt: DateTime!
+  id: ID!
+  imageUrl: String!
+  isActive: Boolean!
+  linkTarget: String
+  linkType: String
+  sortOrder: Int!
+  subtitle: String
+  title: String
+  updatedAt: DateTime!
+}
+
+enum BannerType {
+  INFO
+  SUCCESS
+  WARNING
+}
+
 type Business {
+  activePromotion: BusinessPromotion
+  avgPrepTimeMinutes: Int!
   businessType: BusinessType!
+  commissionPercentage: Float!
   createdAt: Date!
+  description: String
   id: ID!
   imageUrl: String
   isActive: Boolean!
   isOpen: Boolean!
+  isTemporarilyClosed: Boolean!
   location: Location!
   name: String!
+  phoneNumber: String
+  prepTimeOverrideMinutes: Int
+  schedule: [BusinessDayHours!]!
+  temporaryClosureReason: String
   updatedAt: Date!
   workingHours: WorkingHours!
+}
+
+type BusinessDayHours {
+  closesAt: String!
+  dayOfWeek: Int!
+  id: ID!
+  opensAt: String!
+}
+
+input BusinessDayHoursInput {
+  closesAt: String!
+  dayOfWeek: Int!
+  opensAt: String!
+}
+
+type BusinessDeviceHealth {
+  appState: String
+  appVersion: String
+  batteryLevel: Int
+  businessId: ID!
+  createdAt: DateTime!
+  deviceId: String!
+  id: ID!
+  isCharging: Boolean
+  lastHeartbeatAt: DateTime!
+  lastOrderId: ID
+  lastOrderSignalAt: DateTime
+  lastPushReceivedAt: DateTime
+  metadata: JSON
+  networkType: String
+  onlineStatus: BusinessDeviceOnlineStatus!
+  platform: DevicePlatform!
+  receivingOrders: Boolean!
+  subscriptionAlive: Boolean!
+  updatedAt: DateTime!
+  userId: ID!
+}
+
+input BusinessDeviceHeartbeatInput {
+  appState: String
+  appVersion: String
+  batteryLevel: Int
+  deviceId: String!
+  isCharging: Boolean
+  metadata: JSON
+  networkType: String
+  platform: DevicePlatform!
+  subscriptionAlive: Boolean!
+}
+
+enum BusinessDeviceOnlineStatus {
+  OFFLINE
+  ONLINE
+  STALE
+}
+
+type BusinessKPI {
+  """Median minutes driver waited at pickup after arriving"""
+  avgDriverWaitMin: Float
+  avgPrepTimeMin: Float
+  businessId: ID!
+  businessName: String!
+  cancellationRate: Float!
+  completedOrders: Int!
+
+  """Orders where driver arrived before restaurant pressed Ready"""
+  fakeReadyCount: Int!
+  fakeReadyRate: Float
+  p90PrepTimeMin: Float
+
+  """
+  % of orders where restaurant pressed Ready before prep time was 50% elapsed
+  """
+  prematureReadyRate: Float
+  prepOverrunRate: Float
+  totalOrders: Int!
+}
+
+type BusinessMessage {
+  admin: BusinessMessageUser
+  adminId: ID!
+  alertType: MessageAlertType!
+  body: String!
+  businessUser: BusinessMessageUser
+  businessUserId: ID!
+  createdAt: DateTime!
+  id: ID!
+  readAt: DateTime
+  senderRole: String!
+}
+
+type BusinessMessageThread {
+  businessUserId: ID!
+  businessUserName: String!
+  lastMessage: BusinessMessage
+  unreadCount: Int!
+}
+
+type BusinessMessageUser {
+  firstName: String!
+  id: ID!
+  lastName: String!
+}
+
+type BusinessPromotion {
+  description: String
+  discountValue: Float
+  id: ID!
+  name: String!
+  type: PromotionType!
 }
 
 enum BusinessType {
@@ -25,30 +285,143 @@ enum BusinessType {
   RESTAURANT
 }
 
-input CreateBusinessInput {
-  businessType: BusinessType!
-  imageUrl: String
-  location: LocationInput!
-  name: String!
-  workingHours: WorkingHoursInput!
+enum CampaignStatus {
+  DRAFT
+  FAILED
+  SENDING
+  SENT
 }
 
-input CreateOrderInput {
+input CartContextInput {
+  businessIds: [ID!]!
   deliveryPrice: Float!
-  dropOffLocation: LocationInput!
-  items: [CreateOrderItemInput!]!
-  totalPrice: Float!
+  items: [CartItemInput!]!
+  subtotal: Float!
 }
 
-input CreateOrderItemInput {
+input CartItemInput {
+  businessId: ID!
   price: Float!
   productId: ID!
   quantity: Int!
 }
 
+input CreateBannerInput {
+  imageUrl: String!
+  isActive: Boolean
+  linkTarget: String
+  linkType: String
+  sortOrder: Int
+  subtitle: String
+  title: String
+}
+
+input CreateBusinessInput {
+  avgPrepTimeMinutes: Int
+  businessType: BusinessType!
+  description: String
+  imageUrl: String
+  location: LocationInput!
+  name: String!
+  phoneNumber: String
+  workingHours: WorkingHoursInput!
+}
+
+input CreateBusinessOwnerInput {
+  email: String!
+  firstName: String!
+  lastName: String!
+  password: String!
+}
+
+input CreateBusinessWithOwnerInput {
+  business: CreateBusinessInput!
+  owner: CreateBusinessOwnerInput!
+}
+
+type CreateBusinessWithOwnerPayload {
+  business: Business!
+  owner: User!
+}
+
+input CreateCampaignInput {
+  body: String!
+  bodyAl: String
+  category: String
+  data: JSON
+  imageUrl: String
+  query: JSON!
+  relevanceScore: Float
+  timeSensitive: Boolean
+  title: String!
+  titleAl: String
+}
+
+input CreateDeliveryPricingTierInput {
+  maxDistanceKm: Float
+  minDistanceKm: Float!
+  price: Float!
+  sortOrder: Int
+}
+
+input CreateDeliveryZoneInput {
+  deliveryFee: Float!
+  isActive: Boolean
+  name: String!
+  polygon: [PolygonPointInput!]!
+  sortOrder: Int
+}
+
+input CreateOptionGroupInput {
+  displayOrder: Int
+  maxSelections: Int!
+  minSelections: Int!
+  name: String!
+  options: [CreateOptionInput!]!
+  productId: ID!
+}
+
+input CreateOptionInput {
+  displayOrder: Int
+  extraPrice: Float
+  linkedProductId: ID
+  name: String!
+}
+
+input CreateOrderChildItemInput {
+  productId: ID!
+  selectedOptions: [CreateOrderItemOptionInput!]!
+}
+
+input CreateOrderInput {
+  deliveryPrice: Float!
+  driverNotes: String
+  dropOffLocation: LocationInput!
+  items: [CreateOrderItemInput!]!
+  paymentCollection: OrderPaymentCollection
+  prioritySurcharge: Float
+  promoCode: String
+  totalPrice: Float!
+}
+
+input CreateOrderItemInput {
+  childItems: [CreateOrderChildItemInput!]
+  notes: String
+  price: Float!
+  productId: ID!
+  quantity: Int!
+  selectedOptions: [CreateOrderItemOptionInput!]!
+}
+
+input CreateOrderItemOptionInput {
+  optionGroupId: ID!
+  optionId: ID!
+}
+
 input CreateProductCategoryInput {
   businessId: ID!
   name: String!
+  sortOrder: Int
 }
 
 input CreateProductInput {
@@ -57,11 +430,59 @@ input CreateProductInput {
   description: String
   imageUrl: String
   isAvailable: Boolean
+  isOffer: Boolean
   isOnSale: Boolean
   name: String!
   price: Float!
   salePrice: Float
   subcategoryId: ID
+  variantGroupId: ID
+}
+
+input CreateProductSubcategoryInput {
+  categoryId: ID!
+  name: String!
+}
+
+input CreateProductVariantGroupInput {
+  businessId: ID!
+  name: String!
+}
+
+input CreatePromotionInput {
+  code: String
+  creatorId: ID
+  creatorType: String
+  description: String
+  discountValue: Float
+  eligibleBusinessIds: [ID!]
+  endsAt: String
+  isActive: Boolean!
+  isStackable: Boolean!
+  maxDiscountCap: Float
+  maxGlobalUsage: Int
+  maxUsagePerUser: Int
+  minOrderAmount: Float
+  name: String!
+  priority: Int!
+  spendThreshold: Float
+  startsAt: String
+  target: PromotionTarget!
+  targetUserIds: [ID!]
+  thresholdReward: String
+  type: PromotionType!
+}
+
+input CreateSettlementRuleInput {
+  amount: Float!
+  amountType: SettlementAmountType!
+  appliesTo: String
+  businessId: ID
+  direction: SettlementDirection!
+  entityType: SettlementEntityType!
+  name: String!
+  notes: String
+  promotionId: ID
 }
 
 input CreateUserInput {
@@ -75,12 +496,311 @@ input CreateUserInput {
 
 scalar Date
 
+scalar DateTime
+
+type DayOfWeekDistribution {
+  """0 = Sunday, 6 = Saturday"""
+  dow: Int!
+  orderCount: Int!
+  revenue: Float!
+}
+
+type DayVolume {
+  date: String!
+  orderCount: Int!
+  revenue: Float!
+}
+
+type DeliveryPriceResult {
+  distanceKm: Float!
+  price: Float!
+  tierApplied: DeliveryPricingTier
+  zoneApplied: DeliveryZoneMatch
+}
+
+type DeliveryPricingConfig {
+  tiers: [DeliveryPricingTier!]!
+  zones: [DeliveryZone!]!
+}
+
+type DeliveryPricingTier {
+  createdAt: DateTime!
+  id: ID!
+  isActive: Boolean!
+  maxDistanceKm: Float
+  minDistanceKm: Float!
+  price: Float!
+  sortOrder: Int!
+  updatedAt: DateTime!
+}
+
+type DeliveryZone {
+  createdAt: DateTime!
+  deliveryFee: Float!
+  id: ID!
+  isActive: Boolean!
+  name: String!
+  polygon: [PolygonPoint!]!
+  sortOrder: Int!
+  updatedAt: DateTime!
+}
+
+"""
+Returned from calculateDeliveryPrice when a zone matches;
+tells the client which zone (if any) is being applied.
+"""
+type DeliveryZoneMatch {
+  deliveryFee: Float!
+  id: ID!
+  name: String!
+}
+
+enum DeviceAppType {
+  ADMIN
+  BUSINESS
+  CUSTOMER
+  DRIVER
+}
+
+enum DevicePlatform {
+  ANDROID
+  IOS
+}
+
+type DeviceToken {
+  appType: DeviceAppType!
+  createdAt: DateTime!
+  deviceId: String!
+  id: ID!
+  platform: DevicePlatform!
+  token: String!
+  updatedAt: DateTime!
+  userId: ID!
+}
+
+"""Result of driverLogin / driverRegister mutations"""
+type DriverAuthResult {
+  driver: DriverBasicInfo!
+  message: String!
+  refreshToken: String
+  token: String!
+}
+
+"""Basic driver profile returned by driverLogin / driverRegister"""
+type DriverBasicInfo {
+  connectionStatus: DriverConnectionStatus!
+  driverLat: Float
+  driverLng: Float
+  email: String!
+  firstName: String!
+  id: ID!
+  lastHeartbeatAt: Date
+  lastLocationUpdate: Date
+  lastName: String!
+  onlinePreference: Boolean!
+  phoneNumber: String
+}
+
+type DriverConnection {
+  """Current navigation order this ETA belongs to"""
+  activeOrderId: ID
+
+  """Most recently reported battery level percentage from driver device"""
+  batteryLevel: Int
+
+  """Whether driver opted in to battery telemetry sharing"""
+  batteryOptIn: Boolean!
+
+  """When battery telemetry was last refreshed"""
+  batteryUpdatedAt: Date
+
+  """System-calculated: current connection state"""
+  connectionStatus: DriverConnectionStatus!
+
+  """Timestamp when driver was marked as DISCONNECTED"""
+  disconnectedAt: Date
+
+  """When the ETA payload was last refreshed"""
+  etaUpdatedAt: Date
+
+  """Whether device reported it is currently charging"""
+  isCharging: Boolean
+
+  """Last timestamp when driver sent a heartbeat (every 5s)"""
+  lastHeartbeatAt: Date
+
+  """
+  Last timestamp when location was written to DB (throttled to every 10s)
+  """
+  lastLocationUpdate: Date
+
+  """Current navigation phase reported by the driver"""
+  navigationPhase: String
+
+  """User's preference: "I want to work" toggle"""
+  onlinePreference: Boolean!
+
+  """Driver-reported remaining ETA in seconds"""
+  remainingEtaSeconds: Int
+}
+
+"""
+Connection status for drivers:
+- CONNECTED: Actively sending heartbeats
+- STALE: No heartbeat for 45 seconds (warning state)
+- LOST: No heartbeat for 90 seconds (offline state)
+- DISCONNECTED: Subscription closed or never connected
+"""
+enum DriverConnectionStatus {
+  CONNECTED
+  DISCONNECTED
+  LOST
+  STALE
+}
+
+enum DriverCustomerNotificationKind {
+  ARRIVED_WAITING
+  ETA_LT_3_MIN
+}
+
+type DriverDailyMetrics {
+  """Number of active (uncompleted) orders this driver currently has"""
+  activeOrdersCount: Int!
+
+  """Commission rate as a percentage (e.g. 10.0 for 10%)"""
+  commissionPercentage: Float!
+
+  """Driver's current connection status"""
+  connectionStatus: DriverConnectionStatus!
+
+  """Number of orders delivered today"""
+  deliveredTodayCount: Int!
+
+  """Total delivery earnings today (before commission deduction)"""
+  grossEarningsToday: Float!
+
+  """Whether the driver is currently online (online preference)"""
+  isOnline: Boolean!
+
+  """Driver's personal maximum active orders limit"""
+  maxActiveOrders: Int!
+
+  """Driver's net earnings today (after commission deduction)"""
+  netEarningsToday: Float!
+}
+
+"""Result of driver heartbeat mutation"""
+type DriverHeartbeatResult {
+  """Current connection status after processing"""
+  connectionStatus: DriverConnectionStatus!
+
+  """Server timestamp when heartbeat was processed"""
+  lastHeartbeatAt: Date!
+
+  """Whether location was actually written to DB (throttled)"""
+  locationUpdated: Boolean!
+
+  """Whether heartbeat was processed successfully"""
+  success: Boolean!
+}
+
+type DriverKPI {
+  """Minutes from OUT_FOR_DELIVERY to DELIVERED"""
+  avgDeliveryTimeMin: Float
+
+  """Minutes from driver assignment to picking up (travel + wait)"""
+  avgPickupTimeMin: Float
+
+  """Minutes driver waited at restaurant after arriving"""
+  avgWaitAtPickupMin: Float
+  driverId: ID!
+  driverName: String!
+  totalDeliveries: Int!
+}
+
+input DriverLoginInput {
+  email: String!
+  password: String!
+}
+
+type DriverMessage {
+  admin: DriverMessageUser
+  adminId: ID!
+  alertType: MessageAlertType!
+  body: String!
+  createdAt: DateTime!
+  driver: DriverMessageUser
+  driverId: ID!
+  id: ID!
+  readAt: DateTime
+  senderRole: String!
+}
+
+type DriverMessageThread {
+  driverId: ID!
+  driverName: String!
+  lastMessage: DriverMessage
+  unreadCount: Int!
+}
+
+type DriverMessageUser {
+  firstName: String!
+  id: ID!
+  lastName: String!
+}
+
+type DriverPttSignal {
+  action: DriverPttSignalAction!
+  adminId: ID!
+  channelName: String!
+  driverId: ID!
+  muted: Boolean!
+  timestamp: DateTime!
+}
+
+enum DriverPttSignalAction {
+  MUTE
+  STARTED
+  STOPPED
+  UNMUTE
+}
+
+input DriverRegisterInput {
+  email: String!
+  firstName: String!
+  lastName: String!
+  password: String!
+  phoneNumber: String
+}
+
+enum EntityType {
+  BUSINESS
+  CATEGORY
+  DELIVERY_ZONE
+  DRIVER
+  ORDER
+  PRODUCT
+  SETTLEMENT
+  SUBCATEGORY
+  USER
+}
+
+type HourlyDistribution {
+  avgDeliveryTimeMin: Float
+  hour: Int!
+  orderCount: Int!
+  revenue: Float!
+}
+
 input InitiateSignupInput {
   email: String!
   firstName: String!
   lastName: String!
   password: String!
+  referralCode: String
 }
+
+scalar JSON
 
 type Location {
   address: String!
@@ -99,41 +819,308 @@ input LoginInput {
   password: String!
 }
 
+enum MessageAlertType {
+  INFO
+  URGENT
+  WARNING
+}
+
 type Mutation {
+  addUserAddress(input: AddUserAddressInput!): UserAddress!
+  adminCancelOrder(id: ID!, reason: String!, settleBusiness: Boolean, settleDriver: Boolean): Order!
+
+  """Admin sends push-to-talk signaling state to one or multiple drivers"""
+  adminSendPttSignal(action: DriverPttSignalAction!, channelName: String!, driverIds: [ID!]!, muted: Boolean): Boolean!
+
+  """
+  Admin mutation to manually set connection status (for testing/recovery)
+  """
+  adminSetDriverConnectionStatus(driverId: ID!, status: DriverConnectionStatus!): User!
+
+  """
+  Admin mutation to set which drivers are on the current shift.
+  Only on-shift drivers will receive new-order dispatch notifications.
+  Pass an empty list to clear the shift restriction (all eligible drivers receive notifications).
+  """
+  adminSetShiftDrivers(driverIds: [ID!]!): Boolean!
+
+  """
+  Admin simulation heartbeat — wraps processHeartbeat for SUPER_ADMIN.
+  Triggers the full heartbeat pipeline (ETA cache, Live Activity, subscriptions).
+  Non-production only.
+  """
+  adminSimulateDriverHeartbeat(
+    activeOrderId: ID
+    driverId: ID!
+    latitude: Float!
+    longitude: Float!
+    navigationPhase: String
+    remainingEtaSeconds: Int
+
+    """When true, also sets the driver's onlinePreference to true"""
+    setOnline: Boolean
+  ): DriverHeartbeatResult!
+  adminUpdateDriverLocation(driverId: ID!, latitude: Float!, longitude: Float!): User!
+
+  """
+  Admin mutation to update per-driver settings (commission %, max active orders, vehicle ownership)
+  """
+  adminUpdateDriverSettings(commissionPercentage: Float, driverId: ID!, hasOwnVehicle: Boolean, maxActiveOrders: Int): User!
+  assignDriverToOrder(driverId: ID, id: ID!): Order!
+  assignPromotionToUsers(input: AssignPromotionToUserInput!): [UserPromotion!]!
+  backfillSettlementsForDeliveredOrders: Int!
+  businessDeviceHeartbeat(input: BusinessDeviceHeartbeatInput!): Boolean!
+  businessDeviceOrderSignal(deviceId: String!, orderId: ID): Boolean!
   cancelOrder(id: ID!): Order!
+
+  """Admin cancels an outstanding settlement request."""
+  cancelSettlementRequest(requestId: ID!): SettlementRequest!
+  changeMyPassword(currentPassword: String!, newPassword: String!): Boolean!
+  createBanner(input: CreateBannerInput!): Banner!
   createBusiness(input: CreateBusinessInput!): Business!
+  createBusinessWithOwner(input: CreateBusinessWithOwnerInput!): CreateBusinessWithOwnerPayload!
+  createCampaign(input: CreateCampaignInput!): NotificationCampaign!
+  createDeliveryPricingTier(input: CreateDeliveryPricingTierInput!): DeliveryPricingTier!
+  createDeliveryZone(input: CreateDeliveryZoneInput!): DeliveryZone!
+  createOption(input: CreateOptionInput!, optionGroupId: ID!): Option!
+  createOptionGroup(input: CreateOptionGroupInput!): OptionGroup!
   createOrder(input: CreateOrderInput!): Order!
   createProduct(input: CreateProductInput!): Product!
   createProductCategory(input: CreateProductCategoryInput!): ProductCategory!
+  createProductSubcategory(input: CreateProductSubcategoryInput!): ProductSubcategory!
+  createProductVariantGroup(input: CreateProductVariantGroupInput!): ProductVariantGroup!
+  createPromotion(input: CreatePromotionInput!): Promotion!
+
+  """Admin creates a settlement request, notifying the business via push."""
+  createSettlementRequest(amount: Float!, businessId: ID!, note: String, periodEnd: Date!, periodStart: Date!): SettlementRequest!
+  createSettlementRule(input: CreateSettlementRuleInput!): SettlementRule!
+  createTestOrder: Order!
   createUser(input: CreateUserInput!): AuthResponse!
+  deleteBanner(id: ID!): Boolean!
   deleteBusiness(id: ID!): Boolean!
+  deleteCampaign(id: ID!): Boolean!
+  deleteDeliveryPricingTier(id: ID!): Boolean!
+  deleteDeliveryZone(id: ID!): Boolean!
+  deleteMyAccount: Boolean!
+  deleteOption(id: ID!): Boolean!
+  deleteOptionGroup(id: ID!): Boolean!
   deleteProduct(id: ID!): Boolean!
   deleteProductCategory(id: ID!): Boolean!
+  deleteProductSubcategory(id: ID!): Boolean!
+  deleteProductVariantGroup(id: ID!): Boolean!
+  deletePromotion(id: ID!): Boolean!
+  deleteSettlementRule(id: ID!): Boolean!
   deleteUser(id: ID!): Boolean!
+  deleteUserAddress(id: ID!): Boolean!
+
+  """
+  Driver heartbeat - call every 5 seconds while online.
+  Updates lastHeartbeatAt and connectionStatus to CONNECTED.
+  Location is throttled: only written if >10s since last write OR moved >5m.
+  """
+  driverHeartbeat(activeOrderId: ID, latitude: Float!, longitude: Float!, navigationPhase: String, remainingEtaSeconds: Int): DriverHeartbeatResult!
+
+  """Driver login — returns short-lived access token + refresh token"""
+  driverLogin(input: DriverLoginInput!): DriverAuthResult!
+  driverNotifyCustomer(kind: DriverCustomerNotificationKind!, orderId: ID!): Boolean!
+
+  """
+  Driver self-registration — creates user (role=DRIVER) + driver profile row
+  """
+  driverRegister(input: DriverRegisterInput!): DriverAuthResult!
+
+  """Driver battery telemetry update (recommended every 5-10 minutes)"""
+  driverUpdateBatteryStatus(isCharging: Boolean, level: Int!, optIn: Boolean!): DriverConnection!
+  generateReferralCode: String!
+  grantFreeDelivery(orderId: ID!, userId: ID!): Boolean!
   initiateSignup(input: InitiateSignupInput!): AuthResponse!
   login(input: LoginInput!): AuthResponse!
+  logoutAllSessions: Boolean!
+  logoutCurrentSession(refreshToken: String!): Boolean!
+
+  """Mark all messages in a business conversation as read"""
+  markBusinessMessagesRead(otherUserId: ID!): Boolean!
+
+  """Mark all messages in a conversation as read"""
+  markDriverMessagesRead(otherUserId: ID!): Boolean!
+  markFirstOrderUsed(userId: ID!): UserPromoMetadata!
+  markSettlementAsPaid(paymentMethod: String, paymentReference: String, settlementId: ID!): Settlement!
+  markSettlementAsPartiallyPaid(amount: Float!, settlementId: ID!): Settlement!
+  markSettlementsAsPaid(ids: [ID!]!, paymentMethod: String, paymentReference: String): [Settlement!]!
+  refreshToken(refreshToken: String!): TokenRefreshResponse!
+  registerDeviceToken(input: RegisterDeviceTokenInput!): Boolean!
+  registerLiveActivityToken(activityId: String!, orderId: ID!, token: String!): Boolean!
+  removeUserFromPromotion(promotionId: ID!, userId: ID!): Boolean!
+
+  """Business user replies to admin"""
+  replyToBusinessMessage(adminId: ID!, body: String!): BusinessMessage!
+
+  """Driver replies to admin"""
+  replyToDriverMessage(adminId: ID!, body: String!): DriverMessage!
   resendEmailVerification: SignupStepResponse!
+
+  """Business owner accepts or disputes a pending settlement request."""
+  respondToSettlementRequest(action: SettlementRequestAction!, disputeReason: String, requestId: ID!): SettlementRequest!
+  runSettlementScenarioHarness(scenarioIds: [String!]): SettlementScenarioHarnessResult!
+
+  """Admin sends a message to a business user"""
+  sendBusinessMessage(alertType: MessageAlertType!, body: String!, businessUserId: ID!): BusinessMessage!
+  sendCampaign(id: ID!): NotificationCampaign!
+
+  """Admin sends a message to a driver"""
+  sendDriverMessage(alertType: MessageAlertType!, body: String!, driverId: ID!): DriverMessage!
+  sendPushNotification(input: SendPushNotificationInput!): SendNotificationResult!
+  setBusinessSchedule(businessId: ID!, schedule: [BusinessDayHoursInput!]!): [BusinessDayHours!]!
+  setDefaultAddress(id: ID!): Boolean!
+  setDeliveryPricingTiers(input: SetDeliveryPricingTiersInput!): [DeliveryPricingTier!]!
+  setMyPreferredLanguage(language: AppLanguage!): User!
+  setOrderAdminNote(id: ID!, note: String): Order!
+  setUserPermissions(permissions: [UserPermission!]!, userId: ID!): User!
+
+  """
+  Settle all unsettled settlements for a business. Supports partial payment.
+  """
+  settleWithBusiness(amount: Float!, businessId: ID!, note: String, paymentMethod: String, paymentReference: String): SettleResult!
+
+  """Settle all unsettled settlements for a driver (always full)."""
+  settleWithDriver(driverId: ID!): SettleResult!
+  startPreparing(id: ID!, preparationMinutes: Int!): Order!
   submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
+  trackPushTelemetry(input: TrackPushTelemetryInput!): Boolean!
+  unregisterDeviceToken(token: String!): Boolean!
+  unsettleSettlement(settlementId: ID!): Settlement!
+  updateBanner(id: ID!, input: UpdateBannerInput!): Banner!
+  updateBannerOrder(bannerId: ID!, newSortOrder: Int!): Banner!
   updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
+  updateDeliveryPricingTier(id: ID!, input: UpdateDeliveryPricingTierInput!): DeliveryPricingTier!
+  updateDeliveryZone(id: ID!, input: UpdateDeliveryZoneInput!): DeliveryZone!
+  updateDriverLocation(latitude: Float!, longitude: Float!): User!
+  updateDriverOnlineStatus(isOnline: Boolean!): User!
+  updateOption(id: ID!, input: UpdateOptionInput!): Option!
+  updateOptionGroup(id: ID!, input: UpdateOptionGroupInput!): OptionGroup!
   updateOrderStatus(id: ID!, status: OrderStatus!): Order!
+  updatePreparationTime(id: ID!, preparationMinutes: Int!): Order!
   updateProduct(id: ID!, input: UpdateProductInput!): Product!
+  updateProductCategoriesOrder(businessId: ID!, categories: [ProductCategoryOrderInput!]!): Boolean!
   updateProductCategory(id: ID!, input: UpdateProductCategoryInput!): ProductCategory!
+  updateProductSubcategory(id: ID!, input: UpdateProductSubcategoryInput!): ProductSubcategory!
+  updateProductsOrder(businessId: ID!, products: [ProductOrderInput!]!): Boolean!
+  updatePromotion(input: UpdatePromotionInput!): Promotion!
+  updateSettlementRule(id: ID!, input: UpdateSettlementRuleInput!): SettlementRule!
+  updateStoreStatus(input: UpdateStoreStatusInput!): StoreStatus!
   updateUser(input: UpdateUserInput!): User!
+  updateUserAddress(input: UpdateUserAddressInput!): UserAddress!
   updateUserNote(flagColor: String, note: String, userId: ID!): User!
   verifyEmail(input: VerifyEmailInput!): SignupStepResponse!
   verifyPhone(input: VerifyPhoneInput!): SignupStepResponse!
 }
 
+type Notification {
+  body: String!
+  campaignId: ID
+  data: JSON
+  id: ID!
+  sentAt: DateTime!
+  title: String!
+  type: NotificationType!
+  userId: ID
+}
+
+type NotificationCampaign {
+  body: String!
+  bodyAl: String
+  category: String
+  createdAt: DateTime!
+  data: JSON
+  failedCount: Int!
+  id: ID!
+  imageUrl: String
+  query: JSON
+  relevanceScore: Float
+  sender: User
+  sentAt: DateTime
+  sentBy: ID
+  sentCount: Int!
+  status: CampaignStatus!
+  targetCount: Int!
+  timeSensitive: Boolean!
+  title: String!
+  titleAl: String
+}
+
+enum NotificationType {
+  ADMIN_ALERT
+  ORDER_ASSIGNED
+  ORDER_STATUS
+  PROMOTIONAL
+}
+
+type OperationalKPIs {
+  aov: Float!
+  avgDeliveryTimeMin: Float
+  avgDriverWaitAtPickupMin: Float
+  avgPrepTimeMin: Float
+  cancellationRate: Float!
+  cancelledOrders: Int!
+  completedOrders: Int!
+  dailyVolume: [DayVolume!]!
+  fakeReadyRate: Float
+  gmv: Float!
+  prepOverrunRate: Float
+  totalOrders: Int!
+}
+
+type Option {
+  displayOrder: Int!
+  extraPrice: Float!
+  id: ID!
+  linkedProduct: Product
+  linkedProductId: ID
+  name: String!
+  optionGroupId: ID!
+}
+
+type OptionGroup {
+  displayOrder: Int!
+  id: ID!
+  maxSelections: Int!
+  minSelections: Int!
+  name: String!
+  options: [Option!]!
+  productId: ID!
+}
+
 type Order {
+  adminNote: String
   businesses: [OrderBusiness!]!
+  cancellationReason: String
+  cancelledAt: Date
+  deliveredAt: Date
   deliveryPrice: Float!
+  displayId: String!
+  driver: User
+  driverArrivedAtPickup: Date
+  driverAssignedAt: Date
+  driverNotes: String
   dropOffLocation: Location!
+  estimatedReadyAt: Date
   id: ID!
   orderDate: Date!
   orderPrice: Float!
+  orderPromotions: [OrderPromotion!]
+  originalDeliveryPrice: Float
+  originalPrice: Float
+  outForDeliveryAt: Date
+  paymentCollection: OrderPaymentCollection!
+  pickupLocations: [Location!]!
+  preparationMinutes: Int
+  preparingAt: Date
+  readyAt: Date
   status: OrderStatus!
   totalPrice: Float!
+  updatedAt: Date!
   user: User
+  userId: ID!
 }
 
 type OrderBusiness {
@@ -141,20 +1128,76 @@ type OrderBusiness {
   items: [OrderItem!]!
 }
 
+type OrderDriverLiveTracking {
+  driverId: ID!
+  etaUpdatedAt: Date!
+  latitude: Float!
+  longitude: Float!
+  navigationPhase: String
+  orderId: ID!
+  remainingEtaSeconds: Int
+}
+
 type OrderItem {
+  basePrice: Float
+  childItems: [OrderItem!]!
+  id: ID!
   imageUrl: String
   name: String!
-  price: Float!
+  notes: String
+  parentOrderItemId: ID
   productId: ID!
   quantity: Int!
+  selectedOptions: [OrderItemOption!]!
+  unitPrice: Float!
+}
+
+type OrderItemOption {
+  id: ID!
+  optionGroupId: ID!
+  optionGroupName: String!
+  optionId: ID!
+  optionName: String!
+  priceAtOrder: Float!
+}
+
+enum OrderPaymentCollection {
+  CASH_TO_DRIVER
+  PREPAID_TO_PLATFORM
+}
+
+type OrderPromotion {
+  appliesTo: PromotionAppliesTo!
+  discountAmount: Float!
+  id: ID!
+  promoCode: String
+  promotionId: ID!
 }
 
 enum OrderStatus {
-  ACCEPTED
   CANCELLED
   DELIVERED
   OUT_FOR_DELIVERY
   PENDING
+  PREPARING
+  READY
+}
+
+type PeakHourAnalysis {
+  byDayOfWeek: [DayOfWeekDistribution!]!
+  hourly: [HourlyDistribution!]!
+  peakDow: Int!
+  peakHour: Int!
+}
+
+type PolygonPoint {
+  lat: Float!
+  lng: Float!
+}
+
+input PolygonPointInput {
+  lat: Float!
+  lng: Float!
 }
 
 type Product {
@@ -165,11 +1208,31 @@ type Product {
   id: ID!
   imageUrl: String
   isAvailable: Boolean!
+  isOffer: Boolean!
   isOnSale: Boolean!
+  markupPrice: Float
   name: String!
+  nightMarkedupPrice: Float
+  optionGroups: [OptionGroup!]!
   price: Float!
   salePrice: Float
+  sortOrder: Int!
+  subcategoryId: ID
   updatedAt: String!
+  variantGroup: ProductVariantGroup
+  variantGroupId: ID
+  variants: [Product!]!
+}
+
+type ProductCard {
+  basePrice: Float!
+  hasOptionGroups: Boolean!
+  id: ID!
+  imageUrl: String
+  isOffer: Boolean!
+  name: String!
+  product: Product
+  variants: [Product!]!
 }
 
 type ProductCategory {
@@ -178,7 +1241,18 @@ type ProductCategory {
   id: ID!
   isActive: Boolean!
   name: String!
+  sortOrder: Int!
   updatedAt: String!
+}
+
+input ProductCategoryOrderInput {
+  id: ID!
+  sortOrder: Int!
+}
+
+input ProductOrderInput {
+  id: ID!
+  sortOrder: Int!
 }
 
 type ProductSubcategory {
@@ -189,20 +1263,451 @@ type ProductSubcategory {
   updatedAt: String!
 }
 
+type ProductVariantGroup {
+  businessId: ID!
+  id: ID!
+  name: String!
+}
+
+type Promotion {
+  assignedUsers: [UserPromotion!]
+  code: String
+  createdAt: String!
+  creatorId: ID
+  creatorType: String!
+  currentGlobalUsage: Int!
+  description: String
+  discountValue: Float
+  eligibleBusinesses: [Business!]
+  endsAt: String
+  id: ID!
+  isActive: Boolean!
+  isStackable: Boolean!
+  maxDiscountCap: Float
+  maxGlobalUsage: Int
+  maxUsagePerUser: Int
+  minOrderAmount: Float
+  name: String!
+  priority: Int!
+  spendThreshold: Float
+  startsAt: String
+  target: PromotionTarget!
+  thresholdReward: String
+  totalRevenue: Float!
+  totalUsageCount: Int!
+  type: PromotionType!
+}
+
+type PromotionAnalyticsResult {
+  averageOrderValue: Float!
+  conversionRate: Float
+  promotion: Promotion!
+  totalDiscountGiven: Float!
+  totalRevenue: Float!
+  totalUsageCount: Int!
+  uniqueUsers: Int!
+}
+
+enum PromotionAppliesTo {
+  DELIVERY
+  PRICE
+}
+
+type PromotionResult {
+  finalDeliveryPrice: Float!
+  finalSubtotal: Float!
+  finalTotal: Float!
+  freeDeliveryApplied: Boolean!
+  promotions: [ApplicablePromotion!]!
+  totalDiscount: Float!
+}
+
+enum PromotionTarget {
+  ALL_USERS
+  CONDITIONAL
+  FIRST_ORDER
+  SPECIFIC_USERS
+}
+
+type PromotionThreshold {
+  code: String
+  eligibleBusinessIds: [ID!]
+  id: ID!
+  isActive: Boolean!
+  name: String!
+  priority: Int!
+  spendThreshold: Float!
+}
+
+enum PromotionType {
+  FIXED_AMOUNT
+  FREE_DELIVERY
+  PERCENTAGE
+  SPEND_X_FIXED
+  SPEND_X_GET_FREE
+  SPEND_X_PERCENT
+}
+
+type PromotionUsage {
+  businessId: ID
+  discountAmount: Float!
+  freeDeliveryApplied: Boolean!
+  id: ID!
+  order: Order
+  orderId: ID!
+  orderSubtotal: Float!
+  promotion: Promotion
+  promotionId: ID!
+  usedAt: String!
+  user: User
+  userId: ID!
+}
+
+type PushTelemetryEvent {
+  actionId: String
+  appType: DeviceAppType!
+  campaignId: ID
+  createdAt: DateTime!
+  deviceId: String
+  eventType: PushTelemetryEventType!
+  id: ID!
+  metadata: JSON
+  notificationBody: String
+  notificationTitle: String
+  orderId: ID
+  platform: DevicePlatform!
+  token: String
+  userId: ID!
+}
+
+enum PushTelemetryEventType {
+  ACTION_TAPPED
+  OPENED
+  RECEIVED
+  TOKEN_REFRESHED
+  TOKEN_REGISTERED
+  TOKEN_UNREGISTERED
+}
+
+type PushTelemetrySummary {
+  byAppType: [TelemetryCount!]!
+  byEvent: [TelemetryCount!]!
+  byPlatform: [TelemetryCount!]!
+  totalEvents: Int!
+}
+
 type Query {
+  auditLog(id: ID!): AuditLog
+  auditLogs(action: ActionType, actorId: ID, actorType: ActorType, endDate: DateTime, entityId: ID, entityType: EntityType, limit: Int, offset: Int, startDate: DateTime): AuditLogConnection!
   business(id: ID!): Business
+  businessBalance(businessId: ID!): SettlementSummary!
+  businessDeviceHealth(hours: Int): [BusinessDeviceHealth!]!
+  businessKPIs(businessId: ID, endDate: String!, startDate: String!): [BusinessKPI!]!
+
+  """Admin: list of all business user threads with unread counts"""
+  businessMessageThreads: [BusinessMessageThread!]!
+
+  """Admin: full conversation with a specific business user"""
+  businessMessages(businessUserId: ID!, limit: Int, offset: Int): [BusinessMessage!]!
   businesses: [Business!]!
+  calculateDeliveryPrice(businessId: ID!, dropoffLat: Float!, dropoffLng: Float!): DeliveryPriceResult!
+  cancelledOrders(limit: Int, offset: Int): [Order!]!
+  deliveryPricingConfig: DeliveryPricingConfig!
+  deliveryPricingTiers: [DeliveryPricingTier!]!
+  deliveryZones: [DeliveryZone!]!
+  deviceTokens(userId: ID): [DeviceToken!]!
+  driverBalance(driverId: ID!): SettlementSummary!
+  driverKPIs(driverId: ID, endDate: String!, startDate: String!): [DriverKPI!]!
+
+  """Admin: list of all driver threads with unread counts"""
+  driverMessageThreads: [DriverMessageThread!]!
+
+  """Admin: full conversation with a specific driver"""
+  driverMessages(driverId: ID!, limit: Int, offset: Int): [DriverMessage!]!
   drivers: [User!]!
+  getActiveGlobalPromotions: [Promotion!]!
+
+  """Get Agora RTC credentials for the current authenticated user"""
+  getAgoraRtcCredentials(channelName: String!, role: AgoraRtcRole!): AgoraRtcCredentials!
+  getAllPromotions(isActive: Boolean): [Promotion!]!
+  getApplicablePromotions(cart: CartContextInput!, manualCode: String): [ApplicablePromotion!]!
+  getBanner(id: ID!): Banner
+  getBanners(activeOnly: Boolean): [Banner!]!
+  getPromotion(id: ID!): Promotion
+  getPromotionAnalytics(promotionId: ID!): PromotionAnalyticsResult!
+  getPromotionThresholds(cart: CartContextInput!): [PromotionThreshold!]!
+  getPromotionUsage(limit: Int, offset: Int, promotionId: ID!): [PromotionUsage!]!
+  getStoreStatus(url: String): StoreStatus!
+  getUserPromoMetadata(userId: ID!): UserPromoMetadata
+  getUserPromotions(userId: ID!): [UserPromotion!]!
   me: User
+  myAddresses: [UserAddress!]!
+  myBehavior: UserBehavior
+
+  """Business user: my messages"""
+  myBusinessMessages(limit: Int, offset: Int): [BusinessMessage!]!
+
+  """Driver: my messages"""
+  myDriverMessages(limit: Int, offset: Int): [DriverMessage!]!
+
+  """Get live metrics for the authenticated driver"""
+  myDriverMetrics: DriverDailyMetrics!
+  myReferralStats: ReferralStats!
+  notificationCampaign(id: ID!): NotificationCampaign
+  notificationCampaigns: [NotificationCampaign!]!
+  offers(businessId: ID!): [Product!]!
+  operationalKPIs(businessId: ID, endDate: String!, startDate: String!): OperationalKPIs!
   order(id: ID!): Order
-  orders: [Order!]!
-  ordersByStatus(status: OrderStatus!): [Order!]!
+  orders(limit: Int, offset: Int): [Order!]!
+  ordersByStatus(limit: Int, offset: Int, status: OrderStatus!): [Order!]!
+  peakHourAnalysis(businessId: ID, endDate: String!, startDate: String!): PeakHourAnalysis!
+  previewCampaignAudience(query: JSON!): AudiencePreview!
   product(id: ID!): Product
   productCategories(businessId: ID!): [ProductCategory!]!
   productCategory(id: ID!): ProductCategory
-  products(businessId: ID!): [Product!]!
+  productSubcategories(categoryId: ID!): [ProductSubcategory!]!
+  productSubcategoriesByBusiness(businessId: ID!): [ProductSubcategory!]!
+  products(businessId: ID!): [ProductCard!]!
+  pushTelemetryEvents(appType: DeviceAppType, eventType: PushTelemetryEventType, hours: Int, limit: Int, platform: DevicePlatform): [PushTelemetryEvent!]!
+  pushTelemetrySummary(hours: Int): PushTelemetrySummary!
+  settlementPayment(id: ID!): SettlementPayment
+  settlementPayments(businessId: ID, driverId: ID, endDate: Date, entityType: SettlementType, limit: Int, offset: Int, startDate: Date): [SettlementPayment!]!
+  settlementRequests(businessId: ID, limit: Int, offset: Int, status: SettlementRequestStatus): [SettlementRequest!]!
+  settlementRule(id: ID!): SettlementRule
+  settlementRules(filter: SettlementRuleFilterInput): [SettlementRule!]!
+  settlementScenarioDefinitions: [SettlementScenarioDefinition!]!
+  settlementSummary(businessId: ID, driverId: ID, endDate: Date, startDate: Date, type: SettlementType): SettlementSummary!
+  settlements(businessId: ID, direction: SettlementDirection, driverId: ID, endDate: Date, isSettled: Boolean, limit: Int, offset: Int, startDate: Date, status: SettlementStatus, type: SettlementType): [Settlement!]!
   uncompletedOrders: [Order!]!
-  users: [User!]!
+  unsettledBalance(entityId: ID!, entityType: SettlementType!): Float!
+  userBehavior(userId: ID!): UserBehavior
+  users(limit: Int, offset: Int): [User!]!
+  validatePromotions(cart: CartContextInput!, manualCode: String): PromotionResult!
+}
+
+type Referral {
+  completedAt: DateTime
+  createdAt: DateTime!
+  id: ID!
+  referralCode: String!
+  referredUser: User
+  referredUserId: ID
+  referrerUserId: ID!
+  rewardAmount: Float
+  rewardGiven: Boolean!
+  status: ReferralStatus!
+}
+
+type ReferralStats {
+  completedReferrals: Int!
+  pendingReferrals: Int!
+  referralCode: String!
+  referrals: [Referral!]!
+  totalReferrals: Int!
+  totalRewardsEarned: Float!
+}
+
+enum ReferralStatus {
+  COMPLETED
+  EXPIRED
+  PENDING
+}
+
+input RegisterDeviceTokenInput {
+  appType: DeviceAppType!
+  deviceId: String!
+  platform: DevicePlatform!
+  token: String!
+}
+
+type SendNotificationResult {
+  failureCount: Int!
+  success: Boolean!
+  successCount: Int!
+}
+
+input SendPushNotificationInput {
+  body: String!
+  bodyAl: String
+  category: String
+  data: JSON
+  imageUrl: String
+  relevanceScore: Float
+  timeSensitive: Boolean
+  title: String!
+  titleAl: String
+  userIds: [ID!]!
+}
+
+input SetDeliveryPricingTiersInput {
+  tiers: [CreateDeliveryPricingTierInput!]!
+}
+
+type SettleResult {
+  direction: SettlementPaymentDirection!
+  netAmount: Float!
+  payment: SettlementPayment!
+  remainderAmount: Float!
+  remainderSettlement: Settlement
+  settledCount: Int!
+}
+
+type Settlement {
+  amount: Float!
+  business: Business
+  createdAt: Date!
+  currency: String!
+  direction: SettlementDirection!
+  driver: User
+  id: ID!
+  isSettled: Boolean!
+  order: Order
+  paidAt: Date
+  paymentMethod: String
+  paymentReference: String
+  ruleId: ID
+  settlementPayment: SettlementPayment
+  sourcePayment: SettlementPayment
+  status: SettlementStatus!
+  type: SettlementType!
+  updatedAt: Date!
+}
+
+enum SettlementAmountType {
+  FIXED
+  PERCENT
+}
+
+enum SettlementDirection {
+  PAYABLE
+  RECEIVABLE
+}
+
+enum SettlementEntityType {
+  BUSINESS
+  DRIVER
+}
+
+type SettlementPayment {
+  amount: Float!
+  business: Business
+  createdAt: Date!
+  createdBy: User
+  direction: SettlementPaymentDirection!
+  driver: User
+  entityType: SettlementType!
+  id: ID!
+  note: String
+  paymentMethod: String
+  paymentReference: String
+  totalBalanceAtTime: Float!
+}
+
+enum SettlementPaymentDirection {
+  ENTITY_TO_PLATFORM
+  PLATFORM_TO_ENTITY
+}
+
+type SettlementRequest {
+  amount: Float!
+  business: Business!
+  createdAt: Date!
+  currency: String!
+  disputeReason: String
+  expiresAt: Date!
+  id: ID!
+  note: String
+  periodEnd: Date!
+  periodStart: Date!
+  requestedBy: User
+  respondedAt: Date
+  respondedBy: User
+  status: SettlementRequestStatus!
+  updatedAt: Date!
+}
+
+enum SettlementRequestAction {
+  ACCEPT
+  DISPUTE
+}
+
+enum SettlementRequestStatus {
+  ACCEPTED
+  CANCELLED
+  DISPUTED
+  EXPIRED
+  PENDING_APPROVAL
+}
+
+type SettlementRule {
+  amount: Float!
+  amountType: SettlementAmountType!
+  appliesTo: String
+  business: Business
+  createdAt: String!
+  direction: SettlementDirection!
+  entityType: SettlementEntityType!
+  id: ID!
+  isActive: Boolean!
+  name: String!
+  notes: String
+  promotion: Promotion
+  updatedAt: String!
+}
+
+input SettlementRuleFilterInput {
+  businessId: ID
+  entityType: SettlementEntityType
+  isActive: Boolean
+  promotionId: ID
+}
+
+type SettlementScenarioDefinition {
+  description: String!
+  id: String!
+  name: String!
+}
+
+type SettlementScenarioHarnessResult {
+  failedCount: Int!
+  passed: Boolean!
+  passedCount: Int!
+  results: [SettlementScenarioResult!]!
+  total: Int!
+}
+
+type SettlementScenarioResult {
+  actualCount: Int!
+  actualSettlements: JSON!
+  expectedCount: Int!
+  expectedSettlements: JSON!
+  mismatches: [String!]!
+  name: String!
+  passed: Boolean!
+  scenarioId: String!
+}
+
+enum SettlementStatus {
+  CANCELLED
+  DISPUTED
+  OVERDUE
+  PAID
+  PENDING
+}
+
+type SettlementSummary {
+  count: Int!
+  pendingCount: Int!
+  totalAmount: Float!
+  totalPaid: Float!
+  totalPayable: Float!
+  totalPending: Float!
+  totalReceivable: Float!
+}
+
+enum SettlementType {
+  BUSINESS
+  DRIVER
 }
 
 enum SignupStep {
@@ -219,32 +1724,134 @@ type SignupStepResponse {
   userId: ID!
 }
 
+type StoreStatus {
+  bannerEnabled: Boolean!
+  bannerMessage: String
+  bannerType: BannerType!
+  closedMessage: String
+  dispatchModeEnabled: Boolean!
+  isStoreClosed: Boolean!
+}
+
 input SubmitPhoneNumberInput {
   phoneNumber: String!
 }
 
 type Subscription {
+  """Admin receives replies from a specific business user in real-time"""
+  adminBusinessMessageReceived(businessUserId: ID!): BusinessMessage!
+
+  """Admin receives replies from a specific driver in real-time"""
+  adminMessageReceived(driverId: ID!): DriverMessage!
   allOrdersUpdated: [Order!]!
+  auditLogCreated(action: ActionType, actorType: ActorType, entityType: EntityType): AuditLog!
+
+  """Business user receives messages from admin in real-time"""
+  businessMessageReceived: BusinessMessage!
+  driverConnectionStatusChanged(driverId: ID!): DriverConnection!
+
+  """Driver receives messages from admin in real-time"""
+  driverMessageReceived: DriverMessage!
+
+  """Per-driver push-to-talk signal stream (start/stop/mute/unmute)"""
+  driverPttSignal(driverId: ID!): DriverPttSignal!
+  driversUpdated: [User!]!
+  orderDriverLiveTracking(input: SubscriptionInput, orderId: ID!): OrderDriverLiveTracking!
   orderStatusUpdated(orderId: ID!): Order!
-  userOrdersUpdated(input: SubscriptionInput!): [Order!]!
+  settlementCreated(type: SettlementType): Settlement!
+  settlementStatusChanged(id: ID!): Settlement!
+  storeStatusUpdated: StoreStatus!
+  userOrdersUpdated(input: SubscriptionInput): [Order!]!
 }
 
 input SubscriptionInput {
+  token: String
+}
+
+type TelemetryCount {
+  count: Int!
+  key: String!
+}
+
+type TokenRefreshResponse {
+  refreshToken: String!
   token: String!
 }
 
-input UpdateBusinessInput {
-  businessType: BusinessType
+input TrackPushTelemetryInput {
+  actionId: String
+  appType: DeviceAppType!
+  campaignId: ID
+  deviceId: String
+  eventType: PushTelemetryEventType!
+  metadata: JSON
+  notificationBody: String
+  notificationTitle: String
+  orderId: ID
+  platform: DevicePlatform!
+  token: String
+}
+
+input UpdateBannerInput {
   imageUrl: String
   isActive: Boolean
+  linkTarget: String
+  linkType: String
+  sortOrder: Int
+  subtitle: String
+  title: String
+}
+
+input UpdateBusinessInput {
+  avgPrepTimeMinutes: Int
+  businessType: BusinessType
+  commissionPercentage: Float
+  description: String
+  imageUrl: String
+  isActive: Boolean
+  isTemporarilyClosed: Boolean
   location: LocationInput
   name: String
+  phoneNumber: String
+  prepTimeOverrideMinutes: Int
+  temporaryClosureReason: String
   workingHours: WorkingHoursInput
+}
+
+input UpdateDeliveryPricingTierInput {
+  isActive: Boolean
+  maxDistanceKm: Float
+  minDistanceKm: Float
+  price: Float
+  sortOrder: Int
+}
+
+input UpdateDeliveryZoneInput {
+  deliveryFee: Float
+  isActive: Boolean
+  name: String
+  polygon: [PolygonPointInput!]
+  sortOrder: Int
+}
+
+input UpdateOptionGroupInput {
+  displayOrder: Int
+  maxSelections: Int
+  minSelections: Int
+  name: String
+}
+
+input UpdateOptionInput {
+  displayOrder: Int
+  extraPrice: Float
+  linkedProductId: ID
+  name: String
 }
 
 input UpdateProductCategoryInput {
   isActive: Boolean
   name: String
+  sortOrder: Int
 }
 
 input UpdateProductInput {
@@ -253,10 +1860,70 @@ input UpdateProductInput {
   imageUrl: String
   isAvailable: Boolean
   isOnSale: Boolean
+  markupPrice: Float
   name: String
+  nightMarkedupPrice: Float
   price: Float
   salePrice: Float
+  sortOrder: Int
   subcategoryId: ID
+  variantGroupId: ID
+}
+
+input UpdateProductSubcategoryInput {
+  name: String
+}
+
+input UpdatePromotionInput {
+  code: String
+  creatorId: ID
+  creatorType: String
+  description: String
+  discountValue: Float
+  eligibleBusinessIds: [ID!]
+  endsAt: String
+  id: ID!
+  isActive: Boolean
+  isStackable: Boolean
+  maxDiscountCap: Float
+  maxGlobalUsage: Int
+  maxUsagePerUser: Int
+  minOrderAmount: Float
+  name: String
+  priority: Int
+  spendThreshold: Float
+  startsAt: String
+  target: PromotionTarget
+  thresholdReward: String
+  type: PromotionType
+}
+
+input UpdateSettlementRuleInput {
+  amount: Float
+  amountType: SettlementAmountType
+  appliesTo: String
+  direction: SettlementDirection
+  isActive: Boolean
+  name: String
+  notes: String
+}
+
+input UpdateStoreStatusInput {
+  bannerEnabled: Boolean
+  bannerMessage: String
+  bannerType: BannerType
+  closedMessage: String
+  dispatchModeEnabled: Boolean
+  isStoreClosed: Boolean!
+}
+
+input UpdateUserAddressInput {
+  addressName: String
+  displayName: String
+  id: ID!
+  latitude: Float
+  longitude: Float
+  priority: Int
 }
 
 input UpdateUserInput {
@@ -272,20 +1939,89 @@ type User {
   adminNote: String
   business: Business
   businessId: ID
+  commissionPercentage: Float
+  driverConnection: DriverConnection
+  driverLocation: Location
+  driverLocationUpdatedAt: Date
   email: String!
   emailVerified: Boolean!
   firstName: String!
   flagColor: String
+  hasOwnVehicle: Boolean
   id: ID!
+  imageUrl: String
+  isOnline: Boolean!
   lastName: String!
+  maxActiveOrders: Int
+  permissions: [UserPermission!]!
   phoneNumber: String
   phoneVerified: Boolean!
+  preferredLanguage: AppLanguage!
+  referralCode: String
   role: UserRole!
   signupStep: SignupStep!
 }
 
+type UserAddress {
+  addressName: String
+  createdAt: DateTime!
+  displayName: String
+  id: ID!
+  latitude: Float!
+  longitude: Float!
+  priority: Int!
+  updatedAt: DateTime!
+  userId: ID!
+}
+
+type UserBehavior {
+  avgOrderValue: Float!
+  cancelledOrders: Int!
+  createdAt: DateTime!
+  deliveredOrders: Int!
+  firstOrderAt: DateTime
+  lastDeliveredAt: DateTime
+  lastOrderAt: DateTime
+  totalOrders: Int!
+  totalSpend: Float!
+  updatedAt: DateTime!
+  userId: ID!
+}
+
+enum UserPermission {
+  manage_orders
+  manage_products
+  manage_settings
+  view_analytics
+  view_finances
+  view_orders
+  view_products
+}
+
+type UserPromoMetadata {
+  hasUsedFirstOrderPromo: Boolean!
+  lastPromoUsedAt: String
+  totalPromosUsed: Int!
+  totalSavings: Float!
+  user: User
+  userId: ID!
+}
+
+type UserPromotion {
+  assignedAt: String!
+  expiresAt: String
+  id: ID!
+  promotion: Promotion
+  promotionId: ID!
+  usageCount: Int!
+  user: User
+  userId: ID!
+}
+
 enum UserRole {
-  BUSINESS_ADMIN
+  ADMIN
+  BUSINESS_EMPLOYEE
+  BUSINESS_OWNER
   CUSTOMER
   DRIVER
   SUPER_ADMIN

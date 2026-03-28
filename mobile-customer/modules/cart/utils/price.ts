@@ -1,7 +1,15 @@
 import { CartItem } from '../types';
 
+export const calculateItemOptionsTotal = (item: CartItem): number => {
+    return item.selectedOptions.reduce((sum, option) => sum + Number(option.extraPrice || 0), 0);
+};
+
+export const calculateItemUnitTotal = (item: CartItem): number => {
+    return Number(item.unitPrice) + calculateItemOptionsTotal(item);
+};
+
 export const calculateItemTotal = (item: CartItem): number => {
-    return item.price * item.quantity;
+    return calculateItemUnitTotal(item) * item.quantity;
 };
 
 export const calculateCartTotal = (items: CartItem[]): number => {

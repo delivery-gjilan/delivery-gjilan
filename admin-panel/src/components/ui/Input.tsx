@@ -2,12 +2,28 @@
 
 import { InputHTMLAttributes } from "react";
 
-export default function Input(props: InputHTMLAttributes<HTMLInputElement>) {
+interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+  label?: string;
+}
+
+function InputComponent({ label, className = "", ...props }: InputProps) {
   return (
-    <input
-      {...props}
-      className="w-full px-3 py-2 bg-[#0a0a0a] border border-[#262626] rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
-    />
+    <div className="w-full">
+      {label && (
+        <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+          {label}
+        </label>
+      )}
+      <input
+        {...props}
+        className={`w-full px-3 py-2 bg-[#09090b] border border-zinc-800 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all duration-150 ${className}`}
+      />
+    </div>
   );
 }
+
+// Named export
+export { InputComponent as Input };
+// Default export for backward compatibility
+export default InputComponent;
 

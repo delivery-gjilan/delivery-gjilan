@@ -3,30 +3,37 @@
 import { ButtonHTMLAttributes } from "react";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "outline" | "danger" | "success";
-  size?: "sm" | "md" | "lg";
+  variant?: "primary" | "outline" | "danger" | "success" | "default" | "destructive" | "secondary" | "ghost" | "link";
+  size?: "sm" | "md" | "lg" | "default" | "icon";
 }
 
-export default function Button({
+function ButtonComponent({
   children,
   variant = "primary",
   size = "md",
   className = "",
   ...props
 }: ButtonProps) {
-  const base = "rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed";
+  const base = "inline-flex items-center justify-center rounded-lg font-medium transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer";
 
   const sizes: Record<string, string> = {
-    sm: "px-3 py-1.5 text-xs",
-    md: "px-4 py-2 text-sm",
-    lg: "px-6 py-3 text-base",
+    sm: "px-2.5 py-1.5 text-xs gap-1.5",
+    md: "px-3.5 py-2 text-sm gap-2",
+    default: "px-3.5 py-2 text-sm gap-2",
+    lg: "px-5 py-2.5 text-sm gap-2",
+    icon: "h-10 w-10",
   };
 
   const variants: Record<string, string> = {
-    primary: "bg-cyan-600 hover:bg-cyan-700 text-white shadow-sm",
-    outline: "border border-neutral-700 text-neutral-300 hover:bg-neutral-800 hover:text-white",
-    danger: "bg-red-600 hover:bg-red-700 text-white shadow-sm",
-    success: "bg-green-600 hover:bg-green-700 text-white shadow-sm",
+    primary: "bg-violet-600 hover:bg-violet-500 text-white",
+    default: "bg-violet-600 hover:bg-violet-500 text-white",
+    outline: "border border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700 hover:bg-zinc-800/50",
+    danger: "bg-red-600/90 hover:bg-red-500 text-white",
+    destructive: "bg-red-600/90 hover:bg-red-500 text-white",
+    success: "bg-emerald-600/90 hover:bg-emerald-500 text-white",
+    secondary: "bg-zinc-800 hover:bg-zinc-700 text-zinc-100",
+    ghost: "hover:bg-zinc-800/50 text-zinc-400 hover:text-zinc-200",
+    link: "text-violet-400 underline-offset-4 hover:underline",
   };
 
   return (
@@ -35,4 +42,9 @@ export default function Button({
     </button>
   );
 }
+
+// Named export
+export { ButtonComponent as Button };
+// Default export for backward compatibility
+export default ButtonComponent;
 

@@ -1,32 +1,29 @@
-"use client";
+﻿"use client";
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import LoginPage from "@/app/login/page";
 
 export default function RootPage() {
     const router = useRouter();
-    const { isAuthenticated, loading } = useAuth();
+    const { isAuthenticated, loading, authCheckComplete } = useAuth();
 
     useEffect(() => {
-        if (!loading && !isAuthenticated) {
+        if (!authCheckComplete || loading) return;
+
+        if (!isAuthenticated) {
             router.push("/login");
-        } else if (!loading && isAuthenticated) {
+        } else {
             router.push("/dashboard/orders");
         }
-    }, [isAuthenticated, loading, router]);
+    }, [isAuthenticated, loading, authCheckComplete, router]);
 
-    if (loading) {
+    if (loading || !authCheckComplete) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-gray-950">
                 <div className="text-white">Loading...</div>
             </div>
         );
-    }
-
-    if (!isAuthenticated) {
-        return <LoginPage />;
     }
 
     return null;

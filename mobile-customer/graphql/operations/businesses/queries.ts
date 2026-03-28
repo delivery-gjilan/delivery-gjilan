@@ -5,9 +5,14 @@ export const GET_BUSINESSES = graphql(`
         businesses {
             id
             name
+            description
             imageUrl
             businessType
             isActive
+            avgPrepTimeMinutes
+            prepTimeOverrideMinutes
+            isTemporarilyClosed
+            temporaryClosureReason
             location {
                 latitude
                 longitude
@@ -17,7 +22,20 @@ export const GET_BUSINESSES = graphql(`
                 opensAt
                 closesAt
             }
+            schedule {
+                id
+                dayOfWeek
+                opensAt
+                closesAt
+            }
             isOpen
+            activePromotion {
+                id
+                name
+                description
+                type
+                discountValue
+            }
             createdAt
             updatedAt
         }
@@ -29,15 +47,26 @@ export const GET_BUSINESS = graphql(`
         business(id: $id) {
             id
             name
+            description
             imageUrl
             businessType
             isActive
+            avgPrepTimeMinutes
+            prepTimeOverrideMinutes
+            isTemporarilyClosed
+            temporaryClosureReason
             location {
                 latitude
                 longitude
                 address
             }
             workingHours {
+                opensAt
+                closesAt
+            }
+            schedule {
+                id
+                dayOfWeek
                 opensAt
                 closesAt
             }

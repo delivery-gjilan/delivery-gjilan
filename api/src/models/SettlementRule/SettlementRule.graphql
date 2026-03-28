@@ -1,0 +1,65 @@
+enum SettlementEntityType {
+  DRIVER
+  BUSINESS
+}
+
+enum SettlementAmountType {
+  FIXED
+  PERCENT
+}
+
+type SettlementRule {
+  id: ID!
+  name: String!
+  entityType: SettlementEntityType!
+  direction: SettlementDirection!
+  amountType: SettlementAmountType!
+  amount: Float!
+  appliesTo: String
+  business: Business
+  promotion: Promotion
+  isActive: Boolean!
+  notes: String
+  createdAt: String!
+  updatedAt: String!
+}
+
+input CreateSettlementRuleInput {
+  name: String!
+  entityType: SettlementEntityType!
+  direction: SettlementDirection!
+  amountType: SettlementAmountType!
+  amount: Float!
+  appliesTo: String
+  businessId: ID
+  promotionId: ID
+  notes: String
+}
+
+input UpdateSettlementRuleInput {
+  name: String
+  direction: SettlementDirection
+  amountType: SettlementAmountType
+  amount: Float
+  appliesTo: String
+  isActive: Boolean
+  notes: String
+}
+
+input SettlementRuleFilterInput {
+  entityType: SettlementEntityType
+  businessId: ID
+  promotionId: ID
+  isActive: Boolean
+}
+
+extend type Query {
+  settlementRule(id: ID!): SettlementRule
+  settlementRules(filter: SettlementRuleFilterInput): [SettlementRule!]!
+}
+
+extend type Mutation {
+  createSettlementRule(input: CreateSettlementRuleInput!): SettlementRule!
+  updateSettlementRule(id: ID!, input: UpdateSettlementRuleInput!): SettlementRule!
+  deleteSettlementRule(id: ID!): Boolean!
+}

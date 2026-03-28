@@ -4,5 +4,5 @@ export const products: NonNullable<QueryResolvers['products']> = async (
     { businessId },
     { productService },
 ) => {
-    return productService.getProducts(businessId);
+    return productService.getProductCards(businessId);
 };

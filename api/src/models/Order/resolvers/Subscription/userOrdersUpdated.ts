@@ -1,18 +1,16 @@
 import { UserOrdersPayload } from '@/lib/pubsub';
 import type { SubscriptionResolvers } from './../../../../generated/types.generated';
-import { GraphQLError } from 'graphql';
+import { AppError } from '@/lib/errors';
 export const userOrdersUpdated: NonNullable<SubscriptionResolvers['userOrdersUpdated']> = {
-    subscribe: async (_parent, { input }, { authService, orderService }) => {
-        const token = input.token;
-        const userData = await authService.verifyJWT(token);
-        if (!userData) {
-            throw new GraphQLError('Fix error, Authentication');
+    subscribe: async (_parent, _args, { orderService, userData }) => {
+        const contextUserId = userData?.userId;
+        if (contextUserId) {
+            return orderService.subscribeToOrderUpdates(contextUserId);
         }
-        console.log('hej more zor', userData);
-        return orderService.subscribeToOrderUpdates(userData.id);
+
+        throw AppError.unauthorized('Authentication failed');
     },
     resolve: (payload: UserOrdersPayload) => {
-        console.log('payload', payload);
         return payload.orders;
     },
 };

@@ -1,161 +1,272 @@
-import React from 'react';
-import { View, Text, Animated, ScrollView } from 'react-native';
+import React, { useMemo, useRef } from 'react';
+import { View, Text, ScrollView, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/hooks/useTheme';
-import { useTranslations } from '@/hooks/useTranslations';
 import { useBusinesses } from '@/modules/business/hooks/useBusinesses';
-import { RestaurantCard } from '@/modules/business/components/RestaurantCard';
-import { PromoSlider, PromoBanner } from '@/components/PromoSlider';
-import { Categories } from '@/components/Categories';
-import { RestaurantCardSkeleton } from '@/components/Skeleton';
+import { CompactRestaurantCard } from '@/modules/business/components/CompactRestaurantCard';
+import { PromoSlider } from '@/components/PromoSlider';
+import { DiscoverSection } from '@/components/DiscoverSection';
+import { CategoryIcons } from '@/components/CategoryIcons';
+import { Skeleton } from '@/components/Skeleton';
 import { WoltHeader } from '@/components/WoltHeader';
+import { useEstimatedDeliveryPrice } from '@/hooks/useEstimatedDeliveryPrice';
+import { useTranslations } from '@/hooks/useTranslations';
+import { useQuery } from '@apollo/client/react';
+import { GET_BANNERS } from '@/graphql/operations/banners';
+import { useStoreStatus } from '@/hooks/useStoreStatus';
+import type { WoltHeaderBannerType } from '@/components/WoltHeader';
+import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 
-export default function Home() {
+function HorizontalCardSkeleton() {
     const theme = useTheme();
-    const { t } = useTranslations();
+    const sw = Dimensions.get('window').width;
+    const cardWidth = Math.round(sw * 0.75);
+    const imgHeight = Math.round(cardWidth * 0.52);
+    return (
+        <View
+            style={{
+                width: cardWidth,
+                marginRight: 12,
+                borderRadius: 12,
+                overflow: 'hidden',
+                backgroundColor: theme.colors.card,
+            }}
+        >
+            <Skeleton width={cardWidth} height={imgHeight} borderRadius={0} />
+            <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 12 }}>
+                <Skeleton width="80%" height={15} style={{ marginBottom: 6 }} />
+                <Skeleton width="55%" height={13} style={{ marginBottom: 6 }} />
+                <Skeleton width="60%" height={12} />
+            </View>
+        </View>
+    );
+}
+
+export default function Discover() {
+    const theme = useTheme();
     const router = useRouter();
-    const { businesses, loading, error } = useBusinesses();
-    // Demo promotional banners
-    const promoBanners: PromoBanner[] = [
-        {
-            id: '1',
-            imageUrl: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&q=80', // Pizza promo
-            type: 'image',
-            onPress: () => console.log('Promo 1 pressed'),
-        },
-        {
-            id: '2',
-            imageUrl: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80', // Food promo
-            type: 'image',
-            onPress: () => console.log('Promo 2 pressed'),
-        },
-        {
-            id: '3',
-            imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&q=80', // Healthy promo
-            type: 'image',
-            onPress: () => console.log('Promo 3 pressed'),
-        },
-        {
-            id: '4',
-            imageUrl: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80', // Delicious food
-            type: 'image',
-            onPress: () => console.log('Promo 4 pressed'),
-        },
-    ];
+    const { businesses, loading, error, refetch } = useBusinesses();
+    // Only play entering animations on the very first render, not on re-focus
+    const hasAnimated = useRef(false);
+        useFocusEffect(
+            React.useCallback(() => {
+                void refetch();
+            }, [refetch]),
+        );
+
+    const { estimateDeliveryPrice } = useEstimatedDeliveryPrice();
+    const { t } = useTranslations();
+    const { bannerEnabled, bannerMessage, bannerType } = useStoreStatus();
+    const showBanner = bannerEnabled && !!bannerMessage;
+    
+    // Fetch banners from API
+    const { data: bannersData, loading: bannersLoading } = useQuery(GET_BANNERS, {
+        variables: { activeOnly: true },
+        fetchPolicy: 'cache-and-network',
+    });
+
+    const restaurants = useMemo(
+        () => (businesses || []).filter((b) => b.businessType === 'RESTAURANT'),
+        [businesses],
+    );
+
+    // Section: Popular / All restaurants
+    const popularRestaurants = useMemo(() => restaurants.slice(0, 8), [restaurants]);
+
+    // Section: Restaurants with active promotions
+    const promoRestaurants = useMemo(
+        () => restaurants.filter((r) => (r as any).activePromotion),
+        [restaurants],
+    );
+
+    // Section: Open now
+    const openNowRestaurants = useMemo(
+        () => restaurants.filter((r) => r.isOpen).slice(0, 8),
+        [restaurants],
+    );
+
+    // Map API banners to PromoSlider format
+    const promoBanners = useMemo(() => {
+        const apiBanners = (bannersData as any)?.getBanners || [];
+        
+        if (apiBanners.length > 0) {
+            return apiBanners.map((banner: any) => ({
+                id: banner.id,
+                imageUrl: banner.imageUrl,
+                type: 'image' as const,
+                title: banner.title || '',
+                subtitle: banner.subtitle || '',
+            }));
+        }
+        
+        // Fallback to default banners if no API banners
+        return [
+            { id: '1', imageUrl: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&q=80', type: 'image' as const, title: t.home.promo_banners.pizza_discount, subtitle: t.home.promo_banners.pizza_discount_sub },
+            { id: '2', imageUrl: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80', type: 'image' as const, title: t.home.promo_banners.free_delivery, subtitle: t.home.promo_banners.free_delivery_sub },
+            { id: '3', imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&q=80', type: 'image' as const, title: t.home.promo_banners.healthy_food, subtitle: t.home.promo_banners.healthy_food_sub },
+            { id: '4', imageUrl: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80', type: 'image' as const, title: t.home.promo_banners.weekly_menu, subtitle: t.home.promo_banners.weekly_menu_sub },
+        ];
+    }, [bannersData, t]);
+
+    // Category icons for top row
+    const categories = useMemo(() => [
+        { id: 'restaurants', label: t.home.categories.restaurants, imageUrl: 'https://cdn-icons-png.flaticon.com/128/3595/3595455.png', onPress: () => router.push('/(tabs)/restaurants') },
+        { id: 'groceries', label: t.home.categories.grocery, imageUrl: 'https://cdn-icons-png.flaticon.com/128/3514/3514227.png' },
+        { id: 'health', label: t.home.categories.health_wellness, imageUrl: 'https://cdn-icons-png.flaticon.com/128/2966/2966327.png' },
+        { id: 'beauty', label: t.home.categories.beauty_care, imageUrl: 'https://cdn-icons-png.flaticon.com/128/1940/1940922.png' },
+        { id: 'drinks', label: t.home.categories.drinks, imageUrl: 'https://cdn-icons-png.flaticon.com/128/3050/3050095.png' },
+    ], [router, t]);
 
     const handleBusinessPress = (businessId: string) => {
         router.push(`/business/${businessId}`);
     };
 
-    // Helper function to generate realistic metadata for demo purposes
-    const getRestaurantMetadata = (index: number) => {
-        const deliveryFees = [1.1, 2.1, 1.5, 1.9, 2.5];
-        const deliveryTimes = ['35-45', '25-35', '30-40', '40-50', '20-30'];
-        const ratings = [8.6, 8.4, 9.1, 8.8, 7.9];
-        const priceRanges = ['$$$$', '$$$', '$$$$', '$$$', '$$'];
-        const descriptions = [
-            'Hot, fresh, casbas!',
-            'Specialized in pizza creations!',
-            'Fast food done right',
-            'Healthy & fresh options',
-            'Traditional flavors',
-        ];
-
-        return {
-            deliveryFee: deliveryFees[index % deliveryFees.length],
-            deliveryTime: deliveryTimes[index % deliveryTimes.length],
-            rating: ratings[index % ratings.length],
-            priceRange: priceRanges[index % priceRanges.length],
-            description: descriptions[index % descriptions.length],
-            discount: index === 0 ? 20 : undefined,
-            isNew: index === 1,
-            isSponsored: index === 0 || index === 1,
-        };
+    const goToRestaurants = () => {
+        router.push('/(tabs)/restaurants');
     };
+
+    const getPrepTimeLabel = (item: any) => {
+        const base =
+            typeof item.prepTimeOverrideMinutes === 'number' && item.prepTimeOverrideMinutes > 0
+                ? item.prepTimeOverrideMinutes
+                : typeof item.avgPrepTimeMinutes === 'number' && item.avgPrepTimeMinutes > 0
+                  ? item.avgPrepTimeMinutes
+                  : null;
+        return base ? `${base}-${base + 10}` : undefined;
+    };
+
+    const renderCards = (items: typeof restaurants) =>
+        items.map((item, index) => {
+            const lat = (item as any).location?.latitude || 42.4635;
+            const lng = (item as any).location?.longitude || 21.4694;
+            const fee = estimateDeliveryPrice(lat, lng);
+
+            return (
+                <Animated.View
+                    key={item.id}
+                    entering={hasAnimated.current ? undefined : FadeInDown.delay(index * 70).duration(400).springify()}
+                >
+                    <CompactRestaurantCard
+                        id={item.id}
+                        name={item.name}
+                        imageUrl={item.imageUrl}
+                        description={(item as any).description}
+                        isOpen={item.isOpen}
+                        onPress={handleBusinessPress}
+                        deliveryFee={fee}
+                        deliveryTime={getPrepTimeLabel(item)}
+                        activePromotion={(item as any).activePromotion}
+                    />
+                </Animated.View>
+            );
+        });
+
+    const renderSkeletonRow = () => (
+        <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingLeft: 16, paddingRight: 4 }}
+        >
+            {[1, 2, 3].map((i) => (
+                <HorizontalCardSkeleton key={i} />
+            ))}
+        </ScrollView>
+    );
 
     return (
         <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }} edges={['top']}>
             <View className="flex-1">
-                {/* Wolt-style Header */}
                 <WoltHeader
-                    location="Pristina"
-                    onPressLocation={() => console.log('Open location selector')}
-                    onPressProfile={() => router.push('/profile')}
                     onPressNotifications={() => console.log('Open notifications')}
+                    bannerMessage={showBanner ? bannerMessage : undefined}
+                    bannerType={(bannerType as WoltHeaderBannerType) ?? 'INFO'}
                 />
 
                 {loading ? (
                     <ScrollView showsVerticalScrollIndicator={false}>
-                        {/* Categories Skeleton */}
-                        <View className="mb-6">
-                            <Categories />
+                        {/* Category Icons */}
+                        <View style={{ marginBottom: 20, marginTop: 4 }}>
+                            <CategoryIcons categories={categories} />
                         </View>
 
-                        {/* Promotional Slider Skeleton */}
-                        <View className="mb-6">
+                        <View style={{ marginBottom: 24 }}>
                             <PromoSlider banners={promoBanners} />
                         </View>
 
-                        {/* Restaurants Skeleton */}
-                        <View className="px-4">
-                            <Text className="text-xl font-bold mb-4" style={{ color: theme.colors.text }}>
-                                Restaurants
-                            </Text>
-                            {[1, 2, 3, 4].map((i) => (
-                                <RestaurantCardSkeleton key={i} />
-                            ))}
+                        <View style={{ marginBottom: 24 }}>
+                            <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+                                <Skeleton width="40%" height={18} />
+                            </View>
+                            {renderSkeletonRow()}
+                        </View>
+
+                        <View style={{ marginBottom: 24 }}>
+                            <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+                                <Skeleton width="50%" height={18} />
+                            </View>
+                            {renderSkeletonRow()}
                         </View>
                     </ScrollView>
                 ) : error ? (
                     <View className="flex-1 justify-center items-center px-4 py-20">
-                        <Text style={{ color: theme.colors.text }}>Error loading restaurants</Text>
+                        <Text style={{ color: theme.colors.text }}>{t.home.error_loading}</Text>
                         <Text className="text-sm mt-2" style={{ color: theme.colors.subtext }}>
-                            {error.message || 'Something went wrong'}
+                            {error.message || t.common.something_went_wrong}
                         </Text>
                     </View>
                 ) : (
                     <ScrollView showsVerticalScrollIndicator={false}>
-                        {/* Categories */}
-                        <View className="mb-6">
-                            <Categories />
-                        </View>
+                        {/* Category Icons */}
+                        <Animated.View entering={hasAnimated.current ? undefined : FadeIn.duration(500)} style={{ marginBottom: 20, marginTop: 4 }}>
+                            <CategoryIcons categories={categories} />
+                        </Animated.View>
 
-                        {/* Promotional Slider */}
-                        <View className="mb-6">
+                        {/* Promo Banners */}
+                        <Animated.View entering={hasAnimated.current ? undefined : FadeInDown.delay(100).duration(500)} style={{ marginBottom: 20 }}>
                             <PromoSlider banners={promoBanners} />
-                        </View>
+                        </Animated.View>
 
-                        {/* Restaurants Section */}
-                        <View className="px-4">
-                            <Text className="text-xl font-bold mb-4" style={{ color: theme.colors.text }}>
-                                Restaurants
-                            </Text>
+                        {/* Popular Right Now */}
+                        <Animated.View entering={hasAnimated.current ? undefined : FadeInDown.delay(200).duration(500)}>
+                            <DiscoverSection
+                                title={t.home.popular_now}
+                                seeAllLabel={t.home.see_all}
+                                onSeeAll={goToRestaurants}
+                            >
+                                {renderCards(popularRestaurants)}
+                            </DiscoverSection>
+                        </Animated.View>
 
-                            {/* Restaurant Cards */}
-                            {businesses?.map((item, index) => {
-                                const metadata = getRestaurantMetadata(index);
-                                return (
-                                    <RestaurantCard
-                                        key={item.id}
-                                        id={item.id}
-                                        name={item.name}
-                                        imageUrl={item.imageUrl}
-                                        businessType={item.businessType}
-                                        isOpen={item.isOpen}
-                                        onPress={handleBusinessPress}
-                                        deliveryFee={metadata.deliveryFee}
-                                        deliveryTime={metadata.deliveryTime}
-                                        rating={metadata.rating}
-                                        priceRange={metadata.priceRange}
-                                        description={metadata.description}
-                                        discount={metadata.discount}
-                                        isNew={metadata.isNew}
-                                        isSponsored={metadata.isSponsored}
-                                    />
-                                );
-                            })}
-                        </View>
+                        {/* Active Promotions Section */}
+                        {promoRestaurants.length > 0 && (
+                            <Animated.View entering={hasAnimated.current ? undefined : FadeInDown.delay(300).duration(500)}>
+                                <DiscoverSection
+                                    title={t.home.active_discounts}
+                                    seeAllLabel={t.home.see_all}
+                                    onSeeAll={goToRestaurants}
+                                >
+                                    {renderCards(promoRestaurants)}
+                                </DiscoverSection>
+                            </Animated.View>
+                        )}
+
+                        {/* Open Now */}
+                        {openNowRestaurants.length > 0 && (
+                            <Animated.View entering={hasAnimated.current ? undefined : FadeInDown.delay(400).duration(500)}>
+                                <DiscoverSection
+                                    title={t.home.open_now}
+                                    seeAllLabel={t.home.see_all}
+                                    onSeeAll={goToRestaurants}
+                                >
+                                    {renderCards(openNowRestaurants)}
+                                </DiscoverSection>
+                            </Animated.View>
+                        )}
+
+                        {/* Bottom spacing */}
+                        <View style={{ height: 32 }} onLayout={() => { hasAnimated.current = true; }} />
                     </ScrollView>
                 )}
             </View>

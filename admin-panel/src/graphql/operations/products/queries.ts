@@ -8,14 +8,54 @@ export const GET_BUSINESS_PRODUCTS_AND_CATEGORIES = graphql(`
         }
         products(businessId: $businessId) {
             id
-            categoryId
             name
-            description
-            price
             imageUrl
-            isOnSale
-            salePrice
-            isAvailable
+            basePrice
+            isOffer
+            product {
+                id
+                businessId
+                categoryId
+                subcategoryId
+                variantGroupId
+                name
+                description
+                imageUrl
+                price
+                isOnSale
+                salePrice
+                isAvailable
+                sortOrder
+                variantGroup {
+                    id
+                    name
+                }
+                createdAt
+                updatedAt
+            }
+        }
+    }
+`);
+
+export const GET_PRODUCT_WITH_OPTIONS = graphql(`
+    query ProductWithOptions($id: ID!) {
+        product(id: $id) {
+            id
+            name
+            isOffer
+            optionGroups {
+                id
+                name
+                minSelections
+                maxSelections
+                displayOrder
+                options {
+                    id
+                    name
+                    extraPrice
+                    displayOrder
+                }
+            }
         }
     }
 `);

@@ -1,10 +1,13 @@
 import { z } from 'zod';
 import { CreateProductInput, UpdateProductInput } from '@/generated/types.generated';
+import { AppError } from '@/lib/errors';
 
 const createProductSchema = z.object({
     businessId: z.uuid('Invalid Business ID'),
     categoryId: z.uuid('Invalid Category ID'),
     subcategoryId: z.uuid('Invalid Subcategory ID').optional().nullable(),
+    variantGroupId: z.uuid('Invalid Variant Group ID').optional().nullable(),
+    isOffer: z.boolean().optional(),
     name: z.string().min(1, 'Name is required'),
     description: z.string().optional().nullable(),
     imageUrl: z.string().optional().nullable(),
@@ -17,6 +20,7 @@ const createProductSchema = z.object({
 const updateProductSchema = z.object({
     categoryId: z.uuid('Invalid Category ID').optional(),
     subcategoryId: z.uuid('Invalid Subcategory ID').optional().nullable(),
+    variantGroupId: z.uuid('Invalid Variant Group ID').optional().nullable(),
     name: z.string().min(1, 'Name is required').optional(),
     description: z.string().optional().nullable(),
     imageUrl: z.string().optional().nullable(),
@@ -24,15 +28,26 @@ const updateProductSchema = z.object({
     isOnSale: z.boolean().optional(),
     salePrice: z.number().min(0, 'Sale price must be positive').optional().nullable(),
     isAvailable: z.boolean().optional(),
+    sortOrder: z.number().int().optional(),
+    markupPrice: z.number().min(0, 'Markup price must be positive').optional().nullable(),
+    nightMarkedupPrice: z.number().min(0, 'Night price must be positive').optional().nullable(),
 });
 
 export class ProductValidator {
     validateCreateProduct(input: CreateProductInput) {
-        return createProductSchema.parse(input);
+        const result = createProductSchema.safeParse(input);
+        if (!result.success) {
+            throw AppError.fromZodError(result.error);
+        }
+        return result.data;
     }
 
     validateUpdateProduct(input: UpdateProductInput) {
-        return updateProductSchema.parse(input);
+        const result = updateProductSchema.safeParse(input);
+        if (!result.success) {
+            throw AppError.fromZodError(result.error);
+        }
+        return result.data;
     }
 }
 

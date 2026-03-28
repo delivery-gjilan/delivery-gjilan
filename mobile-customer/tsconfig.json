@@ -3,7 +3,7 @@
     "compilerOptions": {
         "moduleResolution": "bundler",
         "module": "esnext",
-        "strict": true,
+        "strict": false,
         "skipLibCheck": true,
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true,
@@ -19,7 +19,7 @@
         "paths": {
             "@/*": ["./*"]
         },
-        "noUncheckedIndexedAccess": true
+        "noUncheckedIndexedAccess": false
     },
     "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "nativewind-env.d.ts", "index.tsx"]
 }

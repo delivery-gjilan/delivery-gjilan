@@ -4,6 +4,7 @@ export const LOGIN_MUTATION = graphql(`
     mutation Login($input: LoginInput!) {
         login(input: $input) {
             token
+            refreshToken
             user {
                 id
                 email
@@ -14,6 +15,7 @@ export const LOGIN_MUTATION = graphql(`
                 phoneVerified
                 phoneNumber
                 role
+                preferredLanguage
             }
             message
         }

@@ -1,4 +1,5 @@
 scalar Date
+scalar DateTime
 
 type Location {
     latitude: Float!
@@ -22,6 +23,51 @@ input WorkingHoursInput {
     closesAt: String! # "23:00"
 }
 
-input SubscriptionInput {
-    token: String!
+type BusinessDayHours {
+    id: ID!
+    dayOfWeek: Int!    # 0=Sun … 6=Sat
+    opensAt: String!   # "HH:MM"
+    closesAt: String!  # "HH:MM"
+}
+
+input BusinessDayHoursInput {
+    dayOfWeek: Int!    # 0=Sun … 6=Sat
+    opensAt: String!   # "HH:MM"
+    closesAt: String!  # "HH:MM"
+}
+
+enum BannerType {
+    INFO
+    WARNING
+    SUCCESS
+}
+
+type StoreStatus {
+    isStoreClosed: Boolean!
+    closedMessage: String
+    bannerEnabled: Boolean!
+    bannerMessage: String
+    bannerType: BannerType!
+    dispatchModeEnabled: Boolean!
+}
+
+input UpdateStoreStatusInput {
+    isStoreClosed: Boolean!
+    closedMessage: String
+    bannerEnabled: Boolean
+    bannerMessage: String
+    bannerType: BannerType
+    dispatchModeEnabled: Boolean
+}
+
+type Query {
+    getStoreStatus(url: String): StoreStatus!
+}
+
+type Mutation {
+    updateStoreStatus(input: UpdateStoreStatusInput!): StoreStatus!
+}
+
+extend type Subscription {
+    storeStatusUpdated: StoreStatus!
 }

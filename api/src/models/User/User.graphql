@@ -10,7 +10,24 @@ enum UserRole {
     CUSTOMER
     DRIVER
     SUPER_ADMIN
-    BUSINESS_ADMIN
+    ADMIN
+    BUSINESS_OWNER
+    BUSINESS_EMPLOYEE
+}
+
+enum UserPermission {
+    view_orders
+    manage_orders
+    view_products
+    manage_products
+    view_finances
+    manage_settings
+    view_analytics
+}
+
+enum AppLanguage {
+    EN
+    AL
 }
 
 type User {
@@ -28,6 +45,27 @@ type User {
     business: Business
     adminNote: String
     flagColor: String
+    imageUrl: String
+    isOnline: Boolean!
+    driverLocation: Location
+    driverLocationUpdatedAt: Date
+    referralCode: String
+    preferredLanguage: AppLanguage!
+    permissions: [UserPermission!]!
+}
+
+type UserBehavior {
+    userId: ID!
+    totalOrders: Int!
+    deliveredOrders: Int!
+    cancelledOrders: Int!
+    totalSpend: Float!
+    avgOrderValue: Float!
+    firstOrderAt: DateTime
+    lastOrderAt: DateTime
+    lastDeliveredAt: DateTime
+    createdAt: DateTime!
+    updatedAt: DateTime!
 }
 
 type SignupStepResponse {
@@ -38,8 +76,14 @@ type SignupStepResponse {
 
 type AuthResponse {
     token: String!
+    refreshToken: String
     user: User!
     message: String!
+}
+
+type TokenRefreshResponse {
+    token: String!
+    refreshToken: String!
 }
 
 input InitiateSignupInput {
@@ -47,6 +91,7 @@ input InitiateSignupInput {
     lastName: String!
     email: String!
     password: String!
+    referralCode: String
 }
 
 input VerifyEmailInput {
@@ -83,10 +128,41 @@ input UpdateUserInput {
     businessId: ID
 }
 
+enum ReferralStatus {
+    PENDING
+    COMPLETED
+    EXPIRED
+}
+
+type Referral {
+    id: ID!
+    referrerUserId: ID!
+    referredUserId: ID
+    referralCode: String!
+    status: ReferralStatus!
+    rewardGiven: Boolean!
+    rewardAmount: Float
+    completedAt: DateTime
+    createdAt: DateTime!
+    referredUser: User
+}
+
+type ReferralStats {
+    totalReferrals: Int!
+    completedReferrals: Int!
+    pendingReferrals: Int!
+    totalRewardsEarned: Float!
+    referralCode: String!
+    referrals: [Referral!]!
+}
+
 type Query {
     me: User
-    users: [User!]!
+    myBehavior: UserBehavior
+    userBehavior(userId: ID!): UserBehavior
+    users(limit: Int, offset: Int): [User!]!
     drivers: [User!]!
+    myReferralStats: ReferralStats!
 }
 
 type Mutation {
@@ -96,8 +172,23 @@ type Mutation {
     submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
     verifyPhone(input: VerifyPhoneInput!): SignupStepResponse!
     login(input: LoginInput!): AuthResponse! @skipAuth
+    refreshToken(refreshToken: String!): TokenRefreshResponse! @skipAuth
+    logoutCurrentSession(refreshToken: String!): Boolean!
+    logoutAllSessions: Boolean!
     createUser(input: CreateUserInput!): AuthResponse!
     updateUser(input: UpdateUserInput!): User!
     deleteUser(id: ID!): Boolean!
+    deleteMyAccount: Boolean!
     updateUserNote(userId: ID!, note: String, flagColor: String): User!
+    setUserPermissions(userId: ID!, permissions: [UserPermission!]!): User!
+    updateDriverLocation(latitude: Float!, longitude: Float!): User!
+    adminUpdateDriverLocation(driverId: ID!, latitude: Float!, longitude: Float!): User!
+    updateDriverOnlineStatus(isOnline: Boolean!): User!
+    generateReferralCode: String!
+    setMyPreferredLanguage(language: AppLanguage!): User!
+    changeMyPassword(currentPassword: String!, newPassword: String!): Boolean!
+}
+
+type Subscription {
+    driversUpdated: [User!]! @skipAuth
 }

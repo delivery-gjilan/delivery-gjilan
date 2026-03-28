@@ -3,39 +3,34 @@ import { GraphQLError } from 'graphql';
 
 export const ordersByStatus: NonNullable<QueryResolvers['ordersByStatus']> = async (
     _parent,
-    { status },
+    { status, limit, offset },
     { orderService, userData },
 ) => {
-    // Check authentication
     if (!userData.userId) {
         throw new GraphQLError('Unauthorized: You must be logged in to view orders', {
             extensions: { code: 'UNAUTHORIZED' },
         });
     }
 
-    // Get orders by status
-    const statusOrders = await orderService.getOrdersByStatus(status);
-
-    // Filter based on role
     switch (userData.role) {
         case 'SUPER_ADMIN':
+        case 'ADMIN':
+            return orderService.getOrdersByStatus(status, limit ?? undefined, offset ?? undefined);
+
         case 'DRIVER':
-            // Super admins and drivers can see all orders
-            return statusOrders;
+            return orderService.getOrdersForDriverByStatus(userData.userId, status);
 
         case 'CUSTOMER':
-            // Customers can only see their own orders
-            return statusOrders.filter(order => order.userId === userData.userId);
+            return orderService.getOrdersByUserIdAndStatus(userData.userId, status);
 
-        case 'BUSINESS_ADMIN':
-            // Business admins can only see orders that contain items from their business
+        case 'BUSINESS_OWNER':
+        case 'BUSINESS_EMPLOYEE':
             if (!userData.businessId) {
-                throw new GraphQLError('Business admin must be associated with a business', {
+                throw new GraphQLError('Business user must be associated with a business', {
                     extensions: { code: 'FORBIDDEN' },
                 });
             }
-            const businessOrders = await orderService.getOrdersByBusinessId(userData.businessId);
-            return businessOrders.filter(order => order.status === status);
+            return orderService.getOrdersByBusinessIdAndStatus(userData.businessId, status);
 
         default:
             throw new GraphQLError('Invalid user role', {

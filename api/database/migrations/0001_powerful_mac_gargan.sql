@@ -1,0 +1,1 @@
+ALTER TABLE "orders" ADD COLUMN "admin_note" varchar(2000);

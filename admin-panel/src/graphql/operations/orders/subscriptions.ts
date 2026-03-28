@@ -1,14 +1,32 @@
 import { gql } from '@apollo/client';
 
-export const ORDERS_SUBSCRIPTION = gql`
-    subscription OrdersUpdated($token: String!) {
-        userOrdersUpdated(input: { token: $token }) {
+export const ORDERS_SUBSCRIPTION = gql(`
+    subscription OrdersUpdated {
+        userOrdersUpdated {
             id
+            displayId
             orderPrice
             deliveryPrice
+            originalPrice
+            originalDeliveryPrice
             totalPrice
             orderDate
+            updatedAt
             status
+            user {
+                id
+                firstName
+                lastName
+                email
+                address
+                phoneNumber
+            }
+            driver {
+                id
+                firstName
+                lastName
+                email
+            }
             dropOffLocation {
                 latitude
                 longitude
@@ -18,30 +36,50 @@ export const ORDERS_SUBSCRIPTION = gql`
                 business {
                     id
                     name
+                    phoneNumber
                     businessType
+                    location {
+                        latitude
+                        longitude
+                        address
+                    }
                 }
                 items {
                     productId
                     name
                     imageUrl
                     quantity
-                    price
+                    basePrice
+                    unitPrice
                 }
             }
         }
     }
-`;
+`);
 
-export const ALL_ORDERS_SUBSCRIPTION = gql`
+export const ALL_ORDERS_SUBSCRIPTION = gql(`
     subscription AllOrdersUpdated {
         allOrdersUpdated {
             id
+            displayId
             orderPrice
             deliveryPrice
+            originalPrice
+            originalDeliveryPrice
             totalPrice
             orderDate
+            updatedAt
             status
+            adminNote
             user {
+                id
+                firstName
+                lastName
+                email
+                address
+                phoneNumber
+            }
+            driver {
                 id
                 firstName
                 lastName
@@ -57,15 +95,22 @@ export const ALL_ORDERS_SUBSCRIPTION = gql`
                     id
                     name
                     businessType
+                    phoneNumber
+                    location {
+                        latitude
+                        longitude
+                        address
+                    }
                 }
                 items {
                     productId
                     name
                     imageUrl
                     quantity
-                    price
+                    basePrice
+                    unitPrice
                 }
             }
         }
     }
-`;
+`);

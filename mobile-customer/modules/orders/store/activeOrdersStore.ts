@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import { Order } from '@/gql/graphql';
 
+interface DriverConnectionPatch {
+    activeOrderId?: string | null;
+    navigationPhase?: string | null;
+    remainingEtaSeconds?: number | null;
+    etaUpdatedAt?: string | null;
+}
+
 interface ActiveOrdersState {
     activeOrders: Order[];
     hasActiveOrders: boolean;
@@ -10,6 +17,8 @@ interface ActiveOrdersState {
     updateOrder: (order: Order) => void;
     removeOrder: (orderId: string) => void;
     clearActiveOrders: () => void;
+    /** Patch driver.driverConnection on an existing order (e.g. from live-tracking subscription). */
+    patchDriverConnection: (orderId: string, patch: DriverConnectionPatch) => void;
 }
 
 export const useActiveOrdersStore = create<ActiveOrdersState>()((set) => ({
@@ -60,5 +69,25 @@ export const useActiveOrdersStore = create<ActiveOrdersState>()((set) => ({
         set({
             activeOrders: [],
             hasActiveOrders: false,
+        }),
+
+    patchDriverConnection: (orderId, patch) =>
+        set((state) => {
+            const idx = state.activeOrders.findIndex((o) => o.id === orderId);
+            if (idx < 0) return state;
+
+            const order = state.activeOrders[idx] as any;
+            const driver = order.driver ?? {};
+            const prev = driver.driverConnection ?? {};
+
+            const newOrders = [...state.activeOrders];
+            newOrders[idx] = {
+                ...order,
+                driver: {
+                    ...driver,
+                    driverConnection: { ...prev, ...patch },
+                },
+            };
+            return { activeOrders: newOrders };
         }),
 }));

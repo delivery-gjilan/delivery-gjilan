@@ -1,7 +1,38 @@
+type ProductVariantGroup {
+    id: ID!
+    businessId: ID!
+    name: String!
+}
+
+type OptionGroup {
+    id: ID!
+    productId: ID!
+    name: String!
+    minSelections: Int!
+    maxSelections: Int!
+    displayOrder: Int!
+    options: [Option!]!
+}
+
+type Option {
+    id: ID!
+    optionGroupId: ID!
+    name: String!
+    extraPrice: Float!
+    linkedProductId: ID
+    linkedProduct: Product
+    displayOrder: Int!
+}
+
 type Product {
     id: ID!
     businessId: ID!
     categoryId: ID!
+    subcategoryId: ID
+    variantGroupId: ID
+    variantGroup: ProductVariantGroup
+    variants: [Product!]!
+    isOffer: Boolean!
     name: String!
     description: String
     imageUrl: String
@@ -9,18 +40,75 @@ type Product {
     isOnSale: Boolean!
     salePrice: Float
     isAvailable: Boolean!
+    sortOrder: Int!
+    markupPrice: Float
+    nightMarkedupPrice: Float
+    optionGroups: [OptionGroup!]!
     createdAt: String!
     updatedAt: String!
 }
+
+type ProductCard {
+    # Storefront identity:
+    # - variant sets: variantGroupId
+    # - standalone products: product.id
+    id: ID!
+    name: String!
+    imageUrl: String
+    basePrice: Float!
+    isOffer: Boolean!
+    hasOptionGroups: Boolean!
+    variants: [Product!]!
+    product: Product
+}
+
 type Query {
-    products(businessId: ID!): [Product!]! @skipAuth
+    products(businessId: ID!): [ProductCard!]! @skipAuth
     product(id: ID!): Product @skipAuth
+    offers(businessId: ID!): [Product!]! @skipAuth
+}
+
+input CreateOptionGroupInput {
+    productId: ID!
+    name: String!
+    minSelections: Int!
+    maxSelections: Int!
+    displayOrder: Int
+    options: [CreateOptionInput!]!
+}
+
+input CreateOptionInput {
+    name: String!
+    extraPrice: Float
+    linkedProductId: ID
+    displayOrder: Int
+}
+
+input UpdateOptionGroupInput {
+    name: String
+    minSelections: Int
+    maxSelections: Int
+    displayOrder: Int
+}
+
+input UpdateOptionInput {
+    name: String
+    extraPrice: Float
+    linkedProductId: ID
+    displayOrder: Int
+}
+
+input CreateProductVariantGroupInput {
+    businessId: ID!
+    name: String!
 }
 
 input CreateProductInput {
     businessId: ID!
     categoryId: ID!
     subcategoryId: ID
+    variantGroupId: ID
+    isOffer: Boolean
     name: String!
     description: String
     imageUrl: String
@@ -33,6 +121,7 @@ input CreateProductInput {
 input UpdateProductInput {
     categoryId: ID
     subcategoryId: ID
+    variantGroupId: ID
     name: String
     description: String
     imageUrl: String
@@ -40,10 +129,30 @@ input UpdateProductInput {
     isOnSale: Boolean
     salePrice: Float
     isAvailable: Boolean
+    sortOrder: Int
+    markupPrice: Float
+    nightMarkedupPrice: Float
+}
+
+input ProductOrderInput {
+    id: ID!
+    sortOrder: Int!
 }
 
 type Mutation {
     createProduct(input: CreateProductInput!): Product!
     updateProduct(id: ID!, input: UpdateProductInput!): Product!
+    updateProductsOrder(businessId: ID!, products: [ProductOrderInput!]!): Boolean!
     deleteProduct(id: ID!): Boolean!
+
+    createProductVariantGroup(input: CreateProductVariantGroupInput!): ProductVariantGroup!
+    deleteProductVariantGroup(id: ID!): Boolean!
+
+    createOptionGroup(input: CreateOptionGroupInput!): OptionGroup!
+    updateOptionGroup(id: ID!, input: UpdateOptionGroupInput!): OptionGroup!
+    deleteOptionGroup(id: ID!): Boolean!
+
+    createOption(optionGroupId: ID!, input: CreateOptionInput!): Option!
+    updateOption(id: ID!, input: UpdateOptionInput!): Option!
+    deleteOption(id: ID!): Boolean!
 }

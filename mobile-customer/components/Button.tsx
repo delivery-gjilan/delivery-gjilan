@@ -28,8 +28,8 @@ export function Button({
 
     const variants = {
         primary: 'bg-primary shadow-lg',
-        success: 'bg-green-500 shadow-lg',
-        danger: 'bg-red-500 shadow-lg',
+        success: 'bg-income shadow-lg',
+        danger: 'bg-expense shadow-lg',
         outline: 'bg-transparent border border-border',
         ghost: 'bg-transparent',
     };

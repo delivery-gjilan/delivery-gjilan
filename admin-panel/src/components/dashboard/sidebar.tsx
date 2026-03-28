@@ -1,10 +1,10 @@
 // src/components/dashboard/Sidebar.tsx
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { useState } from "react";
 import {
   ClipboardList,
   Store,
@@ -12,91 +12,195 @@ import {
   Truck,
   Map,
   Tag,
-  Percent,
   Users,
   UserCog,
-  BarChart3,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
+  DollarSign,
+  Activity,
+  Bell,
+  LayoutDashboard,
+  Image,
+  MessageSquare,
+  Monitor,
+  ChevronDown,
 } from "lucide-react";
 
-const menu = [
-  { name: "Orders", href: "/dashboard/orders", icon: ClipboardList, businessAdminVisible: true },
-  { name: "Products", href: "/dashboard/products", icon: Package, businessAdminVisible: true },
-  { name: "Deals", href: "/dashboard/deals", icon: Percent, businessAdminVisible: true },
-  { name: "Statistics", href: "/dashboard/statistics", icon: BarChart3, businessAdminVisible: true },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings, businessAdminVisible: true },
-  { name: "Businesses", href: "/dashboard/businesses", icon: Store, superAdminOnly: true },
-  { name: "Drivers", href: "/dashboard/drivers", icon: Truck, superAdminOnly: true },
-  { name: "Map", href: "/dashboard/map", icon: Map, superAdminOnly: true },
-  { name: "Promotions", href: "/dashboard/promotions", icon: Tag, superAdminOnly: true },
-  { name: "Admins", href: "/dashboard/admins", icon: UserCog, superAdminOnly: true },
-  { name: "Users", href: "/dashboard/users", icon: Users, superAdminOnly: true },
+interface NavItem {
+  name: string;
+  href: string;
+  icon: React.ElementType;
+  superAdminOnly?: boolean;
+  businessAdminVisible?: boolean;
+}
+
+interface NavSection {
+  header: string;
+  superAdminOnly?: boolean;
+  businessAdminVisible?: boolean;
+  items: NavItem[];
+}
+
+const sections: NavSection[] = [
+  {
+    header: "Operations",
+    superAdminOnly: true,
+    items: [
+      { name: "Orders", href: "/dashboard/orders", icon: ClipboardList, businessAdminVisible: true },
+      { name: "Cancelled Orders", href: "/dashboard/orders/cancelled", icon: ClipboardList, superAdminOnly: true },
+      { name: "Map", href: "/dashboard/map", icon: Map, superAdminOnly: true },
+      { name: "Businesses", href: "/dashboard/businesses", icon: Store, superAdminOnly: true },
+      { name: "Market", href: "/dashboard/market", icon: Store, superAdminOnly: true },
+      { name: "Drivers", href: "/dashboard/drivers", icon: Truck, superAdminOnly: true },
+    ],
+  },
+  {
+    header: "Pricing & Promotions",
+    superAdminOnly: true,
+    items: [
+      { name: "Promotions", href: "/dashboard/promotions", icon: Tag, superAdminOnly: true },
+      { name: "Product Markup", href: "/dashboard/productpricing", icon: Tag, superAdminOnly: true },
+      { name: "Delivery Pricing", href: "/dashboard/delivery-pricing", icon: Truck, superAdminOnly: true },
+      { name: "Delivery Zones", href: "/dashboard/delivery-zones", icon: Map, superAdminOnly: true },
+    ],
+  },
+  {
+    header: "Finance & Admin",
+    superAdminOnly: true,
+    items: [
+      { name: "Financial Ops", href: "/admin/financial", icon: DollarSign, superAdminOnly: true },
+      { name: "Admins", href: "/dashboard/admins", icon: UserCog, superAdminOnly: true },
+      { name: "Users", href: "/dashboard/users", icon: Users, superAdminOnly: true },
+      { name: "Messages", href: "/admin/messages", icon: MessageSquare, superAdminOnly: true },
+    ],
+  },
+  {
+    header: "Other",
+    superAdminOnly: true,
+    businessAdminVisible: true,
+    items: [
+      { name: "Categories", href: "/dashboard/categories", icon: Tag, businessAdminVisible: true },
+      { name: "Products", href: "/dashboard/products", icon: Package, businessAdminVisible: true },
+      { name: "Banners", href: "/admin/banners", icon: Image, superAdminOnly: true },
+      { name: "Notifications", href: "/dashboard/notifications", icon: Bell, superAdminOnly: true },
+      { name: "Push Telemetry", href: "/dashboard/notifications/telemetry", icon: Activity, superAdminOnly: true },
+      { name: "Business Devices", href: "/dashboard/notifications/devices", icon: Activity, superAdminOnly: true },
+      { name: "Realtime", href: "/dashboard/realtime", icon: Activity, superAdminOnly: true },
+      { name: "Ops Wall", href: "/dashboard/ops-wall", icon: Monitor, superAdminOnly: true },
+      { name: "Logs", href: "/dashboard/logs", icon: Activity, superAdminOnly: true },
+    ],
+  },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
   const { admin } = useAuth();
 
   const isSuperAdmin = admin?.role === "SUPER_ADMIN";
-  const isBusinessAdmin = admin?.role === "BUSINESS_ADMIN";
+  const isAdmin = admin?.role === "ADMIN";
+  const isBusinessOwner = admin?.role === "BUSINESS_OWNER";
+  const isBusinessEmployee = admin?.role === "BUSINESS_EMPLOYEE";
+  const isBusinessUser = isBusinessOwner || isBusinessEmployee;
 
-  const filteredMenu = menu.filter(item => {
-    // Super admin sees everything
+  const canSeeItem = (item: NavItem) => {
     if (isSuperAdmin) return true;
-    // Business admin only sees items marked as businessAdminVisible
-    if (isBusinessAdmin) return item.businessAdminVisible;
+    if (isAdmin && !item.superAdminOnly) return true;
+    if (isBusinessUser && item.businessAdminVisible) return true;
     return false;
-  });
+  };
+
+  const canSeeSection = (section: NavSection) => {
+    if (isSuperAdmin) return true;
+    if (isAdmin && !section.superAdminOnly) return true;
+    if (isBusinessUser && section.businessAdminVisible) return true;
+    // Show section even if superAdminOnly but admin role can see at least 1 item
+    if (isAdmin) return section.items.some((i) => canSeeItem(i));
+    if (isBusinessUser) return section.items.some((i) => canSeeItem(i));
+    return false;
+  };
+
+  // Build initial open state — open sections that contain the active route
+  const initialOpen = sections.reduce<Record<string, boolean>>((acc, s) => {
+    const hasActive = s.items.some((i) => pathname === i.href || pathname.startsWith(`${i.href}/`));
+    acc[s.header] = hasActive;
+    return acc;
+  }, {});
+
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(initialOpen);
+
+  const toggleSection = (header: string) => {
+    setOpenSections((prev) => ({ ...prev, [header]: !prev[header] }));
+  };
 
   return (
-    <aside 
-      className={`bg-[#0a0a0a] border-r border-[#262626] p-4 flex flex-col h-screen transition-all duration-300 ${
-        collapsed ? "w-16" : "w-64"
-      }`}
-    >
-      {/* Header with toggle */}
-      <div className="flex items-center justify-between mb-6">
-        {!collapsed && (
-          <h1 className="text-xl font-bold text-white">DG Admin</h1>
-        )}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="p-2 rounded-lg text-neutral-400 hover:text-white hover:bg-[#161616] transition ml-auto"
-        >
-          {collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
-        </button>
-      </div>
+    <aside className="w-[200px] bg-[#09090b] border-r border-[#1e1e22] flex flex-col py-4 h-screen overflow-visible">
+      {/* Logo */}
+      <Link
+        href="/dashboard"
+        title="Dashboard Home"
+        className="mx-3 mb-5 px-3 py-2.5 rounded-lg bg-violet-600 flex items-center gap-3 hover:bg-violet-500 transition-colors"
+      >
+        <LayoutDashboard size={18} className="text-white flex-shrink-0" />
+        <span className="text-white font-semibold text-sm">Dashboard</span>
+      </Link>
 
       {/* Navigation */}
-      <nav className="space-y-1 flex-1 overflow-y-auto">
-        {filteredMenu.map((item) => {
-          const Icon = item.icon;
-          const active = pathname.startsWith(item.href);
+      <nav className="flex-1 flex flex-col overflow-y-auto w-full px-3 gap-0.5">
+        {sections.map((section) => {
+          if (!canSeeSection(section)) return null;
+          const visibleItems = section.items.filter(canSeeItem);
+          if (visibleItems.length === 0) return null;
+          const isOpen = openSections[section.header] ?? false;
+          const sectionHasActive = visibleItems.some((i) => pathname === i.href || pathname.startsWith(`${i.href}/`));
 
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                active
-                  ? "bg-cyan-600 text-white shadow-lg shadow-cyan-600/20"
-                  : "text-neutral-400 hover:bg-[#161616] hover:text-white"
-              }`}
-              title={collapsed ? item.name : undefined}
-            >
-              <Icon size={20} className="flex-shrink-0" />
-              {!collapsed && (
-                <span className="flex-1">{item.name}</span>
-              )}
-              {!collapsed && item.badge && (
-                <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
-                  3
+            <div key={section.header} className="mb-0.5">
+              {/* Section header — clickable to collapse */}
+              <button
+                onClick={() => toggleSection(section.header)}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-150 group ${
+                  sectionHasActive
+                    ? 'bg-violet-500/10 text-violet-300'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
+                }`}
+              >
+                <span className="text-sm font-semibold">
+                  {section.header}
                 </span>
+                <ChevronDown
+                  size={14}
+                  className={`transition-all duration-200 flex-shrink-0 ${sectionHasActive ? 'text-violet-400' : 'text-zinc-600 group-hover:text-zinc-400'} ${isOpen ? 'rotate-0' : '-rotate-90'}`}
+                />
+              </button>
+
+              {/* Items */}
+              {isOpen && (
+                <div className="flex flex-col gap-0.5">
+                  {visibleItems.map((item) => {
+                    const Icon = item.icon;
+                    const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        title={item.name}
+                        className={`relative px-3 py-2.5 rounded-lg flex items-center gap-3 transition-all duration-150 ${
+                          active
+                            ? "bg-violet-500/15 text-violet-400"
+                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60"
+                        }`}
+                      >
+                        {active && (
+                          <div className="absolute left-[-12px] top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-sm bg-violet-500" />
+                        )}
+                        <Icon size={16} strokeWidth={active ? 2.2 : 1.8} className="flex-shrink-0" />
+                        <span className={`text-sm ${active ? 'font-semibold' : 'font-medium'}`}>
+                          {item.name}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </div>
               )}
-            </Link>
+            </div>
           );
         })}
       </nav>
