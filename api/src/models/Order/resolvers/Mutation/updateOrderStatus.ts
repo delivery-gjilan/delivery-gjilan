@@ -10,6 +10,7 @@ import { getDispatchService } from '@/services/driverServices.init';
 import { AppError } from '@/lib/errors';
 import { parseDbTimestamp } from '@/lib/dateTime';
 import { getLiveDriverEta } from '@/lib/driverEtaCache';
+import { cache } from '@/lib/cache';
 import { emitOrderEvent } from '@/repositories/OrderEventRepository';
 
 export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus']> = async (
@@ -180,12 +181,15 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
                     if (liveEta?.remainingEtaSeconds != null && liveEta.remainingEtaSeconds > 0) {
                         estimatedMinutes = Math.ceil(liveEta.remainingEtaSeconds / 60);
                     }
-                } catch { /* fall through to default */ }
+                } catch { /* fall through */ }
             }
-            // Fallback: if no live ETA is available yet (driver hasn't started
-            // navigating or heartbeat hasn't cached an ETA), use a safe default.
+            // If no live ETA: skip the initial OFD push entirely.
+            // The driver hasn't started navigation yet so any number we send is a guess.
+            // maybePushLiveActivityEta will send the correct value on the first
+            // to_dropoff heartbeat (typically within 5–30 s). We mark the order
+            // so the heartbeat handler skips its 90 s throttle for that first push.
             if (estimatedMinutes === 0) {
-                estimatedMinutes = 15;
+                await cache.set(`cache:la-ofd-pending:${id}`, true, 300);
             }
         }
 
@@ -207,15 +211,21 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
                         ? (parseDbTimestamp(dbOrder.outForDeliveryAt)?.getTime() ?? Date.now())
                         : Date.now();
 
-        updateLiveActivity(
-            context.notificationService,
-            id,
-            liveActivityStatus,
-            driverName,
-            estimatedMinutes,
-            phaseInitialMinutes,
-            phaseStartedAt,
-        );
+        // Skip the initial OFD push when we have no live GPS ETA yet.
+        // The driver hasn't started navigation, so any value we send would be wrong.
+        // maybePushLiveActivityEta will fire immediately on the first to_dropoff
+        // heartbeat (bypassing the normal 90s throttle) via the la-ofd-pending flag.
+        if (!(status === 'OUT_FOR_DELIVERY' && estimatedMinutes === 0)) {
+            updateLiveActivity(
+                context.notificationService,
+                id,
+                liveActivityStatus,
+                driverName,
+                estimatedMinutes,
+                phaseInitialMinutes,
+                phaseStartedAt,
+            );
+        }
 
         if (status === 'DELIVERED' || status === 'CANCELLED') {
             // End Live Activity when order is completed or cancelled.

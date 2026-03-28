@@ -33,6 +33,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Component, type ReactNode, type ErrorInfo } from 'react';
 import { useLiveActivity } from '@/hooks/useLiveActivity';
+import { useActiveOrdersStore } from '@/modules/orders/store/activeOrdersStore';
 import { fetchRoute } from '@/utils/route';
 
 // Lazy-load MapLibreGL to prevent crash if native module has issues
@@ -597,6 +598,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const [showDriverInfo, setShowDriverInfo] = useState(false);
     const { update: updateOrderStatus, loading: isMarkingAsDelivered } = useUpdateOrderStatus();
     const [mapZoomLevel, setMapZoomLevel] = useState(15.5);
+    const patchDriverConnection = useActiveOrdersStore((s) => s.patchDriverConnection);
     const [interpolatedDriverLocation, setInterpolatedDriverLocation] = useState<{
         latitude: number;
         longitude: number;
@@ -660,6 +662,16 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
             const payload = data.data?.orderDriverLiveTracking;
             if (!payload) return;
             setLiveDriverTracking(payload);
+            // Propagate live ETA into the Zustand store so useBackgroundLiveActivity
+            // can update the Live Activity without waiting for the next full order push.
+            if (order?.id) {
+                patchDriverConnection(order.id, {
+                    activeOrderId: payload.orderId,
+                    navigationPhase: payload.navigationPhase ?? null,
+                    remainingEtaSeconds: payload.remainingEtaSeconds ?? null,
+                    etaUpdatedAt: payload.etaUpdatedAt,
+                });
+            }
         },
         onError: (error) => {
             console.warn('[OrderDetails] live tracking subscription error:', error);
@@ -964,8 +976,8 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     }, [isPreparingPhase, isMarket, order?.preparationMinutes, order?.preparingAt, order?.orderDate]);
 
     // ─── ETA for OUT_FOR_DELIVERY (delivery only) ────
-    const deliveryEta = useMemo(() => {
-        if (!isDeliveryPhase) return null;
+    const { deliveryEta, deliveryEtaIsLive } = useMemo(() => {
+        if (!isDeliveryPhase) return { deliveryEta: null, deliveryEtaIsLive: false };
 
         const liveEtaOrderId = liveDriverConnection?.activeOrderId;
         const liveEtaSeconds = liveDriverConnection?.remainingEtaSeconds;
@@ -979,8 +991,8 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
             Date.now() - liveEtaUpdatedAtMs <= LIVE_DRIVER_ETA_TTL_MS;
 
         if (liveEtaIsFresh) {
-            if (liveEtaSeconds <= 0) return 0;
-            return Math.max(1, Math.round(liveEtaSeconds / 60));
+            if (liveEtaSeconds <= 0) return { deliveryEta: 0, deliveryEtaIsLive: true };
+            return { deliveryEta: Math.max(1, Math.round(liveEtaSeconds / 60)), deliveryEtaIsLive: true };
         }
 
         // Fallback: haversine
@@ -989,9 +1001,9 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                 driverLocation.latitude, driverLocation.longitude,
                 dropoffLocation.latitude, dropoffLocation.longitude
             );
-            return Math.max(1, Math.ceil(dist * 2.5));
+            return { deliveryEta: Math.max(1, Math.ceil(dist * 2.5)), deliveryEtaIsLive: false };
         }
-        return null;
+        return { deliveryEta: null, deliveryEtaIsLive: false };
     }, [
         isDeliveryPhase,
         liveDriverConnection?.activeOrderId,
@@ -1047,16 +1059,26 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         ),
     });
 
+    // Ref to track how long we've been in OFD without a live GPS ETA.
+    const ofdFallbackWaitingSinceRef = useRef<number | null>(null);
+
     // Manage Live Activity: start/update when active, end when done
     useEffect(() => {
         if (isCompleted || isCancelled) {
             endLiveActivity();
+            ofdFallbackWaitingSinceRef.current = null;
             return;
         }
+
+        if (status !== 'OUT_FOR_DELIVERY') {
+            // Reset gate when leaving OFD
+            ofdFallbackWaitingSinceRef.current = null;
+        }
+
         const etaMinutes = (isDeliveryPhase ? deliveryEta : isPreparingPhase ? preparationEta : null) ?? 0;
         const liveStatus = status === 'OUT_FOR_DELIVERY' ? 'out_for_delivery'
-            : (isMarket && (status === 'READY' || status === 'PREPARING')) ? 'ready'
-            : 'preparing';
+            : (status === 'PENDING') ? 'pending'
+            : 'preparing'; // covers PREPARING, READY (market)
         const phaseInitialMinutes = status === 'OUT_FOR_DELIVERY'
             ? Math.max(1, Math.round(etaMinutes || 0))
             : Math.max(1, Number(order?.preparationMinutes ?? etaMinutes ?? 0));
@@ -1064,6 +1086,19 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
             ? (order?.outForDeliveryAt ? new Date(order.outForDeliveryAt).getTime() : Date.now())
             : (order?.preparingAt ? new Date(order.preparingAt).getTime() : Date.now());
         if (status === 'OUT_FOR_DELIVERY') {
+            if (deliveryEtaIsLive) {
+                // Real GPS ETA from subscription — start immediately and clear grace timer.
+                ofdFallbackWaitingSinceRef.current = null;
+            } else {
+                // No live ETA yet. Wait up to 15s for the subscription to deliver real data.
+                if (ofdFallbackWaitingSinceRef.current === null) {
+                    ofdFallbackWaitingSinceRef.current = Date.now();
+                }
+                const waited = Date.now() - ofdFallbackWaitingSinceRef.current;
+                if (waited < 15_000) return;
+                // Grace period elapsed — proceed with haversine/null fallback.
+            }
+            if (deliveryEta === null) return;
             startLiveActivity({
                 driverName: driverName || 'Driver',
                 estimatedMinutes: etaMinutes,
@@ -1081,7 +1116,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                 status: liveStatus,
             });
         }
-    }, [status, customerVisibleStatus, isCompleted, isCancelled, deliveryEta, preparationEta, isDeliveryPhase, isPreparingPhase, driverName, order?.preparationMinutes, order?.outForDeliveryAt, order?.preparingAt, startLiveActivity, endLiveActivity]);
+    }, [status, customerVisibleStatus, isCompleted, isCancelled, deliveryEta, deliveryEtaIsLive, preparationEta, isDeliveryPhase, isPreparingPhase, driverName, order?.preparationMinutes, order?.outForDeliveryAt, order?.preparingAt, startLiveActivity, endLiveActivity]);
 
     // ─── Map Fitting (status-aware) ────────────────────────
     const fitMapToMarkers = useCallback(() => {

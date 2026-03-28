@@ -15,6 +15,9 @@ import { DriverRepository, CONNECTION_THRESHOLDS } from '@/repositories/DriverRe
 import { AuthRepository } from '@/repositories/AuthRepository';
 import { pubsub, publish, topics, type OrderDriverLiveTrackingPayload } from '@/lib/pubsub';
 import { DbDriver } from '@/database/schema/drivers';
+import { orders as ordersTable } from '@/database/schema';
+import { getDB } from '@/database';
+import { eq } from 'drizzle-orm';
 import { clearLiveDriverEta, setLiveDriverEta } from '@/lib/driverEtaCache';
 import { cache } from '@/lib/cache';
 import { updateLiveActivity } from '@/services/orderNotifications';
@@ -287,10 +290,17 @@ export class DriverHeartbeatHandler {
 
     // Fully async — never blocks the heartbeat response
     (async () => {
-      const existing = await cache.get<number>(gateKey);
-      if (existing) return; // still within throttle window
+      // If the OFD status transition skipped the initial push (no live ETA at
+      // that moment), we set a short-lived flag so the first heartbeat fires
+      // immediately instead of waiting through the normal 90 s throttle.
+      const pendingKey = `cache:la-ofd-pending:${orderId}`;
+      const isFirstOfdPush = await cache.get<boolean>(pendingKey);
 
-      // Claim the gate before doing any work
+      const existing = await cache.get<number>(gateKey);
+      if (existing && !isFirstOfdPush) return; // still within throttle window
+
+      // Clear the pending flag and claim the gate
+      if (isFirstOfdPush) await cache.del(pendingKey);
       await cache.set(gateKey, Date.now(), HEARTBEAT_LA_UPDATE_INTERVAL_S);
 
       // Resolve driver name
@@ -302,15 +312,39 @@ export class DriverHeartbeatHandler {
         }
       } catch { /* fall through with default */ }
 
+      // Compute stable phaseStartedAt and phaseInitialMinutes from outForDeliveryAt so the
+      // progress bar doesn't reset on every heartbeat LA update.
+      // phaseInitialMinutes = elapsed since OFD started + remaining ETA = total delivery duration.
+      let phaseStartedAt: number | undefined;
+      let phaseInitialMinutes: number | undefined;
+      try {
+        const db = await getDB();
+        const [row] = await db
+          .select({ outForDeliveryAt: ordersTable.outForDeliveryAt })
+          .from(ordersTable)
+          .where(eq(ordersTable.id, orderId))
+          .limit(1);
+        if (row?.outForDeliveryAt) {
+          const ofdMs = new Date(row.outForDeliveryAt).getTime();
+          if (Number.isFinite(ofdMs) && ofdMs > 0) {
+            const elapsedMinutes = Math.max(0, (Date.now() - ofdMs) / 60000);
+            phaseStartedAt = ofdMs;
+            phaseInitialMinutes = Math.max(1, Math.round(elapsedMinutes + estimatedMinutes));
+          }
+        }
+      } catch { /* fall through — NotificationService will default to estimatedMinutes + now */ }
+
       updateLiveActivity(
         this.notificationService!,
         orderId,
         'out_for_delivery',
         driverName,
         estimatedMinutes,
+        phaseInitialMinutes,
+        phaseStartedAt,
       );
 
-      log.info({ orderId, estimatedMinutes }, 'heartbeat:liveActivity:etaUpdate');
+      log.info({ orderId, estimatedMinutes, phaseInitialMinutes, phaseStartedAt }, 'heartbeat:liveActivity:etaUpdate');
     })().catch((err) => {
       log.error({ err, orderId }, 'heartbeat:liveActivity:error');
     });

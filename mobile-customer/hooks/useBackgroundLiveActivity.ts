@@ -5,6 +5,9 @@ import { useLiveActivity } from '@/hooks/useLiveActivity';
 
 const LIVE_ACTIVITY_ELIGIBLE_STATUSES = new Set(['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY']);
 
+/** How long to wait for live GPS ETA before falling back to 15-min default (ms). */
+const OFD_LIVE_ETA_GRACE_MS = 15_000;
+
 type LiveStatus = 'pending' | 'preparing' | 'out_for_delivery';
 
 interface DeliveryLiveActivitiesCleanupModule {
@@ -137,17 +140,67 @@ export function useBackgroundLiveActivity() {
     const appStateRef = useRef<AppStateStatus>(AppState.currentState);
     const clearedWhenNoActiveOrderRef = useRef(false);
     const lastSyncedSignatureRef = useRef<string | null>(null);
+    /** Timestamp when we first saw OFD without a live ETA — used to delay fallback. */
+    const ofdFallbackWaitingSinceRef = useRef<number | null>(null);
+    const ofdFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const syncLiveActivity = useCallback(
         (force = false) => {
             if (!candidateOrder?.id) {
                 lastSyncedSignatureRef.current = null;
+                ofdFallbackWaitingSinceRef.current = null;
+                if (ofdFallbackTimerRef.current) {
+                    clearTimeout(ofdFallbackTimerRef.current);
+                    ofdFallbackTimerRef.current = null;
+                }
                 return;
             }
 
             const state = buildState();
             if (!state) {
                 return;
+            }
+
+            // ── OFD live-ETA gate ──────────────────────────────────────────────
+            // When the order just went OFD, driverConnection in the order store is
+            // stale (no live navigationPhase/remainingEtaSeconds yet). Starting the
+            // LA immediately with "15 min" looks wrong. Instead we wait up to
+            // OFD_LIVE_ETA_GRACE_MS for real GPS data before falling back.
+            if (mappedStatus === 'out_for_delivery') {
+                const liveConnection = candidateOrder.driver?.driverConnection;
+                const liveEtaSecondsRaw = Number(liveConnection?.remainingEtaSeconds);
+                const hasLiveEta =
+                    Number.isFinite(liveEtaSecondsRaw) &&
+                    liveEtaSecondsRaw > 0 &&
+                    liveConnection?.navigationPhase === 'to_dropoff' &&
+                    String(liveConnection?.activeOrderId ?? '') === String(candidateOrder.id);
+
+                if (hasLiveEta) {
+                    // Real GPS data is here — clear any pending fallback timer and sync now.
+                    ofdFallbackWaitingSinceRef.current = null;
+                    if (ofdFallbackTimerRef.current) {
+                        clearTimeout(ofdFallbackTimerRef.current);
+                        ofdFallbackTimerRef.current = null;
+                    }
+                } else {
+                    // No live ETA yet. Start the grace-period timer on first encounter.
+                    if (ofdFallbackWaitingSinceRef.current === null) {
+                        ofdFallbackWaitingSinceRef.current = Date.now();
+                        // Schedule a forced sync after the grace period so the LA
+                        // eventually appears even if GPS never arrives.
+                        if (ofdFallbackTimerRef.current) clearTimeout(ofdFallbackTimerRef.current);
+                        ofdFallbackTimerRef.current = setTimeout(() => {
+                            ofdFallbackTimerRef.current = null;
+                            lastSyncedSignatureRef.current = null; // force re-render
+                            syncLiveActivity(true);
+                        }, OFD_LIVE_ETA_GRACE_MS);
+                    }
+                    const waited = Date.now() - ofdFallbackWaitingSinceRef.current;
+                    if (waited < OFD_LIVE_ETA_GRACE_MS && !force) {
+                        // Still within grace period and not a forced call — skip.
+                        return;
+                    }
+                }
             }
 
             const signature = [
@@ -165,7 +218,7 @@ export function useBackgroundLiveActivity() {
             lastSyncedSignatureRef.current = signature;
             void startLiveActivity(state);
         },
-        [buildState, candidateOrder?.id, mappedStatus, startLiveActivity],
+        [buildState, candidateOrder, mappedStatus, startLiveActivity],
     );
 
     useEffect(() => {
@@ -190,6 +243,15 @@ export function useBackgroundLiveActivity() {
         // Keep Live Activity synchronized in real-time whenever active-order data changes.
         syncLiveActivity();
     }, [syncLiveActivity]);
+
+    // Clean up any pending OFD fallback timer on unmount.
+    useEffect(() => {
+        return () => {
+            if (ofdFallbackTimerRef.current) {
+                clearTimeout(ofdFallbackTimerRef.current);
+            }
+        };
+    }, []);
 
     useEffect(() => {
         if (Platform.OS !== 'ios') {
