@@ -5,12 +5,13 @@ import { productCategories, NewDbProductCategory } from './schema/productCategor
 import { productSubcategories, NewDbProductSubcategory } from './schema/productSubcategories';
 import { products, NewDbProduct } from './schema/products';
 
-import { users } from './schema/users';
+import { NewDbUser, users } from './schema/users';
 import { drivers } from './schema/drivers';
 import { promotions, userPromotions, promotionBusinessEligibility, userPromoMetadata } from './schema/promotions';
-import { settlementRules } from './schema/settlementRules';
-import { hashPassword } from '@/lib/utils/authUtils';
-import { sql, eq } from 'drizzle-orm';
+import { orders } from './schema/orders';
+import { orderItems } from './schema/orderItems';
+import { hashPassword } from '../src/lib/utils/authUtils';
+import { eq } from 'drizzle-orm';
 
 const OPEN_12_AM = 0; // 12:00 AM
 const CLOSE_11_59_PM = 1439; // 11:59 PM
@@ -27,8 +28,18 @@ const RESTAURANTS_DATA = [
             {
                 name: 'Burgers',
                 products: [
-                    { name: 'Hamburger', price: 2.00, image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&q=80', desc: 'Classic hamburger' },
-                    { name: 'Chicken Burger', price: 2.00, image: 'https://images.unsplash.com/photo-1606755962773-d324e0a13086?w=800&q=80', desc: 'Crispy chicken burger' },
+                    {
+                        name: 'Hamburger',
+                        price: 2.0,
+                        image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&q=80',
+                        desc: 'Classic hamburger',
+                    },
+                    {
+                        name: 'Chicken Burger',
+                        price: 2.0,
+                        image: 'https://images.unsplash.com/photo-1606755962773-d324e0a13086?w=800&q=80',
+                        desc: 'Crispy chicken burger',
+                    },
                 ],
             },
         ],
@@ -49,17 +60,47 @@ const MARKET_DATA = [
                     {
                         name: 'Fruits',
                         products: [
-                            { name: 'Bananas (1kg)', price: 1.29, image: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=800&q=80', desc: 'Fresh ripe bananas' },
-                            { name: 'Apples (1kg)', price: 2.49, image: 'https://images.unsplash.com/photo-1567306226416-28f0efdc88ce?w=800&q=80', desc: 'Crisp red apples' },
+                            {
+                                name: 'Bananas (1kg)',
+                                price: 1.29,
+                                image: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=800&q=80',
+                                desc: 'Fresh ripe bananas',
+                            },
+                            {
+                                name: 'Apples (1kg)',
+                                price: 2.49,
+                                image: 'https://images.unsplash.com/photo-1567306226416-28f0efdc88ce?w=800&q=80',
+                                desc: 'Crisp red apples',
+                            },
                         ],
                     },
                     {
                         name: 'Vegetables',
                         products: [
-                            { name: 'Tomatoes (1kg)', price: 2.19, image: 'https://images.unsplash.com/photo-1561136594-7f68413baa99?w=800&q=80', desc: 'Juicy vine tomatoes' },
-                            { name: 'Cucumbers (1kg)', price: 1.59, image: 'https://images.unsplash.com/photo-1502741338009-cac2772e18bc?w=800&q=80', desc: 'Fresh cucumbers' },
-                            { name: 'Lettuce', price: 1.09, image: 'https://images.unsplash.com/photo-1506806732259-39c2d0268443?w=800&q=80', desc: 'Crisp green lettuce' },
-                            { name: 'Potatoes (2kg)', price: 2.99, image: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=800&q=80', desc: 'Golden potatoes' },
+                            {
+                                name: 'Tomatoes (1kg)',
+                                price: 2.19,
+                                image: 'https://images.unsplash.com/photo-1561136594-7f68413baa99?w=800&q=80',
+                                desc: 'Juicy vine tomatoes',
+                            },
+                            {
+                                name: 'Cucumbers (1kg)',
+                                price: 1.59,
+                                image: 'https://images.unsplash.com/photo-1502741338009-cac2772e18bc?w=800&q=80',
+                                desc: 'Fresh cucumbers',
+                            },
+                            {
+                                name: 'Lettuce',
+                                price: 1.09,
+                                image: 'https://images.unsplash.com/photo-1506806732259-39c2d0268443?w=800&q=80',
+                                desc: 'Crisp green lettuce',
+                            },
+                            {
+                                name: 'Potatoes (2kg)',
+                                price: 2.99,
+                                image: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=800&q=80',
+                                desc: 'Golden potatoes',
+                            },
                         ],
                     },
                 ],
@@ -70,17 +111,47 @@ const MARKET_DATA = [
                     {
                         name: 'Milk & Yogurt',
                         products: [
-                            { name: 'Milk 1L', price: 1.19, image: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&q=80', desc: 'Fresh whole milk' },
-                            { name: 'Greek Yogurt', price: 1.49, image: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=800&q=80', desc: 'Plain Greek yogurt 500g' },
+                            {
+                                name: 'Milk 1L',
+                                price: 1.19,
+                                image: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&q=80',
+                                desc: 'Fresh whole milk',
+                            },
+                            {
+                                name: 'Greek Yogurt',
+                                price: 1.49,
+                                image: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=800&q=80',
+                                desc: 'Plain Greek yogurt 500g',
+                            },
                         ],
                     },
                     {
                         name: 'Cheese & Eggs',
                         products: [
-                            { name: 'Cheddar Cheese', price: 2.79, image: 'https://images.unsplash.com/photo-1552767059-ce182ead6c1b?w=800&q=80', desc: 'Cheddar block 200g' },
-                            { name: 'Mozzarella', price: 2.19, image: 'https://images.unsplash.com/photo-1452195100486-9cc805987862?w=800&q=80', desc: 'Fresh mozzarella' },
-                            { name: 'Butter', price: 2.29, image: 'https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?w=800&q=80', desc: 'Creamy butter 250g' },
-                            { name: 'Eggs (10 pack)', price: 2.49, image: 'https://images.unsplash.com/photo-1518569656558-1f25e69d93d7?w=800&q=80', desc: 'Free-range eggs' },
+                            {
+                                name: 'Cheddar Cheese',
+                                price: 2.79,
+                                image: 'https://images.unsplash.com/photo-1552767059-ce182ead6c1b?w=800&q=80',
+                                desc: 'Cheddar block 200g',
+                            },
+                            {
+                                name: 'Mozzarella',
+                                price: 2.19,
+                                image: 'https://images.unsplash.com/photo-1452195100486-9cc805987862?w=800&q=80',
+                                desc: 'Fresh mozzarella',
+                            },
+                            {
+                                name: 'Butter',
+                                price: 2.29,
+                                image: 'https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?w=800&q=80',
+                                desc: 'Creamy butter 250g',
+                            },
+                            {
+                                name: 'Eggs (10 pack)',
+                                price: 2.49,
+                                image: 'https://images.unsplash.com/photo-1518569656558-1f25e69d93d7?w=800&q=80',
+                                desc: 'Free-range eggs',
+                            },
                         ],
                     },
                 ],
@@ -91,17 +162,47 @@ const MARKET_DATA = [
                     {
                         name: 'Bread',
                         products: [
-                            { name: 'White Bread', price: 1.29, image: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=800&q=80', desc: 'Soft sliced bread' },
-                            { name: 'Whole Wheat Bread', price: 1.49, image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&q=80', desc: 'Whole wheat loaf' },
-                            { name: 'Pita Bread', price: 1.19, image: 'https://images.unsplash.com/photo-1604908553728-95b6b0b2b4f6?w=800&q=80', desc: 'Soft pita bread' },
+                            {
+                                name: 'White Bread',
+                                price: 1.29,
+                                image: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=800&q=80',
+                                desc: 'Soft sliced bread',
+                            },
+                            {
+                                name: 'Whole Wheat Bread',
+                                price: 1.49,
+                                image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&q=80',
+                                desc: 'Whole wheat loaf',
+                            },
+                            {
+                                name: 'Pita Bread',
+                                price: 1.19,
+                                image: 'https://images.unsplash.com/photo-1604908553728-95b6b0b2b4f6?w=800&q=80',
+                                desc: 'Soft pita bread',
+                            },
                         ],
                     },
                     {
                         name: 'Pastries',
                         products: [
-                            { name: 'Croissant', price: 0.99, image: 'https://images.unsplash.com/photo-1542834369-f10ebf06d3cb?w=800&q=80', desc: 'Buttery croissant' },
-                            { name: 'Bagels (4 pack)', price: 2.39, image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&q=80', desc: 'Fresh baked bagels' },
-                            { name: 'Muffins (4 pack)', price: 2.89, image: 'https://images.unsplash.com/photo-1519682577862-22b62b24e493?w=800&q=80', desc: 'Blueberry muffins' },
+                            {
+                                name: 'Croissant',
+                                price: 0.99,
+                                image: 'https://images.unsplash.com/photo-1542834369-f10ebf06d3cb?w=800&q=80',
+                                desc: 'Buttery croissant',
+                            },
+                            {
+                                name: 'Bagels (4 pack)',
+                                price: 2.39,
+                                image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&q=80',
+                                desc: 'Fresh baked bagels',
+                            },
+                            {
+                                name: 'Muffins (4 pack)',
+                                price: 2.89,
+                                image: 'https://images.unsplash.com/photo-1519682577862-22b62b24e493?w=800&q=80',
+                                desc: 'Blueberry muffins',
+                            },
                         ],
                     },
                 ],
@@ -112,32 +213,137 @@ const MARKET_DATA = [
                     {
                         name: 'Soft Drinks',
                         products: [
-                            { name: 'Mineral Water 1.5L', price: 0.89, image: 'https://images.unsplash.com/photo-1523362628745-0c100150b504?w=800&q=80', desc: 'Sparkling mineral water' },
-                            { name: 'Cola 2L', price: 1.79, image: 'https://images.unsplash.com/photo-1629203851122-3726ecdf080e?w=800&q=80', desc: 'Classic cola' },
-                            { name: 'Iced Tea 1.5L', price: 1.59, image: 'https://images.unsplash.com/photo-1527169402691-feff5539e52c?w=800&q=80', desc: 'Peach iced tea' },
-                            { name: 'Energy Drink', price: 1.49, image: 'https://images.unsplash.com/photo-1607622750671-6cd9a99f3a57?w=800&q=80', desc: 'Energy boost 250ml' },
-                            { name: 'Lemonade 1L', price: 1.39, image: 'https://images.unsplash.com/photo-1523677011781-c91d1bbe2f9c?w=800&q=80', desc: 'Fresh squeezed lemonade' },
-                            { name: 'Sprite 2L', price: 1.79, image: 'https://images.unsplash.com/photo-1625772299848-391b6a87d7b3?w=800&q=80', desc: 'Lemon-lime soda' },
-                            { name: 'Fanta Orange 2L', price: 1.79, image: 'https://images.unsplash.com/photo-1600271886742-f049cd451bba?w=800&q=80', desc: 'Orange flavored soda' },
-                            { name: 'Pepsi 2L', price: 1.79, image: 'https://images.unsplash.com/photo-1554866585-cd94860890b7?w=800&q=80', desc: 'Classic Pepsi cola' },
-                            { name: 'Ginger Ale 1.5L', price: 1.69, image: 'https://images.unsplash.com/photo-1574256788355-8f6f0f20063c?w=800&q=80', desc: 'Refreshing ginger ale' },
-                            { name: 'Tonic Water 1L', price: 1.29, image: 'https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=800&q=80', desc: 'Quinine tonic water' },
-                            { name: 'Mountain Dew 1.5L', price: 1.79, image: 'https://images.unsplash.com/photo-1625772452859-1c03d5bf1137?w=800&q=80', desc: 'Citrus blast soda' },
+                            {
+                                name: 'Mineral Water 1.5L',
+                                price: 0.89,
+                                image: 'https://images.unsplash.com/photo-1523362628745-0c100150b504?w=800&q=80',
+                                desc: 'Sparkling mineral water',
+                            },
+                            {
+                                name: 'Cola 2L',
+                                price: 1.79,
+                                image: 'https://images.unsplash.com/photo-1629203851122-3726ecdf080e?w=800&q=80',
+                                desc: 'Classic cola',
+                            },
+                            {
+                                name: 'Iced Tea 1.5L',
+                                price: 1.59,
+                                image: 'https://images.unsplash.com/photo-1527169402691-feff5539e52c?w=800&q=80',
+                                desc: 'Peach iced tea',
+                            },
+                            {
+                                name: 'Energy Drink',
+                                price: 1.49,
+                                image: 'https://images.unsplash.com/photo-1607622750671-6cd9a99f3a57?w=800&q=80',
+                                desc: 'Energy boost 250ml',
+                            },
+                            {
+                                name: 'Lemonade 1L',
+                                price: 1.39,
+                                image: 'https://images.unsplash.com/photo-1523677011781-c91d1bbe2f9c?w=800&q=80',
+                                desc: 'Fresh squeezed lemonade',
+                            },
+                            {
+                                name: 'Sprite 2L',
+                                price: 1.79,
+                                image: 'https://images.unsplash.com/photo-1625772299848-391b6a87d7b3?w=800&q=80',
+                                desc: 'Lemon-lime soda',
+                            },
+                            {
+                                name: 'Fanta Orange 2L',
+                                price: 1.79,
+                                image: 'https://images.unsplash.com/photo-1600271886742-f049cd451bba?w=800&q=80',
+                                desc: 'Orange flavored soda',
+                            },
+                            {
+                                name: 'Pepsi 2L',
+                                price: 1.79,
+                                image: 'https://images.unsplash.com/photo-1554866585-cd94860890b7?w=800&q=80',
+                                desc: 'Classic Pepsi cola',
+                            },
+                            {
+                                name: 'Ginger Ale 1.5L',
+                                price: 1.69,
+                                image: 'https://images.unsplash.com/photo-1574256788355-8f6f0f20063c?w=800&q=80',
+                                desc: 'Refreshing ginger ale',
+                            },
+                            {
+                                name: 'Tonic Water 1L',
+                                price: 1.29,
+                                image: 'https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=800&q=80',
+                                desc: 'Quinine tonic water',
+                            },
+                            {
+                                name: 'Mountain Dew 1.5L',
+                                price: 1.79,
+                                image: 'https://images.unsplash.com/photo-1625772452859-1c03d5bf1137?w=800&q=80',
+                                desc: 'Citrus blast soda',
+                            },
                         ],
                     },
                     {
                         name: 'Juices & Coffee',
                         products: [
-                            { name: 'Orange Juice', price: 2.19, image: 'https://images.unsplash.com/photo-1506806732259-39c2d0268443?w=800&q=80', desc: '100% orange juice' },
-                            { name: 'Coffee Beans 250g', price: 4.99, image: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&q=80', desc: 'Medium roast coffee beans' },
-                            { name: 'Apple Juice 1L', price: 2.29, image: 'https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?w=800&q=80', desc: 'Pure apple juice' },
-                            { name: 'Cranberry Juice 1L', price: 2.49, image: 'https://images.unsplash.com/photo-1577805947697-89e18249d767?w=800&q=80', desc: 'Tart cranberry juice' },
-                            { name: 'Pineapple Juice 1L', price: 2.39, image: 'https://images.unsplash.com/photo-1589820296156-2454bb8a6ad1?w=800&q=80', desc: 'Tropical pineapple juice' },
-                            { name: 'Instant Coffee 100g', price: 3.99, image: 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=800&q=80', desc: 'Premium instant coffee' },
-                            { name: 'Green Tea Box', price: 3.49, image: 'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?w=800&q=80', desc: '20 green tea bags' },
-                            { name: 'Espresso Capsules 10pk', price: 4.49, image: 'https://images.unsplash.com/photo-1592663527359-cf6642f54cff?w=800&q=80', desc: 'Compatible espresso pods' },
-                            { name: 'Mango Juice 1L', price: 2.49, image: 'https://images.unsplash.com/photo-1553530666-ba11a7da3888?w=800&q=80', desc: 'Sweet mango nectar' },
-                            { name: 'Grape Juice 1L', price: 2.39, image: 'https://images.unsplash.com/photo-1534353473418-4cfa6c56fd38?w=800&q=80', desc: '100% grape juice' },
+                            {
+                                name: 'Orange Juice',
+                                price: 2.19,
+                                image: 'https://images.unsplash.com/photo-1506806732259-39c2d0268443?w=800&q=80',
+                                desc: '100% orange juice',
+                            },
+                            {
+                                name: 'Coffee Beans 250g',
+                                price: 4.99,
+                                image: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&q=80',
+                                desc: 'Medium roast coffee beans',
+                            },
+                            {
+                                name: 'Apple Juice 1L',
+                                price: 2.29,
+                                image: 'https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?w=800&q=80',
+                                desc: 'Pure apple juice',
+                            },
+                            {
+                                name: 'Cranberry Juice 1L',
+                                price: 2.49,
+                                image: 'https://images.unsplash.com/photo-1577805947697-89e18249d767?w=800&q=80',
+                                desc: 'Tart cranberry juice',
+                            },
+                            {
+                                name: 'Pineapple Juice 1L',
+                                price: 2.39,
+                                image: 'https://images.unsplash.com/photo-1589820296156-2454bb8a6ad1?w=800&q=80',
+                                desc: 'Tropical pineapple juice',
+                            },
+                            {
+                                name: 'Instant Coffee 100g',
+                                price: 3.99,
+                                image: 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=800&q=80',
+                                desc: 'Premium instant coffee',
+                            },
+                            {
+                                name: 'Green Tea Box',
+                                price: 3.49,
+                                image: 'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?w=800&q=80',
+                                desc: '20 green tea bags',
+                            },
+                            {
+                                name: 'Espresso Capsules 10pk',
+                                price: 4.49,
+                                image: 'https://images.unsplash.com/photo-1592663527359-cf6642f54cff?w=800&q=80',
+                                desc: 'Compatible espresso pods',
+                            },
+                            {
+                                name: 'Mango Juice 1L',
+                                price: 2.49,
+                                image: 'https://images.unsplash.com/photo-1553530666-ba11a7da3888?w=800&q=80',
+                                desc: 'Sweet mango nectar',
+                            },
+                            {
+                                name: 'Grape Juice 1L',
+                                price: 2.39,
+                                image: 'https://images.unsplash.com/photo-1534353473418-4cfa6c56fd38?w=800&q=80',
+                                desc: '100% grape juice',
+                            },
                         ],
                     },
                 ],
@@ -152,7 +358,7 @@ async function seed() {
     const db = await getDB();
 
     // ── Helper: find-or-create user by email ──
-    async function upsertUser(data: any) {
+    async function upsertUser(data: NewDbUser) {
         const existing = await db.select().from(users).where(eq(users.email, data.email)).limit(1);
         if (existing.length > 0) return existing[0];
         const [created] = await db.insert(users).values(data).returning();
@@ -243,8 +449,8 @@ async function seed() {
         if (existingDriver.length === 0) {
             await db.insert(drivers).values({
                 userId: user.id,
-                driverLat: 42.4604 + (index * 0.005),
-                driverLng: 21.4694 + (index * 0.005),
+                driverLat: 42.4604 + index * 0.005,
+                driverLng: 21.4694 + index * 0.005,
                 onlinePreference: true,
                 connectionStatus: 'CONNECTED',
                 commissionPercentage: '20',
@@ -258,7 +464,11 @@ async function seed() {
     console.log('🚗 3 test drivers ready (driver1@demo.com, driver2@demo.com, driver3@demo.com)');
 
     // Store created businesses and their products
-    const createdBusinesses: Array<{ id: string; name: string; products: Array<{ id: string; name: string; price: number }> }> = [];
+    const createdBusinesses: Array<{
+        id: string;
+        name: string;
+        products: Array<{ id: string; name: string; price: number }>;
+    }> = [];
 
     // Create restaurants with products
     for (const restaurantData of RESTAURANTS_DATA) {
@@ -287,7 +497,8 @@ async function seed() {
 
         // Seed per-day schedule (all 7 days)
         const scheduleSlots = [];
-        for (let day = 0; day <= 6; day++) { // Sun(0) - Sat(6)
+        for (let day = 0; day <= 6; day++) {
+            // Sun(0) - Sat(6)
             scheduleSlots.push({
                 businessId: createdBusiness.id,
                 dayOfWeek: day,
@@ -379,7 +590,7 @@ async function seed() {
             });
         }
         await db.insert(businessHours).values(marketScheduleSlots);
-        console.log(`  🕐 Added 7-day schedule`);
+        console.log('  🕐 Added 7-day schedule');
 
         const businessProducts: Array<{ id: string; name: string; price: number }> = [];
 
@@ -468,125 +679,160 @@ async function seed() {
         const businessId = exampleBusiness?.id ?? null;
 
         // First-order auto-applied free delivery promo (no code) – check by name
-        const existingFirstOrder = await db.select().from(promotions).where(eq(promotions.name, 'First Order Free Delivery')).limit(1);
-        const firstOrderPromo = existingFirstOrder[0] ?? (await db.insert(promotions).values({
-            code: null,
-            name: 'First Order Free Delivery',
-            description: 'Free delivery for users on their first order (auto-applied)',
-            type: 'FREE_DELIVERY',
-            target: 'FIRST_ORDER',
-            discountValue: null,
-            maxDiscountCap: null,
-            minOrderAmount: 0,
-            spendThreshold: null,
-            thresholdReward: null,
-            maxGlobalUsage: null,
-            maxUsagePerUser: 1,
-            currentGlobalUsage: 0,
-            isStackable: false,
-            priority: 100,
-            isActive: true,
-            creatorType: 'PLATFORM',
-            creatorId: null,
-        }).returning())[0];
+        const existingFirstOrder = await db
+            .select()
+            .from(promotions)
+            .where(eq(promotions.name, 'First Order Free Delivery'))
+            .limit(1);
+        const firstOrderPromo =
+            existingFirstOrder[0] ??
+            (
+                await db
+                    .insert(promotions)
+                    .values({
+                        code: null,
+                        name: 'First Order Free Delivery',
+                        description: 'Free delivery for users on their first order (auto-applied)',
+                        type: 'FREE_DELIVERY',
+                        target: 'FIRST_ORDER',
+                        discountValue: null,
+                        maxDiscountCap: null,
+                        minOrderAmount: 0,
+                        spendThreshold: null,
+                        thresholdReward: null,
+                        maxGlobalUsage: null,
+                        maxUsagePerUser: 1,
+                        currentGlobalUsage: 0,
+                        isStackable: false,
+                        priority: 100,
+                        isActive: true,
+                        creatorType: 'PLATFORM',
+                        creatorId: null,
+                    })
+                    .returning()
+            )[0];
 
         // Global percentage promo
         const percentagePromo = existingCodes.has('WELCOME20')
             ? (await db.select().from(promotions).where(eq(promotions.code, 'WELCOME20')).limit(1))[0]
-            : (await db.insert(promotions).values({
-            code: 'WELCOME20',
-            name: 'Welcome 20% Off',
-            description: '20% off your order (up to 50€)',
-            type: 'PERCENTAGE',
-            target: 'ALL_USERS',
-            discountValue: 20.0,
-            maxDiscountCap: 50.0,
-            minOrderAmount: 0,
-            spendThreshold: null,
-            thresholdReward: null,
-            maxGlobalUsage: 10000,
-            maxUsagePerUser: 1,
-            currentGlobalUsage: 0,
-            isStackable: false,
-            priority: 50,
-            isActive: true,
-            creatorType: 'PLATFORM',
-            creatorId: null,
-        }).returning())[0];
+            : (
+                  await db
+                      .insert(promotions)
+                      .values({
+                          code: 'WELCOME20',
+                          name: 'Welcome 20% Off',
+                          description: '20% off your order (up to 50€)',
+                          type: 'PERCENTAGE',
+                          target: 'ALL_USERS',
+                          discountValue: 20.0,
+                          maxDiscountCap: 50.0,
+                          minOrderAmount: 0,
+                          spendThreshold: null,
+                          thresholdReward: null,
+                          maxGlobalUsage: 10000,
+                          maxUsagePerUser: 1,
+                          currentGlobalUsage: 0,
+                          isStackable: false,
+                          priority: 50,
+                          isActive: true,
+                          creatorType: 'PLATFORM',
+                          creatorId: null,
+                      })
+                      .returning()
+              )[0];
 
         // Fixed discount promo
         const fixedPromo = existingCodes.has('EURO3OFF')
             ? (await db.select().from(promotions).where(eq(promotions.code, 'EURO3OFF')).limit(1))[0]
-            : (await db.insert(promotions).values({
-            code: 'EURO3OFF',
-            name: '3€ Off',
-            description: 'Flat 3€ off on orders over 10€',
-            type: 'FIXED_AMOUNT',
-            target: 'ALL_USERS',
-            discountValue: 3.0,
-            maxDiscountCap: null,
-            minOrderAmount: 10.0,
-            spendThreshold: null,
-            thresholdReward: null,
-            maxGlobalUsage: 5000,
-            maxUsagePerUser: 3,
-            currentGlobalUsage: 0,
-            isStackable: true,
-            priority: 40,
-            isActive: true,
-            creatorType: 'PLATFORM',
-            creatorId: null,
-        }).returning())[0];
+            : (
+                  await db
+                      .insert(promotions)
+                      .values({
+                          code: 'EURO3OFF',
+                          name: '3€ Off',
+                          description: 'Flat 3€ off on orders over 10€',
+                          type: 'FIXED_AMOUNT',
+                          target: 'ALL_USERS',
+                          discountValue: 3.0,
+                          maxDiscountCap: null,
+                          minOrderAmount: 10.0,
+                          spendThreshold: null,
+                          thresholdReward: null,
+                          maxGlobalUsage: 5000,
+                          maxUsagePerUser: 3,
+                          currentGlobalUsage: 0,
+                          isStackable: true,
+                          priority: 40,
+                          isActive: true,
+                          creatorType: 'PLATFORM',
+                          creatorId: null,
+                      })
+                      .returning()
+              )[0];
 
         // Business-specific promo if a business exists
         if (businessId) {
             const bizPromo = existingCodes.has('BIZ10')
                 ? (await db.select().from(promotions).where(eq(promotions.code, 'BIZ10')).limit(1))[0]
-                : (await db.insert(promotions).values({
-                code: 'BIZ10',
-                name: 'Business 10% Off',
-                description: '10% off for a specific business',
-                type: 'PERCENTAGE',
-                target: 'CONDITIONAL',
-                discountValue: 10.0,
-                maxDiscountCap: 20.0,
-                minOrderAmount: 0,
-                spendThreshold: null,
-                thresholdReward: null,
-                maxGlobalUsage: 2000,
-                maxUsagePerUser: 2,
-                currentGlobalUsage: 0,
-                isStackable: false,
-                priority: 60,
-                isActive: true,
-                creatorType: 'PLATFORM',
-                creatorId: null,
-            }).returning())[0];
+                : (
+                      await db
+                          .insert(promotions)
+                          .values({
+                              code: 'BIZ10',
+                              name: 'Business 10% Off',
+                              description: '10% off for a specific business',
+                              type: 'PERCENTAGE',
+                              target: 'CONDITIONAL',
+                              discountValue: 10.0,
+                              maxDiscountCap: 20.0,
+                              minOrderAmount: 0,
+                              spendThreshold: null,
+                              thresholdReward: null,
+                              maxGlobalUsage: 2000,
+                              maxUsagePerUser: 2,
+                              currentGlobalUsage: 0,
+                              isStackable: false,
+                              priority: 60,
+                              isActive: true,
+                              creatorType: 'PLATFORM',
+                              creatorId: null,
+                          })
+                          .returning()
+                  )[0];
 
-            await db.insert(promotionBusinessEligibility).values({
-                promotionId: bizPromo.id,
-                businessId: businessId,
-            }).onConflictDoNothing();
+            await db
+                .insert(promotionBusinessEligibility)
+                .values({
+                    promotionId: bizPromo.id,
+                    businessId: businessId,
+                })
+                .onConflictDoNothing();
         }
 
         // Assign an example promo to a sample user if present
         const sampleUser = (await db.select().from(users).limit(1)).at(0);
         if (sampleUser) {
-            await db.insert(userPromotions).values({
-                userId: sampleUser.id,
-                promotionId: fixedPromo.id,
-                assignedBy: sampleUser.id,
-                expiresAt: null,
-                usageCount: 0,
-                isActive: true,
-            }).onConflictDoNothing();
+            await db
+                .insert(userPromotions)
+                .values({
+                    userId: sampleUser.id,
+                    promotionId: fixedPromo.id,
+                    assignedBy: sampleUser.id,
+                    expiresAt: null,
+                    usageCount: 0,
+                    isActive: true,
+                })
+                .onConflictDoNothing();
 
-            await db.insert(userPromoMetadata).values({
-                userId: sampleUser.id,
-                hasUsedFirstOrderPromo: false,
-                totalPromotionsUsed: 0,
-                totalSavings: 0,
-            }).onConflictDoNothing();
+            await db
+                .insert(userPromoMetadata)
+                .values({
+                    userId: sampleUser.id,
+                    hasUsedFirstOrderPromo: false,
+                    totalPromotionsUsed: 0,
+                    totalSavings: 0,
+                })
+                .onConflictDoNothing();
         }
 
         console.log('[SEED] Promotions seeded.');
@@ -595,36 +841,63 @@ async function seed() {
     }
 
     // ------------------------------
-    // Seed settlement rule for Cima (20% commission)
+    // Seed sample orders
     // ------------------------------
     try {
-        const cimaEntry = createdBusinesses.find((biz) => biz.name === 'Cima');
-        if (cimaEntry) {
-            const existingRule = await db
-                .select()
-                .from(settlementRules)
-                .where(eq(settlementRules.businessId, cimaEntry.id))
-                .limit(1);
-            if (existingRule.length === 0) {
-                await db.insert(settlementRules).values({
-                    name: '20% commission on subtotal',
-                    entityType: 'BUSINESS',
-                    direction: 'RECEIVABLE',
-                    amountType: 'PERCENT',
-                    amount: '20',
-                    appliesTo: 'SUBTOTAL',
-                    businessId: cimaEntry.id,
-                    isActive: true,
-                    notes: 'Platform commission for Cima restaurant',
-                });
-                console.log('[SEED] ✅ Created 20% commission settlement rule for Cima');
-            } else {
-                console.log('[SEED] ⏭️  Settlement rule for Cima already exists — skipping');
+        console.log('📦 Seeding sample orders...');
+        const existingOrders = await db.select().from(orders).limit(1);
+        if (existingOrders.length === 0) {
+            const customerId = customerUsers[0];
+            const cimaBiz = createdBusinesses.find((b) => b.name === 'Cima');
+            const driver = (await db.select().from(drivers).limit(1))[0];
+            
+            if (customerId && cimaBiz && driver) {
+                for (let i = 0; i < 5; i++) {
+                    const orderId = faker.string.uuid();
+                    const basePrice = 10 + i * 2;
+                    const markupPrice = basePrice * 0.1;
+                    const actualPrice = basePrice + markupPrice;
+                    const deliveryPrice = 1.5;
+
+                    await db.insert(orders).values({
+                        id: orderId,
+                        displayId: `ORD-${1000 + i}`,
+                        userId: customerId,
+                        businessId: cimaBiz.id,
+                        driverId: (await db.select().from(users).where(eq(users.id, driver.userId)).limit(1))[0].id,
+                        basePrice,
+                        markupPrice,
+                        actualPrice,
+                        deliveryPrice,
+                        status: 'DELIVERED',
+                        paymentCollection: 'CASH_TO_DRIVER',
+                        dropoffLat: 42.4604,
+                        dropoffLng: 21.4694,
+                        dropoffAddress: 'Test Address ' + (i + 1),
+                        deliveredAt: new Date().toISOString(),
+                        orderDate: new Date().toISOString(),
+                    });
+
+                    // Add one item per order
+                    if (cimaBiz.products.length > 0) {
+                        const product = cimaBiz.products[0];
+                        await db.insert(orderItems).values({
+                            orderId,
+                            productId: product.id,
+                            quantity: 1,
+                            basePrice: product.price,
+                            finalAppliedPrice: product.price,
+                            markupPrice: product.price * 0.1,
+                        });
+                    }
+                }
+                console.log(`[SEED] Created 5 sample DELIVERED orders for ${cimaBiz.name}`);
             }
+        } else {
+            console.log('[SEED] Orders already exist — skipping order seeding');
         }
-        console.log('[SEED] Settlement rule for Cima seeded.');
     } catch (err) {
-        console.warn('[SEED] Settlement rule seed skipped or error:', err);
+        console.warn('[SEED] Orders seed error:', err);
     }
 
     console.log('\n✅ Database seeded successfully!');
@@ -633,12 +906,17 @@ async function seed() {
     const totalProducts =
         RESTAURANTS_DATA.reduce((sum, b) => sum + b.categories.reduce((cSum, c) => cSum + c.products.length, 0), 0) +
         MARKET_DATA.reduce(
-            (sum, b) => sum + b.categories.reduce((cSum, c) => cSum + c.subcategories.reduce((sSum, s) => sSum + s.products.length, 0), 0),
+            (sum, b) =>
+                sum +
+                b.categories.reduce(
+                    (cSum, c) => cSum + c.subcategories.reduce((sSum, s) => sSum + s.products.length, 0),
+                    0,
+                ),
             0,
         );
     console.log(`  - ${totalBusinesses} businesses created`);
     console.log(`  - Total products: ${totalProducts}`);
-    console.log(`  - 3 test customer users created`);
+    console.log('  - 3 test customer users created');
     console.log('\n🔐 Credentials:');
     console.log('  Admin: admin@admin.com / asdasdasd');
     console.log('  Cima Business Admin: cima@gmail.com / asdasdasd');

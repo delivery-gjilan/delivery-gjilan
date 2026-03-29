@@ -78,11 +78,17 @@ type Order {
     id: ID!
     displayId: String!
     userId: ID!
-    orderPrice: Float!
+    businessId: ID!
+    # New price breakdown
+    basePrice: Float!
+    markupPrice: Float!
+    actualPrice: Float!
     deliveryPrice: Float!
+    totalPrice: Float!
+    # Legacy fields kept for backward compatibility (map to new columns)
+    orderPrice: Float!
     originalPrice: Float
     originalDeliveryPrice: Float
-    totalPrice: Float!
     orderDate: Date!
     updatedAt: Date!
     status: OrderStatus!

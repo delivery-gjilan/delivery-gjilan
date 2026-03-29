@@ -509,6 +509,7 @@ export type CreateSettlementRuleInput = {
   name: Scalars['String']['input'];
   notes?: InputMaybe<Scalars['String']['input']>;
   promotionId?: InputMaybe<Scalars['ID']['input']>;
+  type: SettlementRuleType;
 };
 
 export type CreateUserInput = {
@@ -1697,7 +1698,10 @@ export type OptionGroup = {
 
 export type Order = {
   __typename?: 'Order';
+  actualPrice: Scalars['Float']['output'];
   adminNote?: Maybe<Scalars['String']['output']>;
+  basePrice: Scalars['Float']['output'];
+  businessId: Scalars['ID']['output'];
   businesses: Array<OrderBusiness>;
   cancellationReason?: Maybe<Scalars['String']['output']>;
   cancelledAt?: Maybe<Scalars['Date']['output']>;
@@ -1711,6 +1715,7 @@ export type Order = {
   dropOffLocation: Location;
   estimatedReadyAt?: Maybe<Scalars['Date']['output']>;
   id: Scalars['ID']['output'];
+  markupPrice: Scalars['Float']['output'];
   orderDate: Scalars['Date']['output'];
   orderPrice: Scalars['Float']['output'];
   orderPromotions?: Maybe<Array<OrderPromotion>>;
@@ -2538,14 +2543,14 @@ export type SettlementPayment = {
   business?: Maybe<Business>;
   createdAt: Scalars['Date']['output'];
   createdBy?: Maybe<User>;
-  direction: SettlementPaymentDirection;
+  direction?: Maybe<SettlementPaymentDirection>;
   driver?: Maybe<User>;
   entityType: SettlementType;
   id: Scalars['ID']['output'];
   note?: Maybe<Scalars['String']['output']>;
   paymentMethod?: Maybe<Scalars['String']['output']>;
   paymentReference?: Maybe<Scalars['String']['output']>;
-  totalBalanceAtTime: Scalars['Float']['output'];
+  totalBalanceAtTime?: Maybe<Scalars['Float']['output']>;
 };
 
 export type SettlementPaymentDirection =
@@ -2596,15 +2601,28 @@ export type SettlementRule = {
   name: Scalars['String']['output'];
   notes?: Maybe<Scalars['String']['output']>;
   promotion?: Maybe<Promotion>;
+  type: SettlementRuleType;
   updatedAt: Scalars['String']['output'];
 };
 
 export type SettlementRuleFilterInput = {
-  businessId?: InputMaybe<Scalars['ID']['input']>;
-  entityType?: InputMaybe<SettlementEntityType>;
+  businessIds?: InputMaybe<Array<Scalars['ID']['input']>>;
+  entityTypes?: InputMaybe<Array<SettlementEntityType>>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
-  promotionId?: InputMaybe<Scalars['ID']['input']>;
+  promotionIds?: InputMaybe<Array<Scalars['ID']['input']>>;
+  scopes?: InputMaybe<Array<SettlementRuleScope>>;
+  type?: InputMaybe<SettlementRuleType>;
 };
+
+export type SettlementRuleScope =
+  | 'BUSINESS'
+  | 'BUSINESS_PROMOTION'
+  | 'GLOBAL'
+  | 'PROMOTION';
+
+export type SettlementRuleType =
+  | 'DELIVERY_PRICE'
+  | 'ORDER_PRICE';
 
 export type SettlementScenarioDefinition = {
   __typename?: 'SettlementScenarioDefinition';
@@ -2905,6 +2923,7 @@ export type UpdateSettlementRuleInput = {
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   notes?: InputMaybe<Scalars['String']['input']>;
+  type?: InputMaybe<SettlementRuleType>;
 };
 
 export type UpdateStoreStatusInput = {
@@ -3258,13 +3277,15 @@ export type ResolversTypes = {
   SettlementAmountType: ResolverTypeWrapper<'FIXED' | 'PERCENT'>;
   SettlementDirection: ResolverTypeWrapper<'RECEIVABLE' | 'PAYABLE'>;
   SettlementEntityType: ResolverTypeWrapper<'DRIVER' | 'BUSINESS'>;
-  SettlementPayment: ResolverTypeWrapper<Omit<SettlementPayment, 'business' | 'createdBy' | 'direction' | 'driver' | 'entityType'> & { business?: Maybe<ResolversTypes['Business']>, createdBy?: Maybe<ResolversTypes['User']>, direction: ResolversTypes['SettlementPaymentDirection'], driver?: Maybe<ResolversTypes['User']>, entityType: ResolversTypes['SettlementType'] }>;
+  SettlementPayment: ResolverTypeWrapper<Omit<SettlementPayment, 'business' | 'createdBy' | 'direction' | 'driver' | 'entityType'> & { business?: Maybe<ResolversTypes['Business']>, createdBy?: Maybe<ResolversTypes['User']>, direction?: Maybe<ResolversTypes['SettlementPaymentDirection']>, driver?: Maybe<ResolversTypes['User']>, entityType: ResolversTypes['SettlementType'] }>;
   SettlementPaymentDirection: ResolverTypeWrapper<'ENTITY_TO_PLATFORM' | 'PLATFORM_TO_ENTITY'>;
   SettlementRequest: ResolverTypeWrapper<Omit<SettlementRequest, 'business' | 'requestedBy' | 'respondedBy' | 'status'> & { business: ResolversTypes['Business'], requestedBy?: Maybe<ResolversTypes['User']>, respondedBy?: Maybe<ResolversTypes['User']>, status: ResolversTypes['SettlementRequestStatus'] }>;
   SettlementRequestAction: ResolverTypeWrapper<'ACCEPT' | 'DISPUTE'>;
   SettlementRequestStatus: ResolverTypeWrapper<'PENDING_APPROVAL' | 'ACCEPTED' | 'DISPUTED' | 'EXPIRED' | 'CANCELLED'>;
-  SettlementRule: ResolverTypeWrapper<Omit<SettlementRule, 'amountType' | 'business' | 'direction' | 'entityType' | 'promotion'> & { amountType: ResolversTypes['SettlementAmountType'], business?: Maybe<ResolversTypes['Business']>, direction: ResolversTypes['SettlementDirection'], entityType: ResolversTypes['SettlementEntityType'], promotion?: Maybe<ResolversTypes['Promotion']> }>;
+  SettlementRule: ResolverTypeWrapper<Omit<SettlementRule, 'amountType' | 'business' | 'direction' | 'entityType' | 'promotion' | 'type'> & { amountType: ResolversTypes['SettlementAmountType'], business?: Maybe<ResolversTypes['Business']>, direction: ResolversTypes['SettlementDirection'], entityType: ResolversTypes['SettlementEntityType'], promotion?: Maybe<ResolversTypes['Promotion']>, type: ResolversTypes['SettlementRuleType'] }>;
   SettlementRuleFilterInput: SettlementRuleFilterInput;
+  SettlementRuleScope: ResolverTypeWrapper<'GLOBAL' | 'BUSINESS' | 'PROMOTION' | 'BUSINESS_PROMOTION'>;
+  SettlementRuleType: ResolverTypeWrapper<'ORDER_PRICE' | 'DELIVERY_PRICE'>;
   SettlementScenarioDefinition: ResolverTypeWrapper<SettlementScenarioDefinition>;
   SettlementScenarioHarnessResult: ResolverTypeWrapper<SettlementScenarioHarnessResult>;
   SettlementScenarioResult: ResolverTypeWrapper<SettlementScenarioResult>;
@@ -4087,7 +4108,10 @@ export type OptionGroupResolvers<ContextType = GraphQLContext, ParentType extend
 };
 
 export type OrderResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Order'] = ResolversParentTypes['Order']> = {
+  actualPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   adminNote?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  basePrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  businessId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   businesses?: Resolver<Array<ResolversTypes['OrderBusiness']>, ParentType, ContextType>;
   cancellationReason?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   cancelledAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
@@ -4101,6 +4125,7 @@ export type OrderResolvers<ContextType = GraphQLContext, ParentType extends Reso
   dropOffLocation?: Resolver<ResolversTypes['Location'], ParentType, ContextType>;
   estimatedReadyAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  markupPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   orderDate?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
   orderPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   orderPromotions?: Resolver<Maybe<Array<ResolversTypes['OrderPromotion']>>, ParentType, ContextType>;
@@ -4514,14 +4539,14 @@ export type SettlementPaymentResolvers<ContextType = GraphQLContext, ParentType 
   business?: Resolver<Maybe<ResolversTypes['Business']>, ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
   createdBy?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
-  direction?: Resolver<ResolversTypes['SettlementPaymentDirection'], ParentType, ContextType>;
+  direction?: Resolver<Maybe<ResolversTypes['SettlementPaymentDirection']>, ParentType, ContextType>;
   driver?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
   entityType?: Resolver<ResolversTypes['SettlementType'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   note?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   paymentMethod?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   paymentReference?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
-  totalBalanceAtTime?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  totalBalanceAtTime?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -4563,9 +4588,14 @@ export type SettlementRuleResolvers<ContextType = GraphQLContext, ParentType ext
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   notes?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   promotion?: Resolver<Maybe<ResolversTypes['Promotion']>, ParentType, ContextType>;
+  type?: Resolver<ResolversTypes['SettlementRuleType'], ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
+
+export type SettlementRuleScopeResolvers = EnumResolverSignature<{ BUSINESS?: any, BUSINESS_PROMOTION?: any, GLOBAL?: any, PROMOTION?: any }, ResolversTypes['SettlementRuleScope']>;
+
+export type SettlementRuleTypeResolvers = EnumResolverSignature<{ DELIVERY_PRICE?: any, ORDER_PRICE?: any }, ResolversTypes['SettlementRuleType']>;
 
 export type SettlementScenarioDefinitionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['SettlementScenarioDefinition'] = ResolversParentTypes['SettlementScenarioDefinition']> = {
   description?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
@@ -4852,6 +4882,8 @@ export type Resolvers<ContextType = GraphQLContext> = {
   SettlementRequestAction?: SettlementRequestActionResolvers;
   SettlementRequestStatus?: SettlementRequestStatusResolvers;
   SettlementRule?: SettlementRuleResolvers<ContextType>;
+  SettlementRuleScope?: SettlementRuleScopeResolvers;
+  SettlementRuleType?: SettlementRuleTypeResolvers;
   SettlementScenarioDefinition?: SettlementScenarioDefinitionResolvers<ContextType>;
   SettlementScenarioHarnessResult?: SettlementScenarioHarnessResultResolvers<ContextType>;
   SettlementScenarioResult?: SettlementScenarioResultResolvers<ContextType>;

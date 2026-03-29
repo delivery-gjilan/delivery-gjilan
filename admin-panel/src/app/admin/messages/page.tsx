@@ -25,59 +25,50 @@ import { USERS_QUERY } from '@/graphql/operations/users/queries';
 import { toast } from 'sonner';
 import { Truck, Building2, Send, AlertTriangle, Info, Zap, Plus, Search, X } from 'lucide-react';
 
-type AlertType = 'INFO' | 'WARNING' | 'URGENT';
+import {
+    MessageAlertType,
+    DriverMessageThreadsQuery,
+    DriverMessagesQuery,
+    BusinessMessageThreadsQuery,
+    BusinessMessagesQuery,
+    DriversQuery,
+    UsersQuery
+} from '@/gql/graphql';
+
 type Tab = 'drivers' | 'businesses';
 
 // ─── Shared types ──────────────────────────────────────────────────────────────
 
-interface BaseMessage {
-    id: string;
-    adminId: string;
-    senderRole: string;
-    body: string;
-    alertType: AlertType;
-    readAt?: string | null;
-    createdAt: string;
-}
+type DriverMessage = NonNullable<DriverMessagesQuery['driverMessages']>[number];
+type BusinessMessage = NonNullable<BusinessMessagesQuery['businessMessages']>[number];
+type BaseMessage = DriverMessage | BusinessMessage;
 
-interface DriverMessage extends BaseMessage { driverId: string; }
-interface BusinessMessage extends BaseMessage { businessUserId: string; }
+type DriverThread = NonNullable<DriverMessageThreadsQuery['driverMessageThreads']>[number];
+type BusinessThread = NonNullable<BusinessMessageThreadsQuery['businessMessageThreads']>[number];
 
-interface DriverThread {
-    driverId: string;
-    driverName: string;
-    unreadCount: number;
-    lastMessage?: DriverMessage | null;
-}
-
-interface BusinessThread {
-    businessUserId: string;
-    businessUserName: string;
-    unreadCount: number;
-    lastMessage?: BusinessMessage | null;
-}
-
-interface DriverItem { id: string; firstName: string; lastName: string; email: string; }
-interface UserItem { id: string; firstName: string; lastName: string; email: string; role: string; business?: { id: string; name: string } | null; }
+type DriverItem = NonNullable<DriversQuery['drivers']>[number];
+type UserItem = NonNullable<UsersQuery['users']>[number];
 
 // ─── Shared helpers ────────────────────────────────────────────────────────────
 
 const DRIVER_STYLES = {
     accent: 'indigo',
-    INFO: { badge: 'bg-blue-500/20 text-blue-300', border: 'border-blue-500/30', bg: 'bg-blue-500/10', icon: <Info size={12} className="inline mr-1" /> },
-    WARNING: { badge: 'bg-amber-500/20 text-amber-300', border: 'border-amber-500/30', bg: 'bg-amber-500/10', icon: <AlertTriangle size={12} className="inline mr-1" /> },
-    URGENT: { badge: 'bg-red-500/20 text-red-300', border: 'border-red-500/30', bg: 'bg-red-500/10', icon: <Zap size={12} className="inline mr-1" /> },
+    [MessageAlertType.Info]: { badge: 'bg-blue-500/20 text-blue-300', border: 'border-blue-500/30', bg: 'bg-blue-500/10', icon: <Info size={12} className="inline mr-1" /> },
+    [MessageAlertType.Warning]: { badge: 'bg-amber-500/20 text-amber-300', border: 'border-amber-500/30', bg: 'bg-amber-500/10', icon: <AlertTriangle size={12} className="inline mr-1" /> },
+    [MessageAlertType.Urgent]: { badge: 'bg-red-500/20 text-red-300', border: 'border-red-500/30', bg: 'bg-red-500/10', icon: <Zap size={12} className="inline mr-1" /> },
 } as const;
 
 const BIZ_STYLES = {
     accent: 'purple',
-    INFO: { badge: 'bg-purple-500/20 text-purple-300', border: 'border-purple-500/30', bg: 'bg-purple-500/10', icon: <Info size={12} className="inline mr-1" /> },
-    WARNING: { badge: 'bg-amber-500/20 text-amber-300', border: 'border-amber-500/30', bg: 'bg-amber-500/10', icon: <AlertTriangle size={12} className="inline mr-1" /> },
-    URGENT: { badge: 'bg-red-500/20 text-red-300', border: 'border-red-500/30', bg: 'bg-red-500/10', icon: <Zap size={12} className="inline mr-1" /> },
+    [MessageAlertType.Info]: { badge: 'bg-purple-500/20 text-purple-300', border: 'border-purple-500/30', bg: 'bg-purple-500/10', icon: <Info size={12} className="inline mr-1" /> },
+    [MessageAlertType.Warning]: { badge: 'bg-amber-500/20 text-amber-300', border: 'border-amber-500/30', bg: 'bg-amber-500/10', icon: <AlertTriangle size={12} className="inline mr-1" /> },
+    [MessageAlertType.Urgent]: { badge: 'bg-red-500/20 text-red-300', border: 'border-red-500/30', bg: 'bg-red-500/10', icon: <Zap size={12} className="inline mr-1" /> },
 } as const;
 
-function alertStyle(tab: Tab, type: AlertType) {
-    return tab === 'drivers' ? DRIVER_STYLES[type] : BIZ_STYLES[type];
+function alertStyle(tab: Tab, type: MessageAlertType) {
+    return tab === 'drivers' 
+        ? ((DRIVER_STYLES as any)[type] || DRIVER_STYLES[MessageAlertType.Info]) 
+        : ((BIZ_STYLES as any)[type] || BIZ_STYLES[MessageAlertType.Info]);
 }
 
 function formatTime(iso: string) {
@@ -114,35 +105,38 @@ function DriverPanel() {
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [selectedName, setSelectedName] = useState('');
     const [input, setInput] = useState('');
-    const [alertType, setAlertType] = useState<AlertType>('INFO');
+    const [alertType, setAlertType] = useState<MessageAlertType>(MessageAlertType.Info);
     const [messages, setMessages] = useState<DriverMessage[]>([]);
     const [showPicker, setShowPicker] = useState(false);
     const [search, setSearch] = useState('');
     const bottomRef = useRef<HTMLDivElement>(null);
 
     const { data: threadsData, loading: threadsLoading, refetch: refetchThreads } =
-        useQuery<{ driverMessageThreads: DriverThread[] }>(GET_DRIVER_MESSAGE_THREADS, { pollInterval: 30000 });
+        useQuery(GET_DRIVER_MESSAGE_THREADS, { pollInterval: 30000 });
 
-    const { data: driversData } = useQuery<{ drivers: DriverItem[] }>(DRIVERS_QUERY);
+    const { data: driversData } = useQuery(DRIVERS_QUERY);
 
-    const { loading: messagesLoading } = useQuery<{ driverMessages: DriverMessage[] }>(GET_DRIVER_MESSAGES, {
-        variables: { driverId: selectedId, limit: 100 },
+    const { data: qMessagesData, loading: messagesLoading } = useQuery(GET_DRIVER_MESSAGES, {
+        variables: { driverId: selectedId || '', limit: 100 },
         skip: !selectedId,
-        onCompleted: (data) => {
-            const incoming = data.driverMessages ?? [];
+    });
+
+    useEffect(() => {
+        const incoming = qMessagesData?.driverMessages ?? [];
+        if (incoming.length > 0) {
             setMessages((prev) => {
                 const ids = new Set(prev.map((m) => m.id));
                 return [...prev, ...incoming.filter((m) => !ids.has(m.id))].sort(
                     (a, b) => new Date(a.createdAt.replace(' ', 'T')).getTime() - new Date(b.createdAt.replace(' ', 'T')).getTime()
                 );
             });
-        },
-    });
+        }
+    }, [qMessagesData]);
 
     const [sendMessage, { loading: sending }] = useMutation(SEND_DRIVER_MESSAGE, {
         onCompleted: (d) => {
             if (d?.sendDriverMessage) {
-                setMessages((prev) => prev.some((m) => m.id === d.sendDriverMessage.id) ? prev : [...prev, d.sendDriverMessage]);
+                setMessages((prev) => prev.some((m) => m.id === d.sendDriverMessage?.id) ? prev : [...prev, d.sendDriverMessage as DriverMessage]);
                 refetchThreads();
             }
         },
@@ -152,7 +146,7 @@ function DriverPanel() {
     const [markRead] = useMutation(MARK_DRIVER_MESSAGES_READ);
 
     useSubscription(ADMIN_MESSAGE_RECEIVED, {
-        variables: { driverId: selectedId },
+        variables: { driverId: selectedId || '' },
         skip: !selectedId,
         onData: ({ data: sub }) => {
             const msg = sub.data?.adminMessageReceived as DriverMessage | undefined;
@@ -209,22 +203,22 @@ function DriverPanel() {
 
                 <div className="flex-1 overflow-y-auto">
                     {threads.map((t) => {
-                        const isActive = t.driverId === selectedId;
-                        const as = t.lastMessage ? DRIVER_STYLES[t.lastMessage.alertType] ?? DRIVER_STYLES.INFO : null;
+                        const isActive = t?.driverId === selectedId;
+                        const as = t?.lastMessage ? alertStyle('drivers', t.lastMessage.alertType as MessageAlertType) : null;
                         return (
-                            <button key={t.driverId} onClick={() => { setSelectedId(t.driverId); setSelectedName(t.driverName); }}
+                            <button key={t?.driverId} onClick={() => { if (t?.driverId) { setSelectedId(t.driverId); setSelectedName(t.driverName); setMessages([]); } }}
                                 className={`w-full text-left px-4 py-3 border-b border-white/5 transition-colors hover:bg-white/5 ${isActive ? 'bg-white/10' : ''}`}>
                                 <div className="flex items-center justify-between mb-1">
-                                    <span className="text-sm font-medium text-white truncate">{t.driverName}</span>
-                                    {t.unreadCount > 0 && <span className="ml-2 flex-shrink-0 text-xs font-bold bg-indigo-500 text-white rounded-full w-5 h-5 flex items-center justify-center">{t.unreadCount}</span>}
+                                    <span className="text-sm font-medium text-white truncate">{t?.driverName}</span>
+                                    {(t?.unreadCount ?? 0) > 0 && <span className="ml-2 flex-shrink-0 text-xs font-bold bg-indigo-500 text-white rounded-full w-5 h-5 flex items-center justify-center">{t?.unreadCount}</span>}
                                 </div>
-                                {t.lastMessage && (
+                                {t?.lastMessage && (
                                     <div className="flex items-center gap-1.5">
                                         {as && <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold flex-shrink-0 ${as.badge}`}>{t.lastMessage.alertType}</span>}
                                         <p className="text-xs text-zinc-400 truncate">{t.lastMessage.senderRole === 'ADMIN' ? 'You: ' : ''}{t.lastMessage.body}</p>
                                     </div>
                                 )}
-                                {t.lastMessage && <p className="text-[10px] text-zinc-600 mt-0.5">{formatTime(t.lastMessage.createdAt)}</p>}
+                                {t?.lastMessage && <p className="text-[10px] text-zinc-600 mt-0.5">{formatTime(t.lastMessage.createdAt)}</p>}
                             </button>
                         );
                     })}
@@ -318,8 +312,8 @@ function DriverPanel() {
                         <div className="px-5 py-4 border-t border-white/10">
                             <div className="flex items-center gap-2 mb-3">
                                 <span className="text-xs text-zinc-500 font-medium">Alert type:</span>
-                                {(['INFO', 'WARNING', 'URGENT'] as AlertType[]).map((type) => {
-                                    const s = DRIVER_STYLES[type];
+                                {[MessageAlertType.Info, MessageAlertType.Warning, MessageAlertType.Urgent].map((type) => {
+                                    const s = alertStyle('drivers', type);
                                     return (
                                         <button key={type} onClick={() => setAlertType(type)}
                                             className={`text-xs px-2.5 py-1 rounded-full font-semibold border transition-all ${alertType === type ? `${s.bg} ${s.border} ${s.badge.split(' ')[1]}` : 'bg-transparent border-white/10 text-zinc-500 hover:border-white/20'}`}>
@@ -352,35 +346,38 @@ function BusinessPanel() {
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [selectedName, setSelectedName] = useState('');
     const [input, setInput] = useState('');
-    const [alertType, setAlertType] = useState<AlertType>('INFO');
+    const [alertType, setAlertType] = useState<MessageAlertType>(MessageAlertType.Info);
     const [messages, setMessages] = useState<BusinessMessage[]>([]);
     const [showPicker, setShowPicker] = useState(false);
     const [search, setSearch] = useState('');
     const bottomRef = useRef<HTMLDivElement>(null);
 
     const { data: threadsData, loading: threadsLoading, refetch: refetchThreads } =
-        useQuery<{ businessMessageThreads: BusinessThread[] }>(GET_BUSINESS_MESSAGE_THREADS, { pollInterval: 30000 });
+        useQuery(GET_BUSINESS_MESSAGE_THREADS, { pollInterval: 30000 });
 
-    const { data: usersData } = useQuery<{ users: UserItem[] }>(USERS_QUERY);
+    const { data: usersData } = useQuery(USERS_QUERY);
 
-    const { loading: messagesLoading } = useQuery<{ businessMessages: BusinessMessage[] }>(GET_BUSINESS_MESSAGES, {
-        variables: { businessUserId: selectedId, limit: 100 },
+    const { data: qMessagesData, loading: messagesLoading } = useQuery(GET_BUSINESS_MESSAGES, {
+        variables: { businessUserId: selectedId || '', limit: 100 },
         skip: !selectedId,
-        onCompleted: (data) => {
-            const incoming = data.businessMessages ?? [];
+    });
+
+    useEffect(() => {
+        const incoming = qMessagesData?.businessMessages ?? [];
+        if (incoming.length > 0) {
             setMessages((prev) => {
                 const ids = new Set(prev.map((m) => m.id));
                 return [...prev, ...incoming.filter((m) => !ids.has(m.id))].sort(
                     (a, b) => new Date(a.createdAt.replace(' ', 'T')).getTime() - new Date(b.createdAt.replace(' ', 'T')).getTime()
                 );
             });
-        },
-    });
+        }
+    }, [qMessagesData]);
 
     const [sendMessage, { loading: sending }] = useMutation(SEND_BUSINESS_MESSAGE, {
         onCompleted: (d) => {
             if (d?.sendBusinessMessage) {
-                setMessages((prev) => prev.some((m) => m.id === d.sendBusinessMessage.id) ? prev : [...prev, d.sendBusinessMessage]);
+                setMessages((prev) => prev.some((m) => m.id === d.sendBusinessMessage?.id) ? prev : [...prev, d.sendBusinessMessage as BusinessMessage]);
                 refetchThreads();
             }
         },
@@ -390,7 +387,7 @@ function BusinessPanel() {
     const [markRead] = useMutation(MARK_BUSINESS_MESSAGES_READ);
 
     useSubscription(ADMIN_BUSINESS_MESSAGE_RECEIVED, {
-        variables: { businessUserId: selectedId },
+        variables: { businessUserId: selectedId || '' },
         skip: !selectedId,
         onData: ({ data: sub }) => {
             const msg = sub.data?.adminBusinessMessageReceived as BusinessMessage | undefined;
@@ -447,22 +444,22 @@ function BusinessPanel() {
 
                 <div className="flex-1 overflow-y-auto">
                     {threads.map((t) => {
-                        const isActive = t.businessUserId === selectedId;
-                        const as = t.lastMessage ? BIZ_STYLES[t.lastMessage.alertType] ?? BIZ_STYLES.INFO : null;
+                        const isActive = t?.businessUserId === selectedId;
+                        const as = t?.lastMessage ? alertStyle('businesses', t.lastMessage.alertType as MessageAlertType) : null;
                         return (
-                            <button key={t.businessUserId} onClick={() => { setSelectedId(t.businessUserId); setSelectedName(t.businessUserName); }}
+                            <button key={t?.businessUserId} onClick={() => { if (t?.businessUserId) { setSelectedId(t.businessUserId); setSelectedName(t.businessUserName); setMessages([]); } }}
                                 className={`w-full text-left px-4 py-3 border-b border-white/5 transition-colors hover:bg-white/5 ${isActive ? 'bg-white/10' : ''}`}>
                                 <div className="flex items-center justify-between mb-1">
-                                    <span className="text-sm font-medium text-white truncate">{t.businessUserName}</span>
-                                    {t.unreadCount > 0 && <span className="ml-2 flex-shrink-0 text-xs font-bold bg-purple-500 text-white rounded-full w-5 h-5 flex items-center justify-center">{t.unreadCount}</span>}
+                                    <span className="text-sm font-medium text-white truncate">{t?.businessUserName}</span>
+                                    {(t?.unreadCount ?? 0) > 0 && <span className="ml-2 flex-shrink-0 text-xs font-bold bg-purple-500 text-white rounded-full w-5 h-5 flex items-center justify-center">{t?.unreadCount}</span>}
                                 </div>
-                                {t.lastMessage && (
+                                {t?.lastMessage && (
                                     <div className="flex items-center gap-1.5">
                                         {as && <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold flex-shrink-0 ${as.badge}`}>{t.lastMessage.alertType}</span>}
                                         <p className="text-xs text-zinc-400 truncate">{t.lastMessage.senderRole === 'ADMIN' ? 'You: ' : ''}{t.lastMessage.body}</p>
                                     </div>
                                 )}
-                                {t.lastMessage && <p className="text-[10px] text-zinc-600 mt-0.5">{formatTime(t.lastMessage.createdAt)}</p>}
+                                {t?.lastMessage && <p className="text-[10px] text-zinc-600 mt-0.5">{formatTime(t.lastMessage.createdAt)}</p>}
                             </button>
                         );
                     })}
@@ -567,8 +564,8 @@ function BusinessPanel() {
                         <div className="px-5 py-4 border-t border-white/10">
                             <div className="flex items-center gap-2 mb-3">
                                 <span className="text-xs text-zinc-500 font-medium">Alert type:</span>
-                                {(['INFO', 'WARNING', 'URGENT'] as AlertType[]).map((type) => {
-                                    const s = BIZ_STYLES[type];
+                                {[MessageAlertType.Info, MessageAlertType.Warning, MessageAlertType.Urgent].map((type) => {
+                                    const s = alertStyle('businesses', type);
                                     return (
                                         <button key={type} onClick={() => setAlertType(type)}
                                             className={`text-xs px-2.5 py-1 rounded-full font-semibold border transition-all ${alertType === type ? `${s.bg} ${s.border} ${s.badge.split(' ')[1]}` : 'bg-transparent border-white/10 text-zinc-500 hover:border-white/20'}`}>

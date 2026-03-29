@@ -483,6 +483,7 @@ input CreateSettlementRuleInput {
   name: String!
   notes: String
   promotionId: ID
+  type: SettlementRuleType!
 }
 
 input CreateUserInput {
@@ -1091,7 +1092,10 @@ type OptionGroup {
 }
 
 type Order {
+  actualPrice: Float!
   adminNote: String
+  basePrice: Float!
+  businessId: ID!
   businesses: [OrderBusiness!]!
   cancellationReason: String
   cancelledAt: Date
@@ -1105,6 +1109,7 @@ type Order {
   dropOffLocation: Location!
   estimatedReadyAt: Date
   id: ID!
+  markupPrice: Float!
   orderDate: Date!
   orderPrice: Float!
   orderPromotions: [OrderPromotion!]
@@ -1593,14 +1598,14 @@ type SettlementPayment {
   business: Business
   createdAt: Date!
   createdBy: User
-  direction: SettlementPaymentDirection!
+  direction: SettlementPaymentDirection
   driver: User
   entityType: SettlementType!
   id: ID!
   note: String
   paymentMethod: String
   paymentReference: String
-  totalBalanceAtTime: Float!
+  totalBalanceAtTime: Float
 }
 
 enum SettlementPaymentDirection {
@@ -1652,14 +1657,29 @@ type SettlementRule {
   name: String!
   notes: String
   promotion: Promotion
+  type: SettlementRuleType!
   updatedAt: String!
 }
 
 input SettlementRuleFilterInput {
-  businessId: ID
-  entityType: SettlementEntityType
+  businessIds: [ID!]
+  entityTypes: [SettlementEntityType!]
   isActive: Boolean
-  promotionId: ID
+  promotionIds: [ID!]
+  scopes: [SettlementRuleScope!]
+  type: SettlementRuleType
+}
+
+enum SettlementRuleScope {
+  BUSINESS
+  BUSINESS_PROMOTION
+  GLOBAL
+  PROMOTION
+}
+
+enum SettlementRuleType {
+  DELIVERY_PRICE
+  ORDER_PRICE
 }
 
 type SettlementScenarioDefinition {
@@ -1906,6 +1926,7 @@ input UpdateSettlementRuleInput {
   isActive: Boolean
   name: String
   notes: String
+  type: SettlementRuleType
 }
 
 input UpdateStoreStatusInput {

@@ -273,6 +273,10 @@ export class OrderService {
             }
         };
 
+        // Track order-level price breakdown
+        let orderBasePrice = 0;   // sum of products' basePrice × qty + options' extraPrice × qty
+        let orderMarkupPrice = 0; // sum of products' markup amounts × qty (platform margin)
+
         for (const itemInput of input.items) {
             const product = productMap.get(itemInput.productId);
             if (!product) {
@@ -311,6 +315,13 @@ export class OrderService {
 
             calculatedItemsTotal += (finalAppliedPrice + optionsExtra) * itemInput.quantity;
 
+            // Accumulate order-level price breakdown
+            // basePrice = product base + option extras (cost to business)
+            orderBasePrice += (basePrice + optionsExtra) * itemInput.quantity;
+            // markupPrice = only the product markup amount (for now, not options)
+            const productMarkup = Math.max(0, finalAppliedPrice - basePrice);
+            orderMarkupPrice += productMarkup * itemInput.quantity;
+
             // Also calculate child item options extra (child finalAppliedPrice is 0, but options may cost extra)
             if (itemInput.childItems) {
                 const linkedChildCounts = new Map<string, number>();
@@ -347,6 +358,8 @@ export class OrderService {
                         }
                     }
                     calculatedItemsTotal += childOptionsExtra * itemInput.quantity;
+                    // Child option extras also count as base price for the order
+                    orderBasePrice += childOptionsExtra * itemInput.quantity;
                 }
             }
 
@@ -375,8 +388,17 @@ export class OrderService {
 
         log.debug({ itemsTotal: calculatedItemsTotal, deliveryPrice: input.deliveryPrice }, 'order:totals');
 
-        // 2a. Validate multi-restaurant restriction
+        // 2a. Validate single-business constraint — all items must be from one business
         const businessIdList = Array.from(businessIds);
+        if (businessIdList.length > 1) {
+            throw AppError.businessRule(
+                'All items in an order must be from the same business. Please remove items from other businesses.',
+            );
+        }
+        const orderBusinessId = businessIdList[0];
+        if (!orderBusinessId) {
+            throw AppError.badInput('Order must contain at least one item');
+        }
 
         const orderBusinesses = await db
             .select({
@@ -390,13 +412,6 @@ export class OrderService {
             .where(inArray(businessesTable.id, businessIdList));
 
         const businessesById = new Map(orderBusinesses.map((business) => [business.id, business]));
-
-        const restaurantCount = orderBusinesses.filter((b) => b.businessType === 'RESTAURANT').length;
-        if (restaurantCount > 1) {
-            throw AppError.businessRule(
-                'You can only order from one restaurant at a time. Please remove items from one restaurant before adding from another.',
-            );
-        }
 
         // 2b. Check that all businesses are currently open
         const now = new Date();
@@ -531,20 +546,19 @@ export class OrderService {
 
         const orderData = {
             displayId: this.generateDisplayId(),
-            price: effectiveOrderPrice,
             userId,
+            businessId: orderBusinessId,
+            // Price breakdown:
+            // basePrice   = sum of products' basePrice + option extras (cost to business)
+            // markupPrice = sum of products' markup amounts (platform margin)
+            // actualPrice = final item price after promotions (what customer pays for items)
+            basePrice: Number(orderBasePrice.toFixed(2)),
+            markupPrice: Number(orderMarkupPrice.toFixed(2)),
+            actualPrice: effectiveOrderPrice,
             // Fold priority surcharge into the stored delivery price so that
-            // order totals (price + deliveryPrice) always equal what the customer paid.
+            // total (actualPrice + deliveryPrice) always equals what the customer paid.
             deliveryPrice: effectiveDeliveryPrice + prioritySurcharge,
             paymentCollection: input.paymentCollection ?? 'CASH_TO_DRIVER',
-            originalPrice:
-                Math.abs(calculatedItemsTotal - effectiveOrderPrice) > 0.01
-                    ? Number(calculatedItemsTotal.toFixed(2))
-                    : undefined,
-            originalDeliveryPrice:
-                Math.abs(expectedDeliveryPrice - effectiveDeliveryPrice) > 0.01
-                    ? Number((expectedDeliveryPrice + prioritySurcharge).toFixed(2))
-                    : undefined,
             status: 'PENDING' as const,
             dropoffLat: input.dropOffLocation.latitude,
             dropoffLng: input.dropOffLocation.longitude,
@@ -681,7 +695,6 @@ export class OrderService {
 
         if (promoResult.promotions.length > 0) {
             const appliedPromotionIds = promoResult.promotions.map((promo) => promo.id);
-            const orderBusinessId = businessIds.size === 1 ? Array.from(businessIds)[0] : null;
 
             const perPromotionUsage = promoResult.promotions.map((promo) => ({
                 promotionId: promo.id,
@@ -885,11 +898,17 @@ export class OrderService {
             id: dbOrder.id,
             displayId: dbOrder.displayId,
             userId: dbOrder.userId,
-            orderPrice: dbOrder.price,
+            businessId: dbOrder.businessId,
+            // New price breakdown
+            basePrice: dbOrder.basePrice,
+            markupPrice: dbOrder.markupPrice,
+            actualPrice: dbOrder.actualPrice,
             deliveryPrice: dbOrder.deliveryPrice,
-            originalPrice: dbOrder.originalPrice ?? undefined,
-            originalDeliveryPrice: dbOrder.originalDeliveryPrice ?? undefined,
-            totalPrice: dbOrder.price + dbOrder.deliveryPrice,
+            totalPrice: dbOrder.actualPrice + dbOrder.deliveryPrice,
+            // Legacy backward-compat fields
+            orderPrice: dbOrder.actualPrice,
+            originalPrice: undefined,
+            originalDeliveryPrice: undefined,
             orderDate: parseDbTimestamp(dbOrder.orderDate) ?? new Date(),
             updatedAt: parseDbTimestamp(dbOrder.updatedAt) ?? new Date(),
             status: dbOrder.status as OrderStatus,
@@ -1094,7 +1113,7 @@ export class OrderService {
             dbOrder.userId,
             dbOrder.status as OrderStatus,
             'CANCELLED',
-            dbOrder.price + dbOrder.deliveryPrice,
+            dbOrder.actualPrice + dbOrder.deliveryPrice,
             dbOrder.orderDate || null,
         );
         return order;
@@ -1142,7 +1161,7 @@ export class OrderService {
             dbOrder.userId,
             dbOrder.status as OrderStatus,
             'CANCELLED',
-            dbOrder.price + dbOrder.deliveryPrice,
+            dbOrder.actualPrice + dbOrder.deliveryPrice,
             dbOrder.orderDate || null,
         );
 

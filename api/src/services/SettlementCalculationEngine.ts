@@ -34,6 +34,23 @@ function calculateMarkupEarnings(orderItems: DbOrderItem[]): number {
     return Number(total.toFixed(2));
 }
 
+type DbSettlementRule = typeof settlementRules.$inferSelect;
+
+/**
+ * Determine the specificity level of a settlement rule's scope.
+ *
+ *   3 = business + promotion (most specific)
+ *   2 = promotion only
+ *   1 = business only
+ *   0 = global (both null)
+ */
+function ruleSpecificity(rule: DbSettlementRule): number {
+    if (rule.businessId && rule.promotionId) return 3;
+    if (rule.promotionId) return 2;
+    if (rule.businessId) return 1;
+    return 0;
+}
+
 export class SettlementCalculationEngine {
     constructor(private db: Database) {}
 
@@ -76,52 +93,32 @@ export class SettlementCalculationEngine {
                     ),
                 );
 
-            // 4. One settlement per rule
+            // 4. Split rules by type
+            const deliveryPriceRules = rules.filter((r) => r.type === 'DELIVERY_PRICE');
+            const orderPriceRules = rules.filter((r) => r.type === 'ORDER_PRICE');
+
             const results: SettlementCalculation[] = [];
 
-            for (const rule of rules) {
-                if (rule.entityType === 'DRIVER' && !driverId) continue;
+            // ── DELIVERY_PRICE rules: most-specific-wins ──
+            // Find the highest specificity level among matched delivery rules,
+            // then apply ONLY rules at that level.
+            if (deliveryPriceRules.length > 0) {
+                const maxSpecificity = Math.max(...deliveryPriceRules.map(ruleSpecificity));
+                const winningRules = deliveryPriceRules.filter((r) => ruleSpecificity(r) === maxSpecificity);
 
-                const base =
-                    rule.appliesTo === 'DELIVERY_FEE'
-                        ? Number(order.deliveryPrice)
-                        : Number(order.price);
-
-                const amount =
-                    rule.amountType === 'FIXED'
-                        ? Number(rule.amount)
-                        : (base * Number(rule.amount)) / 100;
-
-                if (amount <= 0) continue;
-
-                if (rule.entityType === 'BUSINESS') {
-                    const targetBusinessIds = rule.businessId ? [rule.businessId] : orderBusinessIds;
-                    for (const bizId of targetBusinessIds) {
-                        results.push({
-                            type: 'BUSINESS',
-                            direction: rule.direction,
-                            driverId: null,
-                            businessId: bizId,
-                            orderId: order.id,
-                            amount,
-                            ruleId: rule.id,
-                        });
-                    }
-                } else {
-                    results.push({
-                        type: 'DRIVER',
-                        direction: rule.direction,
-                        driverId,
-                        businessId: null,
-                        orderId: order.id,
-                        amount,
-                        ruleId: rule.id,
-                    });
+                for (const rule of winningRules) {
+                    this.applyRule(rule, order, orderBusinessIds, driverId, results);
                 }
             }
 
-            // Automatic markup remittance only applies when the driver
-            // physically collects cash from the customer.
+            // ── ORDER_PRICE rules: stack all ──
+            // Apply every matching rule at every scope level.
+            for (const rule of orderPriceRules) {
+                this.applyRule(rule, order, orderBusinessIds, driverId, results);
+            }
+
+            // ── Automatic markup remittance ──
+            // Only applies when the driver physically collects cash from the customer.
             if (driverId && order.paymentCollection === 'CASH_TO_DRIVER') {
                 const markupEarnings = calculateMarkupEarnings(orderItems);
                 if (markupEarnings > 0) {
@@ -142,6 +139,8 @@ export class SettlementCalculationEngine {
                     orderId: order.id,
                     settlementsCount: results.length,
                     rulesMatched: rules.length,
+                    deliveryRulesCount: deliveryPriceRules.length,
+                    orderPriceRulesCount: orderPriceRules.length,
                     hasAutoMarkupSettlement: results.some((s) => s.ruleId === null && s.type === 'DRIVER'),
                 },
                 'settlement:calculated',
@@ -151,6 +150,57 @@ export class SettlementCalculationEngine {
         } catch (error) {
             log.error({ err: error, orderId: order.id }, 'settlement:calculate:error');
             throw error;
+        }
+    }
+
+    /**
+     * Apply a single settlement rule → push settlement(s) into results.
+     */
+    private applyRule(
+        rule: DbSettlementRule,
+        order: DbOrder,
+        orderBusinessIds: string[],
+        driverId: string | null,
+        results: SettlementCalculation[],
+    ): void {
+        if (rule.entityType === 'DRIVER' && !driverId) return;
+
+        // Determine the base value for the rule
+        const base =
+            rule.type === 'DELIVERY_PRICE'
+                ? Number(order.deliveryPrice)
+                : Number(order.actualPrice);
+
+        const amount =
+            rule.amountType === 'FIXED'
+                ? Number(rule.amount)
+                : (base * Number(rule.amount)) / 100;
+
+        if (amount <= 0) return;
+
+        if (rule.entityType === 'BUSINESS') {
+            const targetBusinessIds = rule.businessId ? [rule.businessId] : orderBusinessIds;
+            for (const bizId of targetBusinessIds) {
+                results.push({
+                    type: 'BUSINESS',
+                    direction: rule.direction,
+                    driverId: null,
+                    businessId: bizId,
+                    orderId: order.id,
+                    amount: Number(amount.toFixed(2)),
+                    ruleId: rule.id,
+                });
+            }
+        } else {
+            results.push({
+                type: 'DRIVER',
+                direction: rule.direction,
+                driverId,
+                businessId: null,
+                orderId: order.id,
+                amount: Number(amount.toFixed(2)),
+                ruleId: rule.id,
+            });
         }
     }
 }

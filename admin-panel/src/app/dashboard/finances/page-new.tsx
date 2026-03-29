@@ -5,8 +5,8 @@ import { useQuery, useMutation } from '@apollo/client/react';
 import { ArrowLeft, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import {
-    GET_SETTLEMENTS,
-    MARK_SETTLEMENTS_PAID,
+    GET_SETTLEMENTS_PAGE as GET_SETTLEMENTS,
+    MARK_SETTLEMENTS_PAID_OP as MARK_SETTLEMENTS_PAID,
     MARK_SETTLEMENT_PARTIAL,
     UNSETTLE_SETTLEMENT,
 } from '@/graphql/operations/settlements/queries';

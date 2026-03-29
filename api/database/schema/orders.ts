@@ -4,6 +4,7 @@ import { orderItems } from './orderItems';
 import { OrderStatus } from '@/generated/types.generated';
 import { users } from './users';
 import { orderPromotions } from './orderPromotions';
+import { businesses } from './businesses';
 
 const orderStatusValues = ['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'] as const;
 [...orderStatusValues] satisfies OrderStatus[];
@@ -19,11 +20,22 @@ export const orders = pgTable('orders', {
         .notNull()
         .references(() => users.id, { onDelete: 'cascade' }),
     driverId: uuid('driver_id').references(() => users.id, { onDelete: 'set null' }),
-    price: numeric('price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
+    businessId: uuid('business_id')
+        .notNull()
+        .references(() => businesses.id, { onDelete: 'restrict' }),
+
+    // Price breakdown:
+    // basePrice     = sum of products' basePrice × qty + options' extraPrice × qty (cost to business)
+    // markupPrice   = sum of products' markup amounts × qty (platform margin, ≥ 0)
+    // actualPrice   = final item price after promotions (what customer pays for items)
+    // deliveryPrice = delivery fee
+    // total         = actualPrice + deliveryPrice (computed, not stored)
+    basePrice: numeric('base_price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
+    markupPrice: numeric('markup_price', { mode: 'number', precision: 10, scale: 2 }).notNull().default('0'),
+    actualPrice: numeric('actual_price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
     deliveryPrice: numeric('delivery_price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
+
     paymentCollection: orderPaymentCollection('payment_collection').default('CASH_TO_DRIVER').notNull(),
-    originalPrice: numeric('original_price', { mode: 'number', precision: 10, scale: 2 }),
-    originalDeliveryPrice: numeric('original_delivery_price', { mode: 'number', precision: 10, scale: 2 }),
     status: orderStatus('status').notNull(),
     dropoffLat: doublePrecision('dropoff_lat').notNull(),
     dropoffLng: doublePrecision('dropoff_lng').notNull(),
@@ -53,6 +65,7 @@ export const orders = pgTable('orders', {
     index('idx_orders_driver_id').on(t.driverId),
     index('idx_orders_status').on(t.status),
     index('idx_orders_status_created').on(t.status, t.createdAt),
+    index('idx_orders_business_id').on(t.businessId),
     uniqueIndex('idx_orders_display_id').on(t.displayId),
 ]));
 
@@ -65,6 +78,10 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
     driver: one(users, {
         fields: [orders.driverId],
         references: [users.id],
+    }),
+    business: one(businesses, {
+        fields: [orders.businessId],
+        references: [businesses.id],
     }),
     orderPromotions: many(orderPromotions),
 }));

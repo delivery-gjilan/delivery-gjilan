@@ -26,11 +26,10 @@ export const updateSettlementRule: NonNullable<MutationResolvers['updateSettleme
   if (input.direction != null) cleanInput.direction = input.direction;
   if (input.amountType != null) cleanInput.amountType = input.amountType;
   if (input.amount != null) cleanInput.amount = input.amount.toString();
-  if (input.appliesTo !== undefined) cleanInput.appliesTo = input.appliesTo || null;
+  if (input.type != null) cleanInput.type = input.type;
   if (input.isActive != null) cleanInput.isActive = input.isActive;
   if (input.notes !== undefined) cleanInput.notes = input.notes || null;
   
-  const rule = await repo.updateRule(id, cleanInput);
-
-  return rule;
+    const rule = await repo.updateRule(id, cleanInput);
+    return rule as any;
 };

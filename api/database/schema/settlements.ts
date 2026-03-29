@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, numeric, timestamp, pgEnum, index, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, numeric, timestamp, index, boolean, pgEnum } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import { drivers } from './drivers';
 import { businesses } from './businesses';
@@ -10,9 +10,6 @@ export { settlementDirection };
 
 const settlementTypeValues = ['DRIVER', 'BUSINESS'] as const;
 export const settlementType = pgEnum('settlement_type', settlementTypeValues);
-
-const settlementStatusValues = ['PENDING', 'PAID', 'OVERDUE', 'DISPUTED', 'CANCELLED'] as const;
-export const settlementStatus = pgEnum('settlement_status', settlementStatusValues);
 
 /**
  * Settlements table — who owes who and how much
@@ -31,25 +28,19 @@ export const settlements = pgTable('settlements', {
     orderId: uuid('order_id')
         .references(() => orders.id, { onDelete: 'cascade' }),
 
-    // Which rule produced this settlement (null for manually created / backfilled)
+    // Which rule produced this settlement (null for manually created / markup remittance)
     ruleId: uuid('rule_id').references(() => settlementRules.id, { onDelete: 'set null' }),
 
-    // Which payment settled this settlement (set when is_settled = true via SettlingService)
+    // Which payment settled this settlement (set when is_settled = true)
     settlementPaymentId: uuid('settlement_payment_id').references(() => settlementPayments.id, { onDelete: 'set null' }),
 
     // If this is a carry-forward remainder settlement, which payment created it
     sourcePaymentId: uuid('source_payment_id').references(() => settlementPayments.id, { onDelete: 'set null' }),
 
     amount: numeric('amount', { mode: 'number', precision: 10, scale: 2 }).notNull(),
-    currency: varchar('currency', { length: 3 }).default('EUR').notNull(),
-    status: settlementStatus('status').default('PENDING').notNull(),
 
-    /** Whether this settlement has been fully resolved (primary filter for active vs done) */
+    /** Whether this settlement has been fully resolved */
     isSettled: boolean('is_settled').default(false).notNull(),
-
-    paidAt: timestamp('paid_at', { withTimezone: true, mode: 'string' }),
-    paymentReference: varchar('payment_reference', { length: 100 }),
-    paymentMethod: varchar('payment_method', { length: 50 }),
 
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
         .default(sql`CURRENT_TIMESTAMP`)
@@ -62,7 +53,6 @@ export const settlements = pgTable('settlements', {
     index('idx_settlements_order_id').on(t.orderId),
     index('idx_settlements_driver_id').on(t.driverId),
     index('idx_settlements_business_id').on(t.businessId),
-    index('idx_settlements_status').on(t.status),
     index('idx_settlements_is_settled').on(t.isSettled),
     index('idx_settlements_type_direction').on(t.type, t.direction),
 ]));

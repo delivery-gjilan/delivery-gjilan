@@ -120,7 +120,7 @@ export const updateOrderStatus: NonNullable<MutationResolvers['updateOrderStatus
         dbOrder.userId,
         currentStatus,
         status,
-        dbOrder.price + dbOrder.deliveryPrice,
+        dbOrder.actualPrice + dbOrder.deliveryPrice,
         dbOrder.orderDate || null,
     );
 

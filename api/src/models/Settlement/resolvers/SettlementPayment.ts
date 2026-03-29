@@ -51,5 +51,11 @@ export const SettlementPayment: SettlementPaymentResolvers = {
         return user || null;
     },
 
+    // Backward-compat: no longer stored in DB
+    direction: () => null,
+    totalBalanceAtTime: () => null,
+    paymentMethod: () => null,
+    paymentReference: () => null,
+
     createdAt: (payment) => normalizeDateValue(payment.createdAt),
 } as any;
