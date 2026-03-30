@@ -1,1 +1,0 @@
-ALTER TYPE "public"."order_status" ADD VALUE 'AWAITING_APPROVAL';

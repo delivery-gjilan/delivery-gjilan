@@ -1,1 +1,0 @@
-ALTER TABLE "delivery_zones" ADD COLUMN "is_service_zone" boolean DEFAULT false NOT NULL;

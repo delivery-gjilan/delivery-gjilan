@@ -17,7 +17,7 @@ import { useActiveOrdersStore } from '@/modules/orders/store/activeOrdersStore';
 import { useApolloClient, useLazyQuery, useQuery, useMutation } from '@apollo/client/react';
 import { GET_ORDERS } from '@/graphql/operations/orders';
 import { GET_PRODUCT } from '@/graphql/operations/products';
-import { VALIDATE_PROMOTIONS, GET_PROMOTION_THRESHOLDS } from '@/graphql/operations/promotions';
+import { VALIDATE_PROMOTIONS, GET_APPLICABLE_PROMOTIONS, GET_PROMOTION_THRESHOLDS } from '@/graphql/operations/promotions';
 import { GET_MY_ADDRESSES, ADD_USER_ADDRESS, SET_DEFAULT_ADDRESS } from '@/graphql/operations/addresses';
 import { CALCULATE_DELIVERY_PRICE } from '@/graphql/operations/deliveryPricing';
 import type { UserAddress } from '@/gql/graphql';
@@ -81,11 +81,13 @@ export const CartScreen = () => {
         refetchQueries: [{ query: GET_MY_ADDRESSES }],
     });
     const [promoResult, setPromoResult] = useState<{
+        promotionId: string | null;
         code: string;
         discountAmount: number;
         freeDeliveryApplied: boolean;
         effectiveDeliveryPrice: number;
         totalPrice: number;
+        source: 'eligible' | 'manual';
     } | null>(null);
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const proceedButtonAnim = useRef(new Animated.Value(1)).current;
@@ -152,6 +154,12 @@ export const CartScreen = () => {
         },
     );
 
+    const { data: applicablePromotionsData } = useQuery(GET_APPLICABLE_PROMOTIONS, {
+        variables: { cart: cartContext },
+        skip: items.length === 0,
+        fetchPolicy: 'cache-and-network',
+    });
+
     const applicableConditional = useMemo(() => {
         if (!thresholdsData?.getPromotionThresholds) return null;
         const thresholds = thresholdsData.getPromotionThresholds;
@@ -173,6 +181,13 @@ export const CartScreen = () => {
     const progress = spendThreshold ? Math.min(Number(total) / Number(spendThreshold), 1) : 0;
     const amountRemaining = spendThreshold ? Math.max(0, Number(spendThreshold) - Number(total)) : 0;
 
+    const eligiblePromotions = useMemo(() => {
+        const list = applicablePromotionsData?.getApplicablePromotions ?? [];
+        return [...list].sort((a, b) => (b.priority || 0) - (a.priority || 0));
+    }, [applicablePromotionsData]);
+    const selectedEligiblePromotion = eligiblePromotions[0] ?? null;
+    const hasEligiblePromotion = !!selectedEligiblePromotion;
+
     // Celebration overlay state
     const [showCelebration, setShowCelebration] = useState(false);
     const [celebrationMessage, setCelebrationMessage] = useState('');
@@ -191,8 +206,6 @@ export const CartScreen = () => {
     };
 
     // Auto-apply helpers
-    const autoAppliedPromotionIdRef = useRef<string | null>(null);
-    const [autoApplying, setAutoApplying] = useState(false);
     const hadItemsOnMount = useRef(items.length > 0);
     // Keep a ref to the latest cartContext so the auto-apply effect doesn't need
     // cartContext / total / deliveryPrice in its deps (prevents waterfall re-runs).
@@ -206,29 +219,31 @@ export const CartScreen = () => {
         }
     }, [items.length, router]);
 
-    // When the cart reaches or exceeds a spend threshold, call the server to validate/apply promotions.
+    // Auto-apply the highest-priority eligible promotion.
     useEffect(() => {
-        if (!applicableConditional || !spendThreshold) {
+        if (!selectedEligiblePromotion) {
+            if (promoResult?.source === 'eligible') {
+                setPromoResult(null);
+                setCouponCode('');
+            }
             return;
         }
-        if (progress < 1) {
-            return;
-        }
-        if (promoResult) {
-            return;
-        }
-        if (autoAppliedPromotionIdRef.current === applicableConditional.id) {
+        if (promoResult?.promotionId === selectedEligiblePromotion.id) {
             return;
         }
 
         let mounted = true;
         const doAutoApply = async () => {
-            setAutoApplying(true);
             // Use the ref so that a delivery-price update mid-flight doesn't re-trigger
             // this effect — cartContextRef always holds the latest values.
             const ctx = cartContextRef.current;
             try {
-                const response = await validatePromotionsManual({ variables: { cart: ctx } });
+                const response = await validatePromotionsManual({
+                    variables: {
+                        cart: ctx,
+                        manualCode: selectedEligiblePromotion.code,
+                    },
+                });
                 const result = (response?.data as any)?.validatePromotions;
                 if (!result || (Array.isArray(result.promotions) && result.promotions.length === 0)) {
                     return;
@@ -236,21 +251,19 @@ export const CartScreen = () => {
 
                 if (!mounted) return;
 
-                const firstPromo = Array.isArray(result.promotions) ? result.promotions[0] : null;
-                const promoCode = firstPromo?.code ?? applicableConditional.code ?? '';
                 setPromoResult({
-                    code: promoCode,
+                    promotionId: selectedEligiblePromotion.id,
+                    code: selectedEligiblePromotion.code,
                     discountAmount: Number(result.totalDiscount ?? 0),
                     freeDeliveryApplied: result.freeDeliveryApplied ?? false,
                     effectiveDeliveryPrice: Number(result.finalDeliveryPrice ?? ctx.deliveryPrice),
                     totalPrice: Number(result.finalTotal ?? ctx.subtotal + ctx.deliveryPrice),
+                    source: 'eligible',
                 });
-                setCouponCode(promoCode); // Show the code in the input field
-                autoAppliedPromotionIdRef.current = firstPromo?.id ?? applicableConditional.id;
                 showNotifier(
                     t.cart.promotion_applied_notifier.replace(
                         '{{name}}',
-                        firstPromo?.name ? `: ${firstPromo.name}` : '',
+                        selectedEligiblePromotion.name ? `: ${selectedEligiblePromotion.name}` : '',
                     ),
                     'success',
                 );
@@ -258,8 +271,6 @@ export const CartScreen = () => {
                 // threshold is hit — no full-screen overlay needed here.
             } catch {
                 // ignore - best effort
-            } finally {
-                if (mounted) setAutoApplying(false);
             }
         };
 
@@ -268,7 +279,7 @@ export const CartScreen = () => {
         return () => {
             mounted = false;
         };
-    }, [progress, applicableConditional, promoResult, t]);
+    }, [selectedEligiblePromotion, promoResult?.promotionId, promoResult?.source, t]);
 
     // Get saved addresses sorted by priority (default first)
     const savedAddresses = useMemo(() => {
@@ -447,19 +458,14 @@ export const CartScreen = () => {
         goToStep(3);
     };
 
-    // Clear promo if cart total drops below threshold for auto-applied promos
+    // Clear eligible promo if it no longer applies
     useEffect(() => {
         if (!promoResult) return;
-        
-        // If this was an auto-applied promo and we're now below threshold, clear it
-        if (autoAppliedPromotionIdRef.current && applicableConditional) {
-            if (progress < 1) {
-                setPromoResult(null);
-                autoAppliedPromotionIdRef.current = null;
-            }
+
+        if (promoResult.source === 'eligible' && !selectedEligiblePromotion) {
+            setPromoResult(null);
         }
-        // For manually applied promos, keep them even if total changes
-    }, [total, deliveryPrice, progress, applicableConditional]);
+    }, [promoResult, selectedEligiblePromotion]);
 
     // Manual promo application handler (previous auto-validation removed)
     const handleApplyCoupon = async () => {
@@ -486,11 +492,13 @@ export const CartScreen = () => {
             }
 
             setPromoResult({
+                promotionId: result.promotions?.[0]?.id ?? null,
                 code: couponCode.trim(),
                 discountAmount: Number(result.totalDiscount ?? 0),
                 freeDeliveryApplied: result.freeDeliveryApplied ?? false,
                 effectiveDeliveryPrice: Number(result.finalDeliveryPrice ?? deliveryPrice),
                 totalPrice: Number(result.finalTotal ?? total + deliveryPrice),
+                source: 'manual',
             });
             showNotifier(
                 t.cart.discount_added.replace('{{amount}}', Number(result.totalDiscount ?? 0).toFixed(2)),
@@ -513,7 +521,6 @@ export const CartScreen = () => {
     useEffect(() => {
         if (items.length === 0) {
             setPromoResult(null);
-            autoAppliedPromotionIdRef.current = null;
             setCouponCode('');
         }
     }, [items.length]);
@@ -521,9 +528,8 @@ export const CartScreen = () => {
     // Clear promo if user empties the coupon code field
     useEffect(() => {
         // If user clears the input field, clear the applied promo
-        if (promoResult && !couponCode.trim()) {
+        if (promoResult?.source === 'manual' && !couponCode.trim()) {
             setPromoResult(null);
-            autoAppliedPromotionIdRef.current = null;
         }
         // Clear error when user starts typing
         if (promoError && couponCode.trim()) {
@@ -659,7 +665,14 @@ export const CartScreen = () => {
             // separately via prioritySurcharge so the backend can fold it into the
             // stored deliveryPrice while keeping zone/tier validation intact.
             const apiDeliveryPrice = deliveryPrice;
-            const order = await createOrder(selectedLocation, apiDeliveryPrice, finalTotal, promoResult?.code, driverNotes, prioritySurcharge);
+            const order = await createOrder(
+                selectedLocation,
+                apiDeliveryPrice,
+                finalTotal,
+                promoResult?.promotionId ?? null,
+                driverNotes,
+                prioritySurcharge,
+            );
             const orderId = order?.id || null;
             
             console.log('[CartScreen] Order created:', orderId);
@@ -1236,6 +1249,7 @@ export const CartScreen = () => {
                         </View>
 
                         {/* Promo Code */}
+                        {!hasEligiblePromotion && (
                         <View
                             className="rounded-2xl border p-4 mb-4"
                             style={{
@@ -1347,6 +1361,7 @@ export const CartScreen = () => {
                                 </View>
                             )}
                         </View>
+                        )}
 
                         {/* Driver Notes */}
                         <View className="rounded-2xl border p-4 mb-4" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>

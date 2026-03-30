@@ -16,7 +16,7 @@ export function useCreateOrder() {
         location: { latitude: number; longitude: number; address: string } | null,
         deliveryPrice: number,
         totalPrice: number,
-        promoCode?: string | null,
+        promotionId?: string | null,
         driverNotes?: string | null,
         prioritySurcharge?: number,
     ) => {
@@ -65,7 +65,7 @@ export function useCreateOrder() {
                         deliveryPrice,
                         totalPrice,
                         prioritySurcharge: prioritySurcharge ?? 0,
-                        promoCode: promoCode || null,
+                        promotionId: promotionId || null,
                         driverNotes: driverNotes || null,
                     },
                 },

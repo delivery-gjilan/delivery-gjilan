@@ -613,7 +613,7 @@ export default function MapPage() {
   const [adminCancelOrder, { loading: cancellingOrder }] = useMutation(ADMIN_CANCEL_ORDER, { refetchQueries: ['GetOrders'] });
   const [approveOrder] = useMutation(APPROVE_ORDER, { fetchPolicy: 'no-cache' });
   const [setOrderAdminNote] = useMutation(SET_ORDER_ADMIN_NOTE);
-  const { data: settlementRulesData } = useQuery(MAP_GET_SETTLEMENT_RULES, { variables: { filter: { entityType: 'BUSINESS' } }, fetchPolicy: 'cache-and-network' });
+  const { data: settlementRulesData } = useQuery(MAP_GET_SETTLEMENT_RULES, { variables: { filter: { entityTypes: ['BUSINESS'] } }, fetchPolicy: 'cache-and-network' });
   const settlementRules: MapSettlementRule[] = useMemo(() => (settlementRulesData as any)?.settlementRules || [], [settlementRulesData]);
   const cancelModalOrder = useMemo(() => cancelModalOrderId ? activeOrders.find((o: any) => o.id === cancelModalOrderId) ?? null : null, [cancelModalOrderId, activeOrders]);
   // Driver chat

@@ -8,7 +8,6 @@ export const GET_ORDERS = graphql(`
             orderPrice
             deliveryPrice
             originalPrice
-            originalDeliveryPrice
             totalPrice
             orderDate
             updatedAt
@@ -53,7 +52,6 @@ export const GET_ORDERS = graphql(`
                     name
                     imageUrl
                     quantity
-                    basePrice
                     unitPrice
                 }
             }
@@ -69,7 +67,6 @@ export const GET_ORDER = graphql(`
             orderPrice
             deliveryPrice
             originalPrice
-            originalDeliveryPrice
             totalPrice
             orderDate
             updatedAt
@@ -110,7 +107,6 @@ export const GET_ORDER = graphql(`
                     name
                     imageUrl
                     quantity
-                    basePrice
                     unitPrice
                 }
             }
@@ -126,7 +122,6 @@ export const GET_ORDERS_BY_STATUS = graphql(`
             orderPrice
             deliveryPrice
             originalPrice
-            originalDeliveryPrice
             totalPrice
             orderDate
             status
@@ -153,7 +148,6 @@ export const GET_ORDERS_BY_STATUS = graphql(`
                     name
                     imageUrl
                     quantity
-                    basePrice
                     unitPrice
                 }
             }

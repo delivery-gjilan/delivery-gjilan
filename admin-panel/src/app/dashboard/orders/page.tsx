@@ -354,7 +354,7 @@ export default function OrdersPage() {
     const [cancelSettleBusiness, setCancelSettleBusiness] = useState<boolean>(false);
 
     const { data: settlementRulesData } = useQuery(GET_BUSINESS_SETTLEMENT_RULES, {
-        variables: { filter: { entityType: 'BUSINESS' } },
+        variables: { filter: { entityTypes: ['BUSINESS'] } },
         fetchPolicy: 'cache-and-network',
     });
 

@@ -22,6 +22,21 @@ export const VALIDATE_PROMOTIONS = graphql(`
     }
 `);
 
+export const GET_APPLICABLE_PROMOTIONS = graphql(`
+    query GetApplicablePromotions($cart: CartContextInput!, $manualCode: String) {
+        getApplicablePromotions(cart: $cart, manualCode: $manualCode) {
+            id
+            name
+            code
+            type
+            target
+            appliedAmount
+            freeDelivery
+            priority
+        }
+    }
+`);
+
 export const GET_PROMOTION_THRESHOLDS = graphql(`
     query GetPromotionThresholds($cart: CartContextInput!) {
         getPromotionThresholds(cart: $cart) {

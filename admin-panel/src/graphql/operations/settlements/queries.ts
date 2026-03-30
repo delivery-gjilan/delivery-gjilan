@@ -42,9 +42,6 @@ export const GET_SETTLEMENTS_PAGE = graphql(`
                 displayId
                 orderDate
                 status
-                basePrice
-                markupPrice
-                actualPrice
                 deliveryPrice
                 totalPrice
                 businesses {

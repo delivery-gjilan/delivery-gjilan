@@ -35,7 +35,6 @@ export const GET_MY_BUSINESS_SETTLEMENTS = gql`
                 orderPrice
                 deliveryPrice
                 originalPrice
-                originalDeliveryPrice
                 totalPrice
                 orderDate
                 status
@@ -54,7 +53,6 @@ export const GET_MY_BUSINESS_SETTLEMENTS = gql`
                         name
                         quantity
                         unitPrice
-                        basePrice
                         notes
                         selectedOptions {
                             optionGroupName
