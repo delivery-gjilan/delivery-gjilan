@@ -62,6 +62,7 @@ type Zone = {
   deliveryFee: number;
   sortOrder: number;
   isActive: boolean;
+  isServiceZone: boolean;
 };
 
 type EditingZone = {
@@ -70,6 +71,7 @@ type EditingZone = {
   deliveryFee: string;
   polygon: PolygonPoint[];
   isActive: boolean;
+  isServiceZone: boolean;
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -135,6 +137,7 @@ export default function DeliveryZonesPage() {
           deliveryFee: z.deliveryFee,
           sortOrder: z.sortOrder,
           isActive: z.isActive,
+          isServiceZone: z.isServiceZone ?? false,
         }))
       );
     }
@@ -288,6 +291,7 @@ export default function DeliveryZonesPage() {
       deliveryFee: "",
       polygon: [],
       isActive: true,
+      isServiceZone: false,
     });
     clearDraw();
   };
@@ -299,6 +303,7 @@ export default function DeliveryZonesPage() {
       deliveryFee: String(zone.deliveryFee),
       polygon: zone.polygon,
       isActive: zone.isActive,
+      isServiceZone: zone.isServiceZone,
     });
     loadPolygonIntoDraw(zone.polygon);
 
@@ -348,6 +353,7 @@ export default function DeliveryZonesPage() {
               deliveryFee: fee,
               polygon: editing.polygon.map((p) => ({ lat: p.lat, lng: p.lng })),
               isActive: editing.isActive,
+              isServiceZone: editing.isServiceZone,
             },
           },
         });
@@ -361,6 +367,7 @@ export default function DeliveryZonesPage() {
               deliveryFee: fee,
               polygon: editing.polygon.map((p) => ({ lat: p.lat, lng: p.lng })),
               isActive: editing.isActive,
+              isServiceZone: editing.isServiceZone,
             },
           },
         });
@@ -620,6 +627,28 @@ export default function DeliveryZonesPage() {
                   </button>
                 </div>
 
+                {/* Service zone toggle */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-sm text-zinc-300">Delivery Service Zone</span>
+                    <p className="text-xs text-zinc-500 mt-0.5">Orders are treated as in-zone only when inside this zone.</p>
+                  </div>
+                  <button
+                    onClick={() =>
+                      setEditing({ ...editing, isServiceZone: !editing.isServiceZone })
+                    }
+                    className={`relative w-11 h-6 rounded-full transition-colors ${
+                      editing.isServiceZone ? "bg-emerald-600" : "bg-zinc-700"
+                    }`}
+                  >
+                    <div
+                      className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
+                        editing.isServiceZone ? "translate-x-[22px]" : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
+                </div>
+
                 {/* Polygon drawing */}
                 <div className="border-t border-zinc-800 pt-4">
                   <label className="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2 block">
@@ -746,6 +775,11 @@ export default function DeliveryZonesPage() {
                                 €{zone.deliveryFee.toFixed(2)} •{" "}
                                 {zone.polygon.length} points
                               </p>
+                              {zone.isServiceZone && (
+                                <span className="inline-flex mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                  Service Zone
+                                </span>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

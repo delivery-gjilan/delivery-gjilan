@@ -393,6 +393,7 @@ export type CreateDeliveryPricingTierInput = {
 export type CreateDeliveryZoneInput = {
   deliveryFee: Scalars['Float']['input'];
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  isServiceZone?: InputMaybe<Scalars['Boolean']['input']>;
   name: Scalars['String']['input'];
   polygon: Array<PolygonPointInput>;
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
@@ -567,6 +568,7 @@ export type DeliveryZone = {
   deliveryFee: Scalars['Float']['output'];
   id: Scalars['ID']['output'];
   isActive: Scalars['Boolean']['output'];
+  isServiceZone: Scalars['Boolean']['output'];
   name: Scalars['String']['output'];
   polygon: Array<PolygonPoint>;
   sortOrder: Scalars['Int']['output'];
@@ -855,6 +857,7 @@ export type Mutation = {
   adminUpdateDriverLocation: User;
   /** Admin mutation to update per-driver settings (commission %, max active orders, vehicle ownership) */
   adminUpdateDriverSettings: User;
+  approveOrder: Order;
   assignDriverToOrder: Order;
   assignPromotionToUsers: Array<UserPromotion>;
   backfillSettlementsForDeliveredOrders: Scalars['Int']['output'];
@@ -1041,6 +1044,11 @@ export type MutationadminUpdateDriverSettingsArgs = {
   driverId: Scalars['ID']['input'];
   hasOwnVehicle?: InputMaybe<Scalars['Boolean']['input']>;
   maxActiveOrders?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type MutationapproveOrderArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -1711,6 +1719,8 @@ export type Order = {
   dropOffLocation: Location;
   estimatedReadyAt?: Maybe<Scalars['Date']['output']>;
   id: Scalars['ID']['output'];
+  locationFlagged: Scalars['Boolean']['output'];
+  needsApproval: Scalars['Boolean']['output'];
   orderDate: Scalars['Date']['output'];
   orderPrice: Scalars['Float']['output'];
   orderPromotions?: Maybe<Array<OrderPromotion>>;
@@ -1785,6 +1795,7 @@ export type OrderPromotion = {
 };
 
 export type OrderStatus =
+  | 'AWAITING_APPROVAL'
   | 'CANCELLED'
   | 'DELIVERED'
   | 'OUT_FOR_DELIVERY'
@@ -2828,6 +2839,7 @@ export type UpdateDeliveryPricingTierInput = {
 export type UpdateDeliveryZoneInput = {
   deliveryFee?: InputMaybe<Scalars['Float']['input']>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  isServiceZone?: InputMaybe<Scalars['Boolean']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   polygon?: InputMaybe<Array<PolygonPointInput>>;
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
@@ -3223,7 +3235,7 @@ export type ResolversTypes = {
   OrderItemOption: ResolverTypeWrapper<OrderItemOption>;
   OrderPaymentCollection: ResolverTypeWrapper<'CASH_TO_DRIVER' | 'PREPAID_TO_PLATFORM'>;
   OrderPromotion: ResolverTypeWrapper<Omit<OrderPromotion, 'appliesTo'> & { appliesTo: ResolversTypes['PromotionAppliesTo'] }>;
-  OrderStatus: ResolverTypeWrapper<'PENDING' | 'PREPARING' | 'READY' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED'>;
+  OrderStatus: ResolverTypeWrapper<'PENDING' | 'PREPARING' | 'READY' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED' | 'AWAITING_APPROVAL'>;
   PeakHourAnalysis: ResolverTypeWrapper<PeakHourAnalysis>;
   PolygonPoint: ResolverTypeWrapper<PolygonPoint>;
   PolygonPointInput: PolygonPointInput;
@@ -3723,6 +3735,7 @@ export type DeliveryZoneResolvers<ContextType = GraphQLContext, ParentType exten
   deliveryFee?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   isActive?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  isServiceZone?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   polygon?: Resolver<Array<ResolversTypes['PolygonPoint']>, ParentType, ContextType>;
   sortOrder?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
@@ -3900,6 +3913,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   adminSimulateDriverHeartbeat?: Resolver<ResolversTypes['DriverHeartbeatResult'], ParentType, ContextType, RequireFields<MutationadminSimulateDriverHeartbeatArgs, 'driverId' | 'latitude' | 'longitude'>>;
   adminUpdateDriverLocation?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationadminUpdateDriverLocationArgs, 'driverId' | 'latitude' | 'longitude'>>;
   adminUpdateDriverSettings?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationadminUpdateDriverSettingsArgs, 'driverId'>>;
+  approveOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationapproveOrderArgs, 'id'>>;
   assignDriverToOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationassignDriverToOrderArgs, 'id'>>;
   assignPromotionToUsers?: Resolver<Array<ResolversTypes['UserPromotion']>, ParentType, ContextType, RequireFields<MutationassignPromotionToUsersArgs, 'input'>>;
   backfillSettlementsForDeliveredOrders?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
@@ -4101,6 +4115,8 @@ export type OrderResolvers<ContextType = GraphQLContext, ParentType extends Reso
   dropOffLocation?: Resolver<ResolversTypes['Location'], ParentType, ContextType>;
   estimatedReadyAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  locationFlagged?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  needsApproval?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   orderDate?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
   orderPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   orderPromotions?: Resolver<Maybe<Array<ResolversTypes['OrderPromotion']>>, ParentType, ContextType>;
@@ -4173,7 +4189,7 @@ export type OrderPromotionResolvers<ContextType = GraphQLContext, ParentType ext
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
-export type OrderStatusResolvers = EnumResolverSignature<{ CANCELLED?: any, DELIVERED?: any, OUT_FOR_DELIVERY?: any, PENDING?: any, PREPARING?: any, READY?: any }, ResolversTypes['OrderStatus']>;
+export type OrderStatusResolvers = EnumResolverSignature<{ AWAITING_APPROVAL?: any, CANCELLED?: any, DELIVERED?: any, OUT_FOR_DELIVERY?: any, PENDING?: any, PREPARING?: any, READY?: any }, ResolversTypes['OrderStatus']>;
 
 export type PeakHourAnalysisResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PeakHourAnalysis'] = ResolversParentTypes['PeakHourAnalysis']> = {
   byDayOfWeek?: Resolver<Array<ResolversTypes['DayOfWeekDistribution']>, ParentType, ContextType>;

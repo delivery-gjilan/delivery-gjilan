@@ -1,11 +1,11 @@
 import { relations, sql } from 'drizzle-orm';
-import { pgTable, varchar, numeric, timestamp, uuid, pgEnum, doublePrecision, integer, index, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, varchar, numeric, timestamp, uuid, pgEnum, doublePrecision, integer, boolean, index, uniqueIndex } from 'drizzle-orm/pg-core';
 import { orderItems } from './orderItems';
 import { OrderStatus } from '@/generated/types.generated';
 import { users } from './users';
 import { orderPromotions } from './orderPromotions';
 
-const orderStatusValues = ['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'] as const;
+const orderStatusValues = ['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED', 'AWAITING_APPROVAL'] as const;
 [...orderStatusValues] satisfies OrderStatus[];
 export const orderStatus = pgEnum('order_status', orderStatusValues);
 
@@ -28,6 +28,7 @@ export const orders = pgTable('orders', {
     dropoffLat: doublePrecision('dropoff_lat').notNull(),
     dropoffLng: doublePrecision('dropoff_lng').notNull(),
     dropoffAddress: varchar('dropoff_address', { length: 500 }).notNull(),
+    locationFlagged: boolean('location_flagged').default(false).notNull(),
     driverNotes: varchar('driver_notes', { length: 500 }),
     cancellationReason: varchar('cancellation_reason', { length: 500 }),
     adminNote: varchar('admin_note', { length: 2000 }),

@@ -5,6 +5,7 @@ enum OrderStatus {
     OUT_FOR_DELIVERY
     DELIVERED
     CANCELLED
+    AWAITING_APPROVAL
 }
 
 enum OrderPaymentCollection {
@@ -103,6 +104,8 @@ type Order {
     pickupLocations: [Location!]!
     driverNotes: String
     adminNote: String
+    needsApproval: Boolean!
+    locationFlagged: Boolean!
     businesses: [OrderBusiness!]!
     orderPromotions: [OrderPromotion!]
 }
@@ -124,6 +127,7 @@ type Mutation {
     cancelOrder(id: ID!): Order!
     adminCancelOrder(id: ID!, reason: String!, settleDriver: Boolean, settleBusiness: Boolean): Order!
     setOrderAdminNote(id: ID!, note: String): Order!
+    approveOrder(id: ID!): Order!
     createOrder(input: CreateOrderInput!): Order!
     createTestOrder: Order!
 }

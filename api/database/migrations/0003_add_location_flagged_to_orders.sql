@@ -1,0 +1,1 @@
+ALTER TABLE "orders" ADD COLUMN "location_flagged" boolean DEFAULT false NOT NULL;

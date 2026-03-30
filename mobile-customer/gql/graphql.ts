@@ -853,6 +853,12 @@ export type Mutation = {
   /** Admin mutation to manually set connection status (for testing/recovery) */
   adminSetDriverConnectionStatus: User;
   /**
+   * Admin mutation to set which drivers are on the current shift.
+   * Only on-shift drivers will receive new-order dispatch notifications.
+   * Pass an empty list to clear the shift restriction (all eligible drivers receive notifications).
+   */
+  adminSetShiftDrivers: Scalars['Boolean']['output'];
+  /**
    * Admin simulation heartbeat — wraps processHeartbeat for SUPER_ADMIN.
    * Triggers the full heartbeat pipeline (ETA cache, Live Activity, subscriptions).
    * Non-production only.
@@ -954,6 +960,7 @@ export type Mutation = {
   setDefaultAddress: Scalars['Boolean']['output'];
   setDeliveryPricingTiers: Array<DeliveryPricingTier>;
   setMyPreferredLanguage: User;
+  setOrderAdminNote: Order;
   setUserPermissions: User;
   /** Settle all unsettled settlements for a business. Supports partial payment. */
   settleWithBusiness: SettleResult;
@@ -1015,6 +1022,11 @@ export type MutationAdminSendPttSignalArgs = {
 export type MutationAdminSetDriverConnectionStatusArgs = {
   driverId: Scalars['ID']['input'];
   status: DriverConnectionStatus;
+};
+
+
+export type MutationAdminSetShiftDriversArgs = {
+  driverIds: Array<Scalars['ID']['input']>;
 };
 
 
@@ -1427,6 +1439,12 @@ export type MutationSetMyPreferredLanguageArgs = {
 };
 
 
+export type MutationSetOrderAdminNoteArgs = {
+  id: Scalars['ID']['input'];
+  note?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type MutationSetUserPermissionsArgs = {
   permissions: Array<UserPermission>;
   userId: Scalars['ID']['input'];
@@ -1692,6 +1710,7 @@ export type OptionGroup = {
 
 export type Order = {
   __typename?: 'Order';
+  adminNote?: Maybe<Scalars['String']['output']>;
   businesses: Array<OrderBusiness>;
   cancellationReason?: Maybe<Scalars['String']['output']>;
   cancelledAt?: Maybe<Scalars['Date']['output']>;
@@ -3509,6 +3528,11 @@ export type GenerateReferralCodeMutationVariables = Exact<{ [key: string]: never
 
 export type GenerateReferralCodeMutation = { __typename?: 'Mutation', generateReferralCode: string };
 
+export type GetServiceZonesQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetServiceZonesQuery = { __typename?: 'Query', deliveryZones: Array<{ __typename?: 'DeliveryZone', id: string, name: string, isActive: boolean, polygon: Array<{ __typename?: 'PolygonPoint', lat: number, lng: number }> }> };
+
 export type GetStoreStatusQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -3587,5 +3611,6 @@ export const GetPromotionThresholdsDocument = {"kind":"Document","definitions":[
 export const GetActiveGlobalPromotionsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetActiveGlobalPromotions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getActiveGlobalPromotions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"target"}},{"kind":"Field","name":{"kind":"Name","value":"discountValue"}},{"kind":"Field","name":{"kind":"Name","value":"spendThreshold"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}}]}}]}}]} as unknown as DocumentNode<GetActiveGlobalPromotionsQuery, GetActiveGlobalPromotionsQueryVariables>;
 export const GetMyReferralStatsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetMyReferralStats"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"myReferralStats"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"totalReferrals"}},{"kind":"Field","name":{"kind":"Name","value":"completedReferrals"}},{"kind":"Field","name":{"kind":"Name","value":"pendingReferrals"}},{"kind":"Field","name":{"kind":"Name","value":"totalRewardsEarned"}},{"kind":"Field","name":{"kind":"Name","value":"referralCode"}},{"kind":"Field","name":{"kind":"Name","value":"referrals"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"rewardGiven"}},{"kind":"Field","name":{"kind":"Name","value":"rewardAmount"}},{"kind":"Field","name":{"kind":"Name","value":"completedAt"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"referredUser"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetMyReferralStatsQuery, GetMyReferralStatsQueryVariables>;
 export const GenerateReferralCodeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"GenerateReferralCode"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"generateReferralCode"}}]}}]} as unknown as DocumentNode<GenerateReferralCodeMutation, GenerateReferralCodeMutationVariables>;
+export const GetServiceZonesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetServiceZones"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryZones"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"polygon"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"lat"}},{"kind":"Field","name":{"kind":"Name","value":"lng"}}]}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}}]}}]}}]} as unknown as DocumentNode<GetServiceZonesQuery, GetServiceZonesQueryVariables>;
 export const GetStoreStatusDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetStoreStatus"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getStoreStatus"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"isStoreClosed"}},{"kind":"Field","name":{"kind":"Name","value":"closedMessage"}},{"kind":"Field","name":{"kind":"Name","value":"bannerEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"bannerMessage"}},{"kind":"Field","name":{"kind":"Name","value":"bannerType"}}]}}]}}]} as unknown as DocumentNode<GetStoreStatusQuery, GetStoreStatusQueryVariables>;
 export const StoreStatusUpdatedDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"subscription","name":{"kind":"Name","value":"StoreStatusUpdated"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"storeStatusUpdated"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"isStoreClosed"}},{"kind":"Field","name":{"kind":"Name","value":"closedMessage"}},{"kind":"Field","name":{"kind":"Name","value":"bannerEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"bannerMessage"}},{"kind":"Field","name":{"kind":"Name","value":"bannerType"}}]}}]}}]} as unknown as DocumentNode<StoreStatusUpdatedSubscription, StoreStatusUpdatedSubscriptionVariables>;

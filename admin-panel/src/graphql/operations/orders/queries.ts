@@ -20,15 +20,9 @@ export const GET_ORDERS = graphql(`
             cancellationReason
             adminNote
             driverNotes
+            needsApproval
+            locationFlagged
             user {
-                id
-                firstName
-                lastName
-                email
-                address
-                phoneNumber
-            }
-            driver {
                 id
                 firstName
                 lastName
@@ -84,12 +78,13 @@ export const GET_ORDER = graphql(`
             cancellationReason
             adminNote
             driverNotes
+            needsApproval
+            locationFlagged
             user {
                 id
                 firstName
                 lastName
                 email
-                address
                 phoneNumber
             }
             dropOffLocation {

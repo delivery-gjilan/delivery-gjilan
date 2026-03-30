@@ -9,7 +9,7 @@ import Dropdown from "@/components/ui/Dropdown";
 import Input from "@/components/ui/Input";
 import { useOrders, useUpdateOrderStatus } from "@/lib/hooks/useOrders";
 import { useAuth } from "@/lib/auth-context";
-import { ASSIGN_DRIVER_TO_ORDER, CREATE_TEST_ORDER, START_PREPARING, UPDATE_PREPARATION_TIME, ADMIN_CANCEL_ORDER } from "@/graphql/operations/orders";
+import { ASSIGN_DRIVER_TO_ORDER, CREATE_TEST_ORDER, START_PREPARING, UPDATE_PREPARATION_TIME, ADMIN_CANCEL_ORDER, APPROVE_ORDER } from "@/graphql/operations/orders";
 import { GRANT_FREE_DELIVERY } from "@/graphql/operations/promotions/mutations";
 import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
 import { Package, Store, Search, ArrowRight, Eye, EyeOff, MapPin, User, Plus, ChefHat, Timer, Copy, Check, Phone, Hash, MessageSquare } from "lucide-react";
@@ -19,7 +19,7 @@ import { toast } from 'sonner';
    TYPES
 --------------------------------------------------------- */
 
-type OrderStatus = "PENDING" | "PREPARING" | "READY" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED";
+type OrderStatus = "AWAITING_APPROVAL" | "PENDING" | "PREPARING" | "READY" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED";
 type CompletedStatusFilter = "ALL" | "DELIVERED" | "CANCELLED";
 
 interface OrderItem {
@@ -81,6 +81,8 @@ interface Order {
     cancellationReason?: string | null;
     cancelledAt?: string | null;
     adminNote?: string | null;
+    needsApproval?: boolean | null;
+    locationFlagged?: boolean | null;
 }
 
 function parseAdminNote(adminNote?: string | null): { tag: string; note: string } | null {
@@ -239,6 +241,7 @@ const computeOrderEarnings = (order: Order, rules: BusinessSettlementRule[]): Or
 --------------------------------------------------------- */
 
 const STATUS_COLORS: Record<OrderStatus, { bg: string; text: string; border: string; dot: string }> = {
+    AWAITING_APPROVAL: { bg: "bg-rose-500/10", text: "text-rose-400", border: "border-rose-500/30", dot: "bg-rose-400" },
     PENDING: { bg: "bg-amber-500/10", text: "text-amber-400", border: "border-amber-500/30", dot: "bg-amber-400" },
     PREPARING: { bg: "bg-violet-500/10", text: "text-violet-400", border: "border-violet-500/30", dot: "bg-violet-400" },
     READY: { bg: "bg-blue-500/10", text: "text-blue-400", border: "border-blue-500/30", dot: "bg-blue-400" },
@@ -248,6 +251,7 @@ const STATUS_COLORS: Record<OrderStatus, { bg: string; text: string; border: str
 };
 
 const STATUS_FLOW: Record<OrderStatus, OrderStatus | null> = {
+    AWAITING_APPROVAL: null,
     PENDING: "PREPARING",
     PREPARING: "READY",
     READY: "OUT_FOR_DELIVERY",
@@ -257,6 +261,7 @@ const STATUS_FLOW: Record<OrderStatus, OrderStatus | null> = {
 };
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
+    AWAITING_APPROVAL: "Awaiting Approval",
     PENDING: "Pending",
     PREPARING: "Preparing",
     READY: "Ready",
@@ -329,6 +334,7 @@ export default function OrdersPage() {
     const [startPreparingMut, { loading: startPreparingLoading }] = useMutation(START_PREPARING, { refetchQueries: ['GetOrders'] });
     const [updatePrepTimeMut] = useMutation(UPDATE_PREPARATION_TIME, { refetchQueries: ['GetOrders'] });
     const [adminCancelOrderMut, { loading: cancellingOrder }] = useMutation(ADMIN_CANCEL_ORDER, { refetchQueries: ['GetOrders'] });
+    const [approveOrderMut, { loading: approvingOrder }] = useMutation(APPROVE_ORDER, { refetchQueries: ['GetOrders'] });
     const [grantFreeDeliveryMut, { loading: grantingFreeDelivery }] = useMutation(GRANT_FREE_DELIVERY);
 
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -394,7 +400,13 @@ export default function OrdersPage() {
     }, [normalizedOrders, searchQuery]);
 
     const activeOrders = useMemo(() =>
-        filteredOrders.filter(o => o.status !== 'DELIVERED' && o.status !== 'CANCELLED'),
+        filteredOrders
+            .filter(o => o.status !== 'DELIVERED' && o.status !== 'CANCELLED')
+            .sort((a, b) => {
+                if (a.status === 'AWAITING_APPROVAL' && b.status !== 'AWAITING_APPROVAL') return -1;
+                if (a.status !== 'AWAITING_APPROVAL' && b.status === 'AWAITING_APPROVAL') return 1;
+                return 0;
+            }),
         [filteredOrders]
     );
 
@@ -684,6 +696,21 @@ export default function OrdersPage() {
                                             </div>
                                         )}
 
+                                        {/* Needs approval banner */}
+                                        {order.needsApproval && (
+                                            <div className="mb-3 flex items-center gap-2 bg-rose-500/10 border border-rose-500/30 rounded-lg px-3 py-2">
+                                                <span className="text-rose-400 text-xs font-semibold">⚠ Awaiting approval — call customer before approving</span>
+                                            </div>
+                                        )}
+
+                                        {/* Out of zone badge */}
+                                        {order.locationFlagged && (
+                                            <div className="mb-3 flex items-center gap-2 bg-orange-500/10 border border-orange-500/30 rounded-lg px-3 py-2">
+                                                <MapPin size={13} className="text-orange-400 flex-shrink-0" />
+                                                <span className="text-orange-400 text-xs font-semibold">Outside delivery zone</span>
+                                            </div>
+                                        )}
+
                                         {/* Prep time */}
                                         {order.status === "PREPARING" && order.preparationMinutes && (
                                             <div className="mb-3 flex items-center justify-between bg-violet-500/10 border border-violet-500/20 rounded-lg px-3 py-2">
@@ -742,6 +769,22 @@ export default function OrdersPage() {
                                                 )}
                                             </div>
                                             <div className="flex items-center gap-2">
+                                                {order.needsApproval && isAdmin && (
+                                                    <button
+                                                        onClick={async () => {
+                                                            try {
+                                                                await approveOrderMut({ variables: { id: order.id } });
+                                                                toast.success('Order approved — moving to Pending');
+                                                            } catch (err: any) {
+                                                                toast.error(err.message || 'Failed to approve order');
+                                                            }
+                                                        }}
+                                                        disabled={approvingOrder}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap border transition-all disabled:opacity-50 bg-green-500/10 text-green-400 border-green-500/30 hover:brightness-125"
+                                                    >
+                                                        ✓ Approve
+                                                    </button>
+                                                )}
                                                 {nextStatus && (() => {
                                                     const c = STATUS_COLORS[nextStatus];
                                                     return (
@@ -1058,6 +1101,39 @@ export default function OrdersPage() {
                                     <MessageSquare size={14} className="text-blue-400 mt-0.5 flex-shrink-0" />
                                     <span className="text-blue-200 text-sm">{selectedOrder.driverNotes}</span>
                                 </div>
+                            </div>
+                        )}
+
+                        {/* Needs approval */}
+                        {selectedOrder.needsApproval && (
+                            <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3">
+                                <div className="text-[10px] text-rose-400 uppercase tracking-wider mb-1.5 font-semibold">Awaiting Approval</div>
+                                <p className="text-rose-200 text-sm">This order requires manual approval. Call the customer to verify, then click Approve.</p>
+                                {isAdmin && (
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                await approveOrderMut({ variables: { id: selectedOrder.id } });
+                                                toast.success('Order approved — moving to Pending');
+                                                setDetailsOpen(false);
+                                            } catch (err: any) {
+                                                toast.error(err.message || 'Failed to approve order');
+                                            }
+                                        }}
+                                        disabled={approvingOrder}
+                                        className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border bg-green-500/10 text-green-400 border-green-500/30 hover:brightness-125 disabled:opacity-50"
+                                    >
+                                        ✓ Approve Order
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Location flagged */}
+                        {selectedOrder.locationFlagged && (
+                            <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-3">
+                                <div className="text-[10px] text-orange-400 uppercase tracking-wider mb-1.5 font-semibold">Outside Delivery Zone</div>
+                                <p className="text-orange-200 text-sm">The drop-off location is outside all active delivery zones. Confirm with the customer before dispatching.</p>
                             </div>
                         )}
 

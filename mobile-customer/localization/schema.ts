@@ -156,6 +156,10 @@ export const translationSchema = z.object(
                 weekly_menu: s(),
                 weekly_menu_sub: s(),
             }),
+            out_of_zone: z.object({
+                title: s(),
+                message: s(),
+            }),
         }),
         restaurants: z.object({
             title: s(),

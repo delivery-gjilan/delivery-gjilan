@@ -150,6 +150,10 @@
             "healthy_food_sub": "Porosit tani me zbritje",
             "weekly_menu": "Menu e re javore",
             "weekly_menu_sub": "Shijo shijet e reja"
+        },
+        "out_of_zone": {
+            "title": "Jashtë Zonës së Dorëzimit",
+            "message": "Vendndodhja juaj është jashtë zonës sonë të dorëzimit. Ju lutemi zgjidhni një adresë brenda zonës."
         }
     },
     "restaurants": {

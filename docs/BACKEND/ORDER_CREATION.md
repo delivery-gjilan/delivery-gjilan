@@ -1,6 +1,6 @@
 # Order Creation
 
-<!-- MDS:B2 | Domain: Backend | Updated: 2026-03-18 -->
+<!-- MDS:B2 | Domain: Backend | Updated: 2026-03-30 -->
 <!-- Depends-On: B1, B3, B6, BL1 -->
 <!-- Depended-By: M4, BL3, O8 -->
 <!-- Nav: Payment collection changes → update BL1 (Settlements), M4 (Mobile Audit). Preflight changes → update O8 (Testing). Pricing logic → update B3 (Validation). -->
@@ -12,19 +12,97 @@ This page documents the current backend order creation behavior in `api/src/serv
 `createOrder(userId, input)` performs these steps:
 
 1. Validate user exists and has `signupStep = COMPLETED`.
-2. Load products and validate availability.
-3. Validate selected options and offer child-item linking.
-4. Recalculate item totals from DB snapshots (client price is not trusted).
-5. Validate business restrictions:
+2. Resolve service coverage using delivery zones and compute outside-zone flag.
+3. Load products and validate availability.
+4. Validate selected options and offer child-item linking.
+5. Recalculate item totals from DB snapshots (client price is not trusted).
+6. Validate business restrictions:
    - max one restaurant per order
    - all involved businesses must be open now
-6. Validate delivery fee using server-calculated pricing.
-7. Apply promotions server-side (`PromotionEngine`).
-8. Validate provided `totalPrice` against effective/allowed totals.
-9. Persist order + top-level items in transaction.
-10. Persist item options + child offer items.
-11. Persist promotion usage and `order_promotions` rows.
-12. Return mapped GraphQL `Order` including `paymentCollection`.
+7. Validate delivery fee using server-calculated pricing.
+8. Apply promotions server-side (`PromotionEngine`).
+9. Validate provided `totalPrice` against effective/allowed totals.
+10. **Determine approval requirement** (see below).
+11. Persist order + top-level items in transaction.
+12. Persist item options + child offer items.
+13. Persist promotion usage and `order_promotions` rows.
+14. Return mapped GraphQL `Order` including `paymentCollection`.
+
+## Service Coverage and Location Flagging
+
+Order creation does not hard-reject addresses outside configured service coverage.
+
+- `OrderService.createOrder` computes `locationFlagged` when drop-off is outside service coverage.
+- Service coverage resolution uses this priority:
+   1. active zones where `isServiceZone = true`
+   2. fallback to all active zones when no service zones are marked
+- `Order.locationFlagged: Boolean!` is returned to admin clients.
+
+This allows operations to review and manually handle edge deliveries while keeping the order in flow.
+
+## Pre-Approval Flow (`AWAITING_APPROVAL`)
+
+Certain orders land in `AWAITING_APPROVAL` status instead of `PENDING` and must be manually approved by an admin before the restaurant and driver flow starts.
+
+**Triggers:**
+- First-time order for the user (no previous orders in DB).
+- Order total > €20.
+
+**Lifecycle:**
+```
+AWAITING_APPROVAL  →  PENDING  →  PREPARING  →  READY  →  OUT_FOR_DELIVERY  →  DELIVERED
+                   ↓
+               CANCELLED
+```
+
+**Backend behavior:**
+- `OrderService.createOrder` queries `orders.userId` with `LIMIT 1` to detect first order.
+- `requiresApproval = isFirstOrder || totalOrderPrice > 20`
+- Status is set to `AWAITING_APPROVAL` when `requiresApproval` is true.
+- `Order.needsApproval: Boolean!` field returns `true` when status is `AWAITING_APPROVAL`.
+
+**Notifications:**
+- Both `notifyAdminsNewOrder` and `notifyAdminsOrderNeedsApproval` are sent.
+- The approval notification has `timeSensitive: true`, `relevanceScore: 1.0`, title `"⚠ Order Needs Approval"`.
+- Business new-order push is deferred for approval-required orders and sent only after admin approval.
+
+**Admin approval:**
+- `approveOrder(id: ID!): Order!` mutation (admin-only).
+- Transitions `AWAITING_APPROVAL → PENDING` via `updateOrderStatus` (skip-validation mode).
+- Publishes to `userOrdersUpdated` and `allOrdersUpdated` subscriptions.
+- Sends business intake push (`notifyBusinessNewOrder`) after successful approval transition.
+- Logged as `ORDER_STATUS_CHANGED` audit log with `{ from: 'AWAITING_APPROVAL', to: 'PENDING' }`.
+
+**Admin UI:**
+- Rose-colored badge "Needs approval" on order cards (table + map sidebar).
+- Call-to-verify banner with customer phone number in expanded order card.
+- "Approve" action on active order cards and "Approve Order" action in order detail panel.
+- Map right-side order detail panel includes "Approve and Send to Business" action.
+- `AWAITING_APPROVAL` included in `STATUS_COLORS` and `STATUS_LABELS` records.
+
+## Delivery Zone Admin Configuration
+
+Delivery zone management includes a dedicated service-zone toggle:
+
+- Admin can set `isServiceZone` on create/edit in Delivery Zones.
+- When a zone is marked as service zone, it is used for service-coverage checks.
+- Delivery fee computation still follows active zone match first, then distance tiers fallback.
+
+## Business Intake Visibility
+
+Business-facing order list queries hide `AWAITING_APPROVAL` orders.
+
+- `getOrdersByBusinessId` excludes `AWAITING_APPROVAL`.
+- `getOrdersByBusinessIdAndStatus('AWAITING_APPROVAL')` returns empty.
+
+Result: business users receive and see orders only after admin approval transitions them to `PENDING`.
+
+**Mobile customer:**
+- `AWAITING_APPROVAL` suppresses the out-of-zone modal (treated as active order in `useHasActiveOrder`).
+- Status label: "AWAITING APPROVAL" (EN) / "NË PRITJE PËR MIRATIM" (AL).
+- Status message: "Your order is pending confirmation — our team will call you shortly."
+
+
 
 ## Payment Collection Behavior
 

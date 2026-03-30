@@ -107,6 +107,16 @@ export const SET_ORDER_ADMIN_NOTE = graphql(`
     }
 `);
 
+export const APPROVE_ORDER = graphql(`
+    mutation ApproveOrder($id: ID!) {
+        approveOrder(id: $id) {
+            id
+            status
+            needsApproval
+        }
+    }
+`);
+
 export const CREATE_TEST_ORDER = graphql(`
     mutation CreateTestOrder {
         createTestOrder {

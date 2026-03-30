@@ -18,7 +18,7 @@ import {
     options as optionsDbTable,
 } from '@/database/schema';
 import { userPromoMetadata } from '@/database/schema';
-import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import type { Order, OrderBusiness, OrderItem, OrderStatus, CreateOrderInput, OrderPaymentCollection } from '@/generated/types.generated';
 import type { DbOrder } from '@/database/schema/orders';
 import { PubSub, publish, subscribe, topics } from '@/lib/pubsub';
@@ -529,6 +529,28 @@ export class OrderService {
             }
         }
 
+        // 4b. Determine if approval is required
+        const existingOrderCheck = await db
+            .select({ id: ordersTable.id })
+            .from(ordersTable)
+            .where(eq(ordersTable.userId, userId))
+            .limit(1);
+        const isFirstOrder = existingOrderCheck.length === 0;
+        const isHighValue = totalOrderPrice > 20;
+        const requiresApproval = isFirstOrder || isHighValue;
+
+        // 4c. Check if drop-off is outside service coverage (flag for admin)
+        // If dedicated service zones exist, use those; otherwise fall back to all active zones.
+        const allActiveZones = await db
+            .select()
+            .from(deliveryZonesTable)
+            .where(eq(deliveryZonesTable.isActive, true));
+        const activeServiceZones = allActiveZones.filter((z) => z.isServiceZone);
+        const effectiveServiceZones = activeServiceZones.length > 0 ? activeServiceZones : allActiveZones;
+        const dropoffPoint = { lat: input.dropOffLocation.latitude, lng: input.dropOffLocation.longitude };
+        const isInsideAnyZone = effectiveServiceZones.some((z) => isPointInPolygon(dropoffPoint, z.polygon));
+        const locationFlagged = !isInsideAnyZone;
+
         const orderData = {
             displayId: this.generateDisplayId(),
             price: effectiveOrderPrice,
@@ -545,7 +567,8 @@ export class OrderService {
                 Math.abs(expectedDeliveryPrice - effectiveDeliveryPrice) > 0.01
                     ? Number((expectedDeliveryPrice + prioritySurcharge).toFixed(2))
                     : undefined,
-            status: 'PENDING' as const,
+            status: (requiresApproval ? 'AWAITING_APPROVAL' : 'PENDING') as 'AWAITING_APPROVAL' | 'PENDING',
+            locationFlagged,
             dropoffLat: input.dropOffLocation.latitude,
             dropoffLng: input.dropOffLocation.longitude,
             dropoffAddress: input.dropOffLocation.address,
@@ -927,6 +950,8 @@ export class OrderService {
                 address: dbOrder.dropoffAddress,
             },
             driverNotes: dbOrder.driverNotes || undefined,
+            needsApproval: dbOrder.status === 'AWAITING_APPROVAL',
+            locationFlagged: (dbOrder as any).locationFlagged ?? false,
             businesses: businessOrderList,
         };
     }
@@ -993,6 +1018,7 @@ export class OrderService {
     // Allowing READY from PENDING here covers that path while still letting
     // restaurants use PENDING → PREPARING → READY as before.
     private static readonly VALID_TRANSITIONS: Record<string, OrderStatus[]> = {
+        AWAITING_APPROVAL: ['PENDING', 'CANCELLED'],
         PENDING: ['PREPARING', 'READY', 'CANCELLED'],
         PREPARING: ['READY', 'CANCELLED'],
         READY: ['OUT_FOR_DELIVERY', 'CANCELLED'],
@@ -1308,7 +1334,7 @@ export class OrderService {
 
             // Fetch only the matched orders
             const dbOrders = await db.query.orders.findMany({
-                where: inArray(ordersTable.id, orderIds),
+                where: and(inArray(ordersTable.id, orderIds), ne(ordersTable.status, 'AWAITING_APPROVAL')),
                 orderBy: (tbl, { desc }) => [desc(tbl.createdAt)],
             });
 
@@ -1321,6 +1347,10 @@ export class OrderService {
 
     async getOrdersByBusinessIdAndStatus(businessId: string, status: OrderStatus): Promise<Order[]> {
         try {
+            if (status === 'AWAITING_APPROVAL') {
+                return [];
+            }
+
             const db = await getDB();
             const orderIds = await db
                 .selectDistinct({ orderId: orderItemsTable.orderId })

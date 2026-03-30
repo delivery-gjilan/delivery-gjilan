@@ -16,7 +16,7 @@
 |----|------|--------|-------------|
 | A1 | [ARCHITECTURE.md](ARCHITECTURE.md) | System | Monorepo shape, layers, realtime topology |
 | B1 | [BACKEND/API.md](BACKEND/API.md) | Backend | Express, Yoga, graphql-ws, Drizzle, auth model |
-| B2 | [BACKEND/ORDER_CREATION.md](BACKEND/ORDER_CREATION.md) | Backend | OrderService, payment collection, preflight gate |
+| B2 | [BACKEND/ORDER_CREATION.md](BACKEND/ORDER_CREATION.md) | Backend | OrderService, AWAITING_APPROVAL, locationFlagged, service-zone coverage, payment collection, preflight gate |
 | B3 | [BACKEND/ORDER_TOTAL_PRICE_VALIDATION.md](BACKEND/ORDER_TOTAL_PRICE_VALIDATION.md) | Backend | Price integrity, epsilon, promo application, one-directional delivery validation |
 | B4 | [BACKEND/WATCHDOG_HEARTBEAT.md](BACKEND/WATCHDOG_HEARTBEAT.md) | Backend | DriverHeartbeatHandler, DriverWatchdogService, connection states |
 | B5 | [BACKEND/AUTH_AND_USERS.md](BACKEND/AUTH_AND_USERS.md) | Backend | JWT model, signup steps, token rotation, roles, password rules |

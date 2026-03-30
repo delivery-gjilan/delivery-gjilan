@@ -11,7 +11,7 @@ import {
   MessageSquare, Send, BatteryLow, Battery, BatteryCharging, ChevronLeft,
   Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen
 } from "lucide-react";
-import { ASSIGN_DRIVER_TO_ORDER, UPDATE_ORDER_STATUS, ADMIN_CANCEL_ORDER, SET_ORDER_ADMIN_NOTE } from "@/graphql/operations/orders";
+import { ASSIGN_DRIVER_TO_ORDER, UPDATE_ORDER_STATUS, ADMIN_CANCEL_ORDER, SET_ORDER_ADMIN_NOTE, APPROVE_ORDER } from "@/graphql/operations/orders";
 import { ADMIN_UPDATE_DRIVER_LOCATION, ADMIN_SET_SHIFT_DRIVERS } from "@/graphql/operations/users/mutations";
 import { getDirectionsTelemetry } from "@/lib/utils/mapbox";
 import { ADMIN_SEND_PTT_SIGNAL, GET_AGORA_RTC_CREDENTIALS } from "@/graphql/operations/users/ptt";
@@ -118,6 +118,7 @@ type RealtimeHealth = {
 };
 
 const ORDER_STATUS_COLORS = {
+  AWAITING_APPROVAL: { bg: "bg-rose-500/10", border: "border-rose-500/50", text: "text-rose-400", marker: "#f43f5e", selectBg: "bg-rose-500/20", hex: "#f43f5e" },
   PENDING: { bg: "bg-amber-500/10", border: "border-amber-500/50", text: "text-amber-500", marker: "#f59e0b", selectBg: "bg-amber-500/20", hex: "#f59e0b" },
   PREPARING: { bg: "bg-orange-500/10", border: "border-orange-500/50", text: "text-orange-400", marker: "#f97316", selectBg: "bg-orange-500/20", hex: "#f97316" },
   READY: { bg: "bg-blue-500/10", border: "border-blue-500/50", text: "text-blue-500", marker: "#3b82f6", selectBg: "bg-blue-500/20", hex: "#3b82f6" },
@@ -610,6 +611,7 @@ export default function MapPage() {
   const [cancelSettleDriver, setCancelSettleDriver] = useState(false);
   const [cancelSettleBusiness, setCancelSettleBusiness] = useState(false);
   const [adminCancelOrder, { loading: cancellingOrder }] = useMutation(ADMIN_CANCEL_ORDER, { refetchQueries: ['GetOrders'] });
+  const [approveOrder] = useMutation(APPROVE_ORDER, { fetchPolicy: 'no-cache' });
   const [setOrderAdminNote] = useMutation(SET_ORDER_ADMIN_NOTE);
   const { data: settlementRulesData } = useQuery(MAP_GET_SETTLEMENT_RULES, { variables: { filter: { entityType: 'BUSINESS' } }, fetchPolicy: 'cache-and-network' });
   const settlementRules: MapSettlementRule[] = useMemo(() => (settlementRulesData as any)?.settlementRules || [], [settlementRulesData]);
@@ -1375,6 +1377,15 @@ export default function MapPage() {
     }
   };
 
+  const handleApproveOrder = async (orderId: string) => {
+    try {
+      await approveOrder({ variables: { id: orderId }, refetchQueries: ['GetOrders'], awaitRefetchQueries: true });
+      toast.success('Order approved and sent to business');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to approve order');
+    }
+  };
+
   const handleConfirmNoDriverStatusUpdate = async () => {
     if (!confirmNoDriverAction) return;
     const { orderId, status } = confirmNoDriverAction;
@@ -2064,6 +2075,7 @@ export default function MapPage() {
                 onAssignDriver={handleAssignDriver}
                 onAutoAssign={handleAutoAssign}
                 onUpdateStatus={handleUpdateStatus}
+                onApproveOrder={handleApproveOrder}
                 onTogglePolyline={() => setShowPolylines((prev) => ({ ...prev, [selectedOrder.id]: !prev[selectedOrder.id] }))}
                 showPolyline={showPolylines[selectedOrder.id] || false}
                 onToggleBothRoutes={() => setShowBothRoutes((prev) => ({ ...prev, [selectedOrder.id]: !prev[selectedOrder.id] }))}
@@ -2787,6 +2799,7 @@ function ItemsList({ orderBusinesses }: { orderBusinesses: any[] }) {
 function BottomDetailPanel({
   order, drivers, activeOrders, orderDistances, driverMap, now, statusChangeTime,
   expanded, onToggleExpand, onClose, onAssignDriver, onAutoAssign, onUpdateStatus,
+  onApproveOrder,
   onTogglePolyline, showPolyline, onToggleBothRoutes, showBothRoutes,
   onFocus, driverProgressOnRoute, onNotifyDriver, onNotifyBusiness, incident, onIncidentUpdate,
   workingDriverIds,
@@ -2958,6 +2971,16 @@ function BottomDetailPanel({
           {order.dropOffLocation?.address && (
             <div className="text-xs text-zinc-600 leading-tight pl-10 truncate">{order.dropOffLocation.address}</div>
           )}
+          {(order as any).needsApproval && (
+            <div className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold">
+              ⚠ Awaiting approval
+            </div>
+          )}
+          {(order as any).locationFlagged && (
+            <div className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-semibold">
+              📍 Outside delivery zone
+            </div>
+          )}
         </div>
 
         {/* ── Order items ── */}
@@ -3071,9 +3094,18 @@ function BottomDetailPanel({
         {/* ── Status ── */}
         <div className="px-5 py-3 border-b border-white/5">
           <div className="text-[10px] uppercase tracking-widest text-zinc-600 font-semibold mb-2">Status</div>
+          {(order as any).needsApproval && (
+            <button
+              onClick={() => onApproveOrder(order.id)}
+              className="w-full mb-2 px-3 py-2.5 rounded-xl text-sm font-semibold bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25 transition"
+            >
+              Approve and Send to Business
+            </button>
+          )}
           <select value={order.status} onChange={(e) => onUpdateStatus(order.id, e.target.value)}
             className={`w-full border rounded-xl px-3 py-2.5 text-sm font-semibold text-white ${statusColor.selectBg} ${statusColor.border}`}
             style={{ colorScheme: 'dark' }}>
+            <option value="AWAITING_APPROVAL" style={{ backgroundColor: '#1f2937' }}>Awaiting Approval</option>
             <option value="PENDING" style={{ backgroundColor: '#1f2937' }}>Pending</option>
             <option value="PREPARING" style={{ backgroundColor: '#1f2937' }}>Preparing</option>
             <option value="READY" style={{ backgroundColor: '#1f2937' }}>Ready</option>

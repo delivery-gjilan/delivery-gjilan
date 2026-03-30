@@ -297,6 +297,39 @@ export function notifyAdminsNewOrder(
 }
 
 /**
+ * Notify admins that an order requires manual approval before moving to PENDING.
+ */
+export function notifyAdminsOrderNeedsApproval(
+    notificationService: NotificationService,
+    adminUserIds: string[],
+    orderId: string,
+): void {
+    if (adminUserIds.length === 0) return;
+
+    const payload: NotificationPayload = {
+        title: '⚠ Order Needs Approval',
+        body: 'An order requires your review before it can proceed. Tap to approve.',
+        localeContent: {
+            en: {
+                title: '⚠ Order Needs Approval',
+                body: 'An order requires your review before it can proceed. Tap to approve.',
+            },
+            al: {
+                title: '⚠ Porosi Kërkon Miratim',
+                body: 'Një porosi kërkon shqyrtimin tuaj para se të vazhdojë.',
+            },
+        },
+        data: { orderId, screen: 'orders', type: 'ORDER_NEEDS_APPROVAL' },
+        timeSensitive: true,
+        relevanceScore: 1.0,
+    };
+
+    notificationService
+        .sendToUsersByAppType(adminUserIds, 'ADMIN', payload, 'ADMIN_ALERT')
+        .catch((err) => logger.error({ err, orderId }, 'Failed to send admin approval notification'));
+}
+
+/**
  * Notify a set of drivers that a new order is ready for pickup (wave 1).
  */
 export function notifyDriversOrderReady(

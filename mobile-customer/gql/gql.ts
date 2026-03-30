@@ -81,6 +81,7 @@ type Documents = {
     "\n    query GetActiveGlobalPromotions {\n        getActiveGlobalPromotions {\n            id\n            name\n            description\n            type\n            target\n            discountValue\n            spendThreshold\n            isActive\n        }\n    }\n": typeof types.GetActiveGlobalPromotionsDocument,
     "\n    query GetMyReferralStats {\n        myReferralStats {\n            totalReferrals\n            completedReferrals\n            pendingReferrals\n            totalRewardsEarned\n            referralCode\n            referrals {\n                id\n                status\n                rewardGiven\n                rewardAmount\n                completedAt\n                createdAt\n                referredUser {\n                    firstName\n                    lastName\n                }\n            }\n        }\n    }\n": typeof types.GetMyReferralStatsDocument,
     "\n    mutation GenerateReferralCode {\n        generateReferralCode\n    }\n": typeof types.GenerateReferralCodeDocument,
+    "\n    query GetServiceZones {\n        deliveryZones {\n            id\n            name\n            polygon {\n                lat\n                lng\n            }\n            isActive\n        }\n    }\n": typeof types.GetServiceZonesDocument,
     "\n    query GetStoreStatus {\n        getStoreStatus {\n            isStoreClosed\n            closedMessage\n            bannerEnabled\n            bannerMessage\n            bannerType\n        }\n    }\n": typeof types.GetStoreStatusDocument,
     "\n    subscription StoreStatusUpdated {\n        storeStatusUpdated {\n            isStoreClosed\n            closedMessage\n            bannerEnabled\n            bannerMessage\n            bannerType\n        }\n    }\n": typeof types.StoreStatusUpdatedDocument,
 };
@@ -152,6 +153,7 @@ const documents: Documents = {
     "\n    query GetActiveGlobalPromotions {\n        getActiveGlobalPromotions {\n            id\n            name\n            description\n            type\n            target\n            discountValue\n            spendThreshold\n            isActive\n        }\n    }\n": types.GetActiveGlobalPromotionsDocument,
     "\n    query GetMyReferralStats {\n        myReferralStats {\n            totalReferrals\n            completedReferrals\n            pendingReferrals\n            totalRewardsEarned\n            referralCode\n            referrals {\n                id\n                status\n                rewardGiven\n                rewardAmount\n                completedAt\n                createdAt\n                referredUser {\n                    firstName\n                    lastName\n                }\n            }\n        }\n    }\n": types.GetMyReferralStatsDocument,
     "\n    mutation GenerateReferralCode {\n        generateReferralCode\n    }\n": types.GenerateReferralCodeDocument,
+    "\n    query GetServiceZones {\n        deliveryZones {\n            id\n            name\n            polygon {\n                lat\n                lng\n            }\n            isActive\n        }\n    }\n": types.GetServiceZonesDocument,
     "\n    query GetStoreStatus {\n        getStoreStatus {\n            isStoreClosed\n            closedMessage\n            bannerEnabled\n            bannerMessage\n            bannerType\n        }\n    }\n": types.GetStoreStatusDocument,
     "\n    subscription StoreStatusUpdated {\n        storeStatusUpdated {\n            isStoreClosed\n            closedMessage\n            bannerEnabled\n            bannerMessage\n            bannerType\n        }\n    }\n": types.StoreStatusUpdatedDocument,
 };
@@ -438,6 +440,10 @@ export function graphql(source: "\n    query GetMyReferralStats {\n        myRef
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n    mutation GenerateReferralCode {\n        generateReferralCode\n    }\n"): (typeof documents)["\n    mutation GenerateReferralCode {\n        generateReferralCode\n    }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n    query GetServiceZones {\n        deliveryZones {\n            id\n            name\n            polygon {\n                lat\n                lng\n            }\n            isActive\n        }\n    }\n"): (typeof documents)["\n    query GetServiceZones {\n        deliveryZones {\n            id\n            name\n            polygon {\n                lat\n                lng\n            }\n            isActive\n        }\n    }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

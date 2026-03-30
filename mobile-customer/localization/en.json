@@ -150,6 +150,10 @@
             "healthy_food_sub": "Order now with discount",
             "weekly_menu": "New weekly menu",
             "weekly_menu_sub": "Try new flavors"
+        },
+        "out_of_zone": {
+            "title": "Outside Delivery Zone",
+            "message": "Your current location is outside our delivery area. Please choose an address within the zone."
         }
     },
     "restaurants": {

@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { View, Text, ScrollView, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -18,6 +18,9 @@ import { GET_BANNERS } from '@/graphql/operations/banners';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import type { WoltHeaderBannerType } from '@/components/WoltHeader';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
+import { useServiceZoneCheck } from '@/hooks/useServiceZoneCheck';
+import { useHasActiveOrder } from '@/hooks/useHasActiveOrder';
+import { OutOfZoneSheet } from '@/components/OutOfZoneSheet';
 
 function HorizontalCardSkeleton() {
     const theme = useTheme();
@@ -50,6 +53,17 @@ export default function Discover() {
     const { businesses, loading, error, refetch } = useBusinesses();
     // Only play entering animations on the very first render, not on re-focus
     const hasAnimated = useRef(false);
+    const isFirstLoad = businesses.length === 0 && loading;
+
+    // Out-of-zone modal
+    const zoneStatus = useServiceZoneCheck();
+    const hasActiveOrder = useHasActiveOrder();
+    const [zoneSheetVisible, setZoneSheetVisible] = useState(false);
+    useEffect(() => {
+        if (zoneStatus === 'outside' && !hasActiveOrder) {
+            setZoneSheetVisible(true);
+        }
+    }, [zoneStatus, hasActiveOrder]);
         useFocusEffect(
             React.useCallback(() => {
                 void refetch();
@@ -177,6 +191,7 @@ export default function Discover() {
 
     return (
         <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }} edges={['top']}>
+            <OutOfZoneSheet visible={zoneSheetVisible} onDismiss={() => setZoneSheetVisible(false)} />
             <View className="flex-1">
                 <WoltHeader
                     onPressNotifications={() => console.log('Open notifications')}
@@ -184,7 +199,7 @@ export default function Discover() {
                     bannerType={(bannerType as WoltHeaderBannerType) ?? 'INFO'}
                 />
 
-                {loading ? (
+                {isFirstLoad ? (
                     <ScrollView showsVerticalScrollIndicator={false}>
                         {/* Category Icons */}
                         <View style={{ marginBottom: 20, marginTop: 4 }}>

@@ -4,7 +4,7 @@ import { AppError } from '@/lib/errors';
 import logger from '@/lib/logger';
 import { users } from '@/database/schema';
 import { and, inArray, isNull } from 'drizzle-orm';
-import { notifyAdminsNewOrder, notifyBusinessNewOrder, updateLiveActivity } from '@/services/orderNotifications';
+import { notifyAdminsNewOrder, notifyAdminsOrderNeedsApproval, notifyBusinessNewOrder, updateLiveActivity } from '@/services/orderNotifications';
 
 const log = logger.child({ resolver: 'createOrder' });
 
@@ -45,39 +45,44 @@ export const createOrder: NonNullable<MutationResolvers['createOrder']> = async 
                 ),
             );
         notifyAdminsNewOrder(context.notificationService, adminRows.map((row) => row.id), String(order.id));
+        if (order.needsApproval) {
+            notifyAdminsOrderNeedsApproval(context.notificationService, adminRows.map((row) => row.id), String(order.id));
+        }
     } catch (error) {
         log.error({ err: error, orderId: order.id }, 'createOrder:notifyAdminsNewOrder:failed');
     }
 
-    try {
-        const orderBusinessIds = Array.from(
-            new Set(
-                (order.businesses ?? [])
-                    .map((entry) => entry?.business?.id)
-                    .filter((id): id is string => Boolean(id)),
-            ),
-        );
-
-        if (orderBusinessIds.length > 0) {
-            const businessUserRows = await db
-                .select({ id: users.id })
-                .from(users)
-                .where(
-                    and(
-                        inArray(users.businessId, orderBusinessIds),
-                        inArray(users.role, ['BUSINESS_OWNER', 'BUSINESS_EMPLOYEE']),
-                        isNull(users.deletedAt),
-                    ),
-                );
-
-            notifyBusinessNewOrder(
-                context.notificationService,
-                businessUserRows.map((row) => row.id),
-                String(order.id),
+    if (!order.needsApproval) {
+        try {
+            const orderBusinessIds = Array.from(
+                new Set(
+                    (order.businesses ?? [])
+                        .map((entry) => entry?.business?.id)
+                        .filter((id): id is string => Boolean(id)),
+                ),
             );
+
+            if (orderBusinessIds.length > 0) {
+                const businessUserRows = await db
+                    .select({ id: users.id })
+                    .from(users)
+                    .where(
+                        and(
+                            inArray(users.businessId, orderBusinessIds),
+                            inArray(users.role, ['BUSINESS_OWNER', 'BUSINESS_EMPLOYEE']),
+                            isNull(users.deletedAt),
+                        ),
+                    );
+
+                notifyBusinessNewOrder(
+                    context.notificationService,
+                    businessUserRows.map((row) => row.id),
+                    String(order.id),
+                );
+            }
+        } catch (error) {
+            log.error({ err: error, orderId: order.id }, 'createOrder:notifyBusinessNewOrder:failed');
         }
-    } catch (error) {
-        log.error({ err: error, orderId: order.id }, 'createOrder:notifyBusinessNewOrder:failed');
     }
 
     try {

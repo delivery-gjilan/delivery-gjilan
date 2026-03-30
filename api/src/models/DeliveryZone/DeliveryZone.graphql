@@ -5,6 +5,7 @@ type DeliveryZone {
     deliveryFee: Float!
     sortOrder: Int!
     isActive: Boolean!
+    isServiceZone: Boolean!
     createdAt: DateTime!
     updatedAt: DateTime!
 }
@@ -35,6 +36,7 @@ input CreateDeliveryZoneInput {
     deliveryFee: Float!
     sortOrder: Int
     isActive: Boolean
+    isServiceZone: Boolean
 }
 
 input UpdateDeliveryZoneInput {
@@ -43,6 +45,7 @@ input UpdateDeliveryZoneInput {
     deliveryFee: Float
     sortOrder: Int
     isActive: Boolean
+    isServiceZone: Boolean
 }
 
 extend type Query {

@@ -367,6 +367,7 @@ input CreateDeliveryPricingTierInput {
 input CreateDeliveryZoneInput {
   deliveryFee: Float!
   isActive: Boolean
+  isServiceZone: Boolean
   name: String!
   polygon: [PolygonPointInput!]!
   sortOrder: Int
@@ -539,6 +540,7 @@ type DeliveryZone {
   deliveryFee: Float!
   id: ID!
   isActive: Boolean!
+  isServiceZone: Boolean!
   name: String!
   polygon: [PolygonPoint!]!
   sortOrder: Int!
@@ -866,6 +868,7 @@ type Mutation {
   Admin mutation to update per-driver settings (commission %, max active orders, vehicle ownership)
   """
   adminUpdateDriverSettings(commissionPercentage: Float, driverId: ID!, hasOwnVehicle: Boolean, maxActiveOrders: Int): User!
+  approveOrder(id: ID!): Order!
   assignDriverToOrder(driverId: ID, id: ID!): Order!
   assignPromotionToUsers(input: AssignPromotionToUserInput!): [UserPromotion!]!
   backfillSettlementsForDeliveredOrders: Int!
@@ -1105,6 +1108,8 @@ type Order {
   dropOffLocation: Location!
   estimatedReadyAt: Date
   id: ID!
+  locationFlagged: Boolean!
+  needsApproval: Boolean!
   orderDate: Date!
   orderPrice: Float!
   orderPromotions: [OrderPromotion!]
@@ -1175,6 +1180,7 @@ type OrderPromotion {
 }
 
 enum OrderStatus {
+  AWAITING_APPROVAL
   CANCELLED
   DELIVERED
   OUT_FOR_DELIVERY
@@ -1829,6 +1835,7 @@ input UpdateDeliveryPricingTierInput {
 input UpdateDeliveryZoneInput {
   deliveryFee: Float
   isActive: Boolean
+  isServiceZone: Boolean
   name: String
   polygon: [PolygonPointInput!]
   sortOrder: Int
