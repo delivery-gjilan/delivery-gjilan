@@ -400,7 +400,7 @@ input CreateOrderInput {
   items: [CreateOrderItemInput!]!
   paymentCollection: OrderPaymentCollection
   prioritySurcharge: Float
-  promoCode: String
+  promotionId: ID
   totalPrice: Float!
 }
 
@@ -450,11 +450,15 @@ input CreateProductVariantGroupInput {
 }
 
 input CreatePromotionInput {
+  addDriverCommission: Boolean
   code: String
+  createSettlementRules: Boolean
   creatorId: ID
   creatorType: String
   description: String
   discountValue: Float
+  driverRuleAmount: Float
+  driverRuleAmountType: SettlementAmountType
   eligibleBusinessIds: [ID!]
   endsAt: String
   isActive: Boolean!
@@ -1092,9 +1096,7 @@ type OptionGroup {
 }
 
 type Order {
-  actualPrice: Float!
   adminNote: String
-  basePrice: Float!
   businessId: ID!
   businesses: [OrderBusiness!]!
   cancellationReason: String
@@ -1109,11 +1111,9 @@ type Order {
   dropOffLocation: Location!
   estimatedReadyAt: Date
   id: ID!
-  markupPrice: Float!
   orderDate: Date!
   orderPrice: Float!
   orderPromotions: [OrderPromotion!]
-  originalDeliveryPrice: Float
   originalPrice: Float
   outForDeliveryAt: Date
   paymentCollection: OrderPaymentCollection!
@@ -1144,7 +1144,6 @@ type OrderDriverLiveTracking {
 }
 
 type OrderItem {
-  basePrice: Float
   childItems: [OrderItem!]!
   id: ID!
   imageUrl: String
@@ -1349,7 +1348,6 @@ enum PromotionType {
   FREE_DELIVERY
   PERCENTAGE
   SPEND_X_FIXED
-  SPEND_X_GET_FREE
   SPEND_X_PERCENT
 }
 

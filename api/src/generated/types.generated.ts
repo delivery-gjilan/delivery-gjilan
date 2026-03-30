@@ -426,7 +426,7 @@ export type CreateOrderInput = {
   items: Array<CreateOrderItemInput>;
   paymentCollection?: InputMaybe<OrderPaymentCollection>;
   prioritySurcharge?: InputMaybe<Scalars['Float']['input']>;
-  promoCode?: InputMaybe<Scalars['String']['input']>;
+  promotionId?: InputMaybe<Scalars['ID']['input']>;
   totalPrice: Scalars['Float']['input'];
 };
 
@@ -476,11 +476,15 @@ export type CreateProductVariantGroupInput = {
 };
 
 export type CreatePromotionInput = {
+  addDriverCommission?: InputMaybe<Scalars['Boolean']['input']>;
   code?: InputMaybe<Scalars['String']['input']>;
+  createSettlementRules?: InputMaybe<Scalars['Boolean']['input']>;
   creatorId?: InputMaybe<Scalars['ID']['input']>;
   creatorType?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   discountValue?: InputMaybe<Scalars['Float']['input']>;
+  driverRuleAmount?: InputMaybe<Scalars['Float']['input']>;
+  driverRuleAmountType?: InputMaybe<SettlementAmountType>;
   eligibleBusinessIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   endsAt?: InputMaybe<Scalars['String']['input']>;
   isActive: Scalars['Boolean']['input'];
@@ -1698,9 +1702,7 @@ export type OptionGroup = {
 
 export type Order = {
   __typename?: 'Order';
-  actualPrice: Scalars['Float']['output'];
   adminNote?: Maybe<Scalars['String']['output']>;
-  basePrice: Scalars['Float']['output'];
   businessId: Scalars['ID']['output'];
   businesses: Array<OrderBusiness>;
   cancellationReason?: Maybe<Scalars['String']['output']>;
@@ -1715,11 +1717,9 @@ export type Order = {
   dropOffLocation: Location;
   estimatedReadyAt?: Maybe<Scalars['Date']['output']>;
   id: Scalars['ID']['output'];
-  markupPrice: Scalars['Float']['output'];
   orderDate: Scalars['Date']['output'];
   orderPrice: Scalars['Float']['output'];
   orderPromotions?: Maybe<Array<OrderPromotion>>;
-  originalDeliveryPrice?: Maybe<Scalars['Float']['output']>;
   originalPrice?: Maybe<Scalars['Float']['output']>;
   outForDeliveryAt?: Maybe<Scalars['Date']['output']>;
   paymentCollection: OrderPaymentCollection;
@@ -1753,7 +1753,6 @@ export type OrderDriverLiveTracking = {
 
 export type OrderItem = {
   __typename?: 'OrderItem';
-  basePrice?: Maybe<Scalars['Float']['output']>;
   childItems: Array<OrderItem>;
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
@@ -1967,7 +1966,6 @@ export type PromotionType =
   | 'FREE_DELIVERY'
   | 'PERCENTAGE'
   | 'SPEND_X_FIXED'
-  | 'SPEND_X_GET_FREE'
   | 'SPEND_X_PERCENT';
 
 export type PromotionUsage = {
@@ -3259,7 +3257,7 @@ export type ResolversTypes = {
   PromotionResult: ResolverTypeWrapper<Omit<PromotionResult, 'promotions'> & { promotions: Array<ResolversTypes['ApplicablePromotion']> }>;
   PromotionTarget: ResolverTypeWrapper<'ALL_USERS' | 'SPECIFIC_USERS' | 'FIRST_ORDER' | 'CONDITIONAL'>;
   PromotionThreshold: ResolverTypeWrapper<PromotionThreshold>;
-  PromotionType: ResolverTypeWrapper<'FIXED_AMOUNT' | 'PERCENTAGE' | 'FREE_DELIVERY' | 'SPEND_X_GET_FREE' | 'SPEND_X_PERCENT' | 'SPEND_X_FIXED'>;
+  PromotionType: ResolverTypeWrapper<'FIXED_AMOUNT' | 'PERCENTAGE' | 'FREE_DELIVERY' | 'SPEND_X_PERCENT' | 'SPEND_X_FIXED'>;
   PromotionUsage: ResolverTypeWrapper<Omit<PromotionUsage, 'order' | 'promotion' | 'user'> & { order?: Maybe<ResolversTypes['Order']>, promotion?: Maybe<ResolversTypes['Promotion']>, user?: Maybe<ResolversTypes['User']> }>;
   PushTelemetryEvent: ResolverTypeWrapper<Omit<PushTelemetryEvent, 'appType' | 'eventType' | 'platform'> & { appType: ResolversTypes['DeviceAppType'], eventType: ResolversTypes['PushTelemetryEventType'], platform: ResolversTypes['DevicePlatform'] }>;
   PushTelemetryEventType: ResolverTypeWrapper<'RECEIVED' | 'OPENED' | 'ACTION_TAPPED' | 'TOKEN_REGISTERED' | 'TOKEN_REFRESHED' | 'TOKEN_UNREGISTERED'>;
@@ -4108,9 +4106,7 @@ export type OptionGroupResolvers<ContextType = GraphQLContext, ParentType extend
 };
 
 export type OrderResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Order'] = ResolversParentTypes['Order']> = {
-  actualPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   adminNote?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
-  basePrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   businessId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   businesses?: Resolver<Array<ResolversTypes['OrderBusiness']>, ParentType, ContextType>;
   cancellationReason?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
@@ -4125,11 +4121,9 @@ export type OrderResolvers<ContextType = GraphQLContext, ParentType extends Reso
   dropOffLocation?: Resolver<ResolversTypes['Location'], ParentType, ContextType>;
   estimatedReadyAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
-  markupPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   orderDate?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
   orderPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   orderPromotions?: Resolver<Maybe<Array<ResolversTypes['OrderPromotion']>>, ParentType, ContextType>;
-  originalDeliveryPrice?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   originalPrice?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   outForDeliveryAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   paymentCollection?: Resolver<ResolversTypes['OrderPaymentCollection'], ParentType, ContextType>;
@@ -4163,7 +4157,6 @@ export type OrderDriverLiveTrackingResolvers<ContextType = GraphQLContext, Paren
 };
 
 export type OrderItemResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['OrderItem'] = ResolversParentTypes['OrderItem']> = {
-  basePrice?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   childItems?: Resolver<Array<ResolversTypes['OrderItem']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
@@ -4344,7 +4337,7 @@ export type PromotionThresholdResolvers<ContextType = GraphQLContext, ParentType
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
-export type PromotionTypeResolvers = EnumResolverSignature<{ FIXED_AMOUNT?: any, FREE_DELIVERY?: any, PERCENTAGE?: any, SPEND_X_FIXED?: any, SPEND_X_GET_FREE?: any, SPEND_X_PERCENT?: any }, ResolversTypes['PromotionType']>;
+export type PromotionTypeResolvers = EnumResolverSignature<{ FIXED_AMOUNT?: any, FREE_DELIVERY?: any, PERCENTAGE?: any, SPEND_X_FIXED?: any, SPEND_X_PERCENT?: any }, ResolversTypes['PromotionType']>;
 
 export type PromotionUsageResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PromotionUsage'] = ResolversParentTypes['PromotionUsage']> = {
   businessId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;

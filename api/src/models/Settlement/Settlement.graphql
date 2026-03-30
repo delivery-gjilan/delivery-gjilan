@@ -8,6 +8,11 @@ enum SettlementDirection {
     PAYABLE
 }
 
+enum SettlementAmountType {
+    FIXED
+    PERCENT
+}
+
 # Kept for backward compatibility - no longer backed by DB column
 enum SettlementStatus {
     PENDING

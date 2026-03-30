@@ -1,12 +1,6 @@
 import { type DbType } from '@/database';
-import {
-    DbOrder,
-    DbOrderItem,
-    settlementRules,
-    orderPromotions,
-    products,
-} from '@/database/schema';
-import { eq, and, or, inArray, isNull } from 'drizzle-orm';
+import { DbOrder, DbOrderItem, settlementRules, orderPromotions, products } from '@/database/schema';
+import { eq, and, or, inArray, isNull, sql } from 'drizzle-orm';
 import logger from '@/lib/logger';
 
 const log = logger.child({ service: 'SettlementCalculationEngine' });
@@ -23,33 +17,7 @@ export interface SettlementCalculation {
     ruleId: string | null;
 }
 
-function calculateMarkupEarnings(orderItems: DbOrderItem[]): number {
-    const total = orderItems.reduce((sum, item) => {
-        const basePrice = Number(item.basePrice ?? 0);
-        const finalAppliedPrice = Number(item.finalAppliedPrice ?? 0);
-        const perUnitMarkup = Math.max(0, finalAppliedPrice - basePrice);
-        return sum + perUnitMarkup * item.quantity;
-    }, 0);
-
-    return Number(total.toFixed(2));
-}
-
 type DbSettlementRule = typeof settlementRules.$inferSelect;
-
-/**
- * Determine the specificity level of a settlement rule's scope.
- *
- *   3 = business + promotion (most specific)
- *   2 = promotion only
- *   1 = business only
- *   0 = global (both null)
- */
-function ruleSpecificity(rule: DbSettlementRule): number {
-    if (rule.businessId && rule.promotionId) return 3;
-    if (rule.promotionId) return 2;
-    if (rule.businessId) return 1;
-    return 0;
-}
 
 export class SettlementCalculationEngine {
     constructor(private db: Database) {}
@@ -62,12 +30,13 @@ export class SettlementCalculationEngine {
         try {
             // 1. Collect business IDs from this order's products
             const productIds = [...new Set(orderItems.map((i) => i.productId))];
-            const productRows = productIds.length > 0
-                ? await this.db
-                      .select({ id: products.id, businessId: products.businessId })
-                      .from(products)
-                      .where(inArray(products.id, productIds))
-                : [];
+            const productRows =
+                productIds.length > 0
+                    ? await this.db
+                          .select({ id: products.id, businessId: products.businessId })
+                          .from(products)
+                          .where(inArray(products.id, productIds))
+                    : [];
             const orderBusinessIds = [...new Set(productRows.map((p) => p.businessId).filter(Boolean))] as string[];
 
             // 2. Collect promotion IDs applied to this order
@@ -78,70 +47,94 @@ export class SettlementCalculationEngine {
             const orderPromotionIds = promoRows.map((r) => r.promotionId);
 
             // 3. Fetch all applicable active rules
-            const rules = await this.db
+            const allRules = await this.db
                 .select()
                 .from(settlementRules)
                 .where(
                     and(
                         eq(settlementRules.isActive, true),
-                        orderBusinessIds.length > 0
-                            ? or(isNull(settlementRules.businessId), inArray(settlementRules.businessId, orderBusinessIds))
-                            : isNull(settlementRules.businessId),
-                        orderPromotionIds.length > 0
-                            ? or(isNull(settlementRules.promotionId), inArray(settlementRules.promotionId, orderPromotionIds))
-                            : isNull(settlementRules.promotionId),
+                        or(
+                            // Global rules
+                            and(isNull(settlementRules.businessId), isNull(settlementRules.promotionId)),
+                            // Business rules
+                            orderBusinessIds.length > 0
+                                ? and(
+                                      inArray(settlementRules.businessId, orderBusinessIds),
+                                      isNull(settlementRules.promotionId),
+                                  )
+                                : sql`false`,
+                            // Promotion rules
+                            orderPromotionIds.length > 0
+                                ? and(
+                                      isNull(settlementRules.businessId),
+                                      inArray(settlementRules.promotionId, orderPromotionIds),
+                                  )
+                                : sql`false`,
+                            // Business + Promotion rules
+                            orderBusinessIds.length > 0 && orderPromotionIds.length > 0
+                                ? and(
+                                      inArray(settlementRules.businessId, orderBusinessIds),
+                                      inArray(settlementRules.promotionId, orderPromotionIds),
+                                  )
+                                : sql`false`,
+                        ),
                     ),
                 );
 
-            // 4. Split rules by type
-            const deliveryPriceRules = rules.filter((r) => r.type === 'DELIVERY_PRICE');
-            const orderPriceRules = rules.filter((r) => r.type === 'ORDER_PRICE');
+            // Categorize into buckets for easier priority handling
+            const globalRules = allRules.filter((r) => !r.businessId && !r.promotionId);
+            const businessRules = allRules.filter((r) => r.businessId && !r.promotionId);
+            const promotionRules = allRules.filter((r) => !r.businessId && r.promotionId);
+            const businessPromoRules = allRules.filter((r) => r.businessId && r.promotionId);
 
+            console.log('rules', allRules);
+            console.log('businessPromoRules', businessPromoRules);
+            console.log('promotionRules', promotionRules);
+            console.log('businessRules', businessRules);
+            console.log('globalRules', globalRules);
             const results: SettlementCalculation[] = [];
 
-            // ── DELIVERY_PRICE rules: most-specific-wins ──
-            // Find the highest specificity level among matched delivery rules,
-            // then apply ONLY rules at that level.
-            if (deliveryPriceRules.length > 0) {
-                const maxSpecificity = Math.max(...deliveryPriceRules.map(ruleSpecificity));
-                const winningRules = deliveryPriceRules.filter((r) => ruleSpecificity(r) === maxSpecificity);
-
-                for (const rule of winningRules) {
-                    this.applyRule(rule, order, orderBusinessIds, driverId, results);
-                }
+            // ── DELIVERY_PRICE selection logic (BP > P > B > G) ──
+            let selectedDeliveryRules: typeof allRules = [];
+            if (businessPromoRules.some((r) => r.type === 'DELIVERY_PRICE')) {
+                selectedDeliveryRules = businessPromoRules.filter((r) => r.type === 'DELIVERY_PRICE');
+            } else if (promotionRules.some((r) => r.type === 'DELIVERY_PRICE')) {
+                selectedDeliveryRules = promotionRules.filter((r) => r.type === 'DELIVERY_PRICE');
+            } else if (businessRules.some((r) => r.type === 'DELIVERY_PRICE')) {
+                selectedDeliveryRules = businessRules.filter((r) => r.type === 'DELIVERY_PRICE');
+            } else {
+                selectedDeliveryRules = globalRules.filter((r) => r.type === 'DELIVERY_PRICE');
             }
 
-            // ── ORDER_PRICE rules: stack all ──
-            // Apply every matching rule at every scope level.
-            for (const rule of orderPriceRules) {
+            // ── ORDER_PRICE selection logic (G + B + BP or G + B + P) ──
+            const selectedOrderRules: typeof allRules = [
+                ...globalRules.filter((r) => r.type === 'ORDER_PRICE'),
+                ...businessRules.filter((r) => r.type === 'ORDER_PRICE'),
+            ];
+
+            if (businessPromoRules.some((r) => r.type === 'ORDER_PRICE')) {
+                selectedOrderRules.push(...businessPromoRules.filter((r) => r.type === 'ORDER_PRICE'));
+                // Mutually exclusive: BP rules win over P rules if both exist
+            } else {
+                selectedOrderRules.push(...promotionRules.filter((r) => r.type === 'ORDER_PRICE'));
+            }
+
+            const finalRules = [...selectedDeliveryRules, ...selectedOrderRules];
+
+            for (const rule of finalRules) {
                 this.applyRule(rule, order, orderBusinessIds, driverId, results);
             }
 
             // ── Automatic markup remittance ──
-            // Only applies when the driver physically collects cash from the customer.
-            if (driverId && order.paymentCollection === 'CASH_TO_DRIVER') {
-                const markupEarnings = calculateMarkupEarnings(orderItems);
-                if (markupEarnings > 0) {
-                    results.push({
-                        type: 'DRIVER',
-                        direction: 'RECEIVABLE',
-                        driverId,
-                        businessId: null,
-                        orderId: order.id,
-                        amount: markupEarnings,
-                        ruleId: null,
-                    });
-                }
-            }
+            this.addMarkupSettlement(order, driverId, results);
 
             log.info(
                 {
                     orderId: order.id,
                     settlementsCount: results.length,
-                    rulesMatched: rules.length,
-                    deliveryRulesCount: deliveryPriceRules.length,
-                    orderPriceRulesCount: orderPriceRules.length,
-                    hasAutoMarkupSettlement: results.some((s) => s.ruleId === null && s.type === 'DRIVER'),
+                    rulesMatched: allRules.length,
+                    deliveryRulesCount: selectedDeliveryRules.length,
+                    orderPriceRulesCount: selectedOrderRules.length,
                 },
                 'settlement:calculated',
             );
@@ -153,9 +146,23 @@ export class SettlementCalculationEngine {
         }
     }
 
-    /**
-     * Apply a single settlement rule → push settlement(s) into results.
-     */
+    private addMarkupSettlement(order: DbOrder, driverId: string | null, results: SettlementCalculation[]): void {
+        if (!driverId) return;
+
+        const markupPrice = Number(order.markupPrice);
+        if (markupPrice <= 0) return;
+
+        results.push({
+            type: 'DRIVER',
+            direction: 'RECEIVABLE',
+            driverId,
+            businessId: null,
+            orderId: order.id,
+            amount: Number(markupPrice.toFixed(2)),
+            ruleId: null,
+        });
+    }
+
     private applyRule(
         rule: DbSettlementRule,
         order: DbOrder,
@@ -165,16 +172,9 @@ export class SettlementCalculationEngine {
     ): void {
         if (rule.entityType === 'DRIVER' && !driverId) return;
 
-        // Determine the base value for the rule
-        const base =
-            rule.type === 'DELIVERY_PRICE'
-                ? Number(order.deliveryPrice)
-                : Number(order.actualPrice);
+        const base = rule.type === 'DELIVERY_PRICE' ? Number(order.originalDeliveryPrice) : Number(order.actualPrice);
 
-        const amount =
-            rule.amountType === 'FIXED'
-                ? Number(rule.amount)
-                : (base * Number(rule.amount)) / 100;
+        const amount = rule.amountType === 'FIXED' ? Number(rule.amount) : (base * Number(rule.amount)) / 100;
 
         if (amount <= 0) return;
 

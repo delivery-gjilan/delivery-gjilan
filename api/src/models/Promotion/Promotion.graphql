@@ -4,7 +4,6 @@ enum PromotionType {
   FIXED_AMOUNT
   PERCENTAGE
   FREE_DELIVERY
-  SPEND_X_GET_FREE
   SPEND_X_PERCENT
   SPEND_X_FIXED
 }
@@ -153,6 +152,12 @@ input CreatePromotionInput {
   
   # Optional: Restrict to specific businesses
   eligibleBusinessIds: [ID!]
+
+  # Settlement Rule Integration
+  createSettlementRules: Boolean
+  driverRuleAmount: Float
+  driverRuleAmountType: SettlementAmountType
+  addDriverCommission: Boolean
 }
 
 input UpdatePromotionInput {

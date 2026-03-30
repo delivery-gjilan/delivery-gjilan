@@ -54,6 +54,7 @@ function formatScope(rule: SettlementRule): string {
 export default function SettlementRulesPage() {
     const { toast } = useToast();
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [editingRule, setEditingRule] = useState<SettlementRule | null>(null);
     const [activeEntityType, setActiveEntityType] = useState<SettlementEntityType | 'ALL'>(
         SettlementEntityType.Business,
     );
@@ -144,23 +145,35 @@ export default function SettlementRulesPage() {
                         Refresh
                     </Button>
 
-                    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                    <Dialog open={isDialogOpen || !!editingRule} onOpenChange={(open) => {
+                        setIsDialogOpen(open);
+                        if (!open) setEditingRule(null);
+                    }}>
                         <DialogTrigger asChild>
-                            <Button>Create Rule</Button>
+                            <Button onClick={() => setEditingRule(null)}>Create Rule</Button>
                         </DialogTrigger>
                         <DialogContent className="z-[70] max-h-[92vh] max-w-lg overflow-y-auto bg-zinc-950 border-zinc-800">
                             <DialogHeader>
-                                <DialogTitle>Create Settlement Rule</DialogTitle>
-                                <DialogDescription>Define who owes who and how much per order.</DialogDescription>
+                                <DialogTitle>{editingRule ? 'Edit Settlement Rule' : 'Create Settlement Rule'}</DialogTitle>
+                                <DialogDescription>
+                                    {editingRule ? 'Modify the existing settlement rule.' : 'Define who owes who and how much per order.'}
+                                </DialogDescription>
                             </DialogHeader>
 
-                            <CreateRuleForm
+                            <SettlementRuleForm
                                 businesses={businesses}
                                 promotions={promotions}
-                                defaultEntityType={
-                                    activeEntityType === 'ALL' ? SettlementEntityType.Business : activeEntityType
-                                }
-                                onSubmit={(values) => createRule({ variables: { input: values } })}
+                                defaultEntityType={activeEntityType === 'ALL' ? SettlementEntityType.Business : activeEntityType}
+                                initialValues={editingRule || undefined}
+                                onSubmit={async (values) => {
+                                    if (editingRule) {
+                                        await updateRule({ variables: { id: editingRule.id, input: values } });
+                                        setEditingRule(null);
+                                    } else {
+                                        await createRule({ variables: { input: values } });
+                                        setIsDialogOpen(false);
+                                    }
+                                }}
                             />
                         </DialogContent>
                     </Dialog>
@@ -286,13 +299,15 @@ export default function SettlementRulesPage() {
                         rules={rules}
                         onToggleActive={(id, isActive) => updateRule({ variables: { id, input: { isActive } } })}
                         onDelete={(id) => {
-                            if (confirm('Delete this settlement rule?')) {
+                            if (window.confirm('Delete this settlement rule?')) {
                                 deleteRule({ variables: { id } });
                             }
                         }}
+                        onEdit={(rule) => setEditingRule(rule)}
                     />
                 </main>
             </div>
+
         </div>
     );
 }
@@ -302,11 +317,13 @@ function RulesTable({
     rules,
     onToggleActive,
     onDelete,
+    onEdit,
 }: {
     loading: boolean;
     rules: SettlementRule[];
     onToggleActive: (id: string, isActive: boolean) => void;
     onDelete: (id: string) => void;
+    onEdit: (rule: SettlementRule) => void;
 }) {
     return (
         <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/50 shadow-sm">
@@ -367,8 +384,16 @@ function RulesTable({
                                     <div className="flex justify-end gap-2">
                                         <Button
                                             size="sm"
-                                            variant={rule.isActive ? 'outline' : 'default'}
+                                            variant="outline"
                                             className="h-8 text-xs"
+                                            onClick={() => onEdit(rule)}
+                                        >
+                                            Edit
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant={rule.isActive ? 'outline' : 'default'}
+                                            className="h-8 text-xs text-orange-400 border-orange-400/30"
                                             onClick={() => onToggleActive(rule.id, !rule.isActive)}
                                         >
                                             {rule.isActive ? 'Deactivate' : 'Activate'}
@@ -392,26 +417,28 @@ function RulesTable({
     );
 }
 
-function CreateRuleForm({
+function SettlementRuleForm({
     businesses,
     promotions,
     defaultEntityType,
+    initialValues,
     onSubmit,
 }: {
     businesses: BusinessOption[];
     promotions: PromotionOption[];
     defaultEntityType: SettlementEntityType;
+    initialValues?: SettlementRule;
     onSubmit: (values: any) => void;
 }) {
-    const [name, setName] = useState('');
-    const [entityType, setEntityType] = useState<SettlementEntityType>(defaultEntityType);
-    const [ruleType, setRuleType] = useState<SettlementRuleType>(SettlementRuleType.OrderPrice);
-    const [direction, setDirection] = useState('RECEIVABLE');
-    const [amountType, setAmountType] = useState('PERCENT');
-    const [amount, setAmount] = useState('');
-    const [businessId, setBusinessId] = useState('none');
-    const [promotionId, setPromotionId] = useState('none');
-    const [notes, setNotes] = useState('');
+    const [name, setName] = useState(initialValues?.name || '');
+    const [entityType, setEntityType] = useState<SettlementEntityType>(initialValues?.entityType || defaultEntityType);
+    const [ruleType, setRuleType] = useState<SettlementRuleType>(initialValues?.type || SettlementRuleType.OrderPrice);
+    const [direction, setDirection] = useState(initialValues?.direction || 'RECEIVABLE');
+    const [amountType, setAmountType] = useState(initialValues?.amountType || 'PERCENT');
+    const [amount, setAmount] = useState(initialValues?.amount || '');
+    const [businessId, setBusinessId] = useState(initialValues?.business?.id || 'none');
+    const [promotionId, setPromotionId] = useState(initialValues?.promotion?.id || 'none');
+    const [notes, setNotes] = useState(initialValues?.notes || '');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();

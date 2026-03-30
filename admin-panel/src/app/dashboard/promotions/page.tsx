@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@apollo/client/react";
@@ -63,6 +63,12 @@ type PromotionFormState = {
     startsAt: string;
     endsAt: string;
     eligibleBusinessIds: string[];
+
+    // Settlement Rules
+    createSettlementRules: boolean;
+    driverRuleAmount: string;
+    driverRuleAmountType: "FIXED" | "PERCENT";
+    addDriverCommission: boolean;
 };
 
 const emptyForm: PromotionFormState = {
@@ -85,6 +91,10 @@ const emptyForm: PromotionFormState = {
     startsAt: "",
     endsAt: "",
     eligibleBusinessIds: [],
+    createSettlementRules: true,
+    driverRuleAmount: "100",
+    driverRuleAmountType: "PERCENT",
+    addDriverCommission: true,
 };
 
 const toDateTimeLocal = (value?: string | null) => {
@@ -237,6 +247,12 @@ export default function PromotionsPage() {
             eligibleBusinessIds: (formData.eligibleBusinessIds || []).length ? formData.eligibleBusinessIds : undefined,
             startsAt: formData.startsAt || undefined,
             endsAt: formData.endsAt || undefined,
+            
+            // Settlement Rules
+            createSettlementRules: formData.createSettlementRules,
+            driverRuleAmount: toOptionalNumber(formData.driverRuleAmount),
+            driverRuleAmountType: formData.driverRuleAmountType,
+            addDriverCommission: formData.addDriverCommission,
         };
 
         if (editingPromotion) {
@@ -759,6 +775,83 @@ export default function PromotionsPage() {
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+                                
+                                {/* Settlement Rules */}
+                                <div className="space-y-4 bg-zinc-800/20 border border-zinc-700/30 rounded-lg p-4">
+                                    <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                                        <h3 className="text-white font-semibold text-sm">
+                                            Settlement Rules Integration
+                                        </h3>
+                                        <Checkbox 
+                                            checked={formData.createSettlementRules} 
+                                            onChange={() => setFormData({ ...formData, createSettlementRules: !formData.createSettlementRules })} 
+                                        />
+                                    </div>
+                                    
+                                    {formData.createSettlementRules && (
+                                        <div className="space-y-4 pt-2">
+                                            <div className="bg-violet-900/10 border border-violet-800/20 rounded p-3 text-xs text-violet-300">
+                                                If enabled, settlement rules will be automatically created for this promotion.
+                                            </div>
+                                            
+                                            {formData.type === "FREE_DELIVERY" ? (
+                                                <div className="space-y-4">
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="space-y-2">
+                                                            <div className="flex items-center justify-between">
+                                                                <label className="text-xs font-medium text-zinc-400">
+                                                                    Platform owes Driver
+                                                                </label>
+                                                                <div className="flex bg-[#09090b] border border-zinc-800 rounded-md p-0.5">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setFormData({ ...formData, driverRuleAmountType: "PERCENT" })}
+                                                                        className={`px-2 py-0.5 text-[10px] rounded ${formData.driverRuleAmountType === "PERCENT" ? "bg-violet-600 text-white" : "text-zinc-500 hover:text-zinc-300"}`}
+                                                                    >
+                                                                        %
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setFormData({ ...formData, driverRuleAmountType: "FIXED" })}
+                                                                        className={`px-2 py-0.5 text-[10px] rounded ${formData.driverRuleAmountType === "FIXED" ? "bg-violet-600 text-white" : "text-zinc-500 hover:text-zinc-300"}`}
+                                                                    >
+                                                                        €
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                            <Input
+                                                                type="number"
+                                                                value={formData.driverRuleAmount}
+                                                                onChange={(e) => setFormData({ ...formData, driverRuleAmount: e.target.value })}
+                                                                placeholder={formData.driverRuleAmountType === "PERCENT" ? "100" : "2.50"}
+                                                            />
+                                                        </div>
+                                                        <div className="flex items-end pb-2">
+                                                            <label className="flex items-center gap-2 cursor-pointer group">
+                                                                <Checkbox 
+                                                                    checked={formData.addDriverCommission} 
+                                                                    onChange={() => setFormData({ ...formData, addDriverCommission: !formData.addDriverCommission })} 
+                                                                />
+                                                                <span className="text-sm text-zinc-300 group-hover:text-white transition-colors">
+                                                                    Add 10% Driver Commission
+                                                                </span>
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                    <p className="text-[10px] text-zinc-500 italic">
+                                                        Note: Commission is hardcoded to 10% of delivery price if enabled.
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                <div className="bg-zinc-900/50 p-3 rounded border border-zinc-800 text-xs text-zinc-400">
+                                                    For {promotionTypeLabels[formData.type]}, a rule will be created where the platform owes the driver 
+                                                    the amount of the promotion ({isPercentType(formData.type) ? `${formData.discountValue}%` : `\u20ac${formData.discountValue}`}) 
+                                                    from the order price.
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Priority & Stacking */}
