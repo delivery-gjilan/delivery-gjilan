@@ -64,7 +64,7 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
     // If driverId is provided, validate that it's a driver
     let driverName = 'Unassigned';
     let maxActiveOrders = 2; // Default fallback
-    
+
     if (effectiveDriverId) {
         const driver = await authService.authRepository.findById(effectiveDriverId);
         if (!driver) {
@@ -90,9 +90,11 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
         const existingOrders = await orderService.orderRepository.findUncompletedOrdersByUserId(effectiveDriverId);
         // If the order already has this driver assigned, allow it (re-assignment)
         const alreadyAssignedToSameDriver = dbOrderBefore.driverId === effectiveDriverId;
-        
+
         if (!alreadyAssignedToSameDriver && existingOrders.length >= maxActiveOrders) {
-            throw AppError.businessRule(`Driver already has maximum number of active orders (${maxActiveOrders}/${maxActiveOrders})`);
+            throw AppError.businessRule(
+                `Driver already has maximum number of active orders (${maxActiveOrders}/${maxActiveOrders})`,
+            );
         }
     }
 
@@ -117,7 +119,7 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
     if (dbOrder) {
         // Publish to user's channel for real-time updates
         await orderService.publishSingleUserOrder(dbOrder.userId, id);
-        
+
         // Publish to all admins for real-time updates
         await orderService.publishAllOrders();
     }
@@ -134,13 +136,9 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
 
     // Notify previous driver if the order was taken away from them by an admin
     if (previousDriverId && previousDriverId !== effectiveDriverId) {
-        notifyDriverOrderReassigned(
-            context.notificationService,
-            previousDriverId,
-            id,
-        );
+        notifyDriverOrderReassigned(context.notificationService, previousDriverId, id);
     }
-    
+
     if (effectiveDriverId) {
         emitOrderEvent({
             orderId: id,

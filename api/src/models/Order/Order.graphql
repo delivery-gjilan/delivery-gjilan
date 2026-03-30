@@ -43,7 +43,6 @@ type OrderItem {
     name: String!
     imageUrl: String
     quantity: Int!
-    basePrice: Float
     unitPrice: Float!
     notes: String
     selectedOptions: [OrderItemOption!]!
@@ -79,11 +78,13 @@ type Order {
     id: ID!
     displayId: String!
     userId: ID!
-    orderPrice: Float!
+    businessId: ID!
+    # Final prices
     deliveryPrice: Float!
-    originalPrice: Float
-    originalDeliveryPrice: Float
     totalPrice: Float!
+    # Legacy fields kept for backward compatibility (map to new columns)
+    orderPrice: Float!
+    originalPrice: Float
     orderDate: Date!
     updatedAt: Date!
     status: OrderStatus!
@@ -165,6 +166,7 @@ input CreateOrderInput {
     totalPrice: Float!
     prioritySurcharge: Float
     paymentCollection: OrderPaymentCollection
-    promoCode: String
+    promotionId: ID
     driverNotes: String
 }
+

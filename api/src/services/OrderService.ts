@@ -1,8 +1,8 @@
 import { randomBytes } from 'crypto';
+import { type DbType } from '@/database';
 import { OrderRepository } from '@/repositories/OrderRepository';
 import { AuthRepository } from '@/repositories/AuthRepository';
 import { ProductRepository } from '@/repositories/ProductRepository';
-import { getDB } from '@/database';
 import {
     orderItems as orderItemsTable,
     orders as ordersTable,
@@ -16,20 +16,35 @@ import {
     orderItemOptions as orderItemOptionsTable,
     optionGroups as optionGroupsTable,
     options as optionsDbTable,
+    users as usersTable,
 } from '@/database/schema';
 import { userPromoMetadata } from '@/database/schema';
 import { and, asc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import type { Order, OrderBusiness, OrderItem, OrderStatus, CreateOrderInput, OrderPaymentCollection } from '@/generated/types.generated';
 import type { DbOrder } from '@/database/schema/orders';
 import { PubSub, publish, subscribe, topics } from '@/lib/pubsub';
-import { GraphQLError } from 'graphql';
 import { AppError } from '@/lib/errors';
 import { PromotionEngine } from '@/services/PromotionEngine';
+import type { PromotionResult, CartContext } from '@/services/PromotionEngine';
 import { FinancialService } from '@/services/FinancialService';
 import { calculateDrivingDistanceKm } from '@/lib/haversine';
 import { isPointInPolygon } from '@/lib/pointInPolygon';
 import { parseDbTimestamp } from '@/lib/dateTime';
 import logger from '@/lib/logger';
+import { ApiContextInterface } from '@/graphql/context';
+import {
+    notifyCustomerOrderStatus,
+    notifyAdminsNewOrder,
+    notifyAdminsOrderNeedsApproval,
+    notifyBusinessNewOrder,
+    updateLiveActivity,
+    endLiveActivity,
+} from '@/services/orderNotifications';
+import { getDispatchService } from '@/services/driverServices.init';
+import { getLiveDriverEta } from '@/lib/driverEtaCache';
+import { cache } from '@/lib/cache';
+import { emitOrderEvent } from '@/repositories/OrderEventRepository';
+import { createAuditLogger } from '@/services/AuditLogger';
 
 const log = logger.child({ service: 'OrderService' });
 
@@ -41,6 +56,7 @@ export class OrderService {
         private authRepository: AuthRepository,
         private productRepository: ProductRepository,
         private pubsub: PubSub,
+        private db: DbType,
     ) {
         this.orderRepository = orderRepository;
     }
@@ -64,7 +80,7 @@ export class OrderService {
         dropoffLat: number;
         dropoffLng: number;
     }): Promise<number> {
-        const db = await getDB();
+        const db = this.db;
         const DEFAULT_DELIVERY_PRICE = 2.0;
 
         const [business] = await db
@@ -153,7 +169,7 @@ export class OrderService {
             quantity: number;
             finalAppliedPrice: number;
             basePrice: number;
-            salePrice: number | null;
+            discountedPrice: number | null;
             markupPrice: number | null;
             nightMarkedupPrice: number | null;
             notes: string | null;
@@ -189,7 +205,7 @@ export class OrderService {
         }
 
         // Batch-fetch options and option groups for price snapshots and validation
-        const db = await getDB();
+        const db = this.db;
         const optionRows =
             allOptionIds.size > 0
                 ? await db
@@ -197,8 +213,7 @@ export class OrderService {
                       .from(optionsDbTable)
                       .where(inArray(optionsDbTable.id, [...allOptionIds]))
                 : [];
-        const optionById = new Map(optionRows.map((o) => [o.id, o]));
-
+        const optionById = new Map<string, any>(optionRows.map((o) => [o.id, o]));
         const optionGroupRows =
             allOptionGroupIds.size > 0
                 ? await db
@@ -206,7 +221,7 @@ export class OrderService {
                       .from(optionGroupsTable)
                       .where(inArray(optionGroupsTable.id, [...allOptionGroupIds]))
                 : [];
-        const optionGroupById = new Map(optionGroupRows.map((og) => [og.id, og]));
+        const optionGroupById = new Map<string, any>(optionGroupRows.map((og) => [og.id, og]));
 
         const productOptionGroupRows = await db
             .select()
@@ -273,6 +288,10 @@ export class OrderService {
             }
         };
 
+        // Track order-level price breakdown
+        let orderBasePrice = 0;   // sum of items' effective price × qty + options' extraPrice × qty (respects discounts)
+        let orderMarkupPrice = 0; // sum of products' markup amounts × qty (platform margin, additional amount only)
+
         for (const itemInput of input.items) {
             const product = productMap.get(itemInput.productId);
             if (!product) {
@@ -286,10 +305,10 @@ export class OrderService {
             const basePrice = Number(product.basePrice);
             const markupPrice = product.markupPrice != null ? Number(product.markupPrice) : null;
             const nightMarkedupPrice = product.nightMarkedupPrice != null ? Number(product.nightMarkedupPrice) : null;
-            const salePrice = product.salePrice != null ? Number(product.salePrice) : null;
+            const discountedPrice = product.salePrice != null ? Number(product.salePrice) : null;
             const isNightHours = (() => { const h = new Date().getHours(); return h >= 23 || h < 6; })();
-            const finalAppliedPrice = (product.isOnSale && salePrice != null)
-                ? salePrice
+            const finalAppliedPrice = (product.isOnSale && discountedPrice != null)
+                ? discountedPrice
                 : (isNightHours && nightMarkedupPrice != null)
                     ? nightMarkedupPrice
                     : (markupPrice != null)
@@ -310,6 +329,15 @@ export class OrderService {
             }
 
             calculatedItemsTotal += (finalAppliedPrice + optionsExtra) * itemInput.quantity;
+
+            // Accumulate order-level price breakdown
+            // basePrice uses the effective item price (respecting discounts/sale prices):
+            // if product is on sale, use discountedPrice; otherwise use the raw basePrice
+            const effectiveItemBase = (product.isOnSale && discountedPrice != null) ? discountedPrice : basePrice;
+            orderBasePrice += (effectiveItemBase + optionsExtra) * itemInput.quantity;
+            // markupPrice = additional amount on top of basePrice (pure margin, clamped ≥ 0)
+            const productMarkup = Math.max(0, finalAppliedPrice - basePrice);
+            orderMarkupPrice += productMarkup * itemInput.quantity;
 
             // Also calculate child item options extra (child finalAppliedPrice is 0, but options may cost extra)
             if (itemInput.childItems) {
@@ -347,6 +375,8 @@ export class OrderService {
                         }
                     }
                     calculatedItemsTotal += childOptionsExtra * itemInput.quantity;
+                    // Child option extras also count as base price for the order
+                    orderBasePrice += childOptionsExtra * itemInput.quantity;
                 }
             }
 
@@ -355,7 +385,7 @@ export class OrderService {
                 quantity: itemInput.quantity,
                 finalAppliedPrice,
                 basePrice,
-                salePrice,
+                discountedPrice,
                 markupPrice,
                 nightMarkedupPrice,
                 notes: itemInput.notes || null,
@@ -375,8 +405,17 @@ export class OrderService {
 
         log.debug({ itemsTotal: calculatedItemsTotal, deliveryPrice: input.deliveryPrice }, 'order:totals');
 
-        // 2a. Validate multi-restaurant restriction
+        // 2a. Validate single-business constraint — all items must be from one business
         const businessIdList = Array.from(businessIds);
+        if (businessIdList.length > 1) {
+            throw AppError.businessRule(
+                'All items in an order must be from the same business. Please remove items from other businesses.',
+            );
+        }
+        const orderBusinessId = businessIdList[0];
+        if (!orderBusinessId) {
+            throw AppError.badInput('Order must contain at least one item');
+        }
 
         const orderBusinesses = await db
             .select({
@@ -390,13 +429,6 @@ export class OrderService {
             .where(inArray(businessesTable.id, businessIdList));
 
         const businessesById = new Map(orderBusinesses.map((business) => [business.id, business]));
-
-        const restaurantCount = orderBusinesses.filter((b) => b.businessType === 'RESTAURANT').length;
-        if (restaurantCount > 1) {
-            throw AppError.businessRule(
-                'You can only order from one restaurant at a time. Please remove items from one restaurant before adding from another.',
-            );
-        }
 
         // 2b. Check that all businesses are currently open
         const now = new Date();
@@ -489,44 +521,44 @@ export class OrderService {
             );
         }
 
-        // 3. Apply PromotionEngine (server-side validation)
-        const promotionEngine = new PromotionEngine(await getDB());
+        // 3. Apply Promotion (server-side validation)
+        const promotionEngine = new PromotionEngine(this.db);
         // Always use the server-calculated delivery price in the promo engine so
         // that promotion discounts are computed against the authoritative base fee,
         // regardless of what the client sent (which may be 0 for a free-delivery promo).
-        const cartContext = {
+        const cartContext: CartContext = {
             items: cartItems,
             subtotal: calculatedItemsTotal,
             deliveryPrice: expectedDeliveryPrice,
             businessIds: Array.from(businessIds),
         };
 
-        const promoResult = await promotionEngine.applyPromotions(userId, cartContext, input.promoCode || undefined);
-
-        if (input.promoCode && promoResult.promotions.length === 0) {
-            throw AppError.badInput('Invalid promo code');
+        // If a promotionId was provided, validate and apply that specific promotion.
+        // Otherwise, no promotion is applied (auto-apply removed from order creation).
+        let promoResult: PromotionResult;
+        if (input.promotionId) {
+            promoResult = await promotionEngine.applySinglePromotion(userId, input.promotionId, cartContext);
+        } else {
+            promoResult = {
+                promotions: [],
+                totalDiscount: 0,
+                freeDeliveryApplied: false,
+                finalSubtotal: cartContext.subtotal,
+                finalDeliveryPrice: cartContext.deliveryPrice,
+                finalTotal: cartContext.subtotal + cartContext.deliveryPrice,
+            };
         }
 
         const effectiveOrderPrice = promoResult.finalSubtotal;
         const effectiveDeliveryPrice = promoResult.finalDeliveryPrice;
         const totalOrderPrice = promoResult.finalTotal;
-        const undiscountedTotal = calculatedItemsTotal + expectedDeliveryPrice + prioritySurcharge;
 
         // Verify total price matches client input (allow small float error).
-        // When no explicit promoCode is supplied, we allow either:
-        // 1) effective total (after auto-applied promos), or
-        // 2) undiscounted total (items + delivery) for clients that don't pre-apply auto promos.
-        // If no promo code is provided, tolerate a client total that matches the
-        // undiscounted total because server-side auto-promotions may still apply.
         // Priority surcharge is layered on top of the promo-engine totals.
         const matchesEffectiveTotal = Math.abs((totalOrderPrice + prioritySurcharge) - input.totalPrice) <= 0.01;
-        const matchesUndiscountedTotal = Math.abs((undiscountedTotal + prioritySurcharge) - input.totalPrice) <= 0.01;
 
         if (!matchesEffectiveTotal) {
-            const allowUndiscountedForAutoPromotions = !input.promoCode && matchesUndiscountedTotal;
-            if (!allowUndiscountedForAutoPromotions) {
-                throw AppError.badInput(`Price mismatch: Calculated ${totalOrderPrice}, provided ${input.totalPrice}`);
-            }
+            throw AppError.badInput(`Price mismatch: Calculated ${totalOrderPrice + prioritySurcharge}, provided ${input.totalPrice}`);
         }
 
         // 4b. Determine if approval is required
@@ -553,19 +585,25 @@ export class OrderService {
 
         const orderData = {
             displayId: this.generateDisplayId(),
-            price: effectiveOrderPrice,
             userId,
+            businessId: orderBusinessId,
+            // Price breakdown:
+            // basePrice              = sum of items' effective price (respecting discounts) + option extras
+            // markupPrice            = sum of products' markup amounts (platform margin, additional amount only)
+            // actualPrice            = final item price after promotions (what customer pays for items)
+            // originalDeliveryPrice  = server-calculated delivery fee (before promotions)
+            // deliveryPrice          = final delivery fee after promotions + priority surcharge
+            basePrice: Number(orderBasePrice.toFixed(2)),
+            markupPrice: Number(orderMarkupPrice.toFixed(2)),
+            actualPrice: effectiveOrderPrice,
+            originalDeliveryPrice: expectedDeliveryPrice,
             // Fold priority surcharge into the stored delivery price so that
-            // order totals (price + deliveryPrice) always equal what the customer paid.
+            // total (actualPrice + deliveryPrice) always equals what the customer paid.
             deliveryPrice: effectiveDeliveryPrice + prioritySurcharge,
             paymentCollection: input.paymentCollection ?? 'CASH_TO_DRIVER',
             originalPrice:
                 Math.abs(calculatedItemsTotal - effectiveOrderPrice) > 0.01
                     ? Number(calculatedItemsTotal.toFixed(2))
-                    : undefined,
-            originalDeliveryPrice:
-                Math.abs(expectedDeliveryPrice - effectiveDeliveryPrice) > 0.01
-                    ? Number((expectedDeliveryPrice + prioritySurcharge).toFixed(2))
                     : undefined,
             status: (requiresApproval ? 'AWAITING_APPROVAL' : 'PENDING') as 'AWAITING_APPROVAL' | 'PENDING',
             locationFlagged,
@@ -581,7 +619,7 @@ export class OrderService {
             quantity: item.quantity,
             finalAppliedPrice: item.finalAppliedPrice,
             basePrice: item.basePrice,
-            salePrice: item.salePrice,
+            discountedPrice: item.discountedPrice,
             markupPrice: item.markupPrice,
             nightMarkedupPrice: item.nightMarkedupPrice,
             notes: item.notes,
@@ -675,7 +713,7 @@ export class OrderService {
                             quantity: inputItem.quantity,
                             finalAppliedPrice: 0, // child items are covered by the offer price
                             basePrice: 0,
-                            salePrice: null,
+                            discountedPrice: null,
                             markupPrice: null,
                             nightMarkedupPrice: null,
                             notes: null,
@@ -704,7 +742,6 @@ export class OrderService {
 
         if (promoResult.promotions.length > 0) {
             const appliedPromotionIds = promoResult.promotions.map((promo) => promo.id);
-            const orderBusinessId = businessIds.size === 1 ? Array.from(businessIds)[0] : null;
 
             const perPromotionUsage = promoResult.promotions.map((promo) => ({
                 promotionId: promo.id,
@@ -759,12 +796,12 @@ export class OrderService {
     }
 
     private async ensureUserPromoMetadata(userId: string): Promise<void> {
-        const db = await getDB();
+        const db = this.db;
         await db.insert(userPromoMetadata).values({ userId }).onConflictDoNothing();
     }
 
     private async mapToOrder(dbOrder: DbOrder): Promise<Order> {
-        const db = await getDB();
+        const db = this.db;
 
         // Fetch all items for this order (1 query) — both top-level and children
         const allItems = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, dbOrder.id));
@@ -817,6 +854,12 @@ export class OrderService {
                 childItemsMap.set(item.parentOrderItemId, arr);
             }
         }
+        
+        // Fetch order promotions
+        const dbPromotions = await db
+            .select()
+            .from(orderPromotionsTable)
+            .where(eq(orderPromotionsTable.orderId, dbOrder.id));
 
         // Helper to build an OrderItem from a DB row
         const buildOrderItem = (item: (typeof allItems)[0]): OrderItem => {
@@ -839,7 +882,6 @@ export class OrderService {
                 name: product?.name ?? '',
                 imageUrl: product?.imageUrl || undefined,
                 quantity: item.quantity,
-                basePrice: Number(item.basePrice),
                 unitPrice: Number(item.finalAppliedPrice), // DB: finalAppliedPrice → GraphQL: unitPrice
                 notes: item.notes || undefined,
                 selectedOptions,
@@ -896,6 +938,10 @@ export class OrderService {
                         createdAt: new Date(business.createdAt),
                         updatedAt: new Date(business.updatedAt),
                         isOpen: true,
+                        isTemporarilyClosed: business.isTemporarilyClosed ?? false,
+                        schedule: [],
+                        prepTimeOverrideMinutes: (business as any).prepTimeOverrideMinutes ?? null,
+                        temporaryClosureReason: (business as any).temporaryClosureReason ?? null,
                     },
                     items: orderItems,
                 });
@@ -908,11 +954,12 @@ export class OrderService {
             id: dbOrder.id,
             displayId: dbOrder.displayId,
             userId: dbOrder.userId,
-            orderPrice: dbOrder.price,
-            deliveryPrice: dbOrder.deliveryPrice,
-            originalPrice: dbOrder.originalPrice ?? undefined,
-            originalDeliveryPrice: dbOrder.originalDeliveryPrice ?? undefined,
-            totalPrice: dbOrder.price + dbOrder.deliveryPrice,
+            businessId: dbOrder.businessId,
+            deliveryPrice: Number(dbOrder.deliveryPrice),
+            totalPrice: Number(dbOrder.actualPrice) + Number(dbOrder.deliveryPrice),
+            // Legacy backward-compat fields
+            orderPrice: Number(dbOrder.actualPrice),
+            originalPrice: undefined,
             orderDate: parseDbTimestamp(dbOrder.orderDate) ?? new Date(),
             updatedAt: parseDbTimestamp(dbOrder.updatedAt) ?? new Date(),
             status: dbOrder.status as OrderStatus,
@@ -942,6 +989,9 @@ export class OrderService {
                       business: undefined,
                       adminNote: driverUser.adminNote || undefined,
                       flagColor: driverUser.flagColor || undefined,
+                      isOnline: (driverUser as any).isOnline ?? false,
+                      permissions: [],
+                      preferredLanguage: ((driverUser as any).preferredLanguage === 'en' ? 'EN' : 'AL') as any,
                   }
                 : undefined,
             dropOffLocation: {
@@ -949,10 +999,17 @@ export class OrderService {
                 longitude: dbOrder.dropoffLng,
                 address: dbOrder.dropoffAddress,
             },
+            pickupLocations: businessOrderList.map((bo) => bo.business.location),
             driverNotes: dbOrder.driverNotes || undefined,
             needsApproval: dbOrder.status === 'AWAITING_APPROVAL',
             locationFlagged: (dbOrder as any).locationFlagged ?? false,
             businesses: businessOrderList,
+            orderPromotions: dbPromotions.map((p) => ({
+                id: p.id,
+                promotionId: p.promotionId,
+                appliesTo: p.appliesTo as any,
+                discountAmount: Number(p.discountAmount),
+            })),
         };
     }
 
@@ -1089,6 +1146,219 @@ export class OrderService {
         return this.mapToOrder(updated);
     }
 
+    async updateStatusWithSideEffects(id: string, status: OrderStatus, context: ApiContextInterface): Promise<Order> {
+        const { userData, db, notificationService, financialService } = context;
+        log.info({ orderId: id, status }, 'order:updateStatusWithSideEffects');
+
+        const role = userData?.role;
+        if (!role) {
+            throw AppError.unauthorized();
+        }
+
+        const currentOrder = await this.getOrderById(id);
+        if (!currentOrder) {
+            throw AppError.notFound('Order');
+        }
+
+        const dbOrder = await this.orderRepository.findById(id);
+        if (!dbOrder) {
+            throw AppError.notFound('Order');
+        }
+
+        const currentStatus = currentOrder.status;
+        const isSuperAdmin = role === 'SUPER_ADMIN';
+        const isDriver = role === 'DRIVER';
+        const isBusinessAdmin = role === 'BUSINESS_OWNER' || role === 'BUSINESS_EMPLOYEE';
+        const isCustomer = role === 'CUSTOMER';
+
+        let order: Order;
+
+        if (isCustomer) {
+            if (currentOrder.userId !== userData.userId) {
+                throw AppError.forbidden('Not authorized to update this order');
+            }
+            if (status !== 'DELIVERED') {
+                throw AppError.businessRule('Customers can only mark orders as DELIVERED');
+            }
+            order = await this.updateOrderStatus(id, status, true);
+        } else if (isBusinessAdmin) {
+            if (!userData.businessId) {
+                throw AppError.forbidden('Business admin has no business assigned');
+            }
+            const canAccess = await this.orderContainsBusiness(id, userData.businessId);
+            if (!canAccess) {
+                throw AppError.forbidden('Not authorized to update this order');
+            }
+            const allowed: Record<string, string[]> = {
+                PENDING: ['READY', 'CANCELLED'],
+                PREPARING: ['READY', 'CANCELLED'],
+            };
+            if (!allowed[currentStatus]?.includes(status)) {
+                throw AppError.businessRule('Invalid status transition for business admin');
+            }
+            order = await this.updateOrderStatus(id, status);
+        } else if (isDriver) {
+            const allowed: Record<string, string[]> = {
+                PREPARING: ['OUT_FOR_DELIVERY'],
+                READY: ['OUT_FOR_DELIVERY'],
+                OUT_FOR_DELIVERY: ['DELIVERED'],
+            };
+            if (!allowed[currentStatus]?.includes(status)) {
+                throw AppError.businessRule('Invalid status transition for driver');
+            }
+            if (!userData.userId) {
+                throw AppError.unauthorized('Driver not authenticated');
+            }
+            if (dbOrder.driverId && dbOrder.driverId !== userData.userId) {
+                throw AppError.conflict('Order already assigned to another driver');
+            }
+            if (status === 'OUT_FOR_DELIVERY') {
+                order = await this.updateOrderStatusWithDriver(id, status, userData.userId);
+            } else {
+                order = await this.updateOrderStatus(id, status);
+            }
+        } else if (!isSuperAdmin) {
+            throw AppError.forbidden('Not authorized to update order status');
+        } else {
+            order = await this.updateOrderStatus(id, status, true);
+        }
+
+        // Side Effects
+        if (status === 'DELIVERED' && currentStatus !== 'DELIVERED') {
+            const items = await this.db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, id));
+            await financialService.createOrderSettlements(dbOrder, items, dbOrder.driverId);
+        }
+
+        await this.updateUserBehaviorOnStatusChange(
+            dbOrder.userId,
+            currentStatus,
+            status,
+            dbOrder.actualPrice + dbOrder.deliveryPrice,
+            dbOrder.orderDate || null,
+        );
+
+        await this.publishSingleUserOrder(dbOrder.userId, id);
+        await this.publishAllOrders();
+        notifyCustomerOrderStatus(notificationService, dbOrder.userId, id, status);
+
+        if (status === 'READY' && currentStatus !== 'READY') {
+            try {
+                const dispatchService = getDispatchService();
+                dispatchService.dispatchOrder(id, notificationService).catch((err) =>
+                    log.error({ err, orderId: id }, 'updateStatus:dispatch:error'),
+                );
+            } catch (err) {
+                log.warn({ err }, 'updateStatus:dispatch:serviceNotReady');
+            }
+        }
+
+        // Live Activity update logic
+        this.handleLiveActivityUpdate(id, status, currentStatus, dbOrder, order, context);
+
+        // Analytics
+        this.emitAnalyticsEvent(id, status, currentStatus, dbOrder, userData, isDriver, isBusinessAdmin, isSuperAdmin);
+
+        // Audit Log
+        const auditLog = createAuditLogger(db, context);
+        await auditLog.log({
+            action: 'ORDER_STATUS_CHANGED',
+            entityType: 'ORDER',
+            entityId: id,
+            metadata: {
+                orderId: id,
+                oldValue: { status: currentStatus },
+                newValue: { status },
+                changedFields: ['status'],
+            },
+        });
+
+        return order;
+    }
+
+    private async handleLiveActivityUpdate(id: string, status: string, currentStatus: string, dbOrder: DbOrder, order: Order, context: ApiContextInterface) {
+        const { notificationService, userData } = context;
+        const statusToLiveActivityStatus: Record<string, any> = {
+            PENDING: 'pending',
+            PREPARING: 'preparing',
+            READY: 'ready',
+            OUT_FOR_DELIVERY: 'out_for_delivery',
+            DELIVERED: 'delivered',
+            CANCELLED: 'cancelled',
+        };
+        const liveActivityStatus = statusToLiveActivityStatus[status];
+
+        if (liveActivityStatus) {
+            let driverName = 'Your driver';
+            if (order.driver?.firstName) {
+                driverName = `${order.driver.firstName} ${order.driver.lastName || ''}`.trim();
+            }
+
+            let estimatedMinutes = 0;
+            if ((status === 'PREPARING' || status === 'READY') && dbOrder.preparationMinutes) {
+                estimatedMinutes = dbOrder.preparationMinutes;
+            } else if (status === 'OUT_FOR_DELIVERY') {
+                const driverId = dbOrder.driverId ?? userData?.userId;
+                if (driverId) {
+                    try {
+                        const liveEta = await getLiveDriverEta(driverId);
+                        if (liveEta?.remainingEtaSeconds != null && liveEta.remainingEtaSeconds > 0) {
+                            estimatedMinutes = Math.ceil(liveEta.remainingEtaSeconds / 60);
+                        }
+                    } catch { /* fall through */ }
+                }
+                if (estimatedMinutes === 0) {
+                    await cache.set(`cache:la-ofd-pending:${id}`, true, 300);
+                }
+            }
+
+            const phaseInitialMinutes =
+                status === 'PENDING'
+                    ? Math.max(1, (dbOrder.preparationMinutes ?? estimatedMinutes) || 15)
+                    : (status === 'PREPARING' || status === 'READY')
+                        ? Math.max(1, (dbOrder.preparationMinutes ?? estimatedMinutes) || 15)
+                        : status === 'OUT_FOR_DELIVERY'
+                            ? Math.max(1, estimatedMinutes || 15)
+                            : Math.max(1, estimatedMinutes || 1);
+
+            const phaseStartedAt =
+                status === 'PENDING'
+                    ? (parseDbTimestamp(dbOrder.orderDate)?.getTime() ?? Date.now())
+                    : (status === 'PREPARING' || status === 'READY')
+                        ? (parseDbTimestamp(dbOrder.preparingAt)?.getTime() ?? Date.now())
+                        : status === 'OUT_FOR_DELIVERY'
+                            ? (parseDbTimestamp(dbOrder.outForDeliveryAt)?.getTime() ?? Date.now())
+                            : Date.now();
+
+            if (!(status === 'OUT_FOR_DELIVERY' && estimatedMinutes === 0)) {
+                updateLiveActivity(notificationService, id, liveActivityStatus, driverName, estimatedMinutes, phaseInitialMinutes, phaseStartedAt);
+            }
+
+            if (status === 'DELIVERED' || status === 'CANCELLED') {
+                endLiveActivity(notificationService, id, status === 'CANCELLED' ? 'cancelled' : 'delivered');
+            }
+        }
+    }
+
+    private emitAnalyticsEvent(id: string, status: string, currentStatus: string, dbOrder: DbOrder, userData: any, isDriver: boolean, isBusinessAdmin: boolean, isSuperAdmin: boolean) {
+        const statusToEventType: Record<string, string> = {
+            READY: 'ORDER_READY',
+            OUT_FOR_DELIVERY: 'ORDER_PICKED_UP',
+            DELIVERED: 'ORDER_DELIVERED',
+            CANCELLED: 'ORDER_CANCELLED',
+        };
+        const analyticsEvent = statusToEventType[status];
+        if (analyticsEvent) {
+            emitOrderEvent({
+                orderId: id,
+                eventType: analyticsEvent as any,
+                actorType: isDriver ? 'DRIVER' : isBusinessAdmin ? 'RESTAURANT' : isSuperAdmin ? 'ADMIN' : 'SYSTEM',
+                actorId: userData?.userId,
+                driverId: isDriver ? userData?.userId : (dbOrder.driverId ?? undefined),
+                metadata: { previousStatus: currentStatus },
+            });
+        }
+    }
+
     async assignDriverToOrder(id: string, driverId: string | null, onlyIfUnassigned = false): Promise<Order | null> {
         const updated = await this.orderRepository.assignDriver(id, driverId, onlyIfUnassigned);
         if (!updated) {
@@ -1104,7 +1374,7 @@ export class OrderService {
             throw AppError.notFound('Order');
         }
 
-        const db = await getDB();
+        const db = this.db;
 
         const order = await this.updateOrderStatus(id, 'CANCELLED');
 
@@ -1120,7 +1390,7 @@ export class OrderService {
             dbOrder.userId,
             dbOrder.status as OrderStatus,
             'CANCELLED',
-            dbOrder.price + dbOrder.deliveryPrice,
+            dbOrder.actualPrice + dbOrder.deliveryPrice,
             dbOrder.orderDate || null,
         );
         return order;
@@ -1139,7 +1409,7 @@ export class OrderService {
             throw AppError.businessRule('Cannot cancel a delivered order');
         }
 
-        const db = await getDB();
+        const db = this.db;
 
         const updated = await this.orderRepository.cancelWithReason(id, reason);
         if (!updated) {
@@ -1168,7 +1438,7 @@ export class OrderService {
             dbOrder.userId,
             dbOrder.status as OrderStatus,
             'CANCELLED',
-            dbOrder.price + dbOrder.deliveryPrice,
+            dbOrder.actualPrice + dbOrder.deliveryPrice,
             dbOrder.orderDate || null,
         );
 
@@ -1195,7 +1465,7 @@ export class OrderService {
     }
 
     private async updateUserBehaviorOnOrderCreated(userId: string, orderDate: string | null): Promise<void> {
-        const db = await getDB();
+        const db = this.db;
         const orderTimestamp = orderDate || new Date().toISOString();
 
         await db
@@ -1222,7 +1492,7 @@ export class OrderService {
         orderTotal: number,
         orderDate: string | null,
     ): Promise<void> {
-        const db = await getDB();
+        const db = this.db;
         const orderTimestamp = orderDate || new Date().toISOString();
 
         await db
@@ -1251,7 +1521,7 @@ export class OrderService {
     }
 
     private async updateUserBehaviorOnCancelled(userId: string, orderDate: string | null): Promise<void> {
-        const db = await getDB();
+        const db = this.db;
         const orderTimestamp = orderDate || new Date().toISOString();
 
         await db
@@ -1322,7 +1592,7 @@ export class OrderService {
     async getOrdersByBusinessId(businessId: string): Promise<Order[]> {
         try {
             // Single query: find order IDs that contain items from this business
-            const db = await getDB();
+            const db = this.db;
             const orderIds = await db
                 .selectDistinct({ orderId: orderItemsTable.orderId })
                 .from(orderItemsTable)
@@ -1351,7 +1621,7 @@ export class OrderService {
                 return [];
             }
 
-            const db = await getDB();
+            const db = this.db;
             const orderIds = await db
                 .selectDistinct({ orderId: orderItemsTable.orderId })
                 .from(orderItemsTable)
@@ -1376,18 +1646,104 @@ export class OrderService {
     async orderContainsBusiness(orderId: string, businessId: string): Promise<boolean> {
         try {
             // Lightweight check — single DB query, no mapToOrder
-            const db = await getDB();
+            const db = this.db;
             const match = await db
                 .select({ orderId: orderItemsTable.orderId })
                 .from(orderItemsTable)
                 .innerJoin(productsTable, eq(orderItemsTable.productId, productsTable.id))
                 .where(and(eq(orderItemsTable.orderId, orderId), eq(productsTable.businessId, businessId)))
                 .limit(1);
-            return match.length > 0;
         } catch (error) {
             log.error({ err: error, orderId, businessId }, 'order:containsBusiness:error');
             return false;
         }
+    }
+
+    /**
+     * Create an order and handle all side effects (notifications, logic, audit)
+     */
+    async createOrderWithSideEffects(
+        userId: string,
+        input: CreateOrderInput,
+        context: ApiContextInterface,
+    ): Promise<Order> {
+        const order = await this.createOrder(userId, input);
+
+        // Best-effort side effects
+        try {
+            await this.publishSingleUserOrder(userId, order.id);
+            await this.publishAllOrders();
+        } catch (error) {
+            log.error({ err: error, userId, orderId: order.id }, 'createOrder:publish:failed');
+        }
+
+        try {
+            const adminRows = await this.db
+                .select({ id: usersTable.id })
+                .from(usersTable)
+                .where(
+                    and(
+                        inArray(usersTable.role, ['SUPER_ADMIN', 'ADMIN']),
+                        isNull(usersTable.deletedAt),
+                    ),
+                );
+            const adminUserIds = adminRows.map((row: any) => row.id);
+            notifyAdminsNewOrder(context.notificationService, adminUserIds, String(order.id));
+            if (order.needsApproval) {
+                notifyAdminsOrderNeedsApproval(context.notificationService, adminUserIds, String(order.id));
+            }
+        } catch (error) {
+            log.error({ err: error, orderId: order.id }, 'createOrder:notifyAdmins:failed');
+        }
+
+        if (!order.needsApproval) {
+            try {
+                const orderBusinessIds = Array.from(
+                    new Set(
+                        (order.businesses ?? [])
+                            .map((entry: any) => entry?.business?.id)
+                            .filter((id: string | undefined): id is string => Boolean(id)),
+                    ),
+                );
+
+                if (orderBusinessIds.length > 0) {
+                    const businessUserRows = await this.db
+                        .select({ id: usersTable.id })
+                        .from(usersTable)
+                        .where(
+                            and(
+                                inArray(usersTable.businessId, orderBusinessIds),
+                                inArray(usersTable.role, ['BUSINESS_OWNER', 'BUSINESS_EMPLOYEE']),
+                                isNull(usersTable.deletedAt),
+                            ),
+                        );
+
+                    notifyBusinessNewOrder(
+                        context.notificationService,
+                        businessUserRows.map((row: any) => row.id),
+                        String(order.id),
+                    );
+                }
+            } catch (error) {
+                log.error({ err: error, orderId: order.id }, 'createOrder:notifyBusiness:failed');
+            }
+        }
+
+        try {
+            updateLiveActivity(context.notificationService, String(order.id), 'pending', 'Your driver', 0);
+        } catch (error) {
+            log.error({ err: error, orderId: order.id }, 'createOrder:liveActivity:failed');
+        }
+
+        const auditLog = createAuditLogger(this.db, context as any);
+        await auditLog.log({
+            action: 'ORDER_CREATED',
+            entityType: 'ORDER',
+            entityId: String(order.id),
+            metadata: { orderId: String(order.id), userId, totalPrice: order.totalPrice },
+        });
+
+        return order;
     }
 }
 

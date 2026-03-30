@@ -11,37 +11,17 @@ import Select from '@/components/ui/Select';
 import { Image, Plus, Edit, Trash2, GripVertical, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 
-interface Banner {
-  id: string;
-  title?: string | null;
-  subtitle?: string | null;
-  imageUrl: string;
-  linkType?: string | null;
-  linkTarget?: string | null;
-  sortOrder: number;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface BannerFormData {
-  title?: string;
-  subtitle?: string;
-  imageUrl: string;
-  linkType?: string;
-  linkTarget?: string;
-  isActive: boolean;
-}
+import { BannersQuery, CreateBannerInput } from '@/gql/graphql';
 
 export default function BannersPage() {
   const [activeOnly, setActiveOnly] = useState<boolean | undefined>(undefined);
   const [showModal, setShowModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
-  const [deletingBanner, setDeletingBanner] = useState<Banner | null>(null);
-  const [draggedBanner, setDraggedBanner] = useState<Banner | null>(null);
+  const [editingBanner, setEditingBanner] = useState<NonNullable<BannersQuery['getBanners']>[number] | null>(null);
+  const [deletingBanner, setDeletingBanner] = useState<NonNullable<BannersQuery['getBanners']>[number] | null>(null);
+  const [draggedBanner, setDraggedBanner] = useState<NonNullable<BannersQuery['getBanners']>[number] | null>(null);
 
-  const [formData, setFormData] = useState<BannerFormData>({
+  const [formData, setFormData] = useState<CreateBannerInput>({
     title: '',
     subtitle: '',
     imageUrl: '',
@@ -97,7 +77,7 @@ export default function BannersPage() {
     },
   });
 
-  const banners = (data?.getBanners || []) as Banner[];
+  const banners = data?.getBanners || [];
 
   const handleCreate = () => {
     setEditingBanner(null);
@@ -112,7 +92,7 @@ export default function BannersPage() {
     setShowModal(true);
   };
 
-  const handleEdit = (banner: Banner) => {
+  const handleEdit = (banner: NonNullable<BannersQuery['getBanners']>[number]) => {
     setEditingBanner(banner);
     setFormData({
       title: banner.title || '',
@@ -125,7 +105,7 @@ export default function BannersPage() {
     setShowModal(true);
   };
 
-  const handleDelete = (banner: Banner) => {
+  const handleDelete = (banner: NonNullable<BannersQuery['getBanners']>[number]) => {
     setDeletingBanner(banner);
     setShowDeleteModal(true);
   };
@@ -190,7 +170,7 @@ export default function BannersPage() {
     }
   };
 
-  const handleDragStart = (banner: Banner) => {
+  const handleDragStart = (banner: NonNullable<BannersQuery['getBanners']>[number]) => {
     setDraggedBanner(banner);
   };
 
@@ -198,7 +178,7 @@ export default function BannersPage() {
     e.preventDefault();
   };
 
-  const handleDrop = async (targetBanner: Banner) => {
+  const handleDrop = async (targetBanner: NonNullable<BannersQuery['getBanners']>[number]) => {
     if (!draggedBanner || draggedBanner.id === targetBanner.id) {
       setDraggedBanner(null);
       return;
@@ -215,7 +195,7 @@ export default function BannersPage() {
     setDraggedBanner(null);
   };
 
-  const toggleActive = async (banner: Banner) => {
+  const toggleActive = async (banner: NonNullable<BannersQuery['getBanners']>[number]) => {
     try {
       await updateBanner({
         variables: {
@@ -272,7 +252,7 @@ export default function BannersPage() {
 
       {banners.length === 0 ? (
         <div className="text-center py-12 text-gray-500">
-          <Image className="mx-auto h-12 w-12 mb-4 opacity-50" />
+          <Image className="mx-auto h-12 w-12 mb-4 opacity-50" aria-label="No banners" />
           <p>No banners found. Create your first banner to get started.</p>
         </div>
       ) : (
@@ -364,7 +344,7 @@ export default function BannersPage() {
                     </Button>
                     <Button
                       size="sm"
-                      variant="danger"
+                      variant="destructive"
                       onClick={() => handleDelete(banner)}
                     >
                       <Trash2 className="w-4 h-4" />
@@ -416,7 +396,7 @@ export default function BannersPage() {
               </label>
               <Input
                 type="text"
-                value={formData.title}
+                value={formData.title || ''}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 placeholder="Banner title"
               />
@@ -428,7 +408,7 @@ export default function BannersPage() {
               </label>
               <Input
                 type="text"
-                value={formData.subtitle}
+                value={formData.subtitle || ''}
                 onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })}
                 placeholder="Banner subtitle"
               />
@@ -439,7 +419,7 @@ export default function BannersPage() {
                 Link Type
               </label>
               <Select
-                value={formData.linkType}
+                value={formData.linkType || ''}
                 onChange={(e) => setFormData({ ...formData, linkType: e.target.value })}
               >
                 <option value="">No Link</option>
@@ -457,7 +437,7 @@ export default function BannersPage() {
                 </label>
                 <Input
                   type="text"
-                  value={formData.linkTarget}
+                  value={formData.linkTarget || ''}
                   onChange={(e) => setFormData({ ...formData, linkTarget: e.target.value })}
                   placeholder={
                     formData.linkType === 'url'
@@ -472,7 +452,7 @@ export default function BannersPage() {
               <input
                 type="checkbox"
                 id="isActive"
-                checked={formData.isActive}
+                checked={!!formData.isActive}
                 onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                 className="w-4 h-4"
               />

@@ -1,11 +1,10 @@
-import { Database } from '@/database';
-import { settlements, drivers, businesses, orders as ordersTable } from '@/database/schema';
+import { type DbType } from '@/database';
+import { settlements } from '@/database/schema';
 import { eq, and, gte, lte, sql, inArray, isNotNull } from 'drizzle-orm';
 import { DbSettlement } from '@/database/schema/settlements';
 
 export interface SettlementFilters {
     type?: string;
-    status?: string;
     direction?: string;
     isSettled?: boolean;
     driverId?: string;
@@ -26,7 +25,7 @@ export interface SettlementSummaryFilters {
 }
 
 export class SettlementRepository {
-    constructor(private db: Database) {}
+    constructor(private db: DbType) {}
 
     async getSettlementById(id: string): Promise<DbSettlement | null> {
         const result = await this.db.select().from(settlements).where(eq(settlements.id, id));
@@ -39,10 +38,6 @@ export class SettlementRepository {
 
         if (filters.type) {
             conditions.push(eq(settlements.type, filters.type as any));
-        }
-
-        if (filters.status) {
-            conditions.push(eq(settlements.status, filters.status as any));
         }
 
         if (filters.direction) {
@@ -116,13 +111,12 @@ export class SettlementRepository {
         const result = await this.db
             .select({
                 totalAmount: sql<number>`SUM(CAST(${settlements.amount} AS NUMERIC))::FLOAT`,
-                totalPending: sql<number>`SUM(CASE WHEN ${settlements.status} = 'PENDING' THEN CAST(${settlements.amount} AS NUMERIC) ELSE 0 END)::FLOAT`,
-                totalPaid: sql<number>`SUM(CASE WHEN ${settlements.status} = 'PAID' THEN CAST(${settlements.amount} AS NUMERIC) ELSE 0 END)::FLOAT`,
-                totalOverdue: sql<number>`SUM(CASE WHEN ${settlements.status} = 'OVERDUE' THEN CAST(${settlements.amount} AS NUMERIC) ELSE 0 END)::FLOAT`,
+                totalPending: sql<number>`SUM(CASE WHEN ${settlements.isSettled} = false THEN CAST(${settlements.amount} AS NUMERIC) ELSE 0 END)::FLOAT`,
+                totalPaid: sql<number>`SUM(CASE WHEN ${settlements.isSettled} = true THEN CAST(${settlements.amount} AS NUMERIC) ELSE 0 END)::FLOAT`,
                 totalReceivable: sql<number>`SUM(CASE WHEN ${settlements.direction} = 'RECEIVABLE' THEN CAST(${settlements.amount} AS NUMERIC) ELSE 0 END)::FLOAT`,
                 totalPayable: sql<number>`SUM(CASE WHEN ${settlements.direction} = 'PAYABLE' THEN CAST(${settlements.amount} AS NUMERIC) ELSE 0 END)::FLOAT`,
                 count: sql<number>`COUNT(*)::INT`,
-                pendingCount: sql<number>`COUNT(CASE WHEN ${settlements.status} = 'PENDING' THEN 1 END)::INT`,
+                pendingCount: sql<number>`COUNT(CASE WHEN ${settlements.isSettled} = false THEN 1 END)::INT`,
             })
             .from(settlements)
             .where(whereClause)
@@ -132,7 +126,6 @@ export class SettlementRepository {
             totalAmount: result.totalAmount || 0,
             totalPending: result.totalPending || 0,
             totalPaid: result.totalPaid || 0,
-            totalOverdue: result.totalOverdue || 0,
             totalReceivable: result.totalReceivable || 0,
             totalPayable: result.totalPayable || 0,
             count: result.count || 0,
@@ -172,7 +165,6 @@ export class SettlementRepository {
                 businessId,
                 orderId,
                 amount,
-                status: 'PENDING',
                 ruleId: ruleId || null,
             })
             .returning();
@@ -185,9 +177,7 @@ export class SettlementRepository {
         const result = await this.db
             .update(settlements)
             .set({
-                status: 'PAID',
                 isSettled: true,
-                paidAt: now,
                 updatedAt: now,
             })
             .where(eq(settlements.id, settlementId))
@@ -204,9 +194,7 @@ export class SettlementRepository {
         await this.db
             .update(settlements)
             .set({
-                status: 'PAID',
                 isSettled: true,
-                paidAt: now,
                 updatedAt: now,
             })
             .where(inArray(settlements.id, ids))
@@ -258,8 +246,7 @@ export class SettlementRepository {
                     businessId: current.businessId,
                     orderId: current.orderId,
                     amount: amount,
-                    status: 'PAID',
-                    paidAt: now,
+                    isSettled: true,
                     ruleId: current.ruleId,
                 })
                 .execute();
@@ -274,9 +261,7 @@ export class SettlementRepository {
         const result = await this.db
             .update(settlements)
             .set({
-                status: 'PENDING',
                 isSettled: false,
-                paidAt: null,
                 settlementPaymentId: null,
                 updatedAt: now,
             })
@@ -287,9 +272,7 @@ export class SettlementRepository {
     }
 
     /**
-     * Delete all PENDING settlements for a given order (used when an order is cancelled
-     * before any settlement has been paid out).
-     * Returns the number of rows deleted.
+     * Delete all unsettled settlements for a given order.
      */
     async deletePendingByOrderId(orderId: string): Promise<number> {
         const deleted = await this.db
@@ -297,10 +280,10 @@ export class SettlementRepository {
             .where(
                 and(
                     eq(settlements.orderId, orderId),
-                    eq(settlements.status, 'PENDING'),
+                    eq(settlements.isSettled, false),
                 ),
             )
-            .returning({ id: settlements.id });
+            .returning();
         return deleted.length;
     }
 
@@ -310,11 +293,11 @@ export class SettlementRepository {
             .where(
                 and(
                     eq(settlements.orderId, orderId),
-                    eq(settlements.status, 'PENDING'),
+                    eq(settlements.isSettled, false),
                     isNotNull(settlements.driverId),
                 ),
             )
-            .returning({ id: settlements.id });
+            .returning();
         return deleted.length;
     }
 
@@ -324,11 +307,11 @@ export class SettlementRepository {
             .where(
                 and(
                     eq(settlements.orderId, orderId),
-                    eq(settlements.status, 'PENDING'),
+                    eq(settlements.isSettled, false),
                     isNotNull(settlements.businessId),
                 ),
             )
-            .returning({ id: settlements.id });
+            .returning();
         return deleted.length;
     }
 

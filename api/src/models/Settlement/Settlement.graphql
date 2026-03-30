@@ -8,6 +8,12 @@ enum SettlementDirection {
     PAYABLE
 }
 
+enum SettlementAmountType {
+    FIXED
+    PERCENT
+}
+
+# Kept for backward compatibility - no longer backed by DB column
 enum SettlementStatus {
     PENDING
     PAID
@@ -25,11 +31,13 @@ type Settlement {
     order: Order
     ruleId: ID
     amount: Float!
+    # Legacy fields kept for backward compatibility (derived from isSettled)
     currency: String!
     status: SettlementStatus!
     isSettled: Boolean!
     settlementPayment: SettlementPayment
     sourcePayment: SettlementPayment
+    # Legacy fields - return null (no longer stored in DB)
     paidAt: Date
     paymentReference: String
     paymentMethod: String
@@ -213,8 +221,9 @@ type SettlementPayment {
     driver: User
     business: Business
     amount: Float!
-    direction: SettlementPaymentDirection!
-    totalBalanceAtTime: Float!
+    # Legacy fields kept for backward compatibility
+    direction: SettlementPaymentDirection
+    totalBalanceAtTime: Float
     paymentMethod: String
     paymentReference: String
     note: String

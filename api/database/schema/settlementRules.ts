@@ -11,22 +11,34 @@ export const settlementDirection = pgEnum('settlement_direction', settlementDire
 
 export const settlementRuleAmountType = pgEnum('settlement_rule_amount_type', ['FIXED', 'PERCENT']);
 
+// What the rule applies to: order item price or delivery price
+const settlementRuleTypeValues = ['ORDER_PRICE', 'DELIVERY_PRICE'] as const;
+export const settlementRuleType = pgEnum('settlement_rule_type', settlementRuleTypeValues);
+
 /**
- * Settlement Rules - simple commission/fee configuration
+ * Settlement Rules - commission/fee configuration
  *
- * A rule says: "for every order, create a settlement of X (fixed or % of subtotal/delivery fee)
+ * A rule says: "for every order, create a settlement of X (fixed or % of actualPrice/deliveryPrice)
  * between the platform and a driver/business".
  *
- * Scoping:
- *   - businessId set  → rule only applies to orders from that business
- *   - promotionId set → rule only applies to orders that used that promotion
- *   - both null       → global: applies to every order
+ * Scoping (determines specificity for delivery rules):
+ *   - businessId + promotionId set → most specific (business+promotion combo)
+ *   - promotionId set (no business) → promotion-only
+ *   - businessId set (no promotion) → business-only
+ *   - both null                     → global: applies to every order
+ *
+ * Rule application:
+ *   - DELIVERY_PRICE rules: most-specific-wins (only the most specific scope level is applied)
+ *   - ORDER_PRICE rules: stack all (every matching rule at every scope level is applied)
  */
 export const settlementRules = pgTable('settlement_rules', {
     id: uuid('id').primaryKey().defaultRandom().notNull(),
 
     // Human-readable label, e.g. "10% commission on subtotal"
     name: varchar('name', { length: 200 }).notNull(),
+
+    // What the rule applies to
+    type: settlementRuleType('type').notNull(),
 
     // Whether this settlement is for a driver or a business
     entityType: settlementEntityType('entity_type').notNull(),
@@ -38,12 +50,10 @@ export const settlementRules = pgTable('settlement_rules', {
 
     // FIXED: amount is euros per order
     // PERCENT: amount is a percentage (0–100) applied to the base
+    //   For ORDER_PRICE type: % of actualPrice
+    //   For DELIVERY_PRICE type: % of deliveryPrice
     amountType: settlementRuleAmountType('amount_type').notNull(),
     amount: numeric('amount', { precision: 10, scale: 2 }).notNull(),
-
-    // Only used when amountType = PERCENT: which value to apply % to
-    // 'SUBTOTAL' = order item total, 'DELIVERY_FEE' = delivery charge
-    appliesTo: varchar('applies_to', { length: 20 }),
 
     // Scope (both null = global rule)
     businessId: uuid('business_id').references(() => businesses.id, { onDelete: 'set null' }),

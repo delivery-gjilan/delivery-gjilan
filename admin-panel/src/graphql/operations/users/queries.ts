@@ -22,7 +22,7 @@ export const USERS_QUERY = graphql(`
   }
 `);
 
-export const DRIVERS_QUERY = gql`
+export const DRIVERS_QUERY = graphql(`
   query Drivers {
     drivers {
       id
@@ -57,7 +57,7 @@ export const DRIVERS_QUERY = gql`
       }
     }
   }
-`;
+`);
 
 export const USER_BEHAVIOR_QUERY = graphql(`
   query UserBehavior($userId: ID!) {

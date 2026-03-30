@@ -1,17 +1,17 @@
 import { type DbType } from '@/database';
 import { 
-    settlementRules, 
-    DbSettlementRule, 
-    NewDbSettlementRule 
+    settlementRules, DbSettlementRule, NewDbSettlementRule 
 } from '@/database/schema';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, or, isNull, isNotNull, inArray, type SQL } from 'drizzle-orm';
 
 type Database = DbType;
 
 export interface SettlementRuleFilters {
-    entityType?: 'DRIVER' | 'BUSINESS';
-    businessId?: string;
-    promotionId?: string;
+    entityTypes?: ('DRIVER' | 'BUSINESS')[];
+    type?: 'ORDER_PRICE' | 'DELIVERY_PRICE';
+    businessIds?: string[];
+    promotionIds?: string[];
+    scopes?: ('GLOBAL' | 'BUSINESS' | 'PROMOTION' | 'BUSINESS_PROMOTION')[];
     isActive?: boolean;
 }
 
@@ -31,16 +31,39 @@ export class SettlementRuleRepository {
         let query = this.db.select().from(settlementRules);
         const conditions = [];
 
-        if (filters.entityType) {
-            conditions.push(eq(settlementRules.entityType, filters.entityType as any));
+        if (filters.entityTypes && filters.entityTypes.length > 0) {
+            conditions.push(inArray(settlementRules.entityType, filters.entityTypes as any));
         }
 
-        if (filters.businessId) {
-            conditions.push(eq(settlementRules.businessId, filters.businessId));
+        if (filters.type) {
+            conditions.push(eq(settlementRules.type, filters.type as any));
         }
 
-        if (filters.promotionId) {
-            conditions.push(eq(settlementRules.promotionId, filters.promotionId));
+        if (filters.businessIds && filters.businessIds.length > 0) {
+            conditions.push(inArray(settlementRules.businessId, filters.businessIds));
+        }
+
+        if (filters.promotionIds && filters.promotionIds.length > 0) {
+            conditions.push(inArray(settlementRules.promotionId, filters.promotionIds));
+        }
+
+        if (filters.scopes && filters.scopes.length > 0) {
+            const scopeConditions = filters.scopes.map(scope => {
+                switch (scope) {
+                    case 'GLOBAL':
+                        return and(isNull(settlementRules.businessId), isNull(settlementRules.promotionId));
+                    case 'BUSINESS':
+                        return and(isNotNull(settlementRules.businessId), isNull(settlementRules.promotionId));
+                    case 'PROMOTION':
+                        return and(isNull(settlementRules.businessId), isNotNull(settlementRules.promotionId));
+                    case 'BUSINESS_PROMOTION':
+                        return and(isNotNull(settlementRules.businessId), isNotNull(settlementRules.promotionId));
+                }
+            });
+            const combinedScopes = or(...scopeConditions);
+            if (combinedScopes) {
+                conditions.push(combinedScopes);
+            }
         }
 
         if (filters.isActive !== undefined) {
@@ -54,7 +77,11 @@ export class SettlementRuleRepository {
             }
         }
 
-        return query.orderBy(settlementRules.createdAt);
+        const rules = await query.orderBy(settlementRules.createdAt);
+        return rules.map((rule) => ({
+            ...rule,
+            amount: parseFloat(rule.amount as any),
+        })) as any;
     }
 
     async createRule(rule: NewDbSettlementRule): Promise<DbSettlementRule> {

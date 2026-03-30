@@ -31,7 +31,7 @@ export type ApplicablePromotion = {
     id: string;
     code: string | null;
     name: string;
-    type: 'FIXED_AMOUNT' | 'PERCENTAGE' | 'FREE_DELIVERY' | 'SPEND_X_GET_FREE' | 'SPEND_X_PERCENT' | 'SPEND_X_FIXED';
+    type: 'FIXED_AMOUNT' | 'PERCENTAGE' | 'FREE_DELIVERY' | 'SPEND_X_PERCENT' | 'SPEND_X_FIXED';
     target: 'ALL_USERS' | 'SPECIFIC_USERS' | 'FIRST_ORDER' | 'CONDITIONAL';
     discountValue?: number | null;
     maxDiscountCap?: number | null;
@@ -96,7 +96,7 @@ export class PromotionEngine {
                     ),
                     or(
                         isNull(promotions.minOrderAmount),
-                        lte(promotions.minOrderAmount, String(cart.subtotal))
+                        lte(promotions.minOrderAmount, cart.subtotal)
                     )
                 )
             );
@@ -243,6 +243,126 @@ export class PromotionEngine {
     }
 
     /**
+     * Apply a SINGLE promotion by ID (used by createOrder when client sends promotionId).
+     * Validates eligibility for the given user + cart, then returns the result.
+     * If the promotion is not valid/eligible, throws an AppError.
+     */
+    async applySinglePromotion(
+        userId: string,
+        promotionId: string,
+        cart: CartContext,
+    ): Promise<PromotionResult> {
+        const now = new Date().toISOString();
+
+        // 1. Fetch the promotion
+        const [promo] = await this.db
+            .select()
+            .from(promotions)
+            .where(eq(promotions.id, promotionId))
+            .limit(1);
+
+        if (!promo) {
+            throw AppError.notFound('Promotion');
+        }
+
+        // 2. Basic validity checks
+        if (!promo.isActive) {
+            throw AppError.businessRule('Promotion is no longer active');
+        }
+        if (promo.startsAt && promo.startsAt > now) {
+            throw AppError.businessRule('Promotion has not started yet');
+        }
+        if (promo.endsAt && promo.endsAt < now) {
+            throw AppError.businessRule('Promotion has expired');
+        }
+        if (promo.minOrderAmount && cart.subtotal < Number(promo.minOrderAmount)) {
+            throw AppError.businessRule(
+                `Minimum order amount of ${promo.minOrderAmount} required`,
+            );
+        }
+
+        // 3. Check spend threshold for conditional types
+        if (promo.spendThreshold && cart.subtotal < Number(promo.spendThreshold)) {
+            throw AppError.businessRule(
+                `Spend threshold of ${promo.spendThreshold} not met`,
+            );
+        }
+
+        // 4. Check target eligibility
+        const [metadata] = await this.db
+            .select()
+            .from(userPromoMetadata)
+            .where(eq(userPromoMetadata.userId, userId))
+            .limit(1);
+
+        switch (promo.target) {
+            case 'FIRST_ORDER': {
+                if (metadata?.hasUsedFirstOrderPromo) {
+                    throw AppError.businessRule('First order promotion already used');
+                }
+                break;
+            }
+            case 'SPECIFIC_USERS': {
+                const assigned = await this.checkUserAssignment(promo.id, userId);
+                if (!assigned) {
+                    throw AppError.businessRule('Promotion is not available for you');
+                }
+                break;
+            }
+            case 'ALL_USERS':
+            case 'CONDITIONAL':
+                break;
+        }
+
+        // 5. Check business eligibility
+        const businessEligible = await this.checkBusinessEligibility(promo.id, cart.businessIds);
+        if (!businessEligible) {
+            throw AppError.businessRule('Promotion is not valid for this business');
+        }
+
+        // 6. Check usage limits
+        const usageLimitOk = await this.checkUsageLimits(promo, userId);
+        if (!usageLimitOk) {
+            throw AppError.businessRule('Promotion usage limit reached');
+        }
+        const codeEligible = await this.checkCodeEligibility(promo, userId);
+        if (!codeEligible) {
+            throw AppError.businessRule('You have already used this promotion the maximum number of times');
+        }
+
+        // 7. Calculate discount
+        const appliedAmount = this.calculateDiscount(promo, cart.subtotal);
+        const freeDelivery = this.checkFreeDelivery(promo);
+
+        const appliedPromo: ApplicablePromotion = {
+            id: promo.id,
+            code: promo.code,
+            name: promo.name,
+            type: promo.type as ApplicablePromotion['type'],
+            target: promo.target as ApplicablePromotion['target'],
+            discountValue: promo.discountValue ? Number(promo.discountValue) : null,
+            maxDiscountCap: promo.maxDiscountCap ? Number(promo.maxDiscountCap) : null,
+            freeDelivery,
+            priority: promo.priority,
+            isStackable: promo.isStackable,
+            appliedAmount,
+        };
+
+        const finalSubtotal = Math.max(0, cart.subtotal - appliedAmount);
+        const finalDeliveryPrice = freeDelivery ? 0 : cart.deliveryPrice;
+        const finalTotal = finalSubtotal + finalDeliveryPrice;
+
+        return {
+            promotions: [appliedPromo],
+            totalDiscount: appliedAmount,
+            freeDeliveryApplied: freeDelivery,
+            finalSubtotal,
+            finalDeliveryPrice,
+            finalTotal,
+        };
+    }
+
+    /**
      * Record promotion usage after order is created
      */
     async recordUsage(
@@ -375,9 +495,6 @@ export class PromotionEngine {
                 discount = 0; // Handled separately
                 break;
 
-            case 'SPEND_X_GET_FREE':
-                discount = 0; // Free item/delivery granted via freeDelivery flag
-                break;
 
             case 'SPEND_X_PERCENT': {
                 const pct = Number(promo.discountValue || 0);

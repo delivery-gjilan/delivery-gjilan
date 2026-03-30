@@ -8,13 +8,20 @@ enum SettlementAmountType {
   PERCENT
 }
 
+enum SettlementRuleType {
+  ORDER_PRICE
+  DELIVERY_PRICE
+}
+
 type SettlementRule {
   id: ID!
   name: String!
+  type: SettlementRuleType!
   entityType: SettlementEntityType!
   direction: SettlementDirection!
   amountType: SettlementAmountType!
   amount: Float!
+  # Legacy field kept for backward compatibility - derived from type
   appliesTo: String
   business: Business
   promotion: Promotion
@@ -26,10 +33,12 @@ type SettlementRule {
 
 input CreateSettlementRuleInput {
   name: String!
+  type: SettlementRuleType!
   entityType: SettlementEntityType!
   direction: SettlementDirection!
   amountType: SettlementAmountType!
   amount: Float!
+  # Legacy field kept for backward compatibility - ignored, use type instead
   appliesTo: String
   businessId: ID
   promotionId: ID
@@ -38,18 +47,29 @@ input CreateSettlementRuleInput {
 
 input UpdateSettlementRuleInput {
   name: String
+  type: SettlementRuleType
   direction: SettlementDirection
   amountType: SettlementAmountType
   amount: Float
+  # Legacy field kept for backward compatibility - ignored, use type instead
   appliesTo: String
   isActive: Boolean
   notes: String
 }
 
+enum SettlementRuleScope {
+  GLOBAL
+  BUSINESS
+  PROMOTION
+  BUSINESS_PROMOTION
+}
+
 input SettlementRuleFilterInput {
-  entityType: SettlementEntityType
-  businessId: ID
-  promotionId: ID
+  entityTypes: [SettlementEntityType!]
+  type: SettlementRuleType
+  businessIds: [ID!]
+  promotionIds: [ID!]
+  scopes: [SettlementRuleScope!]
   isActive: Boolean
 }
 

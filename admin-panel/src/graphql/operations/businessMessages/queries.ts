@@ -1,7 +1,7 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const GET_BUSINESS_MESSAGE_THREADS = gql`
-  query GetBusinessMessageThreads {
+export const GET_BUSINESS_MESSAGE_THREADS = graphql(`
+  query BusinessMessageThreads {
     businessMessageThreads {
       businessUserId
       businessUserName
@@ -15,10 +15,10 @@ export const GET_BUSINESS_MESSAGE_THREADS = gql`
       }
     }
   }
-`;
+`);
 
-export const GET_BUSINESS_MESSAGES = gql`
-  query GetBusinessMessages($businessUserId: ID!, $limit: Int, $offset: Int) {
+export const GET_BUSINESS_MESSAGES = graphql(`
+  query BusinessMessages($businessUserId: ID!, $limit: Int, $offset: Int) {
     businessMessages(businessUserId: $businessUserId, limit: $limit, offset: $offset) {
       id
       adminId
@@ -30,4 +30,4 @@ export const GET_BUSINESS_MESSAGES = gql`
       createdAt
     }
   }
-`;
+`);
