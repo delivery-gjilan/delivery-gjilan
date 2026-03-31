@@ -7,6 +7,7 @@
 
 ## Recent Updates
 
+- 2026-03-31: Priority surcharge (opt-in expedited delivery fee) is now stored as a separate `priority_surcharge` column on orders and automatically creates a `DRIVER / RECEIVABLE` settlement for cash orders (`rule_id = null`).
 - 2026-03-31: Added business-funded promotion flow: `orders.business_price` column, business-funded item discounts stored as `businessPrice`, settlement rules skipped for business-funded item promos, ORDER_PRICE settlements use business-funded base when present, admin wizard exposes creator type toggle + business selector with settlement rules info box.
 - 2026-03-25: Comprehensive doc refresh — added PromotionEngine service docs, stacking logic, progression bar (mobile-customer), corrected promotions table fields to match actual schema, added mobile-customer key files.
 - 2026-03-20: Added DB-level pending-settlement uniqueness guard (`uq_settlements_pending_fingerprint`) plus conflict-safe inserts in `FinancialService.createOrderSettlements()` to hard-stop occasional duplicate pending rows under concurrent triggers.
@@ -120,6 +121,16 @@ This automatic markup remittance is only created for orders where payment collec
 For `PREPAID_TO_PLATFORM`, no driver remittance settlement is created for markup because the platform already collected funds directly.
 
 This keeps platform markup earnings explicit in settlements without requiring an admin-configured settlement rule.
+
+### Automatic Priority Surcharge Remittance (Platform ↔ Driver)
+
+When a customer pays a priority (expedited) delivery surcharge, a second automatic driver settlement is created.
+
+- Settlement type: `DRIVER`
+- Direction: `RECEIVABLE`
+- Meaning: driver owes the platform the priority surcharge collected from the customer
+- Rule linkage: `rule_id = null` (system-generated)
+- Only applicable to `CASH_TO_DRIVER` orders — on `PREPAID_TO_PLATFORM` orders the platform already collected the surcharge directly
 
 ### Examples
 

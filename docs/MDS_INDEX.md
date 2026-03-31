@@ -33,6 +33,9 @@
 | FF1 | [FUTURE_FEATURES/PERSONAL_INVENTORY_COVERAGE.md](FUTURE_FEATURES/PERSONAL_INVENTORY_COVERAGE.md) | Future Feature | Personal stock tracking, order coverage split, margin optimisation |
 | FF2 | [FUTURE_FEATURES/BUSINESS_DISPATCH.md](FUTURE_FEATURES/BUSINESS_DISPATCH.md) | Future Feature | Business-initiated driver dispatch, internal delivery runs |
 | FF3 | [FUTURE_FEATURES/CUSTOM_NAVIGATION.md](FUTURE_FEATURES/CUSTOM_NAVIGATION.md) | Future Feature | Migrating from `@badatgil/expo-mapbox-navigation` SDK to custom `@rnmapbox/maps` navigation — cost driver, unused hook inventory, step-by-step migration plan |
+| FF4 | [FUTURE_FEATURES/EMAIL_SERVICE.md](FUTURE_FEATURES/EMAIL_SERVICE.md) | Future Feature | Transactional email via Resend — order receipt on delivery, email verification migration, react-email templates, EmailService architecture |
+| FF5 | [FUTURE_FEATURES/MINIMUM_ORDER_AMOUNT.md](FUTURE_FEATURES/MINIMUM_ORDER_AMOUNT.md) | Future Feature | Per-business minimum order subtotal — DB column, API enforcement in createOrder, admin panel edit form, mobile-customer cart bar + disabled checkout |
+| FF6 | [FUTURE_FEATURES/BUSINESS_PREP_TIME_UPDATE.md](FUTURE_FEATURES/BUSINESS_PREP_TIME_UPDATE.md) | Future Feature | Business can extend prep time on PREPARING orders — "Add Time" UI in mobile-business, notifies customer/driver/admins (push), amber badge + map marker pulse in admin panel orders & map pages via `usePrepTimeAlerts` hook |
 | M1 | [MOBILE/OVERVIEW.md](MOBILE/OVERVIEW.md) | Mobile | Four-app architecture, shared patterns |
 | M2 | [MOBILE/PUSH_AND_LIVE_ACTIVITY.md](MOBILE/PUSH_AND_LIVE_ACTIVITY.md) | Mobile | FCM tokens, Live Activity, notification maturity |
 | M3 | [MOBILE/LIVE_ACTIVITY_BEHAVIOR.md](MOBILE/LIVE_ACTIVITY_BEHAVIOR.md) | Mobile | iOS widget, progress calculation, APNs pushes |
@@ -43,6 +46,7 @@
 | M8 | [MOBILE/DRIVER_APP.md](MOBILE/DRIVER_APP.md) | Mobile | Driver app deep-dive: heartbeat, navigation, PTT, battery, auth, stores, GraphQL ops, refactor candidates |
 | M9 | [MOBILE/MOBILE_ADMIN_DEEP_DIVE.md](MOBILE/MOBILE_ADMIN_DEEP_DIVE.md) | Mobile | Mobile-admin deep-dive: all screens, GraphQL ops, real-time arch, theme, i18n, refactor candidates |
 | M10 | [MOBILE/REALTIME_SUBSCRIPTIONS_CUSTOMER.md](MOBILE/REALTIME_SUBSCRIPTIONS_CUSTOMER.md) | Mobile | Subscription topology audit, connection count, payload sizing, duplicate subscriptions, optimization roadmap |
+| M11 | [MOBILE/PUSH_AND_LIVE_ACTIVITY_REFACTOR_PLAN.md](MOBILE/PUSH_AND_LIVE_ACTIVITY_REFACTOR_PLAN.md) | Mobile | Full audit of all push notifications and Live Activity; copy refinements; Android notification icon wiring; brand logo in Lock Screen widget; Albanian copy corrections |
 | O1 | [OPERATIONS/MONITORING.md](OPERATIONS/MONITORING.md) | Operations | Health endpoints, Prometheus, Grafana phases |
 | O2 | [OPERATIONS/OBSERVABILITY.md](OPERATIONS/OBSERVABILITY.md) | Operations | Loki, Promtail, structured logging, runbooks |
 | O3 | [OPERATIONS/NOTIFICATIONS.md](OPERATIONS/NOTIFICATIONS.md) | Operations | Query builder, campaigns, payload fields |
@@ -171,6 +175,7 @@ ARCHITECTURE (A1)
 | Live Activity | M2, M3 |
 | Campaign system | O3, O4 |
 | Device token lifecycle | O4 |
+| Transactional email (receipts, verification) | FF4 (future) |
 
 ### Financial Domain
 | Concern | MDS Files |

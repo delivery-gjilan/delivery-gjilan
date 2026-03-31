@@ -1,1 +1,0 @@
-ALTER TABLE "orders" ADD COLUMN "business_price" numeric(10, 2);

@@ -7,12 +7,15 @@ const ACTIVE_STATUSES = new Set(['AWAITING_APPROVAL', 'PENDING', 'PREPARING', 'R
  * Returns true if the user currently has at least one active (non-terminal) order.
  * Used to suppress the out-of-zone modal while an order is in flight.
  */
-export function useHasActiveOrder(): boolean {
-    const { data } = useQuery(GET_ORDERS, {
+export function useHasActiveOrder(): { hasActiveOrder: boolean; isLoading: boolean } {
+    const { data, loading } = useQuery(GET_ORDERS, {
         variables: { limit: 10, offset: 0 },
         fetchPolicy: 'cache-and-network',
     });
 
     const orders: Array<{ status: string }> = (data as any)?.orders ?? [];
-    return orders.some((o) => ACTIVE_STATUSES.has(o.status));
+    return {
+        hasActiveOrder: orders.some((o) => ACTIVE_STATUSES.has(o.status)),
+        isLoading: loading && !data,
+    };
 }

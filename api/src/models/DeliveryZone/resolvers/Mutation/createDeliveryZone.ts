@@ -10,10 +10,6 @@ export const createDeliveryZone: NonNullable<MutationResolvers['createDeliveryZo
 
     const db = await getDB();
 
-    if (input.isServiceZone === true) {
-        await db.update(deliveryZones).set({ isServiceZone: false });
-    }
-
     const [row] = await db
         .insert(deliveryZones)
         .values({

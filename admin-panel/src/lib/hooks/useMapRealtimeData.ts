@@ -2,11 +2,14 @@
 
 import { useApolloClient, useQuery, useSubscription } from '@apollo/client/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { GET_BUSINESSES } from '@/graphql/operations/businesses/queries';
-import { DRIVERS_QUERY } from '@/graphql/operations/users/queries';
-import { DRIVERS_UPDATED_SUBSCRIPTION } from '@/graphql/operations/users/subscriptions';
-import { GET_ORDERS } from '@/graphql/operations/orders/queries';
-import { ALL_ORDERS_SUBSCRIPTION } from '@/graphql/operations/orders/subscriptions';
+import {
+    AllOrdersUpdatedDocument,
+    BusinessesDocument,
+    DriversDocument,
+    DriversUpdatedDocument,
+    GetOrdersDocument,
+} from '@/gql/graphql';
+import { playNewOrderAlert } from '@/lib/audio/orderAlert';
 
 const SUBSCRIPTION_REFETCH_COOLDOWN_MS = 1500;
 const DRIVER_POLL_MS = 30000; // polling is a fallback only; subscription is primary
@@ -33,13 +36,13 @@ export function useMapRealtimeData() {
     // Sync model:
     // - Drivers: query with poll safety net + subscription merge into local state.
     // - Orders: query + payload-first subscription cache updates + cooldown fallback refetch.
-    const { data: businessData } = useQuery(GET_BUSINESSES);
+    const { data: businessData } = useQuery(BusinessesDocument);
     const {
         data: driverData,
         startPolling,
         stopPolling,
-    } = useQuery(DRIVERS_QUERY, { fetchPolicy: 'no-cache' });
-    const { data: orderData, refetch: refetchOrders } = useQuery(GET_ORDERS);
+    } = useQuery(DriversDocument, { fetchPolicy: 'no-cache' });
+    const { data: orderData, refetch: refetchOrders } = useQuery(GetOrdersDocument);
 
     const [driversLive, setDriversLive] = useState<any[]>([]);
     const [realtimeHealth, setRealtimeHealth] = useState({
@@ -49,6 +52,8 @@ export function useMapRealtimeData() {
         orderFallbackRefetchAtMs: 0,
     });
     const lastSubscriptionRefetchMsRef = useRef(0);
+    const knownOrderIdsRef = useRef<Set<string>>(new Set());
+    const hasInitializedKnownIdsRef = useRef(false);
     const lastDriverSubscriptionMsRef = useRef(0);
     const isDriverPollingRef = useRef(false);
 
@@ -91,18 +96,64 @@ export function useMapRealtimeData() {
         }
     }, [driverData]);
 
-    useSubscription(ALL_ORDERS_SUBSCRIPTION, {
+    useEffect(() => {
+        const currentOrders = Array.isArray((orderData as any)?.orders) ? (orderData as any).orders : [];
+        if (currentOrders.length === 0) return;
+
+        currentOrders.forEach((order: any) => {
+            if (order?.id) knownOrderIdsRef.current.add(String(order.id));
+        });
+
+        hasInitializedKnownIdsRef.current = true;
+    }, [orderData]);
+
+    useSubscription(AllOrdersUpdatedDocument, {
         onData: ({ data: subscriptionData }) => {
             const incomingOrders = (subscriptionData.data as any)?.allOrdersUpdated as any[] | undefined;
             if (incomingOrders && incomingOrders.length > 0) {
+                const validIncomingOrders = incomingOrders.filter((order: any) =>
+                    order && typeof order === 'object' && order.id,
+                );
+
+                if (validIncomingOrders.length === 0) {
+                    const now = Date.now();
+                    if (now - lastSubscriptionRefetchMsRef.current < SUBSCRIPTION_REFETCH_COOLDOWN_MS) {
+                        return;
+                    }
+                    lastSubscriptionRefetchMsRef.current = now;
+                    setRealtimeHealth((prev) => ({ ...prev, orderFallbackRefetchAtMs: now }));
+                    refetchOrders();
+                    return;
+                }
+
+                const newActiveOrders = validIncomingOrders.filter((order: any) => {
+                    const isKnown = knownOrderIdsRef.current.has(String(order.id));
+                    if (isKnown) return false;
+                    return order.status !== 'DELIVERED' && order.status !== 'CANCELLED';
+                });
+
+                const shouldAlert = hasInitializedKnownIdsRef.current && newActiveOrders.length > 0;
+
+                validIncomingOrders.forEach((order: any) => {
+                    knownOrderIdsRef.current.add(String(order.id));
+                });
+
+                if (!hasInitializedKnownIdsRef.current) {
+                    hasInitializedKnownIdsRef.current = true;
+                }
+
+                if (shouldAlert) {
+                    void playNewOrderAlert();
+                }
+
                 setRealtimeHealth((prev) => ({ ...prev, orderLastSubAtMs: Date.now() }));
-                apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
+                apolloClient.cache.updateQuery({ query: GetOrdersDocument }, (existing: any) => {
                     const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
                     const byId = new globalThis.Map<string, any>(
                         currentOrders.map((order: any) => [String(order?.id), order]),
                     );
 
-                    incomingOrders.forEach((order: any) => {
+                    validIncomingOrders.forEach((order: any) => {
                         const existingOrder = byId.get(String(order?.id));
                         byId.set(String(order?.id), { ...existingOrder, ...order });
                     });
@@ -125,7 +176,7 @@ export function useMapRealtimeData() {
         },
     });
 
-    useSubscription(DRIVERS_UPDATED_SUBSCRIPTION, {
+    useSubscription(DriversUpdatedDocument, {
         onData: ({ data: subscriptionData }) => {
             const incoming = (subscriptionData.data as any)?.driversUpdated as any[] | undefined;
             const s = incoming?.[0];

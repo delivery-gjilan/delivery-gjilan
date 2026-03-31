@@ -23,7 +23,7 @@ CREATE TYPE "public"."settlement_rule_type" AS ENUM('ORDER_PRICE', 'DELIVERY_PRI
 CREATE TYPE "public"."settlement_request_status" AS ENUM('PENDING_APPROVAL', 'ACCEPTED', 'DISPUTED', 'EXPIRED', 'CANCELLED');--> statement-breakpoint
 CREATE TYPE "public"."promotion_creator_type" AS ENUM('PLATFORM', 'BUSINESS');--> statement-breakpoint
 CREATE TYPE "public"."promotion_target" AS ENUM('ALL_USERS', 'SPECIFIC_USERS', 'FIRST_ORDER', 'CONDITIONAL');--> statement-breakpoint
-CREATE TYPE "public"."promotion_type" AS ENUM('FIXED_AMOUNT', 'PERCENTAGE', 'FREE_DELIVERY', 'SPEND_X_PERCENT', 'SPEND_X_FIXED');--> statement-breakpoint
+CREATE TYPE "public"."promotion_type" AS ENUM('FIXED_AMOUNT', 'PERCENTAGE', 'FREE_DELIVERY', 'SPEND_X_GET_FREE', 'SPEND_X_PERCENT', 'SPEND_X_FIXED');--> statement-breakpoint
 CREATE TYPE "public"."promotion_applies_to" AS ENUM('PRICE', 'DELIVERY');--> statement-breakpoint
 CREATE TYPE "public"."referral_status" AS ENUM('PENDING', 'COMPLETED', 'EXPIRED');--> statement-breakpoint
 CREATE TYPE "public"."campaign_status" AS ENUM('DRAFT', 'SENDING', 'SENT', 'FAILED');--> statement-breakpoint

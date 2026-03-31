@@ -37,7 +37,8 @@ export const calculateDeliveryPrice: NonNullable<QueryResolvers['calculateDelive
 
     const roundedDistance = Math.round(distanceKm * 100) / 100;
 
-    // 3. Check delivery zones first — zones take priority over distance tiers
+    // 3. Check delivery zones first — only non-service zones can override tier pricing.
+    // Service zones are coverage boundaries and must not set delivery fee.
     const zones = await db
         .select()
         .from(deliveryZones)
@@ -45,7 +46,9 @@ export const calculateDeliveryPrice: NonNullable<QueryResolvers['calculateDelive
         .orderBy(asc(deliveryZones.sortOrder));
 
     const dropoffPoint = { lat: dropoffLat, lng: dropoffLng };
-    const matchedZone = zones.find((zone) => isPointInPolygon(dropoffPoint, zone.polygon));
+    const matchedZone = zones.find(
+        (zone) => !zone.isServiceZone && isPointInPolygon(dropoffPoint, zone.polygon),
+    );
 
     if (matchedZone) {
         return {

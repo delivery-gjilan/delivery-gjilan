@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
     View, Text, Modal, TouchableOpacity, Pressable,
     TextInput, ActivityIndicator, StyleSheet,
@@ -28,14 +28,21 @@ export function OutOfZoneSheet({ visible, onDismiss }: OutOfZoneSheetProps) {
     const insets = useSafeAreaInsets();
     const { t } = useTranslations();
     const { setLocation } = useDeliveryLocationStore();
+    const mapRef = useRef<any>(null);
     const cameraRef = useRef<any>(null);
+    const geocodeAbortRef = useRef<AbortController | null>(null);
+    const geocodeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const regionSettleTokenRef = useRef(0);
 
     // `userStep` is only set when the user actively navigates (tap a button).
     // `null` means "auto-decide from data loading state".
     const [userStep, setUserStep] = useState<Step | null>(null);
     const [isDragging, setIsDragging] = useState(false);
+    const [isMapInMotion, setIsMapInMotion] = useState(false);
+    const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
     const [pickedCoord, setPickedCoord] = useState<{ latitude: number; longitude: number } | null>(null);
     const [pickedAddress, setPickedAddress] = useState('');
+    const [geocodedCoord, setGeocodedCoord] = useState<{ latitude: number; longitude: number } | null>(null);
     const [saveLabel, setSaveLabel] = useState('Home');
     const [saving, setSaving] = useState(false);
 
@@ -55,12 +62,111 @@ export function OutOfZoneSheet({ visible, onDismiss }: OutOfZoneSheetProps) {
     const [setDefaultAddress] = useMutation(SET_DEFAULT_ADDRESS);
 
     const allAddresses = (addressesData as any)?.myAddresses ?? [];
-    const serviceZones = ((zonesData as any)?.serviceZones ?? []).filter((z: any) => z.isActive);
+    const activeZones = ((zonesData as any)?.deliveryZones ?? []).filter((z: any) => z.isActive);
+    const serviceZones = activeZones.filter((z: any) => z.isServiceZone === true);
+    const effectiveZones = serviceZones.length > 0 ? serviceZones : activeZones;
+
+    const zoneFillFeature = useMemo(() => {
+        if (effectiveZones.length === 0) return null;
+
+        const rings = effectiveZones
+            .map((zone: any) =>
+                ((zone.polygon ?? []) as Array<{ lat: number; lng: number }>)
+                    .map((p) => [p.lng, p.lat] as [number, number])
+            )
+            .filter((ring: Array<[number, number]>) => ring.length >= 3)
+            .map((ring: Array<[number, number]>) => {
+                const first = ring[0];
+                const last = ring[ring.length - 1];
+                if (!first || !last || first[0] !== last[0] || first[1] !== last[1]) {
+                    return [...ring, first];
+                }
+                return ring;
+            });
+
+        if (rings.length === 0) return null;
+
+        return {
+            type: 'FeatureCollection',
+            features: [
+                {
+                    type: 'Feature',
+                    properties: {},
+                    geometry: {
+                        type: 'Polygon',
+                        // World ring with service-zone holes.
+                        coordinates: [
+                            [
+                                [-180, -85],
+                                [180, -85],
+                                [180, 85],
+                                [-180, 85],
+                                [-180, -85],
+                            ],
+                            ...rings,
+                        ],
+                    },
+                },
+            ],
+        } as any;
+    }, [effectiveZones]);
+
+    const zoneOutlineFeature = useMemo(() => {
+        if (effectiveZones.length === 0) return null;
+
+        const features = effectiveZones
+            .map((zone: any) => {
+                const ring = ((zone.polygon ?? []) as Array<{ lat: number; lng: number }>)
+                    .map((p) => [p.lng, p.lat] as [number, number]);
+                if (ring.length < 3) return null;
+
+                const first = ring[0];
+                const last = ring[ring.length - 1];
+                const closed = !first || !last || first[0] !== last[0] || first[1] !== last[1]
+                    ? [...ring, first]
+                    : ring;
+
+                return {
+                    type: 'Feature',
+                    properties: {},
+                    geometry: { type: 'LineString', coordinates: closed },
+                };
+            })
+            .filter(Boolean);
+
+        if (features.length === 0) return null;
+
+        return {
+            type: 'FeatureCollection',
+            features,
+        } as any;
+    }, [effectiveZones]);
+
+    const zoneBounds = useMemo(() => {
+        if (effectiveZones.length === 0) return { ne: [21.60, 42.55], sw: [21.35, 42.38] as [number, number] };
+
+        const points = effectiveZones.flatMap((zone: any) =>
+            ((zone.polygon ?? []) as Array<{ lat: number; lng: number }>).map((p) => ({ lng: p.lng, lat: p.lat })),
+        );
+
+        if (points.length === 0) return { ne: [21.60, 42.55], sw: [21.35, 42.38] as [number, number] };
+
+        const minLng = Math.min(...points.map((p) => p.lng));
+        const maxLng = Math.max(...points.map((p) => p.lng));
+        const minLat = Math.min(...points.map((p) => p.lat));
+        const maxLat = Math.max(...points.map((p) => p.lat));
+        const pad = 0.02;
+
+        return {
+            ne: [maxLng + pad, maxLat + pad] as [number, number],
+            sw: [minLng - pad, minLat - pad] as [number, number],
+        };
+    }, [effectiveZones]);
 
     // Only show addresses that fall inside a service zone (if zones are configured)
-    const validAddresses = serviceZones.length > 0
+    const validAddresses = effectiveZones.length > 0
         ? allAddresses.filter((addr: any) =>
-            serviceZones.some((zone: any) =>
+            effectiveZones.some((zone: any) =>
                 isPointInPolygon(
                     { lat: addr.latitude, lng: addr.longitude },
                     zone.polygon as Array<{ lat: number; lng: number }>
@@ -68,6 +174,18 @@ export function OutOfZoneSheet({ visible, onDismiss }: OutOfZoneSheetProps) {
             )
         )
         : allAddresses;
+
+    const isPickedWithinDeliveryZone = useMemo(() => {
+        if (!pickedCoord) return false;
+        if (effectiveZones.length === 0) return true;
+
+        return effectiveZones.some((zone: any) =>
+            isPointInPolygon(
+                { lat: pickedCoord.latitude, lng: pickedCoord.longitude },
+                zone.polygon as Array<{ lat: number; lng: number }>,
+            ),
+        );
+    }, [pickedCoord, effectiveZones]);
 
     // Derive the effective step: if the user tapped into a specific step, honour it.
     // Otherwise auto-decide based on data loading.
@@ -83,10 +201,29 @@ export function OutOfZoneSheet({ visible, onDismiss }: OutOfZoneSheetProps) {
             setUserStep(null);
             setPickedCoord(null);
             setPickedAddress('');
+            setGeocodedCoord(null);
             setSaveLabel('Home');
             setIsDragging(false);
+            setIsMapInMotion(false);
+            setIsReverseGeocoding(false);
+        } else {
+            if (geocodeAbortRef.current) {
+                geocodeAbortRef.current.abort();
+                geocodeAbortRef.current = null;
+            }
+            if (geocodeDebounceRef.current) {
+                clearTimeout(geocodeDebounceRef.current);
+                geocodeDebounceRef.current = null;
+            }
         }
     }, [visible]);
+
+    useEffect(() => {
+        return () => {
+            if (geocodeAbortRef.current) geocodeAbortRef.current.abort();
+            if (geocodeDebounceRef.current) clearTimeout(geocodeDebounceRef.current);
+        };
+    }, []);
 
     // ─── Handlers ──────────────────────────────────────────
 
@@ -102,17 +239,62 @@ export function OutOfZoneSheet({ visible, onDismiss }: OutOfZoneSheetProps) {
 
     const handleRegionDidChange = async (feature: any) => {
         setIsDragging(false);
-        const [longitude, latitude] = feature.geometry.coordinates;
-        setPickedCoord({ latitude, longitude });
+
+        let longitude: number | null = null;
+        let latitude: number | null = null;
+
         try {
-            const res = await fetch(
-                `https://api.maptiler.com/geocoding/${longitude},${latitude}.json?key=${MAPTILER_API_KEY}`
-            );
-            const data = await res.json();
-            if (data.features?.length > 0) {
-                setPickedAddress(data.features[0].place_name || data.features[0].text || '');
+            const center = await mapRef.current?.getCenter?.();
+            if (Array.isArray(center) && center.length >= 2) {
+                longitude = Number(center[0]);
+                latitude = Number(center[1]);
             }
-        } catch { /* ignore */ }
+        } catch {
+            // Fallback to event payload below.
+        }
+
+        if (longitude == null || latitude == null) {
+            const coords = feature?.geometry?.coordinates;
+            if (!coords) return;
+            longitude = Number(coords[0]);
+            latitude = Number(coords[1]);
+        }
+
+        setPickedCoord({ latitude, longitude });
+        setPickedAddress('');
+        setGeocodedCoord(null);
+        setIsReverseGeocoding(true);
+        setIsMapInMotion(true);
+
+        const settleToken = ++regionSettleTokenRef.current;
+        if (geocodeDebounceRef.current) clearTimeout(geocodeDebounceRef.current);
+
+        geocodeDebounceRef.current = setTimeout(async () => {
+            if (settleToken !== regionSettleTokenRef.current) return;
+
+            if (geocodeAbortRef.current) geocodeAbortRef.current.abort();
+            const controller = new AbortController();
+            geocodeAbortRef.current = controller;
+
+            try {
+                const res = await fetch(
+                    `https://api.maptiler.com/geocoding/${longitude},${latitude}.json?key=${MAPTILER_API_KEY}`,
+                    { signal: controller.signal },
+                );
+                const data = await res.json();
+                if (!controller.signal.aborted && data.features?.length > 0) {
+                    setPickedAddress(data.features[0].place_name || data.features[0].text || '');
+                    setGeocodedCoord({ latitude, longitude });
+                }
+            } catch {
+                // ignore aborted / failed
+            } finally {
+                if (!controller.signal.aborted && settleToken === regionSettleTokenRef.current) {
+                    setIsReverseGeocoding(false);
+                    setIsMapInMotion(false);
+                }
+            }
+        }, 250);
     };
 
     const handleConfirmLocation = () => {
@@ -343,6 +525,7 @@ export function OutOfZoneSheet({ visible, onDismiss }: OutOfZoneSheetProps) {
                         {/* Map */}
                         <View style={{ flex: 1 }}>
                             <MapLibreGL.MapView
+                                ref={mapRef}
                                 style={StyleSheet.absoluteFillObject}
                                 styleURL="mapbox://styles/mapbox/dark-v11"
                                 logoEnabled={false}
@@ -351,14 +534,54 @@ export function OutOfZoneSheet({ visible, onDismiss }: OutOfZoneSheetProps) {
                                 compassEnabled={false}
                                 pitchEnabled={false}
                                 rotateEnabled={false}
-                                onRegionWillChange={() => setIsDragging(true)}
+                                onRegionWillChange={() => {
+                                    regionSettleTokenRef.current += 1;
+                                    setIsDragging(true);
+                                    setIsMapInMotion(true);
+                                    setPickedAddress('');
+                                    setGeocodedCoord(null);
+                                    setIsReverseGeocoding(false);
+                                    if (geocodeDebounceRef.current) {
+                                        clearTimeout(geocodeDebounceRef.current);
+                                        geocodeDebounceRef.current = null;
+                                    }
+                                    if (geocodeAbortRef.current) {
+                                        geocodeAbortRef.current.abort();
+                                        geocodeAbortRef.current = null;
+                                    }
+                                }}
                                 onRegionDidChange={handleRegionDidChange}
                             >
                                 <MapLibreGL.Camera
                                     ref={cameraRef}
                                     defaultSettings={{ centerCoordinate: [21.4694, 42.4629], zoomLevel: 14 }}
-                                    maxBounds={{ ne: [21.60, 42.55], sw: [21.35, 42.38] }}
+                                    maxBounds={zoneBounds}
                                 />
+
+                                {zoneFillFeature ? (
+                                    <MapLibreGL.ShapeSource id="delivery-zone-mask-source" shape={zoneFillFeature}>
+                                        <MapLibreGL.FillLayer
+                                            id="delivery-zone-mask-layer"
+                                            style={{
+                                                fillColor: '#000000',
+                                                fillOpacity: 0.45,
+                                            }}
+                                        />
+                                    </MapLibreGL.ShapeSource>
+                                ) : null}
+
+                                {zoneOutlineFeature ? (
+                                    <MapLibreGL.ShapeSource id="delivery-zone-outline-source" shape={zoneOutlineFeature}>
+                                        <MapLibreGL.LineLayer
+                                            id="delivery-zone-outline-layer"
+                                            style={{
+                                                lineColor: '#22C55E',
+                                                lineWidth: 2,
+                                                lineOpacity: 0.95,
+                                            }}
+                                        />
+                                    </MapLibreGL.ShapeSource>
+                                ) : null}
                             </MapLibreGL.MapView>
 
                             {/* Fixed centre pin */}
@@ -399,17 +622,46 @@ export function OutOfZoneSheet({ visible, onDismiss }: OutOfZoneSheetProps) {
                         <View style={{ padding: 16, paddingBottom: Math.max(insets.bottom, 16), backgroundColor: theme.colors.card }}>
                             <TouchableOpacity
                                 onPress={handleConfirmLocation}
-                                disabled={!pickedCoord || isDragging}
+                                disabled={
+                                    !pickedCoord ||
+                                    isDragging ||
+                                    isReverseGeocoding ||
+                                    !pickedAddress.trim() ||
+                                    !isPickedWithinDeliveryZone ||
+                                    !geocodedCoord ||
+                                    Math.abs((pickedCoord?.latitude ?? 0) - (geocodedCoord?.latitude ?? 0)) >= 0.0001 ||
+                                    Math.abs((pickedCoord?.longitude ?? 0) - (geocodedCoord?.longitude ?? 0)) >= 0.0001
+                                }
                                 activeOpacity={0.85}
                                 style={{
-                                    backgroundColor: (!pickedCoord || isDragging) ? theme.colors.border : theme.colors.primary,
+                                    backgroundColor: (
+                                        !pickedCoord ||
+                                        isDragging ||
+                                        isReverseGeocoding ||
+                                        !pickedAddress.trim() ||
+                                        !isPickedWithinDeliveryZone ||
+                                        !geocodedCoord ||
+                                        Math.abs((pickedCoord?.latitude ?? 0) - (geocodedCoord?.latitude ?? 0)) >= 0.0001 ||
+                                        Math.abs((pickedCoord?.longitude ?? 0) - (geocodedCoord?.longitude ?? 0)) >= 0.0001
+                                    )
+                                        ? theme.colors.border
+                                        : theme.colors.primary,
                                     paddingVertical: 15, borderRadius: 14, alignItems: 'center',
                                 }}
                             >
                                 <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>
-                                    {isDragging ? 'Drop pin to confirm' : 'Confirm this location'}
+                                    {isDragging
+                                        ? 'Drop pin to confirm'
+                                        : isReverseGeocoding
+                                            ? 'Finding address...'
+                                            : 'Confirm this location'}
                                 </Text>
                             </TouchableOpacity>
+                            {!isPickedWithinDeliveryZone && (
+                                <Text style={{ marginTop: 8, fontSize: 12, fontWeight: '600', textAlign: 'center', color: '#F97316' }}>
+                                    {t.cart.outside_zone_inline_warning}
+                                </Text>
+                            )}
                         </View>
                     </View>
                 )}

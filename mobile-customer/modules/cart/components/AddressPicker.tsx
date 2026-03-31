@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, FlatList,
     ActivityIndicator, Keyboard, Platform, StyleSheet,
@@ -16,6 +16,9 @@ import Animated, {
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import type { UserAddress } from '@/gql/graphql';
+import { useQuery } from '@apollo/client/react';
+import { GET_SERVICE_ZONES } from '@/graphql/operations/serviceZone';
+import { isPointInPolygon } from '@/utils/pointInPolygon';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -98,6 +101,7 @@ export interface SelectedAddress {
     address: string;
     label?: string;
     addressId?: number | string;
+    isOverridden?: boolean;
 }
 
 interface AddressPickerProps {
@@ -171,6 +175,116 @@ export default function AddressPicker({
     const mapRef = useRef<any>(null);
     const cameraRef = useRef<any>(null);
 
+    const { data: zonesData, loading: zonesLoading } = useQuery(GET_SERVICE_ZONES, {
+        skip: !visible,
+        fetchPolicy: 'cache-and-network',
+    });
+
+    const activeZones = useMemo(
+        () => ((zonesData as any)?.deliveryZones ?? []).filter((z: any) => z.isActive),
+        [zonesData],
+    );
+    const serviceZones = useMemo(
+        () => activeZones.filter((z: any) => z.isServiceZone === true),
+        [activeZones],
+    );
+    const effectiveZones = serviceZones.length > 0 ? serviceZones : activeZones;
+
+    const zoneFillFeature = useMemo(() => {
+        if (effectiveZones.length === 0) return null;
+
+        const rings = effectiveZones
+            .map((zone: any) =>
+                ((zone.polygon ?? []) as Array<{ lat: number; lng: number }>)
+                    .map((p) => [p.lng, p.lat] as [number, number])
+            )
+            .filter((ring: Array<[number, number]>) => ring.length >= 3)
+            .map((ring: Array<[number, number]>) => {
+                const first = ring[0];
+                const last = ring[ring.length - 1];
+                if (!first || !last || first[0] !== last[0] || first[1] !== last[1]) {
+                    return [...ring, first];
+                }
+                return ring;
+            });
+
+        if (rings.length === 0) return null;
+
+        return {
+            type: 'FeatureCollection',
+            features: [
+                {
+                    type: 'Feature',
+                    properties: {},
+                    geometry: {
+                        type: 'Polygon',
+                        coordinates: [
+                            [
+                                [-180, -85],
+                                [180, -85],
+                                [180, 85],
+                                [-180, 85],
+                                [-180, -85],
+                            ],
+                            ...rings,
+                        ],
+                    },
+                },
+            ],
+        } as any;
+    }, [effectiveZones]);
+
+    const zoneOutlineFeature = useMemo(() => {
+        if (effectiveZones.length === 0) return null;
+
+        const features = effectiveZones
+            .map((zone: any) => {
+                const ring = ((zone.polygon ?? []) as Array<{ lat: number; lng: number }>)
+                    .map((p) => [p.lng, p.lat] as [number, number]);
+                if (ring.length < 3) return null;
+
+                const first = ring[0];
+                const last = ring[ring.length - 1];
+                const closed = !first || !last || first[0] !== last[0] || first[1] !== last[1]
+                    ? [...ring, first]
+                    : ring;
+
+                return {
+                    type: 'Feature',
+                    properties: {},
+                    geometry: { type: 'LineString', coordinates: closed },
+                };
+            })
+            .filter(Boolean);
+
+        if (features.length === 0) return null;
+
+        return {
+            type: 'FeatureCollection',
+            features,
+        } as any;
+    }, [effectiveZones]);
+
+    const zoneBounds = useMemo(() => {
+        if (effectiveZones.length === 0) return null;
+
+        const points = effectiveZones.flatMap((zone: any) =>
+            ((zone.polygon ?? []) as Array<{ lat: number; lng: number }>).map((p) => ({ lng: p.lng, lat: p.lat })),
+        );
+        if (points.length === 0) return null;
+
+        const minLng = Math.min(...points.map((p) => p.lng));
+        const maxLng = Math.max(...points.map((p) => p.lng));
+        const minLat = Math.min(...points.map((p) => p.lat));
+        const maxLat = Math.max(...points.map((p) => p.lat));
+        const pad = 0.02;
+
+        return {
+            ne: [maxLng + pad, maxLat + pad] as [number, number],
+            sw: [minLng - pad, minLat - pad] as [number, number],
+        };
+    }, [effectiveZones]);
+
     // Search state
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<GeocodingFeature[]>([]);
@@ -188,6 +302,11 @@ export default function AddressPicker({
         initialLocation ? { latitude: initialLocation.latitude, longitude: initialLocation.longitude } : null
     );
     const [pinAddress, setPinAddress] = useState(initialLocation?.address ?? '');
+    const [hasResolvedPinAddress, setHasResolvedPinAddress] = useState<boolean>(!!initialLocation?.address);
+    const [geocodedLocation, setGeocodedLocation] = useState<{ latitude: number; longitude: number } | null>(
+        initialLocation ? { latitude: initialLocation.latitude, longitude: initialLocation.longitude } : null,
+    );
+    const [isMapInMotion, setIsMapInMotion] = useState(false);
     const [reverseLoading, setReverseLoading] = useState(false);
     const [locatingCurrent, setLocatingCurrent] = useState(false);
 
@@ -200,8 +319,32 @@ export default function AddressPicker({
     const lastGeocodedPos = useRef<{ lat: number; lng: number } | null>(null);
     const geocodeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const buttonEnableTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const isTouchingMapRef = useRef(false);
     const mapDidMoveRef = useRef(false);
+    const regionSettleTokenRef = useRef(0);
+
+    const isPinWithinDeliveryZone = useMemo(() => {
+        if (!pinLocation) return false;
+        if (effectiveZones.length === 0) return true;
+
+        return effectiveZones.some((zone: any) =>
+            isPointInPolygon(
+                { lat: pinLocation.latitude, lng: pinLocation.longitude },
+                zone.polygon as Array<{ lat: number; lng: number }>,
+            ),
+        );
+    }, [pinLocation, effectiveZones]);
+
+    const isConfirmDisabled =
+        reverseLoading ||
+        pinElevated ||
+        zonesLoading ||
+        !pinLocation ||
+        !isPinWithinDeliveryZone ||
+        !hasResolvedPinAddress ||
+        !geocodedLocation ||
+        Math.abs(pinLocation.latitude - geocodedLocation.latitude) >= 0.0001 ||
+        Math.abs(pinLocation.longitude - geocodedLocation.longitude) >= 0.0001 ||
+        !pinAddress.trim();
 
     // Reset when opened
     useEffect(() => {
@@ -213,11 +356,16 @@ export default function AddressPicker({
             if (initialLocation) {
                 setPinLocation({ latitude: initialLocation.latitude, longitude: initialLocation.longitude });
                 setPinAddress(initialLocation.address);
+                setHasResolvedPinAddress(!!initialLocation.address);
+                setGeocodedLocation({ latitude: initialLocation.latitude, longitude: initialLocation.longitude });
                 setMapCenter([initialLocation.longitude, initialLocation.latitude]);
                 lastGeocodedPos.current = { lat: initialLocation.latitude, lng: initialLocation.longitude };
             } else {
                 setPinLocation(null);
                 setPinAddress('');
+                setHasResolvedPinAddress(false);
+                setGeocodedLocation(null);
+                setIsMapInMotion(false);
                 lastGeocodedPos.current = null;
 
                 // Auto-detect current GPS location on open
@@ -237,7 +385,6 @@ export default function AddressPicker({
                         const { latitude, longitude } = current.coords;
                         setPinLocation({ latitude, longitude });
                         setMapCenter([longitude, latitude]);
-                        lastGeocodedPos.current = { lat: latitude, lng: longitude };
 
                         cameraRef.current?.setCamera({
                             centerCoordinate: [longitude, latitude],
@@ -247,6 +394,9 @@ export default function AddressPicker({
 
                         const address = await reverseGeocode(latitude, longitude);
                         setPinAddress(address);
+                        setHasResolvedPinAddress(true);
+                        setGeocodedLocation({ latitude, longitude });
+                        lastGeocodedPos.current = { lat: latitude, lng: longitude };
                     } catch { /* best-effort */ }
                 })();
             }
@@ -264,7 +414,6 @@ export default function AddressPicker({
                 clearTimeout(buttonEnableTimeoutRef.current);
                 buttonEnableTimeoutRef.current = null;
             }
-            isTouchingMapRef.current = false;
             mapDidMoveRef.current = false;
         }
     }, [visible]);
@@ -307,9 +456,11 @@ export default function AddressPicker({
 
         setPinLocation(newLocation);
         setPinAddress(feature.place_name);
+        setHasResolvedPinAddress(true);
+        setGeocodedLocation(newLocation);
         setSearchQuery(feature.text);
         setShowResults(false);
-        lastGeocodedPos.current = { lat, lng: lng }; // Mark as geocoded
+        lastGeocodedPos.current = { lat, lng }; // Mark as geocoded
 
         cameraRef.current?.setCamera({
             centerCoordinate: [lng, lat],
@@ -355,7 +506,6 @@ export default function AddressPicker({
             const { latitude, longitude } = current.coords;
             const newLocation = { latitude, longitude };
             setPinLocation(newLocation);
-            lastGeocodedPos.current = { lat: latitude, lng: longitude }; // Mark as geocoded
 
             cameraRef.current?.setCamera({
                 centerCoordinate: [longitude, latitude],
@@ -365,6 +515,9 @@ export default function AddressPicker({
 
             const address = await reverseGeocode(latitude, longitude);
             setPinAddress(address);
+            setHasResolvedPinAddress(true);
+            setGeocodedLocation(newLocation);
+            lastGeocodedPos.current = { lat: latitude, lng: longitude }; // Mark as geocoded
             setSearchQuery('');
         } catch { /* ignore */ }
         setLocatingCurrent(false);
@@ -375,6 +528,8 @@ export default function AddressPicker({
         const newLocation = { latitude: addr.latitude, longitude: addr.longitude };
         setPinLocation(newLocation);
         setPinAddress(addr.displayName);
+        setHasResolvedPinAddress(true);
+        setGeocodedLocation(newLocation);
         setSearchQuery('');
         setShowSavedAddresses(false);
         setShowResults(false);
@@ -403,6 +558,7 @@ export default function AddressPicker({
             address: pinAddress || `${pinLocation.latitude.toFixed(6)}, ${pinLocation.longitude.toFixed(6)}`,
             label: matchedSaved?.addressName ?? undefined,
             addressId: matchedSaved?.id ?? undefined,
+            isOverridden: true,
         });
     }, [pinLocation, pinAddress, savedAddresses, onSelect]);
 
@@ -426,82 +582,6 @@ export default function AddressPicker({
                 {/* ─── Map ─────────────────────────────── */}
                 <View 
                     style={{ flex: 1 }}
-                    onStartShouldSetResponder={() => {
-                        // User touches map - disable button and mark as touching
-                        isTouchingMapRef.current = true;
-                        mapDidMoveRef.current = false; // Reset movement flag
-                        setPinElevated(true);
-                        if (buttonEnableTimeoutRef.current) clearTimeout(buttonEnableTimeoutRef.current);
-                        return true; // Capture touch to get release event
-                    }}
-                    onResponderRelease={() => {
-                        // User released finger from map
-                        isTouchingMapRef.current = false;
-                        
-                        // If map didn't move, re-enable button immediately
-                        if (!mapDidMoveRef.current && !reverseLoading) {
-                            setPinElevated(false);
-                        } else if (mapDidMoveRef.current) {
-                            // Map did move - trigger a check after a brief delay 
-                            // in case onRegionDidChange already fired while finger was down
-                            setTimeout(() => {
-                                // If button is still disabled and not currently geocoding,
-                                // force a region check to trigger geocoding
-                                if (pinElevated && !reverseLoading && mapRef.current) {
-                                    mapRef.current.getCenter().then((coords: any) => {
-                                        if (coords) {
-                                            // Simulate region change to trigger geocoding
-                                            const event = {
-                                                geometry: {
-                                                    coordinates: [coords[0], coords[1]]
-                                                }
-                                            };
-                                            // Manually call the geocoding logic
-                                            const [longitude, latitude] = coords;
-                                            const last = lastGeocodedPos.current;
-                                            if (last) {
-                                                const latDiff = Math.abs(latitude - last.lat);
-                                                const lngDiff = Math.abs(longitude - last.lng);
-                                                if (latDiff < 0.0001 && lngDiff < 0.0001) {
-                                                    setPinElevated(false);
-                                                    return;
-                                                }
-                                            }
-                                            
-                                            setPinLocation({ latitude, longitude });
-                                            setReverseLoading(true);
-                                            
-                                            setTimeout(async () => {
-                                                if (geocodeAbortRef.current) geocodeAbortRef.current.abort();
-                                                const controller = new AbortController();
-                                                geocodeAbortRef.current = controller;
-                                                lastGeocodedPos.current = { lat: latitude, lng: longitude };
-                                                try {
-                                                    const address = await reverseGeocode(latitude, longitude);
-                                                    if (!controller.signal.aborted) {
-                                                        setPinAddress(address);
-                                                        setSearchQuery('');
-                                                    }
-                                                } catch {
-                                                    // ignore
-                                                } finally {
-                                                    if (!controller.signal.aborted) {
-                                                        setReverseLoading(false);
-                                                        buttonEnableTimeoutRef.current = setTimeout(() => {
-                                                            setPinElevated(false);
-                                                        }, 50);
-                                                    }
-                                                }
-                                            }, 50);
-                                        }
-                                    }).catch(() => {
-                                        // If getCenter fails, just re-enable button
-                                        setPinElevated(false);
-                                    });
-                                }
-                            }, 100);
-                        }
-                    }}
                 >
                     <MapLibreGL.MapView
                         ref={mapRef}
@@ -510,59 +590,70 @@ export default function AddressPicker({
                         onPress={handleMapPress}
                         onRegionWillChange={() => {
                             // Map started moving — lift pin, cancel any in-flight geocode
+                            regionSettleTokenRef.current += 1;
                             mapDidMoveRef.current = true; // Mark that map moved
+                            setIsMapInMotion(true);
                             setPinElevated(true);
+                            setPinAddress('');
+                            setHasResolvedPinAddress(false);
+                            setGeocodedLocation(null);
                             if (geocodeAbortRef.current) geocodeAbortRef.current.abort();
                             if (buttonEnableTimeoutRef.current) clearTimeout(buttonEnableTimeoutRef.current);
                         }}
                         onRegionDidChange={async (feature: any) => {
-                            // Map stopped moving
-                            const coords = feature?.geometry?.coordinates;
-                            if (!coords) return;
-                            const [longitude, latitude] = coords;
+                            // Map stopped moving. Always prefer camera center over region payload geometry,
+                            // because payload coordinates can drift from the visual center pin on some devices.
+                            let longitude: number | null = null;
+                            let latitude: number | null = null;
+
+                            try {
+                                const center = await mapRef.current?.getCenter?.();
+                                if (Array.isArray(center) && center.length >= 2) {
+                                    longitude = Number(center[0]);
+                                    latitude = Number(center[1]);
+                                }
+                            } catch {
+                                // Fallback to event payload below.
+                            }
+
+                            if (longitude == null || latitude == null) {
+                                const coords = feature?.geometry?.coordinates;
+                                if (!coords) return;
+                                longitude = Number(coords[0]);
+                                latitude = Number(coords[1]);
+                            }
                             
                             // Clear any pending button enable timeout (from tap without drag)
                             if (buttonEnableTimeoutRef.current) clearTimeout(buttonEnableTimeoutRef.current);
                             
                             // Region settled — the finger must be off the map (or momentum ended).
-                            // Always reset the touch flag here; relying on onResponderRelease is
-                            // unreliable because the native map view eats the gesture before the
-                            // React responder system sees the release event.
-                            isTouchingMapRef.current = false;
-                            
-                            // Check if position changed significantly (>10 meters ~= 0.0001 degrees)
-                            const last = lastGeocodedPos.current;
-                            if (last) {
-                                const latDiff = Math.abs(latitude - last.lat);
-                                const lngDiff = Math.abs(longitude - last.lng);
-                                if (latDiff < 0.0001 && lngDiff < 0.0001) {
-                                    // Position barely changed, don't geocode
-                                    // But keep button disabled briefly to prevent accidental taps
-                                    buttonEnableTimeoutRef.current = setTimeout(() => setPinElevated(false), 200);
-                                    return;
-                                }
-                            }
-
                             // Clear any pending debounce
                             if (geocodeDebounceRef.current) clearTimeout(geocodeDebounceRef.current);
 
                             // Keep button disabled during entire geocoding process
                             setPinLocation({ latitude, longitude });
+                            setPinAddress('');
+                            setHasResolvedPinAddress(false);
+                            setGeocodedLocation(null);
                             setReverseLoading(true);
 
-                            // Small debounce to batch rapid events while staying responsive
+                            const settleToken = ++regionSettleTokenRef.current;
+
+                            // Wait for map movement to fully settle before geocoding.
                             geocodeDebounceRef.current = setTimeout(async () => {
+                                if (settleToken !== regionSettleTokenRef.current) return;
+
                                 // Abort previous geocode if still running
                                 if (geocodeAbortRef.current) geocodeAbortRef.current.abort();
                                 const controller = new AbortController();
                                 geocodeAbortRef.current = controller;
-
-                                // Store this position as the last geocoded
-                                lastGeocodedPos.current = { lat: latitude, lng: longitude };
                                 try {
                                     const address = await reverseGeocode(latitude, longitude);
                                     if (!controller.signal.aborted) {
                                         setPinAddress(address);
+                                        setHasResolvedPinAddress(true);
+                                        setGeocodedLocation({ latitude, longitude });
+                                        lastGeocodedPos.current = { lat: latitude, lng: longitude };
                                         setSearchQuery('');
                                     }
                                 } catch {
@@ -570,13 +661,14 @@ export default function AddressPicker({
                                 } finally {
                                     if (!controller.signal.aborted) {
                                         setReverseLoading(false);
+                                        setIsMapInMotion(false);
                                         // Keep button disabled for 50ms after geocoding completes
                                         buttonEnableTimeoutRef.current = setTimeout(() => {
                                             setPinElevated(false);
                                         }, 50);
                                     }
                                 }
-                            }, 50); // 50ms debounce - faster response while still batching events
+                            }, 250);
                         }}
                         logoEnabled={false}
                         attributionEnabled={false}
@@ -593,7 +685,33 @@ export default function AddressPicker({
                                 centerCoordinate: mapCenter,
                                 zoomLevel: 15,
                             }}
+                            maxBounds={zoneBounds ?? undefined}
                         />
+
+                        {zoneFillFeature ? (
+                            <MapLibreGL.ShapeSource id="address-picker-zone-mask-source" shape={zoneFillFeature}>
+                                <MapLibreGL.FillLayer
+                                    id="address-picker-zone-mask-layer"
+                                    style={{
+                                        fillColor: '#000000',
+                                        fillOpacity: 0.4,
+                                    }}
+                                />
+                            </MapLibreGL.ShapeSource>
+                        ) : null}
+
+                        {zoneOutlineFeature ? (
+                            <MapLibreGL.ShapeSource id="address-picker-zone-outline-source" shape={zoneOutlineFeature}>
+                                <MapLibreGL.LineLayer
+                                    id="address-picker-zone-outline-layer"
+                                    style={{
+                                        lineColor: '#22C55E',
+                                        lineWidth: 2,
+                                        lineOpacity: 0.95,
+                                    }}
+                                />
+                            </MapLibreGL.ShapeSource>
+                        ) : null}
                     </MapLibreGL.MapView>
 
                     {/* ─── Fixed Center Pin ──────────────── */}
@@ -828,17 +946,24 @@ export default function AddressPicker({
                             {/* Confirm Button */}
                             <TouchableOpacity
                                 style={[styles.confirmBtn, {
-                                    backgroundColor: (reverseLoading || pinElevated) ? theme.colors.border : '#7C3AED',
+                                    backgroundColor: isConfirmDisabled ? theme.colors.border : '#7C3AED',
                                 }]}
                                 onPress={handleConfirm}
-                                disabled={reverseLoading || pinElevated}
+                                disabled={isConfirmDisabled}
                                 activeOpacity={0.8}
                             >
                                 <Ionicons name="checkmark-circle" size={20} color="white" />
                                 <Text style={styles.confirmText}>
-                                    {t.cart.confirm_address ?? "Confirm Address"}
+                                    {reverseLoading || !hasResolvedPinAddress
+                                        ? (t.cart.finding_address ?? "Finding address...")
+                                        : (t.cart.confirm_address ?? "Confirm Address")}
                                 </Text>
                             </TouchableOpacity>
+                            {!isPinWithinDeliveryZone && (
+                                <Text style={[styles.outOfZoneHint, { color: '#F97316' }]}>
+                                    {t.cart.outside_zone_inline_warning}
+                                </Text>
+                            )}
                         </View>
                     ) : (
                         /* Empty State - prompt to select */
@@ -989,6 +1114,12 @@ const styles = StyleSheet.create({
     },
     confirmText: {
         color: 'white', fontSize: 16, fontWeight: '700',
+    },
+    outOfZoneHint: {
+        marginTop: 8,
+        fontSize: 12,
+        textAlign: 'center',
+        fontWeight: '600',
     },
     emptyPrompt: {
         alignItems: 'center', paddingVertical: 16, gap: 4,

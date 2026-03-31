@@ -110,6 +110,11 @@ export type ApplicablePromotion = {
   type: PromotionType;
 };
 
+export type ApprovalReason =
+  | 'FIRST_ORDER'
+  | 'HIGH_VALUE'
+  | 'OUT_OF_ZONE';
+
 export type AssignPromotionToUserInput = {
   expiresAt?: InputMaybe<Scalars['String']['input']>;
   promotionId: Scalars['ID']['input'];
@@ -429,6 +434,7 @@ export type CreateOrderInput = {
   prioritySurcharge?: InputMaybe<Scalars['Float']['input']>;
   promotionId?: InputMaybe<Scalars['ID']['input']>;
   totalPrice: Scalars['Float']['input'];
+  userContextLocation?: InputMaybe<LocationInput>;
 };
 
 export type CreateOrderItemInput = {
@@ -1711,6 +1717,7 @@ export type OptionGroup = {
 export type Order = {
   __typename?: 'Order';
   adminNote?: Maybe<Scalars['String']['output']>;
+  approvalReasons?: Maybe<Array<ApprovalReason>>;
   businessId: Scalars['ID']['output'];
   businesses: Array<OrderBusiness>;
   cancellationReason?: Maybe<Scalars['String']['output']>;
@@ -2981,6 +2988,7 @@ export type User = {
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
   isOnline: Scalars['Boolean']['output'];
+  isTrustedCustomer: Scalars['Boolean']['output'];
   lastName: Scalars['String']['output'];
   maxActiveOrders?: Maybe<Scalars['Int']['output']>;
   permissions: Array<UserPermission>;
@@ -2990,6 +2998,7 @@ export type User = {
   referralCode?: Maybe<Scalars['String']['output']>;
   role: UserRole;
   signupStep: SignupStep;
+  totalOrders: Scalars['Int']['output'];
 };
 
 export type UserAddress = {
@@ -3161,6 +3170,7 @@ export type ResolversTypes = {
   ApplicablePromotion: ResolverTypeWrapper<Omit<ApplicablePromotion, 'target' | 'type'> & { target: ResolversTypes['PromotionTarget'], type: ResolversTypes['PromotionType'] }>;
   Boolean: ResolverTypeWrapper<Scalars['Boolean']['output']>;
   ID: ResolverTypeWrapper<Scalars['ID']['output']>;
+  ApprovalReason: ResolverTypeWrapper<'FIRST_ORDER' | 'HIGH_VALUE' | 'OUT_OF_ZONE'>;
   AssignPromotionToUserInput: AssignPromotionToUserInput;
   AudiencePreview: ResolverTypeWrapper<Omit<AudiencePreview, 'sampleUsers'> & { sampleUsers: Array<ResolversTypes['User']> }>;
   AuditLog: ResolverTypeWrapper<Omit<AuditLog, 'action' | 'actor' | 'actorType' | 'entityType'> & { action: ResolversTypes['ActionType'], actor?: Maybe<ResolversTypes['User']>, actorType: ResolversTypes['ActorType'], entityType: ResolversTypes['EntityType'] }>;
@@ -3246,7 +3256,7 @@ export type ResolversTypes = {
   OperationalKPIs: ResolverTypeWrapper<OperationalKPIs>;
   Option: ResolverTypeWrapper<Option>;
   OptionGroup: ResolverTypeWrapper<OptionGroup>;
-  Order: ResolverTypeWrapper<Omit<Order, 'businesses' | 'driver' | 'orderPromotions' | 'paymentCollection' | 'status' | 'user'> & { businesses: Array<ResolversTypes['OrderBusiness']>, driver?: Maybe<ResolversTypes['User']>, orderPromotions?: Maybe<Array<ResolversTypes['OrderPromotion']>>, paymentCollection: ResolversTypes['OrderPaymentCollection'], status: ResolversTypes['OrderStatus'], user?: Maybe<ResolversTypes['User']> }>;
+  Order: ResolverTypeWrapper<Omit<Order, 'approvalReasons' | 'businesses' | 'driver' | 'orderPromotions' | 'paymentCollection' | 'status' | 'user'> & { approvalReasons?: Maybe<Array<ResolversTypes['ApprovalReason']>>, businesses: Array<ResolversTypes['OrderBusiness']>, driver?: Maybe<ResolversTypes['User']>, orderPromotions?: Maybe<Array<ResolversTypes['OrderPromotion']>>, paymentCollection: ResolversTypes['OrderPaymentCollection'], status: ResolversTypes['OrderStatus'], user?: Maybe<ResolversTypes['User']> }>;
   OrderBusiness: ResolverTypeWrapper<Omit<OrderBusiness, 'business'> & { business: ResolversTypes['Business'] }>;
   OrderDriverLiveTracking: ResolverTypeWrapper<OrderDriverLiveTracking>;
   OrderItem: ResolverTypeWrapper<OrderItem>;
@@ -3528,6 +3538,8 @@ export type ApplicablePromotionResolvers<ContextType = GraphQLContext, ParentTyp
   type?: Resolver<ResolversTypes['PromotionType'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
+
+export type ApprovalReasonResolvers = EnumResolverSignature<{ FIRST_ORDER?: any, HIGH_VALUE?: any, OUT_OF_ZONE?: any }, ResolversTypes['ApprovalReason']>;
 
 export type AudiencePreviewResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['AudiencePreview'] = ResolversParentTypes['AudiencePreview']> = {
   count?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
@@ -4122,6 +4134,7 @@ export type OptionGroupResolvers<ContextType = GraphQLContext, ParentType extend
 
 export type OrderResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Order'] = ResolversParentTypes['Order']> = {
   adminNote?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  approvalReasons?: Resolver<Maybe<Array<ResolversTypes['ApprovalReason']>>, ParentType, ContextType>;
   businessId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   businesses?: Resolver<Array<ResolversTypes['OrderBusiness']>, ParentType, ContextType>;
   cancellationReason?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
@@ -4716,6 +4729,7 @@ export type UserResolvers<ContextType = GraphQLContext, ParentType extends Resol
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   isOnline?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  isTrustedCustomer?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   lastName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   maxActiveOrders?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
   permissions?: Resolver<Array<ResolversTypes['UserPermission']>, ParentType, ContextType>;
@@ -4725,6 +4739,7 @@ export type UserResolvers<ContextType = GraphQLContext, ParentType extends Resol
   referralCode?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   role?: Resolver<ResolversTypes['UserRole'], ParentType, ContextType>;
   signupStep?: Resolver<ResolversTypes['SignupStep'], ParentType, ContextType>;
+  totalOrders?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -4795,6 +4810,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   AgoraRtcRole?: AgoraRtcRoleResolvers;
   AppLanguage?: AppLanguageResolvers;
   ApplicablePromotion?: ApplicablePromotionResolvers<ContextType>;
+  ApprovalReason?: ApprovalReasonResolvers;
   AudiencePreview?: AudiencePreviewResolvers<ContextType>;
   AuditLog?: AuditLogResolvers<ContextType>;
   AuditLogConnection?: AuditLogConnectionResolvers<ContextType>;

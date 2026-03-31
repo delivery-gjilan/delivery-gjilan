@@ -21,6 +21,7 @@ export const USER_ORDERS_UPDATED = graphql(`
             orderDate
             updatedAt
             status
+            approvalReasons
             preparationMinutes
             estimatedReadyAt
             preparingAt

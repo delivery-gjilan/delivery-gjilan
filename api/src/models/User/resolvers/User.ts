@@ -3,7 +3,15 @@ import logger from '@/lib/logger';
 import { getUserPermissions } from '@/lib/utils/permissions';
 import { getLiveDriverEta } from '@/lib/driverEtaCache';
 
-export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'businessId'|'driverLocation'|'driverLocationUpdatedAt'|'email'|'emailVerified'|'firstName'|'flagColor'|'id'|'imageUrl'|'isOnline'|'lastName'|'permissions'|'phoneNumber'|'phoneVerified'|'preferredLanguage'|'referralCode'|'role'|'signupStep'|'__isTypeOf'> = {
+const TRUSTED_CUSTOMER_MARKER = '[TRUSTED_CUSTOMER]';
+
+function isTrustedCustomer(adminNote?: string | null, flagColor?: string | null): boolean {
+    const normalizedNote = String(adminNote ?? '').toUpperCase();
+    const normalizedFlag = String(flagColor ?? '').toLowerCase();
+    return normalizedNote.includes(TRUSTED_CUSTOMER_MARKER) || normalizedFlag === 'green';
+}
+
+export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'businessId'|'driverLocation'|'driverLocationUpdatedAt'|'email'|'emailVerified'|'firstName'|'flagColor'|'id'|'imageUrl'|'isOnline'|'isTrustedCustomer'|'lastName'|'permissions'|'phoneNumber'|'phoneVerified'|'preferredLanguage'|'referralCode'|'role'|'signupStep'|'totalOrders'|'__isTypeOf'> = {
     permissions: async (parent) => {
         // Get permissions for this user
         const perms = await getUserPermissions({
@@ -72,6 +80,18 @@ export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'busines
     preferredLanguage: (parent) => {
         const raw = (parent as any).preferredLanguage;
         return raw?.toUpperCase() === 'AL' ? 'AL' : 'EN';
+    },
+    totalOrders: async (parent, _args, { loaders }) => {
+        try {
+            const behavior = await loaders.userBehaviorByUserIdLoader.load(String(parent.id));
+            return Number(behavior?.totalOrders ?? 0);
+        } catch (error) {
+            logger.error({ err: error, userId: parent.id }, 'user:totalOrders resolve failed');
+            return 0;
+        }
+    },
+    isTrustedCustomer: (parent) => {
+        return isTrustedCustomer((parent as any).adminNote, (parent as any).flagColor);
     },
     commissionPercentage: async (parent, _args, { loaders }) => {
         if (parent.role !== 'DRIVER') return null;

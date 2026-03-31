@@ -10,6 +10,7 @@ export const CREATE_ORDER = graphql(`
             totalPrice
             orderDate
             status
+            approvalReasons
             dropOffLocation {
                 latitude
                 longitude

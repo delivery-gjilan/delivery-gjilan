@@ -47,6 +47,7 @@ import { emitOrderEvent } from '@/repositories/OrderEventRepository';
 import { createAuditLogger } from '@/services/AuditLogger';
 
 const log = logger.child({ service: 'OrderService' });
+const TRUSTED_CUSTOMER_MARKER = '[TRUSTED_CUSTOMER]';
 
 export class OrderService {
     public orderRepository: OrderRepository; // Made public for resolver access
@@ -73,6 +74,12 @@ export class OrderService {
             id += chars[bytes[i] % chars.length];
         }
         return `GJ-${id}`;
+    }
+
+    private isTrustedCustomer(adminNote?: string | null, flagColor?: string | null): boolean {
+        const normalizedNote = String(adminNote ?? '').toUpperCase();
+        const normalizedFlag = String(flagColor ?? '').toLowerCase();
+        return normalizedNote.includes(TRUSTED_CUSTOMER_MARKER) || normalizedFlag === 'green';
     }
 
     private async calculateExpectedDeliveryPrice(params: {
@@ -106,7 +113,10 @@ export class OrderService {
             .orderBy(asc(deliveryZonesTable.sortOrder));
 
         const dropoffPoint = { lat: params.dropoffLat, lng: params.dropoffLng };
-        const matchedZone = zones.find((zone) => isPointInPolygon(dropoffPoint, zone.polygon));
+        // Service zones are coverage-only and must not override delivery fee.
+        const matchedZone = zones.find(
+            (zone) => !zone.isServiceZone && isPointInPolygon(dropoffPoint, zone.polygon),
+        );
         if (matchedZone) {
             return matchedZone.deliveryFee;
         }
@@ -570,8 +580,18 @@ export class OrderService {
         const activeServiceZones = allActiveZones.filter((z) => z.isServiceZone);
         const effectiveServiceZones = activeServiceZones.length > 0 ? activeServiceZones : allActiveZones;
         const dropoffPoint = { lat: input.dropOffLocation.latitude, lng: input.dropOffLocation.longitude };
-        const isInsideAnyZone = effectiveServiceZones.some((z) => isPointInPolygon(dropoffPoint, z.polygon));
-        const locationFlagged = !isInsideAnyZone;
+        const isDropoffInsideAnyZone = effectiveServiceZones.some((z) => isPointInPolygon(dropoffPoint, z.polygon));
+
+        const userContextPoint = input.userContextLocation
+            ? { lat: input.userContextLocation.latitude, lng: input.userContextLocation.longitude }
+            : null;
+        const isUserContextInsideAnyZone = userContextPoint
+            ? effectiveServiceZones.some((z) => isPointInPolygon(userContextPoint, z.polygon))
+            : true;
+
+        // Flag orders when either selected drop-off or actual user context is outside coverage.
+        // This keeps troll-prevention checks visible even when user overrides to an in-zone address.
+        const locationFlagged = !isDropoffInsideAnyZone || !isUserContextInsideAnyZone;
 
         // 4c. Determine if approval is required (first order, >€20, or out-of-zone context)
         const existingOrderCheck = await db
@@ -604,6 +624,7 @@ export class OrderService {
             // Fold priority surcharge into the stored delivery price so that
             // total (actualPrice + deliveryPrice) always equals what the customer paid.
             deliveryPrice: effectiveDeliveryPrice + prioritySurcharge,
+            prioritySurcharge: prioritySurcharge,
             paymentCollection: input.paymentCollection ?? 'CASH_TO_DRIVER',
             originalPrice:
                 Math.abs(calculatedItemsTotal - effectiveOrderPrice) > 0.01
@@ -862,11 +883,17 @@ export class OrderService {
             }
         }
         
-        // Fetch order promotions
-        const dbPromotions = await db
-            .select()
-            .from(orderPromotionsTable)
-            .where(eq(orderPromotionsTable.orderId, dbOrder.id));
+        // Fetch order promotions (tolerate failures to avoid breaking order mapping)
+        let dbPromotions: Array<typeof orderPromotionsTable.$inferSelect> = [];
+        try {
+            dbPromotions = await db
+                .select()
+                .from(orderPromotionsTable)
+                .where(eq(orderPromotionsTable.orderId, dbOrder.id));
+        } catch (err) {
+            log.error({ err, orderId: dbOrder.id }, 'order:promotions:fetch_failed');
+            dbPromotions = [];
+        }
 
         // Helper to build an OrderItem from a DB row
         const buildOrderItem = (item: (typeof allItems)[0]): OrderItem => {
@@ -956,6 +983,13 @@ export class OrderService {
         }
 
         const driverUser = dbOrder.driverId ? await this.authRepository.findById(dbOrder.driverId) : null;
+        const [firstOrderRecord] = await this.db
+            .select({ id: ordersTable.id })
+            .from(ordersTable)
+            .where(eq(ordersTable.userId, dbOrder.userId))
+            .orderBy(asc(ordersTable.orderDate), asc(ordersTable.createdAt))
+            .limit(1);
+        const isFirstOrder = firstOrderRecord?.id === dbOrder.id;
 
         return {
             id: dbOrder.id,
@@ -996,6 +1030,8 @@ export class OrderService {
                       business: undefined,
                       adminNote: driverUser.adminNote || undefined,
                       flagColor: driverUser.flagColor || undefined,
+                                            totalOrders: 0,
+                                            isTrustedCustomer: false,
                       isOnline: (driverUser as any).isOnline ?? false,
                       permissions: [],
                       preferredLanguage: ((driverUser as any).preferredLanguage === 'en' ? 'EN' : 'AL') as any,
@@ -1010,7 +1046,16 @@ export class OrderService {
             driverNotes: dbOrder.driverNotes || undefined,
             needsApproval: dbOrder.status === 'AWAITING_APPROVAL',
             locationFlagged: (dbOrder as any).locationFlagged ?? false,
-            approvalReasons: (dbOrder as any).approvalReasons ?? undefined,
+            approvalReasons: (() => {
+                // approvalReasons is not a DB column — re-derive from persisted fields
+                const reasons: Array<'FIRST_ORDER' | 'HIGH_VALUE' | 'OUT_OF_ZONE'> = [];
+                const locationFlagged = (dbOrder as any).locationFlagged ?? false;
+                const totalPrice = Number(dbOrder.actualPrice ?? 0) + Number(dbOrder.deliveryPrice ?? 0);
+                if (isFirstOrder) reasons.push('FIRST_ORDER');
+                if (locationFlagged) reasons.push('OUT_OF_ZONE');
+                if (totalPrice > 20) reasons.push('HIGH_VALUE');
+                return reasons;
+            })(),
             businesses: businessOrderList,
             orderPromotions: dbPromotions.map((p) => ({
                 id: p.id,
@@ -1661,6 +1706,7 @@ export class OrderService {
                 .innerJoin(productsTable, eq(orderItemsTable.productId, productsTable.id))
                 .where(and(eq(orderItemsTable.orderId, orderId), eq(productsTable.businessId, businessId)))
                 .limit(1);
+            return match.length > 0;
         } catch (error) {
             log.error({ err: error, orderId, businessId }, 'order:containsBusiness:error');
             return false;
@@ -1679,7 +1725,7 @@ export class OrderService {
 
         // Best-effort side effects
         try {
-            await this.publishSingleUserOrder(userId, order.id);
+            await this.publishSingleUserOrder(userId, String(order.id));
             await this.publishAllOrders();
         } catch (error) {
             log.error({ err: error, userId, orderId: order.id }, 'createOrder:publish:failed');

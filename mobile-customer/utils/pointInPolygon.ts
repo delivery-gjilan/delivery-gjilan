@@ -18,11 +18,32 @@ export function isPointInPolygon(
     let inside = false;
     const { lat: y, lng: x } = point;
 
+    const isOnSegment = (
+        px: number,
+        py: number,
+        x1: number,
+        y1: number,
+        x2: number,
+        y2: number,
+    ) => {
+        const epsilon = 1e-9;
+        const cross = (py - y1) * (x2 - x1) - (px - x1) * (y2 - y1);
+        if (Math.abs(cross) > epsilon) return false;
+
+        const dot = (px - x1) * (px - x2) + (py - y1) * (py - y2);
+        return dot <= epsilon;
+    };
+
     for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
         const yi = polygon[i].lat;
         const xi = polygon[i].lng;
         const yj = polygon[j].lat;
         const xj = polygon[j].lng;
+
+        // Consider boundary points inside to avoid edge flicker near zone borders.
+        if (isOnSegment(x, y, xi, yi, xj, yj)) {
+            return true;
+        }
 
         const intersects =
             yi > y !== yj > y &&

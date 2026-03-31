@@ -19,6 +19,7 @@ export function useCreateOrder() {
         promotionId?: string | null,
         driverNotes?: string | null,
         prioritySurcharge?: number,
+        userContextLocation?: { latitude: number; longitude: number; address: string } | null,
     ) => {
         // Keep this as UX guidance only; backend remains source of truth.
         if (hasActiveOrders) {
@@ -62,6 +63,13 @@ export function useCreateOrder() {
                             longitude: location.longitude,
                             address: location.address,
                         },
+                        userContextLocation: userContextLocation
+                            ? {
+                                  latitude: userContextLocation.latitude,
+                                  longitude: userContextLocation.longitude,
+                                  address: userContextLocation.address,
+                              }
+                            : null,
                         deliveryPrice,
                         totalPrice,
                         prioritySurcharge: prioritySurcharge ?? 0,

@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useMutation, useQuery } from "@apollo/client/react";
 import { gql } from "@apollo/client";
 import Button from "@/components/ui/Button";
@@ -11,6 +11,7 @@ import { useOrders, useUpdateOrderStatus } from "@/lib/hooks/useOrders";
 import { useAuth } from "@/lib/auth-context";
 import { ASSIGN_DRIVER_TO_ORDER, CREATE_TEST_ORDER, START_PREPARING, UPDATE_PREPARATION_TIME, ADMIN_CANCEL_ORDER, APPROVE_ORDER } from "@/graphql/operations/orders";
 import { GRANT_FREE_DELIVERY } from "@/graphql/operations/promotions/mutations";
+import { UPDATE_USER_NOTE_MUTATION } from "@/graphql/operations/users/mutations";
 import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
 import { Package, Store, Search, ArrowRight, Eye, EyeOff, MapPin, User, Plus, ChefHat, Timer, Copy, Check, Phone, Hash, MessageSquare } from "lucide-react";
 import { toast } from 'sonner';
@@ -21,6 +22,7 @@ import { toast } from 'sonner';
 
 type OrderStatus = "AWAITING_APPROVAL" | "PENDING" | "PREPARING" | "READY" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED";
 type CompletedStatusFilter = "ALL" | "DELIVERED" | "CANCELLED";
+type ApprovalReason = 'FIRST_ORDER' | 'HIGH_VALUE' | 'OUT_OF_ZONE';
 
 interface OrderItem {
     productId: string;
@@ -70,6 +72,10 @@ interface Order {
         lastName: string;
         email: string;
         phoneNumber?: string;
+        adminNote?: string | null;
+        flagColor?: string | null;
+        totalOrders?: number | null;
+        isTrustedCustomer?: boolean | null;
     };
     driver?: {
         id: string;
@@ -83,6 +89,72 @@ interface Order {
     adminNote?: string | null;
     needsApproval?: boolean | null;
     locationFlagged?: boolean | null;
+    approvalReasons?: ApprovalReason[] | null;
+}
+
+const TRUSTED_CUSTOMER_MARKER = "[TRUSTED_CUSTOMER]";
+const APPROVAL_MODAL_SUPPRESS_MARKER = '[SUPPRESS_APPROVAL_MODAL]';
+
+function isTrustedCustomer(user?: Order["user"]): boolean {
+    if (!user) return false;
+    if (user.isTrustedCustomer) return true;
+    if ((user.flagColor || '').toLowerCase() === 'green') return true;
+    return (user.adminNote || '').toUpperCase().includes(TRUSTED_CUSTOMER_MARKER);
+}
+
+function upsertTrustMarker(note?: string | null): string {
+    const cleaned = String(note || '')
+        .replace(TRUSTED_CUSTOMER_MARKER, '')
+        .trim();
+    return cleaned ? `${TRUSTED_CUSTOMER_MARKER}\n${cleaned}` : TRUSTED_CUSTOMER_MARKER;
+}
+
+function removeTrustMarker(note?: string | null): string | null {
+    const cleaned = String(note || '')
+        .replace(TRUSTED_CUSTOMER_MARKER, '')
+        .trim();
+    return cleaned || null;
+}
+
+function isApprovalModalSuppressed(user?: Order['user']): boolean {
+    if (!user) return false;
+    return (user.adminNote || '').toUpperCase().includes(APPROVAL_MODAL_SUPPRESS_MARKER);
+}
+
+function upsertApprovalModalSuppressMarker(note?: string | null): string {
+    const cleaned = String(note || '')
+        .replace(APPROVAL_MODAL_SUPPRESS_MARKER, '')
+        .trim();
+    return cleaned ? `${APPROVAL_MODAL_SUPPRESS_MARKER}\n${cleaned}` : APPROVAL_MODAL_SUPPRESS_MARKER;
+}
+
+function removeApprovalModalSuppressMarker(note?: string | null): string | null {
+    const cleaned = String(note || '')
+        .replace(APPROVAL_MODAL_SUPPRESS_MARKER, '')
+        .trim();
+    return cleaned || null;
+}
+
+function deriveApprovalReasons(order?: Pick<Order, 'approvalReasons' | 'locationFlagged' | 'needsApproval' | 'totalPrice'> | null): ApprovalReason[] {
+    if (!order) return [];
+
+    const normalized = new Set<ApprovalReason>();
+    for (const reason of order.approvalReasons ?? []) {
+        if (reason === 'FIRST_ORDER' || reason === 'HIGH_VALUE' || reason === 'OUT_OF_ZONE') {
+            normalized.add(reason);
+        }
+    }
+
+    if (order.locationFlagged) {
+        normalized.add('OUT_OF_ZONE');
+    }
+
+    // Fallback for sparse payloads: keep high-value visibility for approval-needed orders.
+    if (order.needsApproval && normalized.size === 0 && Number(order.totalPrice || 0) > 20) {
+        normalized.add('HIGH_VALUE');
+    }
+
+    return Array.from(normalized);
 }
 
 function parseAdminNote(adminNote?: string | null): { tag: string; note: string } | null {
@@ -108,9 +180,13 @@ interface OrderEarningsBreakdown {
     deliveryCommission: number;
     deliveryCommissionPotential: number;
     restaurantCommission: number;
+    driverCommission: number;
     markup: number;
+    grossReceivable: number;
+    grossPayable: number;
     deliveryIncluded: boolean;
     driverCommissionRate: number;
+    marginSeverity: 'healthy' | 'thin' | 'negative';
 }
 
 interface BusinessSettlementRule {
@@ -160,23 +236,65 @@ const getBusinessItemsSafe = (business: any): OrderItem[] => {
 const roundMoney = (value: number) => Math.round(value * 100) / 100;
 
 const computeOrderEarnings = (order: Order, rules: BusinessSettlementRule[]): OrderEarningsBreakdown => {
-    const deliveryPrice = Number(order.deliveryPrice || 0);
-    const driverCommissionRate = Number(order.driver?.commissionPercentage || 0);
-    const deliveryCommissionPotential = roundMoney((deliveryPrice * driverCommissionRate) / 100);
+    const subtotalBase = Number((order as any)?.businessPrice ?? order.orderPrice ?? 0);
+    const deliveryBase = Number((order as any)?.originalDeliveryPrice ?? order.deliveryPrice ?? 0);
+    const hasDriver = Boolean(order.driver?.id);
+    const paymentCollection = (order as any)?.paymentCollection ?? 'CASH_TO_DRIVER';
 
-    const deliveryIncluded =
-        Boolean(order.driver?.id) ||
-        order.status === 'OUT_FOR_DELIVERY' ||
-        order.status === 'DELIVERED';
+    const deliveryIncluded = hasDriver || order.status === 'OUT_FOR_DELIVERY' || order.status === 'DELIVERED';
 
-    const deliveryCommission = deliveryIncluded ? deliveryCommissionPotential : 0;
+    const orderBusinessIds = Array.from(new Set(
+        getOrderBusinessesSafe(order)
+            .map((biz) => biz.business?.id)
+            .filter((id): id is string => Boolean(id)),
+    ));
 
+    let settlementReceivable = 0;
+    let settlementPayable = 0;
     let restaurantCommission = 0;
+    let driverCommissionReceivable = 0;
+    let driverCommissionPayable = 0;
+    let deliveryCommissionPotential = 0;
     let grossItemValue = 0;
     let markupFromSnapshots = 0;
     let hasBasePriceSnapshots = false;
 
-    const activeBusinessRules = (rules || []).filter((rule) => rule.isActive && rule.entityType === 'BUSINESS');
+    (rules || []).filter((rule) => rule.isActive).forEach((rule) => {
+        if (rule.entityType === 'DRIVER' && !hasDriver) return;
+
+        const appliesToDelivery = rule.appliesTo === 'DELIVERY_FEE' || rule.appliesTo === 'DELIVERY_PRICE';
+        const base = appliesToDelivery ? deliveryBase : subtotalBase;
+        const amount = rule.amountType === 'FIXED'
+            ? Number(rule.amount || 0)
+            : (base * Number(rule.amount || 0)) / 100;
+
+        if (amount <= 0) return;
+
+        const multiplier = rule.entityType === 'BUSINESS'
+            ? (rule.business?.id ? (orderBusinessIds.includes(rule.business.id) ? 1 : 0) : orderBusinessIds.length)
+            : 1;
+        if (multiplier <= 0) return;
+
+        const totalAmount = amount * multiplier;
+        if (rule.direction === 'RECEIVABLE') settlementReceivable += totalAmount;
+        if (rule.direction === 'PAYABLE') settlementPayable += totalAmount;
+
+        if (rule.entityType === 'BUSINESS' && rule.direction === 'RECEIVABLE') {
+            restaurantCommission += totalAmount;
+        }
+
+        if (rule.entityType === 'DRIVER' && rule.direction === 'RECEIVABLE') {
+            driverCommissionReceivable += totalAmount;
+        }
+
+        if (rule.entityType === 'DRIVER' && rule.direction === 'PAYABLE') {
+            driverCommissionPayable += totalAmount;
+        }
+
+        if (rule.entityType === 'DRIVER' && rule.direction === 'PAYABLE' && appliesToDelivery) {
+            deliveryCommissionPotential += totalAmount;
+        }
+    });
 
     getOrderBusinessesSafe(order).forEach((biz) => {
         const businessItems = getBusinessItemsSafe(biz);
@@ -193,46 +311,35 @@ const computeOrderEarnings = (order: Order, rules: BusinessSettlementRule[]): Or
                 markupFromSnapshots += Math.max(0, finalUnitPrice - baseUnitPrice) * quantity;
             }
         });
-
-        const scopedRules = activeBusinessRules.filter((rule) => !rule.business?.id || rule.business.id === biz.business.id);
-
-        if (scopedRules.length > 0) {
-            scopedRules.forEach((rule) => {
-                const base = rule.appliesTo === 'DELIVERY_FEE' ? deliveryPrice : Number(order.orderPrice || 0);
-                const amount = rule.amountType === 'FIXED'
-                    ? Number(rule.amount || 0)
-                    : (base * Number(rule.amount || 0)) / 100;
-
-                if (amount <= 0) return;
-
-                if (rule.direction === 'RECEIVABLE') {
-                    restaurantCommission += amount;
-                }
-            });
-            return;
-        }
-
-        const pctFallback = Number(biz.business?.commissionPercentage || 0);
-        if (pctFallback > 0) {
-            restaurantCommission += (businessGross * pctFallback) / 100;
-        }
     });
 
     restaurantCommission = roundMoney(restaurantCommission);
+    deliveryCommissionPotential = roundMoney(deliveryCommissionPotential);
+    const deliveryCommission = deliveryIncluded ? deliveryCommissionPotential : 0;
 
     const subtotal = Number(order.orderPrice || 0);
     const fallbackMarkup = grossItemValue > 0 ? roundMoney(Math.max(0, subtotal - grossItemValue)) : 0;
     const markup = hasBasePriceSnapshots ? roundMoney(markupFromSnapshots) : fallbackMarkup;
-    const total = roundMoney(deliveryCommission + restaurantCommission + markup);
+
+    const markupAsReceivable = paymentCollection === 'CASH_TO_DRIVER' && !hasDriver ? 0 : markup;
+    const grossReceivable = roundMoney(settlementReceivable + markupAsReceivable);
+    const grossPayable = roundMoney(settlementPayable);
+    const total = roundMoney(grossReceivable - grossPayable);
+    const driverCommission = roundMoney(driverCommissionReceivable - driverCommissionPayable);
+    const marginSeverity: 'healthy' | 'thin' | 'negative' = total < 0 ? 'negative' : total < 1.5 ? 'thin' : 'healthy';
 
     return {
         total,
         deliveryCommission,
         deliveryCommissionPotential,
         restaurantCommission,
+        driverCommission,
         markup,
+        grossReceivable,
+        grossPayable,
         deliveryIncluded,
-        driverCommissionRate,
+        driverCommissionRate: Number(order.driver?.commissionPercentage || 0),
+        marginSeverity,
     };
 };
 
@@ -322,7 +429,6 @@ function CopyableId({ displayId }: { displayId: string }) {
 --------------------------------------------------------- */
 
 const ORDERS_PAGE_SIZE = 100;
-
 export default function OrdersPage() {
     const [ordersPage, setOrdersPage] = useState(0);
     const { orders, loading } = useOrders({ limit: ORDERS_PAGE_SIZE, offset: ordersPage * ORDERS_PAGE_SIZE });
@@ -336,6 +442,7 @@ export default function OrdersPage() {
     const [adminCancelOrderMut, { loading: cancellingOrder }] = useMutation(ADMIN_CANCEL_ORDER, { refetchQueries: ['GetOrders'] });
     const [approveOrderMut, { loading: approvingOrder }] = useMutation(APPROVE_ORDER, { refetchQueries: ['GetOrders'] });
     const [grantFreeDeliveryMut, { loading: grantingFreeDelivery }] = useMutation(GRANT_FREE_DELIVERY);
+    const [updateUserNoteMut] = useMutation(UPDATE_USER_NOTE_MUTATION, { refetchQueries: ['GetOrders'] });
 
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
@@ -352,13 +459,58 @@ export default function OrdersPage() {
     const [cancelReason, setCancelReason] = useState<string>("");
     const [cancelSettleDriver, setCancelSettleDriver] = useState<boolean>(false);
     const [cancelSettleBusiness, setCancelSettleBusiness] = useState<boolean>(false);
+    const [approvalModalOrder, setApprovalModalOrder] = useState<Order | null>(null);
+    const [trustUpdatingUserId, setTrustUpdatingUserId] = useState<string | null>(null);
+    const [suppressionUpdatingUserId, setSuppressionUpdatingUserId] = useState<string | null>(null);
+    const [dismissedApprovalOrderIds, setDismissedApprovalOrderIds] = useState<Set<string>>(new Set());
+    const seenFlaggedOrderIdsRef = useRef<Set<string>>(new Set());
+
+    const handleApproveConfirm = async () => {
+        if (!approvalModalOrder) return;
+        try {
+            await approveOrderMut({ variables: { id: approvalModalOrder.id } });
+            setDismissedApprovalOrderIds((prev) => {
+                const next = new Set(prev);
+                next.delete(approvalModalOrder.id);
+                return next;
+            });
+            toast.success('Order approved — moving to Pending');
+            setApprovalModalOrder(null);
+            setDetailsOpen(false);
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to approve order');
+        }
+    };
+
+    const handleToggleTrustedCustomer = async (user: NonNullable<Order['user']>, trust: boolean) => {
+        setTrustUpdatingUserId(user.id);
+        try {
+            const nextNote = trust ? upsertTrustMarker(user.adminNote) : removeTrustMarker(user.adminNote);
+            const nextFlagColor = trust
+                ? 'green'
+                : (nextNote ? ((user.flagColor && user.flagColor !== 'green') ? user.flagColor : 'yellow') : null);
+
+            await updateUserNoteMut({
+                variables: {
+                    userId: user.id,
+                    note: nextNote,
+                    flagColor: nextFlagColor,
+                },
+            });
+            toast.success(trust ? 'Customer marked as trusted' : 'Trusted flag removed');
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to update trusted customer status');
+        } finally {
+            setTrustUpdatingUserId(null);
+        }
+    };
 
     const { data: settlementRulesData } = useQuery(GET_BUSINESS_SETTLEMENT_RULES, {
-        variables: { filter: { entityTypes: ['BUSINESS'] } },
+        variables: { filter: { entityTypes: ['BUSINESS', 'DRIVER'] } },
         fetchPolicy: 'cache-and-network',
     });
 
-    const businessSettlementRules = useMemo(() => {
+    const settlementRules = useMemo(() => {
         return ((settlementRulesData as any)?.settlementRules || []) as BusinessSettlementRule[];
     }, [settlementRulesData]);
 
@@ -373,6 +525,44 @@ export default function OrdersPage() {
     const isBusinessOwner = admin?.role === "BUSINESS_OWNER";
     const isBusinessEmployee = admin?.role === "BUSINESS_EMPLOYEE";
     const isBusinessUser = isBusinessOwner || isBusinessEmployee;
+
+    const openApprovalModalForOrder = useCallback((order: Order) => {
+        if (!isAdmin || !order.needsApproval) return;
+        setApprovalModalOrder(order);
+    }, [isAdmin]);
+
+    const setApprovalModalSuppressionForUser = useCallback(async (user: NonNullable<Order['user']>, suppress: boolean) => {
+        setSuppressionUpdatingUserId(user.id);
+        try {
+            const nextNote = suppress
+                ? upsertApprovalModalSuppressMarker(user.adminNote)
+                : removeApprovalModalSuppressMarker(user.adminNote);
+
+            await updateUserNoteMut({
+                variables: {
+                    userId: user.id,
+                    note: nextNote,
+                    flagColor: user.flagColor ?? null,
+                },
+            });
+            toast.success(suppress ? 'Auto-popup muted for this customer' : 'Auto-popup enabled for this customer');
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to update popup preference');
+        } finally {
+            setSuppressionUpdatingUserId(null);
+        }
+    }, [updateUserNoteMut]);
+
+    const handleDismissApprovalModal = useCallback(() => {
+        if (approvalModalOrder) {
+            setDismissedApprovalOrderIds((prev) => {
+                const next = new Set(prev);
+                next.add(approvalModalOrder.id);
+                return next;
+            });
+        }
+        setApprovalModalOrder(null);
+    }, [approvalModalOrder]);
 
     const normalizedOrders = useMemo(() => {
         const source = Array.isArray(orders) ? orders : [];
@@ -410,6 +600,23 @@ export default function OrdersPage() {
         [filteredOrders]
     );
 
+    useEffect(() => {
+        if (!isAdmin) return;
+
+        const flaggedOrders = activeOrders.filter((order) => {
+            if (!order.needsApproval) return false;
+            return !isApprovalModalSuppressed(order.user);
+        });
+        const seen = seenFlaggedOrderIdsRef.current;
+        const newFlagged = flaggedOrders.filter((order) => !seen.has(order.id));
+
+        flaggedOrders.forEach((order) => seen.add(order.id));
+
+        if (!approvalModalOrder && newFlagged.length > 0) {
+            setApprovalModalOrder(newFlagged[0]);
+        }
+    }, [activeOrders, approvalModalOrder, isAdmin]);
+
     const completedOrders = useMemo(() =>
         filteredOrders.filter(o => o.status === 'DELIVERED' || o.status === 'CANCELLED'),
         [filteredOrders]
@@ -422,8 +629,8 @@ export default function OrdersPage() {
 
     const selectedOrderEarnings = useMemo(() => {
         if (!selectedOrder) return null;
-        return computeOrderEarnings(selectedOrder, businessSettlementRules);
-    }, [businessSettlementRules, selectedOrder]);
+        return computeOrderEarnings(selectedOrder, settlementRules);
+    }, [settlementRules, selectedOrder]);
 
     const selectedOrderTotals = useMemo(() => {
         if (!selectedOrder) {
@@ -515,7 +722,18 @@ export default function OrdersPage() {
         }
     };
 
-    const openDetails = (order: Order) => { setSelectedOrder(order); setDetailsOpen(true); };
+    const handleOrderCardFocus = (order: Order) => {
+        if (!isAdmin || !order.needsApproval) return;
+        if (!dismissedApprovalOrderIds.has(order.id)) return;
+        if (approvalModalOrder?.id === order.id) return;
+        setApprovalModalOrder(order);
+    };
+
+    const openDetails = (order: Order) => {
+        handleOrderCardFocus(order);
+        setSelectedOrder(order);
+        setDetailsOpen(true);
+    };
 
     const handleAdminCancel = async () => {
         if (!cancelModalOrder) return;
@@ -620,9 +838,15 @@ export default function OrdersPage() {
                         activeOrders.map((order) => {
                             const nextStatus = STATUS_FLOW[order.status];
                             const businessNames = getOrderBusinessesSafe(order).map(b => b.business.name).join(", ");
-                            const earnings = !isBusinessUser ? computeOrderEarnings(order, businessSettlementRules) : null;
+                            const earnings = !isBusinessUser ? computeOrderEarnings(order, settlementRules) : null;
+                            const approvalReasons = deriveApprovalReasons(order);
                             return (
-                                <div key={order.id} className={`bg-[#111113] border rounded-xl p-4 hover:border-zinc-700 transition-colors ${STATUS_COLORS[order.status].border}`}>
+                                <div
+                                    key={order.id}
+                                    tabIndex={0}
+                                    onFocus={() => handleOrderCardFocus(order)}
+                                    className={`bg-[#111113] border rounded-xl p-4 hover:border-zinc-700 transition-colors ${STATUS_COLORS[order.status].border}`}
+                                >
                                         {/* Header */}
                                         <div className="flex items-start justify-between mb-3">
                                             <div>
@@ -634,6 +858,21 @@ export default function OrdersPage() {
                                             <StatusBadge status={order.status} />
                                         </div>
 
+                                        {/* Approval/context badges */}
+                                        {approvalReasons.length > 0 && (
+                                            <div className="flex flex-wrap items-center gap-1 mb-3">
+                                                {approvalReasons.includes('FIRST_ORDER') && (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-500/10 border border-blue-500/30 text-blue-200">First order</span>
+                                                )}
+                                                {approvalReasons.includes('HIGH_VALUE') && (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 border border-amber-500/30 text-amber-200">Over €20</span>
+                                                )}
+                                                {approvalReasons.includes('OUT_OF_ZONE') && (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-500/10 border border-orange-500/30 text-orange-200">Outside delivery zone</span>
+                                                )}
+                                            </div>
+                                        )}
+
                                         {/* Customer + Business */}
                                         <div className="mb-3 pb-3 border-b border-zinc-800/60 space-y-1.5">
                                             {order.user && (
@@ -642,11 +881,22 @@ export default function OrdersPage() {
                                                     <span className="text-sm text-white font-medium">
                                                         {order.user.firstName} {order.user.lastName}
                                                     </span>
+                                                    {typeof order.user.totalOrders === 'number' && (
+                                                        <>
+                                                            <span className="text-zinc-700">·</span>
+                                                            <span className="text-xs text-zinc-500">{order.user.totalOrders} total orders</span>
+                                                        </>
+                                                    )}
                                                     {order.user.phoneNumber && (
                                                         <>
                                                             <span className="text-zinc-700">·</span>
                                                             <span className="text-xs text-zinc-500">{order.user.phoneNumber}</span>
                                                         </>
+                                                    )}
+                                                    {isTrustedCustomer(order.user) && (
+                                                        <span className="ml-1 inline-flex items-center rounded-full bg-emerald-500/15 border border-emerald-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+                                                            Trusted
+                                                        </span>
                                                     )}
                                                 </div>
                                             )}
@@ -751,8 +1001,14 @@ export default function OrdersPage() {
                                                 <div className="text-lg font-bold text-white">${order.totalPrice.toFixed(2)}</div>
                                                 {earnings && (
                                                     <div className="group relative">
-                                                        <span className="inline-flex items-center rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
-                                                            +${earnings.total.toFixed(2)}
+                                                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
+                                                            earnings.marginSeverity === 'healthy'
+                                                                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                                                                : earnings.marginSeverity === 'thin'
+                                                                    ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                                                                    : 'bg-rose-500/15 border-rose-500/30 text-rose-300'
+                                                        }`}>
+                                                            M {earnings.total >= 0 ? '+' : ''}${earnings.total.toFixed(2)}
                                                         </span>
                                                         {earnings.deliveryIncluded && earnings.deliveryCommission > 0 && (
                                                             <span className="ml-1 inline-flex items-center rounded-full bg-cyan-500/15 border border-cyan-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300">
@@ -760,10 +1016,11 @@ export default function OrdersPage() {
                                                             </span>
                                                         )}
                                                         <div className="pointer-events-none absolute left-0 bottom-full z-[120] mb-2 w-56 rounded-md border border-zinc-700 bg-[#0a0a0d] p-2 text-left text-[11px] text-zinc-300 opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
-                                                            <div className="font-semibold text-zinc-200 mb-1">Earnings breakdown</div>
-                                                            <div className="flex justify-between"><span className="text-zinc-500">Delivery</span><span className={earnings.deliveryIncluded ? 'text-cyan-300' : 'text-zinc-500'}>+${(earnings.deliveryIncluded ? earnings.deliveryCommission : earnings.deliveryCommissionPotential).toFixed(2)}</span></div>
-                                                            <div className="flex justify-between"><span className="text-zinc-500">Restaurant</span><span>+${earnings.restaurantCommission.toFixed(2)}</span></div>
-                                                            <div className="flex justify-between"><span className="text-zinc-500">Markup</span><span>+${earnings.markup.toFixed(2)}</span></div>
+                                                            <div className="font-semibold text-zinc-200 mb-1">Margin breakdown</div>
+                                                            <div className="flex justify-between"><span className="text-zinc-500">Restaurant commission</span><span className="text-emerald-300">+${earnings.restaurantCommission.toFixed(2)}</span></div>
+                                                            <div className="flex justify-between"><span className="text-zinc-500">Markup</span><span className="text-emerald-300">+${earnings.markup.toFixed(2)}</span></div>
+                                                            <div className="flex justify-between"><span className="text-zinc-500">{earnings.driverCommission >= 0 ? 'Driver commission' : 'Driver payout'}</span><span className={earnings.driverCommission >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{earnings.driverCommission >= 0 ? '+' : ''}${earnings.driverCommission.toFixed(2)}</span></div>
+                                                            <div className="flex justify-between"><span className="text-zinc-500">Net margin</span><span className={earnings.total >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{earnings.total >= 0 ? '+' : ''}${earnings.total.toFixed(2)}</span></div>
                                                         </div>
                                                     </div>
                                                 )}
@@ -771,16 +1028,8 @@ export default function OrdersPage() {
                                             <div className="flex items-center gap-2">
                                                 {order.needsApproval && isAdmin && (
                                                     <button
-                                                        onClick={async () => {
-                                                            try {
-                                                                await approveOrderMut({ variables: { id: order.id } });
-                                                                toast.success('Order approved — moving to Pending');
-                                                            } catch (err: any) {
-                                                                toast.error(err.message || 'Failed to approve order');
-                                                            }
-                                                        }}
-                                                        disabled={approvingOrder}
-                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap border transition-all disabled:opacity-50 bg-green-500/10 text-green-400 border-green-500/30 hover:brightness-125"
+                                                        onClick={() => openApprovalModalForOrder(order)}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap border transition-all bg-green-500/10 text-green-400 border-green-500/30 hover:brightness-125"
                                                     >
                                                         ✓ Approve
                                                     </button>
@@ -870,7 +1119,7 @@ export default function OrdersPage() {
                                     <th className="px-3 py-2.5 font-medium">Business</th>
                                     <th className="px-3 py-2.5 font-medium">Status</th>
                                     <th className="px-3 py-2.5 font-medium">Total</th>
-                                    {!isBusinessUser && <th className="px-3 py-2.5 font-medium">Earnings</th>}
+                                    {!isBusinessUser && <th className="px-3 py-2.5 font-medium">Margin</th>}
                                     <th className="px-3 py-2.5 font-medium">Incident</th>
                                     <th className="px-3 py-2.5 font-medium text-right">Actions</th>
                                 </tr>
@@ -892,7 +1141,7 @@ export default function OrdersPage() {
                                 ) : (
                                     filteredCompletedOrders.map((order) => {
                                         const businessNames = getOrderBusinessesSafe(order).map((b) => b.business.name).join(", ");
-                                        const earnings = !isBusinessUser ? computeOrderEarnings(order, businessSettlementRules) : null;
+                                        const earnings = !isBusinessUser ? computeOrderEarnings(order, settlementRules) : null;
                                         return (
                                             <tr key={order.id} className="border-b border-zinc-800/70 hover:bg-zinc-900/40">
                                                 <td className="px-3 py-3 align-top">
@@ -956,8 +1205,14 @@ export default function OrdersPage() {
                                                 {!isBusinessUser && (
                                                     <td className="px-3 py-3 align-top">
                                                         {earnings ? (
-                                                            <span className="inline-flex items-center rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
-                                                                +${earnings.total.toFixed(2)}
+                                                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
+                                                                earnings.marginSeverity === 'healthy'
+                                                                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                                                                    : earnings.marginSeverity === 'thin'
+                                                                        ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                                                                        : 'bg-rose-500/15 border-rose-500/30 text-rose-300'
+                                                            }`}>
+                                                                M {earnings.total >= 0 ? '+' : ''}${earnings.total.toFixed(2)}
                                                             </span>
                                                         ) : (
                                                             <span className="text-zinc-600">-</span>
@@ -1046,12 +1301,36 @@ export default function OrdersPage() {
                                         {selectedOrder.user.firstName} {selectedOrder.user.lastName}
                                     </div>
                                     <div className="text-zinc-500 text-xs mt-0.5">{selectedOrder.user.email}</div>
+                                    {typeof selectedOrder.user.totalOrders === 'number' && (
+                                        <div className="text-zinc-500 text-xs mt-0.5">{selectedOrder.user.totalOrders} total orders</div>
+                                    )}
                                     {selectedOrder.user.phoneNumber && (
                                         <div className="flex items-center gap-1.5 mt-1.5">
                                             <Phone size={11} className="text-zinc-600" />
                                             <span className="text-zinc-400 text-xs">{selectedOrder.user.phoneNumber}</span>
                                         </div>
                                     )}
+                                    <div className="mt-2 flex items-center gap-2">
+                                        {isTrustedCustomer(selectedOrder.user) && (
+                                            <span className="inline-flex items-center rounded-full bg-emerald-500/15 border border-emerald-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+                                                Trusted customer
+                                            </span>
+                                        )}
+                                        {isAdmin && (
+                                            <button
+                                                type="button"
+                                                disabled={trustUpdatingUserId === selectedOrder.user.id}
+                                                onClick={() => handleToggleTrustedCustomer(selectedOrder.user!, !isTrustedCustomer(selectedOrder.user))}
+                                                className="text-[11px] px-2 py-1 rounded-md border border-zinc-700 text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+                                            >
+                                                {trustUpdatingUserId === selectedOrder.user.id
+                                                    ? 'Saving...'
+                                                    : isTrustedCustomer(selectedOrder.user)
+                                                        ? 'Untrust'
+                                                        : 'Mark trusted'}
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                             <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-3">
@@ -1109,22 +1388,22 @@ export default function OrdersPage() {
                             <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3">
                                 <div className="text-[10px] text-rose-400 uppercase tracking-wider mb-1.5 font-semibold">Awaiting Approval</div>
                                 <p className="text-rose-200 text-sm">This order requires manual approval. Call the customer to verify, then click Approve.</p>
+                                {deriveApprovalReasons(selectedOrder).length > 0 && (
+                                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                        {deriveApprovalReasons(selectedOrder).includes('FIRST_ORDER') && (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-500/10 border border-blue-500/30 text-blue-200">First order</span>
+                                        )}
+                                        {deriveApprovalReasons(selectedOrder).includes('HIGH_VALUE') && (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 border border-amber-500/30 text-amber-200">Over €20</span>
+                                        )}
+                                        {deriveApprovalReasons(selectedOrder).includes('OUT_OF_ZONE') && (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-500/10 border border-orange-500/30 text-orange-200">Outside delivery zone</span>
+                                        )}
+                                    </div>
+                                )}
                                 {isAdmin && (
                                     <button
-                                        onClick={async () => {
-                                            const confirmMessage = selectedOrder.locationFlagged
-                                                ? 'This order is outside delivery zones. Confirm you have called the customer and want to approve?'
-                                                : 'Confirm you have called/verified and want to approve this order?';
-                                            if (!window.confirm(confirmMessage)) return;
-                                            try {
-                                                await approveOrderMut({ variables: { id: selectedOrder.id } });
-                                                toast.success('Order approved — moving to Pending');
-                                                setDetailsOpen(false);
-                                            } catch (err: any) {
-                                                toast.error(err.message || 'Failed to approve order');
-                                            }
-                                        }}
-                                        disabled={approvingOrder}
+                                        onClick={() => openApprovalModalForOrder(selectedOrder)}
                                         className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border bg-green-500/10 text-green-400 border-green-500/30 hover:brightness-125 disabled:opacity-50"
                                     >
                                         ✓ Approve Order
@@ -1227,33 +1506,28 @@ export default function OrdersPage() {
                         {!isBusinessUser && selectedOrderEarnings && (
                             <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 space-y-2">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-[10px] text-emerald-300 uppercase tracking-wider">Platform Earnings</span>
+                                    <span className="text-[10px] text-emerald-300 uppercase tracking-wider">Platform Margin</span>
                                     <div className="flex items-center gap-2">
                                         {selectedOrderEarnings.deliveryIncluded && selectedOrderEarnings.deliveryCommission > 0 && (
                                             <span className="inline-flex items-center rounded-full bg-cyan-500/15 border border-cyan-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300">
                                                 DEL+
                                             </span>
                                         )}
-                                        <span className="text-lg font-bold text-emerald-300">+${selectedOrderEarnings.total.toFixed(2)}</span>
+                                        <span className={`text-lg font-bold ${selectedOrderEarnings.total >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                                            {selectedOrderEarnings.total >= 0 ? '+' : ''}${selectedOrderEarnings.total.toFixed(2)}
+                                        </span>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
                                     <div className="rounded-lg border border-emerald-500/20 bg-[#09090b]/70 p-2">
-                                        <div className="text-zinc-500">Delivery commission</div>
-                                        <div className={`font-semibold mt-1 ${selectedOrderEarnings.deliveryIncluded ? 'text-cyan-300' : 'text-zinc-400'}`}>
-                                            +${(selectedOrderEarnings.deliveryIncluded
-                                                ? selectedOrderEarnings.deliveryCommission
-                                                : selectedOrderEarnings.deliveryCommissionPotential).toFixed(2)}
-                                        </div>
-                                        <div className="text-[10px] mt-1 text-zinc-500">
-                                            {selectedOrderEarnings.deliveryIncluded
-                                                ? 'Included now (driver assigned / out for delivery).'
-                                                : 'Pending until driver assignment / out for delivery.'}
-                                        </div>
-                                    </div>
-                                    <div className="rounded-lg border border-emerald-500/20 bg-[#09090b]/70 p-2">
                                         <div className="text-zinc-500">Restaurant commission</div>
                                         <div className="text-emerald-200 font-semibold mt-1">+${selectedOrderEarnings.restaurantCommission.toFixed(2)}</div>
+                                    </div>
+                                    <div className="rounded-lg border border-emerald-500/20 bg-[#09090b]/70 p-2">
+                                        <div className="text-zinc-500">{selectedOrderEarnings.driverCommission >= 0 ? 'Driver commission' : 'Driver payout'}</div>
+                                        <div className={`font-semibold mt-1 ${selectedOrderEarnings.driverCommission >= 0 ? 'text-emerald-200' : 'text-rose-300'}`}>
+                                            {selectedOrderEarnings.driverCommission >= 0 ? '+' : ''}${selectedOrderEarnings.driverCommission.toFixed(2)}
+                                        </div>
                                     </div>
                                     <div className="rounded-lg border border-emerald-500/20 bg-[#09090b]/70 p-2">
                                         <div className="text-zinc-500">Markup</div>
@@ -1371,9 +1645,8 @@ export default function OrdersPage() {
             </Modal>
 
             {/* ════════════════ CANCEL ORDER MODAL ════════════════ */}
-            <Modal isOpen={!!cancelModalOrder} onClose={() => { setCancelModalOrder(null); setCancelReason(""); setCancelSettleDriver(false); setCancelSettleBusiness(false); }} title="Cancel Order">
-                {cancelModalOrder && (() => {
-                    const earnings = !isBusinessUser ? computeOrderEarnings(cancelModalOrder, businessSettlementRules) : null;
+            <Modal isOpen={!!cancelModalOrder} onClose={() => { setCancelModalOrder(null); setCancelReason(""); setCancelSettleDriver(false); setCancelSettleBusiness(false); }} title="Cancel Order">                {cancelModalOrder && (() => {
+                    const earnings = !isBusinessUser ? computeOrderEarnings(cancelModalOrder, settlementRules) : null;
                     const hasDriver = !!cancelModalOrder.driver;
                     return (
                         <div className="space-y-4">
@@ -1495,6 +1768,112 @@ export default function OrdersPage() {
                         </div>
                     );
                 })()}
+            </Modal>
+
+            {/* ── Approval Confirmation Modal ── */}
+            <Modal isOpen={!!approvalModalOrder} onClose={handleDismissApprovalModal} title="Approve Order">
+                {approvalModalOrder && (
+                    <div className="space-y-4">
+                        {/* Order summary */}
+                        <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-4">
+                            <div className="font-medium text-rose-300">Order {approvalModalOrder.displayId}</div>
+                            {approvalModalOrder.user && (
+                                <>
+                                    <div className="text-sm text-zinc-400 mt-0.5">
+                                        {approvalModalOrder.user.firstName} {approvalModalOrder.user.lastName}
+                                    </div>
+                                    {typeof approvalModalOrder.user.totalOrders === 'number' && (
+                                        <div className="text-xs text-zinc-500 mt-1">
+                                            {approvalModalOrder.user.totalOrders} total orders
+                                        </div>
+                                    )}
+                                    {approvalModalOrder.user.phoneNumber && (
+                                        <div className="flex items-center gap-1.5 mt-1 text-xs text-zinc-400">
+                                            <Phone size={11} className="text-zinc-600" />
+                                            <a href={`tel:${approvalModalOrder.user.phoneNumber}`} className="hover:text-white transition-colors">
+                                                {approvalModalOrder.user.phoneNumber}
+                                            </a>
+                                        </div>
+                                    )}
+                                    <div className="mt-2">
+                                        <button
+                                            type="button"
+                                            disabled={trustUpdatingUserId === approvalModalOrder.user.id}
+                                            onClick={() => handleToggleTrustedCustomer(approvalModalOrder.user!, !isTrustedCustomer(approvalModalOrder.user))}
+                                            className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors disabled:opacity-50 ${
+                                                isTrustedCustomer(approvalModalOrder.user)
+                                                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
+                                                    : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
+                                            }`}
+                                        >
+                                            {trustUpdatingUserId === approvalModalOrder.user.id
+                                                ? 'Saving...'
+                                                : isTrustedCustomer(approvalModalOrder.user)
+                                                    ? 'Trusted customer: enabled'
+                                                    : 'Mark as trusted customer'}
+                                        </button>
+                                    </div>
+                                    <label className="mt-2 flex items-center gap-2 text-xs text-zinc-400">
+                                        <input
+                                            type="checkbox"
+                                            disabled={suppressionUpdatingUserId === approvalModalOrder.user?.id}
+                                            checked={isApprovalModalSuppressed(approvalModalOrder.user)}
+                                            onChange={(e) => {
+                                                if (!approvalModalOrder.user) return;
+                                                void setApprovalModalSuppressionForUser(approvalModalOrder.user, e.target.checked);
+                                            }}
+                                            className="w-3.5 h-3.5 rounded border-zinc-600 bg-zinc-900"
+                                        />
+                                        Don't auto-open approval modal again for this user
+                                    </label>
+                                </>
+                            )}
+                            <div className="text-sm text-zinc-500 mt-1">€{approvalModalOrder.totalPrice.toFixed(2)}</div>
+                        </div>
+
+                        {/* Reason flags */}
+                        <div className="space-y-2">
+                            <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Approval flags</div>
+                            {deriveApprovalReasons(approvalModalOrder).includes('FIRST_ORDER') && (
+                                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs font-medium">
+                                    🆕 First order — customer has no previous orders
+                                </div>
+                            )}
+                            {deriveApprovalReasons(approvalModalOrder).includes('HIGH_VALUE') && (
+                                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium">
+                                    💰 High value order (over €20)
+                                </div>
+                            )}
+                            {deriveApprovalReasons(approvalModalOrder).includes('OUT_OF_ZONE') && (
+                                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-300 text-xs font-medium">
+                                    📍 Outside delivery zone — confirm drop-off address with customer
+                                </div>
+                            )}
+                            {deriveApprovalReasons(approvalModalOrder).length === 0 && approvalModalOrder.needsApproval && (
+                                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium">
+                                    ⚠ Manual verification required before approval
+                                </div>
+                            )}
+                        </div>
+
+                        <p className="text-sm text-zinc-400">
+                            Confirm you have called/verified this order. On approval, status moves to <span className="text-white font-medium">Pending</span> and businesses are notified.
+                        </p>
+
+                        <div className="flex gap-3 pt-1">
+                            <Button variant="outline" className="flex-1" onClick={handleDismissApprovalModal}>
+                                Go Back
+                            </Button>
+                            <Button
+                                className="flex-1 bg-green-500/20 border border-green-500/30 text-green-400 hover:bg-green-500/30"
+                                onClick={handleApproveConfirm}
+                                disabled={approvingOrder}
+                            >
+                                {approvingOrder ? "Approving..." : "✓ Approve & Send to Business"}
+                            </Button>
+                        </div>
+                    </div>
+                )}
             </Modal>
         </div>
     );

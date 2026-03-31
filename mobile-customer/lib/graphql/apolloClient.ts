@@ -7,6 +7,7 @@ import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { createClient } from 'graphql-ws';
 import { persistCache, AsyncStorageWrapper } from 'apollo3-cache-persist';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 import { useAuthStore } from '../../store/authStore';
 import { toast } from '../../store/toastStore';
 import { getValidAccessToken, refreshAccessToken } from './authSession';
@@ -37,9 +38,10 @@ const errorLink = onError(({ error, operation, forward }) => {
 
                 const alreadyRetried = operation.getContext().alreadyRetriedAuth === true;
                 if (alreadyRetried || !forward) {
-                    console.warn(
-                        '[Apollo] Auth refresh failed or already retried; preserving session until manual logout',
-                    );
+                    console.warn('[Apollo] Auth refresh failed or already retried; logging out');
+                    void useAuthStore.getState().logout().then(() => {
+                        router.replace('/auth-selection');
+                    });
                     return;
                 }
 
@@ -47,6 +49,10 @@ const errorLink = onError(({ error, operation, forward }) => {
                     refreshAccessToken()
                         .then((token) => {
                             if (!token) {
+                                console.warn('[Apollo] Token refresh returned null; logging out');
+                                void useAuthStore.getState().logout().then(() => {
+                                    router.replace('/auth-selection');
+                                });
                                 observer.error(error);
                                 return;
                             }
@@ -69,6 +75,9 @@ const errorLink = onError(({ error, operation, forward }) => {
                         })
                         .catch((refreshError) => {
                             console.warn('[Apollo] Token refresh failed:', refreshError);
+                            void useAuthStore.getState().logout().then(() => {
+                                router.replace('/auth-selection');
+                            });
                             observer.error(error);
                         });
                 });

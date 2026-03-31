@@ -7,6 +7,7 @@ export type DeliveryLocation = {
     longitude: number;
     address?: string;
     label?: string;
+    isOverridden?: boolean;
 };
 
 type DeliveryLocationStore = {

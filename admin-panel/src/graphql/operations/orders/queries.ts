@@ -21,11 +21,17 @@ export const GET_ORDERS = graphql(`
             driverNotes
             needsApproval
             locationFlagged
+            approvalReasons
             user {
                 id
                 firstName
                 lastName
                 email
+                phoneNumber
+                adminNote
+                flagColor
+                totalOrders
+                isTrustedCustomer
                 commissionPercentage
                 commissionPercentage
             }
@@ -77,12 +83,17 @@ export const GET_ORDER = graphql(`
             driverNotes
             needsApproval
             locationFlagged
+            approvalReasons
             user {
                 id
                 firstName
                 lastName
                 email
                 phoneNumber
+                adminNote
+                flagColor
+                totalOrders
+                isTrustedCustomer
             }
             dropOffLocation {
                 latitude
@@ -125,6 +136,9 @@ export const GET_ORDERS_BY_STATUS = graphql(`
             totalPrice
             orderDate
             status
+            needsApproval
+            locationFlagged
+            approvalReasons
             dropOffLocation {
                 latitude
                 longitude

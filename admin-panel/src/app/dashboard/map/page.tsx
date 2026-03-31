@@ -11,8 +11,8 @@ import {
   MessageSquare, Send, BatteryLow, Battery, BatteryCharging, ChevronLeft,
   Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen
 } from "lucide-react";
-import { ASSIGN_DRIVER_TO_ORDER, UPDATE_ORDER_STATUS, ADMIN_CANCEL_ORDER, SET_ORDER_ADMIN_NOTE, APPROVE_ORDER } from "@/graphql/operations/orders";
-import { ADMIN_UPDATE_DRIVER_LOCATION, ADMIN_SET_SHIFT_DRIVERS } from "@/graphql/operations/users/mutations";
+import { ASSIGN_DRIVER_TO_ORDER, UPDATE_ORDER_STATUS, ADMIN_CANCEL_ORDER, SET_ORDER_ADMIN_NOTE, APPROVE_ORDER, START_PREPARING } from "@/graphql/operations/orders";
+import { ADMIN_UPDATE_DRIVER_LOCATION, ADMIN_SET_SHIFT_DRIVERS, UPDATE_USER_NOTE_MUTATION } from "@/graphql/operations/users/mutations";
 import { getDirectionsTelemetry } from "@/lib/utils/mapbox";
 import { ADMIN_SEND_PTT_SIGNAL, GET_AGORA_RTC_CREDENTIALS } from "@/graphql/operations/users/ptt";
 import { USERS_QUERY } from "@/graphql/operations/users/queries";
@@ -39,6 +39,8 @@ const MIN_ZOOM = 11.5;
 const MAX_ZOOM = 17;
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 const MAP_STYLE = process.env.NEXT_PUBLIC_MAP_STYLE_URL || "mapbox://styles/mapbox/dark-v11";
+const TRUSTED_CUSTOMER_MARKER = '[TRUSTED_CUSTOMER]';
+const APPROVAL_MODAL_SUPPRESS_MARKER = '[SUPPRESS_APPROVAL_MODAL]';
 
 const PENDING_WARNING_MS = 2 * 60 * 1000; // 2 minutes
 
@@ -62,37 +64,68 @@ const MAP_GET_SETTLEMENT_RULES = gql`
 `;
 
 function computeMapOrderEarnings(order: any, rules: MapSettlementRule[]): MapOrderEarnings {
-  const deliveryPrice = Number(order.deliveryPrice || 0);
-  const driverCommissionRate = Number(order.driver?.commissionPercentage || 0);
-  const deliveryCommissionPotential = Math.round((deliveryPrice * driverCommissionRate) / 100 * 100) / 100;
-  let restaurantCommission = 0, grossItemValue = 0, markupFromSnapshots = 0, hasBasePrice = false;
-  const activeRules = (rules || []).filter(r => r.isActive && r.entityType === 'BUSINESS');
-  const businesses = Array.isArray(order?.businesses) ? order.businesses : [];
-  businesses.forEach((biz: any) => {
-    const items = Array.isArray(biz?.items) ? biz.items : [];
-    const bizGross = items.reduce((s: number, i: any) => s + Number(i.unitPrice || 0) * Number(i.quantity || 0), 0);
-    grossItemValue += bizGross;
-    items.forEach((item: any) => {
-      const qty = Number(item.quantity || 0);
-      const basePrice = item.basePrice != null ? Number(item.basePrice) : null;
-      if (basePrice != null) { hasBasePrice = true; markupFromSnapshots += Math.max(0, Number(item.unitPrice || 0) - basePrice) * qty; }
-    });
-    const scoped = activeRules.filter(r => !r.business?.id || r.business.id === biz.business?.id);
-    if (scoped.length > 0) {
-      scoped.forEach(r => {
-        const base = r.appliesTo === 'DELIVERY_FEE' ? deliveryPrice : Number(order.orderPrice || 0);
-        const amt = r.amountType === 'FIXED' ? Number(r.amount || 0) : (base * Number(r.amount || 0)) / 100;
-        if (amt > 0 && r.direction === 'RECEIVABLE') restaurantCommission += amt;
-      });
-    } else {
-      const pct = Number(biz.business?.commissionPercentage || 0);
-      if (pct > 0) restaurantCommission += (bizGross * pct) / 100;
+  const subtotalBase = Number((order as any)?.businessPrice ?? order?.orderPrice ?? 0);
+  const deliveryBase = Number((order as any)?.originalDeliveryPrice ?? order?.deliveryPrice ?? 0);
+  const hasDriver = Boolean(order?.driver?.id);
+  const businessIds = Array.from(new Set(
+    getOrderBusinesses(order)
+      .map((entry: any) => entry?.business?.id)
+      .filter((id: any) => Boolean(id)),
+  ));
+
+  let restaurantCommission = 0;
+  let deliveryCommissionPotential = 0;
+
+  (rules || []).filter((rule) => rule.isActive).forEach((rule) => {
+    if (rule.entityType === 'DRIVER' && !hasDriver) return;
+
+    const appliesToDelivery = rule.appliesTo === 'DELIVERY_FEE' || rule.appliesTo === 'DELIVERY_PRICE';
+    const base = appliesToDelivery ? deliveryBase : subtotalBase;
+    const amount = rule.amountType === 'FIXED' ? Number(rule.amount || 0) : (base * Number(rule.amount || 0)) / 100;
+    if (amount <= 0) return;
+
+    if (rule.entityType === 'BUSINESS' && rule.direction === 'RECEIVABLE') {
+      const businessCount = rule.business?.id ? (businessIds.includes(rule.business.id) ? 1 : 0) : businessIds.length;
+      if (businessCount > 0) restaurantCommission += amount * businessCount;
+    }
+
+    if (rule.entityType === 'DRIVER' && rule.direction === 'PAYABLE' && appliesToDelivery) {
+      deliveryCommissionPotential += amount;
     }
   });
-  restaurantCommission = Math.round(restaurantCommission * 100) / 100;
-  const subtotal = Number(order.orderPrice || 0);
-  const markup = hasBasePrice ? Math.round(markupFromSnapshots * 100) / 100 : (grossItemValue > 0 ? Math.round(Math.max(0, subtotal - grossItemValue) * 100) / 100 : 0);
-  return { restaurantCommission, markup, deliveryCommissionPotential };
+
+  let grossItemValue = 0;
+  let markupFromSnapshots = 0;
+  let hasBasePrice = false;
+  getOrderBusinesses(order).forEach((biz: any) => {
+    const items = getOrderBusinessItems(biz);
+    const businessGross = items.reduce((sum: number, item: any) => {
+      return sum + Number(item?.unitPrice || 0) * Number(item?.quantity || 0);
+    }, 0);
+    grossItemValue += businessGross;
+
+    items.forEach((item: any) => {
+      const qty = Number(item?.quantity || 0);
+      const basePrice = item?.basePrice != null ? Number(item.basePrice) : null;
+      if (basePrice != null) {
+        hasBasePrice = true;
+        markupFromSnapshots += Math.max(0, Number(item?.unitPrice || 0) - basePrice) * qty;
+      }
+    });
+  });
+
+  const subtotal = Number(order?.orderPrice || 0);
+  const markup = hasBasePrice
+    ? Math.round(markupFromSnapshots * 100) / 100
+    : grossItemValue > 0
+      ? Math.round(Math.max(0, subtotal - grossItemValue) * 100) / 100
+      : 0;
+
+  return {
+    restaurantCommission: Math.round(restaurantCommission * 100) / 100,
+    markup,
+    deliveryCommissionPotential: Math.round(deliveryCommissionPotential * 100) / 100,
+  };
 }
 const READY_WARNING_MS = 3 * 60 * 1000;
 const OUT_FOR_DELIVERY_WARNING_MS = 10 * 60 * 1000;
@@ -120,7 +153,7 @@ type RealtimeHealth = {
 const ORDER_STATUS_COLORS = {
   AWAITING_APPROVAL: { bg: "bg-rose-500/10", border: "border-rose-500/50", text: "text-rose-400", marker: "#f43f5e", selectBg: "bg-rose-500/20", hex: "#f43f5e" },
   PENDING: { bg: "bg-amber-500/10", border: "border-amber-500/50", text: "text-amber-500", marker: "#f59e0b", selectBg: "bg-amber-500/20", hex: "#f59e0b" },
-  PREPARING: { bg: "bg-orange-500/10", border: "border-orange-500/50", text: "text-orange-400", marker: "#f97316", selectBg: "bg-orange-500/20", hex: "#f97316" },
+  PREPARING: { bg: "bg-violet-500/10", border: "border-violet-500/50", text: "text-violet-400", marker: "#8b5cf6", selectBg: "bg-violet-500/20", hex: "#8b5cf6" },
   READY: { bg: "bg-blue-500/10", border: "border-blue-500/50", text: "text-blue-500", marker: "#3b82f6", selectBg: "bg-blue-500/20", hex: "#3b82f6" },
   OUT_FOR_DELIVERY: { bg: "bg-emerald-500/10", border: "border-emerald-500/50", text: "text-emerald-500", marker: "#10b981", selectBg: "bg-emerald-500/20", hex: "#10b981" },
   DELIVERED: { bg: "bg-gray-500/10", border: "border-gray-500/50", text: "text-gray-500", marker: "#6b7280", selectBg: "bg-gray-500/20", hex: "#6b7280" },
@@ -209,6 +242,56 @@ const formatHeartbeatElapsed = (lastHeartbeat: string | null | undefined, now: n
   return `${Math.floor(elapsed / 3600000)}h ago`;
 };
 
+const isTrustedCustomer = (user: any) => {
+  if (!user) return false;
+  if (user.isTrustedCustomer) return true;
+  if (String(user.flagColor || '').toLowerCase() === 'green') return true;
+  return String(user.adminNote || '').toUpperCase().includes(TRUSTED_CUSTOMER_MARKER);
+};
+
+const upsertTrustMarker = (note?: string | null) => {
+  const cleaned = String(note || '').replace(TRUSTED_CUSTOMER_MARKER, '').trim();
+  return cleaned ? `${TRUSTED_CUSTOMER_MARKER}\n${cleaned}` : TRUSTED_CUSTOMER_MARKER;
+};
+
+const removeTrustMarker = (note?: string | null) => {
+  const cleaned = String(note || '').replace(TRUSTED_CUSTOMER_MARKER, '').trim();
+  return cleaned || null;
+};
+
+const isApprovalModalSuppressed = (user: any) => {
+  if (!user) return false;
+  return String(user.adminNote || '').toUpperCase().includes(APPROVAL_MODAL_SUPPRESS_MARKER);
+};
+
+const upsertApprovalModalSuppressMarker = (note?: string | null) => {
+  const cleaned = String(note || '').replace(APPROVAL_MODAL_SUPPRESS_MARKER, '').trim();
+  return cleaned ? `${APPROVAL_MODAL_SUPPRESS_MARKER}\n${cleaned}` : APPROVAL_MODAL_SUPPRESS_MARKER;
+};
+
+const removeApprovalModalSuppressMarker = (note?: string | null) => {
+  const cleaned = String(note || '').replace(APPROVAL_MODAL_SUPPRESS_MARKER, '').trim();
+  return cleaned || null;
+};
+
+const getApprovalReasons = (order: any): Array<'FIRST_ORDER' | 'HIGH_VALUE' | 'OUT_OF_ZONE'> => {
+  const normalized = new Set<'FIRST_ORDER' | 'HIGH_VALUE' | 'OUT_OF_ZONE'>();
+  for (const reason of order?.approvalReasons || []) {
+    if (reason === 'FIRST_ORDER' || reason === 'HIGH_VALUE' || reason === 'OUT_OF_ZONE') {
+      normalized.add(reason);
+    }
+  }
+
+  if (order?.locationFlagged) normalized.add('OUT_OF_ZONE');
+
+  // Fallback for sparse payloads: keep high-value visibility for approval-needed orders.
+  if (order?.needsApproval && normalized.size === 0 && Number(order?.totalPrice || 0) > 20) {
+    normalized.add('HIGH_VALUE');
+  }
+
+  return Array.from(normalized);
+};
+
 const getOrderStatusStartMs = (order: any, fallbackNow: number) => {
   const createdMs = parseServerTimeMs(order?.orderDate);
   const updatedMs = parseServerTimeMs(order?.updatedAt);
@@ -285,21 +368,50 @@ const getOrderSlaRisk = (order: any, nowMs: number, statusChangeTime: Record<str
   return { level: 'ok', delayMs: 0 };
 };
 
-const estimateOrderEconomics = (order: any) => {
-  const subtotal = Number(order?.orderPrice ?? 0);
-  const deliveryFee = Number(order?.deliveryPrice ?? 0);
-  const customerTotal = Number(order?.totalPrice ?? subtotal + deliveryFee);
-  const originalSubtotal = Number(order?.originalPrice ?? subtotal);
-  const originalDelivery = Number(order?.originalDeliveryPrice ?? deliveryFee);
+const estimateOrderEconomics = (order: any, rules: MapSettlementRule[]) => {
+  const subtotalBase = Number((order as any)?.businessPrice ?? order?.orderPrice ?? 0);
+  const deliveryBase = Number((order as any)?.originalDeliveryPrice ?? order?.deliveryPrice ?? 0);
+  const hasDriver = Boolean(order?.driver?.id);
+  const businessIds = Array.from(new Set(
+    getOrderBusinesses(order)
+      .map((entry: any) => entry?.business?.id)
+      .filter((id: any) => Boolean(id)),
+  ));
 
-  const commissionPercentCandidates = getOrderBusinesses(order)
-    .map((entry: any) => Number(entry?.business?.commissionPercentage ?? 0))
-    .filter((v: number) => Number.isFinite(v) && v > 0);
-  const businessCommissionPct = commissionPercentCandidates.length
-    ? commissionPercentCandidates.reduce((a: number, b: number) => a + b, 0) / commissionPercentCandidates.length
-    : 0;
+  let settlementReceivable = 0;
+  let settlementPayable = 0;
+  let restaurantCommission = 0;
+  let driverCommissionReceivable = 0;
+  let driverCommissionPayable = 0;
 
-  const commissionRevenue = subtotal * (businessCommissionPct / 100);
+  (rules || []).filter((rule) => rule.isActive).forEach((rule) => {
+    if (rule.entityType === 'DRIVER' && !hasDriver) return;
+
+    const appliesToDelivery = rule.appliesTo === 'DELIVERY_FEE' || rule.appliesTo === 'DELIVERY_PRICE';
+    const base = appliesToDelivery ? deliveryBase : subtotalBase;
+    const amount = rule.amountType === 'FIXED' ? Number(rule.amount || 0) : (base * Number(rule.amount || 0)) / 100;
+    if (amount <= 0) return;
+
+    const multiplier = rule.entityType === 'BUSINESS'
+      ? (rule.business?.id ? (businessIds.includes(rule.business.id) ? 1 : 0) : businessIds.length)
+      : 1;
+    if (multiplier <= 0) return;
+
+    const totalAmount = amount * multiplier;
+    if (rule.direction === 'RECEIVABLE') settlementReceivable += totalAmount;
+    if (rule.direction === 'PAYABLE') settlementPayable += totalAmount;
+
+    if (rule.entityType === 'BUSINESS' && rule.direction === 'RECEIVABLE') {
+      restaurantCommission += totalAmount;
+    }
+    if (rule.entityType === 'DRIVER' && rule.direction === 'RECEIVABLE') {
+      driverCommissionReceivable += totalAmount;
+    }
+    if (rule.entityType === 'DRIVER' && rule.direction === 'PAYABLE') {
+      driverCommissionPayable += totalAmount;
+    }
+  });
+
   const itemMarkupRevenue = getOrderBusinesses(order)
     .flatMap((entry: any) => getOrderBusinessItems(entry))
     .reduce((sum: number, item: any) => {
@@ -309,20 +421,29 @@ const estimateOrderEconomics = (order: any) => {
       return sum + Math.max(0, unit - base) * qty;
     }, 0);
 
-  const platformRevenueEstimate = commissionRevenue + itemMarkupRevenue + deliveryFee;
-  const driverCommissionPct = Number(order?.driver?.commissionPercentage ?? 65);
-  const driverCostEstimate = deliveryFee * (Math.max(0, Math.min(100, driverCommissionPct)) / 100);
+  const paymentCollection = (order as any)?.paymentCollection ?? 'CASH_TO_DRIVER';
+  const markupRevenue = paymentCollection === 'CASH_TO_DRIVER' && !hasDriver ? 0 : itemMarkupRevenue;
+  const driverCommission = driverCommissionReceivable - driverCommissionPayable;
 
+  const platformRevenueEstimate = settlementReceivable + markupRevenue;
+  const driverCostEstimate = settlementPayable;
+
+  const customerTotal = Number(order?.totalPrice ?? 0);
+  const originalSubtotal = Number(order?.originalPrice ?? order?.orderPrice ?? 0);
+  const originalDelivery = Number((order as any)?.originalDeliveryPrice ?? order?.deliveryPrice ?? 0);
   const promoDiscountEstimate = Math.max(0, originalSubtotal + originalDelivery - customerTotal);
-  const platformPromoShareEstimate = promoDiscountEstimate * 0.6;
-  const businessPromoShareEstimate = promoDiscountEstimate - platformPromoShareEstimate;
+  const platformPromoShareEstimate = 0;
+  const businessPromoShareEstimate = 0;
 
-  const marginEstimate = platformRevenueEstimate - driverCostEstimate - platformPromoShareEstimate;
+  const marginEstimate = platformRevenueEstimate - driverCostEstimate;
   const marginSeverity: MarginSeverity = marginEstimate < 0 ? 'negative' : marginEstimate < 1.5 ? 'thin' : 'healthy';
 
   return {
     platformRevenueEstimate,
     driverCostEstimate,
+    restaurantCommission,
+    markupRevenue,
+    driverCommission,
     promoDiscountEstimate,
     platformPromoShareEstimate,
     businessPromoShareEstimate,
@@ -495,6 +616,7 @@ export default function MapPage() {
   
   const [assignDriver] = useMutation(ASSIGN_DRIVER_TO_ORDER);
   const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS, { fetchPolicy: "no-cache" });
+  const [startPreparingOrder, { loading: startPreparingLoading }] = useMutation(START_PREPARING, { fetchPolicy: "no-cache" });
   const [sendPttSignal] = useMutation(ADMIN_SEND_PTT_SIGNAL);
   const [sendDriverMessage] = useMutation(SEND_DRIVER_MESSAGE);
   const [setShiftDrivers] = useMutation(ADMIN_SET_SHIFT_DRIVERS);
@@ -605,17 +727,98 @@ export default function MapPage() {
   const [confirmNoDriverAction, setConfirmNoDriverAction] = useState<{ orderId: string; status: string } | null>(null);
   // Status confirmation
   const [pendingStatusChange, setPendingStatusChange] = useState<{ orderId: string; status: string } | null>(null);
+  const [prepTimeMinutes, setPrepTimeMinutes] = useState("20");
   // Cancel modal
   const [cancelModalOrderId, setCancelModalOrderId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelSettleDriver, setCancelSettleDriver] = useState(false);
   const [cancelSettleBusiness, setCancelSettleBusiness] = useState(false);
+  // Approval modal
+  const [approvalModalOrderId, setApprovalModalOrderId] = useState<string | null>(null);
+  const [dismissedApprovalOrderIds, setDismissedApprovalOrderIds] = useState<Set<string>>(new Set());
+  const seenFlaggedOrderIdsRef = useRef<Set<string>>(new Set());
   const [adminCancelOrder, { loading: cancellingOrder }] = useMutation(ADMIN_CANCEL_ORDER, { refetchQueries: ['GetOrders'] });
-  const [approveOrder] = useMutation(APPROVE_ORDER, { fetchPolicy: 'no-cache' });
+  const [approveOrder, { loading: approvingOrder }] = useMutation(APPROVE_ORDER, { fetchPolicy: 'no-cache' });
   const [setOrderAdminNote] = useMutation(SET_ORDER_ADMIN_NOTE);
-  const { data: settlementRulesData } = useQuery(MAP_GET_SETTLEMENT_RULES, { variables: { filter: { entityTypes: ['BUSINESS'] } }, fetchPolicy: 'cache-and-network' });
+  const [updateUserNote] = useMutation(UPDATE_USER_NOTE_MUTATION, { refetchQueries: ['GetOrders'] });
+  const [trustUpdatingUserId, setTrustUpdatingUserId] = useState<string | null>(null);
+  const [suppressionUpdatingUserId, setSuppressionUpdatingUserId] = useState<string | null>(null);
+  const { data: settlementRulesData } = useQuery(MAP_GET_SETTLEMENT_RULES, { variables: { filter: { entityTypes: ['BUSINESS', 'DRIVER'] } }, fetchPolicy: 'cache-and-network' });
   const settlementRules: MapSettlementRule[] = useMemo(() => (settlementRulesData as any)?.settlementRules || [], [settlementRulesData]);
   const cancelModalOrder = useMemo(() => cancelModalOrderId ? activeOrders.find((o: any) => o.id === cancelModalOrderId) ?? null : null, [cancelModalOrderId, activeOrders]);
+  const approvalModalOrder = useMemo(() => approvalModalOrderId ? activeOrders.find((o: any) => o.id === approvalModalOrderId) ?? null : null, [approvalModalOrderId, activeOrders]);
+  const dismissApprovalModal = useCallback(() => {
+    if (approvalModalOrderId) {
+      setDismissedApprovalOrderIds((prev) => {
+        const next = new Set(prev);
+        next.add(approvalModalOrderId);
+        return next;
+      });
+    }
+    setApprovalModalOrderId(null);
+  }, [approvalModalOrderId]);
+
+  const setApprovalModalSuppressionForUser = useCallback(async (user: any, suppress: boolean) => {
+    if (!user?.id) return;
+    setSuppressionUpdatingUserId(user.id);
+    try {
+      const nextNote = suppress
+        ? upsertApprovalModalSuppressMarker(user.adminNote)
+        : removeApprovalModalSuppressMarker(user.adminNote);
+
+      await updateUserNote({
+        variables: {
+          userId: user.id,
+          note: nextNote,
+          flagColor: user.flagColor ?? null,
+        },
+      });
+      toast.success(suppress ? 'Auto-popup muted for this customer' : 'Auto-popup enabled for this customer');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update popup preference');
+    } finally {
+      setSuppressionUpdatingUserId(null);
+    }
+  }, [updateUserNote]);
+
+  const handleToggleTrustedCustomer = useCallback(async (user: any, trust: boolean) => {
+    if (!user?.id) return;
+    setTrustUpdatingUserId(user.id);
+    try {
+      const nextNote = trust ? upsertTrustMarker(user.adminNote) : removeTrustMarker(user.adminNote);
+      const nextFlagColor = trust
+        ? 'green'
+        : (nextNote ? ((user.flagColor && user.flagColor !== 'green') ? user.flagColor : 'yellow') : null);
+
+      await updateUserNote({
+        variables: {
+          userId: user.id,
+          note: nextNote,
+          flagColor: nextFlagColor,
+        },
+      });
+      toast.success(trust ? 'Customer marked as trusted' : 'Trusted flag removed');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update trusted customer status');
+    } finally {
+      setTrustUpdatingUserId(null);
+    }
+  }, [updateUserNote]);
+
+  useEffect(() => {
+    const flaggedOrders = activeOrders.filter((order: any) => {
+      if (!order.needsApproval) return false;
+      return !isApprovalModalSuppressed(order?.user);
+    });
+    const seen = seenFlaggedOrderIdsRef.current;
+    const newFlagged = flaggedOrders.filter((order: any) => !seen.has(order.id));
+
+    flaggedOrders.forEach((order: any) => seen.add(order.id));
+
+    if (!approvalModalOrderId && newFlagged.length > 0) {
+      setApprovalModalOrderId(newFlagged[0].id);
+    }
+  }, [activeOrders, approvalModalOrderId]);
   // Driver chat
   const [chatDriverId, setChatDriverId] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState('');
@@ -1341,6 +1544,14 @@ export default function MapPage() {
       setCancelSettleBusiness(false);
       return;
     }
+    if (status === 'PREPARING') {
+      const defaultPrep = Number(
+        order?.businesses?.[0]?.business?.prepTimeOverrideMinutes
+        ?? order?.businesses?.[0]?.business?.avgPrepTimeMinutes
+        ?? 20
+      );
+      setPrepTimeMinutes(String(Number.isFinite(defaultPrep) && defaultPrep > 0 ? Math.round(defaultPrep) : 20));
+    }
     setPendingStatusChange({ orderId, status });
   };
 
@@ -1351,6 +1562,25 @@ export default function MapPage() {
     if (status === 'OUT_FOR_DELIVERY' && !order?.driver?.id) {
       setPendingStatusChange(null);
       setConfirmNoDriverAction({ orderId, status });
+      return;
+    }
+    if (status === 'PREPARING') {
+      const minutes = Number.parseInt(prepTimeMinutes, 10);
+      if (!Number.isFinite(minutes) || minutes < 1) {
+        toast.warning('Enter a valid preparation time in minutes.');
+        return;
+      }
+      setPendingStatusChange(null);
+      try {
+        await startPreparingOrder({
+          variables: { id: orderId, preparationMinutes: minutes },
+          refetchQueries: ['GetOrders'],
+          awaitRefetchQueries: true,
+        });
+        toast.success(`Order marked as preparing (${minutes} min)`);
+      } catch (error: any) {
+        toast.error(error.message || 'Failed to start preparing');
+      }
       return;
     }
     setPendingStatusChange(null);
@@ -1377,10 +1607,21 @@ export default function MapPage() {
     }
   };
 
-  const handleApproveOrder = async (orderId: string) => {
+  const handleApproveOrder = (orderId: string) => {
+    setApprovalModalOrderId(orderId);
+  };
+
+  const handleApproveConfirm = async () => {
+    if (!approvalModalOrderId) return;
     try {
-      await approveOrder({ variables: { id: orderId }, refetchQueries: ['GetOrders'], awaitRefetchQueries: true });
+      await approveOrder({ variables: { id: approvalModalOrderId }, refetchQueries: ['GetOrders'], awaitRefetchQueries: true });
+      setDismissedApprovalOrderIds((prev) => {
+        const next = new Set(prev);
+        next.delete(approvalModalOrderId);
+        return next;
+      });
       toast.success('Order approved and sent to business');
+      setApprovalModalOrderId(null);
     } catch (error: any) {
       toast.error(error.message || 'Failed to approve order');
     }
@@ -1447,9 +1688,14 @@ export default function MapPage() {
     setSelectedOrderId(orderId);
     setRightPanelTab('order');
     const order = activeOrders.find((o: any) => o.id === orderId);
-    if (order) focusOrder(order);
+    if (order) {
+      focusOrder(order);
+      if (order.needsApproval && dismissedApprovalOrderIds.has(order.id)) {
+        setApprovalModalOrderId(order.id);
+      }
+    }
     setTimeout(() => orderRefs.current[orderId]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
-  }, [activeOrders, focusOrder]);
+  }, [activeOrders, dismissedApprovalOrderIds, focusOrder]);
 
   const recenterMap = useCallback(() => {
     const map = mapRef.current?.getMap?.();
@@ -1890,7 +2136,7 @@ export default function MapPage() {
           <div className="flex items-center gap-1 flex-wrap">
             {([
               { key: "PENDING", count: stats.pendingOrders, dot: "bg-amber-500", active: "bg-amber-500/25 border-amber-500/60 text-amber-300", idle: "bg-amber-500/10 border-transparent text-amber-500" },
-              { key: "PREPARING", count: stats.preparingOrders, dot: "bg-orange-500", active: "bg-orange-500/25 border-orange-500/60 text-orange-300", idle: "bg-orange-500/10 border-transparent text-orange-400" },
+              { key: "PREPARING", count: stats.preparingOrders, dot: "bg-violet-500", active: "bg-violet-500/25 border-violet-500/60 text-violet-300", idle: "bg-violet-500/10 border-transparent text-violet-400" },
               { key: "READY", count: stats.readyOrders, dot: "bg-blue-500", active: "bg-blue-500/25 border-blue-500/60 text-blue-300", idle: "bg-blue-500/10 border-transparent text-blue-500" },
               { key: "OUT_FOR_DELIVERY", count: stats.outOrders, dot: "bg-emerald-500", active: "bg-emerald-500/25 border-emerald-500/60 text-emerald-300", idle: "bg-emerald-500/10 border-transparent text-emerald-500" },
             ] as const).map(({ key, count, dot, active, idle }) => (
@@ -1935,7 +2181,7 @@ export default function MapPage() {
               const customerName = order.user ? `${order.user.firstName} ${order.user.lastName}` : "Unknown";
               const customerPhone = order.user?.phoneNumber || "";
               const distanceData = orderDistances[order.id];
-              const economics = estimateOrderEconomics(order);
+              const economics = estimateOrderEconomics(order, settlementRules);
               const etaMin = getOrderEtaMinutes(
                 order,
                 distanceData,
@@ -2002,7 +2248,9 @@ export default function MapPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${economics.marginSeverity === 'healthy' ? 'bg-emerald-500/15 text-emerald-300' : economics.marginSeverity === 'thin' ? 'bg-amber-500/15 text-amber-300' : 'bg-rose-500/15 text-rose-300'}`}>
+                      <span
+                        title={`Restaurant +€${economics.restaurantCommission.toFixed(2)} | Markup +€${economics.markupRevenue.toFixed(2)} | ${economics.driverCommission >= 0 ? 'Driver commission' : 'Driver payout'} ${economics.driverCommission >= 0 ? '+' : ''}€${economics.driverCommission.toFixed(2)}`}
+                        className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${economics.marginSeverity === 'healthy' ? 'bg-emerald-500/15 text-emerald-300' : economics.marginSeverity === 'thin' ? 'bg-amber-500/15 text-amber-300' : 'bg-rose-500/15 text-rose-300'}`}>
                         M {economics.marginEstimate >= 0 ? '+' : ''}{economics.marginEstimate.toFixed(2)}
                       </span>
                       {etaMin && (
@@ -2087,6 +2335,9 @@ export default function MapPage() {
                 incident={incidentNotes[selectedOrder.id] || { tag: '', rootCause: '', updatedAt: 0 }}
                 onIncidentUpdate={handleIncidentUpdate}
                 workingDriverIds={workingDriverIds}
+                settlementRules={settlementRules}
+                onToggleTrustedCustomer={handleToggleTrustedCustomer}
+                trustUpdatingUserId={trustUpdatingUserId}
               />
             : <div className="flex-1 flex flex-col items-center justify-center gap-2 text-zinc-700">
                 <Package size={28} strokeWidth={1.5} />
@@ -2651,12 +2902,25 @@ export default function MapPage() {
                 <span className="font-medium text-zinc-200">{fromStatus.replace(/_/g, ' ')}</span>{' → '}
                 <span className={`font-medium ${toColor?.text || 'text-white'}`}>{toStatus.replace(/_/g, ' ')}</span>?
               </p>
+              {toStatus === 'PREPARING' && (
+                <div className="mb-4 space-y-1.5">
+                  <label className="block text-[11px] font-medium text-zinc-300">Preparation time (minutes)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={prepTimeMinutes}
+                    onChange={(e) => setPrepTimeMinutes(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-orange-500/70"
+                  />
+                </div>
+              )}
               <div className="flex gap-2">
                 <button onClick={() => setPendingStatusChange(null)}
                   className="flex-1 py-2 rounded-lg text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition">Cancel</button>
                 <button onClick={handleConfirmStatusChange}
+                  disabled={toStatus === 'PREPARING' && startPreparingLoading}
                   className={`flex-1 py-2 rounded-lg text-xs font-semibold text-white transition ${toColor?.selectBg || 'bg-zinc-700'} hover:opacity-90`}>
-                  Confirm
+                  {toStatus === 'PREPARING' && startPreparingLoading ? 'Saving...' : 'Confirm'}
                 </button>
               </div>
             </div>
@@ -2732,6 +2996,107 @@ export default function MapPage() {
         );
       })()}
 
+      {/* Approve Order Modal */}
+      {approvalModalOrder && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={dismissApprovalModal} />
+          <div className="relative z-[201] w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-white">Approve Order</h3>
+              <button onClick={dismissApprovalModal} className="p-1.5 rounded-lg hover:bg-white/10 text-zinc-400"><X size={14} /></button>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              {/* Order summary */}
+              <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">
+                <div className="font-medium text-rose-300 text-sm">{(approvalModalOrder as any).displayId || approvalModalOrder.id.slice(0, 8)}</div>
+                {(approvalModalOrder as any).user && (
+                  <>
+                    <div className="text-xs text-zinc-400 mt-0.5">{(approvalModalOrder as any).user.firstName} {(approvalModalOrder as any).user.lastName}</div>
+                    <div className="text-xs text-zinc-500 mt-1">{Number((approvalModalOrder as any).user.totalOrders || 0)} total orders</div>
+                    {(approvalModalOrder as any).user.phoneNumber && (
+                      <div className="flex items-center gap-1.5 mt-1 text-xs text-zinc-400">
+                        <Phone size={11} className="text-zinc-600" />
+                        <a href={`tel:${(approvalModalOrder as any).user.phoneNumber}`} className="hover:text-white transition-colors">
+                          {(approvalModalOrder as any).user.phoneNumber}
+                        </a>
+                      </div>
+                    )}
+                    <div className="mt-2">
+                      <button
+                        type="button"
+                        disabled={trustUpdatingUserId === (approvalModalOrder as any).user.id}
+                        onClick={() => handleToggleTrustedCustomer((approvalModalOrder as any).user, !isTrustedCustomer((approvalModalOrder as any).user))}
+                        className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors disabled:opacity-50 ${
+                          isTrustedCustomer((approvalModalOrder as any).user)
+                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
+                            : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
+                        }`}
+                      >
+                        {trustUpdatingUserId === (approvalModalOrder as any).user.id
+                          ? 'Saving...'
+                          : isTrustedCustomer((approvalModalOrder as any).user)
+                            ? 'Trusted customer: enabled'
+                            : 'Mark as trusted customer'}
+                      </button>
+                    </div>
+                    <label className="mt-2 flex items-center gap-2 text-xs text-zinc-400">
+                      <input
+                        type="checkbox"
+                        disabled={suppressionUpdatingUserId === (approvalModalOrder as any).user?.id}
+                        checked={isApprovalModalSuppressed((approvalModalOrder as any).user)}
+                        onChange={(e) => {
+                          const user = (approvalModalOrder as any).user;
+                          if (!user) return;
+                          void setApprovalModalSuppressionForUser(user, e.target.checked);
+                        }}
+                        className="w-3.5 h-3.5 rounded border-zinc-600 bg-zinc-900"
+                      />
+                      Don't auto-open approval modal again for this user
+                    </label>
+                  </>
+                )}
+                <div className="text-xs text-zinc-500 mt-0.5">€{Number((approvalModalOrder as any).totalPrice || 0).toFixed(2)}</div>
+              </div>
+              {/* Reason flags */}
+              <div className="space-y-2">
+                <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Approval flags</div>
+                {getApprovalReasons(approvalModalOrder).includes('FIRST_ORDER') && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs font-medium">
+                    🆕 First order — customer has no previous orders
+                  </div>
+                )}
+                {getApprovalReasons(approvalModalOrder).includes('HIGH_VALUE') && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium">
+                    💰 High value order (over €20)
+                  </div>
+                )}
+                {getApprovalReasons(approvalModalOrder).includes('OUT_OF_ZONE') && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-300 text-xs font-medium">
+                    📍 Outside delivery zone — confirm drop-off address with customer
+                  </div>
+                )}
+                {getApprovalReasons(approvalModalOrder).length === 0 && (approvalModalOrder as any).needsApproval && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium">
+                    ⚠ Manual verification required before approval
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-zinc-400">
+                Confirm you have called/verified this order. On approval, status moves to <span className="text-white font-medium">Pending</span> and businesses are notified.
+              </p>
+              <div className="flex gap-2">
+                <button onClick={dismissApprovalModal}
+                  className="flex-1 py-2 rounded-xl text-sm font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition">Go Back</button>
+                <button onClick={handleApproveConfirm} disabled={approvingOrder}
+                  className="flex-1 py-2 rounded-xl text-sm font-semibold bg-green-500/20 border border-green-500/30 text-green-400 hover:bg-green-500/30 transition disabled:opacity-50">
+                  {approvingOrder ? 'Approving…' : '✓ Approve & Send to Business'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Confirm Out for Delivery without driver */}
       {confirmNoDriverAction && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center">
@@ -2802,7 +3167,7 @@ function BottomDetailPanel({
   onApproveOrder,
   onTogglePolyline, showPolyline, onToggleBothRoutes, showBothRoutes,
   onFocus, driverProgressOnRoute, onNotifyDriver, onNotifyBusiness, incident, onIncidentUpdate,
-  workingDriverIds,
+  workingDriverIds, settlementRules, onToggleTrustedCustomer, trustUpdatingUserId,
 }: any) {
   const [selectedDriverId, setSelectedDriverId] = useState(order.driver?.id || "");
   const statusColor = ORDER_STATUS_COLORS[order.status as keyof typeof ORDER_STATUS_COLORS] || ORDER_STATUS_COLORS.PENDING;
@@ -2812,6 +3177,8 @@ function BottomDetailPanel({
   const businessPhone = orderBusinesses[0]?.business?.phoneNumber || "";
   const customerName = order.user ? `${order.user.firstName} ${order.user.lastName}`.trim() : "Unknown";
   const customerPhone = order.user?.phoneNumber || "";
+  const customerTotalOrders = Number(order.user?.totalOrders ?? 0);
+  const customerTrusted = isTrustedCustomer(order.user);
   const distanceData = orderDistances[order.id];
   const etaMin = getOrderEtaMinutes(
     order, distanceData, now,
@@ -2827,7 +3194,7 @@ function BottomDetailPanel({
   const pickupLocation = orderBusinesses
     ?.map((entry: any) => entry?.business?.location)
     ?.find((location: any) => isValidLatLng(location?.latitude, location?.longitude));
-  const economics = estimateOrderEconomics(order);
+  const economics = estimateOrderEconomics(order, settlementRules);
 
   const allDriversSorted = useMemo(() => {
     return drivers
@@ -2965,18 +3332,49 @@ function BottomDetailPanel({
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium text-white truncate">{customerName}</div>
+              <div className="text-xs text-zinc-500">{customerTotalOrders} total orders</div>
               {customerPhone && <div className="text-xs text-zinc-500">{customerPhone}</div>}
             </div>
+            <button
+              onClick={() => onToggleTrustedCustomer(order.user, !customerTrusted)}
+              disabled={!order.user?.id || trustUpdatingUserId === order.user?.id}
+              className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-medium border transition disabled:opacity-50 ${
+                customerTrusted
+                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25'
+                  : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
+              }`}
+            >
+              {trustUpdatingUserId === order.user?.id
+                ? 'Saving...'
+                : customerTrusted
+                  ? 'Trusted'
+                  : 'Mark trusted'}
+            </button>
           </div>
           {order.dropOffLocation?.address && (
             <div className="text-xs text-zinc-600 leading-tight pl-10 truncate">{order.dropOffLocation.address}</div>
+          )}
+          {getApprovalReasons(order).includes('FIRST_ORDER') && (
+            <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-200 text-[11px] font-semibold">
+              🆕 First order
+            </div>
+          )}
+          {getApprovalReasons(order).includes('HIGH_VALUE') && (
+            <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[11px] font-semibold">
+              💰 Over €20
+            </div>
           )}
           {(order as any).needsApproval && (
             <div className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold">
               ⚠ Awaiting approval
             </div>
           )}
-          {(order as any).locationFlagged && (
+          {customerTrusted && (
+            <div className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
+              ✅ Trusted customer
+            </div>
+          )}
+          {getApprovalReasons(order).includes('OUT_OF_ZONE') && (
             <div className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-semibold">
               📍 Outside delivery zone
             </div>
@@ -3131,12 +3529,14 @@ function BottomDetailPanel({
           <div className="text-[10px] uppercase tracking-widest text-zinc-600 font-semibold mb-2">Economics</div>
           <div className="grid grid-cols-3 gap-2">
             <div className="rounded-lg bg-white/4 px-3 py-2">
-              <div className="text-[10px] text-zinc-500 mb-0.5">Revenue</div>
-              <div className="text-sm font-semibold text-zinc-200">€{economics.platformRevenueEstimate.toFixed(2)}</div>
+              <div className="text-[10px] text-zinc-500 mb-0.5">Restaurant</div>
+              <div className="text-sm font-semibold text-emerald-300">+€{economics.restaurantCommission.toFixed(2)}</div>
             </div>
             <div className="rounded-lg bg-white/4 px-3 py-2">
-              <div className="text-[10px] text-zinc-500 mb-0.5">Driver cost</div>
-              <div className="text-sm font-semibold text-zinc-200">€{economics.driverCostEstimate.toFixed(2)}</div>
+              <div className="text-[10px] text-zinc-500 mb-0.5">{economics.driverCommission >= 0 ? 'Driver commission' : 'Driver payout'}</div>
+              <div className={`text-sm font-semibold ${economics.driverCommission >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                {economics.driverCommission >= 0 ? '+' : ''}€{economics.driverCommission.toFixed(2)}
+              </div>
             </div>
             <div className={`rounded-lg px-3 py-2 ${
               economics.marginSeverity === 'healthy' ? 'bg-emerald-500/10' :
@@ -3149,6 +3549,7 @@ function BottomDetailPanel({
               }`}>{economics.marginEstimate >= 0 ? '+' : ''}€{economics.marginEstimate.toFixed(2)}</div>
             </div>
           </div>
+          <div className="mt-1.5 text-xs text-zinc-500">Markup: +€{economics.markupRevenue.toFixed(2)}</div>
           {economics.promoDiscountEstimate > 0 && (
             <div className="mt-1.5 text-xs text-zinc-600">Promo discount: €{economics.promoDiscountEstimate.toFixed(2)}</div>
           )}

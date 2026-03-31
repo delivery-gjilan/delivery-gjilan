@@ -34,7 +34,7 @@ Order creation does not hard-reject addresses outside configured service coverag
 
 - `OrderService.createOrder` computes `locationFlagged` when drop-off is outside service coverage.
 - Service coverage resolution uses this priority:
-   1. active zones where `isServiceZone = true`
+   1. active zones where `isServiceZone = true` (supports multiple service zones)
    2. fallback to all active zones when no service zones are marked
 - `Order.locationFlagged: Boolean!` is returned to admin clients.
 
@@ -92,15 +92,24 @@ Delivery zone management includes a dedicated service-zone toggle:
 
 Business-facing order list queries hide `AWAITING_APPROVAL` orders.
 
-- `getOrdersByBusinessId` excludes `AWAITING_APPROVAL`.
-- `getOrdersByBusinessIdAndStatus('AWAITING_APPROVAL')` returns empty.
 
 Result: business users receive and see orders only after admin approval transitions them to `PENDING`.
 
 **Mobile customer:**
-- `AWAITING_APPROVAL` suppresses the out-of-zone modal (treated as active order in `useHasActiveOrder`).
-- Status label: "AWAITING APPROVAL" (EN) / "NË PRITJE PËR MIRATIM" (AL).
-- Status message: "Your order is pending confirmation — our team will call you shortly."
+- Out-of-zone modal display is app-init only: mobile evaluates once after zone/order load and does not re-open during the same session when an order transitions to `DELIVERED`/`CANCELLED`.
+
+## Business Status Authorization
+
+- Business-owner/employee status transitions are guarded by business ownership checks (`orderContainsBusiness`).
+- The ownership check returns a strict boolean from `order_items` + `products.businessId` matching, and denies status updates when the order is outside that business.
+- Allowed business transitions remain:
+   - `PENDING -> READY | CANCELLED`
+   - `PREPARING -> READY | CANCELLED`
+
+## Admin Mock Order Behavior
+
+- `createTestOrder` inserts schema-aligned order snapshots (`businessId`, `basePrice`, `actualPrice`, `deliveryPrice`, etc.) so test orders are writable against the current orders table.
+- Test order items persist `discountedPrice`/`finalAppliedPrice` snapshot fields used by current order item schema.
 
 
 

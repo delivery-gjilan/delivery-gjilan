@@ -128,6 +128,9 @@ export class SettlementCalculationEngine {
             // ── Automatic markup remittance ──
             this.addMarkupSettlement(order, driverId, results);
 
+            // ── Automatic priority surcharge remittance ──
+            this.addPrioritySurchargeSettlement(order, driverId, results);
+
             log.info(
                 {
                     orderId: order.id,
@@ -159,6 +162,27 @@ export class SettlementCalculationEngine {
             businessId: null,
             orderId: order.id,
             amount: Number(markupPrice.toFixed(2)),
+            ruleId: null,
+        });
+    }
+
+    private addPrioritySurchargeSettlement(order: DbOrder, driverId: string | null, results: SettlementCalculation[]): void {
+        if (!driverId) return;
+
+        const prioritySurcharge = Number(order.prioritySurcharge ?? 0);
+        if (prioritySurcharge <= 0) return;
+
+        // Only applicable on cash orders: driver collected the surcharge from the customer
+        // and must remit it to the platform.
+        if (order.paymentCollection !== 'CASH_TO_DRIVER') return;
+
+        results.push({
+            type: 'DRIVER',
+            direction: 'RECEIVABLE',
+            driverId,
+            businessId: null,
+            orderId: order.id,
+            amount: Number(prioritySurcharge.toFixed(2)),
             ruleId: null,
         });
     }

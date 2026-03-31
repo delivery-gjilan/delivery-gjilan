@@ -1,6 +1,6 @@
 {
-  "id": "ce66ecd2-ecd5-445e-a7d3-85ca048a4d5b",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "970e83a3-c7bd-4f99-b277-3233b061d1a3",
+  "prevId": "ce66ecd2-ecd5-445e-a7d3-85ca048a4d5b",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1114,6 +1114,13 @@
           "type": "numeric(10, 2)",
           "primaryKey": false,
           "notNull": true
+        },
+        "priority_surcharge": {
+          "name": "priority_surcharge",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         },
         "payment_collection": {
           "name": "payment_collection",

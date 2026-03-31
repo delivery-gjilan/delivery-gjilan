@@ -21,6 +21,11 @@ import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useServiceZoneCheck } from '@/hooks/useServiceZoneCheck';
 import { useHasActiveOrder } from '@/hooks/useHasActiveOrder';
 import { OutOfZoneSheet } from '@/components/OutOfZoneSheet';
+import { useActiveOrdersStore } from '@/modules/orders/store/activeOrdersStore';
+
+// Keep prompt evaluation session-scoped (until full app re-init), not component-mount scoped.
+let hasEvaluatedInitPromptForSession = false;
+let sessionPromptSuppressedForSession = false;
 
 function HorizontalCardSkeleton() {
     const theme = useTheme();
@@ -57,13 +62,28 @@ export default function Discover() {
 
     // Out-of-zone modal
     const zoneStatus = useServiceZoneCheck();
-    const hasActiveOrder = useHasActiveOrder();
+    const { hasActiveOrder: queriedHasActiveOrder, isLoading: hasActiveOrderLoading } = useHasActiveOrder();
+    const storeHasActiveOrders = useActiveOrdersStore((state) => state.hasActiveOrders);
+    const hasActiveOrder = queriedHasActiveOrder || storeHasActiveOrders;
     const [zoneSheetVisible, setZoneSheetVisible] = useState(false);
+
     useEffect(() => {
-        if (zoneStatus === 'outside' && !hasActiveOrder) {
+        if (hasActiveOrder) {
+            sessionPromptSuppressedForSession = true;
+        }
+    }, [hasActiveOrder]);
+
+    // Evaluate this only once per app init. We do not re-open the sheet during this session
+    // when order state changes (e.g. delivered while user is already in-app).
+    useEffect(() => {
+        if (hasEvaluatedInitPromptForSession) return;
+        if (zoneStatus === 'loading' || hasActiveOrderLoading) return;
+
+        if (zoneStatus === 'outside' && !hasActiveOrder && !sessionPromptSuppressedForSession) {
             setZoneSheetVisible(true);
         }
-    }, [zoneStatus, hasActiveOrder]);
+        hasEvaluatedInitPromptForSession = true;
+    }, [zoneStatus, hasActiveOrder, hasActiveOrderLoading]);
         useFocusEffect(
             React.useCallback(() => {
                 void refetch();

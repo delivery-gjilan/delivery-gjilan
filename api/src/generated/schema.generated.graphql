@@ -90,6 +90,12 @@ type ApplicablePromotion {
   type: PromotionType!
 }
 
+enum ApprovalReason {
+  FIRST_ORDER
+  HIGH_VALUE
+  OUT_OF_ZONE
+}
+
 input AssignPromotionToUserInput {
   expiresAt: String
   promotionId: ID!
@@ -403,6 +409,7 @@ input CreateOrderInput {
   prioritySurcharge: Float
   promotionId: ID
   totalPrice: Float!
+  userContextLocation: LocationInput
 }
 
 input CreateOrderItemInput {
@@ -1100,6 +1107,7 @@ type OptionGroup {
 
 type Order {
   adminNote: String
+  approvalReasons: [ApprovalReason!]
   businessId: ID!
   businesses: [OrderBusiness!]!
   cancellationReason: String
@@ -1978,6 +1986,7 @@ type User {
   id: ID!
   imageUrl: String
   isOnline: Boolean!
+  isTrustedCustomer: Boolean!
   lastName: String!
   maxActiveOrders: Int
   permissions: [UserPermission!]!
@@ -1987,6 +1996,7 @@ type User {
   referralCode: String
   role: UserRole!
   signupStep: SignupStep!
+  totalOrders: Int!
 }
 
 type UserAddress {

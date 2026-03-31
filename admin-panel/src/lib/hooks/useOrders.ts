@@ -10,6 +10,7 @@ import {
     CANCEL_ORDER,
 } from '@/graphql/operations/orders';
 import { ALL_ORDERS_SUBSCRIPTION } from '@/graphql/operations/orders/subscriptions';
+import { playNewOrderAlert } from '@/lib/audio/orderAlert';
 
 export interface UseOrdersResult {
     orders: any[];
@@ -67,6 +68,19 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersResult {
     const refetchCooldownRef = useRef(0);
     const refetchInFlightRef = useRef(false);
     const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const knownOrderIdsRef = useRef<Set<string>>(new Set());
+    const hasInitializedKnownIdsRef = useRef(false);
+
+    useEffect(() => {
+        const currentOrders = Array.isArray((data as any)?.orders) ? (data as any).orders : [];
+        if (currentOrders.length === 0) return;
+
+        currentOrders.forEach((order: any) => {
+            if (order?.id) knownOrderIdsRef.current.add(String(order.id));
+        });
+
+        hasInitializedKnownIdsRef.current = true;
+    }, [data]);
 
     useEffect(() => {
         return () => {
@@ -115,11 +129,40 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersResult {
                 return;
             }
 
+            const validIncomingOrders = incomingOrders.filter((order: any) =>
+                order && typeof order === 'object' && order.id,
+            );
+
+            if (validIncomingOrders.length === 0) {
+                scheduleRefetch();
+                return;
+            }
+
+            const newActiveOrders = validIncomingOrders.filter((order: any) => {
+                const isKnown = knownOrderIdsRef.current.has(String(order.id));
+                if (isKnown) return false;
+                return order.status !== 'DELIVERED' && order.status !== 'CANCELLED';
+            });
+
+            const shouldAlert = hasInitializedKnownIdsRef.current && newActiveOrders.length > 0;
+
+            validIncomingOrders.forEach((order: any) => {
+                knownOrderIdsRef.current.add(String(order.id));
+            });
+
+            if (!hasInitializedKnownIdsRef.current) {
+                hasInitializedKnownIdsRef.current = true;
+            }
+
+            if (shouldAlert) {
+                void playNewOrderAlert();
+            }
+
             apolloClient.cache.updateQuery({ query: GET_ORDERS, variables: { limit, offset } }, (existing: any) => {
                 const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
                 const byId = new Map(currentOrders.map((order: any) => [String(order?.id), order]));
 
-                incomingOrders.forEach((order: any) => {
+                validIncomingOrders.forEach((order: any) => {
                     const existingOrder = byId.get(String(order?.id));
                     byId.set(String(order?.id), { ...existingOrder, ...order });
                 });

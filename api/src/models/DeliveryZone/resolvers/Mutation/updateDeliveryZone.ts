@@ -1,7 +1,7 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { getDB } from '@/database';
 import { deliveryZones } from '@/database/schema/deliveryZones';
-import { eq, ne } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { AppError } from '@/lib/errors';
 
 export const updateDeliveryZone: NonNullable<MutationResolvers['updateDeliveryZone']> = async (_parent, { id, input }, _ctx) => {
@@ -10,13 +10,6 @@ export const updateDeliveryZone: NonNullable<MutationResolvers['updateDeliveryZo
     }
 
     const db = await getDB();
-
-    if (input.isServiceZone === true) {
-        await db
-            .update(deliveryZones)
-            .set({ isServiceZone: false })
-            .where(ne(deliveryZones.id, id));
-    }
 
     const updates: Record<string, unknown> = {};
     if (input.name != null) updates.name = input.name;

@@ -104,6 +104,16 @@ function geoJSONToPolygon(feature: any): PolygonPoint[] {
   return points.map(([lng, lat]) => ({ lat, lng }));
 }
 
+function readPolygonFromDraw(draw: MapboxDraw | null): PolygonPoint[] {
+  if (!draw) return [];
+  const collection = draw.getAll();
+  const polygonFeature = collection.features.find(
+    (feature: any) => feature?.geometry?.type === "Polygon"
+  );
+  if (!polygonFeature) return [];
+  return geoJSONToPolygon(polygonFeature);
+}
+
 // ═══════════════════════════════════════════════════════════
 //  Page Component
 // ═══════════════════════════════════════════════════════════
@@ -337,7 +347,14 @@ export default function DeliveryZonesPage() {
       setErrorMsg("Delivery fee must be a valid non-negative number");
       return;
     }
-    if (editing.polygon.length < 3) {
+
+    // Keep form state in sync with draw state in case draw events were missed.
+    const polygon =
+      editing.polygon.length >= 3
+        ? editing.polygon
+        : readPolygonFromDraw(drawRef.current);
+
+    if (polygon.length < 3) {
       setErrorMsg("Draw a polygon on the map first (at least 3 points)");
       return;
     }
@@ -351,7 +368,7 @@ export default function DeliveryZonesPage() {
             input: {
               name: editing.name.trim(),
               deliveryFee: fee,
-              polygon: editing.polygon.map((p) => ({ lat: p.lat, lng: p.lng })),
+              polygon: polygon.map((p) => ({ lat: p.lat, lng: p.lng })),
               isActive: editing.isActive,
               isServiceZone: editing.isServiceZone,
             },
@@ -365,7 +382,7 @@ export default function DeliveryZonesPage() {
             input: {
               name: editing.name.trim(),
               deliveryFee: fee,
-              polygon: editing.polygon.map((p) => ({ lat: p.lat, lng: p.lng })),
+              polygon: polygon.map((p) => ({ lat: p.lat, lng: p.lng })),
               isActive: editing.isActive,
               isServiceZone: editing.isServiceZone,
             },

@@ -20,13 +20,18 @@ import { GET_PRODUCT } from '@/graphql/operations/products';
 import { VALIDATE_PROMOTIONS, GET_APPLICABLE_PROMOTIONS, GET_PROMOTION_THRESHOLDS } from '@/graphql/operations/promotions';
 import { GET_MY_ADDRESSES, ADD_USER_ADDRESS, SET_DEFAULT_ADDRESS } from '@/graphql/operations/addresses';
 import { CALCULATE_DELIVERY_PRICE } from '@/graphql/operations/deliveryPricing';
+import { GET_SERVICE_ZONES } from '@/graphql/operations/serviceZone';
 import type { UserAddress } from '@/gql/graphql';
 import { calculateItemUnitTotal } from '../utils/price';
+import { isPointInPolygon } from '@/utils/pointInPolygon';
 import { RepeatOrCustomizeModal } from '@/modules/business/components/RepeatOrCustomizeModal';
 import type { CartItem } from '../types';
 import * as Haptics from 'expo-haptics';
 import { PromotionProgressBar } from './PromotionProgressBar';
 import { PromoAppliedCelebration } from './PromoAppliedCelebration';
+import { useUserLocation } from '@/hooks/useUserLocation';
+import { useDeliveryLocationStore } from '@/store/useDeliveryLocationStore';
+import { useAwaitingApprovalModalStore } from '@/store/useAwaitingApprovalModalStore';
 
 // Persists across CartScreen mounts so we never replay the celebration for the same promo
 const _celebrationShownPromoIds = new Set<string>();
@@ -48,7 +53,11 @@ export const CartScreen = () => {
     const { items, total, isEmpty } = useCart();
     const { updateQuantity, removeItem, clearCart, updateItemNotes } = useCartActions();
     const { createOrder, loading: orderLoading } = useCreateOrder();
+    const { location: userContextLocation } = useUserLocation();
+    const persistedDeliveryLocation = useDeliveryLocationStore((state) => state.location);
+    const setDeliveryLocation = useDeliveryLocationStore((state) => state.setLocation);
     const { showLoading, showSuccess, hideSuccess } = useSuccessModalStore();
+    const requestAwaitingApprovalAutoOpen = useAwaitingApprovalModalStore((state) => state.requestAutoOpen);
     const updateActiveOrder = useActiveOrdersStore((state) => state.updateOrder);
     const setActiveOrders = useActiveOrdersStore((state) => state.setActiveOrders);
 
@@ -56,6 +65,7 @@ export const CartScreen = () => {
     const [deliveryPrice, setDeliveryPrice] = useState(2.0); // Default; updated from API
     const [deliveryPriceLoading, setDeliveryPriceLoading] = useState(false);
     const [deliveryZoneName, setDeliveryZoneName] = useState<string | null>(null);
+    const [isSelectedLocationInZone, setIsSelectedLocationInZone] = useState<boolean | null>(null);
     const [step, setStep] = useState<1 | 2 | 3>(1);
     const [selectedLocation, setSelectedLocation] = useState<CheckoutLocation | null>(null);
     const [couponCode, setCouponCode] = useState('');
@@ -71,6 +81,31 @@ export const CartScreen = () => {
     const { data: addressesData, loading: addressesLoading } = useQuery(GET_MY_ADDRESSES, {
         fetchPolicy: 'cache-and-network',
     });
+
+    const { data: zonesData, loading: zonesLoading } = useQuery(GET_SERVICE_ZONES, {
+        fetchPolicy: 'cache-and-network',
+    });
+
+    const effectiveServiceZones = useMemo(() => {
+        const activeZones = ((zonesData as any)?.deliveryZones ?? []).filter((z: any) => z.isActive);
+        const serviceZones = activeZones.filter((z: any) => z.isServiceZone === true);
+        return serviceZones.length > 0 ? serviceZones : activeZones;
+    }, [zonesData]);
+
+    const isLocationWithinDeliveryZone = useCallback(
+        (location: CheckoutLocation | null): boolean => {
+            if (!location) return false;
+            if (effectiveServiceZones.length === 0) return true;
+
+            return effectiveServiceZones.some((zone: any) =>
+                isPointInPolygon(
+                    { lat: location.latitude, lng: location.longitude },
+                    zone.polygon as Array<{ lat: number; lng: number }>,
+                ),
+            );
+        },
+        [effectiveServiceZones],
+    );
 
     // Mutation for adding address
     const [addAddress, { loading: addingAddress }] = useMutation(ADD_USER_ADDRESS, {
@@ -91,6 +126,7 @@ export const CartScreen = () => {
     } | null>(null);
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const proceedButtonAnim = useRef(new Animated.Value(1)).current;
+    const feeRequestSequenceRef = useRef(0);
     const screenWidth = Dimensions.get('window').width;
     const headerTopPadding = Platform.OS === 'ios' ? 10 : 6;
     const insets = useSafeAreaInsets();
@@ -286,9 +322,38 @@ export const CartScreen = () => {
         return ((addressesData as any)?.myAddresses ?? []) as UserAddress[];
     }, [addressesData]);
 
+    // Rehydrate checkout selection from persisted delivery location first.
+    useEffect(() => {
+        if (selectedLocation || !persistedDeliveryLocation) return;
+
+        const matchedSaved = savedAddresses.find(
+            (addr) =>
+                Math.abs(addr.latitude - persistedDeliveryLocation.latitude) < 0.0001 &&
+                Math.abs(addr.longitude - persistedDeliveryLocation.longitude) < 0.0001,
+        );
+
+        const locationFromStore: CheckoutLocation = {
+            latitude: persistedDeliveryLocation.latitude,
+            longitude: persistedDeliveryLocation.longitude,
+            address:
+                persistedDeliveryLocation.address ||
+                `${persistedDeliveryLocation.latitude.toFixed(6)}, ${persistedDeliveryLocation.longitude.toFixed(6)}`,
+            label: matchedSaved?.addressName ?? persistedDeliveryLocation.label,
+            addressId: matchedSaved?.id,
+            isOverridden: persistedDeliveryLocation.isOverridden ?? false,
+        };
+
+        if (!isLocationWithinDeliveryZone(locationFromStore)) {
+            return;
+        }
+
+        setSelectedLocation(locationFromStore);
+        void requestFeeForLocation(locationFromStore);
+    }, [persistedDeliveryLocation, savedAddresses, selectedLocation, isLocationWithinDeliveryZone]);
+
     // Auto-select default address on load
     useEffect(() => {
-        if (!selectedLocation && savedAddresses.length > 0) {
+        if (!selectedLocation && !persistedDeliveryLocation && savedAddresses.length > 0) {
             const defaultAddress = savedAddresses.find((addr) => addr.priority === 1) || savedAddresses[0];
             if (defaultAddress) {
                 const location: CheckoutLocation = {
@@ -297,19 +362,26 @@ export const CartScreen = () => {
                     address: defaultAddress.displayName,
                     label: defaultAddress.addressName,
                     addressId: defaultAddress.id,
+                    isOverridden: false,
                 };
+                if (!isLocationWithinDeliveryZone(location)) {
+                    return;
+                }
                 setSelectedLocation(location);
-                requestFeeForLocation(location);
+                void requestFeeForLocation(location);
             }
         }
-    }, [savedAddresses, selectedLocation]);
+    }, [savedAddresses, selectedLocation, persistedDeliveryLocation, isLocationWithinDeliveryZone]);
 
-    const requestFeeForLocation = async (next: CheckoutLocation) => {
+    const requestFeeForLocation = async (next: CheckoutLocation): Promise<boolean | null> => {
         // Calculate delivery fee based on distance from business
         const businessIds = Array.from(new Set(items.map((item) => item.businessId)));
-        if (businessIds.length === 0) return;
+        if (businessIds.length === 0) return null;
 
+        const requestId = ++feeRequestSequenceRef.current;
+        const localInZone = isLocationWithinDeliveryZone(next);
         setDeliveryPriceLoading(true);
+        setIsSelectedLocationInZone(null);
         try {
             // Use the first business to calculate distance
             const response = await calculateDeliveryPriceFn({
@@ -320,15 +392,32 @@ export const CartScreen = () => {
                 },
             });
             const result = response?.data?.calculateDeliveryPrice;
+            if (requestId !== feeRequestSequenceRef.current) {
+                return null;
+            }
+
             if (result?.price != null) {
                 setDeliveryPrice(Number(result.price));
             }
             setDeliveryZoneName(result?.zoneApplied?.name ?? null);
+            const hasZonesConfigured = effectiveServiceZones.length > 0;
+            const serverInZone = hasZonesConfigured ? !!result?.zoneApplied : true;
+            const inZone = hasZonesConfigured ? (localInZone || serverInZone) : true;
+            setIsSelectedLocationInZone(inZone);
+            return inZone;
         } catch {
+            if (requestId !== feeRequestSequenceRef.current) {
+                return null;
+            }
+
             // Keep default price on error
             setDeliveryZoneName(null);
+            setIsSelectedLocationInZone(localInZone);
+            return localInZone;
         } finally {
-            setDeliveryPriceLoading(false);
+            if (requestId === feeRequestSequenceRef.current) {
+                setDeliveryPriceLoading(false);
+            }
         }
     };
 
@@ -395,16 +484,44 @@ export const CartScreen = () => {
     }, [step, goToStep]);
 
     // ─── Address Picker Handler ─────────────────────────────
-    const handleAddressSelected = (next: CheckoutLocation) => {
-        setSelectedLocation(next);
-        requestFeeForLocation(next);
+    const handleAddressSelected = async (next: CheckoutLocation) => {
+        if (!isLocationWithinDeliveryZone(next)) {
+            Alert.alert(
+                t.home.out_of_zone.title,
+                t.cart.outside_zone_selected,
+            );
+            setIsSelectedLocationInZone(false);
+            return;
+        }
+
+        const overriddenLocation: CheckoutLocation = {
+            ...next,
+            isOverridden: true,
+        };
+
+        setSelectedLocation(overriddenLocation);
+        setDeliveryLocation({
+            latitude: overriddenLocation.latitude,
+            longitude: overriddenLocation.longitude,
+            address: overriddenLocation.address,
+            label: overriddenLocation.label,
+            isOverridden: true,
+        });
+        const inZoneFromPricing = await requestFeeForLocation(overriddenLocation);
+        if (inZoneFromPricing === false) {
+            Alert.alert(
+                t.home.out_of_zone.title,
+                t.cart.outside_zone_selected,
+            );
+            return;
+        }
 
         // Only offer to save as default when user picks a new (unsaved) location AND
         // they don't already have a default address. If they already have a default,
         // just proceed to checkout without asking.
         const hasDefaultAddress = savedAddresses.some((addr) => addr.priority === 1);
-        if (!next.addressId && !hasDefaultAddress) {
-            setPendingLocationToSave(next);
+        if (!overriddenLocation.addressId && !hasDefaultAddress) {
+            setPendingLocationToSave(overriddenLocation);
             setAddressName('');
             setTimeout(() => setShowSaveAddressPrompt(true), 200);
         } else {
@@ -651,6 +768,26 @@ export const CartScreen = () => {
             return;
         }
 
+        const localZoneCheck = isLocationWithinDeliveryZone(selectedLocation);
+
+        if (zonesLoading && !(zonesData as any)?.deliveryZones) {
+            Alert.alert(t.home.out_of_zone.title, t.cart.delivery_zone_checking);
+            return;
+        }
+
+        if (!localZoneCheck) {
+            Alert.alert(
+                t.home.out_of_zone.title,
+                t.cart.outside_zone_selected,
+            );
+            return;
+        }
+
+        if (isSelectedLocationInZone === false) {
+            // Recover from stale fee-check state when local polygon validation confirms in-zone.
+            setIsSelectedLocationInZone(true);
+        }
+
         const canContinue = await reconcileCartBeforeCheckout();
         if (!canContinue) {
             return;
@@ -672,6 +809,7 @@ export const CartScreen = () => {
                 promoResult?.promotionId ?? null,
                 driverNotes,
                 prioritySurcharge,
+                userContextLocation,
             );
             const orderId = order?.id || null;
             
@@ -687,6 +825,11 @@ export const CartScreen = () => {
             // Keep current route and show success directly to avoid visible route flashes.
             if (orderId) {
                 updateActiveOrder(order as any);
+
+                if (order?.status === 'AWAITING_APPROVAL') {
+                    requestAwaitingApprovalAutoOpen(String(orderId));
+                }
+
                 console.log('[CartScreen] Showing success modal');
                 showSuccess(orderId, 'order_created');
             } else {
@@ -1427,12 +1570,14 @@ export const CartScreen = () => {
                         <TouchableOpacity
                             className="py-4 rounded-2xl items-center"
                             style={{
-                                backgroundColor: isProcessing ? theme.colors.border : theme.colors.primary,
-                                opacity: isProcessing ? 0.6 : 1,
+                                backgroundColor: (isProcessing || deliveryPriceLoading || isSelectedLocationInZone === false)
+                                    ? theme.colors.border
+                                    : theme.colors.primary,
+                                opacity: (isProcessing || deliveryPriceLoading || isSelectedLocationInZone === false) ? 0.6 : 1,
                             }}
                             activeOpacity={0.8}
                             onPress={handleCheckout}
-                            disabled={isProcessing}
+                            disabled={isProcessing || deliveryPriceLoading || isSelectedLocationInZone === false}
                         >
                             {isProcessing || orderLoading ? (
                                 <View className="flex-row items-center gap-2">
@@ -1446,6 +1591,11 @@ export const CartScreen = () => {
                                 </View>
                             )}
                         </TouchableOpacity>
+                        {isSelectedLocationInZone === false && (
+                            <Text className="text-xs mt-2 text-center" style={{ color: '#F97316' }}>
+                                {t.cart.outside_zone_inline_warning}
+                            </Text>
+                        )}
                     </View>
                 </>
             )}

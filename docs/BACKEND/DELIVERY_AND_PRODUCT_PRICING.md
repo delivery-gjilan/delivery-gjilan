@@ -117,9 +117,10 @@ Adjustment types: `PERCENTAGE`, `FIXED_AMOUNT`, `MULTIPLIER`. Priority field con
 | `is_active` | boolean | Inactive zones are skipped |
 | `is_service_zone` | boolean | Marks service coverage zone used for in-zone checks |
 
-**Zones take priority** over distance tiers. If no active zone matches, fall through to tiers.
+**Only non-service delivery zones take priority** over distance tiers. If no matching non-service active zone exists, fall through to tiers.
 
 When at least one active zone has `is_service_zone = true`, service-coverage checks use only those zones.
+Service zones are coverage-only and do not override delivery fee.
 
 Admin sets this from Delivery Zones UI via the "Delivery Service Zone" toggle in create/edit flow.
 

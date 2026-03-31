@@ -19,6 +19,10 @@ export const ORDERS_SUBSCRIPTION = gql(`
                 email
                 address
                 phoneNumber
+                adminNote
+                flagColor
+                totalOrders
+                isTrustedCustomer
             }
             driver {
                 id
@@ -68,6 +72,9 @@ export const ALL_ORDERS_SUBSCRIPTION = gql(`
             updatedAt
             status
             adminNote
+            needsApproval
+            locationFlagged
+            approvalReasons
             user {
                 id
                 firstName

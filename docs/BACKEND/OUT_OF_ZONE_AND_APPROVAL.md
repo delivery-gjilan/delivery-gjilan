@@ -13,7 +13,10 @@ How the backend and admin surfaces behave when a drop-off is outside configured 
 
 - `OrderService.createOrder` resolves coverage from delivery zones with this priority: service zones (`isServiceZone = true`), else any active zones.
 - Orders are **not rejected** when drop-off is outside coverage; instead `locationFlagged` is set and returned on the `Order` type.
-- Device location can be out-of-zone while the selected address is inside; user can pick or add any in-zone address (e.g., ordering for a friend in another city). Only the chosen drop-off address is validated.
+- `locationFlagged` is computed from both points:
+	- selected drop-off location
+	- optional user-context location captured from the mobile device/session at checkout (`userContextLocation`)
+- If either point is outside coverage, the order is flagged and enters approval flow.
 - After an order is delivered, if the user's default/active address is out-of-zone, the app should prompt them to switch to an in-zone address **only on app re-init / next session**, not immediately upon delivery while they are still in-app.
 - Delivery fee still follows the normal zone/distance pricing path (see [B2](ORDER_CREATION.md)).
 
@@ -28,18 +31,51 @@ How the backend and admin surfaces behave when a drop-off is outside configured 
 ## Notifications / Alerts
 
 - For approval-required orders, backend sends both `notifyAdminsNewOrder` and `notifyAdminsOrderNeedsApproval` (time-sensitive, relevance 1.0, title "⚠ Order Needs Approval").
-- Add a dedicated alert dimension for **out-of-zone user context** (even if drop-off is in-zone) so ops can call/verify before approval. Suggested payload: `reason: 'OUT_OF_ZONE_USER'`, includes user location snapshot + drop-off address.
 - Business new-order push is **deferred** until admin approval transitions the order to `PENDING`.
 
-## Admin UI Surfaces (current)
+## Admin UI Surfaces
 
-- Order cards show rose "Needs approval" badge and include call-to-verify banner with customer phone.
-- Actions: "Approve" on cards and "Approve Order" in detail panel; map detail panel includes "Approve and Send to Business".
-- `STATUS_COLORS`/`STATUS_LABELS` include `AWAITING_APPROVAL`.
-- `locationFlagged` is available to admin clients for out-of-coverage awareness (order is kept in flow instead of rejected).
+### Approval Badges
+
+Flagged orders surface on both the **Orders page** and **Map page** with contextual badges:
+
+| Badge | Color | Condition |
+|---|---|---|
+| 🆕 First order | Blue | Customer has no previous orders (`FIRST_ORDER` reason) |
+| 💰 Over €20 | Amber | Order total > €20 (`HIGH_VALUE` reason, re-derived from `totalPrice`) |
+| 📍 Outside delivery zone | Orange | `locationFlagged = true` (persisted DB column) |
+
+> `approvalReasons` is not a persisted DB column. On order load it is re-derived in `mapToOrder` from: earliest order id per user (`FIRST_ORDER`), persisted `locationFlagged` (`OUT_OF_ZONE`), and `actualPrice + deliveryPrice` (`HIGH_VALUE`).
+
+### Approval Flow
+
+1. Admin sees a flagged order card with rose "Awaiting Approval" badge on the **Orders page** or in the **Map page** sidebar.
+2. For newly created flagged orders, the approval modal opens automatically for admins on both surfaces.
+3. Admin can click **✓ Approve** (card) or **Approve Order** (detail panel / map sidebar).
+4. The **Approval Confirmation Modal** shows:
+   - Order summary (displayId, customer name, total)
+   - All applicable reason flags (First order / High value / Outside zone)
+   - Explanatory copy: "Confirm you have called/verified…"
+5. If the modal is dismissed without approval, focusing the same flagged order card/detail opens the modal again until approval is completed.
+6. Admin clicks **✓ Approve & Send to Business**.
+7. `approveOrder` mutation fires → `AWAITING_APPROVAL → PENDING` → businesses are notified via push.
+
+### `approveOrder` Mutation
+
+- `api/src/models/Order/resolvers/Mutation/approveOrder.ts`
+- Auth: `ADMIN` or `SUPER_ADMIN` only.
+- Validates order is in `AWAITING_APPROVAL`.
+- Calls `orderService.updateOrderStatus(id, 'PENDING', true)`.
+- Publishes user order subscription, all-orders subscription, and sends `notifyBusinessNewOrder` to all businesses on the order.
+
+### Subscription / Real-time
+
+- `allOrdersUpdated` subscription selection set includes `needsApproval`, `locationFlagged`, `approvalReasons` — map page receives live updates without refresh.
+- `GET_ORDERS` query also includes all three fields — orders page initial load reflects them.
 
 ## Customer-Facing Behavior
 
+- Out-of-zone modal is evaluated once on app init after zone + order state resolve; it is not re-opened on mid-session order status transitions.
 - `AWAITING_APPROVAL` suppresses the out-of-zone modal on mobile customer because the order is treated as active (`useHasActiveOrder`).
 - Status label/message reflect pending confirmation: "Your order is pending confirmation — our team will call you shortly." (see [M4](../MOBILE/ORDER_CREATION_AUDIT.md)).
 
@@ -47,12 +83,6 @@ How the backend and admin surfaces behave when a drop-off is outside configured 
 
 - Manual approval is the gate that sends the business intake push and moves order into the normal restaurant/driver pipeline.
 - Because out-of-zone orders are accepted and flagged, operations can manually decide to fulfill or cancel after review.
-
-## Implementation TODO (to align with desired flow)
-
-- Enforce approval-required when `locationFlagged = true` **or** device/session is out-of-zone at order time (even if address is in-zone).
-- Emit explicit admin alert for out-of-zone context with contact/confirm call-to-action.
-- Mobile UX: on next app init/session after a delivery, prompt out-of-zone users to select an in-zone address before starting a new order; allow ordering for others by choosing in-zone drop-off.
 
 ## Known Gaps / TODOs
 

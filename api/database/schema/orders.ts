@@ -44,6 +44,7 @@ export const orders = pgTable(
         actualPrice: numeric('actual_price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
         originalDeliveryPrice: numeric('original_delivery_price', { mode: 'number', precision: 10, scale: 2 }),
         deliveryPrice: numeric('delivery_price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
+        prioritySurcharge: numeric('priority_surcharge', { mode: 'number', precision: 10, scale: 2 }).notNull().default(0),
 
         paymentCollection: orderPaymentCollection('payment_collection').default('CASH_TO_DRIVER').notNull(),
         status: orderStatus('status').notNull(),

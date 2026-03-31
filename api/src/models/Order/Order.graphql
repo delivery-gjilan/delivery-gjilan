@@ -23,6 +23,12 @@ enum DriverCustomerNotificationKind {
     ARRIVED_WAITING
 }
 
+enum ApprovalReason {
+    FIRST_ORDER
+    HIGH_VALUE
+    OUT_OF_ZONE
+}
+
 type OrderBusiness {
     business: Business!
     items: [OrderItem!]!
@@ -107,6 +113,7 @@ type Order {
     adminNote: String
     needsApproval: Boolean!
     locationFlagged: Boolean!
+    approvalReasons: [ApprovalReason!]
     businesses: [OrderBusiness!]!
     orderPromotions: [OrderPromotion!]
 }
@@ -162,6 +169,7 @@ input CreateOrderItemInput {
 input CreateOrderInput {
     items: [CreateOrderItemInput!]!
     dropOffLocation: LocationInput!
+    userContextLocation: LocationInput
     deliveryPrice: Float!
     totalPrice: Float!
     prioritySurcharge: Float
