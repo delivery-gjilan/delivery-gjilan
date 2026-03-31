@@ -1977,6 +1977,7 @@ export type PromotionType =
   | 'FREE_DELIVERY'
   | 'PERCENTAGE'
   | 'SPEND_X_FIXED'
+  | 'SPEND_X_GET_FREE'
   | 'SPEND_X_PERCENT';
 
 export type PromotionUsage = {
@@ -3269,7 +3270,7 @@ export type ResolversTypes = {
   PromotionResult: ResolverTypeWrapper<Omit<PromotionResult, 'promotions'> & { promotions: Array<ResolversTypes['ApplicablePromotion']> }>;
   PromotionTarget: ResolverTypeWrapper<'ALL_USERS' | 'SPECIFIC_USERS' | 'FIRST_ORDER' | 'CONDITIONAL'>;
   PromotionThreshold: ResolverTypeWrapper<PromotionThreshold>;
-  PromotionType: ResolverTypeWrapper<'FIXED_AMOUNT' | 'PERCENTAGE' | 'FREE_DELIVERY' | 'SPEND_X_PERCENT' | 'SPEND_X_FIXED'>;
+  PromotionType: ResolverTypeWrapper<'FIXED_AMOUNT' | 'PERCENTAGE' | 'FREE_DELIVERY' | 'SPEND_X_GET_FREE' | 'SPEND_X_PERCENT' | 'SPEND_X_FIXED'>;
   PromotionUsage: ResolverTypeWrapper<Omit<PromotionUsage, 'order' | 'promotion' | 'user'> & { order?: Maybe<ResolversTypes['Order']>, promotion?: Maybe<ResolversTypes['Promotion']>, user?: Maybe<ResolversTypes['User']> }>;
   PushTelemetryEvent: ResolverTypeWrapper<Omit<PushTelemetryEvent, 'appType' | 'eventType' | 'platform'> & { appType: ResolversTypes['DeviceAppType'], eventType: ResolversTypes['PushTelemetryEventType'], platform: ResolversTypes['DevicePlatform'] }>;
   PushTelemetryEventType: ResolverTypeWrapper<'RECEIVED' | 'OPENED' | 'ACTION_TAPPED' | 'TOKEN_REGISTERED' | 'TOKEN_REFRESHED' | 'TOKEN_UNREGISTERED'>;
@@ -4353,7 +4354,7 @@ export type PromotionThresholdResolvers<ContextType = GraphQLContext, ParentType
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
-export type PromotionTypeResolvers = EnumResolverSignature<{ FIXED_AMOUNT?: any, FREE_DELIVERY?: any, PERCENTAGE?: any, SPEND_X_FIXED?: any, SPEND_X_PERCENT?: any }, ResolversTypes['PromotionType']>;
+export type PromotionTypeResolvers = EnumResolverSignature<{ FIXED_AMOUNT?: any, FREE_DELIVERY?: any, PERCENTAGE?: any, SPEND_X_FIXED?: any, SPEND_X_GET_FREE?: any, SPEND_X_PERCENT?: any }, ResolversTypes['PromotionType']>;
 
 export type PromotionUsageResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PromotionUsage'] = ResolversParentTypes['PromotionUsage']> = {
   businessId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;

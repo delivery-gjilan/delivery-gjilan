@@ -561,17 +561,7 @@ export class OrderService {
             throw AppError.badInput(`Price mismatch: Calculated ${totalOrderPrice + prioritySurcharge}, provided ${input.totalPrice}`);
         }
 
-        // 4b. Determine if approval is required
-        const existingOrderCheck = await db
-            .select({ id: ordersTable.id })
-            .from(ordersTable)
-            .where(eq(ordersTable.userId, userId))
-            .limit(1);
-        const isFirstOrder = existingOrderCheck.length === 0;
-        const isHighValue = totalOrderPrice > 20;
-        const requiresApproval = isFirstOrder || isHighValue;
-
-        // 4c. Check if drop-off is outside service coverage (flag for admin)
+        // 4b. Check if drop-off is outside service coverage (flag for admin)
         // If dedicated service zones exist, use those; otherwise fall back to all active zones.
         const allActiveZones = await db
             .select()
@@ -582,6 +572,20 @@ export class OrderService {
         const dropoffPoint = { lat: input.dropOffLocation.latitude, lng: input.dropOffLocation.longitude };
         const isInsideAnyZone = effectiveServiceZones.some((z) => isPointInPolygon(dropoffPoint, z.polygon));
         const locationFlagged = !isInsideAnyZone;
+
+        // 4c. Determine if approval is required (first order, >€20, or out-of-zone context)
+        const existingOrderCheck = await db
+            .select({ id: ordersTable.id })
+            .from(ordersTable)
+            .where(eq(ordersTable.userId, userId))
+            .limit(1);
+        const isFirstOrder = existingOrderCheck.length === 0;
+        const isHighValue = totalOrderPrice > 20;
+        const approvalReasons: Array<'FIRST_ORDER' | 'HIGH_VALUE' | 'OUT_OF_ZONE'> = [];
+        if (isFirstOrder) approvalReasons.push('FIRST_ORDER');
+        if (isHighValue) approvalReasons.push('HIGH_VALUE');
+        if (locationFlagged) approvalReasons.push('OUT_OF_ZONE');
+        const requiresApproval = approvalReasons.length > 0;
 
         const orderData = {
             displayId: this.generateDisplayId(),
@@ -626,6 +630,9 @@ export class OrderService {
         }));
 
         const createdOrder = await this.orderRepository.create(orderData, flatItems);
+
+        // Attach approval reasons for downstream side-effects/notifications (not persisted column)
+        (createdOrder as any).approvalReasons = approvalReasons;
 
         if (!createdOrder) {
             throw AppError.businessRule(
@@ -1003,6 +1010,7 @@ export class OrderService {
             driverNotes: dbOrder.driverNotes || undefined,
             needsApproval: dbOrder.status === 'AWAITING_APPROVAL',
             locationFlagged: (dbOrder as any).locationFlagged ?? false,
+            approvalReasons: (dbOrder as any).approvalReasons ?? undefined,
             businesses: businessOrderList,
             orderPromotions: dbPromotions.map((p) => ({
                 id: p.id,
@@ -1690,7 +1698,8 @@ export class OrderService {
             const adminUserIds = adminRows.map((row: any) => row.id);
             notifyAdminsNewOrder(context.notificationService, adminUserIds, String(order.id));
             if (order.needsApproval) {
-                notifyAdminsOrderNeedsApproval(context.notificationService, adminUserIds, String(order.id));
+                const approvalReasons = (order as any).approvalReasons as Array<'FIRST_ORDER' | 'HIGH_VALUE' | 'OUT_OF_ZONE'> | undefined;
+                notifyAdminsOrderNeedsApproval(context.notificationService, adminUserIds, String(order.id), approvalReasons);
             }
         } catch (error) {
             log.error({ err: error, orderId: order.id }, 'createOrder:notifyAdmins:failed');

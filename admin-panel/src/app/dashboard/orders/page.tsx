@@ -1112,6 +1112,10 @@ export default function OrdersPage() {
                                 {isAdmin && (
                                     <button
                                         onClick={async () => {
+                                            const confirmMessage = selectedOrder.locationFlagged
+                                                ? 'This order is outside delivery zones. Confirm you have called the customer and want to approve?'
+                                                : 'Confirm you have called/verified and want to approve this order?';
+                                            if (!window.confirm(confirmMessage)) return;
                                             try {
                                                 await approveOrderMut({ variables: { id: selectedOrder.id } });
                                                 toast.success('Order approved — moving to Pending');

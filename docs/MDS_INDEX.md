@@ -25,6 +25,7 @@
 | B8 | [BACKEND/CACHE_AND_INFRASTRUCTURE.md](BACKEND/CACHE_AND_INFRASTRUCTURE.md) | Backend | Redis cache layer, TTLs, key patterns, invalidation helpers |
 | B9 | [BACKEND/UPLOADS_AND_S3.md](BACKEND/UPLOADS_AND_S3.md) | Backend | S3Service, upload/delete REST routes, key generation, auth gaps |
 | B10 | [BACKEND/AUDIT_LOGGING.md](BACKEND/AUDIT_LOGGING.md) | Backend | audit_logs table, actor/action/entity enums, AuditLogRepository |
+| B11 | [BACKEND/OUT_OF_ZONE_AND_APPROVAL.md](BACKEND/OUT_OF_ZONE_AND_APPROVAL.md) | Backend | Out-of-coverage handling, locationFlagged, approval-required orders, admin alerts |
 | BL1 | [BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS.md](BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS.md) | Business Logic | Settlements, rules, promotions, FinancialService, PromotionEngine, mobile-customer progression bar |
 | BL2 | [BUSINESS_LOGIC/PRODUCT_BUSINESS_CATEGORY_REFACTOR_FLOW.md](BUSINESS_LOGIC/PRODUCT_BUSINESS_CATEGORY_REFACTOR_FLOW.md) | Business Logic | CRUD flows, delete semantics, hook consolidation |
 | BL3 | [BUSINESS_LOGIC/CART_ACTIVE_ORDER_FLOW_RECOMMENDATIONS.md](BUSINESS_LOGIC/CART_ACTIVE_ORDER_FLOW_RECOMMENDATIONS.md) | Business Logic | Cart store, subscription lifecycle, race conditions |
@@ -298,6 +299,7 @@ ARCHITECTURE (A1)
 | `database/schema/settlements.ts` | BL1 |
 | `database/schema/settlementRules.ts` | BL1 |
 | `database/schema/promotions.ts` | BL1 |
+| `database/schema/orders.ts` | B2, B3, BL1 |
 | `database/schema/auditLogs.ts` | B10 |
 | `database/schema/deliveryZones.ts` | B6, B7 |
 | `database/schema/deliveryPricingTiers.ts` | B6, B7 |

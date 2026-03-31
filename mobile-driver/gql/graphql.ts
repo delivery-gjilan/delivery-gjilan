@@ -1993,6 +1993,7 @@ export enum PromotionType {
   FreeDelivery = 'FREE_DELIVERY',
   Percentage = 'PERCENTAGE',
   SpendXFixed = 'SPEND_X_FIXED',
+  SpendXGetFree = 'SPEND_X_GET_FREE',
   SpendXPercent = 'SPEND_X_PERCENT'
 }
 

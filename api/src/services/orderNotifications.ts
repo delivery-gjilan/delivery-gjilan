@@ -303,6 +303,7 @@ export function notifyAdminsOrderNeedsApproval(
     notificationService: NotificationService,
     adminUserIds: string[],
     orderId: string,
+    reasons?: Array<'FIRST_ORDER' | 'HIGH_VALUE' | 'OUT_OF_ZONE'>,
 ): void {
     if (adminUserIds.length === 0) return;
 
@@ -319,7 +320,7 @@ export function notifyAdminsOrderNeedsApproval(
                 body: 'Një porosi kërkon shqyrtimin tuaj para se të vazhdojë.',
             },
         },
-        data: { orderId, screen: 'orders', type: 'ORDER_NEEDS_APPROVAL' },
+        data: { orderId, screen: 'orders', type: 'ORDER_NEEDS_APPROVAL', reasons },
         timeSensitive: true,
         relevanceScore: 1.0,
     };

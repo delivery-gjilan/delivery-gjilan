@@ -10,6 +10,7 @@ export const promotionTypeEnum = pgEnum('promotion_type', [
     'FIXED_AMOUNT', // Fixed € off
     'PERCENTAGE', // % off
     'FREE_DELIVERY', // Free delivery
+    'SPEND_X_GET_FREE', // Spend X → free delivery
     'SPEND_X_PERCENT', // Spend X → % discount
     'SPEND_X_FIXED', // Spend X → fixed € discount
 ]);
