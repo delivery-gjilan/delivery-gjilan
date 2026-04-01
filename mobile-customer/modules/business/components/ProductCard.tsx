@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, Platform, Image } from 'react-native';
-import { router } from 'expo-router';
 import { GetProductsQuery, BusinessType } from '@/gql/graphql';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
@@ -27,8 +26,7 @@ export function ProductCard({ productCard, businessType }: ProductCardProps) {
     const targetProductId = productCard.product?.id || productCard.variants[0]?.id;
 
     const handlePress = () => {
-        if (!targetProductId) return;
-        router.push(`/product/${targetProductId}`);
+        // Navigation is handled by CartControls (simple) and ComplexCartControls (variants/options/offers)
     };
 
     const effectivePrice = product ? getEffectiveProductPrice(product) : (productCard.basePrice ?? 0);
@@ -140,7 +138,10 @@ export function ProductCard({ productCard, businessType }: ProductCardProps) {
                         {productCard.product?.isAvailable !== false && (
                             <View style={{ flexShrink: 0, marginLeft: 8 }}>
                                 {!isComplexProduct ? (
-                                    <CartControls product={productCard.product!} businessType={businessType} />
+                                    <CartControls
+                                        product={{ ...productCard.product!, imageUrl: productCard.product!.imageUrl || productCard.imageUrl || undefined }}
+                                        businessType={businessType}
+                                    />
                                 ) : targetProductId ? (
                                     <ComplexCartControls
                                         productId={targetProductId}

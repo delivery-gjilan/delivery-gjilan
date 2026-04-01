@@ -598,9 +598,9 @@ export default function Market() {
         sectionOffsetsRef.current.sort((a, b) => a.y - b.y);
     }, []);
 
-    const handleProductPress = useCallback((productId: string) => {
-        router.push(`/product/${productId}`);
-    }, [router]);
+    const handleProductPress = useCallback((_productId: string) => {
+        // no-op: detail page disabled for market
+    }, []);
 
     const handleClearSearch = useCallback(() => {
         setSearchQuery('');
@@ -867,7 +867,7 @@ export default function Market() {
                                             {section.products.map((product: any) => (
                                                 <View key={product.id} style={{ width: (SCREEN_WIDTH - 44) / 2 }}>
                                                     <MarketProductCard
-                                                        product={product}
+                                                        product={product.product ?? product}
                                                         onPress={handleProductPress}
                                                         businessType={BusinessType.Market}
                                                     />
@@ -921,7 +921,7 @@ export default function Market() {
                                 {searchResults.map((product: any) => (
                                     <View key={product.id} style={{ width: (SCREEN_WIDTH - 44) / 2 }}>
                                         <MarketProductCard
-                                            product={product}
+                                            product={product.product ?? product}
                                             onPress={handleProductPress}
                                             businessType={BusinessType.Market}
                                         />

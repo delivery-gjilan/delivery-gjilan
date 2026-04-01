@@ -6,10 +6,7 @@ import { ActivityIndicator, Text, View } from 'react-native';
 import Providers from '@/lib/graphql/providers';
 import { useDriverTracking } from '@/hooks/useDriverTracking';
 import { useNotifications } from '@/hooks/useNotifications';
-import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { useDriverPttReceiver } from '@/hooks/useDriverPttReceiver';
-import InfoBanner from '@/components/InfoBanner';
-import type { InfoBannerType } from '@/components/InfoBanner';
 import DriverMessageBanner from '@/components/DriverMessageBanner';
 import type { AlertType } from '@/components/DriverMessageBanner';
 import { useSubscription } from '@apollo/client/react';
@@ -26,10 +23,6 @@ function AppContent() {
     const { isAdminTalking } = useDriverPttReceiver();
     const { pendingOrder, autoCountdown, accepting, handleAcceptOrder, handleSkipOrder, handleAcceptAndNavigate } =
         useGlobalOrderAccept();
-
-    const { bannerEnabled, bannerMessage, bannerType } = useStoreStatus();
-    const [bannerDismissed, setBannerDismissed] = useState(false);
-    const showBanner = bannerEnabled && !!bannerMessage && !bannerDismissed;
 
     interface IncomingMessage {
         id: string;
@@ -57,13 +50,6 @@ function AppContent() {
                         Admin is talking
                     </Text>
                 </View>
-            )}
-            {showBanner && (
-                <InfoBanner
-                    message={bannerMessage}
-                    type={(bannerType as InfoBannerType) ?? 'INFO'}
-                    onDismiss={() => setBannerDismissed(true)}
-                />
             )}
             {incomingMessage && (
                 <DriverMessageBanner

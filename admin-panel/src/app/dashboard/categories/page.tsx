@@ -5,6 +5,7 @@ import { useQuery } from "@apollo/client/react";
 import Select from "@/components/ui/Select";
 import { GET_BUSINESSES } from "@/graphql/operations/businesses";
 import CategoriesBlock from "@/components/businesses/CategoriesBlock";
+import SubcategoriesBlock from "@/components/businesses/SubcategoriesBlock";
 import { useAuth } from "@/lib/auth-context";
 
 interface Business {
@@ -70,7 +71,12 @@ export default function CategoriesPage() {
 
             {/* Categories Display */}
             {effectiveBusinessId ? (
-                <CategoriesBlock businessId={effectiveBusinessId} />
+                <>
+                    <CategoriesBlock businessId={effectiveBusinessId} />
+                    <div className="mt-8">
+                        <SubcategoriesBlock businessId={effectiveBusinessId} />
+                    </div>
+                </>
             ) : (
                 <div className="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center">
                     <p className="text-gray-400">

@@ -26,6 +26,7 @@ import { calculateItemUnitTotal } from '../utils/price';
 import { isPointInPolygon } from '@/utils/pointInPolygon';
 import { RepeatOrCustomizeModal } from '@/modules/business/components/RepeatOrCustomizeModal';
 import type { CartItem } from '../types';
+import { useCartDataStore } from '../store/cartDataStore';
 import * as Haptics from 'expo-haptics';
 import { PromotionProgressBar } from './PromotionProgressBar';
 import { PromoAppliedCelebration } from './PromoAppliedCelebration';
@@ -161,6 +162,33 @@ export const CartScreen = () => {
     const [calculateDeliveryPriceFn] = useLazyQuery(CALCULATE_DELIVERY_PRICE, {
         fetchPolicy: 'cache-and-network',
     });
+
+    // Backfill imageUrl for persisted cart items that were saved without it
+    useEffect(() => {
+        const itemsMissingImage = items.filter((item) => !item.imageUrl);
+        if (itemsMissingImage.length === 0) return;
+
+        itemsMissingImage.forEach(async (item) => {
+            try {
+                const response = await apolloClient.query({
+                    query: GET_PRODUCT,
+                    variables: { id: item.productId },
+                    fetchPolicy: 'cache-first',
+                });
+                const imageUrl: string | null = (response.data as any)?.product?.imageUrl ?? null;
+                if (imageUrl) {
+                    useCartDataStore.setState((state) => ({
+                        items: state.items.map((i) =>
+                            i.cartItemId === item.cartItemId ? { ...i, imageUrl } : i
+                        ),
+                    }));
+                }
+            } catch {
+                // best-effort; silently ignore
+            }
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Stable array reference — only changes when the actual set of business IDs changes,
     // not when total or deliveryPrice change. Prevents cascading re-renders.

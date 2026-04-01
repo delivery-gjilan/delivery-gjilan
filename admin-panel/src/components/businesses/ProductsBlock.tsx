@@ -18,7 +18,7 @@ import {
     arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical } from "lucide-react";
+import { GripVertical, Download } from "lucide-react";
 
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -89,6 +89,90 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
     const { updateOrder: updateProductsOrder, loading: updateOrderLoading } = useUpdateProductsOrder();
     const { createVariantGroup, loading: createVariantGroupLoading } = useCreateProductVariantGroup();
     const { deleteVariantGroup } = useDeleteProductVariantGroup();
+
+    /* ===============================================
+     EXPORT
+    =============================================== */
+
+    function handleExport() {
+        const subcategoryMap = new Map(
+            (subcategories as any[]).map((s: any) => [s.id, s])
+        );
+
+        const categoryMap = new Map(categories.map((c) => [c.id, c]));
+
+        // Build category → subcategories → products tree
+        const categoryTree = categories.map((cat) => {
+            const catProducts = products.filter((p) => p.categoryId === cat.id);
+
+            const subMap = new Map<string, any[]>();
+            const noSub: any[] = [];
+
+            catProducts.forEach((p) => {
+                if (p.subcategoryId) {
+                    const arr = subMap.get(p.subcategoryId) ?? [];
+                    arr.push(p);
+                    subMap.set(p.subcategoryId, arr);
+                } else {
+                    noSub.push(p);
+                }
+            });
+
+            const subcategoriesOut = [...subMap.entries()].map(([subId, prods]) => {
+                const sub = subcategoryMap.get(subId);
+                return {
+                    id: subId,
+                    name: sub?.name ?? subId,
+                    products: prods.map((p) => ({
+                        id: p.id,
+                        name: p.name,
+                        description: p.description ?? null,
+                        imageUrl: p.imageUrl ?? null,
+                        price: p.price,
+                        isOnSale: p.isOnSale,
+                        salePrice: p.salePrice ?? null,
+                        isAvailable: p.isAvailable,
+                        sortOrder: p.sortOrder,
+                        isOffer: p.isOffer ?? false,
+                    })),
+                };
+            });
+
+            return {
+                id: cat.id,
+                name: cat.name,
+                subcategories: subcategoriesOut,
+                products: noSub.map((p) => ({
+                    id: p.id,
+                    name: p.name,
+                    description: p.description ?? null,
+                    imageUrl: p.imageUrl ?? null,
+                    price: p.price,
+                    isOnSale: p.isOnSale,
+                    salePrice: p.salePrice ?? null,
+                    isAvailable: p.isAvailable,
+                    sortOrder: p.sortOrder,
+                    isOffer: p.isOffer ?? false,
+                })),
+            };
+        });
+
+        const exportData = {
+            exportedAt: new Date().toISOString(),
+            businessId,
+            totalProducts: products.length,
+            categories: categoryTree,
+        };
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `products-export-${businessId}-${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success(`Exported ${products.length} products`);
+    }
     const [createOptionGroup] = useMutation(CREATE_OPTION_GROUP);
     const [deleteOptionGroup] = useMutation(DELETE_OPTION_GROUP);
     const [updateOptionGroup] = useMutation(UPDATE_OPTION_GROUP);
@@ -823,6 +907,15 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-semibold">Products</h2>
                 <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        onClick={handleExport}
+                        disabled={products.length === 0}
+                        title="Export all products as JSON"
+                    >
+                        <Download size={14} className="mr-1 inline" />
+                        Export JSON
+                    </Button>
                     <Button
                         variant={sortMode ? "primary" : "outline"}
                         onClick={toggleSortMode}

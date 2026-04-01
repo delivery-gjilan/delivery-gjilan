@@ -23,8 +23,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       return;
     }
 
+    const isBusinessUser = admin?.role === "BUSINESS_OWNER" || admin?.role === "BUSINESS_EMPLOYEE";
+
     if (isAuthenticated && !canAccessAdminPanelPath(admin?.role, pathname)) {
-      router.push("/dashboard");
+      router.push(isBusinessUser ? "/dashboard/orders" : "/dashboard");
+      return;
+    }
+
+    // Redirect business users away from the bare /dashboard root (they have no content there)
+    if (isAuthenticated && isBusinessUser && pathname === "/dashboard") {
+      router.push("/dashboard/orders");
     }
   }, [isAuthenticated, loading, authCheckComplete, router, admin?.role, pathname]);
 
@@ -41,6 +49,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   if (!canAccessAdminPanelPath(admin?.role, pathname)) {
+    return null;
+  }
+
+  const isBusinessUserOnRoot =
+    (admin?.role === "BUSINESS_OWNER" || admin?.role === "BUSINESS_EMPLOYEE") &&
+    pathname === "/dashboard";
+
+  if (isBusinessUserOnRoot) {
     return null;
   }
 
