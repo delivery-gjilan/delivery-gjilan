@@ -4,7 +4,7 @@ import { canManageUsers } from '@/lib/utils/permissions';
 import { toUserParent } from '../utils/toUserParent';
 
 export const updateUser: NonNullable<MutationResolvers['updateUser']> = async (_parent, { input }, { authService, userData }) => {
-    const { id, firstName, lastName, role, businessId } = input;
+    const { id, firstName, lastName, role, businessId, isDemoAccount } = input;
 
     // SUPER_ADMIN can update any user.
     // BUSINESS_OWNER can only update BUSINESS_EMPLOYEE users in their own business.
@@ -45,6 +45,12 @@ export const updateUser: NonNullable<MutationResolvers['updateUser']> = async (_
                 extensions: { code: 'FORBIDDEN' },
             });
         }
+
+        if (isDemoAccount !== undefined) {
+            throw new GraphQLError('Business owners cannot change demo account status', {
+                extensions: { code: 'FORBIDDEN' },
+            });
+        }
     }
 
     // Update the user
@@ -53,6 +59,7 @@ export const updateUser: NonNullable<MutationResolvers['updateUser']> = async (_
         lastName,
         role,
         businessId: userData.role === 'BUSINESS_OWNER' ? userData.businessId || null : businessId || null,
+        ...(isDemoAccount !== undefined ? { isDemoAccount } : {}),
     });
 
     if (!updatedUser) {

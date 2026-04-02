@@ -63,6 +63,7 @@ export const CREATE_BUSINESS_WITH_OWNER = graphql(`
                 email
                 firstName
                 lastName
+                isDemoAccount
                 role
                 businessId
             }

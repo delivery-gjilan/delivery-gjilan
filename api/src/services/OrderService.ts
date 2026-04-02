@@ -45,6 +45,7 @@ import { getLiveDriverEta } from '@/lib/driverEtaCache';
 import { cache } from '@/lib/cache';
 import { emitOrderEvent } from '@/repositories/OrderEventRepository';
 import { createAuditLogger } from '@/services/AuditLogger';
+import { scheduleDemoOrderProgression } from '@/services/DemoProgressionService';
 
 const log = logger.child({ service: 'OrderService' });
 const TRUSTED_CUSTOMER_MARKER = '[TRUSTED_CUSTOMER]';
@@ -1312,7 +1313,7 @@ export class OrderService {
         this.emitAnalyticsEvent(id, status, currentStatus, dbOrder, userData, isDriver, isBusinessAdmin, isSuperAdmin);
 
         // Audit Log
-        const auditLog = createAuditLogger(db, context);
+        const auditLog = createAuditLogger(db, context as any);
         await auditLog.log({
             action: 'ORDER_STATUS_CHANGED',
             entityType: 'ORDER',
@@ -1324,6 +1325,165 @@ export class OrderService {
                 changedFields: ['status'],
             },
         });
+
+        return order;
+    }
+
+    async approveOrderWithSideEffects(id: string, context: ApiContextInterface): Promise<Order> {
+        const { userData } = context;
+
+        const role = userData?.role;
+        if (role !== 'SUPER_ADMIN' && role !== 'ADMIN') {
+            throw AppError.forbidden('Only admins can approve orders');
+        }
+
+        const currentOrder = await this.getOrderById(id);
+        if (!currentOrder) {
+            throw AppError.notFound('Order');
+        }
+
+        if (currentOrder.status !== 'AWAITING_APPROVAL') {
+            throw AppError.businessRule('Order is not awaiting approval');
+        }
+
+        const order = await this.updateOrderStatus(id, 'PENDING', true);
+
+        try {
+            await this.publishSingleUserOrder(String(order.userId), String(order.id));
+            await this.publishAllOrders();
+        } catch (error) {
+            log.error({ err: error, orderId: id }, 'approveOrder:publish:failed');
+        }
+
+        try {
+            const orderBusinessIds = Array.from(
+                new Set(
+                    (order.businesses ?? [])
+                        .map((entry) => entry?.business?.id)
+                        .filter((businessId): businessId is string => Boolean(businessId)),
+                ),
+            );
+
+            if (orderBusinessIds.length > 0) {
+                const businessUserRows = await this.db
+                    .select({ id: usersTable.id })
+                    .from(usersTable)
+                    .where(
+                        and(
+                            inArray(usersTable.businessId, orderBusinessIds),
+                            inArray(usersTable.role, ['BUSINESS_OWNER', 'BUSINESS_EMPLOYEE']),
+                            isNull(usersTable.deletedAt),
+                        ),
+                    );
+
+                notifyBusinessNewOrder(
+                    context.notificationService,
+                    businessUserRows.map((row) => row.id),
+                    String(order.id),
+                );
+            }
+        } catch (error) {
+            log.error({ err: error, orderId: id }, 'approveOrder:notifyBusinessNewOrder:failed');
+        }
+
+        const auditLogger = createAuditLogger(this.db, context as any);
+        await auditLogger.log({
+            action: 'ORDER_STATUS_CHANGED',
+            entityType: 'ORDER',
+            entityId: String(id),
+            metadata: { orderId: String(id), adminId: userData.userId, from: 'AWAITING_APPROVAL', to: 'PENDING' },
+        });
+
+        return order;
+    }
+
+    async startPreparingWithSideEffects(
+        id: string,
+        preparationMinutes: number,
+        context: ApiContextInterface,
+    ): Promise<Order> {
+        const { userData } = context;
+
+        const role = userData?.role;
+        if (!role) {
+            throw AppError.unauthorized();
+        }
+
+        const isBusinessAdmin = role === 'BUSINESS_OWNER' || role === 'BUSINESS_EMPLOYEE';
+        const isSuperAdmin = role === 'SUPER_ADMIN';
+
+        if (!isBusinessAdmin && !isSuperAdmin) {
+            throw AppError.forbidden('Not authorized to start preparing');
+        }
+
+        if (isBusinessAdmin) {
+            if (!userData.businessId) {
+                throw AppError.forbidden('Business admin has no business assigned');
+            }
+            const canAccess = await this.orderContainsBusiness(id, userData.businessId);
+            if (!canAccess) {
+                throw AppError.forbidden('Not authorized to update this order');
+            }
+        }
+
+        if (preparationMinutes < 1 || preparationMinutes > 180) {
+            throw AppError.badInput('Preparation time must be between 1 and 180 minutes');
+        }
+
+        const currentOrder = await this.getOrderById(id);
+        if (!currentOrder) {
+            throw AppError.notFound('Order');
+        }
+
+        const order = await this.startPreparing(id, preparationMinutes);
+        const dbOrder = await this.orderRepository.findById(id);
+
+        if (dbOrder) {
+            await this.updateUserBehaviorOnStatusChange(
+                dbOrder.userId,
+                'PENDING',
+                'PREPARING',
+                dbOrder.actualPrice + dbOrder.deliveryPrice,
+                dbOrder.orderDate || null,
+            );
+
+            await this.publishSingleUserOrder(dbOrder.userId, id);
+            await this.publishAllOrders();
+
+            notifyCustomerOrderStatus(context.notificationService, dbOrder.userId, id, 'PREPARING');
+
+            emitOrderEvent({
+                orderId: id,
+                eventType: 'ORDER_PREPARING',
+                actorType: isBusinessAdmin ? 'RESTAURANT' : 'ADMIN',
+                actorId: userData?.userId,
+                businessId: userData?.businessId ?? undefined,
+                metadata: { preparationMinutes },
+            });
+
+            updateLiveActivity(
+                context.notificationService,
+                id,
+                'preparing',
+                'Your driver',
+                preparationMinutes,
+                preparationMinutes,
+                parseDbTimestamp(dbOrder.preparingAt)?.getTime() ?? Date.now(),
+            );
+
+            const auditLogger = createAuditLogger(this.db, context as any);
+            await auditLogger.log({
+                action: 'ORDER_STATUS_CHANGED',
+                entityType: 'ORDER',
+                entityId: id,
+                metadata: {
+                    orderId: id,
+                    oldValue: { status: 'PENDING' },
+                    newValue: { status: 'PREPARING', preparationMinutes },
+                    changedFields: ['status', 'preparationMinutes'],
+                },
+            });
+        }
 
         return order;
     }
@@ -1797,6 +1957,15 @@ export class OrderService {
             entityId: String(order.id),
             metadata: { orderId: String(order.id), userId, totalPrice: order.totalPrice },
         });
+
+        try {
+            const customer = await this.authRepository.findById(userId);
+            if (customer?.isDemoAccount) {
+                await scheduleDemoOrderProgression(String(order.id), context);
+            }
+        } catch (error) {
+            log.error({ err: error, orderId: order.id, userId }, 'createOrder:demoProgression:failed');
+        }
 
         return order;
     }

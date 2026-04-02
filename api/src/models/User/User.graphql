@@ -53,6 +53,7 @@ type User {
     preferredLanguage: AppLanguage!
     totalOrders: Int!
     isTrustedCustomer: Boolean!
+    isDemoAccount: Boolean!
     permissions: [UserPermission!]!
 }
 
@@ -120,6 +121,7 @@ input CreateUserInput {
     lastName: String!
     role: UserRole!
     businessId: ID
+    isDemoAccount: Boolean
 }
 
 input UpdateUserInput {
@@ -128,6 +130,7 @@ input UpdateUserInput {
     lastName: String!
     role: UserRole!
     businessId: ID
+    isDemoAccount: Boolean
 }
 
 enum ReferralStatus {

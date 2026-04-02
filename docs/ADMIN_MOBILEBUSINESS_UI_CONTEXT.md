@@ -208,6 +208,12 @@ This document is a fast context handoff for future UI changes across `admin-pane
 - If the user has had an active order during the current app session, the out-of-zone prompt stays suppressed for the rest of that session.
 - The out-of-zone prompt can appear again only after full app re-init (fresh JS runtime), matching "show once per app init" behavior.
 
+## Mobile Customer Address Picker Geocoding (Current State)
+
+- Reverse geocoding runs only after region settle with debounce and abort control, not on every intermediate map movement frame.
+- Address picker and out-of-zone map picker both ignore negligible center-coordinate jitter (tiny deltas) to avoid repeated geocode retries when camera emits near-identical `onRegionDidChange` events.
+- Confirm-address enablement remains tied to settled pin state and resolved geocoded coordinates for the current center point.
+
 ## Admin Delivery Zones Editor (Current State)
 
 - Admin panel delivery-zones page supports creating multiple delivery zones; there is no single-zone cap in backend storage or mutation contracts.

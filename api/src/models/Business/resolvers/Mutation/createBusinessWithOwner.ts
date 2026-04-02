@@ -103,6 +103,7 @@ export const createBusinessWithOwner: NonNullable<MutationResolvers['createBusin
                 preferredLanguage: 'en',
                 adminNote: null,
                 flagColor: 'yellow',
+                isDemoAccount: input.owner.isDemoAccount ?? false,
             })
             .returning();
 
@@ -144,6 +145,7 @@ export const createBusinessWithOwner: NonNullable<MutationResolvers['createBusin
             businessId: business.id,
             firstName: result.owner.firstName,
             lastName: result.owner.lastName,
+            isDemoAccount: result.owner.isDemoAccount,
         },
     });
 

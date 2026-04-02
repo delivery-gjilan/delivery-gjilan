@@ -336,6 +336,7 @@ input CreateBusinessInput {
 input CreateBusinessOwnerInput {
   email: String!
   firstName: String!
+  isDemoAccount: Boolean
   lastName: String!
   password: String!
 }
@@ -502,6 +503,7 @@ input CreateUserInput {
   businessId: ID
   email: String!
   firstName: String!
+  isDemoAccount: Boolean
   lastName: String!
   password: String!
   role: UserRole!
@@ -1965,6 +1967,7 @@ input UpdateUserInput {
   businessId: ID
   firstName: String!
   id: ID!
+  isDemoAccount: Boolean
   lastName: String!
   role: UserRole!
 }
@@ -1985,6 +1988,7 @@ type User {
   hasOwnVehicle: Boolean
   id: ID!
   imageUrl: String
+  isDemoAccount: Boolean!
   isOnline: Boolean!
   isTrustedCustomer: Boolean!
   lastName: String!

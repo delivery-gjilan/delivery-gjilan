@@ -55,6 +55,7 @@ input CreateBusinessOwnerInput {
     password: String!
     firstName: String!
     lastName: String!
+    isDemoAccount: Boolean
 }
 
 input CreateBusinessWithOwnerInput {

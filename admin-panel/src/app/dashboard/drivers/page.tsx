@@ -9,11 +9,13 @@ import {
     CREATE_USER_MUTATION,
     DELETE_USER_MUTATION,
     ADMIN_UPDATE_DRIVER_SETTINGS_MUTATION,
+    UPDATE_USER_MUTATION,
 } from "@/graphql/operations/users/mutations";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { Table, Th, Td } from "@/components/ui/Table";
 import Modal from "@/components/ui/Modal";
+import { UserRole } from "@/gql/graphql";
 import { useAuth } from "@/lib/auth-context";
 import { Trash2, Plus, Signal, Settings2, Mic, MicOff } from "lucide-react";
 import AgoraRTC, { IAgoraRTCClient, IMicrophoneAudioTrack } from 'agora-rtc-sdk-ng';
@@ -23,6 +25,7 @@ interface DriverItem {
     email: string;
     firstName: string;
     lastName: string;
+    isDemoAccount?: boolean;
     role: string;
     phoneNumber?: string;
     imageUrl?: string;
@@ -90,12 +93,13 @@ export default function DriversPage() {
     const [updateDriverSettings] = useMutation(ADMIN_UPDATE_DRIVER_SETTINGS_MUTATION, {
         onCompleted: () => { refetch(); setShowSettingsModal(false); setSettingsTarget(null); },
     });
+    const [updateUser] = useMutation(UPDATE_USER_MUTATION);
     const [sendPttSignal] = useMutation(ADMIN_SEND_PTT_SIGNAL);
     const [getAgoraCredentials] = useLazyQuery(GET_AGORA_RTC_CREDENTIALS, { fetchPolicy: 'no-cache' });
 
     // Create modal state
     const [showCreateModal, setShowCreateModal] = useState(false);
-    const [createForm, setCreateForm] = useState({ email: "", password: "", firstName: "", lastName: "" });
+    const [createForm, setCreateForm] = useState({ email: "", password: "", firstName: "", lastName: "", isDemoAccount: false });
 
     // Delete modal state
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -104,7 +108,7 @@ export default function DriversPage() {
     // Settings modal state
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [settingsTarget, setSettingsTarget] = useState<DriverItem | null>(null);
-    const [settingsForm, setSettingsForm] = useState({ commissionPercentage: "", maxActiveOrders: "" });
+    const [settingsForm, setSettingsForm] = useState({ commissionPercentage: "", maxActiveOrders: "", isDemoAccount: false });
     const [settingsError, setSettingsError] = useState("");
 
     const [formError, setFormError] = useState("");
@@ -249,7 +253,7 @@ export default function DriversPage() {
 
     const handleCloseCreateModal = () => {
         setShowCreateModal(false);
-        setCreateForm({ email: "", password: "", firstName: "", lastName: "" });
+        setCreateForm({ email: "", password: "", firstName: "", lastName: "", isDemoAccount: false });
         setFormError("");
     };
 
@@ -260,6 +264,7 @@ export default function DriversPage() {
                 ? String(driver.commissionPercentage) : "0",
             maxActiveOrders: driver.maxActiveOrders !== null && driver.maxActiveOrders !== undefined
                 ? String(driver.maxActiveOrders) : "2",
+            isDemoAccount: Boolean(driver.isDemoAccount),
         });
         setSettingsError("");
         setShowSettingsModal(true);
@@ -286,6 +291,16 @@ export default function DriversPage() {
             await updateDriverSettings({
                 variables: { driverId: settingsTarget.id, commissionPercentage: commission, maxActiveOrders: maxOrders },
             });
+            await updateUser({
+                variables: {
+                    id: settingsTarget.id,
+                    firstName: settingsTarget.firstName,
+                    lastName: settingsTarget.lastName,
+                    role: UserRole.Driver,
+                    businessId: null,
+                    isDemoAccount: settingsForm.isDemoAccount,
+                },
+            });
             setFormSuccess(`Settings updated for ${settingsTarget.firstName} ${settingsTarget.lastName}`);
             setTimeout(() => setFormSuccess(""), 3000);
         } catch (err) {
@@ -302,7 +317,7 @@ export default function DriversPage() {
         }
         try {
             const { data: created } = await createDriver({
-                variables: { ...createForm, role: "DRIVER" as any },
+                variables: { ...createForm, role: UserRole.Driver },
             }) as any;
             if (created?.createUser) {
                 setFormSuccess(created.createUser.message || "Driver created successfully");
@@ -445,10 +460,15 @@ export default function DriversPage() {
                                         </Td>
                                         <Td>
                                             <div className="font-medium text-white">{driver.firstName} {driver.lastName}</div>
-                                            <div className="mt-0.5">
+                                            <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                                                 <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs border ${isOnline ? "bg-blue-500/10 text-blue-400 border-blue-500/30" : "bg-gray-500/10 text-gray-500 border-gray-700"}`}>
                                                     {isOnline ? "🟢 Online" : "⚫ Offline"}
                                                 </span>
+                                                {driver.isDemoAccount && (
+                                                    <span className="inline-flex items-center gap-1 rounded border border-sky-500/30 bg-sky-500/10 px-1.5 py-0.5 text-xs text-sky-300">
+                                                        Demo
+                                                    </span>
+                                                )}
                                             </div>
                                         </Td>
                                         <Td><span className="text-gray-300">{driver.email}</span></Td>
@@ -559,6 +579,18 @@ export default function DriversPage() {
                                 placeholder="e.g. 2"
                             />
                         </div>
+                        <label className="flex items-start gap-3 rounded-lg border border-sky-900/50 bg-sky-950/20 p-3">
+                            <input
+                                type="checkbox"
+                                checked={settingsForm.isDemoAccount}
+                                onChange={(e) => setSettingsForm(f => ({ ...f, isDemoAccount: e.target.checked }))}
+                                className="mt-1 h-4 w-4 accent-sky-500"
+                            />
+                            <div>
+                                <div className="text-sm font-medium text-sky-200">Demo / App Review driver</div>
+                                <p className="text-xs text-sky-100/70 mt-1">Used by the automatic review flow when assigning demo deliveries.</p>
+                            </div>
+                        </label>
                         <div className="flex gap-3 pt-2">
                             <Button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700">Save Settings</Button>
                             <Button type="button" variant="outline" className="flex-1" onClick={() => { setShowSettingsModal(false); setSettingsTarget(null); }}>
@@ -596,6 +628,18 @@ export default function DriversPage() {
                             <label className="block text-sm font-medium text-gray-300 mb-2">Password *</label>
                             <Input type="password" value={createForm.password} onChange={(e) => setCreateForm(f => ({ ...f, password: e.target.value }))} placeholder="••••••••" required />
                         </div>
+                        <label className="flex items-start gap-3 rounded-lg border border-sky-900/50 bg-sky-950/20 p-3">
+                            <input
+                                type="checkbox"
+                                checked={createForm.isDemoAccount}
+                                onChange={(e) => setCreateForm(f => ({ ...f, isDemoAccount: e.target.checked }))}
+                                className="mt-1 h-4 w-4 accent-sky-500"
+                            />
+                            <div>
+                                <div className="text-sm font-medium text-sky-200">Create as Demo / Review driver</div>
+                                <p className="text-xs text-sky-100/70 mt-1">This driver can be selected for automatic App Review delivery progression.</p>
+                            </div>
+                        </label>
                         <div className="flex gap-3 pt-4">
                             <Button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-700">Create Driver</Button>
                             <Button type="button" onClick={handleCloseCreateModal} variant="outline" className="flex-1">Cancel</Button>

@@ -33,6 +33,7 @@ export const users = pgTable('users', {
     phoneVerificationCode: text('phone_verification_code'),
     adminNote: text('admin_note'),
     flagColor: text('flag_color').default('yellow'),
+    isDemoAccount: boolean('is_demo_account').default(false).notNull(),
     imageUrl: text('image_url'),
     referralCode: text('referral_code').unique(),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })

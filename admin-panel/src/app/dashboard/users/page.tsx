@@ -20,6 +20,7 @@ interface UserItem {
     email: string;
     firstName: string;
     lastName: string;
+    isDemoAccount?: boolean;
     role: string;
     phoneNumber?: string;
     address?: string;
@@ -162,6 +163,7 @@ export default function UsersPage() {
         lastName: "",
         role: "CUSTOMER",
         businessId: "",
+        isDemoAccount: false,
     });
     const [formError, setFormError] = useState("");
     const [formSuccess, setFormSuccess] = useState("");
@@ -179,6 +181,7 @@ export default function UsersPage() {
             lastName: user.lastName,
             role: user.role,
             businessId: user.business?.id || "",
+            isDemoAccount: Boolean(user.isDemoAccount),
         });
         setShowModal(true);
     };
@@ -206,7 +209,7 @@ export default function UsersPage() {
     const handleCloseModal = () => {
         setShowModal(false);
         setEditingUser(null);
-        setFormData({ email: "", password: "", firstName: "", lastName: "", role: "CUSTOMER", businessId: "" });
+        setFormData({ email: "", password: "", firstName: "", lastName: "", role: "CUSTOMER", businessId: "", isDemoAccount: false });
         setFormError("");
         setFormSuccess("");
     };
@@ -278,6 +281,7 @@ export default function UsersPage() {
                         lastName: formData.lastName,
                         role: formData.role as any,
                         businessId: formData.businessId || null,
+                        isDemoAccount: formData.isDemoAccount,
                     },
                 });
                 setFormSuccess("User updated successfully");
@@ -294,6 +298,7 @@ export default function UsersPage() {
                         lastName: formData.lastName,
                         role: formData.role,
                         businessId: formData.businessId || null,
+                        isDemoAccount: formData.isDemoAccount,
                     },
                 });
 
@@ -454,6 +459,7 @@ export default function UsersPage() {
                             <tr>
                                 <Th>Name</Th>
                                 <Th>Email</Th>
+                                <Th>Review</Th>
                                 <Th>Phone Number</Th>
                                 <Th>Address</Th>
                                 <Th>Flag/Note</Th>
@@ -470,6 +476,15 @@ export default function UsersPage() {
                                     </Td>
                                     <Td>
                                         <div className="text-gray-300">{user.email}</div>
+                                    </Td>
+                                    <Td>
+                                        {user.isDemoAccount ? (
+                                            <span className="inline-flex items-center rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-1 text-xs font-medium text-sky-300">
+                                                Demo / Review
+                                            </span>
+                                        ) : (
+                                            <span className="text-gray-500">-</span>
+                                        )}
                                     </Td>
                                     <Td>
                                         <div className="text-gray-300">{user.phoneNumber || '-'}</div>
@@ -541,7 +556,7 @@ export default function UsersPage() {
                             ))}
                             {!filteredUsers.length && (
                                 <tr>
-                                    <Td colSpan={6}>
+                                    <Td colSpan={7}>
                                         <div className="text-center text-gray-500 py-8">
                                             No users found.
                                         </div>
@@ -617,6 +632,23 @@ export default function UsersPage() {
                                 minLength={6}
                             />
                             <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
+                        </div>
+
+                        <div className="rounded-lg border border-sky-900/50 bg-sky-950/20 p-4">
+                            <label className="flex items-start gap-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={formData.isDemoAccount}
+                                    onChange={(e) => setFormData((prev) => ({ ...prev, isDemoAccount: e.target.checked }))}
+                                    className="mt-1 h-4 w-4 accent-sky-500"
+                                />
+                                <div>
+                                    <div className="text-sm font-medium text-sky-200">Demo / App Review account</div>
+                                    <p className="mt-1 text-xs text-sky-100/70">
+                                        Enable only for review or internal demo users. Demo customer orders auto-progress through the delivery lifecycle.
+                                    </p>
+                                </div>
+                            </label>
                         </div>
 
                         {formError && (

@@ -15,6 +15,13 @@
       "when": 1774991411350,
       "tag": "0001_add-priority-surcharge-to-orders",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775080000000,
+      "tag": "0002_add-is-demo-account-to-users",
+      "breakpoints": true
     }
   ]
 }

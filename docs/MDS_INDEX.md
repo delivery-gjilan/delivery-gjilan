@@ -62,6 +62,8 @@
 | O12 | [OPERATIONS/DRIVER_TRACKING_SMOOTHNESS.md](OPERATIONS/DRIVER_TRACKING_SMOOTHNESS.md) | Operations | End-to-end driver position pipeline, animation tuning, dead-reckoning, route-snap |
 | O13 | [OPERATIONS/PAGINATION_AUDIT.md](OPERATIONS/PAGINATION_AUDIT.md) | Operations | Full pagination audit: what is paginated, unbounded queries by risk level, fix order |
 | O14 | [OPERATIONS/MONITORING_FUTURE_PLAN.md](OPERATIONS/MONITORING_FUTURE_PLAN.md) | Operations | Forward monitoring roadmap: dispatch, freshness, SLOs, integrity, business-impact signals |
+| O15 | [APP_STORE_DEPLOYMENT.md](APP_STORE_DEPLOYMENT.md) | Operations | Workspace-level App Store submission tracker for the four mobile apps, including completed/skipped phases and release blockers |
+| O16 | [DEMO_MODE_PLAN.md](DEMO_MODE_PLAN.md) | Operations | Apple review demo-account flow, auto-progression behavior, reviewer credentials strategy, and admin-panel demo-account operations |
 | UI1 | [ADMIN_MOBILEBUSINESS_UI_CONTEXT.md](ADMIN_MOBILEBUSINESS_UI_CONTEXT.md) | UI | Product types, variant groups, admin/mobile-business UX |
 | UI2 | [ADMIN_PANEL_BUSINESS_SETTLEMENTS.md](ADMIN_PANEL_BUSINESS_SETTLEMENTS.md) | UI | Business-facing settlements semantics, filters, lazy order details |
 

@@ -5,7 +5,7 @@ import { useCart } from '../hooks/useCart';
 import { useCartAnimationStore } from '../store/cartAnimationStore';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -15,33 +15,14 @@ export const CartFloatingBar = () => {
     const { t } = useTranslations();
     const { total, count, isEmpty } = useCart();
     const { triggerCount } = useCartAnimationStore();
-    const scaleAnim = useRef(new Animated.Value(1)).current;
     const colorAnim = useRef(new Animated.Value(0)).current;
+    const [isFlashing, setIsFlashing] = useState(false);
+    const mountTriggerCount = useRef(triggerCount); // capture value at mount — don't flash for it
 
-    // Breathing animation
+    // Color flash animation when items are added (not on initial mount)
     useEffect(() => {
-        const animation = Animated.loop(
-            Animated.sequence([
-                Animated.timing(scaleAnim, {
-                    toValue: 1.03,
-                    duration: 1200,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(scaleAnim, {
-                    toValue: 1,
-                    duration: 1200,
-                    useNativeDriver: true,
-                }),
-            ]),
-        );
-        animation.start();
-        return () => animation.stop();
-    }, [scaleAnim]);
-
-    // Color flash animation when items are added
-    useEffect(() => {
-        if (triggerCount === 0) return;
-        
+        if (triggerCount === 0 || triggerCount === mountTriggerCount.current) return;
+        setIsFlashing(true);
         Animated.sequence([
             Animated.timing(colorAnim, {
                 toValue: 1,
@@ -53,21 +34,21 @@ export const CartFloatingBar = () => {
                 duration: 200,
                 useNativeDriver: false,
             }),
-        ]).start();
-    }, [triggerCount, colorAnim]);
+        ]).start(() => {
+            setIsFlashing(false);
+            colorAnim.setValue(0);
+        });
+    }, [triggerCount]);
 
     if (isEmpty) return null;
 
     // Get lighter version of primary color for flash effect
     const getLightColor = (hexColor: string) => {
-        // Flash to lighter purple
-        if (theme.dark === false && hexColor === '#7C3AED') {
-            return '#A78BFA'; // violet-400 (accent color)
-        }
-        return '#DDD6FE'; // accent for any theme
+        if (theme.dark === false && hexColor === '#7C3AED') return '#A78BFA';
+        return '#DDD6FE';
     };
 
-    const backgroundColor = colorAnim.interpolate({
+    const flashBackgroundColor = colorAnim.interpolate({
         inputRange: [0, 1],
         outputRange: [theme.colors.primary, getLightColor(theme.colors.primary)],
     });
@@ -76,13 +57,10 @@ export const CartFloatingBar = () => {
         <AnimatedTouchable
             activeOpacity={0.9}
             onPress={() => router.push('/cart')}
-            style={{ 
-                transform: [{ scale: scaleAnim }],
-            }}
         >
-            <Animated.View 
+            <Animated.View
                 className="flex-row items-center justify-between p-4 rounded-2xl"
-                style={{ backgroundColor: backgroundColor }}
+                style={{ backgroundColor: isFlashing ? flashBackgroundColor : theme.colors.primary }}
             >
                 <View className="flex-row items-center space-x-3 gap-3">
                     <View className="bg-white/20 px-3 py-1 rounded-full">
