@@ -14,7 +14,7 @@ import { WoltHeader } from '@/components/WoltHeader';
 import { useEstimatedDeliveryPrice } from '@/hooks/useEstimatedDeliveryPrice';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useQuery } from '@apollo/client/react';
-import { GET_BANNERS } from '@/graphql/operations/banners';
+import { GET_ACTIVE_BANNERS } from '@/graphql/operations/banners';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import type { WoltHeaderBannerType } from '@/components/WoltHeader';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
@@ -62,8 +62,8 @@ export default function Discover() {
     const showBanner = bannerEnabled && !!bannerMessage;
     
     // Fetch banners from API
-    const { data: bannersData, loading: bannersLoading } = useQuery(GET_BANNERS, {
-        variables: { activeOnly: true },
+    const { data: bannersData, loading: bannersLoading } = useQuery(GET_ACTIVE_BANNERS, {
+        variables: { displayContext: 'HOME' },
         fetchPolicy: 'cache-and-network',
     });
 
@@ -89,7 +89,7 @@ export default function Discover() {
 
     // Map API banners to PromoSlider format
     const promoBanners = useMemo(() => {
-        const apiBanners = (bannersData as any)?.getBanners || [];
+        const apiBanners = (bannersData as any)?.getActiveBanners || [];
         
         if (apiBanners.length > 0) {
             return apiBanners.map((banner: any) => ({

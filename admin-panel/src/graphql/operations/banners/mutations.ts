@@ -7,8 +7,15 @@ export const CREATE_BANNER = gql`
       title
       subtitle
       imageUrl
+      mediaType
+      businessId
+      productId
+      promotionId
       linkType
       linkTarget
+      displayContext
+      startsAt
+      endsAt
       sortOrder
       isActive
       createdAt
@@ -24,8 +31,15 @@ export const UPDATE_BANNER = gql`
       title
       subtitle
       imageUrl
+      mediaType
+      businessId
+      productId
+      promotionId
       linkType
       linkTarget
+      displayContext
+      startsAt
+      endsAt
       sortOrder
       isActive
       createdAt
@@ -49,3 +63,4 @@ export const UPDATE_BANNER_ORDER = gql`
     }
   }
 `;
+

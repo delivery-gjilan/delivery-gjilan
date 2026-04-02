@@ -34,9 +34,12 @@ const allowedOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
     : ['http://localhost:3000', 'http://localhost:8082', 'http://localhost:8083', 'http://localhost:8084'];
 
+// Handle wildcard (*) for development
+const corsOrigin = allowedOrigins.includes('*') ? true : allowedOrigins;
+
 app.use(
     cors({
-        origin: allowedOrigins,
+        origin: corsOrigin,
         credentials: true,
     }),
 );

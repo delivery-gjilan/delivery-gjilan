@@ -154,17 +154,40 @@ export type AuthResponse = {
 
 export type Banner = {
   __typename?: 'Banner';
+  business?: Maybe<Business>;
+  businessId?: Maybe<Scalars['ID']['output']>;
   createdAt: Scalars['DateTime']['output'];
+  displayContext: BannerDisplayContext;
+  endsAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['ID']['output'];
   imageUrl: Scalars['String']['output'];
   isActive: Scalars['Boolean']['output'];
   linkTarget?: Maybe<Scalars['String']['output']>;
   linkType?: Maybe<Scalars['String']['output']>;
+  mediaType: BannerMediaType;
+  product?: Maybe<Product>;
+  productId?: Maybe<Scalars['ID']['output']>;
+  promotion?: Maybe<Promotion>;
+  promotionId?: Maybe<Scalars['ID']['output']>;
   sortOrder: Scalars['Int']['output'];
+  startsAt?: Maybe<Scalars['DateTime']['output']>;
   subtitle?: Maybe<Scalars['String']['output']>;
   title?: Maybe<Scalars['String']['output']>;
   updatedAt: Scalars['DateTime']['output'];
 };
+
+export type BannerDisplayContext =
+  | 'ALL'
+  | 'BUSINESS'
+  | 'CART'
+  | 'CATEGORY'
+  | 'HOME'
+  | 'PRODUCT';
+
+export type BannerMediaType =
+  | 'GIF'
+  | 'IMAGE'
+  | 'VIDEO';
 
 export type BannerType =
   | 'INFO'
@@ -332,11 +355,18 @@ export type CartItemInput = {
 };
 
 export type CreateBannerInput = {
+  businessId?: InputMaybe<Scalars['ID']['input']>;
+  displayContext?: InputMaybe<BannerDisplayContext>;
+  endsAt?: InputMaybe<Scalars['DateTime']['input']>;
   imageUrl: Scalars['String']['input'];
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
   linkTarget?: InputMaybe<Scalars['String']['input']>;
   linkType?: InputMaybe<Scalars['String']['input']>;
+  mediaType?: InputMaybe<BannerMediaType>;
+  productId?: InputMaybe<Scalars['ID']['input']>;
+  promotionId?: InputMaybe<Scalars['ID']['input']>;
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
+  startsAt?: InputMaybe<Scalars['DateTime']['input']>;
   subtitle?: InputMaybe<Scalars['String']['input']>;
   title?: InputMaybe<Scalars['String']['input']>;
 };
@@ -792,6 +822,15 @@ export type EntityType =
   | 'SETTLEMENT'
   | 'SUBCATEGORY'
   | 'USER';
+
+export type GetBannersFilter = {
+  activeOnly?: InputMaybe<Scalars['Boolean']['input']>;
+  businessId?: InputMaybe<Scalars['ID']['input']>;
+  displayContext?: InputMaybe<BannerDisplayContext>;
+  includeScheduled?: InputMaybe<Scalars['Boolean']['input']>;
+  productId?: InputMaybe<Scalars['ID']['input']>;
+  promotionId?: InputMaybe<Scalars['ID']['input']>;
+};
 
 export type HourlyDistribution = {
   __typename?: 'HourlyDistribution';
@@ -2041,6 +2080,7 @@ export type Query = {
   /** Admin: full conversation with a specific driver */
   driverMessages: Array<DriverMessage>;
   drivers: Array<User>;
+  getActiveBanners: Array<Banner>;
   getActiveGlobalPromotions: Array<Promotion>;
   /** Get Agora RTC credentials for the current authenticated user */
   getAgoraRtcCredentials: AgoraRtcCredentials;
@@ -2182,6 +2222,11 @@ export type QuerydriverMessagesArgs = {
 };
 
 
+export type QuerygetActiveBannersArgs = {
+  displayContext?: InputMaybe<BannerDisplayContext>;
+};
+
+
 export type QuerygetAgoraRtcCredentialsArgs = {
   channelName: Scalars['String']['input'];
   role: AgoraRtcRole;
@@ -2205,7 +2250,7 @@ export type QuerygetBannerArgs = {
 
 
 export type QuerygetBannersArgs = {
-  activeOnly?: InputMaybe<Scalars['Boolean']['input']>;
+  filter?: InputMaybe<GetBannersFilter>;
 };
 
 
@@ -2792,11 +2837,18 @@ export type TrackPushTelemetryInput = {
 };
 
 export type UpdateBannerInput = {
+  businessId?: InputMaybe<Scalars['ID']['input']>;
+  displayContext?: InputMaybe<BannerDisplayContext>;
+  endsAt?: InputMaybe<Scalars['DateTime']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
   linkTarget?: InputMaybe<Scalars['String']['input']>;
   linkType?: InputMaybe<Scalars['String']['input']>;
+  mediaType?: InputMaybe<BannerMediaType>;
+  productId?: InputMaybe<Scalars['ID']['input']>;
+  promotionId?: InputMaybe<Scalars['ID']['input']>;
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
+  startsAt?: InputMaybe<Scalars['DateTime']['input']>;
   subtitle?: InputMaybe<Scalars['String']['input']>;
   title?: InputMaybe<Scalars['String']['input']>;
 };
@@ -3136,7 +3188,9 @@ export type ResolversTypes = {
   AuditLog: ResolverTypeWrapper<Omit<AuditLog, 'action' | 'actor' | 'actorType' | 'entityType'> & { action: ResolversTypes['ActionType'], actor?: Maybe<ResolversTypes['User']>, actorType: ResolversTypes['ActorType'], entityType: ResolversTypes['EntityType'] }>;
   AuditLogConnection: ResolverTypeWrapper<Omit<AuditLogConnection, 'logs'> & { logs: Array<ResolversTypes['AuditLog']> }>;
   AuthResponse: ResolverTypeWrapper<Omit<AuthResponse, 'user'> & { user: ResolversTypes['User'] }>;
-  Banner: ResolverTypeWrapper<Banner>;
+  Banner: ResolverTypeWrapper<Omit<Banner, 'business' | 'displayContext' | 'mediaType' | 'promotion'> & { business?: Maybe<ResolversTypes['Business']>, displayContext: ResolversTypes['BannerDisplayContext'], mediaType: ResolversTypes['BannerMediaType'], promotion?: Maybe<ResolversTypes['Promotion']> }>;
+  BannerDisplayContext: ResolverTypeWrapper<'HOME' | 'BUSINESS' | 'CATEGORY' | 'PRODUCT' | 'CART' | 'ALL'>;
+  BannerMediaType: ResolverTypeWrapper<'IMAGE' | 'GIF' | 'VIDEO'>;
   BannerType: ResolverTypeWrapper<'INFO' | 'WARNING' | 'SUCCESS'>;
   Business: ResolverTypeWrapper<Omit<Business, 'activePromotion' | 'businessType'> & { activePromotion?: Maybe<ResolversTypes['BusinessPromotion']>, businessType: ResolversTypes['BusinessType'] }>;
   BusinessDayHours: ResolverTypeWrapper<BusinessDayHours>;
@@ -3202,6 +3256,7 @@ export type ResolversTypes = {
   DriverPttSignalAction: ResolverTypeWrapper<'STARTED' | 'STOPPED' | 'MUTE' | 'UNMUTE'>;
   DriverRegisterInput: DriverRegisterInput;
   EntityType: ResolverTypeWrapper<'USER' | 'BUSINESS' | 'PRODUCT' | 'ORDER' | 'SETTLEMENT' | 'DRIVER' | 'CATEGORY' | 'SUBCATEGORY' | 'DELIVERY_ZONE'>;
+  GetBannersFilter: GetBannersFilter;
   HourlyDistribution: ResolverTypeWrapper<HourlyDistribution>;
   InitiateSignupInput: InitiateSignupInput;
   JSON: ResolverTypeWrapper<Scalars['JSON']['output']>;
@@ -3322,7 +3377,7 @@ export type ResolversParentTypes = {
   AuditLog: Omit<AuditLog, 'actor'> & { actor?: Maybe<ResolversParentTypes['User']> };
   AuditLogConnection: Omit<AuditLogConnection, 'logs'> & { logs: Array<ResolversParentTypes['AuditLog']> };
   AuthResponse: Omit<AuthResponse, 'user'> & { user: ResolversParentTypes['User'] };
-  Banner: Banner;
+  Banner: Omit<Banner, 'business' | 'promotion'> & { business?: Maybe<ResolversParentTypes['Business']>, promotion?: Maybe<ResolversParentTypes['Promotion']> };
   Business: Omit<Business, 'activePromotion'> & { activePromotion?: Maybe<ResolversParentTypes['BusinessPromotion']> };
   BusinessDayHours: BusinessDayHours;
   BusinessDayHoursInput: BusinessDayHoursInput;
@@ -3378,6 +3433,7 @@ export type ResolversParentTypes = {
   DriverMessageUser: DriverMessageUser;
   DriverPttSignal: DriverPttSignal;
   DriverRegisterInput: DriverRegisterInput;
+  GetBannersFilter: GetBannersFilter;
   HourlyDistribution: HourlyDistribution;
   InitiateSignupInput: InitiateSignupInput;
   JSON: Scalars['JSON']['output'];
@@ -3534,18 +3590,32 @@ export type AuthResponseResolvers<ContextType = GraphQLContext, ParentType exten
 };
 
 export type BannerResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Banner'] = ResolversParentTypes['Banner']> = {
+  business?: Resolver<Maybe<ResolversTypes['Business']>, ParentType, ContextType>;
+  businessId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+  displayContext?: Resolver<ResolversTypes['BannerDisplayContext'], ParentType, ContextType>;
+  endsAt?: Resolver<Maybe<ResolversTypes['DateTime']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   imageUrl?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   isActive?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   linkTarget?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   linkType?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  mediaType?: Resolver<ResolversTypes['BannerMediaType'], ParentType, ContextType>;
+  product?: Resolver<Maybe<ResolversTypes['Product']>, ParentType, ContextType>;
+  productId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
+  promotion?: Resolver<Maybe<ResolversTypes['Promotion']>, ParentType, ContextType>;
+  promotionId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   sortOrder?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  startsAt?: Resolver<Maybe<ResolversTypes['DateTime']>, ParentType, ContextType>;
   subtitle?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   title?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
+
+export type BannerDisplayContextResolvers = EnumResolverSignature<{ ALL?: any, BUSINESS?: any, CART?: any, CATEGORY?: any, HOME?: any, PRODUCT?: any }, ResolversTypes['BannerDisplayContext']>;
+
+export type BannerMediaTypeResolvers = EnumResolverSignature<{ GIF?: any, IMAGE?: any, VIDEO?: any }, ResolversTypes['BannerMediaType']>;
 
 export type BannerTypeResolvers = EnumResolverSignature<{ INFO?: any, SUCCESS?: any, WARNING?: any }, ResolversTypes['BannerType']>;
 
@@ -4386,6 +4456,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   driverMessageThreads?: Resolver<Array<ResolversTypes['DriverMessageThread']>, ParentType, ContextType>;
   driverMessages?: Resolver<Array<ResolversTypes['DriverMessage']>, ParentType, ContextType, RequireFields<QuerydriverMessagesArgs, 'driverId'>>;
   drivers?: Resolver<Array<ResolversTypes['User']>, ParentType, ContextType>;
+  getActiveBanners?: Resolver<Array<ResolversTypes['Banner']>, ParentType, ContextType, Partial<QuerygetActiveBannersArgs>>;
   getActiveGlobalPromotions?: Resolver<Array<ResolversTypes['Promotion']>, ParentType, ContextType>;
   getAgoraRtcCredentials?: Resolver<ResolversTypes['AgoraRtcCredentials'], ParentType, ContextType, RequireFields<QuerygetAgoraRtcCredentialsArgs, 'channelName' | 'role'>>;
   getAllPromotions?: Resolver<Array<ResolversTypes['Promotion']>, ParentType, ContextType, Partial<QuerygetAllPromotionsArgs>>;
@@ -4760,6 +4831,8 @@ export type Resolvers<ContextType = GraphQLContext> = {
   AuditLogConnection?: AuditLogConnectionResolvers<ContextType>;
   AuthResponse?: AuthResponseResolvers<ContextType>;
   Banner?: BannerResolvers<ContextType>;
+  BannerDisplayContext?: BannerDisplayContextResolvers;
+  BannerMediaType?: BannerMediaTypeResolvers;
   BannerType?: BannerTypeResolvers;
   Business?: BusinessResolvers<ContextType>;
   BusinessDayHours?: BusinessDayHoursResolvers<ContextType>;

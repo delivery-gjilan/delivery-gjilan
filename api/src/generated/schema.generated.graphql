@@ -129,16 +129,41 @@ type AuthResponse {
 }
 
 type Banner {
+  business: Business
+  businessId: ID
   createdAt: DateTime!
+  displayContext: BannerDisplayContext!
+  endsAt: DateTime
   id: ID!
   imageUrl: String!
   isActive: Boolean!
   linkTarget: String
   linkType: String
+  mediaType: BannerMediaType!
+  product: Product
+  productId: ID
+  promotion: Promotion
+  promotionId: ID
   sortOrder: Int!
+  startsAt: DateTime
   subtitle: String
   title: String
   updatedAt: DateTime!
+}
+
+enum BannerDisplayContext {
+  ALL
+  BUSINESS
+  CART
+  CATEGORY
+  HOME
+  PRODUCT
+}
+
+enum BannerMediaType {
+  GIF
+  IMAGE
+  VIDEO
 }
 
 enum BannerType {
@@ -307,11 +332,18 @@ input CartItemInput {
 }
 
 input CreateBannerInput {
+  businessId: ID
+  displayContext: BannerDisplayContext
+  endsAt: DateTime
   imageUrl: String!
   isActive: Boolean
   linkTarget: String
   linkType: String
+  mediaType: BannerMediaType
+  productId: ID
+  promotionId: ID
   sortOrder: Int
+  startsAt: DateTime
   subtitle: String
   title: String
 }
@@ -783,6 +815,15 @@ enum EntityType {
   SETTLEMENT
   SUBCATEGORY
   USER
+}
+
+input GetBannersFilter {
+  activeOnly: Boolean
+  businessId: ID
+  displayContext: BannerDisplayContext
+  includeScheduled: Boolean
+  productId: ID
+  promotionId: ID
 }
 
 type HourlyDistribution {
@@ -1425,6 +1466,7 @@ type Query {
   """Admin: full conversation with a specific driver"""
   driverMessages(driverId: ID!, limit: Int, offset: Int): [DriverMessage!]!
   drivers: [User!]!
+  getActiveBanners(displayContext: BannerDisplayContext): [Banner!]!
   getActiveGlobalPromotions: [Promotion!]!
 
   """Get Agora RTC credentials for the current authenticated user"""
@@ -1432,7 +1474,7 @@ type Query {
   getAllPromotions(isActive: Boolean): [Promotion!]!
   getApplicablePromotions(cart: CartContextInput!, manualCode: String): [ApplicablePromotion!]!
   getBanner(id: ID!): Banner
-  getBanners(activeOnly: Boolean): [Banner!]!
+  getBanners(filter: GetBannersFilter): [Banner!]!
   getPromotion(id: ID!): Promotion
   getPromotionAnalytics(promotionId: ID!): PromotionAnalyticsResult!
   getPromotionThresholds(cart: CartContextInput!): [PromotionThreshold!]!
@@ -1793,11 +1835,18 @@ input TrackPushTelemetryInput {
 }
 
 input UpdateBannerInput {
+  businessId: ID
+  displayContext: BannerDisplayContext
+  endsAt: DateTime
   imageUrl: String
   isActive: Boolean
   linkTarget: String
   linkType: String
+  mediaType: BannerMediaType
+  productId: ID
+  promotionId: ID
   sortOrder: Int
+  startsAt: DateTime
   subtitle: String
   title: String
 }
