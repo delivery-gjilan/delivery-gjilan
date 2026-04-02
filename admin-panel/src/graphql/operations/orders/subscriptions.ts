@@ -8,7 +8,6 @@ export const ORDERS_SUBSCRIPTION = gql(`
             orderPrice
             deliveryPrice
             originalPrice
-            originalDeliveryPrice
             totalPrice
             orderDate
             updatedAt
@@ -20,6 +19,10 @@ export const ORDERS_SUBSCRIPTION = gql(`
                 email
                 address
                 phoneNumber
+                adminNote
+                flagColor
+                totalOrders
+                isTrustedCustomer
             }
             driver {
                 id
@@ -49,7 +52,6 @@ export const ORDERS_SUBSCRIPTION = gql(`
                     name
                     imageUrl
                     quantity
-                    basePrice
                     unitPrice
                 }
             }
@@ -65,12 +67,14 @@ export const ALL_ORDERS_SUBSCRIPTION = gql(`
             orderPrice
             deliveryPrice
             originalPrice
-            originalDeliveryPrice
             totalPrice
             orderDate
             updatedAt
             status
             adminNote
+            needsApproval
+            locationFlagged
+            approvalReasons
             user {
                 id
                 firstName
@@ -107,7 +111,6 @@ export const ALL_ORDERS_SUBSCRIPTION = gql(`
                     name
                     imageUrl
                     quantity
-                    basePrice
                     unitPrice
                 }
             }

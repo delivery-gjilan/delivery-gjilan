@@ -3,7 +3,7 @@
     "name": "Zipp Go",
     "slug": "mobile-customer",
     "version": "1.0.0",
-    "orientation": "default",
+    "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": ["deliveryapp", "zipp"],
     "userInterfaceStyle": "automatic",
@@ -14,12 +14,8 @@
         "NSLocationWhenInUseUsageDescription": "We use your location to set the delivery address.",
         "ITSAppUsesNonExemptEncryption": false,
         "NSSupportsLiveActivities": true,
-        "UIBackgroundModes": [
-          "remote-notification",
-          "remote-notification",
-          "remote-notification",
-          "remote-notification"
-        ]
+        "NSSupportsLiveActivitiesFrequentUpdates": true,
+        "UIBackgroundModes": []
       },
       "appleTeamId": "87K8YXG5V8",
       "bundleIdentifier": "com.artshabani.mobilecustomer",
@@ -27,20 +23,6 @@
     },
     "android": {
       "permissions": [
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
       ],

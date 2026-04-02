@@ -2,6 +2,8 @@ import { DbType } from '@/database';
 import { DbUser, users } from '@/database/schema/users';
 import { refreshTokenSessions } from '@/database/schema/refreshTokenSessions';
 import { userReferrals } from '@/database/schema/referrals';
+import { deviceTokens } from '@/database/schema/deviceTokens';
+import { userAddress } from '@/database/schema/userAddress';
 import { SignupStep } from '@/generated/types.generated';
 import { eq, and, isNull, sql, inArray, gt } from 'drizzle-orm';
 
@@ -122,6 +124,7 @@ export class AuthRepository {
         hashedPassword: string,
         role: 'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN' | 'ADMIN' | 'BUSINESS_OWNER' | 'BUSINESS_EMPLOYEE',
         businessId?: string,
+        isDemoAccount = false,
     ): Promise<DbUser> {
         const [user] = await this.db
             .insert(users)
@@ -137,6 +140,7 @@ export class AuthRepository {
                 phoneVerified: false,
                 adminNote: null,
                 flagColor: 'yellow',
+                isDemoAccount,
             })
             .returning();
         return user;
@@ -270,11 +274,21 @@ export class AuthRepository {
     }
 
     async deleteUser(userId: string): Promise<boolean> {
+        // Delete related records first
+        await this.db.delete(deviceTokens).where(eq(deviceTokens.userId, userId));
+        await this.db.delete(userAddress).where(eq(userAddress.userId, userId));
+
+        // Anonymize all PII on the user record
         const result = await this.db
             .update(users)
             .set({
                 deletedAt: sql`CURRENT_TIMESTAMP`,
                 email: sql`'deleted_' || ${users.id} || '@deleted'`,
+                firstName: 'Deleted',
+                lastName: 'User',
+                phoneNumber: null,
+                address: null,
+                referralCode: null,
             })
             .where(and(eq(users.id, userId), isNull(users.deletedAt)))
             .returning();

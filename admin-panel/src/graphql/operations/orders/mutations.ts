@@ -7,7 +7,6 @@ export const UPDATE_ORDER_STATUS = graphql(`
             orderPrice
             deliveryPrice
             originalPrice
-            originalDeliveryPrice
             totalPrice
             orderDate
             status
@@ -33,7 +32,6 @@ export const UPDATE_ORDER_STATUS = graphql(`
                     name
                     imageUrl
                     quantity
-                    basePrice
                     unitPrice
                 }
             }
@@ -107,6 +105,16 @@ export const SET_ORDER_ADMIN_NOTE = graphql(`
     }
 `);
 
+export const APPROVE_ORDER = graphql(`
+    mutation ApproveOrder($id: ID!) {
+        approveOrder(id: $id) {
+            id
+            status
+            needsApproval
+        }
+    }
+`);
+
 export const CREATE_TEST_ORDER = graphql(`
     mutation CreateTestOrder {
         createTestOrder {
@@ -114,7 +122,6 @@ export const CREATE_TEST_ORDER = graphql(`
             orderPrice
             deliveryPrice
             originalPrice
-            originalDeliveryPrice
             totalPrice
             orderDate
             status
@@ -140,7 +147,6 @@ export const CREATE_TEST_ORDER = graphql(`
                     name
                     imageUrl
                     quantity
-                    basePrice
                     unitPrice
                 }
             }

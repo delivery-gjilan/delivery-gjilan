@@ -36,7 +36,7 @@ export const myDriverMetrics: NonNullable<QueryResolvers['myDriverMetrics']> = a
     todayStart.setHours(0, 0, 0, 0);
 
     const deliveredToday = await db
-        .select({ id: ordersTable.id, price: ordersTable.price, deliveryPrice: ordersTable.deliveryPrice })
+        .select({ id: ordersTable.id, deliveryPrice: ordersTable.deliveryPrice })
         .from(ordersTable)
         .where(
             and(

@@ -1,8 +1,10 @@
 import { DbType } from '@/database';
 import { DbPromotion, NewDbPromotion } from '@/database/schema';
 import { PromotionRepository, PromotionFilters } from '@/repositories/PromotionRepository';
+import { SettlementRuleRepository } from '@/repositories/SettlementRuleRepository';
 import logger from '@/lib/logger';
 import { AppError } from '@/lib/errors';
+import type { Promotion, PromotionTarget, PromotionType } from '@/generated/types.generated';
 
 const log = logger.child({ service: 'PromotionService' });
 
@@ -10,7 +12,7 @@ export interface CreatePromotionInput {
     name: string;
     description?: string;
     code?: string;
-    type: 'FIXED_AMOUNT' | 'PERCENTAGE' | 'FREE_DELIVERY' | 'SPEND_X_GET_FREE' | 'SPEND_X_PERCENT' | 'SPEND_X_FIXED';
+    type: 'FIXED_AMOUNT' | 'PERCENTAGE' | 'FREE_DELIVERY' | 'SPEND_X_PERCENT' | 'SPEND_X_FIXED';
     target: 'ALL_USERS' | 'SPECIFIC_USERS' | 'FIRST_ORDER' | 'CONDITIONAL';
     discountValue?: number;
     maxDiscountCap?: number;
@@ -28,6 +30,12 @@ export interface CreatePromotionInput {
     creatorId?: string;
     targetUserIds?: string[];
     eligibleBusinessIds?: string[];
+
+    // Settlement Rule Integration
+    createSettlementRules?: boolean;
+    driverRuleAmount?: number;
+    driverRuleAmountType?: 'FIXED' | 'PERCENT';
+    addDriverCommission?: boolean;
 }
 
 export interface UpdatePromotionInput extends Partial<CreatePromotionInput> {
@@ -36,12 +44,60 @@ export interface UpdatePromotionInput extends Partial<CreatePromotionInput> {
 
 export class PromotionService {
     private repository: PromotionRepository;
+    private settlementRuleRepository: SettlementRuleRepository;
 
     constructor(private db: DbType) {
         this.repository = new PromotionRepository(db);
+        this.settlementRuleRepository = new SettlementRuleRepository(db);
     }
 
-    async createPromotion(input: CreatePromotionInput): Promise<DbPromotion> {
+    /**
+     * Helper to format DB promotion to GraphQL Promotion type.
+     * Centralizing this here makes resolvers "dumb" as requested.
+     */
+    private mapDbPromotionToGraphQL(promo: DbPromotion): Promotion {
+        const toISOString = (date: Date | string | null | undefined): string | null => {
+            if (!date) return null;
+            if (typeof date === 'string') return date;
+            return new Date(date).toISOString();
+        };
+
+        return {
+            id: promo.id,
+            name: promo.name,
+            description: promo.description,
+            code: promo.code,
+            type: promo.type as PromotionType,
+            target: promo.target as PromotionTarget,
+            discountValue: promo.discountValue,
+            maxDiscountCap: promo.maxDiscountCap,
+            minOrderAmount: promo.minOrderAmount,
+            spendThreshold: promo.spendThreshold,
+            thresholdReward: promo.thresholdReward ? JSON.stringify(promo.thresholdReward) : null,
+            maxGlobalUsage: promo.maxGlobalUsage,
+            currentGlobalUsage: promo.currentGlobalUsage,
+            maxUsagePerUser: promo.maxUsagePerUser,
+            isStackable: promo.isStackable,
+            priority: promo.priority,
+            isActive: promo.isActive,
+            startsAt: toISOString(promo.startsAt),
+            endsAt: toISOString(promo.endsAt),
+            createdAt: toISOString(promo.createdAt)!,
+            totalUsageCount: promo.totalUsageCount,
+            totalRevenue: promo.totalRevenue || 0,
+            creatorType: promo.creatorType,
+            creatorId: promo.creatorId,
+        };
+    }
+
+    async createPromotion(
+        input: CreatePromotionInput,
+        userData: { role?: string; userId?: string },
+    ): Promise<Promotion> {
+        // Permission check inside service
+        if (!userData.userId || userData.role !== 'SUPER_ADMIN') {
+            throw AppError.forbidden();
+        }
         // Validate code uniqueness if code is provided
         if (input.code) {
             const exists = await this.repository.checkCodeExists(input.code);
@@ -51,7 +107,10 @@ export class PromotionService {
         }
 
         // Validate basic rules
-        if (input.type === 'PERCENTAGE' && (!input.discountValue || input.discountValue <= 0 || input.discountValue > 100)) {
+        if (
+            input.type === 'PERCENTAGE' && 
+            (!input.discountValue || input.discountValue <= 0 || input.discountValue > 100)
+        ) {
             throw AppError.badInput('Percentage discount must be between 0 and 100');
         }
 
@@ -59,7 +118,6 @@ export class PromotionService {
             throw AppError.badInput('Fixed amount discount must be greater than 0');
         }
 
-        // Create promotion
         const promo = await this.repository.create({
             code: input.code ? input.code.toUpperCase() : null,
             name: input.name,
@@ -76,8 +134,16 @@ export class PromotionService {
             isStackable: input.isStackable ?? false,
             priority: input.priority ?? 0,
             isActive: input.isActive ?? true,
-            startsAt: input.startsAt ? (typeof input.startsAt === 'string' ? input.startsAt : input.startsAt.toISOString()) : null,
-            endsAt: input.endsAt ? (typeof input.endsAt === 'string' ? input.endsAt : input.endsAt.toISOString()) : null,
+            startsAt: input.startsAt
+                ? typeof input.startsAt === 'string'
+                    ? input.startsAt
+                    : (input.startsAt as any).toISOString()
+                : null,
+            endsAt: input.endsAt
+                ? typeof input.endsAt === 'string'
+                    ? input.endsAt
+                    : (input.endsAt as any).toISOString()
+                : null,
             createdBy: null, // Will be set by GraphQL resolver
         } as NewDbPromotion);
 
@@ -91,7 +157,75 @@ export class PromotionService {
             await this.repository.setBusinessEligibility(promo.id, input.eligibleBusinessIds);
         }
 
-        return promo;
+        // Auto-create settlement rules if requested
+        if (input.createSettlementRules) {
+            await this.createSettlementRulesForPromotion(promo, input);
+        }
+
+        return this.mapDbPromotionToGraphQL(promo);
+    }
+
+    private async createSettlementRulesForPromotion(promo: DbPromotion, input: CreatePromotionInput): Promise<void> {
+        log.info(
+            {
+                promotionId: promo.id,
+                type: promo.type,
+                createSettlementRules: input.createSettlementRules,
+            },
+            'promo:autoCreateRules:start',
+        );
+
+        if (promo.type === 'FREE_DELIVERY') {
+            // For FREE_DELIVERY, settlement rules are optional but if requested, commission is mandatory
+            if (input.createSettlementRules) {
+                // Rule 1: Driver owes Platform commission (ALWAYS 10% of delivery fee)
+                await this.settlementRuleRepository.createRule({
+                    name: `${promo.name} - Driver Commission (10%)`,
+                    type: 'DELIVERY_PRICE',
+                    entityType: 'DRIVER',
+                    direction: 'RECEIVABLE',
+                    amountType: 'PERCENT',
+                    amount: '10',
+                    promotionId: promo.id,
+                    isActive: true,
+                    notes: `Mandatory 10% commission for free delivery promotion ${promo.id}`,
+                });
+
+                // Rule 2: Platform owes Driver (based on input amount/type)
+                if (input.driverRuleAmount !== undefined && input.driverRuleAmount !== null) {
+                    await this.settlementRuleRepository.createRule({
+                        name: `${promo.name} - Driver Payout`,
+                        type: 'DELIVERY_PRICE',
+                        entityType: 'DRIVER',
+                        direction: 'PAYABLE',
+                        amountType: input.driverRuleAmountType || 'PERCENT',
+                        amount: input.driverRuleAmount.toString(),
+                        promotionId: promo.id,
+                        isActive: true,
+                        notes: `Auto-created payout for free delivery promotion ${promo.id}`,
+                    });
+                }
+            }
+        } else {
+            // For other types, we always create a settlement rule where the platform owes 
+            // the driver the discount amount specified in the promotion.
+            const amountType = promo.type === 'PERCENTAGE' || promo.type === 'SPEND_X_PERCENT' ? 'PERCENT' : 'FIXED';
+            const amountValue = promo.discountValue || 0;
+
+            if (amountValue > 0) {
+                await this.settlementRuleRepository.createRule({
+                    name: `${promo.name} - Driver Subsidy`,
+                    type: 'ORDER_PRICE',
+                    entityType: 'DRIVER',
+                    direction: 'PAYABLE',
+                    amountType: amountType,
+                    amount: amountValue.toString(),
+                    promotionId: promo.id,
+                    isActive: true,
+                    notes: `Auto-created platform subsidy for promotion ${promo.id}`,
+                });
+            }
+        }
     }
 
     async getPromotion(id: string): Promise<DbPromotion> {
@@ -129,7 +263,9 @@ export class PromotionService {
         const updateObj: any = {};
         for (const [key, value] of Object.entries(updates)) {
             if (key === 'startsAt' || key === 'endsAt') {
-                updateObj[key] = value ? (typeof value === 'string' ? value : value.toISOString()) : null;
+                updateObj[key] = value 
+                    ? (typeof value === 'string' ? value : (value as any).toISOString()) 
+                    : null;
             } else {
                 updateObj[key] = value;
             }
@@ -151,7 +287,6 @@ export class PromotionService {
     }
 
     async setBusinessRestriction(promotionId: string, businessIds: string[]): Promise<void> {
-        const promo = await this.getPromotion(promotionId);
         await this.repository.setBusinessEligibility(promotionId, businessIds);
     }
 
@@ -200,7 +335,7 @@ export class PromotionService {
         // Check per-user usage limit
         if (promo.maxUsagePerUser) {
             const assignments = await this.repository.getUserAssignments(userId, false);
-            const promoUsage = assignments.find(a => a.promotionId === promo.id);
+            const promoUsage = assignments.find((a) => a.promotionId === promo.id);
             if (promoUsage && promoUsage.usageCount >= promo.maxUsagePerUser) {
                 return { valid: false, reason: 'You have already used this promotion' };
             }
@@ -209,7 +344,7 @@ export class PromotionService {
         // Check target eligibility
         if (promo.target === 'SPECIFIC_USERS') {
             const assignments = await this.repository.getUserAssignments(userId);
-            const hasAssignment = assignments.some(a => a.promotionId === promo.id && a.isActive);
+            const hasAssignment = assignments.some((a) => a.promotionId === promo.id && a.isActive);
             if (!hasAssignment) {
                 return { valid: false, reason: 'Promotion is not available for you' };
             }

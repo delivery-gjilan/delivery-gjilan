@@ -8,6 +8,7 @@ export const USERS_QUERY = graphql(`
       email
       firstName
       lastName
+      isDemoAccount
       role
       phoneNumber
       address
@@ -22,13 +23,14 @@ export const USERS_QUERY = graphql(`
   }
 `);
 
-export const DRIVERS_QUERY = gql`
+export const DRIVERS_QUERY = graphql(`
   query Drivers {
     drivers {
       id
       email
       firstName
       lastName
+      isDemoAccount
       role
       imageUrl
       phoneNumber
@@ -57,7 +59,7 @@ export const DRIVERS_QUERY = gql`
       }
     }
   }
-`;
+`);
 
 export const USER_BEHAVIOR_QUERY = graphql(`
   query UserBehavior($userId: ID!) {

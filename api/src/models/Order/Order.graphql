@@ -5,6 +5,7 @@ enum OrderStatus {
     OUT_FOR_DELIVERY
     DELIVERED
     CANCELLED
+    AWAITING_APPROVAL
 }
 
 enum OrderPaymentCollection {
@@ -20,6 +21,12 @@ enum PromotionAppliesTo {
 enum DriverCustomerNotificationKind {
     ETA_LT_3_MIN
     ARRIVED_WAITING
+}
+
+enum ApprovalReason {
+    FIRST_ORDER
+    HIGH_VALUE
+    OUT_OF_ZONE
 }
 
 type OrderBusiness {
@@ -42,7 +49,6 @@ type OrderItem {
     name: String!
     imageUrl: String
     quantity: Int!
-    basePrice: Float
     unitPrice: Float!
     notes: String
     selectedOptions: [OrderItemOption!]!
@@ -78,11 +84,13 @@ type Order {
     id: ID!
     displayId: String!
     userId: ID!
-    orderPrice: Float!
+    businessId: ID!
+    # Final prices
     deliveryPrice: Float!
-    originalPrice: Float
-    originalDeliveryPrice: Float
     totalPrice: Float!
+    # Legacy fields kept for backward compatibility (map to new columns)
+    orderPrice: Float!
+    originalPrice: Float
     orderDate: Date!
     updatedAt: Date!
     status: OrderStatus!
@@ -103,6 +111,9 @@ type Order {
     pickupLocations: [Location!]!
     driverNotes: String
     adminNote: String
+    needsApproval: Boolean!
+    locationFlagged: Boolean!
+    approvalReasons: [ApprovalReason!]
     businesses: [OrderBusiness!]!
     orderPromotions: [OrderPromotion!]
 }
@@ -124,6 +135,7 @@ type Mutation {
     cancelOrder(id: ID!): Order!
     adminCancelOrder(id: ID!, reason: String!, settleDriver: Boolean, settleBusiness: Boolean): Order!
     setOrderAdminNote(id: ID!, note: String): Order!
+    approveOrder(id: ID!): Order!
     createOrder(input: CreateOrderInput!): Order!
     createTestOrder: Order!
 }
@@ -157,10 +169,12 @@ input CreateOrderItemInput {
 input CreateOrderInput {
     items: [CreateOrderItemInput!]!
     dropOffLocation: LocationInput!
+    userContextLocation: LocationInput
     deliveryPrice: Float!
     totalPrice: Float!
     prioritySurcharge: Float
     paymentCollection: OrderPaymentCollection
-    promoCode: String
+    promotionId: ID
     driverNotes: String
 }
+

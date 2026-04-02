@@ -1,4 +1,4 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
 export const GET_BANNERS = gql`
   query GetBanners($filter: GetBannersFilter) {
@@ -35,10 +35,10 @@ export const GET_BANNERS = gql`
       updatedAt
     }
   }
-`;
+`);
 
-export const GET_BANNER = gql`
-  query GetBanner($id: ID!) {
+export const GET_BANNER = graphql(`
+  query Banner($id: ID!) {
     getBanner(id: $id) {
       id
       title
@@ -72,6 +72,7 @@ export const GET_BANNER = gql`
       updatedAt
     }
   }
+<<<<<<< HEAD
 `;
 
 export const GET_ACTIVE_BANNERS = gql`
@@ -94,3 +95,6 @@ export const GET_ACTIVE_BANNERS = gql`
   }
 `;
 
+=======
+`);
+>>>>>>> 6bb5c09ec698e8af07c0d7623e92c7760d7802b1

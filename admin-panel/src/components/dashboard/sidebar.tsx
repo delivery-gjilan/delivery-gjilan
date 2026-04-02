@@ -15,6 +15,7 @@ import {
   Users,
   UserCog,
   DollarSign,
+  Wallet,
   Activity,
   Bell,
   LayoutDashboard,
@@ -79,6 +80,7 @@ const sections: NavSection[] = [
     items: [
       { name: "Categories", href: "/dashboard/categories", icon: Tag, businessAdminVisible: true },
       { name: "Products", href: "/dashboard/products", icon: Package, businessAdminVisible: true },
+      { name: "Settlements", href: "/dashboard/business-settlements", icon: Wallet, businessAdminVisible: true },
       { name: "Banners", href: "/admin/banners", icon: Image, superAdminOnly: true },
       { name: "Notifications", href: "/dashboard/notifications", icon: Bell, superAdminOnly: true },
       { name: "Push Telemetry", href: "/dashboard/notifications/telemetry", icon: Activity, superAdminOnly: true },

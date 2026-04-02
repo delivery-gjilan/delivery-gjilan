@@ -17,6 +17,7 @@ export const deliveryZones: NonNullable<QueryResolvers['deliveryZones']> = async
         deliveryFee: row.deliveryFee,
         sortOrder: row.sortOrder,
         isActive: row.isActive,
+        isServiceZone: row.isServiceZone,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
     }));

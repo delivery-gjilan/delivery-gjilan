@@ -12,6 +12,7 @@ export const GET_DELIVERY_ZONES = graphql(`
             deliveryFee
             sortOrder
             isActive
+            isServiceZone
             createdAt
             updatedAt
         }
@@ -30,6 +31,7 @@ export const CREATE_DELIVERY_ZONE = graphql(`
             deliveryFee
             sortOrder
             isActive
+            isServiceZone
             createdAt
             updatedAt
         }
@@ -48,6 +50,7 @@ export const UPDATE_DELIVERY_ZONE = graphql(`
             deliveryFee
             sortOrder
             isActive
+            isServiceZone
             createdAt
             updatedAt
         }

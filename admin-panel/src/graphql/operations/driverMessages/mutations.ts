@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const SEND_DRIVER_MESSAGE = gql`
+export const SEND_DRIVER_MESSAGE = graphql(`
   mutation SendDriverMessage($driverId: ID!, $body: String!, $alertType: MessageAlertType!) {
     sendDriverMessage(driverId: $driverId, body: $body, alertType: $alertType) {
       id
@@ -13,10 +13,10 @@ export const SEND_DRIVER_MESSAGE = gql`
       createdAt
     }
   }
-`;
+`);
 
-export const MARK_DRIVER_MESSAGES_READ = gql`
+export const MARK_DRIVER_MESSAGES_READ = graphql(`
   mutation MarkDriverMessagesRead($otherUserId: ID!) {
     markDriverMessagesRead(otherUserId: $otherUserId)
   }
-`;
+`);

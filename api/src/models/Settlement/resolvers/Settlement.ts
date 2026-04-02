@@ -49,6 +49,19 @@ export const Settlement: SettlementResolvers = {
         return (settlement as any).isSettled ?? false;
     },
 
+    // Backward-compat: derive status from isSettled
+    status: (settlement) => {
+        return (settlement as any).isSettled ? 'PAID' : 'PENDING';
+    },
+
+    // Backward-compat: always return EUR
+    currency: () => 'EUR',
+
+    // Backward-compat: no longer stored in DB
+    paidAt: () => null,
+    paymentReference: () => null,
+    paymentMethod: () => null,
+
     settlementPayment: async (settlement, _, { db }) => {
         const paymentId = (settlement as any).settlementPaymentId;
         if (!paymentId) return null;
@@ -73,5 +86,4 @@ export const Settlement: SettlementResolvers = {
 
     createdAt: (settlement) => normalizeDateValue(settlement.createdAt),
     updatedAt: (settlement) => normalizeDateValue(settlement.updatedAt),
-    paidAt: (settlement) => normalizeDateValue(settlement.paidAt ?? null),
 } as any;

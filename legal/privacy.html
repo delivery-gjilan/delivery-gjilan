@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy – Zipp</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0a0a0a; color: #e5e7eb; line-height: 1.7; padding: 40px 20px; }
+    .container { max-width: 760px; margin: 0 auto; }
+    h1 { font-size: 2rem; font-weight: 800; color: #fff; margin-bottom: 6px; }
+    .meta { color: #6b7280; font-size: 0.9rem; margin-bottom: 40px; }
+    h2 { font-size: 1.2rem; font-weight: 700; color: #f9fafb; margin-top: 36px; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #1f2937; }
+    p { color: #d1d5db; margin-bottom: 12px; }
+    ul { color: #d1d5db; padding-left: 22px; margin-bottom: 12px; }
+    li { margin-bottom: 6px; }
+    a { color: #60a5fa; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 0.9rem; }
+    th { background: #1f2937; color: #f9fafb; padding: 10px 12px; text-align: left; font-weight: 600; }
+    td { border-top: 1px solid #1f2937; padding: 10px 12px; color: #d1d5db; vertical-align: top; }
+    .back { display: inline-block; color: #6b7280; font-size: 0.85rem; margin-bottom: 32px; text-decoration: none; }
+    .back:hover { color: #9ca3af; }
+    footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #1f2937; color: #6b7280; font-size: 0.85rem; }
+    .lang-toggle { display: flex; gap: 8px; margin-bottom: 28px; }
+    .lang-btn { padding: 6px 16px; border-radius: 8px; border: 1px solid #374151; background: transparent; color: #9ca3af; cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: all 0.15s; }
+    .lang-btn.active { background: #1f2937; color: #f9fafb; border-color: #4b5563; }
+    [data-lang] { display: none; }
+    [data-lang].visible { display: block; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a class="back" href="/">← Back</a>
+
+    <div class="lang-toggle">
+      <button class="lang-btn active" onclick="setLang('en')">EN</button>
+      <button class="lang-btn" onclick="setLang('al')">SQ</button>
+    </div>
+
+    <!-- ═══════════════════════════════ ENGLISH ═══════════════════════════════ -->
+    <div data-lang="en" class="visible">
+    <h1>Privacy Policy</h1>
+    <p class="meta">Effective date: April 1, 2026 &nbsp;·&nbsp; Last updated: April 1, 2026</p>
+
+    <p>
+      This Privacy Policy describes how <strong>Zipp</strong> ("we", "us", or "our") collects, uses,
+      and shares information about you when you use the Zipp platform — including the Zipp Go (customer),
+      Zipp Driver, Zipp Business, and Zipp Admin mobile applications, and any related services
+      (collectively, the "Service").
+    </p>
+    <p>
+      By using any part of the Service, you agree to the collection and use of information described
+      in this policy. If you do not agree, please stop using the Service.
+    </p>
+
+    <h2>1. Information We Collect</h2>
+    <p><strong>Account information</strong></p>
+    <ul>
+      <li>First name, last name</li>
+      <li>Email address</li>
+      <li>Phone number</li>
+      <li>Password (stored as a bcrypt hash — never in plain text)</li>
+      <li>User role (customer, driver, business owner, business employee, admin)</li>
+      <li>Preferred language</li>
+      <li>Referral code (if generated or redeemed)</li>
+    </ul>
+
+    <p><strong>Address and location information</strong></p>
+    <ul>
+      <li><em>Customers:</em> Saved delivery addresses (latitude, longitude, address label) you add to your account.</li>
+      <li><em>Drivers:</em> Precise GPS location collected in the foreground and background while you are active on a delivery. Location updates are throttled (minimum 5-metre movement, 10-second interval). Location data is used to display your position to customers and admins and to calculate delivery ETAs.</li>
+      <li><em>Admins:</em> Coarse device location used to center the map view.</li>
+    </ul>
+
+    <p><strong>Order and transaction information</strong></p>
+    <ul>
+      <li>Items ordered, quantities, applied options and variants</li>
+      <li>Order total, promotions applied, delivery fee</li>
+      <li>Payment method (cash on delivery or prepaid)</li>
+      <li>Delivery address, order timestamps, order status history</li>
+      <li>Driver notes (text you add to an order)</li>
+    </ul>
+
+    <p><strong>Device and technical information</strong></p>
+    <ul>
+      <li>Push notification tokens (FCM for Android, APNs for iOS) to send you order and delivery alerts</li>
+      <li>Live Activity tokens (iOS only) for real-time lock-screen order tracking</li>
+      <li>Device platform (iOS / Android) and app type</li>
+      <li>Battery level (drivers only) — used to detect and warn about low-battery during deliveries</li>
+      <li>App version and runtime channel</li>
+    </ul>
+
+    <p><strong>Camera and microphone</strong></p>
+    <ul>
+      <li><em>Drivers:</em> Camera access to photograph proof-of-delivery when required. Microphone access to receive push-to-talk voice dispatches from operations.</li>
+    </ul>
+
+    <p><strong>Usage and behavioral data</strong></p>
+    <ul>
+      <li>In-app navigation patterns, feature interactions, timestamps of key events (order placed, driver assigned, delivered)</li>
+      <li>Audit log entries for sensitive administrative actions (admin apps only)</li>
+    </ul>
+
+    <h2>2. How We Use Your Information</h2>
+    <table>
+      <thead><tr><th>Purpose</th><th>Data used</th></tr></thead>
+      <tbody>
+        <tr><td>Create and manage your account</td><td>Name, email, phone, password hash, role</td></tr>
+        <tr><td>Process and fulfill orders</td><td>Order details, delivery address, payment method</td></tr>
+        <tr><td>Match and dispatch drivers</td><td>Driver location, connection status, ETA</td></tr>
+        <tr><td>Send push notifications</td><td>Device tokens, order status</td></tr>
+        <tr><td>Display real-time order tracking (Live Activity)</td><td>Live Activity token, order status, driver ETA</td></tr>
+        <tr><td>Calculate delivery pricing</td><td>Customer address coordinates, business location, delivery zone rules</td></tr>
+        <tr><td>Apply promotions and process settlements</td><td>Order totals, promotion eligibility, driver/business settlement rules</td></tr>
+        <tr><td>Prevent fraud and enforce platform rules</td><td>Account data, order history, audit logs</td></tr>
+        <tr><td>Improve the Service</td><td>Aggregated and anonymized usage data</td></tr>
+        <tr><td>Comply with legal obligations</td><td>Any data required by applicable law</td></tr>
+      </tbody>
+    </table>
+
+    <h2>3. How We Share Your Information</h2>
+    <p>We do not sell your personal data. We share data only as follows:</p>
+    <ul>
+      <li><strong>With other users:</strong> Your name and real-time location (drivers only) are shared with customers and admins during an active delivery. Customers' first name and delivery address are shared with the assigned driver.</li>
+      <li><strong>With businesses:</strong> When you place an order, the business receives your name, order details, and any driver notes.</li>
+      <li><strong>With third-party service providers</strong> who process data on our behalf:</li>
+    </ul>
+    <table>
+      <thead><tr><th>Provider</th><th>Purpose</th><th>Data shared</th></tr></thead>
+      <tbody>
+        <tr><td>Google Firebase (FCM)</td><td>Push notifications (Android &amp; iOS)</td><td>Device tokens, notification payload</td></tr>
+        <tr><td>Apple APNs</td><td>Push notifications &amp; Live Activities (iOS)</td><td>Device tokens, Live Activity payload</td></tr>
+        <tr><td>Mapbox</td><td>Maps, routing, delivery ETA</td><td>Driver coordinates during active delivery</td></tr>
+        <tr><td>Expo / EAS</td><td>App build, distribution, and over-the-air updates</td><td>No personal data; app binary only</td></tr>
+        <tr><td>Amazon S3 (or compatible)</td><td>Storage of business assets (product images, banners)</td><td>Uploaded files; no personal data</td></tr>
+      </tbody>
+    </table>
+    <ul>
+      <li><strong>Legal requirements:</strong> We may disclose information if required by law, court order, or to protect the rights and safety of our users or the public.</li>
+      <li><strong>Business transfers:</strong> In the event of a merger, acquisition, or sale of assets, your data may be transferred to the successor entity.</li>
+    </ul>
+
+    <h2>4. Data Retention</h2>
+    <ul>
+      <li>Active account data is retained for as long as your account exists.</li>
+      <li>If you delete your account, your personal information (name, phone number, address, referral code) is immediately anonymized, your push notification tokens are deleted, and your saved addresses are deleted. Your email address is replaced with an irreversible placeholder. Order records are retained in anonymized form for accounting and legal compliance purposes.</li>
+      <li>Refresh token sessions expire after 30 days and are automatically purged.</li>
+      <li>Audit logs are retained for operational and fraud prevention purposes.</li>
+    </ul>
+
+    <h2>5. Your Rights</h2>
+    <p>Depending on your location, you may have the following rights regarding your personal data:</p>
+    <ul>
+      <li><strong>Access:</strong> Request a copy of the personal data we hold about you.</li>
+      <li><strong>Correction:</strong> Ask us to correct inaccurate or incomplete data.</li>
+      <li><strong>Deletion:</strong> Request deletion of your account and personal data. You can also do this directly in the app (Profile → Delete Account). Deletion is immediate and irreversible.</li>
+      <li><strong>Portability:</strong> Request your data in a structured, machine-readable format.</li>
+      <li><strong>Objection / Restriction:</strong> Object to or request restriction of certain processing activities.</li>
+    </ul>
+    <p>To exercise any of these rights, contact us at <a href="mailto:privacy@zippdelivery.com">privacy@zippdelivery.com</a>.</p>
+
+    <h2>6. Location Data</h2>
+    <p>
+      The Zipp Driver app requires background location access to track delivery progress and calculate
+      real-time ETAs. Location collection begins when you start a delivery and stops when the delivery
+      is completed or you go offline. You can revoke location permissions at any time in your device
+      settings; doing so will prevent you from completing deliveries.
+    </p>
+    <p>Customer and Admin apps use location only in the foreground, to set a delivery address or center a map.</p>
+
+    <h2>7. Children's Privacy</h2>
+    <p>
+      The Service is not directed to children under the age of 13. We do not knowingly collect personal
+      information from children. If you believe we have collected data from a child, contact us immediately
+      and we will delete it.
+    </p>
+
+    <h2>8. Security</h2>
+    <p>
+      We protect your data using industry-standard measures: passwords are hashed with bcrypt, tokens
+      are signed with HS256 and stored as SHA-256 hashes, and all data is transmitted over HTTPS/WSS.
+      No method of transmission over the internet is 100% secure, and we cannot guarantee absolute security.
+    </p>
+
+    <h2>9. Changes to This Policy</h2>
+    <p>
+      We may update this policy from time to time. The "Last updated" date at the top will reflect any
+      changes. For material changes, we will notify you through the app or by email.
+      Continued use of the Service after changes constitutes your acceptance of the updated policy.
+    </p>
+
+    <h2>10. Contact Us</h2>
+    <p>
+      If you have questions about this Privacy Policy, contact us at:<br />
+      <a href="mailto:privacy@zippdelivery.com">privacy@zippdelivery.com</a>
+    </p>
+    </div><!-- /en -->
+
+    <!-- ═══════════════════════════════ ALBANIAN ══════════════════════════════ -->
+    <div data-lang="al">
+    <h1>Politika e Privatësisë</h1>
+    <p class="meta">Data e hyrjes në fuqi: 1 Prill 2026 &nbsp;·&nbsp; Përditësuar: 1 Prill 2026</p>
+
+    <p>
+      Kjo Politikë e Privatësisë përshkruan se si <strong>Zipp</strong> ("ne", "nesh") mbledh, përdor
+      dhe ndan informacionin tuaj kur përdorni platformën Zipp — përfshirë aplikacionet Zipp Go (klient),
+      Zipp Driver, Zipp Business dhe Zipp Admin, si dhe çdo shërbim të lidhur me to (kolektivisht, "Shërbimi").
+    </p>
+    <p>
+      Duke përdorur çdo pjesë të Shërbimit, ju pranoni mbledhjen dhe përdorimin e informacionit të
+      përshkruar në këtë politikë. Nëse nuk jeni dakord, ju lutemi ndaloni përdorimin e Shërbimit.
+    </p>
+
+    <h2>1. Informacioni që Mbledhim</h2>
+    <p><strong>Informacioni i llogarisë</strong></p>
+    <ul>
+      <li>Emri dhe mbiemri</li>
+      <li>Adresa e emailit</li>
+      <li>Numri i telefonit</li>
+      <li>Fjalëkalimi (ruhet si hash bcrypt — kurrë në tekst të qartë)</li>
+      <li>Roli i përdoruesit (klient, shofer, pronar biznesi, punonjës biznesi, administrator)</li>
+      <li>Gjuha e preferuar</li>
+      <li>Kodi i referimit (nëse është gjeneruar ose përdorur)</li>
+    </ul>
+
+    <p><strong>Informacioni i adresës dhe vendndodhjes</strong></p>
+    <ul>
+      <li><em>Klientët:</em> Adresat e ruajtura të dorëzimit (gjerësi gjeografike, gjatësi gjeografike, etiketë adrese) që i shtoni në llogarinë tuaj.</li>
+      <li><em>Shoferët:</em> Vendndodhja e saktë GPS e mbledhur në plan të parë dhe në sfond gjatë kohës që jeni aktiv në një dorëzim. Përditësimet e vendndodhjes kufizohen (lëvizje minimale 5 metra, intervali 10 sekonda). Të dhënat e vendndodhjes përdoren për të shfaqur pozicionin tuaj tek klientët dhe administratorët dhe për të llogaritur kohën e mbëritjes.</li>
+      <li><em>Administratorët:</em> Vendndodhja e përafërt e pajisjes për të centruar pamjen e hartës.</li>
+    </ul>
+
+    <p><strong>Informacioni i porosisë dhe transaksioneve</strong></p>
+    <ul>
+      <li>Artikujt e porositur, sasitë, opsionet dhe variantet e zgjedhura</li>
+      <li>Totali i porosisë, promovimet e aplikuara, tarifa e dorëzimit</li>
+      <li>Metoda e pagesës (para në dorë ose parapagim)</li>
+      <li>Adresa e dorëzimit, vulosjet kohore të porosisë, historia e statusit të porosisë</li>
+      <li>Shënimet e shoferit (tekst që shtoni në një porosi)</li>
+    </ul>
+
+    <p><strong>Informacioni i pajisjes dhe teknik</strong></p>
+    <ul>
+      <li>Tokenat e njoftimeve push (FCM për Android, APNs për iOS) për t'ju dërguar alarme për porositë dhe dorëzimet</li>
+      <li>Tokenat Live Activity (vetëm iOS) për gjurmim në kohë reale të porosisë në ekranin e kyçjes</li>
+      <li>Platforma e pajisjes (iOS / Android) dhe lloji i aplikacionit</li>
+      <li>Niveli i baterisë (vetëm shoferët) — për të zbuluar dhe paralajmëruar për bateri të ulët gjatë dorëzimeve</li>
+      <li>Versioni i aplikacionit dhe kanali i ekzekutimit</li>
+    </ul>
+
+    <p><strong>Kamera dhe mikrofoni</strong></p>
+    <ul>
+      <li><em>Shoferët:</em> Aksesi i kamerës për të fotografuar provën e dorëzimit kur kërkohet. Aksesi i mikrofonit për të marrë dispantime zanore push-to-talk nga operacionet.</li>
+    </ul>
+
+    <p><strong>Të dhënat e përdorimit dhe sjelljes</strong></p>
+    <ul>
+      <li>Modelet e navigimit brenda aplikacionit, ndërveprimet me funksione, vulosjet kohore të ngjarjeve kryesore (porosi e vendosur, shofer i caktuar, dorëzuar)</li>
+      <li>Hyrjet e regjistrit të auditimit për veprime administrative të ndjeshme (vetëm aplikacionet e administratorit)</li>
+    </ul>
+
+    <h2>2. Si i Përdorim të Dhënat Tuaja</h2>
+    <table>
+      <thead><tr><th>Qëllimi</th><th>Të dhënat e përdorura</th></tr></thead>
+      <tbody>
+        <tr><td>Krijimi dhe menaxhimi i llogarisë tuaj</td><td>Emri, emaili, telefoni, hash-i i fjalëkalimit, roli</td></tr>
+        <tr><td>Përpunimi dhe ekzekutimi i porosive</td><td>Detajet e porosisë, adresa e dorëzimit, metoda e pagesës</td></tr>
+        <tr><td>Lidhja dhe dërgimi i shoferëve</td><td>Vendndodhja e shoferit, statusi i lidhjes, koha e mbëritjes</td></tr>
+        <tr><td>Dërgimi i njoftimeve push</td><td>Tokenat e pajisjes, statusi i porosisë</td></tr>
+        <tr><td>Shfaqja e gjurmimit të porosisë në kohë reale (Live Activity)</td><td>Tokeni Live Activity, statusi i porosisë, koha e mbëritjes së shoferit</td></tr>
+        <tr><td>Llogaritja e çmimit të dorëzimit</td><td>Koordinatat e adresës së klientit, vendndodhja e biznesit, rregullat e zonës së dorëzimit</td></tr>
+        <tr><td>Aplikimi i promovimeve dhe përpunimi i shlyerjeve</td><td>Totalet e porosive, kualifikimi për promovime, rregullat e shlyerjes</td></tr>
+        <tr><td>Parandalimi i mashtrimit dhe zbatimi i rregullave të platformës</td><td>Të dhënat e llogarisë, historia e porosive, regjistrat e auditimit</td></tr>
+        <tr><td>Përmirësimi i Shërbimit</td><td>Të dhëna të grumbulluara dhe anonimizuara të përdorimit</td></tr>
+        <tr><td>Pajtueshmëria me detyrimet ligjore</td><td>Çdo të dhënë e kërkuar nga ligji i zbatueshëm</td></tr>
+      </tbody>
+    </table>
+
+    <h2>3. Si i Ndajmë të Dhënat Tuaja</h2>
+    <p>Ne nuk i shesim të dhënat tuaja personale. I ndajmë të dhënat vetëm si më poshtë:</p>
+    <ul>
+      <li><strong>Me përdoruesit e tjerë:</strong> Emri juaj dhe vendndodhja në kohë reale (vetëm shoferët) ndahen me klientët dhe administratorët gjatë një dorëzimi aktiv. Emri i klientit dhe adresa e dorëzimit ndahen me shoferrin e caktuar.</li>
+      <li><strong>Me bizneset:</strong> Kur vendosni një porosi, biznesi merr emrin tuaj, detajet e porosisë dhe çdo shënim të shoferit.</li>
+      <li><strong>Me ofruesit e shërbimeve të palëve të treta</strong> që përpunojnë të dhëna në emrin tonë:</li>
+    </ul>
+    <table>
+      <thead><tr><th>Ofruesi</th><th>Qëllimi</th><th>Të dhënat e ndara</th></tr></thead>
+      <tbody>
+        <tr><td>Google Firebase (FCM)</td><td>Njoftime push (Android dhe iOS)</td><td>Tokenat e pajisjes, ngarkesa e njoftimit</td></tr>
+        <tr><td>Apple APNs</td><td>Njoftime push dhe Live Activities (iOS)</td><td>Tokenat e pajisjes, ngarkesa Live Activity</td></tr>
+        <tr><td>Mapbox</td><td>Harta, rrugëtimi, koha e mbëritjes</td><td>Koordinatat e shoferit gjatë dorëzimit aktiv</td></tr>
+        <tr><td>Expo / EAS</td><td>Ndërtimi, shpërndarja dhe përditësimet e aplikacionit</td><td>Asnjë të dhënë personale; vetëm binar i aplikacionit</td></tr>
+        <tr><td>Amazon S3 (ose kompatibël)</td><td>Ruajtja e aseteve të biznesit (imazhe produktesh, banera)</td><td>Skedarë të ngarkuar; asnjë të dhënë personale</td></tr>
+      </tbody>
+    </table>
+    <ul>
+      <li><strong>Kërkesat ligjore:</strong> Mund të zbulojmë informacion nëse kërkohet me ligj, urdhër gjykate, ose për të mbrojtur të drejtat dhe sigurinë e përdoruesve tanë ose publikut.</li>
+      <li><strong>Transferimet e biznesit:</strong> Në rast të një bashkimi, blerje ose shitjeje asetesh, të dhënat tuaja mund t'i transferohen njësisë pasardhëse.</li>
+    </ul>
+
+    <h2>4. Ruajtja e të Dhënave</h2>
+    <ul>
+      <li>Të dhënat e llogarisë aktive ruhen për aq kohë sa ekziston llogaria juaj.</li>
+      <li>Nëse fshini llogarinë tuaj, informacioni juaj personal (emri, numri i telefonit, adresa, kodi i referimit) anonimizоhet menjëherë, tokenat e njoftimeve push fshihen dhe adresat e ruajtura hiqen përgjithmonë. Adresa juaj e emailit zëvendësohet me një zëvendësues të pakthyeshëm. Të dhënat e porosisë ruhen në formë anonime për qëllime kontabiliteti dhe pajtueshmërie ligjore.</li>
+      <li>Sesionet e token-ave të rifreskimit skadojnë pas 30 ditësh dhe pastrohen automatikisht.</li>
+      <li>Regjistrat e auditimit ruhen për qëllime operative dhe parandalimi të mashtrimit.</li>
+    </ul>
+
+    <h2>5. Të Drejtat Tuaja</h2>
+    <p>Në varësi të vendndodhjes suaj, mund të keni të drejtat e mëposhtme lidhur me të dhënat tuaja personale:</p>
+    <ul>
+      <li><strong>Aksesi:</strong> Kërkoni një kopje të të dhënave personale që mbajmë për ju.</li>
+      <li><strong>Korrigjimi:</strong> Kërkoni nga ne të korrigjojmë të dhëna të pasakta ose të paplota.</li>
+      <li><strong>Fshirja:</strong> Kërkoni fshirjen e llogarisë dhe të dhënave personale. Mund ta bëni këtë drejtpërdrejt në aplikacion (Profili → Fshi Llogarinë). Fshirja është e menjëhershme dhe e pakthyeshme.</li>
+      <li><strong>Portabilitetit:</strong> Kërkoni të dhënat tuaja në një format të strukturuar dhe të lexueshëm nga makinat.</li>
+      <li><strong>Kundërshtimi / Kufizimi:</strong> Kundërshtoni ose kërkoni kufizimin e aktiviteteve të caktuara të përpunimit.</li>
+    </ul>
+    <p>Për të ushtruar cilëndo nga këto të drejta, na kontaktoni në <a href="mailto:privacy@zippdelivery.com">privacy@zippdelivery.com</a>.</p>
+
+    <h2>6. Të Dhënat e Vendndodhjes</h2>
+    <p>
+      Aplikacioni Zipp Driver kërkon akses të vendndodhjes në sfond për të gjurmuar progresin e dorëzimit dhe
+      për të llogaritur kohën e mbëritjes në kohë reale. Mbledhja e vendndodhjes fillon kur filloni një dorëzim
+      dhe ndalon kur dorëzimi përfundon ose shkoni jashtë linje. Mund të revokoni lejet e vendndodhjes në çdo
+      kohë në cilësimet e pajisjes suaj; kjo do të parandalojë përfundimin e dorëzimeve.
+    </p>
+    <p>Aplikacionet e Klientit dhe Administratorit përdorin vendndodhjen vetëm në plan të parë, për të vendosur një adresë dorëzimi ose për të centruar një hartë.</p>
+
+    <h2>7. Privatësia e Fëmijëve</h2>
+    <p>
+      Shërbimi nuk drejtohet tek fëmijët nën moshën 13 vjeç. Ne nuk mbledhim me dije informacion personal
+      nga fëmijët. Nëse besoni se kemi mbledhur të dhëna nga një fëmijë, na kontaktoni menjëherë dhe do t'i fshijmë.
+    </p>
+
+    <h2>8. Siguria</h2>
+    <p>
+      I mbrojmë të dhënat tuaja duke përdorur masa të standardeve të industrisë: fjalëkalimet janë hashuar me bcrypt,
+      token-at nënshkruhen me HS256 dhe ruhen si hash-e SHA-256, dhe të gjitha të dhënat transmetohen përmes HTTPS/WSS.
+      Asnjë metodë transmetimi mbi internet nuk është 100% e sigurt dhe ne nuk mund të garantojmë siguri absolute.
+    </p>
+
+    <h2>9. Ndryshimet në këtë Politikë</h2>
+    <p>
+      Mund ta përditësojmë këtë politikë herë pas here. Data "Përditësuar" në krye do të pasqyrojë çdo ndryshim.
+      Për ndryshime materiale, do t'ju njoftojmë përmes aplikacionit ose me email.
+      Vazhdimi i përdorimit të Shërbimit pas ndryshimeve përbën pranimin tuaj të politikës së përditësuar.
+    </p>
+
+    <h2>10. Na Kontaktoni</h2>
+    <p>
+      Nëse keni pyetje rreth kësaj Politike të Privatësisë, na kontaktoni në:<br />
+      <a href="mailto:privacy@zippdelivery.com">privacy@zippdelivery.com</a>
+    </p>
+    </div><!-- /al -->
+
+    <footer>
+      &copy; 2026 Zipp. &nbsp;·&nbsp; <a href="/privacy">Privacy Policy</a> &nbsp;·&nbsp; <a href="/terms">Terms of Service</a>
+    </footer>
+  </div>
+
+  <script>
+    function setLang(lang) {
+      document.querySelectorAll('[data-lang]').forEach(el => el.classList.remove('visible'));
+      document.querySelector('[data-lang="' + lang + '"]').classList.add('visible');
+      document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+      localStorage.setItem('zipp-lang', lang);
+    }
+    (function() {
+      var saved = localStorage.getItem('zipp-lang');
+      if (saved && saved !== 'en') setLang(saved);
+    })();
+  </script>
+</body>
+</html>
+
+    <p>
+      This Privacy Policy describes how <strong>Zipp</strong> ("we", "us", or "our") collects, uses,
+      and shares information about you when you use the Zipp platform — including the Zipp Go (customer),
+      Zipp Driver, Zipp Business, and Zipp Admin mobile applications, and any related services
+      (collectively, the "Service").
+    </p>
+    <p>
+      By using any part of the Service, you agree to the collection and use of information described
+      in this policy. If you do not agree, please stop using the Service.
+    </p>
+
+    <h2>1. Information We Collect</h2>
+
+    <p><strong>Account information</strong></p>
+    <ul>
+      <li>First name, last name</li>
+      <li>Email address</li>
+      <li>Phone number</li>
+      <li>Password (stored as a bcrypt hash — never in plain text)</li>
+      <li>User role (customer, driver, business owner, business employee, admin)</li>
+      <li>Preferred language</li>
+      <li>Referral code (if generated or redeemed)</li>
+    </ul>
+
+    <p><strong>Address and location information</strong></p>
+    <ul>
+      <li><em>Customers:</em> Saved delivery addresses (latitude, longitude, address label) you add to your account.</li>
+      <li><em>Drivers:</em> Precise GPS location collected in the foreground and background while you are active on a delivery. Location updates are throttled (minimum 5-metre movement, 10-second interval). Location data is used to display your position to customers and admins and to calculate delivery ETAs.</li>
+      <li><em>Admins:</em> Coarse device location used to center the map view.</li>
+    </ul>
+
+    <p><strong>Order and transaction information</strong></p>
+    <ul>
+      <li>Items ordered, quantities, applied options and variants</li>
+      <li>Order total, promotions applied, delivery fee</li>
+      <li>Payment method (cash on delivery or prepaid)</li>
+      <li>Delivery address, order timestamps, order status history</li>
+      <li>Driver notes (text you add to an order)</li>
+    </ul>
+
+    <p><strong>Device and technical information</strong></p>
+    <ul>
+      <li>Push notification tokens (FCM for Android, APNs for iOS) to send you order and delivery alerts</li>
+      <li>Live Activity tokens (iOS only) for real-time lock-screen order tracking</li>
+      <li>Device platform (iOS / Android) and app type</li>
+      <li>Battery level (drivers only) — used to detect and warn about low-battery during deliveries</li>
+      <li>App version and runtime channel</li>
+    </ul>
+
+    <p><strong>Camera and microphone</strong></p>
+    <ul>
+      <li><em>Drivers:</em> Camera access to photograph proof-of-delivery when required. Microphone access to receive push-to-talk voice dispatches from operations.</li>
+    </ul>
+
+    <p><strong>Usage and behavioral data</strong></p>
+    <ul>
+      <li>In-app navigation patterns, feature interactions, timestamps of key events (order placed, driver assigned, delivered)</li>
+      <li>Audit log entries for sensitive administrative actions (admin apps only)</li>
+    </ul>
+
+    <h2>2. How We Use Your Information</h2>
+
+    <table>
+      <thead>
+        <tr><th>Purpose</th><th>Data used</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Create and manage your account</td><td>Name, email, phone, password hash, role</td></tr>
+        <tr><td>Process and fulfill orders</td><td>Order details, delivery address, payment method</td></tr>
+        <tr><td>Match and dispatch drivers</td><td>Driver location, connection status, ETA</td></tr>
+        <tr><td>Send push notifications</td><td>Device tokens, order status</td></tr>
+        <tr><td>Display real-time order tracking (Live Activity)</td><td>Live Activity token, order status, driver ETA</td></tr>
+        <tr><td>Calculate delivery pricing</td><td>Customer address coordinates, business location, delivery zone rules</td></tr>
+        <tr><td>Apply promotions and process settlements</td><td>Order totals, promotion eligibility, driver/business settlement rules</td></tr>
+        <tr><td>Prevent fraud and enforce platform rules</td><td>Account data, order history, audit logs</td></tr>
+        <tr><td>Improve the Service</td><td>Aggregated and anonymized usage data</td></tr>
+        <tr><td>Comply with legal obligations</td><td>Any data required by applicable law</td></tr>
+      </tbody>
+    </table>
+
+    <h2>3. How We Share Your Information</h2>
+
+    <p>We do not sell your personal data. We share data only as follows:</p>
+    <ul>
+      <li><strong>With other users:</strong> Your name and real-time location (drivers only) are shared with customers and admins during an active delivery. Customers' first name and delivery address are shared with the assigned driver.</li>
+      <li><strong>With businesses:</strong> When you place an order, the business receives your name, order details, and any driver notes.</li>
+      <li><strong>With third-party service providers</strong> who process data on our behalf:</li>
+    </ul>
+
+    <table>
+      <thead>
+        <tr><th>Provider</th><th>Purpose</th><th>Data shared</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Google Firebase (FCM)</td><td>Push notifications (Android &amp; iOS)</td><td>Device tokens, notification payload</td></tr>
+        <tr><td>Apple APNs</td><td>Push notifications &amp; Live Activities (iOS)</td><td>Device tokens, Live Activity payload</td></tr>
+        <tr><td>Mapbox</td><td>Maps, routing, delivery ETA</td><td>Driver coordinates during active delivery</td></tr>
+        <tr><td>Expo / EAS</td><td>App build, distribution, and over-the-air updates</td><td>No personal data; app binary only</td></tr>
+        <tr><td>Amazon S3 (or compatible)</td><td>Upload and storage of business assets (product images, banners)</td><td>Uploaded files; no personal data</td></tr>
+      </tbody>
+    </table>
+
+    <ul>
+      <li><strong>Legal requirements:</strong> We may disclose information if required by law, court order, or to protect the rights and safety of our users or the public.</li>
+      <li><strong>Business transfers:</strong> In the event of a merger, acquisition, or sale of assets, your data may be transferred to the successor entity.</li>
+    </ul>
+
+    <h2>4. Data Retention</h2>
+    <ul>
+      <li>Active account data is retained for as long as your account exists.</li>
+      <li>If you delete your account, your personal information (name, phone number, address, referral code) is immediately anonymized, your push notification tokens are deleted, and your saved addresses are deleted. Your email address is replaced with an irreversible placeholder. Order records are retained in anonymized form for accounting and legal compliance purposes.</li>
+      <li>Refresh token sessions expire after 30 days and are automatically purged.</li>
+      <li>Audit logs are retained for operational and fraud prevention purposes.</li>
+    </ul>
+
+    <h2>5. Your Rights</h2>
+    <p>Depending on your location, you may have the following rights regarding your personal data:</p>
+    <ul>
+      <li><strong>Access:</strong> Request a copy of the personal data we hold about you.</li>
+      <li><strong>Correction:</strong> Ask us to correct inaccurate or incomplete data.</li>
+      <li><strong>Deletion:</strong> Request deletion of your account and personal data. You can also do this directly in the app (Profile → Delete Account). Deletion is immediate and irreversible.</li>
+      <li><strong>Portability:</strong> Request your data in a structured, machine-readable format.</li>
+      <li><strong>Objection / Restriction:</strong> Object to or request restriction of certain processing activities.</li>
+    </ul>
+    <p>To exercise any of these rights, contact us at <a href="mailto:privacy@zippdelivery.com">privacy@zippdelivery.com</a>.</p>
+
+    <h2>6. Location Data</h2>
+    <p>
+      The Zipp Driver app requires background location access to track delivery progress and calculate
+      real-time ETAs. Location collection begins when you start a delivery and stops when the delivery
+      is completed or you go offline. You can revoke location permissions at any time in your device
+      settings; doing so will prevent you from completing deliveries.
+    </p>
+    <p>
+      Customer and Admin apps use location only in the foreground, to set a delivery address or center a map.
+    </p>
+
+    <h2>7. Children's Privacy</h2>
+    <p>
+      The Service is not directed to children under the age of 13 (or the applicable minimum age in your
+      jurisdiction). We do not knowingly collect personal information from children. If you believe we
+      have collected data from a child, contact us immediately and we will delete it.
+    </p>
+
+    <h2>8. Security</h2>
+    <p>
+      We protect your data using industry-standard measures: passwords are hashed with bcrypt, tokens
+      are signed with HS256 and stored as SHA-256 hashes, and all data is transmitted over HTTPS/WSS.
+      No method of transmission over the internet is 100% secure, and we cannot guarantee absolute security.
+    </p>
+
+    <h2>9. Changes to This Policy</h2>
+    <p>
+      We may update this policy from time to time. The "Last updated" date at the top will reflect any
+      changes. For material changes, we will notify you through the app or by email.
+      Continued use of the Service after changes constitutes your acceptance of the updated policy.
+    </p>
+
+    <h2>10. Contact Us</h2>
+    <p>
+      If you have questions about this Privacy Policy or how we handle your data, contact us at:<br />
+      <a href="mailto:privacy@zippdelivery.com">privacy@zippdelivery.com</a>
+    </p>
+
+    <footer>
+      &copy; 2026 Zipp. &nbsp;·&nbsp; <a href="/privacy">Privacy Policy</a> &nbsp;·&nbsp; <a href="/terms">Terms of Service</a>
+    </footer>
+  </div>
+</body>
+</html>

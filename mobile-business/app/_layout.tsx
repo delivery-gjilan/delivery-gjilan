@@ -1,7 +1,7 @@
 import '../global.css';
 import { useEffect, useRef, useState } from 'react';
 import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
-import { ApolloProvider, useQuery, useSubscription } from '@apollo/client/react';
+import { ApolloProvider, useSubscription } from '@apollo/client/react';
 import { apolloClient } from '@/lib/apollo';
 import { useAuthStore } from '@/store/authStore';
 import { useLocaleStore } from '@/store/useLocaleStore';
@@ -10,12 +10,9 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { useBusinessDeviceMonitoring } from '@/hooks/useBusinessDeviceMonitoring';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator } from 'react-native';
-import InfoBanner from '@/components/InfoBanner';
-import type { InfoBannerType } from '@/components/InfoBanner';
 import BusinessMessageBanner from '@/components/BusinessMessageBanner';
 import type { AlertType } from '@/components/BusinessMessageBanner';
 import StoreClosedOverlay from '@/components/StoreClosedOverlay';
-import { GET_STORE_STATUS } from '@/graphql/store';
 import { BUSINESS_MESSAGE_RECEIVED_SUB } from '@/graphql/messages';
 
 function AppContent() {
@@ -24,7 +21,6 @@ function AppContent() {
     const rootNavigationState = useRootNavigationState();
     const { isAuthenticated, hasHydrated, authInitComplete } = useAuthStore();
     const loadTranslation = useLocaleStore((state) => state.loadTranslation);
-    const [bannerDismissed, setBannerDismissed] = useState(false);
     const [incomingMessage, setIncomingMessage] = useState<{
         id: string; body: string; alertType: AlertType; adminId: string;
     } | null>(null);
@@ -33,12 +29,6 @@ function AppContent() {
     useEffect(() => {
         isMounted.current = true;
     }, []);
-
-    const { data: storeData } = useQuery(GET_STORE_STATUS, { pollInterval: 30_000 });
-    const bannerEnabled = storeData?.getStoreStatus?.bannerEnabled ?? false;
-    const bannerMessage = storeData?.getStoreStatus?.bannerMessage ?? null;
-    const bannerType = (storeData?.getStoreStatus?.bannerType as InfoBannerType) ?? 'INFO';
-    const showBanner = bannerEnabled && !!bannerMessage && !bannerDismissed;
 
     // Subscribe to business messages globally so banner shows even outside messages tab
     useSubscription(BUSINESS_MESSAGE_RECEIVED_SUB, {
@@ -91,13 +81,6 @@ function AppContent() {
     return (
         <>
             <StatusBar style="light" />
-            {showBanner && (
-                <InfoBanner
-                    message={bannerMessage}
-                    type={bannerType}
-                    onDismiss={() => setBannerDismissed(true)}
-                />
-            )}
             {incomingMessage && (
                 <BusinessMessageBanner
                     senderName="Admin"

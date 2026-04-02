@@ -35,6 +35,22 @@ Scope reviewed:
    - `driverNotes`
 2. Delivery fee is calculated from backend endpoint before placing order.
 3. Promo validation is performed from mobile and then revalidated server-side.
+4. Selected checkout address is validated against active delivery zones when zones are configured; out-of-zone addresses are blocked in cart flow with user-facing prompt.
+5. Address-selection maps (cart address picker and out-of-zone sheet picker) visually de-emphasize outside area with a zone mask and outline the effective delivery zones.
+6. Checkout confirm button stays disabled for out-of-zone selected addresses and only unlocks for in-zone addresses.
+7. Home out-of-zone prompt is app-init only and session-suppressed after any active order has existed in the current app session.
+8. Address-picker `Confirm Address` remains disabled until the centered pin is inside effective delivery zones, and cart picker selections are persisted in delivery-location state with `isOverridden=true` for both saved-address and newly picked map points.
+9. Delivery-fee zone checks reconcile local polygon validation with backend zone response and ignore stale async responses, so prior checks cannot incorrectly keep a newly selected in-zone address in an out-of-zone state.
+10. Cart address picker now resolves pin coordinates from map camera center on region settle (with payload fallback), and zone polygon checks treat boundary points as inside to avoid false out-of-zone locks near edges.
+11. Cart checkout hydrates selected address from persisted delivery-location state before default saved-address fallback, so user-overridden pin coordinates remain the starting point when reopening cart/address picker.
+12. Map-picker confirm actions (cart picker and out-of-zone sheet picker) stay disabled until reverse geocoding resolves the current centered pin location, preventing stale/previous address confirmations.
+13. Cart picker geocoding starts only from region-settle flow (not touch-release) with settle debounce, and confirm button text switches to `Finding address...` until current-pin reverse geocoding resolves.
+14. Out-of-zone sheet map picker mirrors the same settle-token geocoding model (map-center coordinates, debounce, abort stale runs), so reverse geocoding starts only after movement fully settles.
+15. Both map pickers enforce an explicit map-motion lock (`isMapInMotion`) so confirm actions remain disabled through drag release and momentum/hover phases until settle + current-pin geocode completion.
+16. Out-of-zone picker confirm additionally requires the centered pin to be inside effective delivery zones and requires geocoded coordinates to match the current pin coordinate before enabling.
+17. Both map pickers also enforce an active touch-hold lock (`isTouchingMap`), so confirm remains disabled while finger is down and only becomes eligible after finger release plus full settle and current-pin geocode completion.
+18. Touch-responder lock was removed from confirm gating due inconsistent native responder delivery in map views; confirm eligibility now relies on stable motion-state (`isMapInMotion`) plus current-pin geocode-complete and in-zone checks, which remain the source of truth.
+19. To avoid sticky disable states on certain devices, confirm gating no longer blocks directly on `isMapInMotion`; eligibility is driven by reverse-geocoding completion + current-pin geocode coordinate match + in-zone validation.
 
 ## Confirmed Gaps
 

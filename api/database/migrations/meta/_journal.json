@@ -5,15 +5,22 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1774558476421,
-      "tag": "0000_boring_callisto",
+      "when": 1774922981603,
+      "tag": "0000_tranquil_alex_wilder",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1774657068022,
-      "tag": "0001_powerful_mac_gargan",
+      "when": 1774991411350,
+      "tag": "0001_add-priority-surcharge-to-orders",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775080000000,
+      "tag": "0002_add-is-demo-account-to-users",
       "breakpoints": true
     }
   ]

@@ -5,21 +5,59 @@
 
 ---
 
+## ✅ Completed / ⏭️ Skipped / ❌ Remaining
+
+| Phase | Status | Notes |
+|-------|--------|-------|
+| Phase 1 — Legal pages & in-app links | ✅ Done | `legal/` folder created, hosted on Vercel. Links in all 4 apps. |
+| Phase 2 — Account deletion compliance | ✅ Done | Backend PII anonymization fixed. Delete button added to Driver + Business. |
+| Phase 3 — Debug/dead UI cleanup | ✅ Done | Dead-end buttons hidden, Contact Support → `mailto:`, debug screen removed. |
+| Phase 4 — app.json / eas.json config fixes | ✅ Done | `appleTeamId`, `ITSAppUsesNonExemptEncryption`, `runtimeVersion`, permissions deduped, EAS submit configs populated. |
+| Phase 5 — Production API infrastructure | ⏭️ Skipped | Still on ngrok for now. **Must complete before App Store submission** — replace all ngrok URLs in `eas.json` with the production domain. |
+| Phase 6 — Live Activities verification | ✅ Done | `NSSupportsLiveActivitiesFrequentUpdates: true` added. Manual checks remain (see Phase 6 section). |
+| Phase 7 — App Store Connect metadata & screenshots | ⏭️ Skipped | Copy written in `docs/APP_STORE_COPY.md`. **Must complete before submission** — enter metadata in ASC, take screenshots, fill Privacy Nutrition Labels. |
+| Phase 8 — Build, test & submit | ❌ Not started | Blocked by Phase 5 and Phase 7. |
+
+---
+
+## Post-Approval Cleanup Checklist
+
+> Things that exist **only** to support Apple/Google review. Delete or disable them after approval is granted and the app is live.
+
+### Demo Accounts (most important)
+- [ ] **Delete the demo customer account** — go to Admin Panel → Users, find the account with "Demo / App Review" badge, delete it. This account triggers automatic order progression for any order it places; it must not remain in production.
+- [ ] **Delete the demo driver account** — go to Admin Panel → Drivers, find the demo driver, delete it.
+- [ ] **Remove `DEMO_DRIVER_ID` from `api/.env`** (or production environment variables) — this env var has no use after review.
+- [ ] **Delete the demo business + owner account** (if created exclusively for review) — go to Admin Panel → Businesses.
+
+### Code / Infrastructure
+- [ ] **`DemoProgressionService.ts`** (`api/src/services/DemoProgressionService.ts`) — can be removed entirely. It is only called when `customer.isDemoAccount === true`, so removing demo accounts above is enough to neutralize it, but cleaning the file reduces attack surface.
+- [ ] **`isDemoAccount` DB column** — optional long-term: `ALTER TABLE users DROP COLUMN is_demo_account;`. Only do this once the service code is also removed, otherwise runtime will error. Safe to leave indefinitely if you plan to re-use it for future review cycles.
+- [ ] **`api/database/migrations/0002_add-is-demo-account-to-users.sql`** — keep for historical record (do not delete migration files).
+
+### Legal / Placeholder Pages
+- [ ] Verify `legal/` pages (Privacy Policy, Terms of Service) contain final, lawyer-reviewed text — not the placeholder copy. These are live on Vercel and public-facing.
+
+### App Review Notes Credentials
+- [ ] After app is live, **rotate the demo account passwords** used in App Review Notes in App Store Connect (ASC → App → App Review Information). Credentials submitted to Apple should not remain valid in production.
+
+---
+
 ## Apps Overview
 
 | App | Bundle ID (iOS) | Package (Android) | ASC App ID | EAS Project ID | Owner |
 |---|---|---|---|---|---|
 | **Zipp Go** (Customer) | `com.artshabani.mobilecustomer` | `com.artshabani.mobilecustomer` | `6760239090` | `e5c04b16-...` | `artshabani2002` |
 | **Zipp Driver** | `com.zippdelivery.mobiledriver` | `com.zippdelivery.mobiledriver` | `6760439437` | `1c06f250-...` | `edonramadani` |
-| **Zipp Business** | `com.zippdelivery.mobilebusiness` | `com.zippdelivery.mobilebusiness` | ❌ Not set | `dc536dcd-...` | ❌ Not set |
-| **Zipp Admin** | `com.zippdelivery.mobileadmin` | `com.zippdelivery.mobileadmin` | ❌ Not set | `311a1600-...` | `artshabani2002` |
+| **Zipp Business** | `com.zippdelivery.mobilebusiness` | `com.zippdelivery.mobilebusiness` | `6760672459` | `dc536dcd-...` | ❌ Not set |
+| **Zipp Admin** | `com.zippdelivery.mobileadmin` | `com.zippdelivery.mobileadmin` | `6760673685` | `311a1600-...` | `artshabani2002` |
 
 ### Configuration Gap Matrix
 
 | Config Key | Customer | Driver | Business | Admin |
 |---|---|---|---|---|
 | `appleTeamId` | ✅ `87K8YXG5V8` | ❌ Missing | ❌ Missing | ❌ Missing |
-| `ascAppId` (eas.json submit) | ✅ | ✅ | ❌ Empty | ❌ No eas.json |
+| `ascAppId` (eas.json submit) | ✅ | ✅ | ✅ | ✅ |
 | `owner` (app.json) | ✅ | ✅ | ❌ Missing | ✅ |
 | `ITSAppUsesNonExemptEncryption` | ✅ | ✅ | ❌ No infoPlist | ⚠️ Not set |
 | `runtimeVersion` | ✅ policy | ✅ policy | ✅ policy | ⚠️ Hardcoded `"1.0.0"` |
@@ -343,8 +381,10 @@ For **each app** being submitted:
 5. **App Review Information:**
    - Demo credentials for each app
    - Contact info for reviewer questions
-   - Notes explaining background location (Driver) and Live Activities (Customer)
+   - Notes explaining background location (Driver), Live Activities (Customer), and demo auto-progression for review accounts
    - Video attachments if applicable
+
+   Use the prepared text in `docs/APP_STORE_COPY.md` under **App Review Notes** and paste it into App Store Connect → Your App → App Review → Notes for Review.
 
 ---
 

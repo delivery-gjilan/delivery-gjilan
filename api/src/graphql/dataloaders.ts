@@ -1,6 +1,7 @@
 import DataLoader from 'dataloader';
 import { DbType } from '@/database';
 import { users, DbUser } from '@/database/schema/users';
+import { userBehaviors, DbUserBehavior } from '@/database/schema/userBehaviors';
 import { drivers, DbDriver } from '@/database/schema/drivers';
 import { orderPromotions, DbOrderPromotion } from '@/database/schema/orderPromotions';
 import { promotions } from '@/database/schema/promotions';
@@ -23,6 +24,21 @@ export function createUserLoader(db: DbType) {
             .where(inArray(users.id, [...ids]));
         const map = new Map(rows.map((r) => [r.id, r]));
         return ids.map((id) => map.get(id) ?? null);
+    });
+}
+
+/**
+ * Batch-loads user behavior rows by userId.
+ * Used for user-level operational context like total order count.
+ */
+export function createUserBehaviorByUserIdLoader(db: DbType) {
+    return new DataLoader<string, DbUserBehavior | null>(async (userIds) => {
+        const rows = await db
+            .select()
+            .from(userBehaviors)
+            .where(inArray(userBehaviors.userId, [...userIds]));
+        const map = new Map(rows.map((row) => [row.userId, row]));
+        return userIds.map((id) => map.get(id) ?? null);
     });
 }
 
@@ -179,6 +195,7 @@ export function createChildItemsByParentOrderItemIdLoader(db: DbType) {
 
 export interface DataLoaders {
     userLoader: DataLoader<string, DbUser | null>;
+    userBehaviorByUserIdLoader: DataLoader<string, DbUserBehavior | null>;
     driverByUserIdLoader: DataLoader<string, DbDriver | null>;
     orderPromotionsLoader: DataLoader<string, DbOrderPromotionWithCode[]>;
     optionGroupsByProductIdLoader: DataLoader<string, DbOptionGroup[]>;
@@ -191,6 +208,7 @@ export interface DataLoaders {
 export function createDataLoaders(db: DbType): DataLoaders {
     return {
         userLoader: createUserLoader(db),
+        userBehaviorByUserIdLoader: createUserBehaviorByUserIdLoader(db),
         driverByUserIdLoader: createDriverByUserIdLoader(db),
         orderPromotionsLoader: createOrderPromotionsLoader(db),
         optionGroupsByProductIdLoader: createOptionGroupsByProductIdLoader(db),

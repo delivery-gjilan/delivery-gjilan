@@ -102,6 +102,7 @@ export default function BusinessesPage() {
         ownerLastName: "",
         ownerEmail: "",
         ownerPassword: "",
+        ownerIsDemoAccount: false,
         location: {
             latitude: 0,
             longitude: 0,
@@ -264,6 +265,7 @@ export default function BusinessesPage() {
                             password: createForm.ownerPassword,
                             firstName: createForm.ownerFirstName.trim(),
                             lastName: createForm.ownerLastName.trim(),
+                            isDemoAccount: createForm.ownerIsDemoAccount,
                         },
                     },
                 },
@@ -291,6 +293,7 @@ export default function BusinessesPage() {
             ownerLastName: "",
             ownerEmail: "",
             ownerPassword: "",
+            ownerIsDemoAccount: false,
             location: {
                 latitude: 0,
                 longitude: 0,
@@ -648,6 +651,23 @@ export default function BusinessesPage() {
                                         })
                                     }
                                 />
+                                <label className="flex items-start gap-3 rounded-lg border border-sky-900/50 bg-sky-950/20 p-3">
+                                    <input
+                                        type="checkbox"
+                                        checked={createForm.ownerIsDemoAccount}
+                                        onChange={(e) =>
+                                            setCreateForm({
+                                                ...createForm,
+                                                ownerIsDemoAccount: e.target.checked,
+                                            })
+                                        }
+                                        className="mt-1 h-4 w-4 accent-sky-500"
+                                    />
+                                    <div>
+                                        <div className="text-sm font-medium text-sky-200">Demo / App Review owner</div>
+                                        <p className="mt-1 text-xs text-sky-100/70">Marks the linked owner account as a demo account for App Review test flows.</p>
+                                    </div>
+                                </label>
                             </div>
                         )}
                     </div>

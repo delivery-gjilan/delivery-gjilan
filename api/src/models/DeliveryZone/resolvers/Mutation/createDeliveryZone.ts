@@ -9,6 +9,7 @@ export const createDeliveryZone: NonNullable<MutationResolvers['createDeliveryZo
     }
 
     const db = await getDB();
+
     const [row] = await db
         .insert(deliveryZones)
         .values({
@@ -17,6 +18,7 @@ export const createDeliveryZone: NonNullable<MutationResolvers['createDeliveryZo
             deliveryFee: input.deliveryFee,
             sortOrder: input.sortOrder ?? 0,
             isActive: input.isActive ?? true,
+            isServiceZone: input.isServiceZone ?? false,
         })
         .returning();
 
@@ -27,6 +29,7 @@ export const createDeliveryZone: NonNullable<MutationResolvers['createDeliveryZo
         deliveryFee: row.deliveryFee,
         sortOrder: row.sortOrder,
         isActive: row.isActive,
+        isServiceZone: row.isServiceZone,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
     };

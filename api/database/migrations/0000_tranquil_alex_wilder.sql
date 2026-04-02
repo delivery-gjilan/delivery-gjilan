@@ -9,19 +9,18 @@ CREATE TYPE "public"."device_platform" AS ENUM('IOS', 'ANDROID');--> statement-b
 CREATE TYPE "public"."message_sender_role" AS ENUM('ADMIN', 'DRIVER');--> statement-breakpoint
 CREATE TYPE "public"."driver_connection_status" AS ENUM('CONNECTED', 'STALE', 'LOST', 'DISCONNECTED');--> statement-breakpoint
 CREATE TYPE "public"."order_payment_collection" AS ENUM('CASH_TO_DRIVER', 'PREPAID_TO_PLATFORM');--> statement-breakpoint
-CREATE TYPE "public"."order_status" AS ENUM('PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED');--> statement-breakpoint
+CREATE TYPE "public"."order_status" AS ENUM('PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED', 'AWAITING_APPROVAL');--> statement-breakpoint
 CREATE TYPE "public"."order_event_actor_type" AS ENUM('SYSTEM', 'RESTAURANT', 'DRIVER', 'CUSTOMER', 'ADMIN');--> statement-breakpoint
 CREATE TYPE "public"."order_event_type" AS ENUM('ORDER_CREATED', 'ORDER_PREPARING', 'ORDER_READY', 'ORDER_PICKED_UP', 'ORDER_DELIVERED', 'ORDER_CANCELLED', 'DRIVER_ASSIGNED', 'DRIVER_ARRIVED_PICKUP', 'DISPATCH_SENT', 'PREP_TIME_UPDATED');--> statement-breakpoint
 CREATE TYPE "public"."signup_step" AS ENUM('INITIAL', 'EMAIL_SENT', 'EMAIL_VERIFIED', 'PHONE_SENT', 'COMPLETED');--> statement-breakpoint
 CREATE TYPE "public"."user_role" AS ENUM('CUSTOMER', 'DRIVER', 'SUPER_ADMIN', 'ADMIN', 'BUSINESS_OWNER', 'BUSINESS_EMPLOYEE');--> statement-breakpoint
 CREATE TYPE "public"."user_permission" AS ENUM('view_orders', 'manage_orders', 'view_products', 'manage_products', 'view_finances', 'manage_settings', 'view_analytics');--> statement-breakpoint
 CREATE TYPE "public"."settlement_direction" AS ENUM('RECEIVABLE', 'PAYABLE');--> statement-breakpoint
-CREATE TYPE "public"."settlement_status" AS ENUM('PENDING', 'PAID', 'OVERDUE', 'DISPUTED', 'CANCELLED');--> statement-breakpoint
 CREATE TYPE "public"."settlement_type" AS ENUM('DRIVER', 'BUSINESS');--> statement-breakpoint
 CREATE TYPE "public"."settlement_entity_type" AS ENUM('DRIVER', 'BUSINESS');--> statement-breakpoint
 CREATE TYPE "public"."settlement_rule_amount_type" AS ENUM('FIXED', 'PERCENT');--> statement-breakpoint
+CREATE TYPE "public"."settlement_rule_type" AS ENUM('ORDER_PRICE', 'DELIVERY_PRICE');--> statement-breakpoint
 CREATE TYPE "public"."settlement_request_status" AS ENUM('PENDING_APPROVAL', 'ACCEPTED', 'DISPUTED', 'EXPIRED', 'CANCELLED');--> statement-breakpoint
-CREATE TYPE "public"."settlement_payment_direction" AS ENUM('ENTITY_TO_PLATFORM', 'PLATFORM_TO_ENTITY');--> statement-breakpoint
 CREATE TYPE "public"."promotion_creator_type" AS ENUM('PLATFORM', 'BUSINESS');--> statement-breakpoint
 CREATE TYPE "public"."promotion_target" AS ENUM('ALL_USERS', 'SPECIFIC_USERS', 'FIRST_ORDER', 'CONDITIONAL');--> statement-breakpoint
 CREATE TYPE "public"."promotion_type" AS ENUM('FIXED_AMOUNT', 'PERCENTAGE', 'FREE_DELIVERY', 'SPEND_X_GET_FREE', 'SPEND_X_PERCENT', 'SPEND_X_FIXED');--> statement-breakpoint
@@ -119,6 +118,7 @@ CREATE TABLE "delivery_zones" (
 	"delivery_fee" numeric(10, 2) NOT NULL,
 	"sort_order" integer DEFAULT 0 NOT NULL,
 	"is_active" boolean DEFAULT true NOT NULL,
+	"is_service_zone" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -172,17 +172,22 @@ CREATE TABLE "orders" (
 	"display_id" varchar(10) NOT NULL,
 	"user_id" uuid NOT NULL,
 	"driver_id" uuid,
-	"price" numeric(10, 2) NOT NULL,
+	"business_id" uuid NOT NULL,
+	"original_price" numeric(10, 2),
+	"base_price" numeric(10, 2) NOT NULL,
+	"markup_price" numeric(10, 2) DEFAULT 0 NOT NULL,
+	"actual_price" numeric(10, 2) NOT NULL,
+	"original_delivery_price" numeric(10, 2),
 	"delivery_price" numeric(10, 2) NOT NULL,
 	"payment_collection" "order_payment_collection" DEFAULT 'CASH_TO_DRIVER' NOT NULL,
-	"original_price" numeric(10, 2),
-	"original_delivery_price" numeric(10, 2),
 	"status" "order_status" NOT NULL,
 	"dropoff_lat" double precision NOT NULL,
 	"dropoff_lng" double precision NOT NULL,
 	"dropoff_address" varchar(500) NOT NULL,
+	"location_flagged" boolean DEFAULT false NOT NULL,
 	"driver_notes" varchar(500),
 	"cancellation_reason" varchar(500),
+	"admin_note" varchar(2000),
 	"cancelled_at" timestamp with time zone,
 	"preparation_minutes" integer,
 	"estimated_ready_at" timestamp with time zone,
@@ -204,7 +209,7 @@ CREATE TABLE "order_items" (
 	"parent_order_item_id" uuid,
 	"quantity" integer NOT NULL,
 	"base_price" numeric(10, 2) NOT NULL,
-	"sale_price" numeric(10, 2),
+	"discounted_price" numeric(10, 2),
 	"markup_price" numeric(10, 2),
 	"night_marked_up_price" numeric(10, 2),
 	"final_applied_price" numeric(10, 2) NOT NULL,
@@ -309,12 +314,7 @@ CREATE TABLE "settlements" (
 	"settlement_payment_id" uuid,
 	"source_payment_id" uuid,
 	"amount" numeric(10, 2) NOT NULL,
-	"currency" varchar(3) DEFAULT 'EUR' NOT NULL,
-	"status" "settlement_status" DEFAULT 'PENDING' NOT NULL,
 	"is_settled" boolean DEFAULT false NOT NULL,
-	"paid_at" timestamp with time zone,
-	"payment_reference" varchar(100),
-	"payment_method" varchar(50),
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -322,11 +322,11 @@ CREATE TABLE "settlements" (
 CREATE TABLE "settlement_rules" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" varchar(200) NOT NULL,
+	"type" "settlement_rule_type" NOT NULL,
 	"entity_type" "settlement_entity_type" NOT NULL,
 	"direction" "settlement_direction" NOT NULL,
 	"amount_type" "settlement_rule_amount_type" NOT NULL,
 	"amount" numeric(10, 2) NOT NULL,
-	"applies_to" varchar(20),
 	"business_id" uuid,
 	"promotion_id" uuid,
 	"is_active" boolean DEFAULT true NOT NULL,
@@ -359,10 +359,6 @@ CREATE TABLE "settlement_payments" (
 	"driver_id" uuid,
 	"business_id" uuid,
 	"amount" numeric(10, 2) NOT NULL,
-	"direction" "settlement_payment_direction" NOT NULL,
-	"total_balance_at_time" numeric(10, 2) NOT NULL,
-	"payment_method" varchar(50),
-	"payment_reference" varchar(100),
 	"note" text,
 	"created_by_user_id" uuid,
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -686,6 +682,7 @@ ALTER TABLE "driver_messages" ADD CONSTRAINT "driver_messages_driver_id_users_id
 ALTER TABLE "drivers" ADD CONSTRAINT "drivers_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "orders" ADD CONSTRAINT "orders_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "orders" ADD CONSTRAINT "orders_driver_id_users_id_fk" FOREIGN KEY ("driver_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "orders" ADD CONSTRAINT "orders_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order_items" ADD CONSTRAINT "order_items_order_id_orders_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order_items" ADD CONSTRAINT "order_items_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order_items" ADD CONSTRAINT "order_items_parent_order_item_id_order_items_id_fk" FOREIGN KEY ("parent_order_item_id") REFERENCES "public"."order_items"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -764,6 +761,7 @@ CREATE INDEX "idx_orders_user_id" ON "orders" USING btree ("user_id");--> statem
 CREATE INDEX "idx_orders_driver_id" ON "orders" USING btree ("driver_id");--> statement-breakpoint
 CREATE INDEX "idx_orders_status" ON "orders" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "idx_orders_status_created" ON "orders" USING btree ("status","created_at");--> statement-breakpoint
+CREATE INDEX "idx_orders_business_id" ON "orders" USING btree ("business_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "idx_orders_display_id" ON "orders" USING btree ("display_id");--> statement-breakpoint
 CREATE INDEX "idx_order_items_order_id" ON "order_items" USING btree ("order_id");--> statement-breakpoint
 CREATE INDEX "idx_order_items_product_id" ON "order_items" USING btree ("product_id");--> statement-breakpoint
@@ -781,7 +779,6 @@ CREATE INDEX "idx_user_permissions_user_id" ON "user_permissions" USING btree ("
 CREATE INDEX "idx_settlements_order_id" ON "settlements" USING btree ("order_id");--> statement-breakpoint
 CREATE INDEX "idx_settlements_driver_id" ON "settlements" USING btree ("driver_id");--> statement-breakpoint
 CREATE INDEX "idx_settlements_business_id" ON "settlements" USING btree ("business_id");--> statement-breakpoint
-CREATE INDEX "idx_settlements_status" ON "settlements" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "idx_settlements_is_settled" ON "settlements" USING btree ("is_settled");--> statement-breakpoint
 CREATE INDEX "idx_settlements_type_direction" ON "settlements" USING btree ("type","direction");--> statement-breakpoint
 CREATE INDEX "idx_settlement_requests_business_id" ON "settlement_requests" USING btree ("business_id");--> statement-breakpoint

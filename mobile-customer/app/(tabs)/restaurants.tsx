@@ -1,7 +1,18 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import Animated, {
+    FadeInDown,
+    useSharedValue,
+    useAnimatedStyle,
+    useAnimatedRef,
+    useScrollViewOffset,
+    interpolate,
+    Extrapolation,
+    withTiming,
+    interpolateColor,
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/hooks/useTheme';
@@ -35,14 +46,49 @@ function selectFeaturedRestaurant(restaurants: any[], excludedBusinessIds: Set<s
     return openCandidate ?? candidates[0];
 }
 
+function FilterPill({ label, isActive, onPress, primaryColor, cardColor, borderColor, textColor }: {
+    label: string; isActive: boolean; onPress: () => void;
+    primaryColor: string; cardColor: string; borderColor: string; textColor: string;
+}) {
+    const progress = useSharedValue(isActive ? 1 : 0);
+    useEffect(() => {
+        progress.value = withTiming(isActive ? 1 : 0, { duration: 200 });
+    }, [isActive]);
+    const pillStyle = useAnimatedStyle(() => ({
+        backgroundColor: interpolateColor(progress.value, [0, 1], [cardColor, primaryColor]),
+        borderColor: interpolateColor(progress.value, [0, 1], [borderColor, primaryColor]),
+    }));
+    const txtStyle = useAnimatedStyle(() => ({
+        color: interpolateColor(progress.value, [0, 1], [textColor, '#ffffff']),
+    }));
+    return (
+        <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
+            <Animated.View style={[{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 }, pillStyle]}>
+                <Animated.Text style={[{ fontSize: 13, fontWeight: '600' }, txtStyle]}>{label}</Animated.Text>
+            </Animated.View>
+        </TouchableOpacity>
+    );
+}
+
 export default function Restaurants() {
     const theme = useTheme();
     const router = useRouter();
     const { businesses, loading, error, refetch } = useBusinesses();
     const [activeFilter, setActiveFilter] = useState<FilterOption>('all');
+    const hasAnimated = useRef(false);
     const { t } = useTranslations();
     const { bannerEnabled, bannerMessage, bannerType } = useStoreStatus();
     const showBanner = bannerEnabled && !!bannerMessage;
+
+    const HEADER_H = 70;
+    const flatListRef = useAnimatedRef<FlatList>();
+    const scrollOffset = useScrollViewOffset(flatListRef);
+
+    const headerStyle = useAnimatedStyle(() => ({
+        height: interpolate(scrollOffset.value, [0, HEADER_H], [HEADER_H, 0], Extrapolation.CLAMP),
+        opacity: interpolate(scrollOffset.value, [0, HEADER_H * 0.55], [1, 0], Extrapolation.CLAMP),
+        overflow: 'hidden',
+    }));
 
     const BANNER_ICON: Record<InfoBannerType, { name: React.ComponentProps<typeof Ionicons>['name']; color: string }> = {
         INFO:    { name: 'information-circle', color: '#7C3AED' },
@@ -165,16 +211,17 @@ export default function Restaurants() {
     return (
         <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }} edges={['top']}>
             <View className="flex-1">
-                {/* Header */}
-                <View
-                    style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        paddingHorizontal: 16,
-                        paddingVertical: 12,
-                    }}
-                >
+                {/* ── Collapsing header ── */}
+                <Animated.View style={headerStyle}>
+                    <View
+                        style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            paddingHorizontal: 16,
+                            paddingVertical: 12,
+                        }}
+                    >
                     <TouchableOpacity onPress={() => router.back()}>
                         <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                     </TouchableOpacity>
@@ -207,9 +254,10 @@ export default function Restaurants() {
                         <Ionicons name="map-outline" size={24} color={theme.colors.text} />
                     </TouchableOpacity>
                 </View>
+                </Animated.View>
 
-                {/* Filter Pills */}
-                <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+                {/* ── Filter Pills (always visible) ── */}
+                <View style={{ paddingHorizontal: 16, marginBottom: 10 }}>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                         <TouchableOpacity
                             style={{
@@ -268,53 +316,46 @@ export default function Restaurants() {
                         {filters.map((filter) => {
                             const isActive = activeFilter === filter.key;
                             return (
-                                <TouchableOpacity
+                                <FilterPill
                                     key={filter.key}
+                                    label={filter.label}
+                                    isActive={isActive}
                                     onPress={() => setActiveFilter(filter.key)}
-                                    style={{
-                                        paddingHorizontal: 14,
-                                        paddingVertical: 8,
-                                        borderRadius: 20,
-                                        backgroundColor: isActive ? theme.colors.primary : theme.colors.card,
-                                        borderWidth: 1,
-                                        borderColor: isActive ? theme.colors.primary : theme.colors.border,
-                                    }}
-                                >
-                                    <Text
-                                        style={{
-                                            fontSize: 13,
-                                            fontWeight: '600',
-                                            color: isActive ? '#ffffff' : theme.colors.text,
-                                        }}
-                                    >
-                                        {filter.label}
-                                    </Text>
-                                </TouchableOpacity>
+                                    primaryColor={theme.colors.primary}
+                                    cardColor={theme.colors.card}
+                                    borderColor={theme.colors.border}
+                                    textColor={theme.colors.text}
+                                />
                             );
                         })}
                     </ScrollView>
                 </View>
 
-                {/* Restaurant List */}
+                {/* ── Restaurant List ── */}
                 {loading ? (
-                    <View style={{ flex: 1 }}>
-                        {[1, 2, 3, 4, 5].map((i) => (
+                    <View style={{ flex: 1, paddingTop: 8 }}>
+                        {[1, 2, 3].map((i) => (
                             <View
                                 key={i}
                                 style={{
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    paddingVertical: 12,
-                                    paddingHorizontal: 16,
-                                    borderBottomWidth: 1,
-                                    borderBottomColor: theme.colors.border,
+                                    marginHorizontal: 16,
+                                    marginBottom: 16,
+                                    borderRadius: 20,
+                                    overflow: 'hidden',
+                                    backgroundColor: theme.colors.card,
                                 }}
                             >
-                                <Skeleton width={56} height={56} borderRadius={8} />
-                                <View style={{ flex: 1, marginLeft: 12 }}>
-                                    <Skeleton width="60%" height={16} style={{ marginBottom: 6 }} />
-                                    <Skeleton width="80%" height={13} style={{ marginBottom: 4 }} />
-                                    <Skeleton width="40%" height={20} borderRadius={12} />
+                                <Skeleton width="100%" height={168} borderRadius={0} />
+                                <View style={{ padding: 14 }}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+                                        <Skeleton width="55%" height={18} borderRadius={6} />
+                                        <Skeleton width={48} height={24} borderRadius={10} />
+                                    </View>
+                                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                                        <Skeleton width={70} height={27} borderRadius={10} />
+                                        <Skeleton width={80} height={27} borderRadius={10} />
+                                        <Skeleton width={55} height={27} borderRadius={10} />
+                                    </View>
                                 </View>
                             </View>
                         ))}
@@ -338,6 +379,7 @@ export default function Restaurants() {
                     </View>
                 ) : (
                     <FlatList
+                        ref={flatListRef}
                         data={listItems}
                         keyExtractor={(item, index) => {
                             if (item.type === 'restaurant') return item.data.id;
@@ -346,50 +388,61 @@ export default function Restaurants() {
                             return `item-${index}`;
                         }}
                         showsVerticalScrollIndicator={false}
-                        contentContainerStyle={{ paddingBottom: 24 }}
-                        renderItem={({ item }) => {
+                        contentContainerStyle={{ paddingBottom: 32, paddingTop: 4 }}
+                        onLayout={() => { hasAnimated.current = true; }}
+                        renderItem={({ item, index }) => {
+                            const entering = hasAnimated.current
+                                ? undefined
+                                : FadeInDown.delay(Math.min(index, 8) * 65).duration(380).springify().damping(28).stiffness(160);
+
                             if (item.type === 'promo-banner') {
                                 return (
-                                    <PromotionalBanner
-                                        title={item.data.title}
-                                        subtitle={item.data.subtitle}
-                                        price={item.data.price}
-                                        imageUrl={item.data.imageUrl}
-                                        businessLogo={item.data.businessLogo}
-                                        businessName={item.data.businessName}
-                                        onPress={() => console.log('Promo clicked')}
-                                    />
+                                    <Animated.View entering={entering}>
+                                        <PromotionalBanner
+                                            title={item.data.title}
+                                            subtitle={item.data.subtitle}
+                                            price={item.data.price}
+                                            imageUrl={item.data.imageUrl}
+                                            businessLogo={item.data.businessLogo}
+                                            businessName={item.data.businessName}
+                                            onPress={() => handleBusinessPress(item.data.id.replace('promo-', ''))}
+                                        />
+                                    </Animated.View>
                                 );
                             }
 
                             if (item.type === 'featured') {
                                 return (
-                                    <FeaturedRestaurantCard
-                                        id={item.data.id}
-                                        name={item.data.name}
-                                        logoUrl={item.data.logoUrl}
-                                        menuItems={item.data.menuItems}
-                                        onPress={handleBusinessPress}
-                                    />
+                                    <Animated.View entering={entering}>
+                                        <FeaturedRestaurantCard
+                                            id={item.data.id}
+                                            name={item.data.name}
+                                            logoUrl={item.data.logoUrl}
+                                            menuItems={item.data.menuItems}
+                                            onPress={handleBusinessPress}
+                                        />
+                                    </Animated.View>
                                 );
                             }
 
                             // Regular restaurant card
                             const restaurant = item.data;
                             return (
-                                <ListRestaurantCard
-                                    id={restaurant.id}
-                                    name={restaurant.name}
-                                    imageUrl={restaurant.imageUrl}
-                                    isOpen={restaurant.isOpen}
-                                    onPress={handleBusinessPress}
-                                    locationLat={(restaurant as any).location?.latitude || 42.4635}
-                                    locationLng={(restaurant as any).location?.longitude || 21.4694}
-                                    avgPrepTimeMinutes={(restaurant as any).avgPrepTimeMinutes}
-                                    prepTimeOverrideMinutes={(restaurant as any).prepTimeOverrideMinutes}
-                                    activePromotion={(restaurant as any).activePromotion}
-                                    isSponsored={restaurant.id === promoRestaurant?.id}
-                                />
+                                <Animated.View entering={entering}>
+                                    <ListRestaurantCard
+                                        id={restaurant.id}
+                                        name={restaurant.name}
+                                        imageUrl={restaurant.imageUrl}
+                                        isOpen={restaurant.isOpen}
+                                        onPress={handleBusinessPress}
+                                        locationLat={(restaurant as any).location?.latitude || 42.4635}
+                                        locationLng={(restaurant as any).location?.longitude || 21.4694}
+                                        avgPrepTimeMinutes={(restaurant as any).avgPrepTimeMinutes}
+                                        prepTimeOverrideMinutes={(restaurant as any).prepTimeOverrideMinutes}
+                                        activePromotion={(restaurant as any).activePromotion}
+                                        isSponsored={restaurant.id === promoRestaurant?.id}
+                                    />
+                                </Animated.View>
                             );
                         }}
                     />

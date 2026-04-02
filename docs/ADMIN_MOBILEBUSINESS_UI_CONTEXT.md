@@ -142,6 +142,84 @@ This document is a fast context handoff for future UI changes across `admin-pane
 - Admin panel map page (`/dashboard/map`) left sidebar order cards display customer name and customer phone when available.
 - Mobile-business orders tab (`app/(tabs)/index.tsx`) order cards display customer name and customer phone when available in a dedicated customer block.
 
+## Map Status Transition (Current State)
+
+- Admin panel map page (`/dashboard/map`) status changes use a confirmation modal before mutation.
+- Changing an order to `PREPARING` requires entering `Preparation time (minutes)` in that confirmation modal.
+- The map page uses `startPreparing(id, preparationMinutes)` for `PREPARING` transitions, and keeps `updateOrderStatus` for the other status transitions.
+- On the map page, `PREPARING` status visual styling uses purple tokens (cards, status chips, and related status accents).
+
+## Map Realtime Data Documents (Current State)
+
+- Admin panel map realtime hook (`admin-panel/src/lib/hooks/useMapRealtimeData.ts`) reads GraphQL documents directly from generated `src/gql/graphql` exports.
+- The hook currently uses generated document constants for businesses, drivers, orders, and both map subscriptions to keep Apollo document references stable at runtime.
+
+## Admin Margin Badges (Current State)
+
+- Admin panel map and orders surfaces compute margin badges from net settlement flow: `receivable - payable`, then include markup revenue from item snapshots.
+- Settlement inputs include both `BUSINESS` and `DRIVER` rule entities, with direction-aware handling (`RECEIVABLE` adds to platform inflow, `PAYABLE` adds to platform outflow).
+- Percent-rule bases use order subtotal for order-price rules and delivery base for delivery-fee rules, while promos are reflected through already-discounted order totals.
+- Margin badges are severity-coded by net result: healthy (green), thin (amber), negative (red).
+- Margin breakdown surfaces now explicitly show component contributions as restaurant commission, markup, and driver commission (driver can be positive or negative depending on settlement rule direction).
+- Driver component labels are sign-aware in margin breakdowns: positive values are shown as `Driver commission`, while negative values are shown as `Driver payout`.
+
+## Customer Phone Visibility (Current State)
+
+- Admin panel orders page cards show customer phone when available.
+- Admin panel orders details modal shows customer phone when available.
+- Admin panel approval confirmation modals (orders and map surfaces) show customer phone when available, with click-to-call links.
+
+## New Order Audible Alert (Current State)
+
+- Admin panel plays a new-order sound from `/sounds/beep.wav` (served from `admin-panel/public/sounds/beep.wav`).
+- If the MP3 file is missing or blocked, admin panel falls back to a synthesized multi-tone beep.
+- The alert is ID-based (new order IDs only), so status updates on existing orders do not trigger beeps.
+- The alert has a cooldown to avoid repetitive beeps during burst updates.
+- Realtime order subscription handlers sanitize incoming payload entries before cache merges; malformed/empty entries are ignored and fall back to throttled refetch.
+- Audio context is unlocked on first user interaction (`pointerdown`/`keydown`/`touchstart`), after which new-order beeps play normally.
+
+## Trusted Customer + Order Count (Current State)
+
+- Admin panel orders and map flows expose customer lifetime order count directly in operational surfaces.
+- Orders page shows customer total orders on active order cards, in order details, and in approval modal context.
+- Map page shows customer total orders in the right-side order detail panel and approval modal context.
+- Admins can toggle a trusted-customer marker from both orders and map approval contexts.
+- Trusted marker uses user metadata (`[TRUSTED_CUSTOMER]` marker and green flag color) so no new customer-table column is required.
+- Backend order creation keeps risk-triggered approval flow active for all users (first/high-value/out-of-zone), including trusted customers.
+- Trusted state is shown as context in approval modals so admins can decide whether to call.
+- Orders and map pages support per-user modal suppression (`Don't auto-open approval modal again for this user`) persisted in backend user metadata (`[SUPPRESS_APPROVAL_MODAL]` marker in `adminNote`), so the setting is consistent across pages/admin sessions/devices.
+- `locationFlagged` remains computed and available for map/ops visibility.
+- Admin orders/map approval badges use derived approval reasons with payload fallback logic, so first/high-value flags are still visible in UI even when subscription/query payloads are sparse.
+
+## Mobile Customer Awaiting Approval Modal (Current State)
+
+- Mobile customer active-order floating bar treats `AWAITING_APPROVAL` as a first-class active status with dedicated banner label and status message.
+- Checkout flow registers an auto-open intent when the created order status is `AWAITING_APPROVAL`.
+- The floating-bar layer opens a large centered review modal that takes most of the viewport once that awaiting order is present in active-order state.
+- The modal is dismissible and shows reason-specific, high-contrast numbered cards from order `approvalReasons` when provided (including multiple reasons at once, such as first order and out-of-zone together).
+- If `approvalReasons` is missing in the current payload, the modal falls back to the generic three-bullet explanation (first order, high-value, out-of-zone) so UI behavior remains stable.
+- Modal copy includes a note that an agent may call for confirmation.
+- While an order remains `AWAITING_APPROVAL`, tapping the active-order banner reopens this modal instead of navigating into order details.
+- Delivered/cancelled transitions remove the active floating bar without hook-order instability, so moving out of active state does not trigger a transient global error boundary.
+
+## Mobile Customer Out-of-Zone Prompt Timing (Current State)
+
+- Home out-of-zone prompt evaluation is session-scoped for the running app process (module-level gate), not component-mount scoped.
+- If the user has had an active order during the current app session, the out-of-zone prompt stays suppressed for the rest of that session.
+- The out-of-zone prompt can appear again only after full app re-init (fresh JS runtime), matching "show once per app init" behavior.
+
+## Mobile Customer Address Picker Geocoding (Current State)
+
+- Reverse geocoding runs only after region settle with debounce and abort control, not on every intermediate map movement frame.
+- Address picker and out-of-zone map picker both ignore negligible center-coordinate jitter (tiny deltas) to avoid repeated geocode retries when camera emits near-identical `onRegionDidChange` events.
+- Confirm-address enablement remains tied to settled pin state and resolved geocoded coordinates for the current center point.
+
+## Admin Delivery Zones Editor (Current State)
+
+- Admin panel delivery-zones page supports creating multiple delivery zones; there is no single-zone cap in backend storage or mutation contracts.
+- Multiple zones can be marked as `isServiceZone=true` at the same time, and service-coverage checks evaluate the full active service-zone set.
+- Save flow resolves polygon points from either form state or current Mapbox Draw layer state, so repeated create/edit cycles keep polygon validation stable even when draw events are missed.
+
 ## Orders Page Completed Section (Current State)
 
 - Admin panel orders page (`/dashboard/orders`) shows completed orders in a table view (not cards).

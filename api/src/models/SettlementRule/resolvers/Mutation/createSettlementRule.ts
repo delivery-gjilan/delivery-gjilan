@@ -37,21 +37,15 @@ export const createSettlementRule: NonNullable<MutationResolvers['createSettleme
         });
     }
 
-    if (input.amountType === 'PERCENT' && !input.appliesTo) {
-        throw new GraphQLError('appliesTo is required for percentage rules (SUBTOTAL or DELIVERY_FEE)', {
-            extensions: { code: 'BAD_USER_INPUT' },
-        });
-    }
-
     const repo = new SettlementRuleRepository(db);
 
     const rule = await repo.createRule({
         name: input.name.trim(),
+        type: input.type,
         entityType: input.entityType,
         direction: input.direction,
         amountType: input.amountType,
         amount: input.amount.toString(),
-        appliesTo: input.appliesTo || null,
         businessId: input.businessId || null,
         promotionId: input.promotionId || null,
         notes: input.notes || null,
@@ -59,3 +53,4 @@ export const createSettlementRule: NonNullable<MutationResolvers['createSettleme
 
     return rule;
 };
+

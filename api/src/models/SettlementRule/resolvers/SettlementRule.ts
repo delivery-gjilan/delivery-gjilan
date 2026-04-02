@@ -21,4 +21,14 @@ export const SettlementRule: SettlementRuleResolvers = {
             .limit(1);
         return result[0] || null;
     },
+    amount: (rule) => {
+        return Number(rule.amount);
+    },
+    // Backward-compat: derive appliesTo from type
+    appliesTo: (rule) => {
+        const ruleType = (rule as any).type;
+        if (ruleType === 'ORDER_PRICE') return 'SUBTOTAL';
+        if (ruleType === 'DELIVERY_PRICE') return 'DELIVERY_FEE';
+        return null;
+    },
 } as any;

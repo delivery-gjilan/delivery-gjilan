@@ -16,7 +16,7 @@
 |----|------|--------|-------------|
 | A1 | [ARCHITECTURE.md](ARCHITECTURE.md) | System | Monorepo shape, layers, realtime topology |
 | B1 | [BACKEND/API.md](BACKEND/API.md) | Backend | Express, Yoga, graphql-ws, Drizzle, auth model |
-| B2 | [BACKEND/ORDER_CREATION.md](BACKEND/ORDER_CREATION.md) | Backend | OrderService, payment collection, preflight gate |
+| B2 | [BACKEND/ORDER_CREATION.md](BACKEND/ORDER_CREATION.md) | Backend | OrderService, AWAITING_APPROVAL, locationFlagged, service-zone coverage, payment collection, preflight gate |
 | B3 | [BACKEND/ORDER_TOTAL_PRICE_VALIDATION.md](BACKEND/ORDER_TOTAL_PRICE_VALIDATION.md) | Backend | Price integrity, epsilon, promo application, one-directional delivery validation |
 | B4 | [BACKEND/WATCHDOG_HEARTBEAT.md](BACKEND/WATCHDOG_HEARTBEAT.md) | Backend | DriverHeartbeatHandler, DriverWatchdogService, connection states |
 | B5 | [BACKEND/AUTH_AND_USERS.md](BACKEND/AUTH_AND_USERS.md) | Backend | JWT model, signup steps, token rotation, roles, password rules |
@@ -25,6 +25,7 @@
 | B8 | [BACKEND/CACHE_AND_INFRASTRUCTURE.md](BACKEND/CACHE_AND_INFRASTRUCTURE.md) | Backend | Redis cache layer, TTLs, key patterns, invalidation helpers |
 | B9 | [BACKEND/UPLOADS_AND_S3.md](BACKEND/UPLOADS_AND_S3.md) | Backend | S3Service, upload/delete REST routes, key generation, auth gaps |
 | B10 | [BACKEND/AUDIT_LOGGING.md](BACKEND/AUDIT_LOGGING.md) | Backend | audit_logs table, actor/action/entity enums, AuditLogRepository |
+| B11 | [BACKEND/OUT_OF_ZONE_AND_APPROVAL.md](BACKEND/OUT_OF_ZONE_AND_APPROVAL.md) | Backend | Out-of-coverage handling, locationFlagged, approval-required orders, admin alerts |
 | BL1 | [BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS.md](BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS.md) | Business Logic | Settlements, rules, promotions, FinancialService, PromotionEngine, mobile-customer progression bar |
 | BL2 | [BUSINESS_LOGIC/PRODUCT_BUSINESS_CATEGORY_REFACTOR_FLOW.md](BUSINESS_LOGIC/PRODUCT_BUSINESS_CATEGORY_REFACTOR_FLOW.md) | Business Logic | CRUD flows, delete semantics, hook consolidation |
 | BL3 | [BUSINESS_LOGIC/CART_ACTIVE_ORDER_FLOW_RECOMMENDATIONS.md](BUSINESS_LOGIC/CART_ACTIVE_ORDER_FLOW_RECOMMENDATIONS.md) | Business Logic | Cart store, subscription lifecycle, race conditions |
@@ -33,6 +34,9 @@
 | FF1 | [FUTURE_FEATURES/PERSONAL_INVENTORY_COVERAGE.md](FUTURE_FEATURES/PERSONAL_INVENTORY_COVERAGE.md) | Future Feature | Personal stock tracking, order coverage split, margin optimisation |
 | FF2 | [FUTURE_FEATURES/BUSINESS_DISPATCH.md](FUTURE_FEATURES/BUSINESS_DISPATCH.md) | Future Feature | Business-initiated driver dispatch, internal delivery runs |
 | FF3 | [FUTURE_FEATURES/CUSTOM_NAVIGATION.md](FUTURE_FEATURES/CUSTOM_NAVIGATION.md) | Future Feature | Migrating from `@badatgil/expo-mapbox-navigation` SDK to custom `@rnmapbox/maps` navigation — cost driver, unused hook inventory, step-by-step migration plan |
+| FF4 | [FUTURE_FEATURES/EMAIL_SERVICE.md](FUTURE_FEATURES/EMAIL_SERVICE.md) | Future Feature | Transactional email via Resend — order receipt on delivery, email verification migration, react-email templates, EmailService architecture |
+| FF5 | [FUTURE_FEATURES/MINIMUM_ORDER_AMOUNT.md](FUTURE_FEATURES/MINIMUM_ORDER_AMOUNT.md) | Future Feature | Per-business minimum order subtotal — DB column, API enforcement in createOrder, admin panel edit form, mobile-customer cart bar + disabled checkout |
+| FF6 | [FUTURE_FEATURES/BUSINESS_PREP_TIME_UPDATE.md](FUTURE_FEATURES/BUSINESS_PREP_TIME_UPDATE.md) | Future Feature | Business can extend prep time on PREPARING orders — "Add Time" UI in mobile-business, notifies customer/driver/admins (push), amber badge + map marker pulse in admin panel orders & map pages via `usePrepTimeAlerts` hook |
 | M1 | [MOBILE/OVERVIEW.md](MOBILE/OVERVIEW.md) | Mobile | Four-app architecture, shared patterns |
 | M2 | [MOBILE/PUSH_AND_LIVE_ACTIVITY.md](MOBILE/PUSH_AND_LIVE_ACTIVITY.md) | Mobile | FCM tokens, Live Activity, notification maturity |
 | M3 | [MOBILE/LIVE_ACTIVITY_BEHAVIOR.md](MOBILE/LIVE_ACTIVITY_BEHAVIOR.md) | Mobile | iOS widget, progress calculation, APNs pushes |
@@ -43,6 +47,7 @@
 | M8 | [MOBILE/DRIVER_APP.md](MOBILE/DRIVER_APP.md) | Mobile | Driver app deep-dive: heartbeat, navigation, PTT, battery, auth, stores, GraphQL ops, refactor candidates |
 | M9 | [MOBILE/MOBILE_ADMIN_DEEP_DIVE.md](MOBILE/MOBILE_ADMIN_DEEP_DIVE.md) | Mobile | Mobile-admin deep-dive: all screens, GraphQL ops, real-time arch, theme, i18n, refactor candidates |
 | M10 | [MOBILE/REALTIME_SUBSCRIPTIONS_CUSTOMER.md](MOBILE/REALTIME_SUBSCRIPTIONS_CUSTOMER.md) | Mobile | Subscription topology audit, connection count, payload sizing, duplicate subscriptions, optimization roadmap |
+| M11 | [MOBILE/PUSH_AND_LIVE_ACTIVITY_REFACTOR_PLAN.md](MOBILE/PUSH_AND_LIVE_ACTIVITY_REFACTOR_PLAN.md) | Mobile | Full audit of all push notifications and Live Activity; copy refinements; Android notification icon wiring; brand logo in Lock Screen widget; Albanian copy corrections |
 | O1 | [OPERATIONS/MONITORING.md](OPERATIONS/MONITORING.md) | Operations | Health endpoints, Prometheus, Grafana phases |
 | O2 | [OPERATIONS/OBSERVABILITY.md](OPERATIONS/OBSERVABILITY.md) | Operations | Loki, Promtail, structured logging, runbooks |
 | O3 | [OPERATIONS/NOTIFICATIONS.md](OPERATIONS/NOTIFICATIONS.md) | Operations | Query builder, campaigns, payload fields |
@@ -58,6 +63,9 @@
 | O12 | [OPERATIONS/DRIVER_TRACKING_SMOOTHNESS.md](OPERATIONS/DRIVER_TRACKING_SMOOTHNESS.md) | Operations | End-to-end driver position pipeline, animation tuning, dead-reckoning, route-snap |
 | O13 | [OPERATIONS/PAGINATION_AUDIT.md](OPERATIONS/PAGINATION_AUDIT.md) | Operations | Full pagination audit: what is paginated, unbounded queries by risk level, fix order |
 | O14 | [OPERATIONS/MONITORING_FUTURE_PLAN.md](OPERATIONS/MONITORING_FUTURE_PLAN.md) | Operations | Forward monitoring roadmap: dispatch, freshness, SLOs, integrity, business-impact signals |
+| O15 | [APP_STORE_DEPLOYMENT.md](APP_STORE_DEPLOYMENT.md) | Operations | Workspace-level App Store submission tracker for the four mobile apps, including completed/skipped phases and release blockers |
+| O17 | [OPERATIONS/ANDROID_PLAY_STORE_DEPLOYMENT.md](OPERATIONS/ANDROID_PLAY_STORE_DEPLOYMENT.md) | Operations | Android Play Store deployment plan for Zipp Go, Zipp Driver, and Zipp Business — map bug root cause, config gap matrix, build/submit phases, Data Safety form requirements |
+| O16 | [DEMO_MODE_PLAN.md](DEMO_MODE_PLAN.md) | Operations | Apple review demo-account flow, auto-progression behavior, reviewer credentials strategy, and admin-panel demo-account operations |
 | UI1 | [ADMIN_MOBILEBUSINESS_UI_CONTEXT.md](ADMIN_MOBILEBUSINESS_UI_CONTEXT.md) | UI | Product types, variant groups, admin/mobile-business UX |
 | UI2 | [ADMIN_PANEL_BUSINESS_SETTLEMENTS.md](ADMIN_PANEL_BUSINESS_SETTLEMENTS.md) | UI | Business-facing settlements semantics, filters, lazy order details |
 
@@ -180,6 +188,7 @@ ARCHITECTURE (A1)
 | Live Activity | M2, M3 |
 | Campaign system | O3, O4 |
 | Device token lifecycle | O4 |
+| Transactional email (receipts, verification) | FF4 (future) |
 
 ### Financial Domain
 | Concern | MDS Files |
@@ -308,6 +317,7 @@ ARCHITECTURE (A1)
 | `database/schema/settlements.ts` | BL1 |
 | `database/schema/settlementRules.ts` | BL1 |
 | `database/schema/promotions.ts` | BL1 |
+| `database/schema/orders.ts` | B2, B3, BL1 |
 | `database/schema/auditLogs.ts` | B10 |
 | `database/schema/deliveryZones.ts` | B6, B7 |
 | `database/schema/deliveryPricingTiers.ts` | B6, B7 |

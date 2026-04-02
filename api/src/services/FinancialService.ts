@@ -1,4 +1,3 @@
-import { Database } from '@/database';
 import { SettlementRepository } from '@/repositories/SettlementRepository';
 import { SettlementCalculationEngine } from '@/services/SettlementCalculationEngine';
 import { DbOrder, DbOrderItem } from '@/database/schema';
@@ -6,12 +5,13 @@ import logger from '@/lib/logger';
 import { drivers } from '@/database/schema/drivers';
 import { settlements } from '@/database/schema/settlements';
 import { eq, sql } from 'drizzle-orm';
+import { DbType } from '@/database/index';
 
 const log = logger.child({ service: 'FinancialService' });
 
 /**
  * FinancialService handles all commission and settlement calculations
- * 
+ *
  * Flow:
  * 1. Order created with total price
  * 2. Use SettlementCalculationEngine to calculate settlements based on rules
@@ -21,7 +21,7 @@ export class FinancialService {
     private settlementRepo: SettlementRepository;
     private settlementEngine: SettlementCalculationEngine;
 
-    constructor(private db: Database) {
+    constructor(private db: DbType) {
         this.settlementRepo = new SettlementRepository(db);
         this.settlementEngine = new SettlementCalculationEngine(db);
     }
@@ -30,11 +30,7 @@ export class FinancialService {
      * Create settlements after an order is completed
      * Uses the SettlementCalculationEngine to apply all active rules
      */
-    async createOrderSettlements(
-        order: DbOrder,
-        orderItems: DbOrderItem[],
-        driverId: string | null,
-    ): Promise<void> {
+    async createOrderSettlements(order: DbOrder, orderItems: DbOrderItem[], driverId: string | null): Promise<void> {
         try {
             const normalizedDriverId = await this.normalizeDriverId(driverId);
             const normalizedItems = Array.isArray(orderItems) ? orderItems : [];

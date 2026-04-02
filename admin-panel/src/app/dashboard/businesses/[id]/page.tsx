@@ -4,14 +4,10 @@ import { useQuery, useMutation } from '@apollo/client/react';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import ProductsBlock from '@/components/businesses/ProductsBlock';
-
-import Button from '@/components/ui/Button';
-import Input from '@/components/ui/Input';
-import Select from '@/components/ui/Select';
-import Modal from '@/components/ui/Modal';
 import CategoriesBlock from '@/components/businesses/CategoriesBlock';
 import { BusinessType } from '@/gql/graphql';
 import { GET_BUSINESS, UPDATE_BUSINESS } from '@/graphql/operations/businesses';
+
 
 /* ----------------------------------
    TYPES

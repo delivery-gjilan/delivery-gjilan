@@ -12,6 +12,7 @@ export const GET_ORDERS = graphql(`
             orderDate
             updatedAt
             status
+            approvalReasons
             preparationMinutes
             estimatedReadyAt
             preparingAt
@@ -87,6 +88,7 @@ export const GET_ORDER = graphql(`
             orderDate
             updatedAt
             status
+            approvalReasons
             preparationMinutes
             estimatedReadyAt
             preparingAt
@@ -178,7 +180,6 @@ export const GET_ORDER = graphql(`
                 }
             }
             originalPrice
-            originalDeliveryPrice
             paymentCollection
             orderPromotions {
                 id

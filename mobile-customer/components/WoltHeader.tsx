@@ -82,6 +82,7 @@ export function WoltHeader({
             )}
 
             {/* Notifications */}
+            {!!onPressNotifications && (
             <Pressable
                 onPress={onPressNotifications}
                 style={({ pressed }) => ({
@@ -95,6 +96,7 @@ export function WoltHeader({
             >
                 <Ionicons name="notifications-outline" size={22} color="#fff" />
             </Pressable>
+            )}
         </View>
     );
 }

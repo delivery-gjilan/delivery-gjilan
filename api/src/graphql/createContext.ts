@@ -1,5 +1,4 @@
 import { YogaInitialContext } from 'graphql-yoga';
-import jwt from 'jsonwebtoken';
 import { getDB } from '@/database';
 import { BusinessRepository } from '@/repositories/BusinessRepository';
 import { BusinessHoursRepository } from '@/repositories/BusinessHoursRepository';
@@ -26,6 +25,8 @@ import logger from '@/lib/logger';
 import { NotificationRepository } from '@/repositories/NotificationRepository';
 import { NotificationService } from '@/services/NotificationService';
 import { PromotionService } from '@/services/PromotionService';
+import { FinancialService } from '@/services/FinancialService';
+import { SettlementCalculationEngine } from '@/services/SettlementCalculationEngine';
 
 /**
  * Extracts and verifies JWT token from request Authorization header or WebSocket connection params
@@ -33,7 +34,10 @@ import { PromotionService } from '@/services/PromotionService';
  * Non-blocking: continues gracefully if token is missing or invalid
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function extractUserData(context: YogaInitialContext & { connectionParams?: any; req?: any }): Promise<{ userId?: string; role?: string; businessId?: string }> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function extractUserData(
+    context: YogaInitialContext & { connectionParams?: any; req?: any },
+): Promise<{ userId?: string; role?: string; businessId?: string }> {
     try {
         let authHeader: string | null | undefined = null;
 
@@ -59,10 +63,10 @@ async function extractUserData(context: YogaInitialContext & { connectionParams?
         const token = authHeader.substring(7);
         const decoded = decodeJwtToken(token);
 
-        return { 
-            userId: decoded.userId, 
+        return {
+            userId: decoded.userId,
             role: decoded.role,
-            businessId: decoded.businessId || undefined
+            businessId: decoded.businessId || undefined,
         };
     } catch (error) {
         // Token verification failed - continue without userId
@@ -81,6 +85,7 @@ let cachedServices: {
     orderService: OrderService;
     notificationService: NotificationService;
     promotionService: PromotionService;
+    financialService: FinancialService;
 } | null = null;
 
 async function getOrCreateServices(db: any) {
@@ -97,13 +102,17 @@ async function getOrCreateServices(db: any) {
     cachedServices = {
         businessService: new BusinessService(businessRepository, businessHoursRepository),
         productCategoryService: new ProductCategoryService(productCategoryRepository),
-        productSubcategoryService: new ProductSubcategoryService(productSubcategoryRepository, productCategoryRepository),
+        productSubcategoryService: new ProductSubcategoryService(
+            productSubcategoryRepository,
+            productCategoryRepository,
+        ),
         productService: new ProductService(productRepository, db),
         authService: new AuthService(authRepository),
         driverAuthService: new DriverAuthService(authRepository, new DriverRepository(db)),
-        orderService: new OrderService(orderRepository, authRepository, productRepository, pubsub),
+        orderService: new OrderService(orderRepository, authRepository, productRepository, pubsub, db),
         notificationService: new NotificationService(new NotificationRepository(db)),
         promotionService: new PromotionService(db),
+        financialService: new FinancialService(db),
     };
     return cachedServices;
 }

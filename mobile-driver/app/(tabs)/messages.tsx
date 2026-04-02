@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
     View,
     Text,
@@ -111,10 +112,16 @@ export default function MessagesScreen() {
         });
     }, []);
 
-    const { loading, data: queryData } = useQuery<{ myDriverMessages: DriverMessage[] }>(MY_DRIVER_MESSAGES, {
+    const { loading, data: queryData, refetch } = useQuery<{ myDriverMessages: DriverMessage[] }>(MY_DRIVER_MESSAGES, {
         variables: { limit: 100 },
         fetchPolicy: 'cache-and-network',
+        pollInterval: 30_000,
     });
+
+    // Refetch whenever the screen comes into focus (handles missed subscription events)
+    useFocusEffect(useCallback(() => {
+        refetch();
+    }, [refetch]));
 
     // Derive base messages and adminId directly from query data (survives remount/cache)
     const baseMessages = queryData?.myDriverMessages ?? [];
@@ -305,7 +312,7 @@ export default function MessagesScreen() {
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
             >
-                {loading ? (
+                {loading && messages.length === 0 ? (
                     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                         <ActivityIndicator color={theme.colors.primary} />
                     </View>

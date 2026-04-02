@@ -17,16 +17,23 @@ import { useActiveOrdersStore } from '@/modules/orders/store/activeOrdersStore';
 import { useApolloClient, useLazyQuery, useQuery, useMutation } from '@apollo/client/react';
 import { GET_ORDERS } from '@/graphql/operations/orders';
 import { GET_PRODUCT } from '@/graphql/operations/products';
-import { VALIDATE_PROMOTIONS, GET_PROMOTION_THRESHOLDS } from '@/graphql/operations/promotions';
+import { VALIDATE_PROMOTIONS, GET_APPLICABLE_PROMOTIONS, GET_PROMOTION_THRESHOLDS } from '@/graphql/operations/promotions';
 import { GET_MY_ADDRESSES, ADD_USER_ADDRESS, SET_DEFAULT_ADDRESS } from '@/graphql/operations/addresses';
 import { CALCULATE_DELIVERY_PRICE } from '@/graphql/operations/deliveryPricing';
+import { GET_SERVICE_ZONES } from '@/graphql/operations/serviceZone';
 import type { UserAddress } from '@/gql/graphql';
 import { calculateItemUnitTotal } from '../utils/price';
+import { isPointInPolygon } from '@/utils/pointInPolygon';
 import { RepeatOrCustomizeModal } from '@/modules/business/components/RepeatOrCustomizeModal';
 import type { CartItem } from '../types';
+import { useCartDataStore } from '../store/cartDataStore';
 import * as Haptics from 'expo-haptics';
+import Reanimated, { FadeInDown } from 'react-native-reanimated';
 import { PromotionProgressBar } from './PromotionProgressBar';
 import { PromoAppliedCelebration } from './PromoAppliedCelebration';
+import { useUserLocation } from '@/hooks/useUserLocation';
+import { useDeliveryLocationStore } from '@/store/useDeliveryLocationStore';
+import { useAwaitingApprovalModalStore } from '@/store/useAwaitingApprovalModalStore';
 
 // Persists across CartScreen mounts so we never replay the celebration for the same promo
 const _celebrationShownPromoIds = new Set<string>();
@@ -48,7 +55,11 @@ export const CartScreen = () => {
     const { items, total, isEmpty } = useCart();
     const { updateQuantity, removeItem, clearCart, updateItemNotes } = useCartActions();
     const { createOrder, loading: orderLoading } = useCreateOrder();
+    const { location: userContextLocation } = useUserLocation();
+    const persistedDeliveryLocation = useDeliveryLocationStore((state) => state.location);
+    const setDeliveryLocation = useDeliveryLocationStore((state) => state.setLocation);
     const { showLoading, showSuccess, hideSuccess } = useSuccessModalStore();
+    const requestAwaitingApprovalAutoOpen = useAwaitingApprovalModalStore((state) => state.requestAutoOpen);
     const updateActiveOrder = useActiveOrdersStore((state) => state.updateOrder);
     const setActiveOrders = useActiveOrdersStore((state) => state.setActiveOrders);
 
@@ -56,6 +67,7 @@ export const CartScreen = () => {
     const [deliveryPrice, setDeliveryPrice] = useState(2.0); // Default; updated from API
     const [deliveryPriceLoading, setDeliveryPriceLoading] = useState(false);
     const [deliveryZoneName, setDeliveryZoneName] = useState<string | null>(null);
+    const [isSelectedLocationInZone, setIsSelectedLocationInZone] = useState<boolean | null>(null);
     const [step, setStep] = useState<1 | 2 | 3>(1);
     const [selectedLocation, setSelectedLocation] = useState<CheckoutLocation | null>(null);
     const [couponCode, setCouponCode] = useState('');
@@ -72,6 +84,31 @@ export const CartScreen = () => {
         fetchPolicy: 'cache-and-network',
     });
 
+    const { data: zonesData, loading: zonesLoading } = useQuery(GET_SERVICE_ZONES, {
+        fetchPolicy: 'cache-and-network',
+    });
+
+    const effectiveServiceZones = useMemo(() => {
+        const activeZones = ((zonesData as any)?.deliveryZones ?? []).filter((z: any) => z.isActive);
+        const serviceZones = activeZones.filter((z: any) => z.isServiceZone === true);
+        return serviceZones.length > 0 ? serviceZones : activeZones;
+    }, [zonesData]);
+
+    const isLocationWithinDeliveryZone = useCallback(
+        (location: CheckoutLocation | null): boolean => {
+            if (!location) return false;
+            if (effectiveServiceZones.length === 0) return true;
+
+            return effectiveServiceZones.some((zone: any) =>
+                isPointInPolygon(
+                    { lat: location.latitude, lng: location.longitude },
+                    zone.polygon as Array<{ lat: number; lng: number }>,
+                ),
+            );
+        },
+        [effectiveServiceZones],
+    );
+
     // Mutation for adding address
     const [addAddress, { loading: addingAddress }] = useMutation(ADD_USER_ADDRESS, {
         refetchQueries: [{ query: GET_MY_ADDRESSES }],
@@ -81,14 +118,17 @@ export const CartScreen = () => {
         refetchQueries: [{ query: GET_MY_ADDRESSES }],
     });
     const [promoResult, setPromoResult] = useState<{
+        promotionId: string | null;
         code: string;
         discountAmount: number;
         freeDeliveryApplied: boolean;
         effectiveDeliveryPrice: number;
         totalPrice: number;
+        source: 'eligible' | 'manual';
     } | null>(null);
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const proceedButtonAnim = useRef(new Animated.Value(1)).current;
+    const feeRequestSequenceRef = useRef(0);
     const screenWidth = Dimensions.get('window').width;
     const headerTopPadding = Platform.OS === 'ios' ? 10 : 6;
     const insets = useSafeAreaInsets();
@@ -124,6 +164,33 @@ export const CartScreen = () => {
         fetchPolicy: 'cache-and-network',
     });
 
+    // Backfill imageUrl for persisted cart items that were saved without it
+    useEffect(() => {
+        const itemsMissingImage = items.filter((item) => !item.imageUrl);
+        if (itemsMissingImage.length === 0) return;
+
+        itemsMissingImage.forEach(async (item) => {
+            try {
+                const response = await apolloClient.query({
+                    query: GET_PRODUCT,
+                    variables: { id: item.productId },
+                    fetchPolicy: 'cache-first',
+                });
+                const imageUrl: string | null = (response.data as any)?.product?.imageUrl ?? null;
+                if (imageUrl) {
+                    useCartDataStore.setState((state) => ({
+                        items: state.items.map((i) =>
+                            i.cartItemId === item.cartItemId ? { ...i, imageUrl } : i
+                        ),
+                    }));
+                }
+            } catch {
+                // best-effort; silently ignore
+            }
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     // Stable array reference — only changes when the actual set of business IDs changes,
     // not when total or deliveryPrice change. Prevents cascading re-renders.
     const businessIdsKey = items.map((i) => i.businessId).sort().join(',');
@@ -152,6 +219,12 @@ export const CartScreen = () => {
         },
     );
 
+    const { data: applicablePromotionsData } = useQuery(GET_APPLICABLE_PROMOTIONS, {
+        variables: { cart: cartContext },
+        skip: items.length === 0,
+        fetchPolicy: 'cache-and-network',
+    });
+
     const applicableConditional = useMemo(() => {
         if (!thresholdsData?.getPromotionThresholds) return null;
         const thresholds = thresholdsData.getPromotionThresholds;
@@ -173,6 +246,13 @@ export const CartScreen = () => {
     const progress = spendThreshold ? Math.min(Number(total) / Number(spendThreshold), 1) : 0;
     const amountRemaining = spendThreshold ? Math.max(0, Number(spendThreshold) - Number(total)) : 0;
 
+    const eligiblePromotions = useMemo(() => {
+        const list = applicablePromotionsData?.getApplicablePromotions ?? [];
+        return [...list].sort((a, b) => (b.priority || 0) - (a.priority || 0));
+    }, [applicablePromotionsData]);
+    const selectedEligiblePromotion = eligiblePromotions[0] ?? null;
+    const hasEligiblePromotion = !!selectedEligiblePromotion;
+
     // Celebration overlay state
     const [showCelebration, setShowCelebration] = useState(false);
     const [celebrationMessage, setCelebrationMessage] = useState('');
@@ -191,8 +271,6 @@ export const CartScreen = () => {
     };
 
     // Auto-apply helpers
-    const autoAppliedPromotionIdRef = useRef<string | null>(null);
-    const [autoApplying, setAutoApplying] = useState(false);
     const hadItemsOnMount = useRef(items.length > 0);
     // Keep a ref to the latest cartContext so the auto-apply effect doesn't need
     // cartContext / total / deliveryPrice in its deps (prevents waterfall re-runs).
@@ -206,29 +284,31 @@ export const CartScreen = () => {
         }
     }, [items.length, router]);
 
-    // When the cart reaches or exceeds a spend threshold, call the server to validate/apply promotions.
+    // Auto-apply the highest-priority eligible promotion.
     useEffect(() => {
-        if (!applicableConditional || !spendThreshold) {
+        if (!selectedEligiblePromotion) {
+            if (promoResult?.source === 'eligible') {
+                setPromoResult(null);
+                setCouponCode('');
+            }
             return;
         }
-        if (progress < 1) {
-            return;
-        }
-        if (promoResult) {
-            return;
-        }
-        if (autoAppliedPromotionIdRef.current === applicableConditional.id) {
+        if (promoResult?.promotionId === selectedEligiblePromotion.id) {
             return;
         }
 
         let mounted = true;
         const doAutoApply = async () => {
-            setAutoApplying(true);
             // Use the ref so that a delivery-price update mid-flight doesn't re-trigger
             // this effect — cartContextRef always holds the latest values.
             const ctx = cartContextRef.current;
             try {
-                const response = await validatePromotionsManual({ variables: { cart: ctx } });
+                const response = await validatePromotionsManual({
+                    variables: {
+                        cart: ctx,
+                        manualCode: selectedEligiblePromotion.code,
+                    },
+                });
                 const result = (response?.data as any)?.validatePromotions;
                 if (!result || (Array.isArray(result.promotions) && result.promotions.length === 0)) {
                     return;
@@ -236,21 +316,19 @@ export const CartScreen = () => {
 
                 if (!mounted) return;
 
-                const firstPromo = Array.isArray(result.promotions) ? result.promotions[0] : null;
-                const promoCode = firstPromo?.code ?? applicableConditional.code ?? '';
                 setPromoResult({
-                    code: promoCode,
+                    promotionId: selectedEligiblePromotion.id,
+                    code: selectedEligiblePromotion.code,
                     discountAmount: Number(result.totalDiscount ?? 0),
                     freeDeliveryApplied: result.freeDeliveryApplied ?? false,
                     effectiveDeliveryPrice: Number(result.finalDeliveryPrice ?? ctx.deliveryPrice),
                     totalPrice: Number(result.finalTotal ?? ctx.subtotal + ctx.deliveryPrice),
+                    source: 'eligible',
                 });
-                setCouponCode(promoCode); // Show the code in the input field
-                autoAppliedPromotionIdRef.current = firstPromo?.id ?? applicableConditional.id;
                 showNotifier(
                     t.cart.promotion_applied_notifier.replace(
                         '{{name}}',
-                        firstPromo?.name ? `: ${firstPromo.name}` : '',
+                        selectedEligiblePromotion.name ? `: ${selectedEligiblePromotion.name}` : '',
                     ),
                     'success',
                 );
@@ -258,8 +336,6 @@ export const CartScreen = () => {
                 // threshold is hit — no full-screen overlay needed here.
             } catch {
                 // ignore - best effort
-            } finally {
-                if (mounted) setAutoApplying(false);
             }
         };
 
@@ -268,16 +344,45 @@ export const CartScreen = () => {
         return () => {
             mounted = false;
         };
-    }, [progress, applicableConditional, promoResult, t]);
+    }, [selectedEligiblePromotion, promoResult?.promotionId, promoResult?.source, t]);
 
     // Get saved addresses sorted by priority (default first)
     const savedAddresses = useMemo(() => {
         return ((addressesData as any)?.myAddresses ?? []) as UserAddress[];
     }, [addressesData]);
 
+    // Rehydrate checkout selection from persisted delivery location first.
+    useEffect(() => {
+        if (selectedLocation || !persistedDeliveryLocation) return;
+
+        const matchedSaved = savedAddresses.find(
+            (addr) =>
+                Math.abs(addr.latitude - persistedDeliveryLocation.latitude) < 0.0001 &&
+                Math.abs(addr.longitude - persistedDeliveryLocation.longitude) < 0.0001,
+        );
+
+        const locationFromStore: CheckoutLocation = {
+            latitude: persistedDeliveryLocation.latitude,
+            longitude: persistedDeliveryLocation.longitude,
+            address:
+                persistedDeliveryLocation.address ||
+                `${persistedDeliveryLocation.latitude.toFixed(6)}, ${persistedDeliveryLocation.longitude.toFixed(6)}`,
+            label: matchedSaved?.addressName ?? persistedDeliveryLocation.label,
+            addressId: matchedSaved?.id,
+            isOverridden: persistedDeliveryLocation.isOverridden ?? false,
+        };
+
+        if (!isLocationWithinDeliveryZone(locationFromStore)) {
+            return;
+        }
+
+        setSelectedLocation(locationFromStore);
+        void requestFeeForLocation(locationFromStore);
+    }, [persistedDeliveryLocation, savedAddresses, selectedLocation, isLocationWithinDeliveryZone]);
+
     // Auto-select default address on load
     useEffect(() => {
-        if (!selectedLocation && savedAddresses.length > 0) {
+        if (!selectedLocation && !persistedDeliveryLocation && savedAddresses.length > 0) {
             const defaultAddress = savedAddresses.find((addr) => addr.priority === 1) || savedAddresses[0];
             if (defaultAddress) {
                 const location: CheckoutLocation = {
@@ -286,19 +391,26 @@ export const CartScreen = () => {
                     address: defaultAddress.displayName,
                     label: defaultAddress.addressName,
                     addressId: defaultAddress.id,
+                    isOverridden: false,
                 };
+                if (!isLocationWithinDeliveryZone(location)) {
+                    return;
+                }
                 setSelectedLocation(location);
-                requestFeeForLocation(location);
+                void requestFeeForLocation(location);
             }
         }
-    }, [savedAddresses, selectedLocation]);
+    }, [savedAddresses, selectedLocation, persistedDeliveryLocation, isLocationWithinDeliveryZone]);
 
-    const requestFeeForLocation = async (next: CheckoutLocation) => {
+    const requestFeeForLocation = async (next: CheckoutLocation): Promise<boolean | null> => {
         // Calculate delivery fee based on distance from business
         const businessIds = Array.from(new Set(items.map((item) => item.businessId)));
-        if (businessIds.length === 0) return;
+        if (businessIds.length === 0) return null;
 
+        const requestId = ++feeRequestSequenceRef.current;
+        const localInZone = isLocationWithinDeliveryZone(next);
         setDeliveryPriceLoading(true);
+        setIsSelectedLocationInZone(null);
         try {
             // Use the first business to calculate distance
             const response = await calculateDeliveryPriceFn({
@@ -309,15 +421,32 @@ export const CartScreen = () => {
                 },
             });
             const result = response?.data?.calculateDeliveryPrice;
+            if (requestId !== feeRequestSequenceRef.current) {
+                return null;
+            }
+
             if (result?.price != null) {
                 setDeliveryPrice(Number(result.price));
             }
             setDeliveryZoneName(result?.zoneApplied?.name ?? null);
+            const hasZonesConfigured = effectiveServiceZones.length > 0;
+            const serverInZone = hasZonesConfigured ? !!result?.zoneApplied : true;
+            const inZone = hasZonesConfigured ? (localInZone || serverInZone) : true;
+            setIsSelectedLocationInZone(inZone);
+            return inZone;
         } catch {
+            if (requestId !== feeRequestSequenceRef.current) {
+                return null;
+            }
+
             // Keep default price on error
             setDeliveryZoneName(null);
+            setIsSelectedLocationInZone(localInZone);
+            return localInZone;
         } finally {
-            setDeliveryPriceLoading(false);
+            if (requestId === feeRequestSequenceRef.current) {
+                setDeliveryPriceLoading(false);
+            }
         }
     };
 
@@ -384,16 +513,44 @@ export const CartScreen = () => {
     }, [step, goToStep]);
 
     // ─── Address Picker Handler ─────────────────────────────
-    const handleAddressSelected = (next: CheckoutLocation) => {
-        setSelectedLocation(next);
-        requestFeeForLocation(next);
+    const handleAddressSelected = async (next: CheckoutLocation) => {
+        if (!isLocationWithinDeliveryZone(next)) {
+            Alert.alert(
+                t.home.out_of_zone.title,
+                t.cart.outside_zone_selected,
+            );
+            setIsSelectedLocationInZone(false);
+            return;
+        }
+
+        const overriddenLocation: CheckoutLocation = {
+            ...next,
+            isOverridden: true,
+        };
+
+        setSelectedLocation(overriddenLocation);
+        setDeliveryLocation({
+            latitude: overriddenLocation.latitude,
+            longitude: overriddenLocation.longitude,
+            address: overriddenLocation.address,
+            label: overriddenLocation.label,
+            isOverridden: true,
+        });
+        const inZoneFromPricing = await requestFeeForLocation(overriddenLocation);
+        if (inZoneFromPricing === false) {
+            Alert.alert(
+                t.home.out_of_zone.title,
+                t.cart.outside_zone_selected,
+            );
+            return;
+        }
 
         // Only offer to save as default when user picks a new (unsaved) location AND
         // they don't already have a default address. If they already have a default,
         // just proceed to checkout without asking.
         const hasDefaultAddress = savedAddresses.some((addr) => addr.priority === 1);
-        if (!next.addressId && !hasDefaultAddress) {
-            setPendingLocationToSave(next);
+        if (!overriddenLocation.addressId && !hasDefaultAddress) {
+            setPendingLocationToSave(overriddenLocation);
             setAddressName('');
             setTimeout(() => setShowSaveAddressPrompt(true), 200);
         } else {
@@ -447,19 +604,14 @@ export const CartScreen = () => {
         goToStep(3);
     };
 
-    // Clear promo if cart total drops below threshold for auto-applied promos
+    // Clear eligible promo if it no longer applies
     useEffect(() => {
         if (!promoResult) return;
-        
-        // If this was an auto-applied promo and we're now below threshold, clear it
-        if (autoAppliedPromotionIdRef.current && applicableConditional) {
-            if (progress < 1) {
-                setPromoResult(null);
-                autoAppliedPromotionIdRef.current = null;
-            }
+
+        if (promoResult.source === 'eligible' && !selectedEligiblePromotion) {
+            setPromoResult(null);
         }
-        // For manually applied promos, keep them even if total changes
-    }, [total, deliveryPrice, progress, applicableConditional]);
+    }, [promoResult, selectedEligiblePromotion]);
 
     // Manual promo application handler (previous auto-validation removed)
     const handleApplyCoupon = async () => {
@@ -486,11 +638,13 @@ export const CartScreen = () => {
             }
 
             setPromoResult({
+                promotionId: result.promotions?.[0]?.id ?? null,
                 code: couponCode.trim(),
                 discountAmount: Number(result.totalDiscount ?? 0),
                 freeDeliveryApplied: result.freeDeliveryApplied ?? false,
                 effectiveDeliveryPrice: Number(result.finalDeliveryPrice ?? deliveryPrice),
                 totalPrice: Number(result.finalTotal ?? total + deliveryPrice),
+                source: 'manual',
             });
             showNotifier(
                 t.cart.discount_added.replace('{{amount}}', Number(result.totalDiscount ?? 0).toFixed(2)),
@@ -513,7 +667,6 @@ export const CartScreen = () => {
     useEffect(() => {
         if (items.length === 0) {
             setPromoResult(null);
-            autoAppliedPromotionIdRef.current = null;
             setCouponCode('');
         }
     }, [items.length]);
@@ -521,9 +674,8 @@ export const CartScreen = () => {
     // Clear promo if user empties the coupon code field
     useEffect(() => {
         // If user clears the input field, clear the applied promo
-        if (promoResult && !couponCode.trim()) {
+        if (promoResult?.source === 'manual' && !couponCode.trim()) {
             setPromoResult(null);
-            autoAppliedPromotionIdRef.current = null;
         }
         // Clear error when user starts typing
         if (promoError && couponCode.trim()) {
@@ -645,6 +797,26 @@ export const CartScreen = () => {
             return;
         }
 
+        const localZoneCheck = isLocationWithinDeliveryZone(selectedLocation);
+
+        if (zonesLoading && !(zonesData as any)?.deliveryZones) {
+            Alert.alert(t.home.out_of_zone.title, t.cart.delivery_zone_checking);
+            return;
+        }
+
+        if (!localZoneCheck) {
+            Alert.alert(
+                t.home.out_of_zone.title,
+                t.cart.outside_zone_selected,
+            );
+            return;
+        }
+
+        if (isSelectedLocationInZone === false) {
+            // Recover from stale fee-check state when local polygon validation confirms in-zone.
+            setIsSelectedLocationInZone(true);
+        }
+
         const canContinue = await reconcileCartBeforeCheckout();
         if (!canContinue) {
             return;
@@ -659,7 +831,15 @@ export const CartScreen = () => {
             // separately via prioritySurcharge so the backend can fold it into the
             // stored deliveryPrice while keeping zone/tier validation intact.
             const apiDeliveryPrice = deliveryPrice;
-            const order = await createOrder(selectedLocation, apiDeliveryPrice, finalTotal, promoResult?.code, driverNotes, prioritySurcharge);
+            const order = await createOrder(
+                selectedLocation,
+                apiDeliveryPrice,
+                finalTotal,
+                promoResult?.promotionId ?? null,
+                driverNotes,
+                prioritySurcharge,
+                userContextLocation,
+            );
             const orderId = order?.id || null;
             
             console.log('[CartScreen] Order created:', orderId);
@@ -674,6 +854,11 @@ export const CartScreen = () => {
             // Keep current route and show success directly to avoid visible route flashes.
             if (orderId) {
                 updateActiveOrder(order as any);
+
+                if (order?.status === 'AWAITING_APPROVAL') {
+                    requestAwaitingApprovalAutoOpen(String(orderId));
+                }
+
                 console.log('[CartScreen] Showing success modal');
                 showSuccess(orderId, 'order_created');
             } else {
@@ -856,9 +1041,9 @@ export const CartScreen = () => {
                                 </View>
                             </View>
 
-                            {items.map((item) => (
+                            {items.map((item, index) => (
+                                <Reanimated.View key={item.cartItemId} entering={FadeInDown.delay(index * 55).duration(350).springify().damping(28).stiffness(160)}>
                                 <TouchableOpacity
-                                    key={item.cartItemId}
                                     className="rounded-xl p-4 flex-row items-center border"
                                     activeOpacity={0.9}
                                     onPress={() => handleEditCartItem(item)}
@@ -982,6 +1167,7 @@ export const CartScreen = () => {
                                         <Ionicons name="trash-outline" size={24} color={theme.colors.expense} />
                                     </TouchableOpacity>
                                 </TouchableOpacity>
+                                </Reanimated.View>
                             ))}
                         </View>
                     </ScrollView>
@@ -1148,8 +1334,8 @@ export const CartScreen = () => {
                                 </TouchableOpacity>
                             </View>
                             {items.map((item, idx) => (
+                                <Reanimated.View key={item.cartItemId} entering={FadeInDown.delay(idx * 45).duration(300).springify().damping(28).stiffness(160)}>
                                 <View
-                                    key={item.cartItemId}
                                     className="flex-row items-center px-4 py-2.5"
                                     style={idx < items.length - 1 ? { borderBottomWidth: 1, borderBottomColor: theme.colors.border } : undefined}
                                 >
@@ -1189,6 +1375,7 @@ export const CartScreen = () => {
                                         )}
                                     </View>
                                 </View>
+                                </Reanimated.View>
                             ))}
                         </View>
 
@@ -1236,6 +1423,7 @@ export const CartScreen = () => {
                         </View>
 
                         {/* Promo Code */}
+                        {!hasEligiblePromotion && (
                         <View
                             className="rounded-2xl border p-4 mb-4"
                             style={{
@@ -1347,6 +1535,7 @@ export const CartScreen = () => {
                                 </View>
                             )}
                         </View>
+                        )}
 
                         {/* Driver Notes */}
                         <View className="rounded-2xl border p-4 mb-4" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
@@ -1412,12 +1601,14 @@ export const CartScreen = () => {
                         <TouchableOpacity
                             className="py-4 rounded-2xl items-center"
                             style={{
-                                backgroundColor: isProcessing ? theme.colors.border : theme.colors.primary,
-                                opacity: isProcessing ? 0.6 : 1,
+                                backgroundColor: (isProcessing || deliveryPriceLoading || isSelectedLocationInZone === false)
+                                    ? theme.colors.border
+                                    : theme.colors.primary,
+                                opacity: (isProcessing || deliveryPriceLoading || isSelectedLocationInZone === false) ? 0.6 : 1,
                             }}
                             activeOpacity={0.8}
                             onPress={handleCheckout}
-                            disabled={isProcessing}
+                            disabled={isProcessing || deliveryPriceLoading || isSelectedLocationInZone === false}
                         >
                             {isProcessing || orderLoading ? (
                                 <View className="flex-row items-center gap-2">
@@ -1431,6 +1622,11 @@ export const CartScreen = () => {
                                 </View>
                             )}
                         </TouchableOpacity>
+                        {isSelectedLocationInZone === false && (
+                            <Text className="text-xs mt-2 text-center" style={{ color: '#F97316' }}>
+                                {t.cart.outside_zone_inline_warning}
+                            </Text>
+                        )}
                     </View>
                 </>
             )}

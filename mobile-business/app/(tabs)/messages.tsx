@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
     View,
     Text,
@@ -23,6 +24,7 @@ import {
 import { useTranslation } from '@/hooks/useTranslation';
 
 const CLEAR_STORAGE_KEY = 'business_chat_cleared_at';
+const EXTRA_MESSAGES_KEY = 'business_chat_extra_messages';
 
 type AlertType = 'INFO' | 'WARNING' | 'URGENT';
 
@@ -101,17 +103,29 @@ export default function MessagesScreen() {
     const [clearedAt, setClearedAt] = useState<number | null>(null);
     const flatListRef = useRef<FlatList>(null);
 
-    // Load persisted clear timestamp
+    // Load persisted clear timestamp and extra messages
     useEffect(() => {
-        AsyncStorage.getItem(CLEAR_STORAGE_KEY).then((val) => {
-            if (val) setClearedAt(parseInt(val, 10));
+        Promise.all([
+            AsyncStorage.getItem(CLEAR_STORAGE_KEY),
+            AsyncStorage.getItem(EXTRA_MESSAGES_KEY),
+        ]).then(([clearVal, extrasVal]) => {
+            if (clearVal) setClearedAt(parseInt(clearVal, 10));
+            if (extrasVal) {
+                try { setExtraMessages(JSON.parse(extrasVal)); } catch { /* ignore */ }
+            }
         });
     }, []);
 
-    const { loading, data: queryData } = useQuery<{ myBusinessMessages: BusinessMessage[] }>(MY_BUSINESS_MESSAGES, {
+    const { loading, data: queryData, refetch } = useQuery<{ myBusinessMessages: BusinessMessage[] }>(MY_BUSINESS_MESSAGES, {
         variables: { limit: 100 },
         fetchPolicy: 'cache-and-network',
+        pollInterval: 30_000,
     });
+
+    // Refetch whenever the screen comes into focus (handles missed subscription events)
+    useFocusEffect(useCallback(() => {
+        refetch();
+    }, [refetch]));
 
     // Derive base messages and adminId directly from query data (survives remount/cache)
     const baseMessages = queryData?.myBusinessMessages ?? [];
@@ -132,7 +146,11 @@ export default function MessagesScreen() {
     const [reply, { loading: replying }] = useMutation(REPLY_TO_BUSINESS_MESSAGE, {
         onCompleted: (data) => {
             if (data?.replyToBusinessMessage) {
-                setExtraMessages((prev) => [...prev, data.replyToBusinessMessage]);
+                setExtraMessages((prev) => {
+                    const next = [...prev, data.replyToBusinessMessage];
+                    AsyncStorage.setItem(EXTRA_MESSAGES_KEY, JSON.stringify(next));
+                    return next;
+                });
                 scrollToBottom();
             }
         },
@@ -144,7 +162,9 @@ export default function MessagesScreen() {
             if (!msg) return;
             setExtraMessages((prev) => {
                 if (prev.some((m) => m.id === msg.id)) return prev;
-                return [...prev, msg];
+                const next = [...prev, msg];
+                AsyncStorage.setItem(EXTRA_MESSAGES_KEY, JSON.stringify(next));
+                return next;
             });
             scrollToBottom();
         },
@@ -186,7 +206,9 @@ export default function MessagesScreen() {
                     onPress: async () => {
                         const now = Date.now();
                         await AsyncStorage.setItem(CLEAR_STORAGE_KEY, now.toString());
+                        await AsyncStorage.removeItem(EXTRA_MESSAGES_KEY);
                         setClearedAt(now);
+                        setExtraMessages([]);
                     },
                 },
             ],
@@ -281,7 +303,7 @@ export default function MessagesScreen() {
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
-                {loading ? (
+                {loading && messages.length === 0 ? (
                     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                         <ActivityIndicator color={COLORS.primary} />
                     </View>

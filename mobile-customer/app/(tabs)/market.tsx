@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import Animated, {
     useSharedValue, useAnimatedScrollHandler,
-    useAnimatedStyle, interpolate, Extrapolate, runOnJS, withTiming,
+    useAnimatedStyle, interpolate, Extrapolate, runOnJS, withTiming, Easing, cancelAnimation,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -151,13 +151,28 @@ function SubcategoryPills({
     onPress: (id: string) => void;
 }) {
     const theme = useTheme();
+    const scrollRef = useRef<RNScrollView>(null);
+    const tabPositions = useRef<Map<string, number>>(new Map());
+
+    const scrollToTab = useCallback((id: string) => {
+        const x = tabPositions.current.get(id);
+        if (x !== undefined && scrollRef.current) {
+            scrollRef.current.scrollTo({ x: Math.max(0, x - 40), animated: true });
+        }
+    }, []);
+
+    useEffect(() => {
+        if (activeId) scrollToTab(activeId);
+    }, [activeId, scrollToTab]);
+
     if (subcategories.length === 0) return null;
 
     return (
         <RNScrollView
+            ref={scrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingVertical: 6 }}
+            contentContainerStyle={{ paddingHorizontal: 16 }}
             style={{ flexGrow: 0 }}
         >
             {subcategories.map((sub) => {
@@ -165,20 +180,29 @@ function SubcategoryPills({
                 return (
                     <TouchableOpacity
                         key={sub.id}
-                        onPress={() => onPress(sub.id)}
+                        onPress={() => {
+                            onPress(sub.id);
+                            scrollToTab(sub.id);
+                        }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        onLayout={(e) => {
+                            tabPositions.current.set(sub.id, e.nativeEvent.layout.x);
+                        }}
                         activeOpacity={0.7}
                         style={{
                             paddingHorizontal: 12,
-                            paddingVertical: 6,
-                            borderRadius: 999,
-                            backgroundColor: isActive ? '#DDD6FE' : '#F3F4F6',
+                            paddingVertical: 10,
+                            marginRight: 4,
+                            borderBottomWidth: 2.5,
+                            borderBottomColor: isActive ? theme.colors.primary : 'transparent',
                         }}
                     >
                         <Text
                             style={{
-                                fontSize: 12,
-                                fontWeight: '600',
-                                color: isActive ? '#5B21B6' : '#71717A',
+                                fontSize: 13,
+                                fontWeight: isActive ? '800' : '600',
+                                color: isActive ? theme.colors.primary : theme.colors.subtext,
+                                letterSpacing: 0.3,
                             }}
                         >
                             {sub.name}
@@ -241,12 +265,31 @@ export default function Market() {
     const [activeSubcategoryId, setActiveSubcategoryId] = useState<string | null>(null);
     const activeSubcategoryRef = useRef<string | null>(null);
 
+    // ─── Stable refs for rapid-swipe navigation ─────────────
+    const allTabsRef = useRef<{ id: string; name: string }[]>([]);
+    const subcategoryMapRef = useRef<Map<string, { id: string; name: string; categoryId: string }[]>>(new Map());
+
     // ─── Swipe Animation ────────────────────────────────────
     const contentTranslateX = useSharedValue(0);
     const prevTabRef = useRef<string>(DISCOVER_TAB_ID);
     const prevSubcategoryRef = useRef<string | null>(null);
     const gestureTranslateX = useSharedValue(0);
     const isGestureActive = useSharedValue(false);
+
+    // ─── Staging Panel (peek-behind on swipe) ───────────────
+    const [stagingSubcategoryId, setStagingSubcategoryId] = useState<string | null>(null);
+    const [stagingTabId, setStagingTabId] = useState<string | null>(null);
+    const stagingTranslateX = useSharedValue(SCREEN_WIDTH);
+    const stagingSide = useSharedValue(1); // 1 = right, -1 = left
+    const stagingPrepared = useSharedValue(0);
+    // Set to true just before navigate() is called. The useEffect below
+    // fires after React commits new content and THEN parks the staging panel.
+    const stagingHandoffPending = useRef(false);
+    // Tracks whether onEnd committed to a navigation that may still be animating.
+    // If a new gesture starts while this is 1, we skip the animation and
+    // immediately complete the pending navigation.
+    const animationCommitted = useSharedValue(0);
+    const commitGoingRight = useSharedValue(0); // 1 = right, 0 = left
 
     // ─── Derived Data ───────────────────────────────────────
     const allProducts = useMemo(() => products ?? [], [products]);
@@ -257,7 +300,9 @@ export default function Market() {
 
     // Tabs: actual categories only
     const allTabs = useMemo(() => {
-        return categoryList;
+        const tabs = categoryList;
+        allTabsRef.current = tabs;
+        return tabs;
     }, [categoryList]);
 
     const subcategoryMap = useMemo(() => {
@@ -269,6 +314,7 @@ export default function Market() {
             if (!byCategory.has(sub.categoryId)) byCategory.set(sub.categoryId, []);
             byCategory.get(sub.categoryId)!.push(sub);
         });
+        subcategoryMapRef.current = byCategory;
 
         return { byCategory, byId };
     }, [subcategories]);
@@ -277,11 +323,6 @@ export default function Market() {
     const activeCategoryProducts = useMemo(() => {
         if (isDiscover) return [];
         const filtered = allProducts.filter((p: any) => p.product?.categoryId === activeTabId);
-        // Debug logging
-        if (filtered.length === 0 && allProducts.length > 0) {
-            console.log('No products found for category:', activeTabId);
-            console.log('Available products:', allProducts.map((p: any) => ({ id: p.id, name: p.name, categoryId: p.product?.categoryId })));
-        }
         return filtered;
     }, [allProducts, activeTabId, isDiscover]);
 
@@ -337,6 +378,31 @@ export default function Market() {
         return result;
     }, [isDiscover, activeSubcategories, activeSubcategoryId, activeCategoryProducts, activeTabId, categoryList, t]);
 
+    // Staging category sections (the page that peeks in during swipe)
+    const stagingCategorySections = useMemo(() => {
+        if (!stagingTabId && !stagingSubcategoryId) return [];
+        const tabId = stagingTabId ?? activeTabId;
+        const catProds = allProducts.filter((p: any) => p.product?.categoryId === tabId);
+        const catSubs = subcategoryMap.byCategory.get(tabId) ?? [];
+        const result: { subcategoryId: string; subcategoryName: string; products: any[] }[] = [];
+
+        if (catSubs.length > 0) {
+            const subId = stagingSubcategoryId ?? catSubs[0]?.id;
+            const sub = catSubs.find((s) => s.id === subId);
+            if (sub) {
+                const prods = catProds
+                    .filter((p: any) => p.product?.subcategoryId === sub.id)
+                    .sort((a: any, b: any) => (a.product?.sortOrder ?? 0) - (b.product?.sortOrder ?? 0));
+                if (prods.length > 0) result.push({ subcategoryId: sub.id, subcategoryName: sub.name, products: prods });
+            }
+        } else {
+            const catName = categoryList.find((c) => c.id === tabId)?.name ?? '';
+            const sorted = catProds.sort((a: any, b: any) => (a.product?.sortOrder ?? 0) - (b.product?.sortOrder ?? 0));
+            if (sorted.length > 0) result.push({ subcategoryId: `__all_${tabId}`, subcategoryName: catName, products: sorted });
+        }
+        return result;
+    }, [stagingTabId, stagingSubcategoryId, activeTabId, allProducts, subcategoryMap, categoryList]);
+
     const visibleSubcategoryPills = useMemo(
         () => subcategoryPillList.filter((sub) => {
             // Show all subcategories that have products in the active category
@@ -368,41 +434,22 @@ export default function Market() {
         return map;
     }, [categoryList, allProducts]);
 
-    // ─── Swipe Animation Effect ─────────────────────────────
-    useEffect(() => {
-        // Determine direction based on tab/subcategory change
-        let direction = 0; // -1 = left to right (going back), 1 = right to left (going forward)
-
-        // Check if tab changed
-        if (activeTabId !== prevTabRef.current) {
-            const prevIndex = allTabs.findIndex(t => t.id === prevTabRef.current);
-            const newIndex = allTabs.findIndex(t => t.id === activeTabId);
-            if (prevIndex !== -1 && newIndex !== -1) {
-                direction = newIndex > prevIndex ? 1 : -1;
-            }
-            prevTabRef.current = activeTabId;
-        }
-        // Check if subcategory changed
-        else if (activeSubcategoryId !== prevSubcategoryRef.current) {
-            const prevIndex = subcategoryPillList.findIndex(s => s.id === prevSubcategoryRef.current);
-            const newIndex = subcategoryPillList.findIndex(s => s.id === activeSubcategoryId);
-            if (prevIndex !== -1 && newIndex !== -1) {
-                direction = newIndex > prevIndex ? 1 : -1;
-            }
-            prevSubcategoryRef.current = activeSubcategoryId;
-        }
-
-        if (direction !== 0) {
-            // Start from off-screen in the direction of change
-            contentTranslateX.value = direction * SCREEN_WIDTH;
-            // Animate to center (0)
-            contentTranslateX.value = withTiming(0, { duration: 300 });
-        }
-    }, [activeTabId, activeSubcategoryId, allTabs, subcategoryPillList]);
+    // ─── Swipe Animation ────────────────────────────────────
+    // Driven entirely from the gesture — no useEffect delay
 
     const contentAnimatedStyle = useAnimatedStyle(() => {
         return {
             transform: [{ translateX: contentTranslateX.value + gestureTranslateX.value }],
+        };
+    });
+
+    const stagingPanelStyle = useAnimatedStyle(() => {
+        return {
+            position: 'absolute' as const,
+            top: 0,
+            left: 0,
+            width: SCREEN_WIDTH,
+            transform: [{ translateX: stagingTranslateX.value }],
         };
     });
 
@@ -426,70 +473,224 @@ export default function Market() {
 
     // ─── Gesture Handlers ───────────────────────────────────
     const goToNextItem = useCallback(() => {
-        if (activeSubcategories.length > 0 && activeSubcategoryId) {
-            const currentIndex = activeSubcategories.findIndex(s => s.id === activeSubcategoryId);
-            if (currentIndex < activeSubcategories.length - 1) {
-                const nextSub = activeSubcategories[currentIndex + 1];
+        const tabId = activeTabRef.current;
+        const subId = activeSubcategoryRef.current;
+        const subs = subcategoryMapRef.current.get(tabId) ?? [];
+        if (subs.length > 0 && subId) {
+            const currentIndex = subs.findIndex(s => s.id === subId);
+            if (currentIndex < subs.length - 1) {
+                const nextSub = subs[currentIndex + 1];
                 setActiveSubcategoryId(nextSub.id);
                 activeSubcategoryRef.current = nextSub.id;
                 return true;
             }
         }
-        // Try next category
-        const currentCatIndex = allTabs.findIndex(t => t.id === activeTabId);
-        if (currentCatIndex < allTabs.length - 1) {
-            const nextCat = allTabs[currentCatIndex + 1];
-            handleTabPress(nextCat.id);
+        const tabs = allTabsRef.current;
+        const currentCatIndex = tabs.findIndex(t => t.id === tabId);
+        if (currentCatIndex < tabs.length - 1) {
+            handleTabPress(tabs[currentCatIndex + 1].id);
             return true;
         }
         return false;
-    }, [activeSubcategories, activeSubcategoryId, allTabs, activeTabId, handleTabPress]);
+    }, [handleTabPress]);
 
     const goToPrevItem = useCallback(() => {
-        if (activeSubcategories.length > 0 && activeSubcategoryId) {
-            const currentIndex = activeSubcategories.findIndex(s => s.id === activeSubcategoryId);
+        const tabId = activeTabRef.current;
+        const subId = activeSubcategoryRef.current;
+        const subs = subcategoryMapRef.current.get(tabId) ?? [];
+        if (subs.length > 0 && subId) {
+            const currentIndex = subs.findIndex(s => s.id === subId);
             if (currentIndex > 0) {
-                const prevSub = activeSubcategories[currentIndex - 1];
+                const prevSub = subs[currentIndex - 1];
                 setActiveSubcategoryId(prevSub.id);
                 activeSubcategoryRef.current = prevSub.id;
                 return true;
             }
         }
-        // Try previous category
-        const currentCatIndex = allTabs.findIndex(t => t.id === activeTabId);
+        const tabs = allTabsRef.current;
+        const currentCatIndex = tabs.findIndex(t => t.id === tabId);
         if (currentCatIndex > 0) {
-            const prevCat = allTabs[currentCatIndex - 1];
-            handleTabPress(prevCat.id);
+            handleTabPress(tabs[currentCatIndex - 1].id);
             return true;
         }
         return false;
-    }, [activeSubcategories, activeSubcategoryId, allTabs, activeTabId, handleTabPress]);
+    }, [handleTabPress]);
+
+    const slideConfig = { duration: 260, easing: Easing.out(Easing.cubic) };
+
+    const prepareStaging = useCallback((direction: 'next' | 'prev') => {
+        const tabId = activeTabRef.current;
+        const subId = activeSubcategoryRef.current;
+        const subs = subcategoryMapRef.current.get(tabId) ?? [];
+        const tabs = allTabsRef.current;
+
+        if (direction === 'next') {
+            if (subs.length > 0 && subId) {
+                const idx = subs.findIndex((s) => s.id === subId);
+                if (idx < subs.length - 1) {
+                    setStagingSubcategoryId(subs[idx + 1].id);
+                    setStagingTabId(tabId);
+                    return;
+                }
+            }
+            const catIdx = tabs.findIndex((t) => t.id === tabId);
+            if (catIdx < tabs.length - 1) {
+                setStagingTabId(tabs[catIdx + 1].id);
+                setStagingSubcategoryId(null);
+            }
+        } else {
+            if (subs.length > 0 && subId) {
+                const idx = subs.findIndex((s) => s.id === subId);
+                if (idx > 0) {
+                    setStagingSubcategoryId(subs[idx - 1].id);
+                    setStagingTabId(tabId);
+                    return;
+                }
+            }
+            const catIdx = tabs.findIndex((t) => t.id === tabId);
+            if (catIdx > 0) {
+                setStagingTabId(tabs[catIdx - 1].id);
+                setStagingSubcategoryId(null);
+            }
+        }
+    }, []);
+
+    const canSwipeNext = useCallback(() => {
+        const tabId = activeTabRef.current;
+        const subId = activeSubcategoryRef.current;
+        const subs = subcategoryMapRef.current.get(tabId) ?? [];
+        if (subs.length > 0 && subId) {
+            const idx = subs.findIndex((s) => s.id === subId);
+            if (idx < subs.length - 1) return true;
+        }
+        const tabs = allTabsRef.current;
+        const catIdx = tabs.findIndex((t) => t.id === tabId);
+        return catIdx < tabs.length - 1;
+    }, []);
+
+    const canSwipePrev = useCallback(() => {
+        const tabId = activeTabRef.current;
+        const subId = activeSubcategoryRef.current;
+        const subs = subcategoryMapRef.current.get(tabId) ?? [];
+        if (subs.length > 0 && subId) {
+            const idx = subs.findIndex((s) => s.id === subId);
+            if (idx > 0) return true;
+        }
+        const tabs = allTabsRef.current;
+        const catIdx = tabs.findIndex((t) => t.id === tabId);
+        return catIdx > 0;
+    }, []);
+
+    // Shared values so the gesture worklet can read edge state without runOnJS
+    const hasNext = useSharedValue(1);
+    const hasPrev = useSharedValue(1);
+
+    // Keep them in sync whenever the active position changes
+    useEffect(() => {
+        hasNext.value = canSwipeNext() ? 1 : 0;
+        hasPrev.value = canSwipePrev() ? 1 : 0;
+    }, [activeTabId, activeSubcategoryId]);
+
+    const commitHandoff = useCallback((goingRight: boolean) => {
+        stagingHandoffPending.current = true;
+        if (goingRight) goToPrevItem();
+        else goToNextItem();
+    }, [goToPrevItem, goToNextItem]);
+
+    const clearStaging = useCallback(() => {
+        setStagingSubcategoryId(null);
+        setStagingTabId(null);
+    }, []);
 
     const panGesture = Gesture.Pan()
-        .activeOffsetX([-20, 20])
+        .activeOffsetX([-15, 15])
         .onStart(() => {
+            // Cancel any in-flight animations.
+            cancelAnimation(gestureTranslateX);
+            cancelAnimation(stagingTranslateX);
+
+            if (animationCommitted.value) {
+                // A previous swipe was committed but the animation was interrupted.
+                // Complete that navigation immediately so the user doesn't lose a page.
+                gestureTranslateX.value = 0;
+                contentTranslateX.value = 0;
+                stagingTranslateX.value = stagingSide.value * SCREEN_WIDTH;
+                runOnJS(commitHandoff)(commitGoingRight.value === 1);
+                animationCommitted.value = 0;
+            } else if (stagingPrepared.value) {
+                // Gesture was mid-drag but didn't commit — reset staging cleanly.
+                stagingTranslateX.value = stagingSide.value * SCREEN_WIDTH;
+                gestureTranslateX.value = 0;
+                runOnJS(clearStaging)();
+            }
+
+            stagingPrepared.value = 0;
             isGestureActive.value = true;
         })
         .onUpdate((event) => {
             if (isGestureActive.value) {
-                gestureTranslateX.value = event.translationX * 0.5;
+                const goingRight = event.translationX > 0;
+                const blocked = goingRight ? !hasPrev.value : !hasNext.value;
+
+                if (blocked) {
+                    // Rubber-band resistance — allow slight drag but not full movement
+                    gestureTranslateX.value = event.translationX * 0.15;
+                    return;
+                }
+
+                if (!stagingPrepared.value && Math.abs(event.translationX) > 5) {
+                    stagingSide.value = goingRight ? -1 : 1;
+                    stagingTranslateX.value = stagingSide.value * SCREEN_WIDTH + event.translationX;
+                    runOnJS(prepareStaging)(goingRight ? 'prev' : 'next');
+                    stagingPrepared.value = 1;
+                } else if (stagingPrepared.value) {
+                    stagingTranslateX.value = stagingSide.value * SCREEN_WIDTH + event.translationX;
+                }
+                gestureTranslateX.value = event.translationX;
             }
         })
         .onEnd((event) => {
             const threshold = SCREEN_WIDTH * 0.25;
-            const shouldSwipe = Math.abs(event.translationX) > threshold;
-            
-            if (shouldSwipe) {
-                if (event.translationX > 0) {
-                    // Swiping right - go to previous
-                    runOnJS(goToPrevItem)();
-                } else {
-                    // Swiping left - go to next
-                    runOnJS(goToNextItem)();
+            const velocityThreshold = 500;
+            const shouldSwipe =
+                Math.abs(event.translationX) > threshold ||
+                Math.abs(event.velocityX) > velocityThreshold;
+
+            const goingRight = event.translationX > 0;
+            const blocked = goingRight ? !hasPrev.value : !hasNext.value;
+
+            if (blocked || !shouldSwipe) {
+                // Snap back
+                gestureTranslateX.value = withTiming(0, { duration: 200, easing: Easing.out(Easing.quad) });
+                if (stagingPrepared.value) {
+                    stagingTranslateX.value = withTiming(
+                        stagingSide.value * SCREEN_WIDTH,
+                        { duration: 200, easing: Easing.out(Easing.quad) },
+                        (finished) => { if (finished) { runOnJS(clearStaging)(); } },
+                    );
                 }
+                isGestureActive.value = false;
+                return;
             }
-            
-            gestureTranslateX.value = withTiming(0, { duration: 200 });
+
+            if (shouldSwipe) {
+                const exitTo = goingRight ? SCREEN_WIDTH : -SCREEN_WIDTH;
+
+                // Mark as committed so a rapid next gesture can complete us immediately.
+                animationCommitted.value = 1;
+                commitGoingRight.value = goingRight ? 1 : 0;
+
+                // Animate both panels together: current exits, staging arrives at 0
+                gestureTranslateX.value = withTiming(exitTo, slideConfig);
+                stagingTranslateX.value = withTiming(0, slideConfig, (finished) => {
+                    if (!finished) return; // interrupted — onStart of next gesture will handle it
+                    animationCommitted.value = 0;
+                    gestureTranslateX.value = 0;
+                    contentTranslateX.value = 0;
+                    runOnJS(commitHandoff)(goingRight);
+                });
+            }
+
             isGestureActive.value = false;
         });
 
@@ -510,16 +711,20 @@ export default function Market() {
         }
     }, [categorySections, isDiscover]);
 
-    // Reset subcategory when switching tabs
+    // Reset subcategory when switching tabs — removed: handleTabPress now sets
+    // the first subcategory atomically to avoid a double-render delay.
+
+    // ─── Staging handoff ────────────────────────────────────
+    // Runs AFTER React has committed new content to the current panel.
+    // Staging is still at 0 covering it, so there is no visible flash.
+    // Now it is safe to park staging off-screen and clear its state.
     useEffect(() => {
-        if (isDiscover) {
-            setActiveSubcategoryId(null);
-            activeSubcategoryRef.current = null;
-        } else if (categorySections.length > 0) {
-            setActiveSubcategoryId(categorySections[0].subcategoryId);
-            activeSubcategoryRef.current = categorySections[0].subcategoryId;
-        }
-    }, [activeTabId]);
+        if (!stagingHandoffPending.current) return;
+        stagingHandoffPending.current = false;
+        stagingTranslateX.value = stagingSide.value * SCREEN_WIDTH;
+        setStagingSubcategoryId(null);
+        setStagingTabId(null);
+    }, [activeTabId, activeSubcategoryId]);
 
     // ─── Scroll sync ────────────────────────────────────────
     useEffect(() => {
@@ -598,9 +803,9 @@ export default function Market() {
         sectionOffsetsRef.current.sort((a, b) => a.y - b.y);
     }, []);
 
-    const handleProductPress = useCallback((productId: string) => {
-        router.push(`/product/${productId}`);
-    }, [router]);
+    const handleProductPress = useCallback((_productId: string) => {
+        // no-op: detail page disabled for market
+    }, []);
 
     const handleClearSearch = useCallback(() => {
         setSearchQuery('');
@@ -808,6 +1013,7 @@ export default function Market() {
                 {/* ═══ 1: Content ═══ */}
                 <View onLayout={(e) => { productsContainerY.current = e.nativeEvent.layout.y; }}>
                     <GestureDetector gesture={panGesture}>
+                        <View style={{ overflow: 'hidden', width: SCREEN_WIDTH }}>
                         <Animated.View style={contentAnimatedStyle}>
                             {!isSearching && isDiscover && (
                             /* ─── Discover Content ─── */
@@ -852,22 +1058,11 @@ export default function Market() {
                                         key={section.subcategoryId}
                                         onLayout={(e) => handleSectionLayout(section.subcategoryId, e)}
                                     >
-                                        <View style={{ paddingHorizontal: 16, paddingTop: idx === 0 ? 16 : 28, paddingBottom: 10 }}>
-                                            <Text
-                                                style={{
-                                                    fontSize: 13, fontWeight: '600', color: theme.colors.subtext,
-                                                    letterSpacing: 0.3,
-                                                }}
-                                            >
-                                                {section.subcategoryName}
-                                            </Text>
-                                        </View>
-
-                                        <View style={{ paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                                        <View style={{ paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingTop: idx === 0 ? 16 : 0 }}>
                                             {section.products.map((product: any) => (
                                                 <View key={product.id} style={{ width: (SCREEN_WIDTH - 44) / 2 }}>
                                                     <MarketProductCard
-                                                        product={product}
+                                                        product={product.product ?? product}
                                                         onPress={handleProductPress}
                                                         businessType={BusinessType.Market}
                                                     />
@@ -888,6 +1083,29 @@ export default function Market() {
                             </View>
                         )}
                         </Animated.View>
+
+                        {/* Staging panel — reveals during swipe */}
+                        <Animated.View style={stagingPanelStyle}>
+                            <View style={{ paddingBottom: 60 }}>
+                                {stagingCategorySections.map((section, idx) => (
+                                    <View key={section.subcategoryId}>
+                                        <View style={{ paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingTop: idx === 0 ? 16 : 0 }}>
+                                            {section.products.map((product: any) => (
+                                                <View key={product.id} style={{ width: (SCREEN_WIDTH - 44) / 2 }}>
+                                                    <MarketProductCard
+                                                        product={product.product ?? product}
+                                                        onPress={handleProductPress}
+                                                        businessType={BusinessType.Market}
+                                                    />
+                                                </View>
+                                            ))}
+                                        </View>
+                                    </View>
+                                ))}
+                            </View>
+                        </Animated.View>
+
+                        </View>
                     </GestureDetector>
                 </View>
             </Animated.ScrollView>
@@ -921,7 +1139,7 @@ export default function Market() {
                                 {searchResults.map((product: any) => (
                                     <View key={product.id} style={{ width: (SCREEN_WIDTH - 44) / 2 }}>
                                         <MarketProductCard
-                                            product={product}
+                                            product={product.product ?? product}
                                             onPress={handleProductPress}
                                             businessType={BusinessType.Market}
                                         />

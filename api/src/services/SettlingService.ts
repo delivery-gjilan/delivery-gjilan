@@ -73,8 +73,6 @@ export class SettlingService {
                     entityType: 'DRIVER',
                     driverId,
                     amount: netAmount,
-                    direction,
-                    totalBalanceAtTime: netAmount,
                     createdByUserId,
                 })
                 .returning();
@@ -84,8 +82,6 @@ export class SettlingService {
                 .update(settlements)
                 .set({
                     isSettled: true,
-                    status: 'PAID',
-                    paidAt: now,
                     settlementPaymentId: payment.id,
                     updatedAt: now,
                 })
@@ -123,8 +119,8 @@ export class SettlingService {
         businessId: string,
         paymentAmount: number,
         createdByUserId: string,
-        paymentMethod?: string,
-        paymentReference?: string,
+        _paymentMethod?: string,
+        _paymentReference?: string,
         note?: string,
     ): Promise<SettleResult> {
         const paymentCents = Math.round(paymentAmount * 100);
@@ -170,7 +166,6 @@ export class SettlingService {
 
             const direction: 'ENTITY_TO_PLATFORM' | 'PLATFORM_TO_ENTITY' =
                 netCents >= 0 ? 'ENTITY_TO_PLATFORM' : 'PLATFORM_TO_ENTITY';
-            const totalBalance = Number((absNet / 100).toFixed(2));
             const now = new Date().toISOString();
 
             const [payment] = await tx
@@ -179,10 +174,6 @@ export class SettlingService {
                     entityType: 'BUSINESS',
                     businessId,
                     amount: paymentAmount,
-                    direction,
-                    totalBalanceAtTime: totalBalance,
-                    paymentMethod: paymentMethod ?? null,
-                    paymentReference: paymentReference ?? null,
                     note: note ?? null,
                     createdByUserId,
                 })
@@ -194,8 +185,6 @@ export class SettlingService {
                 .update(settlements)
                 .set({
                     isSettled: true,
-                    status: 'PAID',
-                    paidAt: now,
                     settlementPaymentId: payment.id,
                     updatedAt: now,
                 })
@@ -219,7 +208,6 @@ export class SettlingService {
                         businessId,
                         orderId: null,
                         amount: remainderAmount,
-                        status: 'PENDING',
                         isSettled: false,
                         sourcePaymentId: payment.id,
                     })
@@ -234,7 +222,6 @@ export class SettlingService {
                     paymentId: payment.id,
                     settledCount: unsettled.length,
                     paymentAmount,
-                    totalBalance,
                     remainderAmount,
                     direction,
                 },

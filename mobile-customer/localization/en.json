@@ -150,6 +150,10 @@
             "healthy_food_sub": "Order now with discount",
             "weekly_menu": "New weekly menu",
             "weekly_menu_sub": "Try new flavors"
+        },
+        "out_of_zone": {
+            "title": "Outside Delivery Zone",
+            "message": "Your current location is outside our delivery area. Please choose an address within the zone."
         }
     },
     "restaurants": {
@@ -315,6 +319,9 @@
         "promo_error": "Promo Error",
         "unable_validate_promo": "Unable to validate promo code.",
         "select_address_alert": "Please choose a delivery address to continue.",
+        "delivery_zone_checking": "Checking delivery zone coverage. Please try again in a moment.",
+        "outside_zone_selected": "Selected address is outside our delivery area. Please choose an address within the zone.",
+        "outside_zone_inline_warning": "Selected address is outside our delivery area. Choose an in-zone address to continue.",
         "order_failed": "Order Failed",
         "unable_create_order": "Unable to create order. Please try again.",
         "active_order_exists_title": "Active Order Exists",
@@ -449,6 +456,7 @@
         },
         "active_bar": "Active Order",
         "status": {
+            "awaiting_approval": "AWAITING APPROVAL",
             "pending": "PENDING",
             "preparing": "PREPARING",
             "ready": "READY",
@@ -458,12 +466,22 @@
             "delivered": "DELIVERED"
         },
         "status_messages": {
+            "awaiting_approval": "Your order is waiting for manual approval",
             "pending": "Waiting for the restaurant to accept your order",
             "preparing": "Your order is being prepared",
             "ready": "Your order is ready for pickup",
             "out_for_delivery": "Your order is on its way",
             "cancelled": "This order has been cancelled",
             "delivered": "Your order has been delivered"
+        },
+        "awaiting_approval_modal": {
+            "title": "Your Order Is Under Review",
+            "subtitle": "We are checking your order before it is accepted.",
+            "reason_first_order": "This is your first order.",
+            "reason_high_value": "The total is above our high-value review threshold.",
+            "reason_out_of_zone": "Your address may be outside the standard delivery zone.",
+            "agent_call_note": "An agent may call you to confirm details before approval.",
+            "dismiss": "Okay"
         },
         "status_messages_market": {
             "pending": "Waiting for the store to accept your order",

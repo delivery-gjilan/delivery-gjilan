@@ -19,8 +19,6 @@ import SuccessModalContainer from '@/components/SuccessModalContainer';
 import { useBackgroundLiveActivity } from '@/hooks/useBackgroundLiveActivity';
 import { useEffect } from 'react';
 import Mapbox from '@rnmapbox/maps';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCartDataStore } from '@/modules/cart/store/cartDataStore';
 
 // Inner component that uses Apollo Client (must be inside ApolloProvider)
 function AppContent() {
@@ -104,12 +102,6 @@ function AppContent() {
 
 export default function RootLayout() {
     const { ready } = useAppSetup();
-
-    // TEMP DEBUG: force-clear cart on every app start.
-    useEffect(() => {
-        useCartDataStore.setState({ items: [] });
-        void AsyncStorage.removeItem('cart-storage');
-    }, []);
 
     // Initialize Mapbox
     useEffect(() => {

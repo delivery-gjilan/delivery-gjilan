@@ -7,6 +7,8 @@
 
 ## Recent Updates
 
+- 2026-03-31: Priority surcharge (opt-in expedited delivery fee) is now stored as a separate `priority_surcharge` column on orders and automatically creates a `DRIVER / RECEIVABLE` settlement for cash orders (`rule_id = null`).
+- 2026-03-31: Added business-funded promotion flow: `orders.business_price` column, business-funded item discounts stored as `businessPrice`, settlement rules skipped for business-funded item promos, ORDER_PRICE settlements use business-funded base when present, admin wizard exposes creator type toggle + business selector with settlement rules info box.
 - 2026-03-25: Comprehensive doc refresh — added PromotionEngine service docs, stacking logic, progression bar (mobile-customer), corrected promotions table fields to match actual schema, added mobile-customer key files.
 - 2026-03-20: Added DB-level pending-settlement uniqueness guard (`uq_settlements_pending_fingerprint`) plus conflict-safe inserts in `FinancialService.createOrderSettlements()` to hard-stop occasional duplicate pending rows under concurrent triggers.
 - 2026-03-19: Settlement creation is now protected by an order-scoped Postgres advisory transaction lock in `FinancialService.createOrderSettlements()` to prevent duplicate settlements during concurrent delivery/backfill triggers.
@@ -120,6 +122,16 @@ For `PREPAID_TO_PLATFORM`, no driver remittance settlement is created for markup
 
 This keeps platform markup earnings explicit in settlements without requiring an admin-configured settlement rule.
 
+### Automatic Priority Surcharge Remittance (Platform ↔ Driver)
+
+When a customer pays a priority (expedited) delivery surcharge, a second automatic driver settlement is created.
+
+- Settlement type: `DRIVER`
+- Direction: `RECEIVABLE`
+- Meaning: driver owes the platform the priority surcharge collected from the customer
+- Rule linkage: `rule_id = null` (system-generated)
+- Only applicable to `CASH_TO_DRIVER` orders — on `PREPAID_TO_PLATFORM` orders the platform already collected the surcharge directly
+
 ### Examples
 
 | Name | Entity | Direction | Amount | Applies To | Scope |
@@ -223,6 +235,14 @@ Links orders to applied promotions:
 | `promotion_usage` | Full redemption log (who used what, on which order, discount amount) |
 | `promotion_business_eligibility` | Restricts a promo to specific businesses |
 | `user_promo_metadata` | Per-user stats: first order promo used, total savings |
+
+### Business-funded promotions (item discounts)
+
+- `creator_type = BUSINESS` + non-delivery promotions are treated as business-funded item discounts.
+- Order creation stores the business-funded adjusted items total in `orders.business_price` (null when no business-funded promo); original item subtotal remains in `orders.base_price`.
+- SettlementCalculationEngine uses `order.businessPrice ?? order.basePrice` when computing ORDER_PRICE settlements so business-funded discounts do not reduce platform-take calculations for platform-funded rules.
+- PromotionService skips creating settlement rules for business-funded item promotions (non-delivery) to avoid double-charging the business.
+- Admin panel promotion wizard surfaces a Platform/Business toggle and business selector; for business-funded item promos, the settlement rules step is replaced with an info box explaining settlements are skipped.
 
 ---
 

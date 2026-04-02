@@ -153,6 +153,12 @@ input CreatePromotionInput {
   
   # Optional: Restrict to specific businesses
   eligibleBusinessIds: [ID!]
+
+  # Settlement Rule Integration
+  createSettlementRules: Boolean
+  driverRuleAmount: Float
+  driverRuleAmountType: SettlementAmountType
+  addDriverCommission: Boolean
 }
 
 input UpdatePromotionInput {

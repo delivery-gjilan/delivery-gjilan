@@ -17,6 +17,7 @@ export const updateDeliveryZone: NonNullable<MutationResolvers['updateDeliveryZo
     if (input.deliveryFee != null) updates.deliveryFee = input.deliveryFee;
     if (input.sortOrder != null) updates.sortOrder = input.sortOrder;
     if (input.isActive != null) updates.isActive = input.isActive;
+    if (input.isServiceZone != null) updates.isServiceZone = input.isServiceZone;
 
     const [row] = await db
         .update(deliveryZones)
@@ -35,6 +36,7 @@ export const updateDeliveryZone: NonNullable<MutationResolvers['updateDeliveryZo
         deliveryFee: row.deliveryFee,
         sortOrder: row.sortOrder,
         isActive: row.isActive,
+        isServiceZone: row.isServiceZone,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
     };

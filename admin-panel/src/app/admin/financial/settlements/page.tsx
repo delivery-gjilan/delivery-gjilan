@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useMutation } from '@apollo/client';
+import { useQuery, useMutation } from '@apollo/client/react';
+import { useToast } from '@/hooks/use-toast';
 import {
   Table,
   TableBody,
@@ -21,10 +22,8 @@ import {
   SettlementType,
   SettlementStatus,
   SettlementDirection,
-  type GetSettlementsQuery,
+  type SettlementsPageQuery,
 } from '@/gql/graphql';
-import { gql } from '@apollo/client';
-import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
   DialogContent,
@@ -33,7 +32,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 
-type SettlementRecord = GetSettlementsQuery['settlements'][number];
+type SettlementRecord = SettlementsPageQuery['settlements'][number];
 
 type SettlementGroup = {
   id: string;
@@ -47,264 +46,27 @@ type SettlementGroup = {
   paidCount: number;
 };
 
-const GET_SETTLEMENTS_PAGE = gql`
-  query GetSettlementsPage(
-    $type: SettlementType
-    $status: SettlementStatus
-    $direction: SettlementDirection
-    $isSettled: Boolean
-    $driverId: ID
-    $businessId: ID
-    $startDate: Date
-    $endDate: Date
-    $limit: Int
-    $offset: Int
-  ) {
-    settlements(
-      type: $type
-      status: $status
-      direction: $direction
-      isSettled: $isSettled
-      driverId: $driverId
-      businessId: $businessId
-      startDate: $startDate
-      endDate: $endDate
-      limit: $limit
-      offset: $offset
-    ) {
-      id
-      type
-      direction
-      isSettled
-      driver {
-        id
-        firstName
-        lastName
-        phoneNumber
-      }
-      business {
-        id
-        name
-      }
-      order {
-        id
-        displayId
-        orderDate
-        status
-        orderPrice
-        deliveryPrice
-        totalPrice
-        businesses {
-          business {
-            id
-            name
-            businessType
-          }
-          items {
-            id
-            productId
-            name
-            quantity
-            unitPrice
-            notes
-            selectedOptions {
-              id
-              optionName
-              priceAtOrder
-            }
-          }
-        }
-      }
-      amount
-      currency
-      status
-      paidAt
-      paymentReference
-      paymentMethod
-      ruleId
-      createdAt
-    }
-  }
-`;
-
-const MARK_SETTLEMENT_AS_PAID = gql`
-  mutation MarkSettlementAsPaidPage($settlementId: ID!, $paymentReference: String, $paymentMethod: String) {
-    markSettlementAsPaid(settlementId: $settlementId, paymentReference: $paymentReference, paymentMethod: $paymentMethod) {
-      id
-      status
-      amount
-      paidAt
-      paymentReference
-      paymentMethod
-    }
-  }
-`;
-
-const MARK_SETTLEMENT_AS_PARTIALLY_PAID = gql`
-  mutation MarkSettlementAsPartiallyPaidPage($settlementId: ID!, $amount: Float!) {
-    markSettlementAsPartiallyPaid(settlementId: $settlementId, amount: $amount) {
-      id
-      status
-      amount
-      paidAt
-    }
-  }
-`;
-
-const MARK_SETTLEMENTS_AS_PAID = gql`
-  mutation MarkSettlementsAsPaidPage($ids: [ID!]!, $paymentReference: String, $paymentMethod: String) {
-    markSettlementsAsPaid(ids: $ids, paymentReference: $paymentReference, paymentMethod: $paymentMethod) {
-      id
-      status
-      paidAt
-    }
-  }
-`;
-
-const BACKFILL_SETTLEMENTS = gql`
-  mutation BackfillSettlements {
-    backfillSettlementsForDeliveredOrders
-  }
-`;
-
-const SETTLE_WITH_DRIVER_MUTATION = gql`
-  mutation SettleWithDriverPage($driverId: ID!) {
-    settleWithDriver(driverId: $driverId) {
-      payment {
-        id
-        amount
-        direction
-        totalBalanceAtTime
-        createdAt
-      }
-      settledCount
-      netAmount
-      direction
-      remainderAmount
-      remainderSettlement {
-        id
-        amount
-        direction
-      }
-    }
-  }
-`;
-
-const SETTLE_WITH_BUSINESS_MUTATION = gql`
-  mutation SettleWithBusinessPage(
-    $businessId: ID!
-    $amount: Float!
-    $paymentMethod: String
-    $paymentReference: String
-    $note: String
-  ) {
-    settleWithBusiness(
-      businessId: $businessId
-      amount: $amount
-      paymentMethod: $paymentMethod
-      paymentReference: $paymentReference
-      note: $note
-    ) {
-      payment {
-        id
-        amount
-        direction
-        totalBalanceAtTime
-        createdAt
-      }
-      settledCount
-      netAmount
-      direction
-      remainderAmount
-      remainderSettlement {
-        id
-        amount
-        direction
-      }
-    }
-  }
-`;
-
-const GET_UNSETTLED_BALANCE_QUERY = gql`
-  query GetUnsettledBalancePage($entityType: SettlementType!, $entityId: ID!) {
-    unsettledBalance(entityType: $entityType, entityId: $entityId)
-  }
-`;
-
-const CREATE_SETTLEMENT_REQUEST_MUTATION = gql`
-  mutation AdminCreateSettlementRequest(
-    $businessId: ID!
-    $amount: Float!
-    $periodStart: Date!
-    $periodEnd: Date!
-    $note: String
-  ) {
-    createSettlementRequest(
-      businessId: $businessId
-      amount: $amount
-      periodStart: $periodStart
-      periodEnd: $periodEnd
-      note: $note
-    ) {
-      id
-      status
-      amount
-      currency
-      periodStart
-      periodEnd
-      note
-      expiresAt
-      createdAt
-    }
-  }
-`;
-
-const CANCEL_SETTLEMENT_REQUEST_MUTATION = gql`
-  mutation AdminCancelSettlementRequest($requestId: ID!) {
-    cancelSettlementRequest(requestId: $requestId) {
-      id
-      status
-    }
-  }
-`;
-
-const GET_SETTLEMENT_REQUESTS_QUERY = gql`
-  query AdminGetSettlementRequests($businessId: ID, $limit: Int) {
-    settlementRequests(businessId: $businessId, limit: $limit) {
-      id
-      amount
-      currency
-      periodStart
-      periodEnd
-      note
-      status
-      expiresAt
-      createdAt
-      respondedAt
-      disputeReason
-      requestedBy {
-        id
-        firstName
-        lastName
-      }
-      respondedBy {
-        id
-        firstName
-        lastName
-      }
-    }
-  }
-`;
+import {
+  GET_SETTLEMENTS_PAGE,
+  MARK_SETTLEMENT_PAID,
+  MARK_SETTLEMENTS_PAID_OP,
+  MARK_SETTLEMENT_PARTIAL,
+  BACKFILL_SETTLEMENTS,
+  CREATE_SETTLEMENT_REQUEST,
+  CANCEL_SETTLEMENT_REQUEST,
+  GET_SETTLEMENT_REQUESTS,
+  SETTLE_WITH_DRIVER,
+  SETTLE_WITH_BUSINESS,
+} from '@/graphql/operations/settlements/queries';
 
 export default function SettlementsPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'business' | 'driver'>('business');
-  const [statusFilter, setStatusFilter] = useState<'all' | SettlementStatus>('all');
   const [directionFilter, setDirectionFilter] = useState<'all' | SettlementDirection>('all');
   const [settledFilter, setSettledFilter] = useState<'all' | 'settled' | 'unsettled'>('unsettled');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
-  const [selectedSettlement, setSelectedSettlement] = useState<any>(null);
+  const [selectedSettlement, setSelectedSettlement] = useState<SettlementRecord | null>(null);
   const [bulkPartialAmount, setBulkPartialAmount] = useState('');
   const [bulkProcessing, setBulkProcessing] = useState(false);
   // Settle dialog state
@@ -335,7 +97,6 @@ export default function SettlementsPage() {
   } = useQuery(GET_SETTLEMENTS_PAGE, {
     variables: {
       type: SettlementType.Business,
-      status: statusFilter === 'all' ? null : statusFilter,
       direction: directionFilter === 'all' ? null : directionFilter,
       isSettled: settledFilter === 'all' ? null : settledFilter === 'settled',
       limit: 200,
@@ -350,7 +111,6 @@ export default function SettlementsPage() {
   } = useQuery(GET_SETTLEMENTS_PAGE, {
     variables: {
       type: SettlementType.Driver,
-      status: statusFilter === 'all' ? null : statusFilter,
       direction: directionFilter === 'all' ? null : directionFilter,
       isSettled: settledFilter === 'all' ? null : settledFilter === 'settled',
       limit: 200,
@@ -402,12 +162,10 @@ export default function SettlementsPage() {
       existingGroup.settlements.push(settlement);
       existingGroup.totalAmount += amount;
 
-      if (settlement.status === SettlementStatus.Pending) {
+      if (!settlement.isSettled) {
         existingGroup.pendingAmount += amount;
         existingGroup.pendingCount += 1;
-      }
-
-      if (settlement.status === SettlementStatus.Paid) {
+      } else {
         existingGroup.paidAmount += amount;
         existingGroup.paidCount += 1;
       }
@@ -421,10 +179,10 @@ export default function SettlementsPage() {
       subtitle: getEntitySubtitle(settlement),
       settlements: [settlement],
       totalAmount: amount,
-      pendingAmount: settlement.status === SettlementStatus.Pending ? amount : 0,
-      paidAmount: settlement.status === SettlementStatus.Paid ? amount : 0,
-      pendingCount: settlement.status === SettlementStatus.Pending ? 1 : 0,
-      paidCount: settlement.status === SettlementStatus.Paid ? 1 : 0,
+      pendingAmount: !settlement.isSettled ? amount : 0,
+      paidAmount: settlement.isSettled ? amount : 0,
+      pendingCount: !settlement.isSettled ? 1 : 0,
+      paidCount: settlement.isSettled ? 1 : 0,
     });
   });
 
@@ -480,7 +238,7 @@ export default function SettlementsPage() {
     : filteredGroups.flatMap((group) => group.settlements);
 
   const pendingSettlements = settlementsInCurrentView.filter(
-    (settlement) => settlement.status === SettlementStatus.Pending,
+    (settlement) => !settlement.isSettled,
   );
 
   const pendingSettlementIds = pendingSettlements.map((settlement) => settlement.id);
@@ -496,51 +254,27 @@ export default function SettlementsPage() {
       : 'all visible drivers';
 
   // Mark as paid mutation
-  const [markAsPaid] = useMutation(MARK_SETTLEMENT_AS_PAID);
+  const [markAsPaid] = useMutation(MARK_SETTLEMENT_PAID);
+  const [markAsPartiallyPaid] = useMutation(MARK_SETTLEMENT_PARTIAL);
+  const [markSettlementsAsPaid] = useMutation(MARK_SETTLEMENTS_PAID_OP);
+  const [backfillSettlements, { loading: backfillLoading }] = useMutation(BACKFILL_SETTLEMENTS);
+  const [cancelSettlementRequest] = useMutation(CANCEL_SETTLEMENT_REQUEST);
+  const [createSettlementRequest] = useMutation(CREATE_SETTLEMENT_REQUEST);
 
-  // Mark as partially paid mutation
-  const [markAsPartiallyPaid] = useMutation(MARK_SETTLEMENT_AS_PARTIALLY_PAID);
-
-  const [markSettlementsAsPaid] = useMutation(MARK_SETTLEMENTS_AS_PAID);
-
-  // Settlement request mutations
-  const [createSettlementRequest] = useMutation(CREATE_SETTLEMENT_REQUEST_MUTATION);
-  const [cancelSettlementRequest] = useMutation(CANCEL_SETTLEMENT_REQUEST_MUTATION);
-
-  // New settling mutations
-  const [settleWithDriver] = useMutation(SETTLE_WITH_DRIVER_MUTATION);
-  const [settleWithBusiness] = useMutation(SETTLE_WITH_BUSINESS_MUTATION);
+  // New settling mutations (Moved to imported from queries if possible, otherwise use local ones for now)
+  // These were missing from queries.ts so I'll keep them here or add them to queries.ts
+  const [settleWithDriver] = useMutation(SETTLE_WITH_DRIVER);
+  const [settleWithBusiness] = useMutation(SETTLE_WITH_BUSINESS);
 
   // Fetch settlement requests for selected business
-  const {
-    data: settlementRequestsData,
-    loading: settlementRequestsLoading,
-    refetch: refetchSettlementRequests,
-  } = useQuery(GET_SETTLEMENT_REQUESTS_QUERY, {
-    variables: { businessId: selectedEntityId, limit: 20 },
-    skip: !selectedEntityId || activeTab !== 'business',
+  const { data: settlementRequestsData, loading: settlementRequestsLoading, refetch: refetchSettlementRequests } = useQuery(GET_SETTLEMENT_REQUESTS, {
+    variables: { businessId: selectedGroup?.id, limit: 10 },
+    skip: !selectedGroup || activeTab !== 'business',
     fetchPolicy: 'network-only',
   });
 
-  const settlementRequests: any[] = (settlementRequestsData as any)?.settlementRequests ?? [];
+  const settlementRequests = (settlementRequestsData as any)?.settlementRequests ?? [];
 
-  // Backfill settlements mutation
-  const [backfillSettlements, { loading: backfillLoading }] = useMutation(BACKFILL_SETTLEMENTS, {
-    onCompleted: (data) => {
-      toast({
-        title: 'Success',
-        description: `Backfilled ${data.backfillSettlementsForDeliveredOrders} settlements from delivered orders`,
-      });
-      handleRefresh();
-    },
-    onError: (error) => {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to backfill settlements',
-        variant: 'destructive',
-      });
-    },
-  });
 
   // Calculate totals for current view
   const totalsSource = selectedGroup ? filteredSettlements : filteredGroups;
@@ -553,7 +287,7 @@ export default function SettlementsPage() {
     pending: totalsSource.reduce(
       (sum: number, item: SettlementRecord | SettlementGroup) =>
         sum + ('amount' in item
-          ? item.status === SettlementStatus.Pending
+          ? !item.isSettled
             ? Number(item.amount || 0)
             : 0
           : item.pendingAmount),
@@ -562,7 +296,7 @@ export default function SettlementsPage() {
     paid: totalsSource.reduce(
       (sum: number, item: SettlementRecord | SettlementGroup) =>
         sum + ('amount' in item
-          ? item.status === SettlementStatus.Paid
+          ? item.isSettled
             ? Number(item.amount || 0)
             : 0
           : item.paidAmount),
@@ -579,40 +313,6 @@ export default function SettlementsPage() {
     }
   };
 
-  const handleBulkSettleAll = async () => {
-    if (pendingSettlementIds.length === 0) {
-      toast({
-        title: 'Nothing to settle',
-        description: `No pending settlements found for ${aggregateScopeLabel}.`,
-      });
-      return;
-    }
-
-    setBulkProcessing(true);
-    try {
-      await markSettlementsAsPaid({
-        variables: {
-          ids: pendingSettlementIds,
-        },
-      });
-
-      toast({
-        title: 'Success',
-        description: `Marked ${pendingSettlementIds.length} settlements as paid for ${aggregateScopeLabel}.`,
-      });
-
-      setBulkPartialAmount('');
-      await handleRefresh();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error?.message || 'Failed to settle all pending settlements',
-        variant: 'destructive',
-      });
-    } finally {
-      setBulkProcessing(false);
-    }
-  };
 
   const handleBulkPartialSettle = async () => {
     const amountToSettle = Number(bulkPartialAmount);
@@ -780,9 +480,13 @@ export default function SettlementsPage() {
           variables: { driverId: selectedEntityId },
         });
         const result = data?.settleWithDriver;
+        const remainderAmount = result?.remainderAmount ?? 0;
+        const remainderMsg = remainderAmount > 0
+          ? ` Remainder: €${remainderAmount.toFixed(2)} carried forward.`
+          : '';
         toast({
           title: 'Driver settled',
-          description: `${result?.settledCount ?? 0} settlements settled. Net: €${Number(result?.netAmount ?? 0).toFixed(2)} (${result?.direction}).`,
+          description: `${result?.settledCount ?? 0} settlements settled. Net: €${(result?.netAmount ?? 0).toFixed(2)} (${result?.direction}).${remainderMsg}`,
         });
       } else {
         const amount = parseFloat(settleAmount);
@@ -801,12 +505,13 @@ export default function SettlementsPage() {
           },
         });
         const result = data?.settleWithBusiness;
-        const remainderMsg = result?.remainderAmount > 0
-          ? ` Remainder: €${Number(result.remainderAmount).toFixed(2)} carried forward.`
+        const remainderAmount = result?.remainderAmount ?? 0;
+        const remainderMsg = remainderAmount > 0
+          ? ` Remainder: €${remainderAmount.toFixed(2)} carried forward.`
           : '';
         toast({
           title: 'Business settled',
-          description: `${result?.settledCount ?? 0} settlements settled. Paid: €${Number(result?.netAmount ?? 0).toFixed(2)}.${remainderMsg}`,
+          description: `${result?.settledCount ?? 0} settlements settled. Paid: €${(result?.netAmount ?? 0).toFixed(2)}.${remainderMsg}`,
         });
       }
 
@@ -859,57 +564,34 @@ export default function SettlementsPage() {
           )}
 
           {/* Controls Row */}
-          <div className="flex items-center gap-3 mb-4">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-muted-foreground mr-1">Status:</span>
-              <div className="flex gap-1 rounded-md bg-muted/30 p-1 flex-wrap">
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-muted-foreground mr-1">Direction:</span>
+              <div className="flex gap-1 rounded-md bg-muted/30 p-1 mr-4">
                 <Button
-                  variant={statusFilter === 'all' ? 'default' : 'ghost'}
+                  variant={directionFilter === 'all' ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => setStatusFilter('all')}
+                  onClick={() => setDirectionFilter('all')}
                   className="h-7 px-3"
                 >
                   All
                 </Button>
                 <Button
-                  variant={statusFilter === SettlementStatus.Pending ? 'default' : 'ghost'}
+                  variant={directionFilter === SettlementDirection.Receivable ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => setStatusFilter(SettlementStatus.Pending)}
+                  onClick={() => setDirectionFilter(SettlementDirection.Receivable)}
                   className="h-7 px-3"
                 >
-                  Pending
+                  Receivable
                 </Button>
                 <Button
-                  variant={statusFilter === SettlementStatus.Paid ? 'default' : 'ghost'}
+                  variant={directionFilter === SettlementDirection.Payable ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => setStatusFilter(SettlementStatus.Paid)}
+                  onClick={() => setDirectionFilter(SettlementDirection.Payable)}
                   className="h-7 px-3"
                 >
-                  Paid
-                </Button>
-                <Button
-                  variant={statusFilter === ('OVERDUE' as any) ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setStatusFilter('OVERDUE' as any)}
-                  className="h-7 px-3 text-orange-600"
-                >
-                  Overdue
-                </Button>
-                <Button
-                  variant={statusFilter === ('DISPUTED' as any) ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setStatusFilter('DISPUTED' as any)}
-                  className="h-7 px-3 text-red-600"
-                >
-                  Disputed
-                </Button>
-                <Button
-                  variant={statusFilter === ('CANCELLED' as any) ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setStatusFilter('CANCELLED' as any)}
-                  className="h-7 px-3"
-                >
-                  Cancelled
+                  Payable
                 </Button>
               </div>
             </div>
@@ -970,7 +652,7 @@ export default function SettlementsPage() {
 
       {/* Table */}
       <div className="overflow-x-auto border border-zinc-800 rounded-lg">
-        <Table className="w-full text-xs">
+        <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-b border-zinc-800 bg-[#09090b]">
               {selectedGroup ? (
@@ -1222,7 +904,7 @@ export default function SettlementsPage() {
             <div className="text-xs text-zinc-500 py-3">No settlement requests for this business.</div>
           ) : (
             <div className="space-y-2">
-              {settlementRequests.map((req: any) => {
+              {(settlementRequests || []).map((req: any) => {
                 const statusColors: Record<string, string> = {
                   PENDING_APPROVAL: 'bg-amber-500/20 text-amber-300',
                   ACCEPTED: 'bg-green-500/20 text-green-300',
@@ -1254,7 +936,7 @@ export default function SettlementsPage() {
                         <div className="text-zinc-400">{periodLabel}</div>
                       )}
                       {req.note && (
-                        <div className="text-zinc-500 italic truncate">"{req.note}"</div>
+                        <div className="text-zinc-500 italic truncate">&quot;{req.note}&quot;</div>
                       )}
                       <div className="text-zinc-600">
                         By {requestedBy} ·{' '}
@@ -1416,7 +1098,7 @@ export default function SettlementsPage() {
               <div className="bg-muted/50 rounded-lg p-4 space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="font-medium">Settlement Amount</span>
-                  <span className="text-2xl font-bold">{selectedSettlement.currency} {parseFloat(selectedSettlement.amount).toFixed(2)}</span>
+                  <span className="text-2xl font-bold">{selectedSettlement.currency} {Number(selectedSettlement.amount).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-muted-foreground">
@@ -1466,8 +1148,16 @@ export default function SettlementsPage() {
                     </span>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Order Price:</span>{' '}
-                    <span className="font-medium">EUR {Number(selectedSettlement.order?.orderPrice || 0).toFixed(2)}</span>
+                    <span className="text-muted-foreground">Base Price:</span>{' '}
+                    <span className="font-medium">EUR {Number(selectedSettlement.order?.basePrice || 0).toFixed(2)}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Markup Price:</span>{' '}
+                    <span className="font-medium">EUR {Number(selectedSettlement.order?.markupPrice || 0).toFixed(2)}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Actual Price:</span>{' '}
+                    <span className="font-medium">EUR {Number(selectedSettlement.order?.actualPrice || 0).toFixed(2)}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Total Price:</span>{' '}
@@ -1479,7 +1169,7 @@ export default function SettlementsPage() {
                   {(selectedSettlement.order?.businesses || []).length === 0 ? (
                     <div className="text-sm text-muted-foreground">No business/item details available for this order.</div>
                   ) : (
-                    (selectedSettlement.order?.businesses || []).map((orderBusiness: any, index: number) => (
+                    (selectedSettlement.order?.businesses || []).map((orderBusiness, index) => (
                       <div key={`${orderBusiness.business?.id || 'business'}-${index}`} className="rounded-md border p-3">
                         <div className="text-sm font-medium mb-2">
                           {orderBusiness.business?.name || 'Business'}
@@ -1490,7 +1180,7 @@ export default function SettlementsPage() {
                           <div className="text-xs text-muted-foreground">No items found.</div>
                         ) : (
                           <div className="space-y-2">
-                            {(orderBusiness.items || []).map((item: any) => (
+                            {(orderBusiness.items || []).map((item) => (
                               <div key={item.id} className="rounded bg-muted/40 p-2 text-xs">
                                 <div className="flex items-start justify-between gap-2">
                                   <div>

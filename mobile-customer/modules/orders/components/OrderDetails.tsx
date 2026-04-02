@@ -13,7 +13,6 @@ import { Image } from 'expo-image';
 import { useQuery, useSubscription } from '@apollo/client/react';
 import { GET_ORDER_DRIVER } from '@/graphql/operations/orders';
 import { ORDER_DRIVER_LIVE_TRACKING } from '@/graphql/operations/orders/subscriptions';
-import { useUpdateOrderStatus } from '../hooks/useOrders';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
@@ -23,6 +22,7 @@ import Animated, {
     withRepeat,
     withSequence,
     withTiming,
+    withSpring,
     Easing,
     FadeIn,
     FadeInDown,
@@ -509,6 +509,13 @@ const IconStepper = ({ status, color, theme: th, t, businessType }: {
     const visibleStatus = getCustomerVisibleStatus(status, businessType);
     const currentIndex = statusOrder.indexOf(visibleStatus as any);
     const isCancelled = status === 'CANCELLED';
+    const activeScale = useSharedValue(1);
+    const activeScaleStyle = useAnimatedStyle(() => ({ transform: [{ scale: activeScale.value }] }));
+
+    useEffect(() => {
+        activeScale.value = withSequence(withSpring(1.3, { damping: 4, stiffness: 200 }), withSpring(1, { damping: 8, stiffness: 120 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentIndex]);
 
     const stepLabels: Record<string, string> = {
         PENDING: t.orders.details.placed_at,
@@ -538,7 +545,7 @@ const IconStepper = ({ status, color, theme: th, t, businessType }: {
                             )}
                             {index === 0 && <View style={{ flex: 1 }} />}
 
-                            <View style={{
+                            <Animated.View style={[{
                                 width: 28,
                                 height: 28,
                                 borderRadius: 14,
@@ -546,13 +553,13 @@ const IconStepper = ({ status, color, theme: th, t, businessType }: {
                                 alignItems: 'center', justifyContent: 'center',
                                 borderWidth: active ? 2 : 0,
                                 borderColor: active ? color + '40' : 'transparent',
-                            }}>
+                            }, active ? activeScaleStyle : undefined]}>
                                 {done ? (
                                     <Ionicons name="checkmark" size={14} color="#22C55E" />
                                 ) : (
                                     <Ionicons name={iconName} size={14} color={iconColor} />
                                 )}
-                            </View>
+                            </Animated.View>
 
                             {!isLast && (
                                 <View style={{ flex: 1, height: 2, backgroundColor: rightLineColor }} />
@@ -596,7 +603,6 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const fitMapToMarkersRef = useRef<() => void>(() => {});
     const [showSummary, setShowSummary] = useState(false);
     const [showDriverInfo, setShowDriverInfo] = useState(false);
-    const { update: updateOrderStatus, loading: isMarkingAsDelivered } = useUpdateOrderStatus();
     const [mapZoomLevel, setMapZoomLevel] = useState(15.5);
     const patchDriverConnection = useActiveOrdersStore((s) => s.patchDriverConnection);
     const [interpolatedDriverLocation, setInterpolatedDriverLocation] = useState<{
@@ -1247,18 +1253,6 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         try { await Linking.openURL(`tel:${driverPhone}`); }
         catch { Alert.alert(t.orders.details.call_failed, t.orders.details.unable_open_dialer); }
     }, [driverPhone, t.orders.details.call_failed, t.orders.details.unable_open_dialer]);
-
-    const handleMarkAsDelivered = useCallback(async () => {
-        if (!order?.id || isMarkingAsDelivered) return;
-
-        const result = await updateOrderStatus(order.id, OrderStatus.Delivered);
-        if (result.error) {
-            Alert.alert('Failed', 'Could not mark this order as delivered.');
-            return;
-        }
-
-        Alert.alert('Success', 'Order marked as delivered.');
-    }, [order?.id, isMarkingAsDelivered, updateOrderStatus]);
 
     const markerScale = useMemo(() => {
         const normalized = clamp((mapZoomLevel - 13) / 4, 0, 1);
@@ -2214,27 +2208,6 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                         >
                             <Text style={{ color: theme.colors.subtext, fontSize: 13, fontWeight: '600' }}>
                                 {showSummary ? `▲ ${t.orders.details.hide_order_summary}` : `▼ ${t.orders.details.show_order_summary}`}
-                            </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            onPress={handleMarkAsDelivered}
-                            activeOpacity={0.85}
-                            disabled={isMarkingAsDelivered}
-                            style={{
-                                alignSelf: 'center',
-                                marginBottom: 12,
-                                backgroundColor:
-                                    isMarkingAsDelivered
-                                        ? '#9CA3AF'
-                                        : '#16A34A',
-                                paddingHorizontal: 14,
-                                paddingVertical: 8,
-                                borderRadius: 999,
-                            }}
-                        >
-                            <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
-                                {isMarkingAsDelivered ? 'Marking...' : 'Mark as delivered (test)'}
                             </Text>
                         </TouchableOpacity>
 

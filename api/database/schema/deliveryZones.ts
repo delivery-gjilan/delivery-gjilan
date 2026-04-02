@@ -19,6 +19,7 @@ export const deliveryZones = pgTable('delivery_zones', {
     deliveryFee: numeric('delivery_fee', { mode: 'number', precision: 10, scale: 2 }).notNull(),
     sortOrder: integer('sort_order').notNull().default(0),
     isActive: boolean('is_active').notNull().default(true),
+    isServiceZone: boolean('is_service_zone').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull(),

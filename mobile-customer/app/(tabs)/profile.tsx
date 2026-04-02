@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, Modal, Pressable, Animated, PanResponder } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Alert, Modal, Pressable, Animated, PanResponder, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -245,7 +245,9 @@ export default function Profile() {
                 {/* ── Account Section ─────────────────────────────────── */}
                 <View style={{ marginHorizontal: 16, marginBottom: 14, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
                     <ProfileRow title={t.profile.my_addresses} icon="location-outline" onPress={() => router.push('/addresses')} />
-                    <ProfileRow title={t.profile.contact_support} icon="chatbubble-outline" onPress={() => {}} showDivider={false} />
+                    <ProfileRow title={t.profile.contact_support} icon="chatbubble-outline" onPress={() => Linking.openURL('mailto:support@zippdelivery.com')} />
+                    <ProfileRow title="Privacy Policy" icon="shield-checkmark-outline" onPress={() => Linking.openURL('https://zippdelivery.com/privacy')} />
+                    <ProfileRow title="Terms of Service" icon="document-text-outline" onPress={() => Linking.openURL('https://zippdelivery.com/terms')} showDivider={false} />
                 </View>
 
                 {/* ── Language ─────────────────────────────────────────── */}

@@ -90,6 +90,12 @@ type ApplicablePromotion {
   type: PromotionType!
 }
 
+enum ApprovalReason {
+  FIRST_ORDER
+  HIGH_VALUE
+  OUT_OF_ZONE
+}
+
 input AssignPromotionToUserInput {
   expiresAt: String
   promotionId: ID!
@@ -362,6 +368,7 @@ input CreateBusinessInput {
 input CreateBusinessOwnerInput {
   email: String!
   firstName: String!
+  isDemoAccount: Boolean
   lastName: String!
   password: String!
 }
@@ -399,6 +406,7 @@ input CreateDeliveryPricingTierInput {
 input CreateDeliveryZoneInput {
   deliveryFee: Float!
   isActive: Boolean
+  isServiceZone: Boolean
   name: String!
   polygon: [PolygonPointInput!]!
   sortOrder: Int
@@ -432,8 +440,9 @@ input CreateOrderInput {
   items: [CreateOrderItemInput!]!
   paymentCollection: OrderPaymentCollection
   prioritySurcharge: Float
-  promoCode: String
+  promotionId: ID
   totalPrice: Float!
+  userContextLocation: LocationInput
 }
 
 input CreateOrderItemInput {
@@ -482,11 +491,15 @@ input CreateProductVariantGroupInput {
 }
 
 input CreatePromotionInput {
+  addDriverCommission: Boolean
   code: String
+  createSettlementRules: Boolean
   creatorId: ID
   creatorType: String
   description: String
   discountValue: Float
+  driverRuleAmount: Float
+  driverRuleAmountType: SettlementAmountType
   eligibleBusinessIds: [ID!]
   endsAt: String
   isActive: Boolean!
@@ -515,12 +528,14 @@ input CreateSettlementRuleInput {
   name: String!
   notes: String
   promotionId: ID
+  type: SettlementRuleType!
 }
 
 input CreateUserInput {
   businessId: ID
   email: String!
   firstName: String!
+  isDemoAccount: Boolean
   lastName: String!
   password: String!
   role: UserRole!
@@ -571,6 +586,7 @@ type DeliveryZone {
   deliveryFee: Float!
   id: ID!
   isActive: Boolean!
+  isServiceZone: Boolean!
   name: String!
   polygon: [PolygonPoint!]!
   sortOrder: Int!
@@ -907,6 +923,7 @@ type Mutation {
   Admin mutation to update per-driver settings (commission %, max active orders, vehicle ownership)
   """
   adminUpdateDriverSettings(commissionPercentage: Float, driverId: ID!, hasOwnVehicle: Boolean, maxActiveOrders: Int): User!
+  approveOrder(id: ID!): Order!
   assignDriverToOrder(driverId: ID, id: ID!): Order!
   assignPromotionToUsers(input: AssignPromotionToUserInput!): [UserPromotion!]!
   backfillSettlementsForDeliveredOrders: Int!
@@ -1133,6 +1150,8 @@ type OptionGroup {
 
 type Order {
   adminNote: String
+  approvalReasons: [ApprovalReason!]
+  businessId: ID!
   businesses: [OrderBusiness!]!
   cancellationReason: String
   cancelledAt: Date
@@ -1146,10 +1165,11 @@ type Order {
   dropOffLocation: Location!
   estimatedReadyAt: Date
   id: ID!
+  locationFlagged: Boolean!
+  needsApproval: Boolean!
   orderDate: Date!
   orderPrice: Float!
   orderPromotions: [OrderPromotion!]
-  originalDeliveryPrice: Float
   originalPrice: Float
   outForDeliveryAt: Date
   paymentCollection: OrderPaymentCollection!
@@ -1180,7 +1200,6 @@ type OrderDriverLiveTracking {
 }
 
 type OrderItem {
-  basePrice: Float
   childItems: [OrderItem!]!
   id: ID!
   imageUrl: String
@@ -1216,6 +1235,7 @@ type OrderPromotion {
 }
 
 enum OrderStatus {
+  AWAITING_APPROVAL
   CANCELLED
   DELIVERED
   OUT_FOR_DELIVERY
@@ -1635,14 +1655,14 @@ type SettlementPayment {
   business: Business
   createdAt: Date!
   createdBy: User
-  direction: SettlementPaymentDirection!
+  direction: SettlementPaymentDirection
   driver: User
   entityType: SettlementType!
   id: ID!
   note: String
   paymentMethod: String
   paymentReference: String
-  totalBalanceAtTime: Float!
+  totalBalanceAtTime: Float
 }
 
 enum SettlementPaymentDirection {
@@ -1694,14 +1714,29 @@ type SettlementRule {
   name: String!
   notes: String
   promotion: Promotion
+  type: SettlementRuleType!
   updatedAt: String!
 }
 
 input SettlementRuleFilterInput {
-  businessId: ID
-  entityType: SettlementEntityType
+  businessIds: [ID!]
+  entityTypes: [SettlementEntityType!]
   isActive: Boolean
-  promotionId: ID
+  promotionIds: [ID!]
+  scopes: [SettlementRuleScope!]
+  type: SettlementRuleType
+}
+
+enum SettlementRuleScope {
+  BUSINESS
+  BUSINESS_PROMOTION
+  GLOBAL
+  PROMOTION
+}
+
+enum SettlementRuleType {
+  DELIVERY_PRICE
+  ORDER_PRICE
 }
 
 type SettlementScenarioDefinition {
@@ -1878,6 +1913,7 @@ input UpdateDeliveryPricingTierInput {
 input UpdateDeliveryZoneInput {
   deliveryFee: Float
   isActive: Boolean
+  isServiceZone: Boolean
   name: String
   polygon: [PolygonPointInput!]
   sortOrder: Int
@@ -1955,6 +1991,7 @@ input UpdateSettlementRuleInput {
   isActive: Boolean
   name: String
   notes: String
+  type: SettlementRuleType
 }
 
 input UpdateStoreStatusInput {
@@ -1979,6 +2016,7 @@ input UpdateUserInput {
   businessId: ID
   firstName: String!
   id: ID!
+  isDemoAccount: Boolean
   lastName: String!
   role: UserRole!
 }
@@ -1999,7 +2037,9 @@ type User {
   hasOwnVehicle: Boolean
   id: ID!
   imageUrl: String
+  isDemoAccount: Boolean!
   isOnline: Boolean!
+  isTrustedCustomer: Boolean!
   lastName: String!
   maxActiveOrders: Int
   permissions: [UserPermission!]!
@@ -2009,6 +2049,7 @@ type User {
   referralCode: String
   role: UserRole!
   signupStep: SignupStep!
+  totalOrders: Int!
 }
 
 type UserAddress {

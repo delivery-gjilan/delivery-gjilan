@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { View, Text, Animated, Easing, Dimensions, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useMemo } from 'react';
+import { View, Text, Dimensions, TouchableOpacity } from 'react-native';
+import Reanimated, { useSharedValue, useAnimatedStyle, withSpring, withRepeat, withSequence, withTiming, Easing } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useQuery } from '@apollo/client/react';
@@ -79,47 +80,37 @@ export function GlobalPromoBanner() {
     }, [data, dismissed, t]);
 
     // ---- Animations ----
-    const slideAnim = useRef(new Animated.Value(-120)).current;
-    const shimmerAnim = useRef(new Animated.Value(0)).current;
-    const iconPulse = useRef(new Animated.Value(1)).current;
+    const slideAnim = useSharedValue(-120);
+    const shimmerAnim = useSharedValue(0);
+    const iconPulse = useSharedValue(1);
     const isVisible = promos.length > 0;
+
+    const slideStyle = useAnimatedStyle(() => ({ transform: [{ translateY: slideAnim.value }] }));
+    const shimmerStyle = useAnimatedStyle(() => ({
+        transform: [{ translateX: shimmerAnim.value * (SCREEN_WIDTH * 2) - SCREEN_WIDTH }, { skewX: '-20deg' }],
+    }));
+    const iconPulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: iconPulse.value }] }));
 
     // Slide in/out
     useEffect(() => {
-        Animated.spring(slideAnim, {
-            toValue: isVisible ? 0 : -120,
-            useNativeDriver: true,
-            tension: 80,
-            friction: 12,
-        }).start();
+        slideAnim.value = withSpring(isVisible ? 0 : -120, { damping: 12, stiffness: 80 });
     }, [isVisible]);
 
     // Shimmer loop
     useEffect(() => {
         if (!isVisible) return;
-        const loop = Animated.loop(
-            Animated.timing(shimmerAnim, {
-                toValue: 1,
-                duration: 2500,
-                easing: Easing.linear,
-                useNativeDriver: true,
-            }),
-        );
-        loop.start();
-        return () => loop.stop();
+        shimmerAnim.value = withRepeat(withTiming(1, { duration: 2500, easing: Easing.linear }), -1, false);
+        return () => { shimmerAnim.value = 0; };
     }, [isVisible]);
 
     // Icon pulse
     useEffect(() => {
         if (!isVisible) return;
-        const loop = Animated.loop(
-            Animated.sequence([
-                Animated.timing(iconPulse, { toValue: 1.2, duration: 600, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-                Animated.timing(iconPulse, { toValue: 1, duration: 600, easing: Easing.in(Easing.ease), useNativeDriver: true }),
-            ]),
-        );
-        loop.start();
-        return () => loop.stop();
+        iconPulse.value = withRepeat(withSequence(
+            withTiming(1.2, { duration: 600, easing: Easing.out(Easing.ease) }),
+            withTiming(1, { duration: 600, easing: Easing.in(Easing.ease) }),
+        ), -1, false);
+        return () => { iconPulse.value = 1; };
     }, [isVisible]);
 
     if (!isVisible) return null;
@@ -127,17 +118,12 @@ export function GlobalPromoBanner() {
     // Show first promo (could rotate, but let's keep it simple)
     const promo = promos[0];
 
-    const shimmerTranslateX = shimmerAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [-SCREEN_WIDTH, SCREEN_WIDTH],
-    });
-
     return (
-        <Animated.View
-            style={{
-                transform: [{ translateY: slideAnim }],
-                overflow: 'hidden',
-            }}
+        <Reanimated.View
+            style={[
+                slideStyle,
+                { overflow: 'hidden' },
+            ]}
         >
             <LinearGradient
                 colors={promo.gradient}
@@ -153,21 +139,23 @@ export function GlobalPromoBanner() {
                 }}
             >
                 {/* Shimmer overlay */}
-                <Animated.View
-                    style={{
-                        position: 'absolute',
-                        top: 0,
-                        bottom: 0,
-                        width: 80,
-                        transform: [{ translateX: shimmerTranslateX }, { skewX: '-20deg' }],
-                        backgroundColor: 'rgba(255,255,255,0.15)',
-                    }}
+                <Reanimated.View
+                    style={[
+                        shimmerStyle,
+                        {
+                            position: 'absolute',
+                            top: 0,
+                            bottom: 0,
+                            width: 80,
+                            backgroundColor: 'rgba(255,255,255,0.15)',
+                        },
+                    ]}
                 />
 
                 {/* Icon */}
-                <Animated.View style={{ transform: [{ scale: iconPulse }], marginRight: 10 }}>
+                <Reanimated.View style={[iconPulseStyle, { marginRight: 10 }]}>
                     <Ionicons name={promo.icon} size={20} color="rgba(255,255,255,0.9)" />
-                </Animated.View>
+                </Reanimated.View>
 
                 {/* Label */}
                 <Text
@@ -191,6 +179,6 @@ export function GlobalPromoBanner() {
                     <Ionicons name="close" size={16} color="rgba(255,255,255,0.7)" />
                 </TouchableOpacity>
             </LinearGradient>
-        </Animated.View>
+        </Reanimated.View>
     );
 }

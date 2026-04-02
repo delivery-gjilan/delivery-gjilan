@@ -3,7 +3,9 @@
     "name": "Zipp Admin",
     "slug": "delivery-admin",
     "version": "1.0.0",
-    "runtimeVersion": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "updates": {
       "url": "https://u.expo.dev/311a1600-6dc4-4a4d-9772-9aa6af6edd43",
       "requestHeaders": {
@@ -19,7 +21,8 @@
       "bundleIdentifier": "com.zippdelivery.mobileadmin",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "We use your location to center the map on your position."
+        "NSLocationWhenInUseUsageDescription": "We use your location to center the map on your position.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

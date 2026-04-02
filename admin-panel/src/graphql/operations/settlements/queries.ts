@@ -1,9 +1,8 @@
 import { graphql } from '@/gql';
 
-export const GET_SETTLEMENTS = graphql(`
-    query GetSettlements(
+export const GET_SETTLEMENTS_PAGE = graphql(`
+    query SettlementsPage(
         $type: SettlementType
-        $status: SettlementStatus
         $direction: SettlementDirection
         $isSettled: Boolean
         $driverId: ID
@@ -15,7 +14,6 @@ export const GET_SETTLEMENTS = graphql(`
     ) {
         settlements(
             type: $type
-            status: $status
             direction: $direction
             isSettled: $isSettled
             driverId: $driverId
@@ -43,16 +41,36 @@ export const GET_SETTLEMENTS = graphql(`
                 id
                 displayId
                 orderDate
-                orderPrice
+                status
                 deliveryPrice
                 totalPrice
+                businesses {
+                  business {
+                    id
+                    name
+                    businessType
+                  }
+                  items {
+                    id
+                    productId
+                    name
+                    quantity
+                    unitPrice
+                    notes
+                    selectedOptions {
+                      id
+                      optionName
+                      priceAtOrder
+                    }
+                  }
+                }
             }
             amount
             currency
             status
-            paidAt
-            paymentReference
             paymentMethod
+            paymentReference
+            paidAt
             ruleId
             createdAt
         }
@@ -134,18 +152,17 @@ export const MARK_SETTLEMENT_PAID = graphql(`
     mutation MarkSettlementAsPaid($settlementId: ID!) {
         markSettlementAsPaid(settlementId: $settlementId) {
             id
-            status
-            paidAt
+            isSettled
+            amount
         }
     }
 `);
 
-export const MARK_SETTLEMENTS_PAID = graphql(`
+export const MARK_SETTLEMENTS_PAID_OP = graphql(`
     mutation MarkSettlementsAsPaid($ids: [ID!]!) {
         markSettlementsAsPaid(ids: $ids) {
             id
-            status
-            paidAt
+            isSettled
         }
     }
 `);
@@ -155,9 +172,7 @@ export const MARK_SETTLEMENT_PARTIAL = graphql(`
         markSettlementAsPartiallyPaid(settlementId: $settlementId, amount: $amount) {
             id
             amount
-            status
-            paidAt
-            updatedAt
+            isSettled
         }
     }
 `);

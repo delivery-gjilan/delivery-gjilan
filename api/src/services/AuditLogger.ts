@@ -64,6 +64,8 @@ export class AuditLogger {
             case 'SUPER_ADMIN':
                 return 'ADMIN';
             case 'BUSINESS':
+            case 'BUSINESS_OWNER':
+            case 'BUSINESS_EMPLOYEE':
                 return 'BUSINESS';
             case 'DRIVER':
                 return 'DRIVER';

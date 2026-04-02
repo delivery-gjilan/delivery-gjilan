@@ -1,0 +1,1 @@
+ALTER TABLE "orders" ADD COLUMN "priority_surcharge" numeric(10, 2) DEFAULT 0 NOT NULL;

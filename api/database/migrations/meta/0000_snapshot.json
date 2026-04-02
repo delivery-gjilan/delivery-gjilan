@@ -1,5 +1,5 @@
 {
-  "id": "5b6fc742-73d3-4a19-9f8f-ce45d9bea8df",
+  "id": "ce66ecd2-ecd5-445e-a7d3-85ca048a4d5b",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -644,6 +644,13 @@
           "notNull": true,
           "default": true
         },
+        "is_service_zone": {
+          "name": "is_service_zone",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -1065,11 +1072,42 @@
           "primaryKey": false,
           "notNull": false
         },
-        "price": {
-          "name": "price",
+        "business_id": {
+          "name": "business_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "original_price": {
+          "name": "original_price",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "base_price": {
+          "name": "base_price",
           "type": "numeric(10, 2)",
           "primaryKey": false,
           "notNull": true
+        },
+        "markup_price": {
+          "name": "markup_price",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "actual_price": {
+          "name": "actual_price",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "original_delivery_price": {
+          "name": "original_delivery_price",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false
         },
         "delivery_price": {
           "name": "delivery_price",
@@ -1084,18 +1122,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'CASH_TO_DRIVER'"
-        },
-        "original_price": {
-          "name": "original_price",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "original_delivery_price": {
-          "name": "original_delivery_price",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": false
         },
         "status": {
           "name": "status",
@@ -1122,6 +1148,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "location_flagged": {
+          "name": "location_flagged",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "driver_notes": {
           "name": "driver_notes",
           "type": "varchar(500)",
@@ -1131,6 +1164,12 @@
         "cancellation_reason": {
           "name": "cancellation_reason",
           "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "admin_note": {
+          "name": "admin_note",
+          "type": "varchar(2000)",
           "primaryKey": false,
           "notNull": false
         },
@@ -1277,6 +1316,21 @@
           "method": "btree",
           "with": {}
         },
+        "idx_orders_business_id": {
+          "name": "idx_orders_business_id",
+          "columns": [
+            {
+              "expression": "business_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "idx_orders_display_id": {
           "name": "idx_orders_display_id",
           "columns": [
@@ -1318,6 +1372,19 @@
             "id"
           ],
           "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "orders_business_id_businesses_id_fk": {
+          "name": "orders_business_id_businesses_id_fk",
+          "tableFrom": "orders",
+          "tableTo": "businesses",
+          "columnsFrom": [
+            "business_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -1368,8 +1435,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "sale_price": {
-          "name": "sale_price",
+        "discounted_price": {
+          "name": "discounted_price",
           "type": "numeric(10, 2)",
           "primaryKey": false,
           "notNull": false
@@ -2393,45 +2460,12 @@
           "primaryKey": false,
           "notNull": true
         },
-        "currency": {
-          "name": "currency",
-          "type": "varchar(3)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'EUR'"
-        },
-        "status": {
-          "name": "status",
-          "type": "settlement_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'PENDING'"
-        },
         "is_settled": {
           "name": "is_settled",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
           "default": false
-        },
-        "paid_at": {
-          "name": "paid_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "payment_reference": {
-          "name": "payment_reference",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "payment_method": {
-          "name": "payment_method",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -2484,21 +2518,6 @@
           "columns": [
             {
               "expression": "business_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_settlements_status": {
-          "name": "idx_settlements_status",
-          "columns": [
-            {
-              "expression": "status",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2649,6 +2668,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "type": {
+          "name": "type",
+          "type": "settlement_rule_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
         "entity_type": {
           "name": "entity_type",
           "type": "settlement_entity_type",
@@ -2675,12 +2701,6 @@
           "type": "numeric(10, 2)",
           "primaryKey": false,
           "notNull": true
-        },
-        "applies_to": {
-          "name": "applies_to",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": false
         },
         "business_id": {
           "name": "business_id",
@@ -2987,31 +3007,6 @@
           "type": "numeric(10, 2)",
           "primaryKey": false,
           "notNull": true
-        },
-        "direction": {
-          "name": "direction",
-          "type": "settlement_payment_direction",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "total_balance_at_time": {
-          "name": "total_balance_at_time",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "payment_method": {
-          "name": "payment_method",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "payment_reference": {
-          "name": "payment_reference",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false
         },
         "note": {
           "name": "note",
@@ -6212,7 +6207,8 @@
         "READY",
         "OUT_FOR_DELIVERY",
         "DELIVERED",
-        "CANCELLED"
+        "CANCELLED",
+        "AWAITING_APPROVAL"
       ]
     },
     "public.order_event_actor_type": {
@@ -6286,17 +6282,6 @@
         "PAYABLE"
       ]
     },
-    "public.settlement_status": {
-      "name": "settlement_status",
-      "schema": "public",
-      "values": [
-        "PENDING",
-        "PAID",
-        "OVERDUE",
-        "DISPUTED",
-        "CANCELLED"
-      ]
-    },
     "public.settlement_type": {
       "name": "settlement_type",
       "schema": "public",
@@ -6321,6 +6306,14 @@
         "PERCENT"
       ]
     },
+    "public.settlement_rule_type": {
+      "name": "settlement_rule_type",
+      "schema": "public",
+      "values": [
+        "ORDER_PRICE",
+        "DELIVERY_PRICE"
+      ]
+    },
     "public.settlement_request_status": {
       "name": "settlement_request_status",
       "schema": "public",
@@ -6330,14 +6323,6 @@
         "DISPUTED",
         "EXPIRED",
         "CANCELLED"
-      ]
-    },
-    "public.settlement_payment_direction": {
-      "name": "settlement_payment_direction",
-      "schema": "public",
-      "values": [
-        "ENTITY_TO_PLATFORM",
-        "PLATFORM_TO_ENTITY"
       ]
     },
     "public.promotion_creator_type": {

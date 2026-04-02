@@ -8,7 +8,6 @@ export const GET_ORDERS = graphql(`
             orderPrice
             deliveryPrice
             originalPrice
-            originalDeliveryPrice
             totalPrice
             orderDate
             updatedAt
@@ -20,19 +19,19 @@ export const GET_ORDERS = graphql(`
             cancellationReason
             adminNote
             driverNotes
+            needsApproval
+            locationFlagged
+            approvalReasons
             user {
                 id
                 firstName
                 lastName
                 email
-                address
                 phoneNumber
-            }
-            driver {
-                id
-                firstName
-                lastName
-                email
+                adminNote
+                flagColor
+                totalOrders
+                isTrustedCustomer
                 commissionPercentage
                 commissionPercentage
             }
@@ -59,7 +58,6 @@ export const GET_ORDERS = graphql(`
                     name
                     imageUrl
                     quantity
-                    basePrice
                     unitPrice
                 }
             }
@@ -75,7 +73,6 @@ export const GET_ORDER = graphql(`
             orderPrice
             deliveryPrice
             originalPrice
-            originalDeliveryPrice
             totalPrice
             orderDate
             updatedAt
@@ -84,13 +81,19 @@ export const GET_ORDER = graphql(`
             cancellationReason
             adminNote
             driverNotes
+            needsApproval
+            locationFlagged
+            approvalReasons
             user {
                 id
                 firstName
                 lastName
                 email
-                address
                 phoneNumber
+                adminNote
+                flagColor
+                totalOrders
+                isTrustedCustomer
             }
             dropOffLocation {
                 latitude
@@ -115,7 +118,6 @@ export const GET_ORDER = graphql(`
                     name
                     imageUrl
                     quantity
-                    basePrice
                     unitPrice
                 }
             }
@@ -131,10 +133,12 @@ export const GET_ORDERS_BY_STATUS = graphql(`
             orderPrice
             deliveryPrice
             originalPrice
-            originalDeliveryPrice
             totalPrice
             orderDate
             status
+            needsApproval
+            locationFlagged
+            approvalReasons
             dropOffLocation {
                 latitude
                 longitude
@@ -158,7 +162,6 @@ export const GET_ORDERS_BY_STATUS = graphql(`
                     name
                     imageUrl
                     quantity
-                    basePrice
                     unitPrice
                 }
             }

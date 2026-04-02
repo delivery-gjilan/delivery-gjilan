@@ -1,4 +1,4 @@
-import { Database } from '@/database';
+import { type DbType } from '@/database';
 import {
     settlementRequests,
     settlements,
@@ -26,7 +26,7 @@ export interface CreateSettlementRequestInput {
 }
 
 export class SettlementRequestRepository {
-    constructor(private db: Database) {}
+    constructor(private db: DbType) {}
 
     async getById(id: string): Promise<DbSettlementRequest | null> {
         const result = await this.db
@@ -168,7 +168,7 @@ export class SettlementRequestRepository {
                         eq(settlements.businessId, businessId),
                         eq(settlements.type, 'BUSINESS'),
                         eq(settlements.direction, 'RECEIVABLE'),
-                        inArray(settlements.status, ['PENDING', 'OVERDUE']),
+                        eq(settlements.isSettled, false),
                         gte(settlements.createdAt, periodStart),
                         lte(settlements.createdAt, periodEnd),
                     ),
@@ -185,8 +185,7 @@ export class SettlementRequestRepository {
                     await tx
                         .update(settlements)
                         .set({
-                            status: 'PAID',
-                            paidAt: now,
+                            isSettled: true,
                             updatedAt: now,
                         })
                         .where(eq(settlements.id, candidate.id))
@@ -222,10 +221,7 @@ export class SettlementRequestRepository {
                         orderId: candidate.orderId,
                         ruleId: candidate.ruleId,
                         amount: partialAmount,
-                        currency: candidate.currency,
-                        status: 'PAID',
-                        paidAt: now,
-                        paymentMethod: 'SETTLEMENT_REQUEST_ACCEPTED',
+                        isSettled: true,
                     })
                     .execute();
 

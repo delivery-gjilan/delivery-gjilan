@@ -343,6 +343,7 @@ export class AuthService {
         password: string,
         role: 'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN' | 'ADMIN' | 'BUSINESS_OWNER' | 'BUSINESS_EMPLOYEE',
         businessId?: string,
+        isDemoAccount = false,
     ): Promise<AuthResponse> {
         // Normalize email to lowercase to ensure consistent lookup
         email = email.trim().toLowerCase();
@@ -382,6 +383,7 @@ export class AuthService {
             hashedPassword,
             role,
             businessId,
+            isDemoAccount,
         );
 
         log.info({ userId: user.id, email: user.email, role: user.role }, 'auth:createUser:userCreated');
