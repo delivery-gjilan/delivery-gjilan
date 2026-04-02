@@ -49,15 +49,15 @@
 |---|---|---|---|---|---|
 | **Zipp Go** (Customer) | `com.artshabani.mobilecustomer` | `com.artshabani.mobilecustomer` | `6760239090` | `e5c04b16-...` | `artshabani2002` |
 | **Zipp Driver** | `com.zippdelivery.mobiledriver` | `com.zippdelivery.mobiledriver` | `6760439437` | `1c06f250-...` | `edonramadani` |
-| **Zipp Business** | `com.zippdelivery.mobilebusiness` | `com.zippdelivery.mobilebusiness` | ❌ Not set | `dc536dcd-...` | ❌ Not set |
-| **Zipp Admin** | `com.zippdelivery.mobileadmin` | `com.zippdelivery.mobileadmin` | ❌ Not set | `311a1600-...` | `artshabani2002` |
+| **Zipp Business** | `com.zippdelivery.mobilebusiness` | `com.zippdelivery.mobilebusiness` | `6760672459` | `dc536dcd-...` | ❌ Not set |
+| **Zipp Admin** | `com.zippdelivery.mobileadmin` | `com.zippdelivery.mobileadmin` | `6760673685` | `311a1600-...` | `artshabani2002` |
 
 ### Configuration Gap Matrix
 
 | Config Key | Customer | Driver | Business | Admin |
 |---|---|---|---|---|
 | `appleTeamId` | ✅ `87K8YXG5V8` | ❌ Missing | ❌ Missing | ❌ Missing |
-| `ascAppId` (eas.json submit) | ✅ | ✅ | ❌ Empty | ❌ No eas.json |
+| `ascAppId` (eas.json submit) | ✅ | ✅ | ✅ | ✅ |
 | `owner` (app.json) | ✅ | ✅ | ❌ Missing | ✅ |
 | `ITSAppUsesNonExemptEncryption` | ✅ | ✅ | ❌ No infoPlist | ⚠️ Not set |
 | `runtimeVersion` | ✅ policy | ✅ policy | ✅ policy | ⚠️ Hardcoded `"1.0.0"` |

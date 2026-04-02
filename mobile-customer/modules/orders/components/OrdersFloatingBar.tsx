@@ -8,6 +8,9 @@ import { toast } from '@/store/toastStore';
 import AwaitingApprovalModal from '@/components/AwaitingApprovalModal';
 import { useAwaitingApprovalModalStore } from '@/store/useAwaitingApprovalModalStore';
 import { useEffect } from 'react';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, Easing } from 'react-native-reanimated';
+
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 export const OrdersFloatingBar = () => {
     const router = useRouter();
@@ -157,6 +160,18 @@ export const OrdersFloatingBar = () => {
         ? (modalOrder as any).approvalReasons
         : undefined;
 
+    // Slide-up entrance animation
+    const translateY = useSharedValue(80);
+    const opacity = useSharedValue(0);
+    useEffect(() => {
+        translateY.value = withSpring(0, { damping: 18, stiffness: 220 });
+        opacity.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.quad) });
+    }, []);
+    const slideStyle = useAnimatedStyle(() => ({
+        opacity: opacity.value,
+        transform: [{ translateY: translateY.value }],
+    }));
+
     if (!hasActiveOrders || activeOrders.length === 0 || !activeOrder) {
         return null;
     }
@@ -197,13 +212,13 @@ export const OrdersFloatingBar = () => {
 
     return (
         <>
-            <TouchableOpacity
+            <AnimatedTouchable
                 activeOpacity={0.9}
                 onPress={() => {
                     void handlePress();
                 }}
                 className="flex-row items-center justify-between p-4 rounded-2xl w-full"
-                style={{ backgroundColor: statusInfo.bgColor }}
+                style={[{ backgroundColor: statusInfo.bgColor }, slideStyle]}
             >
                 <View className="flex-row items-center gap-3 flex-1">
                     <View className="bg-white/20 p-2 rounded-full">
@@ -233,7 +248,7 @@ export const OrdersFloatingBar = () => {
                     )}
                     <Ionicons name="chevron-forward" size={20} color="white" />
                 </View>
-            </TouchableOpacity>
+            </AnimatedTouchable>
 
             <AwaitingApprovalModal
                 visible={visible}

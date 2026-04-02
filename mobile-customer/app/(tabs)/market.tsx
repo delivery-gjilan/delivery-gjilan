@@ -323,11 +323,6 @@ export default function Market() {
     const activeCategoryProducts = useMemo(() => {
         if (isDiscover) return [];
         const filtered = allProducts.filter((p: any) => p.product?.categoryId === activeTabId);
-        // Debug logging
-        if (filtered.length === 0 && allProducts.length > 0) {
-            console.log('No products found for category:', activeTabId);
-            console.log('Available products:', allProducts.map((p: any) => ({ id: p.id, name: p.name, categoryId: p.product?.categoryId })));
-        }
         return filtered;
     }, [allProducts, activeTabId, isDiscover]);
 

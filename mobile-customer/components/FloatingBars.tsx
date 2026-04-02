@@ -3,7 +3,6 @@ import { usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CartFloatingBar } from '@/modules/cart/components/CartFloatingBar';
 import { OrdersFloatingBar } from '@/modules/orders/components/OrdersFloatingBar';
-import { useState, useEffect, useRef } from 'react';
 
 export const FloatingBars = () => {
     const pathname = usePathname();
@@ -13,44 +12,20 @@ export const FloatingBars = () => {
     const hiddenRoutes = ['/product/', '/cart', '/orders', '/login', '/signup', '/auth-selection', '/invite-friends', '/profile', '/addresses', '/business/'];
     const shouldHide = hiddenRoutes.some((route) => pathname.startsWith(route)) || pathname === '/';
 
-    // Delay showing bars so they don't pop in while a screen is still sliding away.
-    // Hide immediately, show only after the exit transition finishes.
-    const [visible, setVisible] = useState(!shouldHide);
-    const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-    useEffect(() => {
-        if (timerRef.current) clearTimeout(timerRef.current);
-
-        if (shouldHide) {
-            setVisible(false);
-        } else {
-            timerRef.current = setTimeout(() => setVisible(true), 350);
-        }
-
-        return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-    }, [shouldHide]);
-
-    if (!visible) return null;
+    if (shouldHide) return null;
 
     // Check if we're on a tab route
     const tabRoutes = ['/market', '/home', '/profile', '/restaurants', '/analytics'];
     const isOnTabRoute = tabRoutes.some((route) => pathname === route || pathname.startsWith(route));
 
-    // Calculate bottom position based on whether tab bar is visible
-    const getBottomPosition = () => {
-        if (Platform.OS === 'ios') {
-            return isOnTabRoute ? 64 + insets.bottom : 20 + insets.bottom;
-        }
-        return isOnTabRoute ? 56 + insets.bottom : 20 + insets.bottom;
-    };
+    const bottomPosition = Platform.OS === 'ios'
+        ? isOnTabRoute ? 64 + insets.bottom : 20 + insets.bottom
+        : isOnTabRoute ? 56 + insets.bottom : 20 + insets.bottom;
 
     return (
         <View
             className="absolute left-4 right-4 gap-3"
-            style={{
-                bottom: getBottomPosition(),
-                zIndex: 50,
-            }}
+            style={{ bottom: bottomPosition, zIndex: 50 }}
             pointerEvents="box-none"
         >
             <OrdersFloatingBar />

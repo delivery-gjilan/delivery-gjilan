@@ -3,7 +3,7 @@
     "name": "Zipp Go",
     "slug": "mobile-customer",
     "version": "1.0.0",
-    "orientation": "default",
+    "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": ["deliveryapp", "zipp"],
     "userInterfaceStyle": "automatic",
@@ -15,9 +15,7 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSSupportsLiveActivities": true,
         "NSSupportsLiveActivitiesFrequentUpdates": true,
-        "UIBackgroundModes": [
-          "remote-notification"
-        ]
+        "UIBackgroundModes": []
       },
       "appleTeamId": "87K8YXG5V8",
       "bundleIdentifier": "com.artshabani.mobilecustomer",

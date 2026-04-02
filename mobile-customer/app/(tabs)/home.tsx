@@ -180,7 +180,7 @@ export default function Discover() {
             return (
                 <Animated.View
                     key={item.id}
-                    entering={hasAnimated.current ? undefined : FadeInDown.delay(index * 70).duration(400).springify()}
+                    entering={hasAnimated.current ? undefined : FadeInDown.delay(index * 70).duration(400).springify().damping(28).stiffness(160)}
                 >
                     <CompactRestaurantCard
                         id={item.id}
@@ -214,7 +214,6 @@ export default function Discover() {
             <OutOfZoneSheet visible={zoneSheetVisible} onDismiss={() => setZoneSheetVisible(false)} />
             <View className="flex-1">
                 <WoltHeader
-                    onPressNotifications={() => console.log('Open notifications')}
                     bannerMessage={showBanner ? bannerMessage : undefined}
                     bannerType={(bannerType as WoltHeaderBannerType) ?? 'INFO'}
                 />

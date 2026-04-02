@@ -28,6 +28,7 @@ import { RepeatOrCustomizeModal } from '@/modules/business/components/RepeatOrCu
 import type { CartItem } from '../types';
 import { useCartDataStore } from '../store/cartDataStore';
 import * as Haptics from 'expo-haptics';
+import Reanimated, { FadeInDown } from 'react-native-reanimated';
 import { PromotionProgressBar } from './PromotionProgressBar';
 import { PromoAppliedCelebration } from './PromoAppliedCelebration';
 import { useUserLocation } from '@/hooks/useUserLocation';
@@ -1040,9 +1041,9 @@ export const CartScreen = () => {
                                 </View>
                             </View>
 
-                            {items.map((item) => (
+                            {items.map((item, index) => (
+                                <Reanimated.View key={item.cartItemId} entering={FadeInDown.delay(index * 55).duration(350).springify().damping(28).stiffness(160)}>
                                 <TouchableOpacity
-                                    key={item.cartItemId}
                                     className="rounded-xl p-4 flex-row items-center border"
                                     activeOpacity={0.9}
                                     onPress={() => handleEditCartItem(item)}
@@ -1166,6 +1167,7 @@ export const CartScreen = () => {
                                         <Ionicons name="trash-outline" size={24} color={theme.colors.expense} />
                                     </TouchableOpacity>
                                 </TouchableOpacity>
+                                </Reanimated.View>
                             ))}
                         </View>
                     </ScrollView>
@@ -1332,8 +1334,8 @@ export const CartScreen = () => {
                                 </TouchableOpacity>
                             </View>
                             {items.map((item, idx) => (
+                                <Reanimated.View key={item.cartItemId} entering={FadeInDown.delay(idx * 45).duration(300).springify().damping(28).stiffness(160)}>
                                 <View
-                                    key={item.cartItemId}
                                     className="flex-row items-center px-4 py-2.5"
                                     style={idx < items.length - 1 ? { borderBottomWidth: 1, borderBottomColor: theme.colors.border } : undefined}
                                 >
@@ -1373,6 +1375,7 @@ export const CartScreen = () => {
                                         )}
                                     </View>
                                 </View>
+                                </Reanimated.View>
                             ))}
                         </View>
 

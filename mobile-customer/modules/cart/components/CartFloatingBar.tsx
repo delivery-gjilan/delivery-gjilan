@@ -1,11 +1,20 @@
-import { View, Text, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCart } from '../hooks/useCart';
 import { useCartAnimationStore } from '../store/cartAnimationStore';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    withSpring,
+    withSequence,
+    withTiming,
+    Easing,
+    interpolateColor,
+} from 'react-native-reanimated';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -15,52 +24,57 @@ export const CartFloatingBar = () => {
     const { t } = useTranslations();
     const { total, count, isEmpty } = useCart();
     const { triggerCount } = useCartAnimationStore();
-    const colorAnim = useRef(new Animated.Value(0)).current;
-    const [isFlashing, setIsFlashing] = useState(false);
-    const mountTriggerCount = useRef(triggerCount); // capture value at mount — don't flash for it
+    const mountTriggerCount = useRef(triggerCount);
 
-    // Color flash animation when items are added (not on initial mount)
+    // Slide-up entrance / slide-down exit
+    const translateY = useSharedValue(80);
+    const opacity = useSharedValue(0);
+
+    // Color flash (0 = normal, 1 = light flash)
+    const flashProgress = useSharedValue(0);
+
+    // Appear on mount
+    useEffect(() => {
+        translateY.value = withSpring(0, { damping: 18, stiffness: 220 });
+        opacity.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.quad) });
+    }, []);
+
+    // Color flash when items are added (not on mount)
     useEffect(() => {
         if (triggerCount === 0 || triggerCount === mountTriggerCount.current) return;
-        setIsFlashing(true);
-        Animated.sequence([
-            Animated.timing(colorAnim, {
-                toValue: 1,
-                duration: 150,
-                useNativeDriver: false,
-            }),
-            Animated.timing(colorAnim, {
-                toValue: 0,
-                duration: 200,
-                useNativeDriver: false,
-            }),
-        ]).start(() => {
-            setIsFlashing(false);
-            colorAnim.setValue(0);
-        });
+        flashProgress.value = withSequence(
+            withTiming(1, { duration: 140, easing: Easing.out(Easing.quad) }),
+            withTiming(0, { duration: 220, easing: Easing.in(Easing.quad) }),
+        );
     }, [triggerCount]);
 
-    if (isEmpty) return null;
+    const wrapperStyle = useAnimatedStyle(() => ({
+        opacity: opacity.value,
+        transform: [{ translateY: translateY.value }],
+    }));
 
-    // Get lighter version of primary color for flash effect
-    const getLightColor = (hexColor: string) => {
-        if (theme.dark === false && hexColor === '#7C3AED') return '#A78BFA';
-        return '#DDD6FE';
-    };
-
-    const flashBackgroundColor = colorAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [theme.colors.primary, getLightColor(theme.colors.primary)],
+    const flashStyle = useAnimatedStyle(() => {
+        const lightColor = theme.dark === false ? '#A78BFA' : '#DDD6FE';
+        return {
+            backgroundColor: interpolateColor(
+                flashProgress.value,
+                [0, 1],
+                [theme.colors.primary, lightColor],
+            ),
+        };
     });
+
+    if (isEmpty) return null;
 
     return (
         <AnimatedTouchable
             activeOpacity={0.9}
             onPress={() => router.push('/cart')}
+            style={wrapperStyle}
         >
             <Animated.View
                 className="flex-row items-center justify-between p-4 rounded-2xl"
-                style={{ backgroundColor: isFlashing ? flashBackgroundColor : theme.colors.primary }}
+                style={flashStyle}
             >
                 <View className="flex-row items-center space-x-3 gap-3">
                     <View className="bg-white/20 px-3 py-1 rounded-full">

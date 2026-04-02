@@ -1,10 +1,14 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, Image } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, TouchableOpacity } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import Animated, {
     useAnimatedStyle,
     interpolate,
     Extrapolate,
     SharedValue,
+    useSharedValue,
+    withTiming,
+    Easing,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,7 +17,7 @@ import { Business } from '@/gql/graphql';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 
-export const HERO_HEIGHT = 220;
+export const HERO_HEIGHT = 260;
 const LOGO_SIZE = 80;
 const LOGO_OVERLAP = LOGO_SIZE / 2;
 
@@ -22,13 +26,23 @@ export function BusinessHeader({ business, scrollY }: { business: Partial<Busine
     const router = useRouter();
     const insets = useSafeAreaInsets();
 
+    // Mount zoom-in for hero image (Wolt-style entrance)
+    const mountScale = useSharedValue(1.12);
+    useEffect(() => {
+        mountScale.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.cubic) });
+    }, []);
+
+    const mountStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: mountScale.value }],
+    }));
+
     // Parallax on the image
     const imageStyle = useAnimatedStyle(() => {
         const translateY = scrollY
-            ? interpolate(scrollY.value, [-100, 0, HERO_HEIGHT], [-30, 0, HERO_HEIGHT * 0.35], Extrapolate.CLAMP)
+            ? interpolate(scrollY.value, [-100, 0, HERO_HEIGHT], [-40, 0, HERO_HEIGHT * 0.4], Extrapolate.CLAMP)
             : 0;
         const scale = scrollY
-            ? interpolate(scrollY.value, [-200, 0], [1.4, 1], Extrapolate.CLAMP)
+            ? interpolate(scrollY.value, [-200, 0], [1.3, 1], Extrapolate.CLAMP)
             : 1;
         return {
             transform: [
@@ -39,16 +53,18 @@ export function BusinessHeader({ business, scrollY }: { business: Partial<Busine
     }) as any;
 
     return (
-        <View style={{ height: HERO_HEIGHT + LOGO_OVERLAP, overflow: 'visible' }}>
+        <View style={{ height: HERO_HEIGHT + LOGO_OVERLAP, overflow: 'visible', backgroundColor: theme.colors.background }}>
             {/* Hero image container */}
-            <View style={{ height: HERO_HEIGHT, overflow: 'hidden' }}>
+            <View style={{ height: HERO_HEIGHT, overflow: 'hidden', backgroundColor: theme.colors.card }}>
                 {/* Parallax Image */}
-                <Animated.View style={[{ position: 'absolute', top: -30, left: 0, right: 0, bottom: -30 }, imageStyle as any]}>
+                <Animated.View style={[{ position: 'absolute', top: -40, left: 0, right: 0, bottom: -40 }, imageStyle as any, mountStyle]}>
                     {business.imageUrl ? (
-                        <Image
+                        <ExpoImage
                             source={{ uri: business.imageUrl }}
                             style={{ width: '100%', height: '100%' }}
-                            resizeMode="cover"
+                            contentFit="cover"
+                            transition={300}
+                            placeholder={null}
                         />
                     ) : (
                         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.card }}>
@@ -57,10 +73,17 @@ export function BusinessHeader({ business, scrollY }: { business: Partial<Busine
                     )}
                 </Animated.View>
 
-                {/* Bottom gradient */}
+                {/* Top gradient — status bar legibility */}
                 <LinearGradient
-                    colors={['transparent', 'rgba(0,0,0,0.45)']}
-                    style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: HERO_HEIGHT * 0.55 }}
+                    colors={['rgba(0,0,0,0.5)', 'transparent']}
+                    style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top + 60 }}
+                />
+
+                {/* Bottom gradient — bleeds into content below */}
+                <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.55)', theme.colors.background]}
+                    locations={[0, 0.6, 1]}
+                    style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: HERO_HEIGHT * 0.65 }}
                 />
 
                 {/* Floating Back Button */}
@@ -109,7 +132,7 @@ export function BusinessHeader({ business, scrollY }: { business: Partial<Busine
                         width: LOGO_SIZE,
                         height: LOGO_SIZE,
                         borderRadius: 18,
-                        backgroundColor: '#fff',
+                        backgroundColor: theme.colors.card,
                         alignItems: 'center',
                         justifyContent: 'center',
                         shadowColor: '#000',
@@ -120,10 +143,11 @@ export function BusinessHeader({ business, scrollY }: { business: Partial<Busine
                     }}
                 >
                     {business.imageUrl ? (
-                        <Image
+                        <ExpoImage
                             source={{ uri: business.imageUrl }}
                             style={{ width: LOGO_SIZE - 8, height: LOGO_SIZE - 8, borderRadius: 14 }}
-                            resizeMode="cover"
+                            contentFit="cover"
+                            transition={200}
                         />
                     ) : (
                         <Ionicons name="restaurant" size={36} color={theme.colors.subtext} />
