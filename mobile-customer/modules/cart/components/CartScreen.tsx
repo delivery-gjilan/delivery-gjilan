@@ -33,7 +33,6 @@ import { PromotionProgressBar } from './PromotionProgressBar';
 import { PromoAppliedCelebration } from './PromoAppliedCelebration';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import { useDeliveryLocationStore } from '@/store/useDeliveryLocationStore';
-import { useAwaitingApprovalModalStore } from '@/store/useAwaitingApprovalModalStore';
 
 // Persists across CartScreen mounts so we never replay the celebration for the same promo
 const _celebrationShownPromoIds = new Set<string>();
@@ -59,7 +58,6 @@ export const CartScreen = () => {
     const persistedDeliveryLocation = useDeliveryLocationStore((state) => state.location);
     const setDeliveryLocation = useDeliveryLocationStore((state) => state.setLocation);
     const { showLoading, showSuccess, hideSuccess } = useSuccessModalStore();
-    const requestAwaitingApprovalAutoOpen = useAwaitingApprovalModalStore((state) => state.requestAutoOpen);
     const updateActiveOrder = useActiveOrdersStore((state) => state.updateOrder);
     const setActiveOrders = useActiveOrdersStore((state) => state.setActiveOrders);
 
@@ -854,10 +852,6 @@ export const CartScreen = () => {
             // Keep current route and show success directly to avoid visible route flashes.
             if (orderId) {
                 updateActiveOrder(order as any);
-
-                if (order?.status === 'AWAITING_APPROVAL') {
-                    requestAwaitingApprovalAutoOpen(String(orderId));
-                }
 
                 console.log('[CartScreen] Showing success modal');
                 showSuccess(orderId, 'order_created');

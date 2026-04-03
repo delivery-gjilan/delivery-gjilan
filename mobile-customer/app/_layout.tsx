@@ -16,6 +16,7 @@ import StoreClosedScreen from '@/components/StoreClosedScreen';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ToastContainer } from '@/components/Toast';
 import SuccessModalContainer from '@/components/SuccessModalContainer';
+import AwaitingApprovalModalContainer from '@/components/AwaitingApprovalModalContainer';
 import { useBackgroundLiveActivity } from '@/hooks/useBackgroundLiveActivity';
 import { useEffect } from 'react';
 import Mapbox from '@rnmapbox/maps';
@@ -94,6 +95,7 @@ function AppContent() {
                     <FloatingBars />
                     <ToastContainer />
                     <SuccessModalContainer />
+                    <AwaitingApprovalModalContainer />
                 </SafeAreaProvider>
             </GestureHandlerRootView>
         </ThemeProvider>

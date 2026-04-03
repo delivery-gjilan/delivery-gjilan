@@ -158,7 +158,6 @@ export default function Profile() {
                 <View className="px-4 mb-6">
                     <Text className="text-2xl font-bold text-white mb-4">Quick links</Text>
                     <View>
-                        <ProfileRow title="Invite Friends" icon="gift" onPress={() => router.push('/invite-friends')} />
                         {false && <ProfileRow title="Redeem code" onPress={() => {}} />}
                         <ProfileRow title="Contact Support" onPress={() => Linking.openURL('mailto:support@zippdelivery.com')} />
                         <ProfileRow title="Order history" onPress={handleOrderHistoryPress} showDivider={false} />

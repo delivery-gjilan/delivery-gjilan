@@ -55,6 +55,19 @@ export class AuthRepository {
         return user;
     }
 
+    async markEmailVerified(userId: string): Promise<DbUser | undefined> {
+        const [user] = await this.db
+            .update(users)
+            .set({
+                emailVerified: true,
+                signupStep: 'EMAIL_VERIFIED',
+                emailVerificationCode: null,
+            })
+            .where(eq(users.id, userId))
+            .returning();
+        return user;
+    }
+
     async setPhoneVerificationCode(userId: string, code: string): Promise<DbUser | undefined> {
         const [user] = await this.db
             .update(users)
@@ -105,6 +118,15 @@ export class AuthRepository {
 
     async setPhoneNumber(userId: string, phoneNumber: string): Promise<DbUser | undefined> {
         const [user] = await this.db.update(users).set({ phoneNumber }).where(eq(users.id, userId)).returning();
+        return user;
+    }
+
+    async setPhoneNumberAndComplete(userId: string, phoneNumber: string): Promise<DbUser | undefined> {
+        const [user] = await this.db
+            .update(users)
+            .set({ phoneNumber, phoneVerified: true, signupStep: 'COMPLETED' })
+            .where(eq(users.id, userId))
+            .returning();
         return user;
     }
 

@@ -87,7 +87,9 @@ const errorLink = onError(({ error, operation, forward }) => {
         const firstError = error.errors[0];
         if (firstError && !operation.getContext().silentErrors) {
             console.error(`[Apollo] GraphQL error in ${operation.operationName}:`, firstError.message);
-            toast.error(firstError.message);
+            if (__DEV__) {
+                toast.error(firstError.message);
+            }
         } else if (firstError) {
             console.warn(`[Apollo] Silent GraphQL error in ${operation.operationName}:`, firstError.message);
         }

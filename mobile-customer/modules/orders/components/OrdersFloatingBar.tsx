@@ -5,10 +5,14 @@ import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useActiveOrdersStore } from '../store/activeOrdersStore';
 import { toast } from '@/store/toastStore';
-import AwaitingApprovalModal from '@/components/AwaitingApprovalModal';
 import { useAwaitingApprovalModalStore } from '@/store/useAwaitingApprovalModalStore';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, Easing } from 'react-native-reanimated';
+
+// Module-level flag so the entrance animation only plays once per app session.
+// If the component remounts (e.g. due to a brief route flicker), it snaps
+// instantly to the final position instead of fading in from zero.
+let _entranceAnimationPlayed = false;
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -19,8 +23,8 @@ export const OrdersFloatingBar = () => {
     const { t } = useTranslations();
 
     const { hasActiveOrders, activeOrders } = useActiveOrdersStore();
-    const { visible, orderId: modalOrderId, autoOpenOrderId, openModal, consumeAutoOpen, hideModal } =
-        useAwaitingApprovalModalStore();
+    const openModal = useAwaitingApprovalModalStore((state) => state.openModal);
+    const isModalVisible = useAwaitingApprovalModalStore((state) => state.visible);
 
     const activeOrderCount = activeOrders.length;
     // For multiple active orders, we highlight the first one for status coloring
@@ -30,18 +34,7 @@ export const OrdersFloatingBar = () => {
     const customerVisibleStatus = activeOrder?.status === 'READY' ? 'PREPARING' : activeOrder?.status;
     const isAwaitingApproval = activeOrder?.status === 'AWAITING_APPROVAL';
 
-    useEffect(() => {
-        if (!autoOpenOrderId) return;
 
-        const matchingAwaitingOrder = activeOrders.find(
-            (order: any) => String(order?.id) === autoOpenOrderId && order?.status === 'AWAITING_APPROVAL',
-        );
-
-        if (!matchingAwaitingOrder) return;
-
-        openModal(autoOpenOrderId);
-        consumeAutoOpen(autoOpenOrderId);
-    }, [autoOpenOrderId, activeOrders, openModal, consumeAutoOpen]);
 
     // Get business names
     const orderBusinesses = Array.isArray(activeOrder?.businesses) ? activeOrder.businesses : [];
@@ -155,15 +148,27 @@ export const OrdersFloatingBar = () => {
     const activeOrderHint =
         activeOrderCount > 1 ? t.orders.multiple_active_subtitle : statusInfo.message;
 
-    const modalOrder = activeOrders.find((order: any) => String(order?.id) === String(modalOrderId));
-    const modalApprovalReasons = Array.isArray((modalOrder as any)?.approvalReasons)
-        ? (modalOrder as any).approvalReasons
-        : undefined;
-
-    // Slide-up entrance animation
-    const translateY = useSharedValue(80);
-    const opacity = useSharedValue(0);
+    // Auto-open modal when order is AWAITING_APPROVAL and modal is not already visible.
     useEffect(() => {
+        if (isAwaitingApproval && activeOrderId && !isModalVisible) {
+            openModal(activeOrderId);
+        }
+    }, [isAwaitingApproval, activeOrderId, isModalVisible, openModal]);
+
+    // Slide-up entrance animation — only plays on the very first mount.
+    // Subsequent mounts (e.g. brief route flickers) snap instantly to avoid
+    // the banner appearing to vanish for 220 ms.
+    const translateY = useSharedValue(_entranceAnimationPlayed ? 0 : 80);
+    const opacity = useSharedValue(_entranceAnimationPlayed ? 1 : 0);
+    const hasAnimatedRef = useRef(_entranceAnimationPlayed);
+    useEffect(() => {
+        if (hasAnimatedRef.current) {
+            translateY.value = 0;
+            opacity.value = 1;
+            return;
+        }
+        hasAnimatedRef.current = true;
+        _entranceAnimationPlayed = true;
         translateY.value = withSpring(0, { damping: 18, stiffness: 220 });
         opacity.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.quad) });
     }, []);
@@ -211,8 +216,7 @@ export const OrdersFloatingBar = () => {
     };
 
     return (
-        <>
-            <AnimatedTouchable
+        <AnimatedTouchable
                 activeOpacity={0.9}
                 onPress={() => {
                     void handlePress();
@@ -249,12 +253,5 @@ export const OrdersFloatingBar = () => {
                     <Ionicons name="chevron-forward" size={20} color="white" />
                 </View>
             </AnimatedTouchable>
-
-            <AwaitingApprovalModal
-                visible={visible}
-                approvalReasons={modalApprovalReasons}
-                onClose={hideModal}
-            />
-        </>
     );
 };
