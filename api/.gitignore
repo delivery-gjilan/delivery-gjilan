@@ -24,6 +24,8 @@ lerna-debug.log*
 # Testing
 coverage
 .nyc_output
+tests/k6/results/
+tests/k6/results/*.json
 
 # IDEs and Editors
 .idea
