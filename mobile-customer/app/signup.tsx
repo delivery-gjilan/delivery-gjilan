@@ -1,21 +1,25 @@
 import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
+import { useAuthStore } from '@/store/authStore';
 import { useState, useRef } from 'react';
 import { useRouter, type Href } from 'expo-router';
-import { SignupStep } from '@/gql/graphql';
+import { AppLanguage, SetMyPreferredLanguageDocument, SignupStep } from '@/gql/graphql';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useTheme } from '@/hooks/useTheme';
 import type { Translation } from '@/localization/schema';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
+import { useMutation } from '@apollo/client/react';
+import { useLocaleStore } from '@/store/useLocaleStore';
+import type { LanguageChoice } from '@/utils/types';
 
 const getStepConfig = (t: Translation): Record<SignupStep, { number: number; title: string; description: string }> => ({
     INITIAL: { number: 1, title: t.auth.signup.step_titles.create_account, description: t.auth.signup.step_titles.create_account_desc },
-    EMAIL_SENT: { number: 2, title: t.auth.signup.step_titles.verify_email, description: t.auth.signup.step_titles.verify_email_desc },
-    EMAIL_VERIFIED: { number: 3, title: t.auth.signup.step_titles.add_phone, description: t.auth.signup.step_titles.add_phone_desc },
-    PHONE_SENT: { number: 4, title: t.auth.signup.step_titles.verify_phone, description: t.auth.signup.step_titles.verify_phone_desc },
-    COMPLETED: { number: 5, title: t.auth.signup.step_titles.complete, description: t.auth.signup.step_titles.complete_desc },
+    EMAIL_SENT: { number: 1, title: t.auth.signup.step_titles.verify_email, description: t.auth.signup.step_titles.verify_email_desc },
+    EMAIL_VERIFIED: { number: 2, title: t.auth.signup.step_titles.add_phone, description: t.auth.signup.step_titles.add_phone_desc },
+    PHONE_SENT: { number: 2, title: t.auth.signup.step_titles.verify_phone, description: t.auth.signup.step_titles.verify_phone_desc },
+    COMPLETED: { number: 2, title: t.auth.signup.step_titles.complete, description: t.auth.signup.step_titles.complete_desc },
 });
 
 /* ── OTP-style code input ── */
@@ -103,18 +107,18 @@ function InputRow({
 
 export default function SignupScreen() {
     const {
-        user,
         initiateSignup,
-        verifyEmail,
         submitPhoneNumber,
-        verifyPhone,
-        resendEmailVerification,
-        resendPhoneVerification,
         loading: authLoading,
     } = useAuth();
+    // Subscribe directly so re-render is guaranteed when signupStep changes
+    const user = useAuthStore((state) => state.user);
     const router = useRouter();
     const { t } = useTranslations();
     const theme = useTheme();
+
+    const { languageChoice, setLanguageChoice } = useLocaleStore();
+    const [setPreferredLanguage] = useMutation(SetMyPreferredLanguageDocument);
 
     const STEP_CONFIG = getStepConfig(t);
 
@@ -123,25 +127,25 @@ export default function SignupScreen() {
     const [lastName, setLastName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [referralCode, setReferralCode] = useState('');
+
     const [showPassword, setShowPassword] = useState(false);
 
-    // Step 2: Email verification
-    const [emailCode, setEmailCode] = useState('');
-
-    // Step 3: Phone number
+    // Step 2: Phone number
     const [phoneNumber, setPhoneNumber] = useState('');
-
-    // Step 4: Phone verification
-    const [phoneCode, setPhoneCode] = useState('');
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const currentStep: SignupStep = user?.signupStep ?? SignupStep.Initial;
+    const handleLanguageSelect = (choice: LanguageChoice) => {
+        setLanguageChoice(choice);
+    };
+
+    // EMAIL_SENT is a legacy step no longer used — treat it as EMAIL_VERIFIED (phone entry)
+    const rawStep: SignupStep = user?.signupStep ?? SignupStep.Initial;
+    const currentStep: SignupStep = rawStep === SignupStep.EmailSent ? SignupStep.EmailVerified : rawStep;
     const stepConfig = STEP_CONFIG[currentStep] ?? STEP_CONFIG.INITIAL;
 
-    const TOTAL_STEPS = 4;
+    const TOTAL_STEPS = 2;
     const currentStepNumber = stepConfig.number;
     const progressPercent = ((currentStepNumber - 1) / (TOTAL_STEPS - 1)) * 100;
 
@@ -158,32 +162,16 @@ export default function SignupScreen() {
         setError(null);
         setLoading(true);
         try {
-            await initiateSignup(email, password, firstName, lastName, referralCode.trim() || undefined);
+            await initiateSignup(email, password, firstName, lastName);
+            // Persist the chosen language to the user's profile
+            const apiLanguage = languageChoice === 'al' ? AppLanguage.Al : AppLanguage.En;
+            setPreferredLanguage({ variables: { language: apiLanguage } }).catch(() => {});
             setFirstName('');
             setLastName('');
             setEmail('');
             setPassword('');
-            setReferralCode('');
         } catch (err) {
             setError(err instanceof Error ? err.message : t.auth.signup.signup_failed);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleVerifyEmail = async () => {
-        if (!emailCode.trim()) {
-            setError(t.auth.signup.enter_verification_code);
-            return;
-        }
-
-        setError(null);
-        setLoading(true);
-        try {
-            await verifyEmail(emailCode);
-            setEmailCode('');
-        } catch (err) {
-            setError(err instanceof Error ? err.message : t.auth.signup.email_verification_failed);
         } finally {
             setLoading(false);
         }
@@ -199,29 +187,11 @@ export default function SignupScreen() {
         setLoading(true);
         try {
             await submitPhoneNumber(phoneNumber);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : t.auth.signup.phone_submit_failed);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleVerifyPhone = async () => {
-        if (!phoneCode.trim()) {
-            setError(t.auth.signup.enter_verification_code);
-            return;
-        }
-
-        setError(null);
-        setLoading(true);
-        try {
-            await verifyPhone(phoneCode);
-            setPhoneCode('');
             setTimeout(() => {
                 router.replace('/brand-splash');
             }, 500);
         } catch (err) {
-            setError(err instanceof Error ? err.message : t.auth.signup.phone_verification_failed);
+            setError(err instanceof Error ? err.message : t.auth.signup.phone_submit_failed);
         } finally {
             setLoading(false);
         }
@@ -233,15 +203,14 @@ export default function SignupScreen() {
         marginLeft: 12,
         fontSize: 16,
         color: theme.colors.text,
+        backgroundColor: 'transparent',
     } as const;
 
     /* ── Step Progress Bar ── */
     const StepProgressBar = () => {
         const steps = [
             { label: t.auth.signup.steps.account },
-            { label: t.auth.signup.steps.email },
             { label: t.auth.signup.steps.phone },
-            { label: t.auth.signup.steps.verify },
         ];
 
         return (
@@ -308,6 +277,51 @@ export default function SignupScreen() {
                                     {step.label}
                                 </Text>
                             </View>
+                        );
+                    })}
+                </View>
+            </View>
+        );
+    };
+
+    /* ── Language Picker ── */
+    const LanguagePicker = () => {
+        const options: { choice: LanguageChoice; label: string; flag: string }[] = [
+            { choice: 'en', label: t.auth.signup.language_en, flag: '🇬🇧' },
+            { choice: 'al', label: t.auth.signup.language_al, flag: '🇦🇱' },
+        ];
+        return (
+            <View style={{ marginBottom: 20 }}>
+                <Text style={{ color: theme.colors.subtext, fontSize: 13, fontWeight: '500', marginBottom: 8 }}>
+                    {t.auth.signup.language_picker_label}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                    {options.map(({ choice, label, flag }) => {
+                        const isSelected = languageChoice === choice;
+                        return (
+                            <TouchableOpacity
+                                key={choice}
+                                onPress={() => handleLanguageSelect(choice)}
+                                activeOpacity={0.75}
+                                style={{
+                                    flex: 1,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 6,
+                                    paddingVertical: 12,
+                                    borderRadius: 14,
+                                    borderWidth: 1,
+                                    borderColor: theme.colors.border,
+                                    backgroundColor: theme.colors.card,
+                                }}
+                            >
+                                <Text style={{ fontSize: 18 }}>{flag}</Text>
+                                <Text style={{ color: theme.colors.text, fontSize: 14 }}>{label}</Text>
+                                {isSelected && (
+                                    <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+                                )}
+                            </TouchableOpacity>
                         );
                     })}
                 </View>
@@ -440,6 +454,7 @@ export default function SignupScreen() {
                         {/* ── Step 1: Account Details ── */}
                         {currentStep === 'INITIAL' && (
                             <Animated.View entering={FadeInDown.delay(100).duration(400)}>
+                                <LanguagePicker />
                                 <InputRow icon="person-outline" theme={theme}>
                                     <TextInput
                                         style={inputStyle}
@@ -449,6 +464,8 @@ export default function SignupScreen() {
                                         onChangeText={setFirstName}
                                         editable={!loading}
                                         autoCapitalize="words"
+                                        autoComplete="off"
+                                        textContentType="givenName"
                                     />
                                 </InputRow>
 
@@ -461,6 +478,8 @@ export default function SignupScreen() {
                                         onChangeText={setLastName}
                                         editable={!loading}
                                         autoCapitalize="words"
+                                        autoComplete="off"
+                                        textContentType="familyName"
                                     />
                                 </InputRow>
 
@@ -475,6 +494,7 @@ export default function SignupScreen() {
                                         keyboardType="email-address"
                                         autoCapitalize="none"
                                         autoComplete="email"
+                                        textContentType="emailAddress"
                                     />
                                 </InputRow>
 
@@ -487,6 +507,8 @@ export default function SignupScreen() {
                                         onChangeText={setPassword}
                                         editable={!loading}
                                         secureTextEntry={!showPassword}
+                                        autoComplete="off"
+                                        textContentType="oneTimeCode"
                                     />
                                     <TouchableOpacity
                                         onPress={() => setShowPassword(!showPassword)}
@@ -500,117 +522,12 @@ export default function SignupScreen() {
                                     </TouchableOpacity>
                                 </InputRow>
 
-                                <InputRow icon="gift-outline" theme={theme}>
-                                    <TextInput
-                                        style={inputStyle}
-                                        placeholder={t.auth.signup.referral_code_placeholder}
-                                        placeholderTextColor={theme.colors.subtext}
-                                        value={referralCode}
-                                        onChangeText={(text) => setReferralCode(text.toUpperCase())}
-                                        editable={!loading}
-                                        autoCapitalize="characters"
-                                    />
-                                </InputRow>
-                                <Text
-                                    style={{
-                                        color: theme.colors.subtext,
-                                        fontSize: 12,
-                                        marginTop: -4,
-                                        marginBottom: 20,
-                                        marginLeft: 4,
-                                    }}
-                                >
-                                    {t.auth.signup.referral_code_hint}
-                                </Text>
-
                                 <ActionButton onPress={handleInitiateSignup} label={t.common.continue} />
                                 <SignInLink />
                             </Animated.View>
                         )}
 
-                        {/* ── Step 2: Email Verification ── */}
-                        {currentStep === 'EMAIL_SENT' && (
-                            <Animated.View entering={FadeInDown.delay(100).duration(400)}>
-                                <View
-                                    style={{
-                                        backgroundColor: theme.colors.primary + '12',
-                                        borderRadius: 16,
-                                        padding: 16,
-                                        marginBottom: 24,
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                    }}
-                                >
-                                    <Ionicons name="mail" size={24} color={theme.colors.primary} />
-                                    <Text
-                                        style={{
-                                            color: theme.colors.subtext,
-                                            fontSize: 14,
-                                            marginLeft: 12,
-                                            flex: 1,
-                                            lineHeight: 20,
-                                        }}
-                                    >
-                                        {t.auth.signup.email_sent}{' '}
-                                        <Text style={{ color: theme.colors.text, fontWeight: '600' }}>
-                                            {user?.email}
-                                        </Text>
-                                    </Text>
-                                </View>
-
-                                <View style={{ marginBottom: 24 }}>
-                                    <Text
-                                        style={{
-                                            color: theme.colors.text,
-                                            fontWeight: '600',
-                                            fontSize: 14,
-                                            marginBottom: 12,
-                                            textAlign: 'center',
-                                        }}
-                                    >
-                                        {t.auth.signup.verification_code}
-                                    </Text>
-                                    <CodeInput
-                                        value={emailCode}
-                                        onChange={setEmailCode}
-                                        theme={theme}
-                                        editable={!loading}
-                                    />
-                                </View>
-
-                                <ActionButton onPress={handleVerifyEmail} label={t.auth.signup.verify_email_button} />
-
-                                <TouchableOpacity
-                                    style={{ paddingVertical: 14, marginTop: 8 }}
-                                    onPress={async () => {
-                                        setLoading(true);
-                                        try {
-                                            await resendEmailVerification();
-                                            setError(null);
-                                        } catch (err) {
-                                            setError(err instanceof Error ? err.message : t.auth.signup.resend_failed);
-                                        } finally {
-                                            setLoading(false);
-                                        }
-                                    }}
-                                    disabled={loading}
-                                >
-                                    <Text
-                                        style={{
-                                            color: theme.colors.primary,
-                                            textAlign: 'center',
-                                            fontWeight: '600',
-                                            fontSize: 15,
-                                        }}
-                                    >
-                                        {t.auth.signup.resend_code}
-                                    </Text>
-                                </TouchableOpacity>
-                                <SignInLink />
-                            </Animated.View>
-                        )}
-
-                        {/* ── Step 3: Phone Number ── */}
+                        {/* ── Step 2: Phone Number ── */}
                         {currentStep === 'EMAIL_VERIFIED' && (
                             <Animated.View entering={FadeInDown.delay(100).duration(400)}>
                                 <View
@@ -646,7 +563,8 @@ export default function SignupScreen() {
                                         onChangeText={setPhoneNumber}
                                         editable={!loading}
                                         keyboardType="phone-pad"
-                                        autoComplete="tel"
+                                        autoComplete="off"
+                                        textContentType="telephoneNumber"
                                     />
                                 </InputRow>
 
@@ -657,81 +575,7 @@ export default function SignupScreen() {
                             </Animated.View>
                         )}
 
-                        {/* ── Step 4: Phone Verification ── */}
-                        {currentStep === 'PHONE_SENT' && (
-                            <Animated.View entering={FadeInDown.delay(100).duration(400)}>
-                                <View
-                                    style={{
-                                        backgroundColor: theme.colors.primary + '12',
-                                        borderRadius: 16,
-                                        padding: 16,
-                                        marginBottom: 24,
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                    }}
-                                >
-                                    <Ionicons name="chatbubble-ellipses" size={24} color={theme.colors.primary} />
-                                    <Text
-                                        style={{
-                                            color: theme.colors.subtext,
-                                            fontSize: 14,
-                                            marginLeft: 12,
-                                            flex: 1,
-                                            lineHeight: 20,
-                                        }}
-                                    >
-                                        {t.auth.signup.phone_verification_sent}{' '}
-                                        <Text style={{ color: theme.colors.text, fontWeight: '600' }}>
-                                            {user?.phoneNumber}
-                                        </Text>
-                                        . {t.auth.signup.phone_verification_instruction}
-                                    </Text>
-                                </View>
-
-                                <View style={{ marginBottom: 24 }}>
-                                    <Text
-                                        style={{
-                                            color: theme.colors.text,
-                                            fontWeight: '600',
-                                            fontSize: 14,
-                                            marginBottom: 12,
-                                            textAlign: 'center',
-                                        }}
-                                    >
-                                        {t.auth.signup.verification_code}
-                                    </Text>
-                                    <CodeInput
-                                        value={phoneCode}
-                                        onChange={setPhoneCode}
-                                        theme={theme}
-                                        editable={!loading}
-                                    />
-                                </View>
-
-                                <ActionButton onPress={handleVerifyPhone} label={t.auth.signup.complete_signup} />
-
-                                <TouchableOpacity
-                                    style={{ paddingVertical: 14, marginTop: 8 }}
-                                    onPress={() => {
-                                        resendPhoneVerification();
-                                        setPhoneCode('');
-                                    }}
-                                    disabled={loading}
-                                >
-                                    <Text
-                                        style={{
-                                            color: theme.colors.primary,
-                                            textAlign: 'center',
-                                            fontWeight: '600',
-                                            fontSize: 15,
-                                        }}
-                                    >
-                                        {t.auth.signup.change_phone}
-                                    </Text>
-                                </TouchableOpacity>
-                                <SignInLink />
-                            </Animated.View>
-                        )}
+                
                     </View>
 
                     {/* Bottom spacing */}

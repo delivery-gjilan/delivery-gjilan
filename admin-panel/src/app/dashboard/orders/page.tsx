@@ -8,6 +8,7 @@ import Modal from "@/components/ui/Modal";
 import Dropdown from "@/components/ui/Dropdown";
 import Input from "@/components/ui/Input";
 import { useOrders, useUpdateOrderStatus } from "@/lib/hooks/useOrders";
+import { usePrepTimeAlerts, type PrepTimeAlert } from "@/lib/hooks/usePrepTimeAlerts";
 import { useAuth } from "@/lib/auth-context";
 import { ASSIGN_DRIVER_TO_ORDER, CREATE_TEST_ORDER, START_PREPARING, UPDATE_PREPARATION_TIME, ADMIN_CANCEL_ORDER, APPROVE_ORDER } from "@/graphql/operations/orders";
 import { GRANT_FREE_DELIVERY } from "@/graphql/operations/promotions/mutations";
@@ -464,6 +465,9 @@ export default function OrdersPage() {
     const [suppressionUpdatingUserId, setSuppressionUpdatingUserId] = useState<string | null>(null);
     const [dismissedApprovalOrderIds, setDismissedApprovalOrderIds] = useState<Set<string>>(new Set());
     const seenFlaggedOrderIdsRef = useRef<Set<string>>(new Set());
+
+    const [prepTimeAlerts, setPrepTimeAlerts] = useState<PrepTimeAlert[]>([]);
+    const { dismiss: dismissPrepAlert } = usePrepTimeAlerts(setPrepTimeAlerts);
 
     const handleApproveConfirm = async () => {
         if (!approvalModalOrder) return;
@@ -960,6 +964,26 @@ export default function OrdersPage() {
                                                 <span className="text-orange-400 text-xs font-semibold">Outside delivery zone</span>
                                             </div>
                                         )}
+
+                                        {/* Prep time extended alert */}
+                                        {(() => {
+                                            const alert = prepTimeAlerts.find((a) => a.orderId === order.id);
+                                            if (!alert) return null;
+                                            return (
+                                                <div className="mb-3 flex items-center gap-2 bg-amber-500/10 border border-amber-500/40 rounded-lg px-3 py-2">
+                                                    <Timer size={13} className="text-amber-400 flex-shrink-0" />
+                                                    <span className="text-amber-400 text-xs font-semibold flex-1">
+                                                        +{alert.addedMinutes} min (now {alert.newTotalMinutes} min)
+                                                    </span>
+                                                    <button
+                                                        onClick={() => dismissPrepAlert(alert.orderId)}
+                                                        className="text-amber-400/60 hover:text-amber-400 text-xs leading-none ml-1"
+                                                    >
+                                                        ×
+                                                    </button>
+                                                </div>
+                                            );
+                                        })()}
 
                                         {/* Prep time */}
                                         {order.status === "PREPARING" && order.preparationMinutes && (

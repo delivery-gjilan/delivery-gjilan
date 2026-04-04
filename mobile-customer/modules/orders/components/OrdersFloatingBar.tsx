@@ -5,9 +5,16 @@ import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useActiveOrdersStore } from '../store/activeOrdersStore';
 import { toast } from '@/store/toastStore';
-import AwaitingApprovalModal from '@/components/AwaitingApprovalModal';
 import { useAwaitingApprovalModalStore } from '@/store/useAwaitingApprovalModalStore';
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, Easing } from 'react-native-reanimated';
+
+// Module-level flag so the entrance animation only plays once per app session.
+// If the component remounts (e.g. due to a brief route flicker), it snaps
+// instantly to the final position instead of fading in from zero.
+let _entranceAnimationPlayed = false;
+
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 export const OrdersFloatingBar = () => {
     const router = useRouter();
@@ -16,8 +23,10 @@ export const OrdersFloatingBar = () => {
     const { t } = useTranslations();
 
     const { hasActiveOrders, activeOrders } = useActiveOrdersStore();
-    const { visible, orderId: modalOrderId, autoOpenOrderId, openModal, consumeAutoOpen, hideModal } =
-        useAwaitingApprovalModalStore();
+    const openModal = useAwaitingApprovalModalStore((state) => state.openModal);
+    const isModalVisible = useAwaitingApprovalModalStore((state) => state.visible);
+
+    // Auto-open is now handled centrally in AwaitingApprovalModalContainer.
 
     const activeOrderCount = activeOrders.length;
     // For multiple active orders, we highlight the first one for status coloring
@@ -27,18 +36,69 @@ export const OrdersFloatingBar = () => {
     const customerVisibleStatus = activeOrder?.status === 'READY' ? 'PREPARING' : activeOrder?.status;
     const isAwaitingApproval = activeOrder?.status === 'AWAITING_APPROVAL';
 
+    // ─── Live countdown ─────────────────────────────────────────────────────────
+    // Compute the authoritative remaining seconds from store data, then run a
+    // local 1s countdown so the display updates every second without waiting for
+    // the next subscription push.
+    const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
+    const countdownInitRef = useRef<string | null>(null); // tracks what we last initialised from
+
+    // Derive the authoritative remaining seconds from the active order.
+    const authEtaSeconds = (() => {
+        if (customerVisibleStatus === 'PREPARING') {
+            if (activeOrder?.estimatedReadyAt) {
+                const ms = new Date(activeOrder.estimatedReadyAt).getTime() - Date.now();
+                if (!Number.isNaN(ms)) return Math.max(0, ms / 1000);
+            }
+            const prepTotal = Number(activeOrder?.preparationMinutes ?? 0);
+            if (!Number.isFinite(prepTotal) || prepTotal <= 0) return null;
+            const startRaw = activeOrder?.preparingAt || activeOrder?.orderDate;
+            const startMs = startRaw ? new Date(startRaw).getTime() : 0;
+            if (!startMs || Number.isNaN(startMs)) return prepTotal * 60;
+            return Math.max(0, prepTotal * 60 - (Date.now() - startMs) / 1000);
+        }
+        if (customerVisibleStatus === 'OUT_FOR_DELIVERY') {
+            const secs = activeOrder?.driver?.driverConnection?.remainingEtaSeconds;
+            const updatedAt = activeOrder?.driver?.driverConnection?.etaUpdatedAt;
+            if (typeof secs !== 'number' || !Number.isFinite(secs) || !updatedAt) return null;
+            const age = (Date.now() - new Date(updatedAt).getTime()) / 1000;
+            if (age > 20) return null; // stale
+            return Math.max(0, secs - age); // age-adjust so countdown starts accurate
+        }
+        return null;
+    })();
+
+    // Reset the local countdown whenever authoritative data meaningfully changes.
+    const initKey = customerVisibleStatus === 'PREPARING'
+        ? `${activeOrder?.estimatedReadyAt ?? ''}|${activeOrder?.preparingAt ?? ''}|${activeOrder?.preparationMinutes ?? ''}`
+        : `${activeOrder?.driver?.driverConnection?.etaUpdatedAt ?? ''}`;
+
     useEffect(() => {
-        if (!autoOpenOrderId) return;
+        if (authEtaSeconds === null) {
+            setCountdownSeconds(null);
+            countdownInitRef.current = null;
+            return;
+        }
+        // Re-initialise whenever the source data key changed or we had no value.
+        if (countdownInitRef.current !== initKey || countdownSeconds === null) {
+            countdownInitRef.current = initKey;
+            setCountdownSeconds(Math.round(authEtaSeconds));
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [initKey, authEtaSeconds === null]);
 
-        const matchingAwaitingOrder = activeOrders.find(
-            (order: any) => String(order?.id) === autoOpenOrderId && order?.status === 'AWAITING_APPROVAL',
-        );
+    // Tick down every second while a countdown is active.
+    useEffect(() => {
+        if (countdownSeconds === null) return;
+        if (countdownSeconds <= 0) return;
+        const id = setInterval(() => {
+            setCountdownSeconds((prev) => (prev !== null && prev > 0 ? prev - 1 : prev));
+        }, 1000);
+        return () => clearInterval(id);
+    }, [countdownSeconds === null, countdownSeconds === 0]);
 
-        if (!matchingAwaitingOrder) return;
-
-        openModal(autoOpenOrderId);
-        consumeAutoOpen(autoOpenOrderId);
-    }, [autoOpenOrderId, activeOrders, openModal, consumeAutoOpen]);
+    const etaMinutes = countdownSeconds !== null ? Math.max(1, Math.ceil(countdownSeconds / 60)) : null;
+    const etaLabel = customerVisibleStatus === 'PREPARING' ? t.orders.details.est_ready : customerVisibleStatus === 'OUT_FOR_DELIVERY' ? t.orders.details.est_delivery : '';
 
     // Get business names
     const orderBusinesses = Array.isArray(activeOrder?.businesses) ? activeOrder.businesses : [];
@@ -51,36 +111,6 @@ export const OrdersFloatingBar = () => {
             ? businessNames.substring(0, 30) + '...'
             : businessNames
         : t.orders.active_bar;
-
-    const liveEtaSeconds = activeOrder?.driver?.driverConnection?.remainingEtaSeconds;
-    const liveEtaUpdatedAt = activeOrder?.driver?.driverConnection?.etaUpdatedAt;
-    const liveEtaMs = liveEtaUpdatedAt ? new Date(liveEtaUpdatedAt).getTime() : 0;
-    const liveEtaFresh =
-        customerVisibleStatus === 'OUT_FOR_DELIVERY' &&
-        typeof liveEtaSeconds === 'number' &&
-        Number.isFinite(liveEtaSeconds) &&
-        liveEtaMs > 0 &&
-        Date.now() - liveEtaMs <= 20_000;
-
-    const prepEta = (() => {
-        if (customerVisibleStatus !== 'PREPARING') return null;
-        const prepTotal = Number(activeOrder.preparationMinutes ?? 0);
-        if (!Number.isFinite(prepTotal) || prepTotal <= 0) return null;
-        const prepStart = activeOrder.preparingAt || activeOrder.orderDate;
-        const prepStartMs = prepStart ? new Date(prepStart).getTime() : 0;
-        if (!prepStartMs || Number.isNaN(prepStartMs)) return Math.max(1, Math.round(prepTotal));
-        const elapsedMin = Math.max(0, (Date.now() - prepStartMs) / 60000);
-        return Math.max(1, Math.ceil(prepTotal - elapsedMin));
-    })();
-
-    const deliveryEta = (() => {
-        if (!liveEtaFresh) return null;
-        if (liveEtaSeconds <= 0) return 0;
-        return Math.max(1, Math.round(liveEtaSeconds / 60));
-    })();
-
-    const etaMinutes = customerVisibleStatus === 'PREPARING' ? prepEta : customerVisibleStatus === 'OUT_FOR_DELIVERY' ? deliveryEta : null;
-    const etaLabel = customerVisibleStatus === 'PREPARING' ? t.orders.details.est_ready : customerVisibleStatus === 'OUT_FOR_DELIVERY' ? t.orders.details.est_delivery : '';
 
     // Determine status info with stronger colors
     const getStatusInfo = (status: string) => {
@@ -152,10 +182,29 @@ export const OrdersFloatingBar = () => {
     const activeOrderHint =
         activeOrderCount > 1 ? t.orders.multiple_active_subtitle : statusInfo.message;
 
-    const modalOrder = activeOrders.find((order: any) => String(order?.id) === String(modalOrderId));
-    const modalApprovalReasons = Array.isArray((modalOrder as any)?.approvalReasons)
-        ? (modalOrder as any).approvalReasons
-        : undefined;
+    // Auto-open is handled in AwaitingApprovalModalContainer — not here.
+
+    // Slide-up entrance animation — only plays on the very first mount.
+    // Subsequent mounts (e.g. brief route flickers) snap instantly to avoid
+    // the banner appearing to vanish for 220 ms.
+    const translateY = useSharedValue(_entranceAnimationPlayed ? 0 : 80);
+    const opacity = useSharedValue(_entranceAnimationPlayed ? 1 : 0);
+    const hasAnimatedRef = useRef(_entranceAnimationPlayed);
+    useEffect(() => {
+        if (hasAnimatedRef.current) {
+            translateY.value = 0;
+            opacity.value = 1;
+            return;
+        }
+        hasAnimatedRef.current = true;
+        _entranceAnimationPlayed = true;
+        translateY.value = withSpring(0, { damping: 22, stiffness: 160 });
+        opacity.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.quad) });
+    }, []);
+    const slideStyle = useAnimatedStyle(() => ({
+        opacity: opacity.value,
+        transform: [{ translateY: translateY.value }],
+    }));
 
     if (!hasActiveOrders || activeOrders.length === 0 || !activeOrder) {
         return null;
@@ -196,14 +245,13 @@ export const OrdersFloatingBar = () => {
     };
 
     return (
-        <>
-            <TouchableOpacity
+        <AnimatedTouchable
                 activeOpacity={0.9}
                 onPress={() => {
                     void handlePress();
                 }}
                 className="flex-row items-center justify-between p-4 rounded-2xl w-full"
-                style={{ backgroundColor: statusInfo.bgColor }}
+                style={[{ backgroundColor: statusInfo.bgColor }, slideStyle]}
             >
                 <View className="flex-row items-center gap-3 flex-1">
                     <View className="bg-white/20 p-2 rounded-full">
@@ -233,13 +281,6 @@ export const OrdersFloatingBar = () => {
                     )}
                     <Ionicons name="chevron-forward" size={20} color="white" />
                 </View>
-            </TouchableOpacity>
-
-            <AwaitingApprovalModal
-                visible={visible}
-                approvalReasons={modalApprovalReasons}
-                onClose={hideModal}
-            />
-        </>
+            </AnimatedTouchable>
     );
 };

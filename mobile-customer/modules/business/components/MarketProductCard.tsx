@@ -10,10 +10,9 @@ interface MarketProductCardProps {
     product: Partial<Product>;
     businessType?: BusinessType;
     onPress?: (productId: string) => void;
-    descriptionOverride?: string | null;
 }
 
-export function MarketProductCard({ product, businessType, onPress, descriptionOverride }: MarketProductCardProps) {
+export function MarketProductCard({ product, businessType, onPress }: MarketProductCardProps) {
     const theme = useTheme();
     const { quantity, addToCart, incrementQuantity, decrementQuantity } = useProductInCart(product, businessType);
 
@@ -52,11 +51,11 @@ export function MarketProductCard({ product, businessType, onPress, descriptionO
         >
             <View className="relative">
                 {product.imageUrl ? (
-                    <Image source={{ uri: product.imageUrl }} style={{ width: '100%', height: 130 }} resizeMode="cover" />
+                    <Image source={{ uri: product.imageUrl }} style={{ width: '100%', height: 165 }} resizeMode="cover" />
                 ) : (
                     <View
                         className="items-center justify-center"
-                        style={{ height: 130, backgroundColor: theme.colors.background }}
+                        style={{ height: 165, backgroundColor: theme.colors.background }}
                     >
                         <Ionicons name="basket-outline" size={36} color={theme.colors.subtext} />
                     </View>
@@ -86,18 +85,10 @@ export function MarketProductCard({ product, businessType, onPress, descriptionO
                 )}
             </View>
 
-            <View className="p-3" style={{ minHeight: 116 }}>
-                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }} numberOfLines={2}>
+            <View style={{ padding: 10, paddingTop: 22, minHeight: 90 }}>
+                <Text className="text-sm font-semibold flex-1" style={{ color: theme.colors.text }} numberOfLines={2}>
                     {product.name}
                 </Text>
-
-                {descriptionOverride ?? product.description ? (
-                    <Text className="text-xs mt-1" style={{ color: theme.colors.subtext }} numberOfLines={2}>
-                        {descriptionOverride ?? product.description}
-                    </Text>
-                ) : (
-                    <View className="h-7" />
-                )}
 
                 <View className="flex-row items-center justify-between mt-2">
                     <View className="flex-row items-baseline" style={{ gap: 6 }}>

@@ -1,5 +1,6 @@
-import React, { useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, GestureResponderEvent, Animated } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, GestureResponderEvent } from 'react-native';
+import Reanimated, { useSharedValue, useAnimatedStyle, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { BusinessType } from '@/gql/graphql';
@@ -9,7 +10,7 @@ import { useCartActions } from '@/modules/cart/hooks/useCartActions';
 import { RepeatOrCustomizeModal } from './RepeatOrCustomizeModal';
 import * as Haptics from 'expo-haptics';
 
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+const AnimatedTouchable = Reanimated.createAnimatedComponent(TouchableOpacity);
 
 interface ComplexCartControlsProps {
     productId: string;
@@ -21,50 +22,34 @@ export function ComplexCartControls({ productId, businessType }: ComplexCartCont
     const { totalQuantity, cartItems, decrementLast } = useComplexProductInCart(productId);
     const { updateQuantity } = useCartActions();
     const [modalVisible, setModalVisible] = useState(false);
-    const scaleAnim = useRef(new Animated.Value(1)).current;
+    const scaleAnim = useSharedValue(1);
     const [showFloatingNumber, setShowFloatingNumber] = useState(false);
-    const floatingOpacity = useRef(new Animated.Value(0)).current;
-    const floatingTranslateY = useRef(new Animated.Value(0)).current;
+    const floatingOpacity = useSharedValue(0);
+    const floatingTranslateY = useSharedValue(0);
+
+    const scaleStyle = useAnimatedStyle(() => ({ transform: [{ scale: scaleAnim.value }] }));
+    const floatingStyle = useAnimatedStyle(() => ({
+        opacity: floatingOpacity.value,
+        transform: [{ translateY: floatingTranslateY.value }],
+    }));
 
     const triggerFloatingAnimation = () => {
         setShowFloatingNumber(true);
-        floatingOpacity.setValue(1);
-        floatingTranslateY.setValue(0);
-
-        Animated.parallel([
-            Animated.timing(floatingOpacity, {
-                toValue: 0,
-                duration: 800,
-                useNativeDriver: true,
-            }),
-            Animated.timing(floatingTranslateY, {
-                toValue: -40,
-                duration: 800,
-                useNativeDriver: true,
-            }),
-        ]).start(() => {
-            setShowFloatingNumber(false);
-        });
+        floatingOpacity.value = 1;
+        floatingTranslateY.value = 0;
+        floatingOpacity.value = withTiming(0, { duration: 800 });
+        floatingTranslateY.value = withTiming(-40, { duration: 800 });
+        setTimeout(() => setShowFloatingNumber(false), 820);
     };
 
     const handleAddPress = (e: GestureResponderEvent) => {
         e.stopPropagation();
 
         // Bounce animation
-        Animated.sequence([
-            Animated.spring(scaleAnim, {
-                toValue: 1.2,
-                friction: 3,
-                tension: 200,
-                useNativeDriver: true,
-            }),
-            Animated.spring(scaleAnim, {
-                toValue: 1,
-                friction: 4,
-                tension: 100,
-                useNativeDriver: true,
-            }),
-        ]).start();
+        scaleAnim.value = withSequence(
+            withSpring(1.2, { damping: 3, stiffness: 200 }),
+            withSpring(1, { damping: 4, stiffness: 100 }),
+        );
 
         // Not in cart yet — navigate to product detail
         router.push(`/product/${productId}`);
@@ -99,10 +84,7 @@ export function ComplexCartControls({ productId, businessType }: ComplexCartCont
                 <AnimatedTouchable
                     onPress={handleAddPress}
                     className="w-10 h-10 rounded-full items-center justify-center"
-                    style={{
-                        backgroundColor: theme.colors.primary,
-                        transform: [{ scale: scaleAnim }],
-                    }}
+                    style={[{ backgroundColor: theme.colors.primary }, scaleStyle]}
                     activeOpacity={0.7}
                 >
                     <Ionicons name="add" size={24} color="#ffffff" />
@@ -137,20 +119,21 @@ export function ComplexCartControls({ productId, businessType }: ComplexCartCont
             </View>
 
             {showFloatingNumber && (
-                <Animated.Text
-                    style={{
-                        position: 'absolute',
-                        top: -15,
-                        right: 5,
-                        fontSize: 18,
-                        fontWeight: 'bold',
-                        color: theme.colors.primary,
-                        opacity: floatingOpacity,
-                        transform: [{ translateY: floatingTranslateY }],
-                    }}
+                <Reanimated.Text
+                    style={[
+                        floatingStyle,
+                        {
+                            position: 'absolute',
+                            top: -15,
+                            right: 5,
+                            fontSize: 18,
+                            fontWeight: 'bold',
+                            color: theme.colors.primary,
+                        },
+                    ]}
                 >
                     +1
-                </Animated.Text>
+                </Reanimated.Text>
             )}
 
             <RepeatOrCustomizeModal

@@ -75,6 +75,8 @@ export const ALL_ORDERS_SUBSCRIPTION = gql(`
             needsApproval
             locationFlagged
             approvalReasons
+            preparationMinutes
+            estimatedReadyAt
             user {
                 id
                 firstName

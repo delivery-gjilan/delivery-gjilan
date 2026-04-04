@@ -27,6 +27,7 @@ export const GET_BUSINESS = graphql(`
                 closesAt
             }
             createdAt
+            minOrderAmount
         }
     }
 `);
@@ -42,6 +43,7 @@ export const GET_BUSINESSES = graphql(`
             isActive
             avgPrepTimeMinutes
             prepTimeOverrideMinutes
+            minOrderAmount
             location {
                 latitude
                 longitude
@@ -59,6 +61,34 @@ export const GET_BUSINESSES = graphql(`
             }
             createdAt
             updatedAt
+        }
+    }
+`);
+
+export const GET_FEATURED_BUSINESSES = graphql(`
+    query FeaturedBusinesses {
+        featuredBusinesses {
+            id
+            name
+            imageUrl
+            businessType
+            isActive
+            isFeatured
+            featuredSortOrder
+        }
+    }
+`);
+
+export const GET_ALL_BUSINESSES_FOR_FEATURED = graphql(`
+    query AllBusinessesForFeatured {
+        businesses {
+            id
+            name
+            imageUrl
+            businessType
+            isActive
+            isFeatured
+            featuredSortOrder
         }
     }
 `);

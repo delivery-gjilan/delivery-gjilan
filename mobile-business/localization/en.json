@@ -117,7 +117,12 @@
     "remaining": "remaining",
     "overdue": "overdue",
     "just_now": "Just now",
-    "ago": "ago"
+    "ago": "ago",
+    "add_time": "Add Time",
+    "add_time_title": "Extend Preparation Time",
+    "add_time_subtext": "How many extra minutes does this order need?",
+    "add_time_confirm": "Confirm",
+    "add_time_success": "Preparation time updated"
   },
   "products": {
     "title": "Products",

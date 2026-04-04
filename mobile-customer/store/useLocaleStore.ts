@@ -28,7 +28,7 @@ function getTranslationFromLanguage(language: LanguageChoice): Translation {
 export const useLocaleStore = create<LocaleStore>()(
     persist(
         (set) => ({
-            languageChoice: 'en',
+            languageChoice: 'al',
             translations: null,
             setLanguageChoice: (choice) => {
                 if (!SUPPORTED_LANGUAGES.includes(choice)) return;

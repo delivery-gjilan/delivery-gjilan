@@ -9,9 +9,10 @@ interface AwaitingApprovalModalProps {
     visible: boolean;
     onClose: () => void;
     approvalReasons?: Array<ApprovalReason | string> | null;
+    locked?: boolean;
 }
 
-export default function AwaitingApprovalModal({ visible, onClose, approvalReasons }: AwaitingApprovalModalProps) {
+export default function AwaitingApprovalModal({ visible, onClose, approvalReasons, locked = false }: AwaitingApprovalModalProps) {
     const theme = useTheme();
     const { t } = useTranslations();
 
@@ -100,9 +101,11 @@ export default function AwaitingApprovalModal({ visible, onClose, approvalReason
                     <Pressable
                         onPress={onClose}
                         className="mt-6 py-4 rounded-2xl items-center"
-                        style={{ backgroundColor: theme.colors.primary }}
+                        style={{ backgroundColor: locked ? theme.colors.card : theme.colors.primary, borderWidth: locked ? 1 : 0, borderColor: theme.colors.border }}
                     >
-                        <Text className="text-white font-bold text-base">{t.orders.awaiting_approval_modal.dismiss}</Text>
+                        <Text className="font-bold text-base" style={{ color: locked ? theme.colors.subtext : '#fff' }}>
+                            {locked ? t.orders.awaiting_approval_modal.dismiss_locked ?? t.orders.awaiting_approval_modal.dismiss : t.orders.awaiting_approval_modal.dismiss}
+                        </Text>
                     </Pressable>
                 </View>
             </View>

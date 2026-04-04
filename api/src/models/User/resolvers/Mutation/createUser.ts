@@ -34,6 +34,12 @@ export const createUser: NonNullable<MutationResolvers['createUser']> = async (_
                 extensions: { code: 'FORBIDDEN' },
             });
         }
+
+        if (input.isDemoAccount) {
+            throw new GraphQLError('Business owners cannot create demo accounts', {
+                extensions: { code: 'FORBIDDEN' },
+            });
+        }
     }
 
     const result = await authService.createUser(
@@ -43,6 +49,7 @@ export const createUser: NonNullable<MutationResolvers['createUser']> = async (_
         input.password,
         input.role,
         input.businessId,
+        input.isDemoAccount ?? false,
     );
 
     // If creating a DRIVER user, create their driver profile
@@ -66,6 +73,7 @@ export const createUser: NonNullable<MutationResolvers['createUser']> = async (_
             role: input.role,
             firstName: input.firstName,
             lastName: input.lastName,
+            isDemoAccount: input.isDemoAccount ?? false,
         },
     });
 

@@ -1,0 +1,40 @@
+# DigitalOcean Basic node simulation
+# Matches: s-1vcpu-2gb ($12/month node)
+# Real-world usable: ~1 vCPU, ~1.6 GB RAM after OS overhead
+#
+# Usage:
+#   1. Copy .env to .env.docker and update hostnames (see below)
+#   2. docker compose -f docker-compose.simulate.yml up --build
+#   3. In another terminal: k6 run tests/k6/browse.js
+#      (fixtures.json still points to localhost:4000 which maps to the container)
+#
+# .env.docker changes needed vs .env:
+#   DB_URL=postgresql://postgres:postgres@host.docker.internal:8090/delivery-gjilan-db-local
+#   REDIS_URL=redis://host.docker.internal:6379
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "4001:4000"
+    env_file:
+      - .env.docker
+    # ── Resource limits matching DO Basic s-1vcpu-2gb node ──────────────────
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"      # 1 vCPU
+          memory: 1638M    # ~1.6 GB (2GB minus ~400MB OS overhead)
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    # host.docker.internal lets the container reach your local Postgres/Redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3

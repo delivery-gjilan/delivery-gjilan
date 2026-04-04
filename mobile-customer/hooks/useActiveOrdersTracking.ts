@@ -3,6 +3,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useOrders } from '../modules/orders/hooks/useOrders';
 import { useOrdersSubscription } from '../modules/orders/hooks/useOrdersSubscription';
 import { useSuccessModalStore } from '@/store/useSuccessModalStore';
+import { useGlobalDriverTracking } from './useGlobalDriverTracking';
 
 /**
  * Hook to manage active orders tracking using real-time subscriptions
@@ -25,6 +26,10 @@ export function useActiveOrdersTracking() {
 
     // Subscribe to real-time order updates
     useOrdersSubscription();
+
+    // Subscribe to live driver tracking for any OUT_FOR_DELIVERY order so the
+    // floating banner shows live ETA even when OrderDetails is not open.
+    useGlobalDriverTracking();
 
     // Refetch orders when user becomes authenticated
     useEffect(() => {

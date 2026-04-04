@@ -33,6 +33,7 @@ const MAPBOX_TOKEN =
 // Gjilan/Kosovo bounding box for proximity
 const GJILAN_BBOX = '20.9,42.3,21.7,42.7';
 const GJILAN_CENTER = { latitude: 42.4629, longitude: 21.4694 };
+const MIN_GEOCODE_DELTA = 0.00003;
 
 interface GeocodingFeature {
     id: string;
@@ -594,9 +595,6 @@ export default function AddressPicker({
                             mapDidMoveRef.current = true; // Mark that map moved
                             setIsMapInMotion(true);
                             setPinElevated(true);
-                            setPinAddress('');
-                            setHasResolvedPinAddress(false);
-                            setGeocodedLocation(null);
                             if (geocodeAbortRef.current) geocodeAbortRef.current.abort();
                             if (buttonEnableTimeoutRef.current) clearTimeout(buttonEnableTimeoutRef.current);
                         }}
@@ -621,6 +619,20 @@ export default function AddressPicker({
                                 if (!coords) return;
                                 longitude = Number(coords[0]);
                                 latitude = Number(coords[1]);
+                            }
+
+                            const last = lastGeocodedPos.current;
+                            if (
+                                last &&
+                                Math.abs(last.lat - latitude) < MIN_GEOCODE_DELTA &&
+                                Math.abs(last.lng - longitude) < MIN_GEOCODE_DELTA
+                            ) {
+                                setReverseLoading(false);
+                                setIsMapInMotion(false);
+                                buttonEnableTimeoutRef.current = setTimeout(() => {
+                                    setPinElevated(false);
+                                }, 50);
+                                return;
                             }
                             
                             // Clear any pending button enable timeout (from tap without drag)

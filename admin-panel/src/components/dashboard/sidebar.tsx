@@ -23,6 +23,8 @@ import {
   MessageSquare,
   Monitor,
   ChevronDown,
+  Settings,
+  Star,
 } from "lucide-react";
 
 interface NavItem {
@@ -81,7 +83,9 @@ const sections: NavSection[] = [
       { name: "Categories", href: "/dashboard/categories", icon: Tag, businessAdminVisible: true },
       { name: "Products", href: "/dashboard/products", icon: Package, businessAdminVisible: true },
       { name: "Settlements", href: "/dashboard/business-settlements", icon: Wallet, businessAdminVisible: true },
+      { name: "Working Hours", href: "/dashboard/business-settings", icon: Settings, businessAdminVisible: true },
       { name: "Banners", href: "/admin/banners", icon: Image, superAdminOnly: true },
+      { name: "Featured", href: "/admin/featured", icon: Star, superAdminOnly: true },
       { name: "Notifications", href: "/dashboard/notifications", icon: Bell, superAdminOnly: true },
       { name: "Push Telemetry", href: "/dashboard/notifications/telemetry", icon: Activity, superAdminOnly: true },
       { name: "Business Devices", href: "/dashboard/notifications/devices", icon: Activity, superAdminOnly: true },

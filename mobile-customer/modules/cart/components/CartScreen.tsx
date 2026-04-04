@@ -21,6 +21,7 @@ import { VALIDATE_PROMOTIONS, GET_APPLICABLE_PROMOTIONS, GET_PROMOTION_THRESHOLD
 import { GET_MY_ADDRESSES, ADD_USER_ADDRESS, SET_DEFAULT_ADDRESS } from '@/graphql/operations/addresses';
 import { CALCULATE_DELIVERY_PRICE } from '@/graphql/operations/deliveryPricing';
 import { GET_SERVICE_ZONES } from '@/graphql/operations/serviceZone';
+import { GET_BUSINESS_MINIMUM } from '@/graphql/operations/businesses';
 import type { UserAddress } from '@/gql/graphql';
 import { calculateItemUnitTotal } from '../utils/price';
 import { isPointInPolygon } from '@/utils/pointInPolygon';
@@ -28,11 +29,11 @@ import { RepeatOrCustomizeModal } from '@/modules/business/components/RepeatOrCu
 import type { CartItem } from '../types';
 import { useCartDataStore } from '../store/cartDataStore';
 import * as Haptics from 'expo-haptics';
+import Reanimated, { FadeInDown } from 'react-native-reanimated';
 import { PromotionProgressBar } from './PromotionProgressBar';
 import { PromoAppliedCelebration } from './PromoAppliedCelebration';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import { useDeliveryLocationStore } from '@/store/useDeliveryLocationStore';
-import { useAwaitingApprovalModalStore } from '@/store/useAwaitingApprovalModalStore';
 
 // Persists across CartScreen mounts so we never replay the celebration for the same promo
 const _celebrationShownPromoIds = new Set<string>();
@@ -58,7 +59,6 @@ export const CartScreen = () => {
     const persistedDeliveryLocation = useDeliveryLocationStore((state) => state.location);
     const setDeliveryLocation = useDeliveryLocationStore((state) => state.setLocation);
     const { showLoading, showSuccess, hideSuccess } = useSuccessModalStore();
-    const requestAwaitingApprovalAutoOpen = useAwaitingApprovalModalStore((state) => state.requestAutoOpen);
     const updateActiveOrder = useActiveOrdersStore((state) => state.updateOrder);
     const setActiveOrders = useActiveOrdersStore((state) => state.setActiveOrders);
 
@@ -140,19 +140,6 @@ export const CartScreen = () => {
     const repeatModalCartItems = useMemo(
         () => (repeatModalProductId ? items.filter((i) => i.productId === repeatModalProductId) : []),
         [items, repeatModalProductId],
-    );
-
-    const handleEditCartItem = useCallback(
-        (item: (typeof items)[number]) => {
-            router.push({
-                pathname: '/product/[productId]',
-                params: {
-                    productId: item.productId,
-                    cartItemId: item.cartItemId,
-                },
-            });
-        },
-        [router],
     );
 
     const [validatePromotionsManual, { loading: manualPromoLoading }] = useLazyQuery(VALIDATE_PROMOTIONS, {
@@ -244,6 +231,16 @@ export const CartScreen = () => {
     const spendThreshold = applicableConditional?.spendThreshold;
     const progress = spendThreshold ? Math.min(Number(total) / Number(spendThreshold), 1) : 0;
     const amountRemaining = spendThreshold ? Math.max(0, Number(spendThreshold) - Number(total)) : 0;
+
+    // Minimum order amount enforcement
+    const { data: businessMinData } = useQuery(GET_BUSINESS_MINIMUM, {
+        variables: { id: businessIds[0] },
+        skip: !businessIds[0],
+        fetchPolicy: 'cache-and-network',
+    });
+    const minOrderAmount = Number(businessMinData?.business?.minOrderAmount ?? 0);
+    const minimumMet = minOrderAmount <= 0 || total >= minOrderAmount;
+    const amountUntilMinimum = Math.max(0, minOrderAmount - total);
 
     const eligiblePromotions = useMemo(() => {
         const list = applicablePromotionsData?.getApplicablePromotions ?? [];
@@ -857,10 +854,6 @@ export const CartScreen = () => {
             if (orderId) {
                 updateActiveOrder(order as any);
 
-                if (order?.status === 'AWAITING_APPROVAL') {
-                    requestAwaitingApprovalAutoOpen(String(orderId));
-                }
-
                 console.log('[CartScreen] Showing success modal');
                 showSuccess(orderId, 'order_created');
             } else {
@@ -1010,6 +1003,25 @@ export const CartScreen = () => {
                         />
                     )}
 
+                    {/* Minimum order progress bar */}
+                    {minOrderAmount > 0 && !minimumMet && (
+                        <View className="mx-4 mt-2 mb-1 p-3 rounded-xl" style={{ backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border }}>
+                            <View className="flex-row justify-between mb-1">
+                                <Text className="text-xs font-semibold" style={{ color: theme.colors.subtext }}>{t.cart.minimum_order_label}</Text>
+                                <Text className="text-xs font-bold" style={{ color: theme.colors.expense }}>{formatCurrency(minOrderAmount)}</Text>
+                            </View>
+                            <View className="h-1.5 rounded-full" style={{ backgroundColor: theme.colors.border }}>
+                                <View
+                                    className="h-1.5 rounded-full"
+                                    style={{ width: `${Math.min((total / minOrderAmount) * 100, 100)}%`, backgroundColor: theme.colors.expense }}
+                                />
+                            </View>
+                            <Text className="text-xs mt-1" style={{ color: theme.colors.subtext }}>
+                                {t.cart.minimum_not_met.replace('{amount}', formatCurrency(amountUntilMinimum))}
+                            </Text>
+                        </View>
+                    )}
+
                     {/* Cart Items */}
                     <ScrollView className="flex-1">
                         <View className="p-4 gap-3">
@@ -1043,12 +1055,10 @@ export const CartScreen = () => {
                                 </View>
                             </View>
 
-                            {items.map((item) => (
-                                <TouchableOpacity
-                                    key={item.cartItemId}
+                            {items.map((item, index) => (
+                                <Reanimated.View key={item.cartItemId} entering={FadeInDown.delay(index * 55).duration(350).springify().damping(28).stiffness(160)}>
+                                <View
                                     className="rounded-xl p-4 flex-row items-center border"
-                                    activeOpacity={0.9}
-                                    onPress={() => handleEditCartItem(item)}
                                     style={{
                                         backgroundColor: theme.colors.card,
                                         borderColor: theme.colors.border,
@@ -1168,7 +1178,8 @@ export const CartScreen = () => {
                                     <TouchableOpacity onPress={() => removeItem(item.cartItemId)} className="ml-2 p-2">
                                         <Ionicons name="trash-outline" size={24} color={theme.colors.expense} />
                                     </TouchableOpacity>
-                                </TouchableOpacity>
+                                </View>
+                                </Reanimated.View>
                             ))}
                         </View>
                     </ScrollView>
@@ -1192,11 +1203,20 @@ export const CartScreen = () => {
                         <AnimatedTouchable
                             className="py-4 rounded-2xl items-center flex-row justify-center gap-2"
                             style={{
-                                backgroundColor: theme.colors.primary,
-                                opacity: pulseAnim,
+                                backgroundColor: minimumMet ? theme.colors.primary : theme.colors.border,
+                                opacity: minimumMet ? pulseAnim : 0.6,
                             }}
                             activeOpacity={0.8}
-                            onPress={() => goToStep(2)}
+                            onPress={() => {
+                                if (!minimumMet) {
+                                    Alert.alert(
+                                        t.cart.minimum_order_label,
+                                        t.cart.minimum_not_met.replace('{amount}', formatCurrency(amountUntilMinimum)),
+                                    );
+                                    return;
+                                }
+                                goToStep(2);
+                            }}
                         >
                             <Ionicons name="location-outline" size={20} color="white" />
                             <Text className="text-white font-bold text-lg">{t.cart.choose_address}</Text>
@@ -1335,8 +1355,8 @@ export const CartScreen = () => {
                                 </TouchableOpacity>
                             </View>
                             {items.map((item, idx) => (
+                                <Reanimated.View key={item.cartItemId} entering={FadeInDown.delay(idx * 45).duration(300).springify().damping(28).stiffness(160)}>
                                 <View
-                                    key={item.cartItemId}
                                     className="flex-row items-center px-4 py-2.5"
                                     style={idx < items.length - 1 ? { borderBottomWidth: 1, borderBottomColor: theme.colors.border } : undefined}
                                 >
@@ -1376,6 +1396,7 @@ export const CartScreen = () => {
                                         )}
                                     </View>
                                 </View>
+                                </Reanimated.View>
                             ))}
                         </View>
 
@@ -1601,14 +1622,14 @@ export const CartScreen = () => {
                         <TouchableOpacity
                             className="py-4 rounded-2xl items-center"
                             style={{
-                                backgroundColor: (isProcessing || deliveryPriceLoading || isSelectedLocationInZone === false)
+                                backgroundColor: (isProcessing || deliveryPriceLoading || isSelectedLocationInZone === false || !minimumMet)
                                     ? theme.colors.border
                                     : theme.colors.primary,
-                                opacity: (isProcessing || deliveryPriceLoading || isSelectedLocationInZone === false) ? 0.6 : 1,
+                                opacity: (isProcessing || deliveryPriceLoading || isSelectedLocationInZone === false || !minimumMet) ? 0.6 : 1,
                             }}
                             activeOpacity={0.8}
                             onPress={handleCheckout}
-                            disabled={isProcessing || deliveryPriceLoading || isSelectedLocationInZone === false}
+                            disabled={isProcessing || deliveryPriceLoading || isSelectedLocationInZone === false || !minimumMet}
                         >
                             {isProcessing || orderLoading ? (
                                 <View className="flex-row items-center gap-2">
@@ -1625,6 +1646,11 @@ export const CartScreen = () => {
                         {isSelectedLocationInZone === false && (
                             <Text className="text-xs mt-2 text-center" style={{ color: '#F97316' }}>
                                 {t.cart.outside_zone_inline_warning}
+                            </Text>
+                        )}
+                        {!minimumMet && minOrderAmount > 0 && (
+                            <Text className="text-xs mt-2 text-center" style={{ color: theme.colors.expense }}>
+                                {t.cart.minimum_not_met.replace('{amount}', formatCurrency(amountUntilMinimum))}
                             </Text>
                         )}
                     </View>

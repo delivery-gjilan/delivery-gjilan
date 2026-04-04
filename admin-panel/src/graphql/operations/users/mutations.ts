@@ -9,6 +9,7 @@ export const CREATE_USER_MUTATION = graphql(`
     $lastName: String!
     $role: UserRole!
     $businessId: ID
+    $isDemoAccount: Boolean
   ) {
     createUser(
       input: {
@@ -18,6 +19,7 @@ export const CREATE_USER_MUTATION = graphql(`
         lastName: $lastName
         role: $role
         businessId: $businessId
+        isDemoAccount: $isDemoAccount
       }
     ) {
       token
@@ -26,6 +28,7 @@ export const CREATE_USER_MUTATION = graphql(`
         email
         firstName
         lastName
+        isDemoAccount
         role
         businessId
       }
@@ -41,6 +44,7 @@ export const UPDATE_USER_MUTATION = graphql(`
     $lastName: String!
     $role: UserRole!
     $businessId: ID
+    $isDemoAccount: Boolean
   ) {
     updateUser(
       input: {
@@ -49,12 +53,14 @@ export const UPDATE_USER_MUTATION = graphql(`
         lastName: $lastName
         role: $role
         businessId: $businessId
+        isDemoAccount: $isDemoAccount
       }
     ) {
       id
       email
       firstName
       lastName
+      isDemoAccount
       role
       business {
         id

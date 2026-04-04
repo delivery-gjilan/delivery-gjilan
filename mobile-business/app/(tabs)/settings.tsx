@@ -9,6 +9,7 @@ import {
     Modal,
     TextInput,
     ActivityIndicator,
+    Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -21,7 +22,7 @@ import { UserPermission } from '@/gql/graphql';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useLocaleStore } from '@/store/useLocaleStore';
 import { useNotificationSettingsStore } from '@/store/useNotificationSettingsStore';
-import { CHANGE_MY_PASSWORD, SET_MY_PREFERRED_LANGUAGE } from '@/graphql/auth';
+import { CHANGE_MY_PASSWORD, SET_MY_PREFERRED_LANGUAGE, DELETE_MY_ACCOUNT } from '@/graphql/auth';
 import { GET_BUSINESS_SCHEDULE, SET_BUSINESS_SCHEDULE } from '@/graphql/business';
 
 type DayState = {
@@ -93,6 +94,7 @@ export default function SettingsScreen() {
     const [changeMyPassword] = useMutation(CHANGE_MY_PASSWORD);
     const [setMyPreferredLanguage] = useMutation(SET_MY_PREFERRED_LANGUAGE);
     const [setBusinessSchedule] = useMutation(SET_BUSINESS_SCHEDULE);
+    const [deleteMyAccount] = useMutation(DELETE_MY_ACCOUNT);
 
     const handleLanguageChoice = async (choice: 'en' | 'al') => {
         if (choice === languageChoice) return;
@@ -147,6 +149,29 @@ export default function SettingsScreen() {
                 },
             },
         ]);
+    };
+
+    const handleDeleteAccount = () => {
+        Alert.alert(
+            t('settings.delete_account', 'Delete Account'),
+            'This will permanently erase your account and all personal data. This cannot be undone.',
+            [
+                { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await deleteMyAccount();
+                            await logout();
+                            router.replace('/login');
+                        } catch {
+                            Alert.alert(t('common.error', 'Error'), 'Failed to delete account. Please try again.');
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     const handleSubmitPassword = async () => {
@@ -355,6 +380,19 @@ export default function SettingsScreen() {
                     </View>
                 </SettingSection>
 
+                <SettingSection title={t('settings.legal', 'Legal')}>
+                    <SettingRow
+                        icon="shield-checkmark-outline"
+                        label={t('settings.privacy_policy', 'Privacy Policy')}
+                        onPress={() => Linking.openURL('https://zippdelivery.com/privacy')}
+                    />
+                    <SettingRow
+                        icon="document-text-outline"
+                        label={t('settings.terms_of_service', 'Terms of Service')}
+                        onPress={() => Linking.openURL('https://zippdelivery.com/terms')}
+                    />
+                </SettingSection>
+
                 <View className="mx-4">
                     <TouchableOpacity
                         className="bg-danger/20 py-4 rounded-xl flex-row items-center justify-center"
@@ -362,6 +400,16 @@ export default function SettingsScreen() {
                     >
                         <Ionicons name="log-out" size={20} color="#ef4444" />
                         <Text className="text-danger font-semibold ml-2">{t('settings.logout', 'Logout')}</Text>
+                    </TouchableOpacity>
+                </View>
+
+                <View className="mx-4 mt-3 mb-2">
+                    <TouchableOpacity
+                        className="bg-danger/10 py-4 rounded-xl flex-row items-center justify-center"
+                        onPress={handleDeleteAccount}
+                    >
+                        <Ionicons name="trash-outline" size={20} color="#ef4444" />
+                        <Text className="text-danger font-semibold ml-2">{t('settings.delete_account', 'Delete Account')}</Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>

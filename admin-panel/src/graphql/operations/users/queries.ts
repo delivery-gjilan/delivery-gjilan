@@ -8,6 +8,7 @@ export const USERS_QUERY = graphql(`
       email
       firstName
       lastName
+      isDemoAccount
       role
       phoneNumber
       address
@@ -29,6 +30,7 @@ export const DRIVERS_QUERY = graphql(`
       email
       firstName
       lastName
+      isDemoAccount
       role
       imageUrl
       phoneNumber

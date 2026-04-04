@@ -1,12 +1,49 @@
+enum BannerMediaType {
+    IMAGE
+    GIF
+    VIDEO
+}
+
+enum BannerDisplayContext {
+    HOME            # Home page carousel
+    BUSINESS        # Business detail page
+    CATEGORY        # Category page
+    PRODUCT         # Product detail page
+    CART            # Cart page
+    ALL             # All pages
+}
+
 type Banner {
     id: ID!
     title: String
     subtitle: String
     imageUrl: String!
+    mediaType: BannerMediaType!
+    
+    # Relationships
+    businessId: ID
+    business: Business
+    productId: ID
+    product: Product
+    promotionId: ID
+    promotion: Promotion
+    
+    # Legacy link configuration (kept for backward compatibility)
     linkType: String
     linkTarget: String
+    
+    # Display configuration
+    displayContext: BannerDisplayContext!
+    
+    # Scheduling
+    startsAt: DateTime
+    endsAt: DateTime
+    
+    # Ordering and status
     sortOrder: Int!
     isActive: Boolean!
+    
+    # Metadata
     createdAt: DateTime!
     updatedAt: DateTime!
 }
@@ -15,8 +52,24 @@ input CreateBannerInput {
     title: String
     subtitle: String
     imageUrl: String!
+    mediaType: BannerMediaType
+    
+    # Relationships
+    businessId: ID
+    productId: ID
+    promotionId: ID
+    
+    # Legacy link configuration
     linkType: String
     linkTarget: String
+    
+    # Display configuration
+    displayContext: BannerDisplayContext
+    
+    # Scheduling
+    startsAt: DateTime
+    endsAt: DateTime
+    
     sortOrder: Int
     isActive: Boolean
 }
@@ -25,15 +78,41 @@ input UpdateBannerInput {
     title: String
     subtitle: String
     imageUrl: String
+    mediaType: BannerMediaType
+    
+    # Relationships
+    businessId: ID
+    productId: ID
+    promotionId: ID
+    
+    # Legacy link configuration
     linkType: String
     linkTarget: String
+    
+    # Display configuration
+    displayContext: BannerDisplayContext
+    
+    # Scheduling
+    startsAt: DateTime
+    endsAt: DateTime
+    
     sortOrder: Int
     isActive: Boolean
 }
 
+input GetBannersFilter {
+    activeOnly: Boolean
+    businessId: ID
+    productId: ID
+    promotionId: ID
+    displayContext: BannerDisplayContext
+    includeScheduled: Boolean  # If true, only return banners within their scheduled time
+}
+
 extend type Query {
-    getBanners(activeOnly: Boolean): [Banner!]!
+    getBanners(filter: GetBannersFilter): [Banner!]!
     getBanner(id: ID!): Banner
+    getActiveBanners(displayContext: BannerDisplayContext): [Banner!]!  # Returns only active and scheduled banners
 }
 
 extend type Mutation {

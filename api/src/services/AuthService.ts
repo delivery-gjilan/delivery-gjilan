@@ -88,20 +88,18 @@ export class AuthService {
             await this.authRepository.createReferral(referrerUserId, user.id, referralCode!);
         }
 
-        // Generate and set email verification code
-        const verificationCode = generateVerificationCode();
-        await this.authRepository.setEmailVerificationCode(user.id, verificationCode);
+        // Mark email as verified immediately (no confirmation step)
+        const verifiedUser = await this.authRepository.markEmailVerified(user.id);
 
-        // In a real app, you would send this code via email
-        log.info({ email }, 'auth:signup:verificationSent');
+        log.info({ email }, 'auth:signup:created');
 
         // Generate JWT token for authenticated signup steps
         const token = await this.generateJWT(user.id);
 
         return {
             token,
-            user,
-            message: `Verification code sent to ${email}. Please check your email.`,
+            user: verifiedUser ?? user,
+            message: 'Account created. Please add your phone number.',
         };
     }
 
@@ -151,7 +149,7 @@ export class AuthService {
     }
 
     /**
-     * Step 3: Submit phone number and generate verification code
+     * Step 3: Submit phone number and complete signup (no verification code)
      */
     async submitPhoneNumber(userId: string, phoneNumber: string): Promise<SignupStepResponse> {
         const user = await this.authRepository.findById(userId);
@@ -160,29 +158,20 @@ export class AuthService {
             throw AppError.notFound('User');
         }
 
-        if (!user.emailVerified) {
-            throw AppError.businessRule('Please verify your email first');
-        }
-
         // Allow resubmission if phone not verified yet
         if (user.phoneVerified) {
             throw AppError.conflict('Phone number is already verified');
         }
 
-        // Set phone number
-        await this.authRepository.setPhoneNumber(userId, phoneNumber);
+        // Save phone number and mark signup as completed without OTP
+        const updated = await this.authRepository.setPhoneNumberAndComplete(userId, phoneNumber);
 
-        // Generate and set phone verification code
-        const verificationCode = generateVerificationCode();
-        await this.authRepository.setPhoneVerificationCode(userId, verificationCode);
-
-        // In a real app, you would send this code via SMS
-        log.info({ phoneNumber: phoneNumber.slice(-4) }, 'auth:phoneVerification:sent');
+        log.info({ userId }, 'auth:phoneNumber:saved');
 
         return {
-            userId: user.id,
-            currentStep: 'PHONE_SENT',
-            message: `Verification code sent to ${phoneNumber}. Please check your messages.`,
+            userId: updated?.id ?? userId,
+            currentStep: 'COMPLETED',
+            message: 'Phone number saved. Your account is now active!',
         };
     }
 
@@ -343,6 +332,7 @@ export class AuthService {
         password: string,
         role: 'CUSTOMER' | 'DRIVER' | 'SUPER_ADMIN' | 'ADMIN' | 'BUSINESS_OWNER' | 'BUSINESS_EMPLOYEE',
         businessId?: string,
+        isDemoAccount = false,
     ): Promise<AuthResponse> {
         // Normalize email to lowercase to ensure consistent lookup
         email = email.trim().toLowerCase();
@@ -382,6 +372,7 @@ export class AuthService {
             hashedPassword,
             role,
             businessId,
+            isDemoAccount,
         );
 
         log.info({ userId: user.id, email: user.email, role: user.role }, 'auth:createUser:userCreated');

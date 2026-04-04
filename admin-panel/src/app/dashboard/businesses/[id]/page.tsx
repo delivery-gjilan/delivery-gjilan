@@ -7,6 +7,10 @@ import ProductsBlock from '@/components/businesses/ProductsBlock';
 import CategoriesBlock from '@/components/businesses/CategoriesBlock';
 import { BusinessType } from '@/gql/graphql';
 import { GET_BUSINESS, UPDATE_BUSINESS } from '@/graphql/operations/businesses';
+import { Button } from '@/components/ui/Button';
+import Modal from '@/components/ui/Modal';
+import { Input } from '@/components/ui/Input';
+import Select from '@/components/ui/Select';
 
 
 /* ----------------------------------
@@ -21,6 +25,7 @@ interface Business {
     businessType: string;
     isActive: boolean;
     createdAt: string;
+    minOrderAmount?: number | null;
 }
 
 /* ----------------------------------
@@ -51,11 +56,13 @@ export default function BusinessDetailsPage() {
         phoneNumber: string;
         businessType: BusinessType;
         imageUrl: string;
+        minOrderAmount: number;
     }>({
         name: '',
         phoneNumber: '',
         businessType: BusinessType.Restaurant,
         imageUrl: '',
+        minOrderAmount: 0,
     });
 
     function openEditModal(b: Business) {
@@ -64,6 +71,7 @@ export default function BusinessDetailsPage() {
             phoneNumber: b.phoneNumber || '',
             businessType: BusinessType.Restaurant,
             imageUrl: b.imageUrl || '',
+            minOrderAmount: b.minOrderAmount ?? 0,
         });
 
         setEditOpen(true);
@@ -78,6 +86,7 @@ export default function BusinessDetailsPage() {
                     phoneNumber: editForm.phoneNumber.trim() || null,
                     businessType: editForm.businessType,
                     imageUrl: editForm.imageUrl || null,
+                    minOrderAmount: editForm.minOrderAmount,
                 },
             },
         });
@@ -139,6 +148,13 @@ export default function BusinessDetailsPage() {
                         </p>
 
                         <p className="text-gray-400 text-sm">Created at: {new Date(b.createdAt).toLocaleString()}</p>
+
+                        {(b.minOrderAmount ?? 0) > 0 && (
+                            <p>
+                                <span className="text-gray-400">Minimum Order:</span>{' '}
+                                <span className="font-semibold text-yellow-400">€{Number(b.minOrderAmount).toFixed(2)}</span>
+                            </p>
+                        )}
                     </div>
                 </div>
 
@@ -211,6 +227,23 @@ export default function BusinessDetailsPage() {
                                 })
                             }
                         />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Minimum Order Amount (€)</label>
+                        <Input
+                            type="number"
+                            min={0}
+                            step={0.5}
+                            value={editForm.minOrderAmount}
+                            onChange={(e) =>
+                                setEditForm({
+                                    ...editForm,
+                                    minOrderAmount: parseFloat(e.target.value) || 0,
+                                })
+                            }
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Set to 0 to disable</p>
                     </div>
 
                     <Button variant="primary" className="w-full mt-2" onClick={handleEdit}>

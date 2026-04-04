@@ -7,8 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_GAP = 12;
-const CARD_WIDTH = Math.round(SCREEN_WIDTH * 0.75);
-const IMAGE_HEIGHT = Math.round(CARD_WIDTH * 0.52);
+const CARD_WIDTH = Math.round(SCREEN_WIDTH * 0.65);
+const IMAGE_HEIGHT = Math.round(CARD_WIDTH * 0.47);
 
 // Curated restaurant placeholder images
 const FALLBACK_IMAGES = [

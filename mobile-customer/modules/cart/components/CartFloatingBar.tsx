@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCart } from '../hooks/useCart';
@@ -6,6 +6,15 @@ import { useCartAnimationStore } from '../store/cartAnimationStore';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useEffect, useRef } from 'react';
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    withSpring,
+    withSequence,
+    withTiming,
+    Easing,
+    interpolateColor,
+} from 'react-native-reanimated';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -15,74 +24,57 @@ export const CartFloatingBar = () => {
     const { t } = useTranslations();
     const { total, count, isEmpty } = useCart();
     const { triggerCount } = useCartAnimationStore();
-    const scaleAnim = useRef(new Animated.Value(1)).current;
-    const colorAnim = useRef(new Animated.Value(0)).current;
+    const mountTriggerCount = useRef(triggerCount);
 
-    // Breathing animation
+    // Slide-up entrance / slide-down exit
+    const translateY = useSharedValue(80);
+    const opacity = useSharedValue(0);
+
+    // Color flash (0 = normal, 1 = light flash)
+    const flashProgress = useSharedValue(0);
+
+    // Appear on mount
     useEffect(() => {
-        const animation = Animated.loop(
-            Animated.sequence([
-                Animated.timing(scaleAnim, {
-                    toValue: 1.03,
-                    duration: 1200,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(scaleAnim, {
-                    toValue: 1,
-                    duration: 1200,
-                    useNativeDriver: true,
-                }),
-            ]),
+        translateY.value = withSpring(0, { damping: 18, stiffness: 220 });
+        opacity.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.quad) });
+    }, []);
+
+    // Color flash when items are added (not on mount)
+    useEffect(() => {
+        if (triggerCount === 0 || triggerCount === mountTriggerCount.current) return;
+        flashProgress.value = withSequence(
+            withTiming(1, { duration: 140, easing: Easing.out(Easing.quad) }),
+            withTiming(0, { duration: 220, easing: Easing.in(Easing.quad) }),
         );
-        animation.start();
-        return () => animation.stop();
-    }, [scaleAnim]);
+    }, [triggerCount]);
 
-    // Color flash animation when items are added
-    useEffect(() => {
-        if (triggerCount === 0) return;
-        
-        Animated.sequence([
-            Animated.timing(colorAnim, {
-                toValue: 1,
-                duration: 150,
-                useNativeDriver: false,
-            }),
-            Animated.timing(colorAnim, {
-                toValue: 0,
-                duration: 200,
-                useNativeDriver: false,
-            }),
-        ]).start();
-    }, [triggerCount, colorAnim]);
+    const wrapperStyle = useAnimatedStyle(() => ({
+        opacity: opacity.value,
+        transform: [{ translateY: translateY.value }],
+    }));
+
+    const flashStyle = useAnimatedStyle(() => {
+        const lightColor = theme.dark === false ? '#A78BFA' : '#DDD6FE';
+        return {
+            backgroundColor: interpolateColor(
+                flashProgress.value,
+                [0, 1],
+                [theme.colors.primary, lightColor],
+            ),
+        };
+    });
 
     if (isEmpty) return null;
-
-    // Get lighter version of primary color for flash effect
-    const getLightColor = (hexColor: string) => {
-        // Flash to lighter purple
-        if (theme.dark === false && hexColor === '#7C3AED') {
-            return '#A78BFA'; // violet-400 (accent color)
-        }
-        return '#DDD6FE'; // accent for any theme
-    };
-
-    const backgroundColor = colorAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [theme.colors.primary, getLightColor(theme.colors.primary)],
-    });
 
     return (
         <AnimatedTouchable
             activeOpacity={0.9}
             onPress={() => router.push('/cart')}
-            style={{ 
-                transform: [{ scale: scaleAnim }],
-            }}
+            style={wrapperStyle}
         >
-            <Animated.View 
+            <Animated.View
                 className="flex-row items-center justify-between p-4 rounded-2xl"
-                style={{ backgroundColor: backgroundColor }}
+                style={flashStyle}
             >
                 <View className="flex-row items-center space-x-3 gap-3">
                     <View className="bg-white/20 px-3 py-1 rounded-full">

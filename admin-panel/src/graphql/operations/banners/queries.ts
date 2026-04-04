@@ -1,14 +1,34 @@
 import { graphql } from '@/gql';
 
-export const GET_BANNERS = graphql(`
-  query Banners($activeOnly: Boolean) {
-    getBanners(activeOnly: $activeOnly) {
+export const GET_BANNERS = gql`
+  query GetBanners($filter: GetBannersFilter) {
+    getBanners(filter: $filter) {
       id
       title
       subtitle
       imageUrl
+      mediaType
+      businessId
+      business {
+        id
+        name
+      }
+      productId
+      product {
+        id
+        name
+      }
+      promotionId
+      promotion {
+        id
+        name
+        code
+      }
       linkType
       linkTarget
+      displayContext
+      startsAt
+      endsAt
       sortOrder
       isActive
       createdAt
@@ -24,12 +44,57 @@ export const GET_BANNER = graphql(`
       title
       subtitle
       imageUrl
+      mediaType
+      businessId
+      business {
+        id
+        name
+      }
+      productId
+      product {
+        id
+        name
+      }
+      promotionId
+      promotion {
+        id
+        name
+        code
+      }
       linkType
       linkTarget
+      displayContext
+      startsAt
+      endsAt
       sortOrder
       isActive
       createdAt
       updatedAt
     }
   }
+<<<<<<< HEAD
+`;
+
+export const GET_ACTIVE_BANNERS = gql`
+  query GetActiveBanners($displayContext: BannerDisplayContext) {
+    getActiveBanners(displayContext: $displayContext) {
+      id
+      title
+      subtitle
+      imageUrl
+      mediaType
+      businessId
+      productId
+      promotionId
+      linkType
+      linkTarget
+      displayContext
+      sortOrder
+      isActive
+    }
+  }
+`;
+
+=======
 `);
+>>>>>>> 6bb5c09ec698e8af07c0d7623e92c7760d7802b1

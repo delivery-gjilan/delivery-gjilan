@@ -25,8 +25,8 @@ export default function AddressesScreen() {
             refetch();
             toast.success((t.addresses as any).deleted_success || 'Address deleted');
         },
-        onError: (error) => {
-            toast.error(t.common.error, error.message);
+        onError: () => {
+            toast.error(t.common.error);
         },
     });
 
@@ -34,8 +34,8 @@ export default function AddressesScreen() {
         onCompleted: () => {
             refetch();
         },
-        onError: (error) => {
-            toast.error(t.common.error, error.message);
+        onError: () => {
+            toast.error(t.common.error);
         },
     });
 

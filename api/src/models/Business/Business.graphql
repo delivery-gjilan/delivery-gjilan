@@ -20,6 +20,9 @@ type Business {
     isTemporarilyClosed: Boolean!
     temporaryClosureReason: String
     commissionPercentage: Float!
+    minOrderAmount: Float!
+    isFeatured: Boolean!
+    featuredSortOrder: Int!
     isOpen: Boolean!
     activePromotion: BusinessPromotion
     createdAt: Date!
@@ -37,6 +40,7 @@ type BusinessPromotion {
 type Query {
     businesses: [Business!]! @skipAuth
     business(id: ID!): Business @skipAuth
+    featuredBusinesses: [Business!]! @skipAuth
 }
 
 input CreateBusinessInput {
@@ -48,6 +52,7 @@ input CreateBusinessInput {
     location: LocationInput!
     workingHours: WorkingHoursInput!
     avgPrepTimeMinutes: Int
+    minOrderAmount: Float
 }
 
 input CreateBusinessOwnerInput {
@@ -55,6 +60,7 @@ input CreateBusinessOwnerInput {
     password: String!
     firstName: String!
     lastName: String!
+    isDemoAccount: Boolean
 }
 
 input CreateBusinessWithOwnerInput {
@@ -81,6 +87,7 @@ input UpdateBusinessInput {
     isTemporarilyClosed: Boolean
     temporaryClosureReason: String
     commissionPercentage: Float
+    minOrderAmount: Float
 }
 
 type Mutation {
@@ -89,4 +96,5 @@ type Mutation {
     updateBusiness(id: ID!, input: UpdateBusinessInput!): Business!
     deleteBusiness(id: ID!): Boolean!
     setBusinessSchedule(businessId: ID!, schedule: [BusinessDayHoursInput!]!): [BusinessDayHours!]!
+    setBusinessFeatured(id: ID!, isFeatured: Boolean!, sortOrder: Int): Business!
 }

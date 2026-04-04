@@ -30,6 +30,7 @@
 | BL2 | [BUSINESS_LOGIC/PRODUCT_BUSINESS_CATEGORY_REFACTOR_FLOW.md](BUSINESS_LOGIC/PRODUCT_BUSINESS_CATEGORY_REFACTOR_FLOW.md) | Business Logic | CRUD flows, delete semantics, hook consolidation |
 | BL3 | [BUSINESS_LOGIC/CART_ACTIVE_ORDER_FLOW_RECOMMENDATIONS.md](BUSINESS_LOGIC/CART_ACTIVE_ORDER_FLOW_RECOMMENDATIONS.md) | Business Logic | Cart store, subscription lifecycle, race conditions |
 | BL4 | [BUSINESS_LOGIC/PERSONAL_INVENTORY_COVERAGE.md](BUSINESS_LOGIC/PERSONAL_INVENTORY_COVERAGE.md) | Business Logic | ⚠️ **Superseded by FF1** — see FUTURE_FEATURES/PERSONAL_INVENTORY_COVERAGE.md |
+| BL5 | [BANNER_MANAGEMENT.md](BANNER_MANAGEMENT.md) | Business Logic | Banner system: multi-media support, business/product/promotion targeting, scheduling, display contexts, admin panel UI |
 | FF1 | [FUTURE_FEATURES/PERSONAL_INVENTORY_COVERAGE.md](FUTURE_FEATURES/PERSONAL_INVENTORY_COVERAGE.md) | Future Feature | Personal stock tracking, order coverage split, margin optimisation |
 | FF2 | [FUTURE_FEATURES/BUSINESS_DISPATCH.md](FUTURE_FEATURES/BUSINESS_DISPATCH.md) | Future Feature | Business-initiated driver dispatch, internal delivery runs |
 | FF3 | [FUTURE_FEATURES/CUSTOM_NAVIGATION.md](FUTURE_FEATURES/CUSTOM_NAVIGATION.md) | Future Feature | Migrating from `@badatgil/expo-mapbox-navigation` SDK to custom `@rnmapbox/maps` navigation — cost driver, unused hook inventory, step-by-step migration plan |
@@ -62,6 +63,9 @@
 | O12 | [OPERATIONS/DRIVER_TRACKING_SMOOTHNESS.md](OPERATIONS/DRIVER_TRACKING_SMOOTHNESS.md) | Operations | End-to-end driver position pipeline, animation tuning, dead-reckoning, route-snap |
 | O13 | [OPERATIONS/PAGINATION_AUDIT.md](OPERATIONS/PAGINATION_AUDIT.md) | Operations | Full pagination audit: what is paginated, unbounded queries by risk level, fix order |
 | O14 | [OPERATIONS/MONITORING_FUTURE_PLAN.md](OPERATIONS/MONITORING_FUTURE_PLAN.md) | Operations | Forward monitoring roadmap: dispatch, freshness, SLOs, integrity, business-impact signals |
+| O15 | [APP_STORE_DEPLOYMENT.md](APP_STORE_DEPLOYMENT.md) | Operations | Workspace-level App Store submission tracker for the four mobile apps, including completed/skipped phases and release blockers |
+| O17 | [OPERATIONS/ANDROID_PLAY_STORE_DEPLOYMENT.md](OPERATIONS/ANDROID_PLAY_STORE_DEPLOYMENT.md) | Operations | Android Play Store deployment plan for Zipp Go, Zipp Driver, and Zipp Business — map bug root cause, config gap matrix, build/submit phases, Data Safety form requirements |
+| O16 | [DEMO_MODE_PLAN.md](DEMO_MODE_PLAN.md) | Operations | Apple review demo-account flow, auto-progression behavior, reviewer credentials strategy, and admin-panel demo-account operations |
 | UI1 | [ADMIN_MOBILEBUSINESS_UI_CONTEXT.md](ADMIN_MOBILEBUSINESS_UI_CONTEXT.md) | UI | Product types, variant groups, admin/mobile-business UX |
 | UI2 | [ADMIN_PANEL_BUSINESS_SETTLEMENTS.md](ADMIN_PANEL_BUSINESS_SETTLEMENTS.md) | UI | Business-facing settlements semantics, filters, lazy order details |
 
@@ -167,6 +171,15 @@ ARCHITECTURE (A1)
 | Personal inventory & order coverage | FF1 (future) |
 | Business-initiated driver dispatch | FF2 (future) |
 | Custom navigation (replace SDK) | FF3 (future) |
+
+### Marketing/Promotions Domain
+| Concern | MDS Files |
+|---------|-----------|
+| Banner management | BL5 |
+| Banner scheduling | BL5 |
+| Business/product targeting | BL5 |
+| Promotion system | BL1, B2, B3 |
+| Multi-media banners (image/GIF/video) | BL5 |
 
 ### Notifications Domain
 | Concern | MDS Files |

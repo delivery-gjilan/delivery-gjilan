@@ -1,6 +1,6 @@
-# Minimum Order Amount — Implementation Plan
+# Minimum Order Amount
 
-<!-- MDS:FF5 | Domain: Future Features | Updated: 2026-03-31 -->
+<!-- MDS:FF5 | Domain: Business Logic | Updated: 2026-04-03 | Status: SHIPPED -->
 <!-- Depends-On: B2, B3, BL2, UI1 -->
 <!-- Nav: Business schema → B7. Order validation → B2, B3. Admin business edit UI → update UI1. -->
 

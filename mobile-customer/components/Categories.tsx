@@ -43,13 +43,7 @@ export function Categories() {
             color: '#6A5ACD',
             onPress: () => console.log('Beauty'),
         },
-        {
-            id: '5',
-            name: 'Alcohol',
-            icon: 'wine',
-            color: '#2F4F4F',
-            onPress: () => console.log('Alcohol'),
-        },
+
     ];
 
     return (

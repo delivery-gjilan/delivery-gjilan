@@ -7,7 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import Animated, {
     useSharedValue, useAnimatedScrollHandler,
     useAnimatedStyle, interpolate, Extrapolate, runOnJS, withTiming,
-    FadeInDown,
+    FadeInDown, FadeIn,
 } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -162,6 +162,12 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
     const thresholdProgress = thresholdSpend ? Math.min(Number(businessCartTotal) / Number(thresholdSpend), 1) : 0;
     const thresholdAmountRemaining = thresholdSpend ? Math.max(0, Number(thresholdSpend) - Number(businessCartTotal)) : 0;
     const formatCurrency = (value: number) => `€${Number(value).toFixed(2)}`;
+
+    // Minimum order progress
+    const minOrderAmount = Number((business as any)?.minOrderAmount ?? 0);
+    const minimumMet = minOrderAmount <= 0 || businessCartTotal >= minOrderAmount;
+    const minOrderProgress = minOrderAmount > 0 ? Math.min(businessCartTotal / minOrderAmount, 1) : 1;
+    const amountUntilMinimum = Math.max(0, minOrderAmount - businessCartTotal);
 
 
 
@@ -350,14 +356,18 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
     }, []);
 
     // ─── Compact header animated style ──────────────────────
+    // Height goes 0→full so it doesn't create a black dead zone when invisible
     const compactHeaderStyle = useAnimatedStyle(() => {
+        const progress = interpolate(
+            scrollY.value,
+            [HERO_HEIGHT * 0.5, HERO_HEIGHT * 0.85],
+            [0, 1],
+            Extrapolate.CLAMP
+        );
         return {
-            opacity: interpolate(
-                scrollY.value,
-                [HERO_HEIGHT * 0.3, HERO_HEIGHT * 0.7],
-                [0, 1],
-                Extrapolate.CLAMP
-            ),
+            height: progress * (44 + insets.top),
+            opacity: progress,
+            overflow: 'hidden' as const,
         };
     });
 
@@ -465,16 +475,16 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                 <BusinessHeader business={business} scrollY={scrollY} />
 
                 {/* ═══ 1: Restaurant Info (centered) ═══ */}
-                <View
-                    style={{
-                        backgroundColor: theme.colors.background,
-                    }}
+                <Animated.View
+                    entering={FadeIn.delay(80).duration(350)}
+                    style={{ backgroundColor: theme.colors.background }}
                 >
-                    <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, alignItems: 'center' }}>
+                    <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 14, alignItems: 'center' }}>
                         {/* Name – centered */}
-                        <Text
+                        <Animated.Text
+                            entering={FadeInDown.delay(200).duration(400).springify().damping(28).stiffness(140)}
                             style={{
-                                fontSize: 22,
+                                fontSize: 24,
                                 fontWeight: '800',
                                 color: theme.colors.text,
                                 letterSpacing: -0.5,
@@ -482,10 +492,30 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                             }}
                         >
                             {business.name}
-                        </Text>
+                        </Animated.Text>
+
+                        {/* Description */}
+                        {(business as any).description ? (
+                            <Animated.Text
+                                entering={FadeInDown.delay(240).duration(400).springify().damping(28).stiffness(140)}
+                                style={{
+                                    fontSize: 13,
+                                    color: theme.colors.subtext,
+                                    textAlign: 'center',
+                                    marginTop: 4,
+                                    lineHeight: 18,
+                                }}
+                                numberOfLines={2}
+                            >
+                                {(business as any).description}
+                            </Animated.Text>
+                        ) : null}
 
                         {/* Open status · schedule · delivery */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, flexWrap: 'wrap', justifyContent: 'center', gap: 6 }}>
+                        <Animated.View
+                            entering={FadeInDown.delay(280).duration(400).springify().damping(28).stiffness(140)}
+                            style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, flexWrap: 'wrap', justifyContent: 'center', gap: 6 }}
+                        >
                             <View
                                 style={{
                                     backgroundColor: business.isOpen ? '#1B873520' : '#D32F2F20',
@@ -512,10 +542,11 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                     </Text>
                                 </>
                             )}
-                        </View>
+                        </Animated.View>
 
                         {!business.isOpen && business.temporaryClosureReason && (
-                            <View
+                            <Animated.View
+                                entering={FadeInDown.delay(320).duration(350).springify().damping(28).stiffness(140)}
                                 style={{
                                     marginTop: 8,
                                     paddingHorizontal: 10,
@@ -536,56 +567,80 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                 >
                                     {business.temporaryClosureReason}
                                 </Text>
-                            </View>
+                            </Animated.View>
                         )}
 
                         {/* Delivery info card */}
+                        <Animated.View entering={FadeInDown.delay(340).duration(400).springify().damping(28).stiffness(140)}>
                         <TouchableOpacity
                             activeOpacity={0.85}
                             style={{
                                 flexDirection: 'row',
                                 alignItems: 'center',
                                 alignSelf: 'center',
-                                marginTop: 8,
-                                backgroundColor: theme.colors.primary + '20',
+                                marginTop: 10,
+                                backgroundColor: theme.colors.card,
                                 borderWidth: 1,
-                                borderColor: theme.colors.primary + '45',
-                                borderRadius: 10,
-                                paddingHorizontal: 16,
-                                paddingVertical: 7,
+                                borderColor: theme.colors.border,
+                                borderRadius: 24,
+                                paddingHorizontal: 18,
+                                paddingVertical: 9,
                                 justifyContent: 'center',
                                 gap: 8,
                             }}
                         >
                             <Ionicons name="bicycle-outline" size={16} color={theme.colors.primary} />
-                            <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.primary }}>
+                            <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text }}>
                                 Delivery {deliveryTimeMin}–{deliveryTimeMax} min
                             </Text>
-                            <Ionicons name="chevron-down" size={14} color={theme.colors.primary} />
+                            <Ionicons name="chevron-down" size={14} color={theme.colors.subtext} />
                         </TouchableOpacity>
+                        </Animated.View>
+
+                        {/* Minimum order badge */}
+                        {Number((business as any)?.minOrderAmount ?? 0) > 0 && (
+                            <Animated.View
+                                entering={FadeInDown.delay(360).duration(350).springify().damping(28).stiffness(140)}
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    alignSelf: 'center',
+                                    marginTop: 6,
+                                    gap: 4,
+                                    backgroundColor: theme.colors.card,
+                                    borderWidth: 1,
+                                    borderColor: theme.colors.border,
+                                    borderRadius: 20,
+                                    paddingHorizontal: 12,
+                                    paddingVertical: 5,
+                                }}
+                            >
+                                <Ionicons name="cart-outline" size={13} color={theme.colors.subtext} />
+                                <Text style={{ fontSize: 12, color: theme.colors.subtext }}>
+                                    Min. order €{Number((business as any).minOrderAmount).toFixed(2)}
+                                </Text>
+                            </Animated.View>
+                        )}
                     </View>
-                </View>
+                </Animated.View>
 
                 {/* ═══ 2: STICKY — Header + Search + Categories ═══ */}
-                <View
-                    style={{ backgroundColor: theme.colors.background, zIndex: 50 }}
+                <Animated.View
+                    style={[{ backgroundColor: theme.colors.background, zIndex: 50 }, compactHeaderStyle]}
                     onLayout={(e) => {
                         stickyHeight.current = e.nativeEvent.layout.height;
                     }}
                 >
                     {/* Compact header (fades in as hero scrolls away) */}
-                    <Animated.View
-                        style={[
-                            {
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                paddingTop: insets.top,
-                                paddingHorizontal: 16,
-                                paddingBottom: 6,
-                                height: 44 + insets.top,
-                            },
-                            compactHeaderStyle,
-                        ]}
+                    <View
+                        style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            flex: 1,
+                            paddingTop: insets.top,
+                            paddingHorizontal: 16,
+                            paddingBottom: 6,
+                        }}
                     >
                         <TouchableOpacity
                             onPress={() => expoRouter.back()}
@@ -608,7 +663,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                         <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                             <Ionicons name="ellipsis-horizontal" size={22} color={theme.colors.text} />
                         </TouchableOpacity>
-                    </Animated.View>
+                    </View>
 
                     {/* Search bar */}
                     <Animated.View
@@ -677,7 +732,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
 
                     {/* Bottom border */}
                     <View style={{ height: 1, backgroundColor: theme.colors.border }} />
-                </View>
+                </Animated.View>
 
                 {/* ═══ 3: Products ═══ */}
                 <View
@@ -757,12 +812,13 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
 
                                         {/* Products in this category */}
                                         <View style={{ paddingHorizontal: 16 }}>
-                                            {catProducts.map((productCard) => (
+                                            {catProducts.map((productCard, pIdx) => (
+                                                <Animated.View key={productCard.id} entering={FadeInDown.delay(catIdx * 60 + pIdx * 40).duration(350).springify().damping(28).stiffness(160)}>
                                                 <ProductCard
-                                                    key={productCard.id}
                                                     productCard={productCard}
                                                     businessType={business.businessType}
                                                 />
+                                                </Animated.View>
                                             ))}
                                         </View>
                                     </View>
@@ -920,17 +976,43 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                             />
                         </View>
                     )}
+                    {minOrderAmount > 0 && !minimumMet && (
+                        <View style={{ marginBottom: 10 }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                                <Text style={{ fontSize: 12, color: theme.colors.subtext, fontWeight: '600' }}>
+                                    {t.cart.minimum_order_label}
+                                </Text>
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.expense }}>
+                                    {formatCurrency(minOrderAmount)}
+                                </Text>
+                            </View>
+                            <View style={{ height: 5, borderRadius: 3, backgroundColor: theme.colors.border, overflow: 'hidden' }}>
+                                <View
+                                    style={{
+                                        height: 5,
+                                        borderRadius: 3,
+                                        width: `${minOrderProgress * 100}%`,
+                                        backgroundColor: theme.colors.expense,
+                                    }}
+                                />
+                            </View>
+                            <Text style={{ fontSize: 11, color: theme.colors.subtext, marginTop: 3 }}>
+                                {t.cart.minimum_not_met.replace('{amount}', formatCurrency(amountUntilMinimum))}
+                            </Text>
+                        </View>
+                    )}
                     <TouchableOpacity
-                        activeOpacity={0.9}
-                        onPress={() => expoRouter.push('/cart')}
+                        activeOpacity={minimumMet ? 0.9 : 1}
+                        onPress={() => { if (minimumMet) expoRouter.push('/cart'); }}
                         style={{
-                            backgroundColor: theme.colors.primary,
+                            backgroundColor: minimumMet ? theme.colors.primary : theme.colors.border,
                             borderRadius: 14,
                             paddingVertical: 14,
                             paddingHorizontal: 16,
                             flexDirection: 'row',
                             alignItems: 'center',
                             justifyContent: 'space-between',
+                            opacity: minimumMet ? 1 : 0.7,
                         }}
                     >
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -940,14 +1022,14 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                 </Text>
                             </View>
                             <Text style={{ color: 'white', fontWeight: '600', fontSize: 16 }}>
-                                {t.cart.view_cart}
+                                {minimumMet ? t.cart.view_cart : t.cart.minimum_order_label}
                             </Text>
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                             <Text style={{ color: 'white', fontWeight: '700', fontSize: 16 }}>
                                 {formatCurrency(businessCartTotal)}
                             </Text>
-                            <Ionicons name="chevron-forward" size={18} color="white" />
+                            <Ionicons name={minimumMet ? 'chevron-forward' : 'lock-closed-outline'} size={18} color="white" />
                         </View>
                     </TouchableOpacity>
                 </Animated.View>

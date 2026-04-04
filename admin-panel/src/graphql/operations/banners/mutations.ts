@@ -7,8 +7,15 @@ export const CREATE_BANNER = graphql(`
       title
       subtitle
       imageUrl
+      mediaType
+      businessId
+      productId
+      promotionId
       linkType
       linkTarget
+      displayContext
+      startsAt
+      endsAt
       sortOrder
       isActive
       createdAt
@@ -24,8 +31,15 @@ export const UPDATE_BANNER = graphql(`
       title
       subtitle
       imageUrl
+      mediaType
+      businessId
+      productId
+      promotionId
       linkType
       linkTarget
+      displayContext
+      startsAt
+      endsAt
       sortOrder
       isActive
       createdAt

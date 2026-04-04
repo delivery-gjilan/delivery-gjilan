@@ -15,6 +15,7 @@ import { isPointInPolygon } from '@/utils/pointInPolygon';
 import { MapLibreGL } from '@/components/MapWrapper.native';
 
 const MAPTILER_API_KEY = process.env.EXPO_PUBLIC_MAPTILER_API_KEY ?? '';
+const MIN_GEOCODE_DELTA = 0.00003;
 
 type Step = 'choice' | 'addresses' | 'map' | 'save-prompt';
 
@@ -33,6 +34,7 @@ export function OutOfZoneSheet({ visible, onDismiss }: OutOfZoneSheetProps) {
     const geocodeAbortRef = useRef<AbortController | null>(null);
     const geocodeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const regionSettleTokenRef = useRef(0);
+    const lastGeocodedPosRef = useRef<{ lat: number; lng: number } | null>(null);
 
     // `userStep` is only set when the user actively navigates (tap a button).
     // `null` means "auto-decide from data loading state".
@@ -206,6 +208,7 @@ export function OutOfZoneSheet({ visible, onDismiss }: OutOfZoneSheetProps) {
             setIsDragging(false);
             setIsMapInMotion(false);
             setIsReverseGeocoding(false);
+            lastGeocodedPosRef.current = null;
         } else {
             if (geocodeAbortRef.current) {
                 geocodeAbortRef.current.abort();
@@ -261,6 +264,18 @@ export function OutOfZoneSheet({ visible, onDismiss }: OutOfZoneSheetProps) {
         }
 
         setPickedCoord({ latitude, longitude });
+
+        const last = lastGeocodedPosRef.current;
+        if (
+            last &&
+            Math.abs(last.lat - latitude) < MIN_GEOCODE_DELTA &&
+            Math.abs(last.lng - longitude) < MIN_GEOCODE_DELTA
+        ) {
+            setIsReverseGeocoding(false);
+            setIsMapInMotion(false);
+            return;
+        }
+
         setPickedAddress('');
         setGeocodedCoord(null);
         setIsReverseGeocoding(true);
@@ -285,6 +300,7 @@ export function OutOfZoneSheet({ visible, onDismiss }: OutOfZoneSheetProps) {
                 if (!controller.signal.aborted && data.features?.length > 0) {
                     setPickedAddress(data.features[0].place_name || data.features[0].text || '');
                     setGeocodedCoord({ latitude, longitude });
+                    lastGeocodedPosRef.current = { lat: latitude, lng: longitude };
                 }
             } catch {
                 // ignore aborted / failed

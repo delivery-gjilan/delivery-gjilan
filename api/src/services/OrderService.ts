@@ -51,6 +51,7 @@ import { cache } from '@/lib/cache';
 import { emitOrderEvent } from '@/repositories/OrderEventRepository';
 import { createAuditLogger } from '@/services/AuditLogger';
 import { getPrioritySurchargeAmount } from '@/config/prioritySurcharge';
+import { scheduleDemoOrderProgression } from '@/services/DemoProgressionService';
 
 const log = logger.child({ service: 'OrderService' });
 const TRUSTED_CUSTOMER_MARKER = '[TRUSTED_CUSTOMER]';
@@ -516,6 +517,7 @@ export class OrderService {
                 businessType: businessesTable.businessType,
                 opensAt: businessesTable.opensAt,
                 closesAt: businessesTable.closesAt,
+                minOrderAmount: businessesTable.minOrderAmount,
             })
             .from(businessesTable)
             .where(inArray(businessesTable.id, businessIdList));
@@ -664,6 +666,16 @@ export class OrderService {
             );
         }
 
+        // Enforce minimum order amount
+        const orderBusiness = businessesById.get(orderBusinessId);
+        const minOrderAmount = Number(orderBusiness?.minOrderAmount ?? 0);
+        if (minOrderAmount > 0 && effectiveOrderPrice < minOrderAmount) {
+            throw AppError.badInput(
+                `Minimum order amount for this business is €${minOrderAmount.toFixed(2)}. Your subtotal is €${effectiveOrderPrice.toFixed(2)}.`
+            );
+        }
+
+        // Verify total price matches client input (allow small float error).
         // Priority surcharge is layered on top of the promo-engine totals.
         const expectedTotalWithSurcharge = normalizeMoney(totalOrderPrice + prioritySurcharge);
         const clientTotal = normalizeMoney(Number(input.totalPrice));
@@ -1099,6 +1111,9 @@ export class OrderService {
                         },
                         avgPrepTimeMinutes: business.avgPrepTimeMinutes,
                         commissionPercentage: Number(business.commissionPercentage),
+                        minOrderAmount: Number(business.minOrderAmount ?? 0),
+                        isFeatured: business.isFeatured ?? false,
+                        featuredSortOrder: business.featuredSortOrder ?? 0,
                         createdAt: new Date(business.createdAt),
                         updatedAt: new Date(business.updatedAt),
                         isOpen: true,
@@ -1161,8 +1176,9 @@ export class OrderService {
                       business: undefined,
                       adminNote: driverUser.adminNote || undefined,
                       flagColor: driverUser.flagColor || undefined,
-                                            totalOrders: 0,
-                                            isTrustedCustomer: false,
+                      isDemoAccount: (driverUser as any).isDemoAccount ?? false,
+                      totalOrders: 0,
+                      isTrustedCustomer: false,
                       isOnline: (driverUser as any).isOnline ?? false,
                       permissions: [],
                       preferredLanguage: ((driverUser as any).preferredLanguage === 'en' ? 'EN' : 'AL') as any,
@@ -1514,9 +1530,24 @@ export class OrderService {
         if (status === 'READY' && currentStatus !== 'READY') {
             try {
                 const dispatchService = getDispatchService();
-                dispatchService.dispatchOrder(id, notificationService).catch((err) =>
-                    log.error({ err, orderId: id }, 'updateStatus:dispatch:error'),
-                );
+                // Check whether an early dispatch was already scheduled or fired from
+                // startPreparing.  If 'fired' → skip (drivers already notified).
+                // If 'pending' → the order became ready before the timer fired; cancel
+                // the timer and dispatch immediately.  If absent → legacy path (order
+                // skipped PREPARING), dispatch normally.
+                const earlyState = await cache.get<string>(`dispatch:early:${id}`);
+                if (earlyState === 'fired') {
+                    log.info({ orderId: id }, 'updateStatus:READY — early dispatch already fired, skipping');
+                } else {
+                    if (earlyState === 'pending') {
+                        dispatchService.cancelEarlyDispatch(id);
+                        log.info({ orderId: id }, 'updateStatus:READY — order ready before early timer, dispatching now');
+                    }
+                    await cache.set(`dispatch:early:${id}`, 'fired', 3600);
+                    dispatchService.dispatchOrder(id, notificationService).catch((err) =>
+                        log.error({ err, orderId: id }, 'updateStatus:dispatch:error'),
+                    );
+                }
             } catch (err) {
                 log.warn({ err }, 'updateStatus:dispatch:serviceNotReady');
             }
@@ -1529,7 +1560,7 @@ export class OrderService {
         this.emitAnalyticsEvent(id, status, currentStatus, dbOrder, userData, isDriver, isBusinessAdmin, isSuperAdmin);
 
         // Audit Log
-        const auditLog = createAuditLogger(db, context);
+        const auditLog = createAuditLogger(db, context as any);
         await auditLog.log({
             action: 'ORDER_STATUS_CHANGED',
             entityType: 'ORDER',
@@ -1541,6 +1572,178 @@ export class OrderService {
                 changedFields: ['status'],
             },
         });
+
+        return order;
+    }
+
+    async approveOrderWithSideEffects(id: string, context: ApiContextInterface): Promise<Order> {
+        const { userData } = context;
+
+        const role = userData?.role;
+        if (role !== 'SUPER_ADMIN' && role !== 'ADMIN') {
+            throw AppError.forbidden('Only admins can approve orders');
+        }
+
+        const currentOrder = await this.getOrderById(id);
+        if (!currentOrder) {
+            throw AppError.notFound('Order');
+        }
+
+        if (currentOrder.status !== 'AWAITING_APPROVAL') {
+            throw AppError.businessRule('Order is not awaiting approval');
+        }
+
+        const order = await this.updateOrderStatus(id, 'PENDING', true);
+
+        try {
+            await this.publishSingleUserOrder(String(order.userId), String(order.id));
+            await this.publishAllOrders();
+        } catch (error) {
+            log.error({ err: error, orderId: id }, 'approveOrder:publish:failed');
+        }
+
+        try {
+            const orderBusinessIds = Array.from(
+                new Set(
+                    (order.businesses ?? [])
+                        .map((entry) => entry?.business?.id)
+                        .filter((businessId): businessId is string => Boolean(businessId)),
+                ),
+            );
+
+            if (orderBusinessIds.length > 0) {
+                const businessUserRows = await this.db
+                    .select({ id: usersTable.id })
+                    .from(usersTable)
+                    .where(
+                        and(
+                            inArray(usersTable.businessId, orderBusinessIds),
+                            inArray(usersTable.role, ['BUSINESS_OWNER', 'BUSINESS_EMPLOYEE']),
+                            isNull(usersTable.deletedAt),
+                        ),
+                    );
+
+                notifyBusinessNewOrder(
+                    context.notificationService,
+                    businessUserRows.map((row) => row.id),
+                    String(order.id),
+                );
+            }
+        } catch (error) {
+            log.error({ err: error, orderId: id }, 'approveOrder:notifyBusinessNewOrder:failed');
+        }
+
+        const auditLogger = createAuditLogger(this.db, context as any);
+        await auditLogger.log({
+            action: 'ORDER_STATUS_CHANGED',
+            entityType: 'ORDER',
+            entityId: String(id),
+            metadata: { orderId: String(id), adminId: userData.userId, from: 'AWAITING_APPROVAL', to: 'PENDING' },
+        });
+
+        return order;
+    }
+
+    async startPreparingWithSideEffects(
+        id: string,
+        preparationMinutes: number,
+        context: ApiContextInterface,
+    ): Promise<Order> {
+        const { userData } = context;
+
+        const role = userData?.role;
+        if (!role) {
+            throw AppError.unauthorized();
+        }
+
+        const isBusinessAdmin = role === 'BUSINESS_OWNER' || role === 'BUSINESS_EMPLOYEE';
+        const isSuperAdmin = role === 'SUPER_ADMIN';
+
+        if (!isBusinessAdmin && !isSuperAdmin) {
+            throw AppError.forbidden('Not authorized to start preparing');
+        }
+
+        if (isBusinessAdmin) {
+            if (!userData.businessId) {
+                throw AppError.forbidden('Business admin has no business assigned');
+            }
+            const canAccess = await this.orderContainsBusiness(id, userData.businessId);
+            if (!canAccess) {
+                throw AppError.forbidden('Not authorized to update this order');
+            }
+        }
+
+        if (preparationMinutes < 1 || preparationMinutes > 180) {
+            throw AppError.badInput('Preparation time must be between 1 and 180 minutes');
+        }
+
+        const currentOrder = await this.getOrderById(id);
+        if (!currentOrder) {
+            throw AppError.notFound('Order');
+        }
+
+        const order = await this.startPreparing(id, preparationMinutes);
+        const dbOrder = await this.orderRepository.findById(id);
+
+        if (dbOrder) {
+            await this.updateUserBehaviorOnStatusChange(
+                dbOrder.userId,
+                'PENDING',
+                'PREPARING',
+                Number(dbOrder.actualPrice) +
+                    Number(dbOrder.deliveryPrice) +
+                    Number((dbOrder as any).prioritySurcharge ?? 0),
+                dbOrder.orderDate || null,
+            );
+
+            await this.publishSingleUserOrder(dbOrder.userId, id);
+            await this.publishAllOrders();
+
+            notifyCustomerOrderStatus(context.notificationService, dbOrder.userId, id, 'PREPARING');
+
+            // Schedule driver dispatch to fire EARLY_DISPATCH_LEAD_MIN minutes before ready
+            // so drivers have time to reach the business before the food is ready.
+            try {
+                const dispatchService = getDispatchService();
+                dispatchService
+                    .scheduleEarlyDispatch(id, preparationMinutes, context.notificationService)
+                    .catch((err) => log.error({ err, orderId: id }, 'startPreparing:earlyDispatch:error'));
+            } catch (err) {
+                log.warn({ err }, 'startPreparing:dispatch:serviceNotReady');
+            }
+
+            emitOrderEvent({
+                orderId: id,
+                eventType: 'ORDER_PREPARING',
+                actorType: isBusinessAdmin ? 'RESTAURANT' : 'ADMIN',
+                actorId: userData?.userId,
+                businessId: userData?.businessId ?? undefined,
+                metadata: { preparationMinutes },
+            });
+
+            updateLiveActivity(
+                context.notificationService,
+                id,
+                'preparing',
+                'Your driver',
+                preparationMinutes,
+                preparationMinutes,
+                parseDbTimestamp(dbOrder.preparingAt)?.getTime() ?? Date.now(),
+            );
+
+            const auditLogger = createAuditLogger(this.db, context as any);
+            await auditLogger.log({
+                action: 'ORDER_STATUS_CHANGED',
+                entityType: 'ORDER',
+                entityId: id,
+                metadata: {
+                    orderId: id,
+                    oldValue: { status: 'PENDING' },
+                    newValue: { status: 'PREPARING', preparationMinutes },
+                    changedFields: ['status', 'preparationMinutes'],
+                },
+            });
+        }
 
         return order;
     }
@@ -1599,9 +1802,11 @@ export class OrderService {
                             ? (parseDbTimestamp(dbOrder.outForDeliveryAt)?.getTime() ?? Date.now())
                             : Date.now();
 
-            if (!(status === 'OUT_FOR_DELIVERY' && estimatedMinutes === 0)) {
-                updateLiveActivity(notificationService, id, liveActivityStatus, driverName, estimatedMinutes, phaseInitialMinutes, phaseStartedAt);
-            }
+            // Always push the Live Activity update. When OFD has no GPS ETA yet,
+            // fall back to 15 minutes so the Dynamic Island transitions immediately.
+            // The frontend JS-side OFD grace period will refine the ETA once GPS arrives.
+            const safeEstimatedMinutes = (status === 'OUT_FOR_DELIVERY' && estimatedMinutes === 0) ? 15 : estimatedMinutes;
+            updateLiveActivity(notificationService, id, liveActivityStatus, driverName, safeEstimatedMinutes, phaseInitialMinutes, phaseStartedAt);
 
             if (status === 'DELIVERED' || status === 'CANCELLED') {
                 endLiveActivity(notificationService, id, status === 'CANCELLED' ? 'cancelled' : 'delivered');
@@ -2013,6 +2218,15 @@ export class OrderService {
             entityId: String(order.id),
             metadata: { orderId: String(order.id), userId, totalPrice: order.totalPrice },
         });
+
+        try {
+            const customer = await this.authRepository.findById(userId);
+            if (customer?.isDemoAccount) {
+                await scheduleDemoOrderProgression(String(order.id), context);
+            }
+        } catch (error) {
+            log.error({ err: error, orderId: order.id, userId }, 'createOrder:demoProgression:failed');
+        }
 
         return order;
     }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Switch, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@apollo/client/react';
@@ -264,6 +264,25 @@ export default function MoreScreen() {
                                     </Text>
                                 </View>
                             ),
+                        },
+                    ]}
+                />
+
+                {/* Legal */}
+                <MenuSection
+                    title="LEGAL"
+                    items={[
+                        {
+                            icon: 'shield-checkmark-outline',
+                            label: 'Privacy Policy',
+                            color: '#6b7280',
+                            onPress: () => Linking.openURL('https://zippdelivery.com/privacy'),
+                        },
+                        {
+                            icon: 'document-text-outline',
+                            label: 'Terms of Service',
+                            color: '#6b7280',
+                            onPress: () => Linking.openURL('https://zippdelivery.com/terms'),
                         },
                     ]}
                 />

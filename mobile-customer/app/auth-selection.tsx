@@ -97,23 +97,6 @@ export default function AuthSelectionScreen() {
                             {t.auth.sign_in}
                         </Text>
                     </TouchableOpacity>
-
-                    {/* Guest Option */}
-                    <TouchableOpacity
-                        style={{ paddingVertical: 12 }}
-                        onPress={() => router.replace('/(tabs)/home')}
-                    >
-                        <Text
-                            style={{
-                                color: theme.colors.subtext,
-                                textAlign: 'center',
-                                fontWeight: '500',
-                                fontSize: 15,
-                            }}
-                        >
-                            {t.auth.continue_as_guest}
-                        </Text>
-                    </TouchableOpacity>
                 </Animated.View>
             </View>
         </SafeAreaView>

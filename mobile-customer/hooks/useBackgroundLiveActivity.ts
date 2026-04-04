@@ -137,6 +137,11 @@ export function useBackgroundLiveActivity() {
         };
     }, [candidateOrder, mappedStatus]);
 
+    const syncLiveActivityRef = useRef(syncLiveActivity);
+    useEffect(() => {
+        syncLiveActivityRef.current = syncLiveActivity;
+    }, [syncLiveActivity]);
+
     const appStateRef = useRef<AppStateStatus>(AppState.currentState);
     const clearedWhenNoActiveOrderRef = useRef(false);
     const lastSyncedSignatureRef = useRef<string | null>(null);
@@ -243,6 +248,18 @@ export function useBackgroundLiveActivity() {
         // Keep Live Activity synchronized in real-time whenever active-order data changes.
         syncLiveActivity();
     }, [syncLiveActivity]);
+
+    // Background store-change listener: when the app is in the background React
+    // doesn't re-render, so the useEffect above won't fire. A Zustand subscribe
+    // callback runs outside the render cycle and makes sure every store update
+    // (e.g. a status change pushed via Apollo subscription while backgrounded)
+    // still triggers a Live Activity sync.
+    useEffect(() => {
+        const unsub = useActiveOrdersStore.subscribe(() => {
+            syncLiveActivityRef.current();
+        });
+        return unsub;
+    }, []);
 
     // Clean up any pending OFD fallback timer on unmount.
     useEffect(() => {

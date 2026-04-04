@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ScrollView, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -84,8 +84,8 @@ export default function Profile() {
                     >
                         <View className="px-4">
                             <ProfileRow title="Order history" subtitle={ordersSubtitle} onPress={handleOrderHistoryPress} />
-                            <ProfileRow title="Credits" onPress={() => {}} />
-                            <ProfileRow title="Buy gift card" onPress={() => {}} showDivider={false} />
+                            {false && <ProfileRow title="Credits" onPress={() => {}} />}
+                            {false && <ProfileRow title="Buy gift card" onPress={() => {}} showDivider={false} />}
                         </View>
                     </View>
                 </View>
@@ -158,9 +158,8 @@ export default function Profile() {
                 <View className="px-4 mb-6">
                     <Text className="text-2xl font-bold text-white mb-4">Quick links</Text>
                     <View>
-                        <ProfileRow title="Invite Friends" icon="gift" onPress={() => router.push('/invite-friends')} />
-                        <ProfileRow title="Redeem code" onPress={() => {}} />
-                        <ProfileRow title="Contact Support" onPress={() => {}} />
+                        {false && <ProfileRow title="Redeem code" onPress={() => {}} />}
+                        <ProfileRow title="Contact Support" onPress={() => Linking.openURL('mailto:support@zippdelivery.com')} />
                         <ProfileRow title="Order history" onPress={handleOrderHistoryPress} showDivider={false} />
                     </View>
                 </View>
@@ -170,7 +169,7 @@ export default function Profile() {
                     <Text className="text-2xl font-bold text-white mb-4">Settings</Text>
                     <View>
                         <ProfileRow title="My Addresses" icon="location" onPress={() => router.push('/addresses')} />
-                        <ProfileRow title="Account" onPress={() => {}} showDivider={false} />
+                        {false && <ProfileRow title="Account" onPress={() => {}} showDivider={false} />}
                     </View>
                 </View>
 

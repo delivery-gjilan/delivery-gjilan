@@ -51,12 +51,25 @@ const ACCEPT_WINDOW_MS = 60_000; // 60 seconds
 /** Redis TTL for the dispatch state key (generous buffer above ACCEPT_WINDOW_MS). */
 const DISPATCH_CACHE_TTL_S = 300; // 5 minutes
 
+/**
+ * How many minutes before the estimated ready time to notify drivers.
+ * This gives drivers time to travel to the business before the food is ready.
+ * If prep time is ≤ this value, dispatch fires immediately on PREPARING.
+ */
+const EARLY_DISPATCH_LEAD_MIN = 5;
+const EARLY_DISPATCH_LEAD_MS = EARLY_DISPATCH_LEAD_MIN * 60_000;
+
 // ── Internals ─────────────────────────────────────────────────────────────────
 
 type DispatchState = {
     firstWaveIds: string[];
     expanded: boolean;
 };
+
+type EarlyDispatchState = 'pending' | 'fired';
+
+/** Redis TTL for the early dispatch state key. */
+const EARLY_DISPATCH_CACHE_TTL_S = 3600; // 1 hour
 
 /** Haversine straight-line distance in km. */
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -77,10 +90,105 @@ export class OrderDispatchService {
     /** In-memory map of pending expansion timers, keyed by orderId. */
     private expandTimers = new Map<string, NodeJS.Timeout>();
 
+    /** In-memory map of pending early-dispatch timers (fire before order is ready), keyed by orderId. */
+    private earlyDispatchTimers = new Map<string, NodeJS.Timeout>();
+
     constructor(
         private readonly db: DbType,
         private readonly driverRepository: DriverRepository,
     ) {}
+
+    /**
+     * Schedule driver dispatch to fire EARLY_DISPATCH_LEAD_MIN minutes before the
+     * estimated ready time.  Call this immediately after `startPreparing` is saved.
+     *
+     * - If preparationMinutes ≤ EARLY_DISPATCH_LEAD_MIN: dispatch fires immediately.
+     * - Otherwise: a timer fires (preparationMinutes - EARLY_DISPATCH_LEAD_MIN) minutes
+     *   from now.
+     *
+     * Stores `dispatch:early:<orderId>` = 'pending' | 'fired' in Redis so that the
+     * updateStatus(READY) path can skip a duplicate dispatch.
+     */
+    async scheduleEarlyDispatch(
+        orderId: string,
+        preparationMinutes: number,
+        notificationService: NotificationService,
+    ): Promise<void> {
+        const delayMs = Math.max(0, (preparationMinutes - EARLY_DISPATCH_LEAD_MIN) * 60_000);
+        await this._scheduleEarlyDispatchWithDelay(orderId, delayMs, notificationService);
+    }
+
+    /**
+     * Reschedule the early dispatch for an order whose prep time changed mid-PREPARING.
+     * Only call this after confirming the current Redis state is 'pending'.
+     *
+     * @param orderId
+     * @param preparingAtMs  Timestamp (ms) when the order entered PREPARING.
+     * @param newPreparationMinutes  Updated prep time in minutes.
+     * @param notificationService
+     */
+    async rescheduleEarlyDispatch(
+        orderId: string,
+        preparingAtMs: number,
+        newPreparationMinutes: number,
+        notificationService: NotificationService,
+    ): Promise<void> {
+        // Cancel the old timer (if any).
+        const oldTimer = this.earlyDispatchTimers.get(orderId);
+        if (oldTimer) {
+            clearTimeout(oldTimer);
+            this.earlyDispatchTimers.delete(orderId);
+        }
+
+        // Compute how far in the future the dispatch should fire.
+        const fireAt = preparingAtMs + Math.max(0, newPreparationMinutes - EARLY_DISPATCH_LEAD_MIN) * 60_000;
+        const delayMs = Math.max(0, fireAt - Date.now());
+
+        log.info({ orderId, newPreparationMinutes, delayMs }, 'earlyDispatch:rescheduled');
+        await this._scheduleEarlyDispatchWithDelay(orderId, delayMs, notificationService);
+    }
+
+    private async _scheduleEarlyDispatchWithDelay(
+        orderId: string,
+        delayMs: number,
+        notificationService: NotificationService,
+    ): Promise<void> {
+        if (delayMs === 0) {
+            log.info({ orderId }, 'earlyDispatch:immediate');
+            await cache.set(`dispatch:early:${orderId}`, 'fired' as EarlyDispatchState, EARLY_DISPATCH_CACHE_TTL_S);
+            this.dispatchOrder(orderId, notificationService).catch((err) =>
+                log.error({ err, orderId }, 'earlyDispatch:immediate:error'),
+            );
+            return;
+        }
+
+        log.info({ orderId, delayMs }, 'earlyDispatch:scheduled');
+        await cache.set(`dispatch:early:${orderId}`, 'pending' as EarlyDispatchState, EARLY_DISPATCH_CACHE_TTL_S);
+
+        const timer = setTimeout(async () => {
+            this.earlyDispatchTimers.delete(orderId);
+            await cache.set(`dispatch:early:${orderId}`, 'fired' as EarlyDispatchState, EARLY_DISPATCH_CACHE_TTL_S);
+            this.dispatchOrder(orderId, notificationService).catch((err) =>
+                log.error({ err, orderId }, 'earlyDispatch:timer:error'),
+            );
+        }, delayMs);
+
+        this.earlyDispatchTimers.set(orderId, timer);
+    }
+
+    /**
+     * Cancel a pending early-dispatch timer (e.g. order was cancelled before dispatch fired).
+     * Does NOT delete the Redis key — `cancelDispatch` handles full cleanup.
+     */
+    cancelEarlyDispatch(orderId: string): void {
+        const timer = this.earlyDispatchTimers.get(orderId);
+        if (timer) {
+            clearTimeout(timer);
+            this.earlyDispatchTimers.delete(orderId);
+            log.debug({ orderId }, 'earlyDispatch:cancelled');
+        }
+        cache.del(`dispatch:early:${orderId}`).catch(() => {});
+    }
 
     /**
      * Dispatch an order that just became READY.
@@ -189,7 +297,7 @@ export class OrderDispatchService {
     }
 
     /**
-     * Cancel a pending wave-2 expansion.
+     * Cancel a pending wave-2 expansion (and any early-dispatch timer).
      * Call this as soon as a driver accepts the order.
      */
     cancelDispatch(orderId: string): void {
@@ -199,8 +307,16 @@ export class OrderDispatchService {
             this.expandTimers.delete(orderId);
             log.debug({ orderId }, 'dispatch:cancelled — timer cleared');
         }
+        // Also cancel any pending early-dispatch timer.
+        const earlyTimer = this.earlyDispatchTimers.get(orderId);
+        if (earlyTimer) {
+            clearTimeout(earlyTimer);
+            this.earlyDispatchTimers.delete(orderId);
+            log.debug({ orderId }, 'earlyDispatch:cancelled — timer cleared');
+        }
         // Clean up Redis state (fire-and-forget).
         cache.del(`dispatch:order:${orderId}`).catch(() => {});
+        cache.del(`dispatch:early:${orderId}`).catch(() => {});
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────

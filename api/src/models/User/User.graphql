@@ -53,6 +53,7 @@ type User {
     preferredLanguage: AppLanguage!
     totalOrders: Int!
     isTrustedCustomer: Boolean!
+    isDemoAccount: Boolean!
     permissions: [UserPermission!]!
 }
 
@@ -120,6 +121,7 @@ input CreateUserInput {
     lastName: String!
     role: UserRole!
     businessId: ID
+    isDemoAccount: Boolean
 }
 
 input UpdateUserInput {
@@ -128,6 +130,13 @@ input UpdateUserInput {
     lastName: String!
     role: UserRole!
     businessId: ID
+    isDemoAccount: Boolean
+}
+
+input UpdateMyProfileInput {
+    firstName: String!
+    lastName: String!
+    phoneNumber: String
 }
 
 enum ReferralStatus {
@@ -189,6 +198,7 @@ type Mutation {
     generateReferralCode: String!
     setMyPreferredLanguage(language: AppLanguage!): User!
     changeMyPassword(currentPassword: String!, newPassword: String!): Boolean!
+    updateMyProfile(input: UpdateMyProfileInput!): User!
 }
 
 type Subscription {

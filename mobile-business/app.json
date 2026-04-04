@@ -3,7 +3,7 @@
     "name": "Zipp Business",
     "slug": "delivery-gjilan-business",
     "version": "1.0.0",
-    "orientation": "default",
+    "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
@@ -15,7 +15,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.zippdelivery.mobilebusiness",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "appleTeamId": "87K8YXG5V8",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -59,6 +63,8 @@
         "expo-channel-name": "production"
       }
     },
-    "runtimeVersion": "1.0.0"
+    "runtimeVersion": {
+      "policy": "appVersion"
+    }
   }
 }
