@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Product, BusinessType } from '@/gql/graphql';
 import { useTheme } from '@/hooks/useTheme';
 import { useProductInCart } from '../hooks/useProductInCart';
-import { getEffectiveProductPrice } from '@/modules/product/utils/pricing';
+import { getEffectiveProductPrice, getPreDiscountProductPrice } from '@/modules/product/utils/pricing';
 
 interface MarketProductCardProps {
     product: Partial<Product>;
@@ -23,9 +23,10 @@ export function MarketProductCard({ product, businessType, onPress }: MarketProd
     };
 
     const effectivePrice = getEffectiveProductPrice(product);
-    const hasDiscount = product.isOnSale && product.salePrice;
-    const discountPercent = hasDiscount
-        ? Math.round(((product.price - product.salePrice!) / product.price) * 100)
+    const preDiscountPrice = getPreDiscountProductPrice(product);
+    const hasDiscount = preDiscountPrice != null;
+    const discountPercent = hasDiscount && product.saleDiscountPercentage
+        ? Math.round(Number(product.saleDiscountPercentage))
         : 0;
     const isSoldOut = !product.isAvailable;
 
@@ -95,9 +96,9 @@ export function MarketProductCard({ product, businessType, onPress }: MarketProd
                         <Text className="text-base font-bold" style={{ color: theme.colors.primary }}>
                             €{effectivePrice.toFixed(2)}
                         </Text>
-                        {hasDiscount && (
+                        {preDiscountPrice != null && (
                             <Text className="text-xs line-through" style={{ color: theme.colors.subtext }}>
-                                €{product.price.toFixed(2)}
+                                €{preDiscountPrice.toFixed(2)}
                             </Text>
                         )}
                     </View>

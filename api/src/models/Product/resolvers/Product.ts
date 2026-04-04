@@ -32,6 +32,10 @@ export const Product: ProductResolvers = {
             .map((v) => ({
                 ...v,
                 variantGroupId: v.groupId ?? undefined,
+                price: Number(v.basePrice),
+                markupPrice: v.markupPrice ?? null,
+                nightMarkedupPrice: v.nightMarkedupPrice ?? null,
+                saleDiscountPercentage: v.saleDiscountPercentage ?? null,
                 isOffer: v.isOffer ?? false,
                 optionGroups: [],
                 variants: [],

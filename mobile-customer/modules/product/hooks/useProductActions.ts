@@ -7,7 +7,7 @@ import { useCartActions } from '@/modules/cart/hooks/useCartActions';
 import { Product } from '@/gql/graphql';
 import { GET_BUSINESS } from '@/graphql/operations/businesses';
 import { useTranslations } from '@/hooks/useTranslations';
-import { getEffectiveProductPrice } from '@/modules/product/utils/pricing';
+import { getEffectiveProductPrice, getPreDiscountProductPrice } from '@/modules/product/utils/pricing';
 
 export function useProductActions(
     product: any,
@@ -105,6 +105,7 @@ export function useProductActions(
         });
 
         const unitPrice = getEffectiveProductPrice(product);
+        const preDiscountPrice = getPreDiscountProductPrice(product);
 
         const error = addItem({
             cartItemId,
@@ -115,7 +116,7 @@ export function useProductActions(
             imageUrl: product.imageUrl || parentProduct?.imageUrl || undefined,
             businessId: (product.businessId || parentProduct?.businessId) ?? '',
             businessType: businessType,
-            originalPrice: product.isOnSale && product.salePrice ? product.price : undefined,
+            originalPrice: preDiscountPrice ?? undefined,
             selectedOptions: cartItemOptions,
             childItems: childItems.length > 0 ? childItems : undefined,
         });

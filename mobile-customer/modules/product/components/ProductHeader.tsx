@@ -62,7 +62,7 @@ export function ProductHeader({ product }: ProductHeaderProps) {
                 </View>
             )}
 
-            {product.isOnSale && product.salePrice && (
+            {product.isOnSale && (product.saleDiscountPercentage ?? 0) > 0 && (
                 <View
                     style={{
                         position: 'absolute',

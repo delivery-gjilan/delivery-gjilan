@@ -3,7 +3,7 @@ import { Alert } from 'react-native';
 import { Product, BusinessType } from '@/gql/graphql';
 import { useCart } from '@/modules/cart/hooks/useCart';
 import { useCartActions } from '@/modules/cart/hooks/useCartActions';
-import { getEffectiveProductPrice } from '@/modules/product/utils/pricing';
+import { getEffectiveProductPrice, getPreDiscountProductPrice } from '@/modules/product/utils/pricing';
 
 export function useProductInCart(product: Partial<Product>, businessType?: BusinessType) {
     const { items } = useCart();
@@ -16,6 +16,7 @@ export function useProductInCart(product: Partial<Product>, businessType?: Busin
     const addToCart = () => {
         if (!id) return;
         const unitPrice = getEffectiveProductPrice(product);
+        const preDiscountPrice = getPreDiscountProductPrice(product);
 
         const error = addItem({
             cartItemId: id, // Simple product (no options) uses productId as cartItemId
@@ -26,7 +27,7 @@ export function useProductInCart(product: Partial<Product>, businessType?: Busin
             imageUrl: product.imageUrl || undefined,
             businessId: product.businessId ?? '',
             businessType: businessType,
-            originalPrice: product.isOnSale && product.salePrice ? product.price : undefined,
+            originalPrice: preDiscountPrice ?? undefined,
             selectedOptions: [],
         });
 

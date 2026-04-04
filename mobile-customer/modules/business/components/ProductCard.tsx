@@ -6,7 +6,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { CartControls } from './CartControls';
 import { ComplexCartControls } from './ComplexCartControls';
-import { getEffectiveProductPrice } from '@/modules/product/utils/pricing';
+import { getEffectiveProductPrice, getPreDiscountProductPrice } from '@/modules/product/utils/pricing';
 
 type ProductCardItem = GetProductsQuery['products'][number];
 
@@ -30,9 +30,11 @@ export function ProductCard({ productCard, businessType }: ProductCardProps) {
     };
 
     const effectivePrice = product ? getEffectiveProductPrice(product) : (productCard.basePrice ?? 0);
-    const hasDiscount = !!(product?.isOnSale && product?.salePrice);
-    const discountPercent =
-        hasDiscount && product ? Math.round(((product.price - (product.salePrice ?? 0)) / product.price) * 100) : 0;
+    const preDiscountPrice = product ? getPreDiscountProductPrice(product) : null;
+    const hasDiscount = preDiscountPrice != null;
+    const discountPercent = hasDiscount && product?.saleDiscountPercentage
+        ? Math.round(Number(product.saleDiscountPercentage))
+        : 0;
 
     return (
         <TouchableOpacity
@@ -127,9 +129,9 @@ export function ProductCard({ productCard, businessType }: ProductCardProps) {
                                     €{effectivePrice.toFixed(2)}
                                 </Text>
                             </View>
-                            {hasDiscount && product && (
+                            {preDiscountPrice != null && (
                                 <Text className="text-xs line-through" style={{ color: theme.colors.subtext }}>
-                                    €{product.price.toFixed(2)}
+                                    €{preDiscountPrice.toFixed(2)}
                                 </Text>
                             )}
                         </View>

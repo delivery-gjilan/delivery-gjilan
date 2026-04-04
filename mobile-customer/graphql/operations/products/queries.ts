@@ -14,10 +14,11 @@ export const GET_PRODUCTS = graphql(`
                 name
                 imageUrl
                 price
+                effectivePrice
                 markupPrice
                 nightMarkedupPrice
                 isOnSale
-                salePrice
+                saleDiscountPercentage
                 isAvailable
             }
             product {
@@ -29,10 +30,11 @@ export const GET_PRODUCTS = graphql(`
                 description
                 imageUrl
                 price
+                effectivePrice
                 markupPrice
                 nightMarkedupPrice
                 isOnSale
-                salePrice
+                saleDiscountPercentage
                 isAvailable
                 sortOrder
                 isOffer
@@ -54,10 +56,11 @@ export const GET_PRODUCT = graphql(`
             description
             imageUrl
             price
+            effectivePrice
             markupPrice
             nightMarkedupPrice
             isOnSale
-            salePrice
+            saleDiscountPercentage
             isAvailable
             sortOrder
             isOffer
@@ -66,10 +69,11 @@ export const GET_PRODUCT = graphql(`
                 id
                 name
                 price
+                effectivePrice
                 markupPrice
                 nightMarkedupPrice
                 isOnSale
-                salePrice
+                saleDiscountPercentage
                 isAvailable
                 imageUrl
                 description
@@ -91,8 +95,11 @@ export const GET_PRODUCT = graphql(`
                         name
                         imageUrl
                         price
+                        effectivePrice
                         markupPrice
                         nightMarkedupPrice
+                        isOnSale
+                        saleDiscountPercentage
                         optionGroups {
                             id
                             name

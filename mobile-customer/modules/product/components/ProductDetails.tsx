@@ -3,7 +3,7 @@ import { Product, OptionGroup, Option, BusinessType } from '@/gql/graphql';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useTheme } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
-import { getEffectiveProductPrice } from '@/modules/product/utils/pricing';
+import { getEffectiveProductPrice, getPreDiscountProductPrice } from '@/modules/product/utils/pricing';
 
 interface ProductDetailsProps {
     product: any; // Using any for simplicity with complex GQL types
@@ -34,6 +34,7 @@ export function ProductDetails({
     const { t } = useTranslations();
     const theme = useTheme();
     const effectivePrice = getEffectiveProductPrice(activeProduct);
+    const preDiscountPrice = getPreDiscountProductPrice(activeProduct);
 
     const handleOptionToggle = (groupId: string, optionId: string, maxSelections: number) => {
         const current = selectedOptions[groupId] || [];
@@ -66,13 +67,13 @@ export function ProductDetails({
 
             {/* Price Section */}
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
-                {activeProduct.isOnSale && activeProduct.salePrice ? (
+                {preDiscountPrice != null ? (
                     <>
                         <Text style={{ color: theme.colors.expense, fontSize: 22, fontWeight: '700', marginRight: 10 }}>
-                            €{activeProduct.salePrice.toFixed(2)}
+                            €{effectivePrice.toFixed(2)}
                         </Text>
                         <Text style={{ color: theme.colors.subtext, fontSize: 17, textDecorationLine: 'line-through' }}>
-                            €{activeProduct.price.toFixed(2)}
+                            €{preDiscountPrice.toFixed(2)}
                         </Text>
                     </>
                 ) : (

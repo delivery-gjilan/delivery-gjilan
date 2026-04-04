@@ -8,15 +8,20 @@ function isNightHours(timestamp: Date = new Date()): boolean {
 
 type ProductPriceLike = {
     price?: number | null;
-    salePrice?: number | null;
+    effectivePrice?: number | null;
     isOnSale?: boolean | null;
+    saleDiscountPercentage?: number | null;
     markupPrice?: number | null;
     nightMarkedupPrice?: number | null;
 };
 
+function normalizeMoney(value: number): number {
+    return Math.round(value * 100) / 100;
+}
+
 export function getEffectiveProductPrice(product: ProductPriceLike, timestamp: Date = new Date()): number {
-    if (product.isOnSale && product.salePrice != null) {
-        return Number(product.salePrice);
+    if (product.effectivePrice != null) {
+        return Number(product.effectivePrice);
     }
 
     if (isNightHours(timestamp) && product.nightMarkedupPrice != null) {
@@ -28,4 +33,15 @@ export function getEffectiveProductPrice(product: ProductPriceLike, timestamp: D
     }
 
     return Number(product.price ?? 0);
+}
+
+export function getPreDiscountProductPrice(product: ProductPriceLike, timestamp: Date = new Date()): number | null {
+    const effective = getEffectiveProductPrice(product, timestamp);
+    const discount = product.saleDiscountPercentage != null ? Number(product.saleDiscountPercentage) : null;
+
+    if (!product.isOnSale || discount == null || discount <= 0 || discount >= 100) {
+        return null;
+    }
+
+    return normalizeMoney(effective / (1 - discount / 100));
 }
