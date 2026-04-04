@@ -1,7 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator, Options as RateLimitOptions } from 'express-rate-limit';
+import { RedisStore } from 'rate-limit-redis';
 import { createYoga } from 'graphql-yoga';
 import { EnvelopArmorPlugin } from '@escape.tech/graphql-armor';
 import { schema } from './graphql/schema';
@@ -48,6 +49,24 @@ app.use(
 app.use(express.json({ limit: '16kb' }));
 
 // ── Rate limiting ──
+// Build a shared Redis store for rate limiting so counters are consistent
+// across multiple API instances. Falls back to in-memory if Redis is unavailable.
+function makeStore(prefix: string): RateLimitOptions['store'] | undefined {
+    try {
+        const { createClient } = require('redis');
+        const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+        const redisClient = createClient({
+            url: redisUrl,
+            socket: { reconnectStrategy: false, connectTimeout: 3_000 },
+        });
+        redisClient.on('error', () => {}); // swallow errors silently
+        redisClient.connect().catch(() => {}); // connect async, don't block startup
+        return new RedisStore({ prefix: `rl:${prefix}:`, sendCommand: (...args: string[]) => redisClient.sendCommand(args) });
+    } catch {
+        // Redis unavailable — fall back to in-memory (acceptable for single-instance)
+        return undefined;
+    }
+}
 function getBearerFromHeaders(authHeader: string | undefined): string | null {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return null;
@@ -81,6 +100,7 @@ const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 500, // 500 requests per window
     keyGenerator: getRateLimitKey,
+    store: makeStore('api'),
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests, please try again later.' },
@@ -91,6 +111,7 @@ const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 20, // 20 attempts per window
     keyGenerator: getRateLimitKey,
+    store: makeStore('auth'),
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many authentication attempts, please try again later.' },
@@ -101,6 +122,7 @@ const uploadLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 50, // 50 uploads per window
     keyGenerator: getRateLimitKey,
+    store: makeStore('upload'),
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many upload requests, please try again later.' },
@@ -111,6 +133,7 @@ const directionsLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 200,
     keyGenerator: getRateLimitKey,
+    store: makeStore('directions'),
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many directions requests, please try again later.' },

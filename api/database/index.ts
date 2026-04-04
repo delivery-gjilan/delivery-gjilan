@@ -57,7 +57,7 @@ export async function getDB(): Promise<AnyDb> {
 
         pool = new Pool({
             connectionString,
-            max: 20,
+            max: 50,
             min: 2,
             idleTimeoutMillis: 30_000,
             connectionTimeoutMillis: 5_000,

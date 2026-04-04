@@ -1,27 +1,40 @@
 # Docker And Stress Testing
 
-<!-- MDS:O9 | Domain: Operations | Updated: 2026-03-18 -->
+<!-- MDS:O9 | Domain: Operations | Updated: 2026-04-04 -->
 <!-- Depends-On: O8 -->
 <!-- Depended-By: (none) -->
 <!-- Nav: Container changes → review O7 (Environments). Scenario design → review B4 (Watchdog heartbeat). -->
 
 ## Current State In This Repo
 
-You already have partial containerization, but not application containerization.
+You now have partial application containerization for the API and a working local stress-test harness.
 
 What exists today:
 
 - local Postgres and Redis docker-compose under `api/database/docker-compose.yml`
 - local observability docker-compose under `observability/docker-compose.yml`
+- API `Dockerfile` for local resource-constrained simulation
+- API compose stack for a single-node constrained runtime via `api/docker-compose.simulate.yml`
+- `k6` stress suite covering browse, order-flow, and websocket traffic
 
 What does not exist yet:
 
-- no Dockerfile for the API
-- no compose stack for API + DB + Redis + observability together
+- no full compose stack for API + DB + Redis + observability together
 - no Docker setup for admin-panel
-- no load or stress testing suite
+- no production-grade multi-stage API image build targeting compiled output
 
-That is normal for the current stage of the product.
+Current local simulation findings:
+
+- a single constrained node around 1 vCPU and 2 GB RAM handles isolated browse and order-flow load, but degrades badly under combined browse + order + websocket pressure
+- a simulated 2 vCPU and 4 GB node materially improves combined-load behavior for browse and websocket traffic, but order creation latency still crosses thresholds under the current combined profile
+- the order creation path remains the first bottleneck to investigate when mixed traffic is applied
+- local order smoke verification is environment-sensitive because create-order inputs are strictly validated against server-calculated delivery pricing; the stress fixture generator must write the current expected delivery fee into `tests/k6/fixtures.json` or the run fails before it measures the hot path
+
+Current standalone order benchmark state:
+
+- regenerated stress fixtures now send the current expected delivery fee instead of a hard-coded zero value
+- the latest standalone `order-flow.js` run against `localhost:4000` completed with `1764` successful orders, `0%` request failures, `create_order_duration p95 = 76.02 ms`, and `http_req_duration p99 = 265.21 ms`
+- this is the first clean standalone order benchmark after the fixture mismatch was removed, so it is the reliable local reference point for future before/after comparisons
 
 ## Should You Dockerize Now?
 

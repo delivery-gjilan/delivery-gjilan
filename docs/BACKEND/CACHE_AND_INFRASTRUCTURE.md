@@ -1,6 +1,6 @@
 # Cache & Infrastructure
 
-<!-- MDS:B8 | Domain: Backend | Updated: 2026-03-18 -->
+<!-- MDS:B8 | Domain: Backend | Updated: 2026-04-04 -->
 <!-- Depends-On: B1 -->
 <!-- Depended-By: B2, B3 -->
 <!-- Nav: Changing TTLs or adding a new cached entity → update this file. Adding a new service that reads from cache → update the Depended-By list. -->
@@ -43,6 +43,8 @@ The `reconnectStrategy: false` option on the socket means Redis will never retry
 | `TTL.CATEGORIES` | `cache:categories:{businessId}` | 10 min | Very stable |
 | `TTL.SUBCATEGORIES` | `cache:subcategories:{businessId}` | 10 min | Very stable |
 | — | `cache:subcategories-cat:{categoryId}` | Uses `TTL.SUBCATEGORIES` | Subcategories by category |
+| `TTL.DELIVERY_ZONES` | `cache:delivery-zones:active` | 5 min | Active delivery polygons are reference data and change infrequently |
+| `TTL.DELIVERY_PRICING_TIERS` | `cache:delivery-pricing-tiers:active` | 5 min | Active delivery tiers are reference data and change infrequently |
 
 ---
 
@@ -56,6 +58,8 @@ cache:product:{id}                       — single product
 cache:categories:{businessId}            — categories for a business
 cache:subcategories:{businessId}         — subcategories for a business
 cache:subcategories-cat:{categoryId}     — subcategories filtered by category
+cache:delivery-zones:active              — active delivery zones ordered by sortOrder
+cache:delivery-pricing-tiers:active      — active delivery tiers ordered by sortOrder/minDistance
 ```
 
 All keys are namespaced with `cache:` prefix. No other prefix is used.
@@ -79,6 +83,7 @@ await cache.invalidateAllBusinesses()           // del businesses + all cache:bu
 await cache.invalidateProducts(businessId, productId?)   // del products:{businessId} [+ product:{id}]
 await cache.invalidateCategories(businessId)    // del categories:{businessId}
 await cache.invalidateSubcategories(businessId, categoryId?)  // del subcategories:{businessId} [+ subcategories-cat:{categoryId}]
+await cache.invalidateDeliveryPricing()         // del active zone/tier reference data
 
 // Health
 await cache.ping()                   // → { ok: boolean; disabled: boolean }
@@ -101,6 +106,7 @@ Services call the invalidation helpers immediately after writes. The read-throug
 | `ProductService` | `cache:products:{businessId}`, `cache:product:{id}` | product create/update/delete |
 | `ProductCategoryService` | `cache:categories:{businessId}` | category create/update/delete |
 | `ProductSubcategoryService` | `cache:subcategories:{businessId}`, `cache:subcategories-cat:{categoryId}` | subcategory create/update/delete |
+| `OrderService` | `cache:delivery-zones:active`, `cache:delivery-pricing-tiers:active` | delivery-zone or delivery-tier admin changes |
 | `directionsRoutes.ts` | `dir:{points}:s={steps}:l={lang}` | never invalidated (TTL-only, 65 s). Cross-client: mobile-customer, mobile-driver, and admin-panel may share the same Redis entry when routes overlap. |
 
 ---
@@ -117,4 +123,4 @@ Services call the invalidation helpers immediately after writes. The read-throug
 
 - **No reconnect after mid-run disconnect.** If Redis drops while the API is running, the process must be restarted to re-enable caching.  
 - **No global cache flush command.** Admin operations that affect multiple businesses (e.g., bulk product update) must call invalidation helpers per entity. There is no "nuke everything" method exposed in the cache API (though `delPattern('cache:*')` works internally).
-- **Order and user data are not cached.** Only catalog data (businesses, products, categories) and directions results go through Redis.
+- **Order and user data are not cached.** Redis is used for catalog data, delivery-pricing reference data, live ETA helpers, and directions results, but individual order rows still come straight from Postgres.

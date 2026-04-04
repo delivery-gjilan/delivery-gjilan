@@ -11,12 +11,12 @@
 #   .\tests\k6\run.ps1
 #
 # Flags:
-#   -TestFilter browse|order|websocket    run only one test
+#   -TestFilter browse|order|list-orders|websocket    run only one test
 #   -SkipSeed                             skip re-seeding
 #   -Smoke                                fast 50-second smoke test (5 VUs)
 
 param(
-    [string]$TestFilter = '',
+    [string]$TestFilter = '',  # browse | order | list-orders | websocket
     [switch]$SkipSeed,
     [switch]$Smoke
 )
@@ -87,9 +87,10 @@ New-Item -ItemType Directory -Force -Path $ResultsDir | Out-Null
 
 # -- Test definitions ----------------------------------------------------------
 $tests = @(
-    @{ Name = 'browse';    File = 'browse.js';     Desc = 'Read-heavy browse (businesses + products)' },
-    @{ Name = 'order';     File = 'order-flow.js'; Desc = 'Full order creation flow' },
-    @{ Name = 'websocket'; File = 'websocket.js';  Desc = 'WebSocket connections (drivers + subscriptions)' }
+    @{ Name = 'browse';       File = 'browse.js';      Desc = 'Read-heavy browse (businesses + products)' },
+    @{ Name = 'order';        File = 'order-flow.js';  Desc = 'Full order creation flow' },
+    @{ Name = 'list-orders';  File = 'list-orders.js'; Desc = 'Order list read-path (batched mapper)' },
+    @{ Name = 'websocket';    File = 'websocket.js';   Desc = 'WebSocket connections (drivers + subscriptions)' }
 )
 
 if ($TestFilter) {

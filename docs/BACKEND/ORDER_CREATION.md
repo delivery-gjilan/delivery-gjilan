@@ -1,11 +1,30 @@
 # Order Creation
 
-<!-- MDS:B2 | Domain: Backend | Updated: 2026-03-30 -->
+<!-- MDS:B2 | Domain: Backend | Updated: 2026-04-04 -->
 <!-- Depends-On: B1, B3, B6, BL1 -->
 <!-- Depended-By: M4, BL3, O8 -->
 <!-- Nav: Payment collection changes → update BL1 (Settlements), M4 (Mobile Audit). Preflight changes → update O8 (Testing). Pricing logic → update B3 (Validation). -->
 
-This page documents the current backend order creation behavior in `api/src/services/OrderService.ts` and the current preflight checks that run before API startup.
+This page documents the current backend order creation behavior and the preflight checks that run before API startup.
+
+## File Layout
+
+OrderService is split into a facade + domain modules under `api/src/services/order/`:
+
+| File | Responsibility |
+|------|----------------|
+| `IOrderService.ts` | Public interface (33 methods) |
+| `OrderService.ts` | Facade — delegates to modules, implements `IOrderService` |
+| `OrderCreationModule.ts` | `createOrder`, pricing helpers, zone/tier resolution |
+| `OrderQueryModule.ts` | All read/query methods (14 queries, ownership check) |
+| `OrderLifecycleModule.ts` | Status transitions, approval, cancellation, analytics |
+| `OrderMappingModule.ts` | DB → GraphQL order mapping (batched) |
+| `OrderPublishingModule.ts` | PubSub subscription and publishing |
+| `OrderUserBehaviorModule.ts` | User behavior tracking on order events |
+| `types.ts` | Shared `OrderServiceDeps` type |
+| `index.ts` | Barrel re-export |
+
+A re-export shim at `api/src/services/OrderService.ts` preserves all existing import paths.
 
 ## Core Flow
 
@@ -27,6 +46,16 @@ This page documents the current backend order creation behavior in `api/src/serv
 12. Persist item options + child offer items.
 13. Persist promotion usage and `order_promotions` rows.
 14. Return mapped GraphQL `Order` including `paymentCollection`.
+
+## Read-Path Mapping
+
+`OrderService` maps collection results through a shared batched loader instead of issuing the full supporting read set per order.
+
+- list endpoints gather order items, item options, products, businesses, promotions, driver users, and first-order markers in grouped queries
+- approval reasons are still derived from the same business rules (`FIRST_ORDER`, `OUT_OF_ZONE`, `HIGH_VALUE`)
+- single-order reads still return the same GraphQL shape, but delegate to the same mapping path so response semantics stay aligned across list and detail queries
+
+This keeps the response contract stable while reducing repeated database work on large order lists.
 
 ## Service Coverage and Location Flagging
 

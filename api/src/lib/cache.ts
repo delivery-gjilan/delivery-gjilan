@@ -73,6 +73,9 @@ const TTL = {
     PRODUCTS: 2 * 60,           // 2 min — product lists change moderately
     CATEGORIES: 10 * 60,        // 10 min — very stable
     SUBCATEGORIES: 10 * 60,     // 10 min — very stable
+    DELIVERY_ZONES: 5 * 60,     // 5 min — zone edits are rare and invalidateable
+    DELIVERY_PRICING_TIERS: 5 * 60, // 5 min — tier edits are rare and invalidateable
+    DRIVERS: 5,                     // 5 s — short TTL; dispatch needs fresh connection states
 } as const;
 
 // ── Key helpers ──
@@ -84,6 +87,9 @@ const keys = {
     categories: (businessId: string) => `cache:categories:${businessId}`,
     subcategories: (businessId: string) => `cache:subcategories:${businessId}`,
     subcategoriesByCat: (categoryId: string) => `cache:subcategories-cat:${categoryId}`,
+    deliveryZones: () => 'cache:delivery-zones:active',
+    deliveryPricingTiers: () => 'cache:delivery-pricing-tiers:active',
+    drivers: () => 'cache:drivers:all',
 };
 
 // ── Generic get / set ──
@@ -175,6 +181,10 @@ export const cache = {
         const toDelete = [keys.subcategories(businessId)];
         if (categoryId) toDelete.push(keys.subcategoriesByCat(categoryId));
         await del(...toDelete);
+    },
+
+    async invalidateDeliveryPricing() {
+        await del(keys.deliveryZones(), keys.deliveryPricingTiers());
     },
 
     // ── Shutdown ──

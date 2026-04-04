@@ -180,7 +180,7 @@ function renderReport(filePath) {
     }
 
     // ── Counters ──────────────────────────────────────────────────────────────
-    const counterMetrics = ['orders_created', 'login_failures', 'order_failures', 'ws_errors', 'cache_hit_responses'];
+    const counterMetrics = ['orders_created', 'login_failures', 'order_failures', 'list_failures', 'ws_errors', 'cache_hit_responses'];
     const foundCounters = counterMetrics.filter((m) => metrics[m]);
     if (foundCounters.length > 0) {
         console.log(bold('\n  Counters'));
@@ -211,6 +211,14 @@ function renderReport(filePath) {
     if (metrics['create_order_duration']) {
         const cop95 = percentile(metrics['create_order_duration'], 95);
         console.log(checkThreshold('createOrder p95 < 2000ms', cop95, 2000));
+    }
+    if (metrics['orders_list_duration']) {
+        const olp95 = percentile(metrics['orders_list_duration'], 95);
+        console.log(checkThreshold('ordersList p95 < 500ms', olp95, 500));
+    }
+    if (metrics['uncompleted_orders_duration']) {
+        const uop95 = percentile(metrics['uncompleted_orders_duration'], 95);
+        console.log(checkThreshold('uncompletedOrders p95 < 300ms', uop95, 300));
     }
     if (metrics['ws_connect_duration']) {
         const wsp95 = percentile(metrics['ws_connect_duration'], 95);
