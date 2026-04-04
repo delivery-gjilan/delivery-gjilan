@@ -12,6 +12,24 @@ export const GET_BUSINESS_PRODUCTS_AND_CATEGORIES = graphql(`
             imageUrl
             basePrice
             isOffer
+            hasOptionGroups
+            variants {
+                id
+                businessId
+                categoryId
+                subcategoryId
+                variantGroupId
+                name
+                description
+                imageUrl
+                price
+                isOnSale
+                saleDiscountPercentage
+                isAvailable
+                sortOrder
+                createdAt
+                updatedAt
+            }
             product {
                 id
                 businessId

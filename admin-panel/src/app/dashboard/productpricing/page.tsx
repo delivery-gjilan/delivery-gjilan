@@ -47,6 +47,14 @@ const GET_PRODUCTS_FOR_MARKUP = graphql(`
       name
       imageUrl
       basePrice
+      variants {
+        id
+        name
+        imageUrl
+        price
+        markupPrice
+        nightMarkedupPrice
+      }
       product {
         id
         name
@@ -79,6 +87,7 @@ interface ProductRow {
   basePrice: number;
   markupPrice: number | null | undefined;
   nightMarkedupPrice: number | null | undefined;
+  variantGroupName?: string;
 }
 
 // Helpers
@@ -131,15 +140,40 @@ export default function ProductMarkupPage() {
     fetchPolicy: 'cache-and-network',
   });
 
-  const productRows: ProductRow[] = (productsData?.products ?? []).map((card) => ({
-    cardId: card.id,
-    id: card.product?.id ?? card.id,
-    name: card.product?.name ?? card.name,
-    imageUrl: card.product?.imageUrl ?? card.imageUrl,
-    basePrice: card.product?.price ?? card.basePrice,
-    markupPrice: card.product?.markupPrice,
-    nightMarkedupPrice: card.product?.nightMarkedupPrice,
-  }));
+  const productRows: ProductRow[] = (productsData?.products ?? []).flatMap((card) => {
+    const product = card.product;
+    const variants = card.variants ?? [];
+
+    // Variant group card: expand each variant into its own row
+    if (!product && variants.length > 0) {
+      return variants.map((v) => ({
+        cardId: card.id,
+        id: v.id,
+        name: v.name,
+        imageUrl: v.imageUrl ?? card.imageUrl,
+        basePrice: v.price ?? card.basePrice,
+        markupPrice: v.markupPrice,
+        nightMarkedupPrice: v.nightMarkedupPrice,
+        variantGroupName: card.name,
+      }));
+    }
+
+    // Standalone product card
+    if (product) {
+      return [{
+        cardId: card.id,
+        id: product.id,
+        name: product.name,
+        imageUrl: product.imageUrl ?? card.imageUrl,
+        basePrice: product.price ?? card.basePrice,
+        markupPrice: product.markupPrice,
+        nightMarkedupPrice: product.nightMarkedupPrice,
+      }];
+    }
+
+    // Fallback: skip cards with neither product nor variants
+    return [];
+  });
 
   // Mutation
 
@@ -345,6 +379,11 @@ export default function ProductMarkupPage() {
                                 <div className="h-10 w-10 rounded border bg-muted flex-shrink-0" />
                               )}
                               <span className="font-medium">{product.name}</span>
+                              {product.variantGroupName && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-violet-400 text-violet-600">
+                                  {product.variantGroupName}
+                                </Badge>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell className="tabular-nums text-sm">

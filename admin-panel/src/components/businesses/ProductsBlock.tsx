@@ -72,6 +72,7 @@ interface Product {
     saleDiscountPercentage?: number | null;
     isAvailable: boolean;
     sortOrder: number;
+    hasOptionGroups?: boolean;
 }
 
 /* ===============================================
@@ -302,6 +303,21 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             groups[p.categoryId].push(p);
         });
 
+        // Sort each category group so variant members are adjacent
+        for (const catId of Object.keys(groups)) {
+            groups[catId].sort((a, b) => {
+                // Group by variantGroupId first (nulls last), then by sortOrder
+                const aGroup = a.variantGroupId ?? '';
+                const bGroup = b.variantGroupId ?? '';
+                if (aGroup !== bGroup) {
+                    if (!aGroup) return 1;
+                    if (!bGroup) return -1;
+                    return aGroup.localeCompare(bGroup);
+                }
+                return a.sortOrder - b.sortOrder;
+            });
+        }
+
         return groups;
     }, [products, categories, searchQuery, subcategories]);
 
@@ -481,11 +497,6 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
     };
 
     const openOptionsModal = (product: Product) => {
-        if (!product.isOffer) {
-            toast.warning("Questions / options are available only for deals/offers.");
-            return;
-        }
-
         setOptionsError("");
         setNewOptionGroupName("");
         setNewOptionGroupMin(0);
@@ -1018,13 +1029,34 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                 )}
                                             </Td>
 
-                                            <Td>{p.name}</Td>
+                                            <Td>
+                                                <div className="flex flex-col gap-1">
+                                                    <span>{p.name}</span>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {p.variantGroupId && (
+                                                            <span className="inline-flex items-center rounded-full bg-violet-500/20 border border-violet-500/40 px-2 py-0.5 text-[10px] font-medium text-violet-300">
+                                                                Variant: {p.variantGroupName || 'Group'}
+                                                            </span>
+                                                        )}
+                                                        {p.isOffer && (
+                                                            <span className="inline-flex items-center rounded-full bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 text-[10px] font-medium text-amber-300">
+                                                                Offer
+                                                            </span>
+                                                        )}
+                                                        {p.hasOptionGroups && (
+                                                            <span className="inline-flex items-center rounded-full bg-blue-500/20 border border-blue-500/40 px-2 py-0.5 text-[10px] font-medium text-blue-300">
+                                                                Has Options
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </Td>
 
                                             <Td>
                                                 {subcategories.find((s: any) => s.id === p.subcategoryId)?.name || "-"}
                                             </Td>
 
-                                            <Td>${p.price.toFixed(2)}</Td>
+                                            <Td>€{p.price.toFixed(2)}</Td>
 
                                             <Td>
                                                 {p.isOnSale &&
@@ -1062,15 +1094,13 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                         Edit
                                                     </Button>
 
-                                                    {p.isOffer && (
-                                                        <Button
-                                                            variant="outline"
-                                                            className="text-xs px-3"
-                                                            onClick={() => openOptionsModal(p)}
-                                                        >
-                                                            Questions / Options
-                                                        </Button>
-                                                    )}
+                                                    <Button
+                                                        variant="outline"
+                                                        className="text-xs px-3"
+                                                        onClick={() => openOptionsModal(p)}
+                                                    >
+                                                        Options
+                                                    </Button>
 
                                                     <Button
                                                         variant="danger"

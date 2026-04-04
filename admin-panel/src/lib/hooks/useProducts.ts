@@ -84,9 +84,34 @@ export function useProducts(businessId: string): UseProductsResult {
     });
 
     const products = (data?.products || [])
-        .map((card: any) => {
+        .flatMap((card: any) => {
             const product = card?.product;
-            return {
+            const variants = card?.variants || [];
+
+            // Variant group card: expand each variant into its own row
+            if (!product && variants.length > 0) {
+                return variants.map((v: any) => ({
+                    id: v.id,
+                    businessId: v.businessId ?? businessId,
+                    categoryId: v.categoryId ?? '',
+                    subcategoryId: v.subcategoryId ?? null,
+                    variantGroupId: v.variantGroupId ?? card.id,
+                    variantGroupName: card.name,
+                    name: v.name,
+                    description: v.description ?? null,
+                    imageUrl: v.imageUrl ?? card.imageUrl ?? null,
+                    price: v.price ?? card.basePrice ?? 0,
+                    isOffer: card.isOffer ?? false,
+                    isOnSale: v.isOnSale ?? false,
+                    saleDiscountPercentage: v.saleDiscountPercentage ?? null,
+                    isAvailable: v.isAvailable ?? true,
+                    sortOrder: v.sortOrder ?? 0,
+                    hasOptionGroups: card.hasOptionGroups ?? false,
+                }));
+            }
+
+            // Standalone product card
+            return [{
                 id: product?.id ?? card?.id,
                 businessId: product?.businessId ?? businessId,
                 categoryId: product?.categoryId ?? '',
@@ -102,7 +127,8 @@ export function useProducts(businessId: string): UseProductsResult {
                 saleDiscountPercentage: product?.saleDiscountPercentage ?? null,
                 isAvailable: product?.isAvailable ?? true,
                 sortOrder: product?.sortOrder ?? 0,
-            };
+                hasOptionGroups: card?.hasOptionGroups ?? false,
+            }];
         })
         .filter((p: any) => Boolean(p.categoryId));
 
