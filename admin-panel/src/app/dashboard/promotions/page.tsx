@@ -68,11 +68,9 @@ type PromotionFormState = {
     creatorType: "PLATFORM" | "BUSINESS";
     creatorId: string;
 
-    // Settlement Rules
-    createSettlementRules: boolean;
-    driverRuleAmount: string;
-    driverRuleAmountType: "FIXED" | "PERCENT";
-    addDriverCommission: boolean;
+    // Required for delivery-fee promotions (FREE_DELIVERY / SPEND_X_GET_FREE)
+    // Fixed euro amount per order.
+    driverPayoutAmount: string;
 };
 
 const emptyForm: PromotionFormState = {
@@ -97,10 +95,7 @@ const emptyForm: PromotionFormState = {
     eligibleBusinessIds: [],
     creatorType: "PLATFORM",
     creatorId: "",
-    createSettlementRules: true,
-    driverRuleAmount: "100",
-    driverRuleAmountType: "PERCENT",
-    addDriverCommission: true,
+    driverPayoutAmount: "",
 };
 
 const toDateTimeLocal = (value?: string | null) => {
@@ -152,52 +147,19 @@ export default function PromotionsPage() {
 
     const handleOpenCreate = () => {
         setEditingPromotion(null);
+        setWizardStep(1);
         setFormData(emptyForm);
         setShowModal(true);
     };
 
     const handleOpenEdit = (promotion: GetPromotionsQuery["getAllPromotions"][number]) => {
+        // Editing is intentionally limited (name + code only)
         setEditingPromotion(promotion);
-        
-        // Parse threshold reward if it exists
-        let thresholdRewardType: "FIXED_AMOUNT" | "PERCENTAGE" | "FREE_DELIVERY" = "FIXED_AMOUNT";
-        let thresholdRewardValue = "";
-        if (promotion.thresholdReward) {
-            try {
-                const parsed = JSON.parse(promotion.thresholdReward);
-                thresholdRewardType = parsed.type || "FIXED_AMOUNT";
-                thresholdRewardValue = parsed.value ? String(parsed.value) : "";
-            } catch (e) {
-                console.error("Failed to parse thresholdReward:", e);
-            }
-        }
-        
+        setWizardStep(1);
         setFormData({
+            ...emptyForm,
             name: promotion.name,
-            description: promotion.description ?? "",
             code: promotion.code ?? "",
-            type: promotion.type,
-            target: promotion.target,
-            discountValue: promotion.discountValue ? String(promotion.discountValue) : "",
-            maxDiscountCap: promotion.maxDiscountCap ? String(promotion.maxDiscountCap) : "",
-            minOrderAmount: promotion.minOrderAmount ? String(promotion.minOrderAmount) : "",
-            spendThreshold: promotion.spendThreshold ? String(promotion.spendThreshold) : "",
-            thresholdRewardType,
-            thresholdRewardValue,
-            maxGlobalUsage: promotion.maxGlobalUsage ? String(promotion.maxGlobalUsage) : "",
-            maxUsagePerUser: promotion.maxUsagePerUser ? String(promotion.maxUsagePerUser) : "",
-            isStackable: promotion.isStackable ? "true" : "false",
-            priority: String(promotion.priority),
-            isActive: promotion.isActive ? "true" : "false",
-            startsAt: toDateTimeLocal(promotion.startsAt),
-            endsAt: toDateTimeLocal(promotion.endsAt),
-            eligibleBusinessIds: (promotion as any).eligibleBusinessIds || [],
-            creatorType: ((promotion as any).creatorType ?? "PLATFORM") as "PLATFORM" | "BUSINESS",
-            creatorId: (promotion as any).creatorId ?? "",
-            createSettlementRules: true,
-            driverRuleAmount: "100",
-            driverRuleAmountType: "PERCENT",
-            addDriverCommission: false,
         });
         setShowModal(true);
     };
@@ -222,6 +184,27 @@ export default function PromotionsPage() {
     };
 
     const handleSave = async () => {
+        if (editingPromotion) {
+            const code = formData.code.trim() ? formData.code.trim().toUpperCase() : null;
+            await updatePromotion({
+                variables: {
+                    input: {
+                        id: editingPromotion.id,
+                        name: formData.name.trim(),
+                        code,
+                    },
+                },
+            });
+            handleCloseModal();
+            return;
+        }
+
+        const isDeliveryFeePromotion = formData.type === "FREE_DELIVERY" || formData.type === "SPEND_X_GET_FREE";
+        const driverPayoutAmount = isDeliveryFeePromotion ? toOptionalNumber(formData.driverPayoutAmount) : undefined;
+        if (isDeliveryFeePromotion && !driverPayoutAmount) {
+            return;
+        }
+
         // Construct thresholdReward JSON for types/targets that need it
         let thresholdReward: string | undefined = undefined;
 
@@ -239,11 +222,11 @@ export default function PromotionsPage() {
         }
 
         const vis = typeFieldVisibility[formData.type];
-        
+
         const payload = {
             name: formData.name.trim(),
             description: formData.description.trim() || undefined,
-            code: formData.code.trim().toUpperCase() || undefined,
+            code: formData.code.trim() ? formData.code.trim().toUpperCase() : undefined,
             type: formData.type,
             target: formData.target,
             discountValue: vis.discountValue ? toOptionalNumber(formData.discountValue) : undefined,
@@ -256,24 +239,18 @@ export default function PromotionsPage() {
             isStackable: formData.isStackable === "true",
             priority: Number(formData.priority),
             isActive: formData.isActive === "true",
-            eligibleBusinessIds: (formData.eligibleBusinessIds || []).length ? formData.eligibleBusinessIds : undefined,
+            eligibleBusinessIds:
+                formData.creatorType === "PLATFORM" && (formData.eligibleBusinessIds || []).length
+                    ? formData.eligibleBusinessIds
+                    : undefined,
             startsAt: formData.startsAt || undefined,
             endsAt: formData.endsAt || undefined,
             creatorType: formData.creatorType,
             creatorId: formData.creatorType === "BUSINESS" && formData.creatorId ? formData.creatorId : undefined,
-            
-            // Settlement Rules
-            createSettlementRules: formData.createSettlementRules,
-            driverRuleAmount: toOptionalNumber(formData.driverRuleAmount),
-            driverRuleAmountType: formData.driverRuleAmountType,
-            addDriverCommission: formData.addDriverCommission,
+            driverPayoutAmount,
         };
 
-        if (editingPromotion) {
-            await updatePromotion({ variables: { input: { id: editingPromotion.id, ...payload } } });
-        } else {
-            await createPromotion({ variables: { input: payload } });
-        }
+        await createPromotion({ variables: { input: payload } });
         handleCloseModal();
     };
 
@@ -407,45 +384,49 @@ export default function PromotionsPage() {
             {/* Create/Edit Modal - Wizard */}
             <Modal isOpen={showModal} onClose={handleCloseModal} title={editingPromotion ? "Edit Promotion" : "Create Promotion"}>
                 <div className="space-y-6">
-                    {/* Progress Indicator */}
-                    <div className="flex items-center justify-between mb-6">
-                        {[1, 2, 3].map((step) => (
-                            <div key={step} className="flex items-center flex-1">
-                                <div
-                                    className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
-                                        step === wizardStep
-                                            ? "bg-violet-500 border-violet-500 text-white"
-                                            : step < wizardStep
-                                                ? "bg-green-500 border-green-500 text-white"
-                                                : "bg-gray-800 border-gray-600 text-gray-400"
-                                    }`}
-                                >
-                                    {step < wizardStep ? "âœ“" : step}
-                                </div>
-                                {step < 3 && (
-                                    <div
-                                        className={`flex-1 h-1 mx-2 ${
-                                            step < wizardStep ? "bg-green-500" : "bg-gray-700"
-                                        }`}
-                                    />
-                                )}
+                    {!editingPromotion && (
+                        <>
+                            {/* Progress Indicator */}
+                            <div className="flex items-center justify-between mb-6">
+                                {[1, 2, 3].map((step) => (
+                                    <div key={step} className="flex items-center flex-1">
+                                        <div
+                                            className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
+                                                step === wizardStep
+                                                    ? "bg-violet-500 border-violet-500 text-white"
+                                                    : step < wizardStep
+                                                        ? "bg-green-500 border-green-500 text-white"
+                                                        : "bg-gray-800 border-gray-600 text-gray-400"
+                                            }`}
+                                        >
+                                            {step < wizardStep ? "âœ“" : step}
+                                        </div>
+                                        {step < 3 && (
+                                            <div
+                                                className={`flex-1 h-1 mx-2 ${
+                                                    step < wizardStep ? "bg-green-500" : "bg-gray-700"
+                                                }`}
+                                            />
+                                        )}
+                                    </div>
+                                ))}
                             </div>
-                        ))}
-                    </div>
 
-                    {/* Step Titles */}
-                    <div className="text-center mb-4">
-                        <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
-                            {wizardStep === 1 && "Step 1: Basic Information"}
-                            {wizardStep === 2 && "Step 2: Configure the Deal"}
-                            {wizardStep === 3 && "Step 3: Limits, Schedule & Review"}
-                        </h3>
-                        <p className="text-sm text-zinc-500 mt-1">
-                            {wizardStep === 1 && "Set up the basic details of your promotion"}
-                            {wizardStep === 2 && "Configure discount values and business eligibility"}
-                            {wizardStep === 3 && "Set usage limits, schedule, and review your promotion"}
-                        </p>
-                    </div>
+                            {/* Step Titles */}
+                            <div className="text-center mb-4">
+                                <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
+                                    {wizardStep === 1 && "Step 1: Basic Information"}
+                                    {wizardStep === 2 && "Step 2: Configure the Deal"}
+                                    {wizardStep === 3 && "Step 3: Limits, Schedule & Review"}
+                                </h3>
+                                <p className="text-sm text-zinc-500 mt-1">
+                                    {wizardStep === 1 && "Set up the basic details of your promotion"}
+                                    {wizardStep === 2 && "Configure discount values and business eligibility"}
+                                    {wizardStep === 3 && "Set usage limits, schedule, and review your promotion"}
+                                </p>
+                            </div>
+                        </>
+                    )}
 
                     {/* Form Content */}
                     <div className="max-h-[50vh] overflow-y-auto pr-2">
@@ -462,15 +443,19 @@ export default function PromotionsPage() {
                                     Internal name for this promotion (visible to admins only)
                                 </div>
                                 
-                                <Input
-                                    label="Description"
-                                    value={formData.description}
-                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                    placeholder="Get 20% off your first order!"
-                                />
-                                <div className="text-xs text-zinc-600 -mt-2">
-                                    Customer-facing description shown in the app
-                                </div>
+                                {!editingPromotion && (
+                                    <>
+                                        <Input
+                                            label="Description"
+                                            value={formData.description}
+                                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                            placeholder="Get 20% off your first order!"
+                                        />
+                                        <div className="text-xs text-zinc-600 -mt-2">
+                                            Customer-facing description shown in the app
+                                        </div>
+                                    </>
+                                )}
 
                                 <Input
                                     label="Promo Code (Optional)"
@@ -482,123 +467,129 @@ export default function PromotionsPage() {
                                     Leave empty for auto-applied promotions. Enter a code for manual entry by customers.
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4 pt-4">
-                                    <div>
-                                        <Select
-                                            label="Promotion Type *"
-                                            value={formData.type}
-                                            onChange={(e) => {
-                                                const newType = e.target.value as PromotionType;
-                                                const updates: Partial<PromotionFormState> = { type: newType };
-                                                const vis = typeFieldVisibility[newType];
-                                                if (!vis.discountValue) { updates.discountValue = ""; }
-                                                if (!vis.maxDiscountCap) { updates.maxDiscountCap = ""; }
-                                                if (!vis.spendThreshold) { updates.spendThreshold = ""; updates.thresholdRewardValue = ""; }
-                                                if (newType === "SPEND_X_GET_FREE") { updates.thresholdRewardType = "FREE_DELIVERY"; updates.thresholdRewardValue = ""; }
-                                                setFormData((prev) => ({ ...prev, ...updates }));
-                                            }}
-                                        >
-                                            <optgroup label="Simple Discounts">
-                                                <option value="FIXED_AMOUNT">Fixed Amount (e.g., &euro;5 off)</option>
-                                                <option value="PERCENTAGE">Percentage (e.g., 20% off)</option>
-                                                <option value="FREE_DELIVERY">Free Delivery</option>
-                                            </optgroup>
-                                            <optgroup label="Spend Threshold Deals">
-                                                <option value="SPEND_X_FIXED">Spend &euro;X, Get &euro;Y Off</option>
-                                                <option value="SPEND_X_PERCENT">Spend &euro;X, Get Y% Off</option>
-                                                <option value="SPEND_X_GET_FREE">Spend &euro;X, Get Free Delivery</option>
-                                            </optgroup>
-                                        </Select>
-                                        <div className="text-xs text-zinc-600 mt-1">
-                                            {formData.type === "FIXED_AMOUNT" && "Subtract a fixed euro amount from the order"}
-                                            {formData.type === "PERCENTAGE" && "Discount by percentage of order subtotal"}
-                                            {formData.type === "FREE_DELIVERY" && "Waive the delivery fee entirely"}
-                                            {formData.type === "SPEND_X_FIXED" && "Customer spends a minimum, gets a fixed discount"}
-                                            {formData.type === "SPEND_X_PERCENT" && "Customer spends a minimum, gets a percentage discount"}
-                                            {formData.type === "SPEND_X_GET_FREE" && "Customer spends a minimum, gets free delivery"}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <Select
-                                            label="Target Audience *"
-                                            value={formData.target}
-                                            onChange={(e) => setFormData({ ...formData, target: e.target.value as PromotionTarget })}
-                                        >
-                                            <option value="ALL_USERS">All Users</option>
-                                            <option value="SPECIFIC_USERS">Specific Users</option>
-                                            <option value="FIRST_ORDER">First Order Only</option>
-                                            <option value="CONDITIONAL">Conditional (Spend Threshold)</option>
-                                        </Select>
-                                        <div className="text-xs text-zinc-600 mt-1">
-                                            {formData.target === "ALL_USERS" && "Anyone can use this promo"}
-                                            {formData.target === "SPECIFIC_USERS" && "Manually assign to specific users"}
-                                            {formData.target === "FIRST_ORDER" && "Auto-applies to user's first order"}
-                                            {formData.target === "CONDITIONAL" && "Requires minimum spend threshold"}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Creator Type */}
-                                <div className="space-y-2 pt-2">
-                                    <div className="flex gap-3">
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormData({ ...formData, creatorType: "PLATFORM", creatorId: "" })}
-                                            className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${formData.creatorType === "PLATFORM" ? "bg-violet-600 border-violet-500 text-white" : "bg-gray-900 border-zinc-700 text-zinc-400 hover:border-zinc-500"}`}
-                                        >
-                                            Platform Promotion
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormData({ ...formData, creatorType: "BUSINESS" })}
-                                            className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${formData.creatorType === "BUSINESS" ? "bg-orange-600 border-orange-500 text-white" : "bg-gray-900 border-zinc-700 text-zinc-400 hover:border-zinc-500"}`}
-                                        >
-                                            Business Promotion
-                                        </button>
-                                    </div>
-                                    <div className="text-xs text-zinc-500">
-                                        {formData.creatorType === "PLATFORM"
-                                            ? "Promotion is funded by the platform. Settlement rules will be created automatically."
-                                            : "Promotion is funded by a business. For item discounts, no settlement rules are created — the business price is adjusted instead."}
-                                    </div>
-                                    {formData.creatorType === "BUSINESS" && (
-                                        <div className="pt-1">
-                                            <Select
-                                                label="Business *"
-                                                value={formData.creatorId}
-                                                onChange={(e) => setFormData({ ...formData, creatorId: e.target.value })}
-                                            >
-                                                <option value="">Select a business...</option>
-                                                {businesses.map((b: any) => (
-                                                    <option key={b.id} value={b.id}>{b.name}</option>
-                                                ))}
-                                            </Select>
-                                            <div className="text-xs text-zinc-600 mt-1">
-                                                The business that is sponsoring this promotion
+                                {!editingPromotion && (
+                                    <>
+                                        <div className="grid grid-cols-2 gap-4 pt-4">
+                                            <div>
+                                                <Select
+                                                    label="Promotion Type *"
+                                                    value={formData.type}
+                                                    onChange={(e) => {
+                                                        const newType = e.target.value as PromotionType;
+                                                        const updates: Partial<PromotionFormState> = { type: newType };
+                                                        const vis = typeFieldVisibility[newType];
+                                                        const isDeliveryFeePromotion = newType === "FREE_DELIVERY" || newType === "SPEND_X_GET_FREE";
+                                                        if (!vis.discountValue) { updates.discountValue = ""; }
+                                                        if (!vis.maxDiscountCap) { updates.maxDiscountCap = ""; }
+                                                        if (!vis.spendThreshold) { updates.spendThreshold = ""; updates.thresholdRewardValue = ""; }
+                                                        if (newType === "SPEND_X_GET_FREE") { updates.thresholdRewardType = "FREE_DELIVERY"; updates.thresholdRewardValue = ""; }
+                                                        if (!isDeliveryFeePromotion) { updates.driverPayoutAmount = ""; }
+                                                        setFormData((prev) => ({ ...prev, ...updates }));
+                                                    }}
+                                                >
+                                                    <optgroup label="Simple Discounts">
+                                                        <option value="FIXED_AMOUNT">Fixed Amount (e.g., &euro;5 off)</option>
+                                                        <option value="PERCENTAGE">Percentage (e.g., 20% off)</option>
+                                                        <option value="FREE_DELIVERY">Free Delivery</option>
+                                                    </optgroup>
+                                                    <optgroup label="Spend Threshold Deals">
+                                                        <option value="SPEND_X_FIXED">Spend &euro;X, Get &euro;Y Off</option>
+                                                        <option value="SPEND_X_PERCENT">Spend &euro;X, Get Y% Off</option>
+                                                        <option value="SPEND_X_GET_FREE">Spend &euro;X, Get Free Delivery</option>
+                                                    </optgroup>
+                                                </Select>
+                                                <div className="text-xs text-zinc-600 mt-1">
+                                                    {formData.type === "FIXED_AMOUNT" && "Subtract a fixed euro amount from the order"}
+                                                    {formData.type === "PERCENTAGE" && "Discount by percentage of order subtotal"}
+                                                    {formData.type === "FREE_DELIVERY" && "Waive the delivery fee entirely"}
+                                                    {formData.type === "SPEND_X_FIXED" && "Customer spends a minimum, gets a fixed discount"}
+                                                    {formData.type === "SPEND_X_PERCENT" && "Customer spends a minimum, gets a percentage discount"}
+                                                    {formData.type === "SPEND_X_GET_FREE" && "Customer spends a minimum, gets free delivery"}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <Select
+                                                    label="Target Audience *"
+                                                    value={formData.target}
+                                                    onChange={(e) => setFormData({ ...formData, target: e.target.value as PromotionTarget })}
+                                                >
+                                                    <option value="ALL_USERS">All Users</option>
+                                                    <option value="SPECIFIC_USERS">Specific Users</option>
+                                                    <option value="FIRST_ORDER">First Order Only</option>
+                                                    <option value="CONDITIONAL">Conditional (Spend Threshold)</option>
+                                                </Select>
+                                                <div className="text-xs text-zinc-600 mt-1">
+                                                    {formData.target === "ALL_USERS" && "Anyone can use this promo"}
+                                                    {formData.target === "SPECIFIC_USERS" && "Manually assign to specific users"}
+                                                    {formData.target === "FIRST_ORDER" && "Auto-applies to user's first order"}
+                                                    {formData.target === "CONDITIONAL" && "Requires minimum spend threshold"}
+                                                </div>
                                             </div>
                                         </div>
-                                    )}
-                                </div>
 
-                                {/* Type-specific info banner */}
-                                {isSpendType(formData.type) && (
-                                    <div className="bg-violet-900/15 border border-violet-700/30 rounded-lg p-3 text-xs text-violet-200 mt-4">
-                                        <strong>How it works:</strong>{" "}
-                                        {formData.type === "SPEND_X_FIXED" && "Customer sees a progress bar in the cart. When their subtotal reaches the threshold, a fixed euro discount is automatically applied."}
-                                        {formData.type === "SPEND_X_PERCENT" && "Customer sees a progress bar in the cart. When their subtotal reaches the threshold, a percentage discount is automatically applied."}
-                                        {formData.type === "SPEND_X_GET_FREE" && "Customer sees a progress bar in the cart. When their subtotal reaches the threshold, delivery becomes free automatically."}
-                                    </div>
-                                )}
-                                {formData.type === "FREE_DELIVERY" && (
-                                    <div className="bg-green-900/15 border border-green-700/30 rounded-lg p-3 text-xs text-green-200 mt-4">
-                                        <strong>Free Delivery:</strong> The delivery fee will be waived entirely. No discount amount needed.
-                                    </div>
+                                        {/* Creator Type */}
+                                        <div className="space-y-2 pt-2">
+                                            <div className="flex gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setFormData({ ...formData, creatorType: "PLATFORM", creatorId: "" })}
+                                                    className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${formData.creatorType === "PLATFORM" ? "bg-violet-600 border-violet-500 text-white" : "bg-gray-900 border-zinc-700 text-zinc-400 hover:border-zinc-500"}`}
+                                                >
+                                                    Platform Promotion
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setFormData({ ...formData, creatorType: "BUSINESS" })}
+                                                    className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${formData.creatorType === "BUSINESS" ? "bg-orange-600 border-orange-500 text-white" : "bg-gray-900 border-zinc-700 text-zinc-400 hover:border-zinc-500"}`}
+                                                >
+                                                    Business Promotion
+                                                </button>
+                                            </div>
+                                            <div className="text-xs text-zinc-500">
+                                                {formData.creatorType === "PLATFORM"
+                                                    ? "Promotion is funded by the platform. Settlement rules will be created automatically."
+                                                    : "Promotion is funded by a business. For item discounts, no settlement rules are created — the business price is adjusted instead."}
+                                            </div>
+                                            {formData.creatorType === "BUSINESS" && (
+                                                <div className="pt-1">
+                                                    <Select
+                                                        label="Business *"
+                                                        value={formData.creatorId}
+                                                        onChange={(e) => setFormData({ ...formData, creatorId: e.target.value })}
+                                                    >
+                                                        <option value="">Select a business...</option>
+                                                        {businesses.map((b: any) => (
+                                                            <option key={b.id} value={b.id}>{b.name}</option>
+                                                        ))}
+                                                    </Select>
+                                                    <div className="text-xs text-zinc-600 mt-1">
+                                                        The business that is sponsoring this promotion
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Type-specific info banner */}
+                                        {isSpendType(formData.type) && (
+                                            <div className="bg-violet-900/15 border border-violet-700/30 rounded-lg p-3 text-xs text-violet-200 mt-4">
+                                                <strong>How it works:</strong>{" "}
+                                                {formData.type === "SPEND_X_FIXED" && "Customer sees a progress bar in the cart. When their subtotal reaches the threshold, a fixed euro discount is automatically applied."}
+                                                {formData.type === "SPEND_X_PERCENT" && "Customer sees a progress bar in the cart. When their subtotal reaches the threshold, a percentage discount is automatically applied."}
+                                                {formData.type === "SPEND_X_GET_FREE" && "Customer sees a progress bar in the cart. When their subtotal reaches the threshold, delivery becomes free automatically."}
+                                            </div>
+                                        )}
+                                        {formData.type === "FREE_DELIVERY" && (
+                                            <div className="bg-green-900/15 border border-green-700/30 rounded-lg p-3 text-xs text-green-200 mt-4">
+                                                <strong>Free Delivery:</strong> The delivery fee will be waived entirely. No discount amount needed.
+                                            </div>
+                                        )}
+                                    </>
                                 )}
                             </div>
                         )}
 
                         {/* STEP 2: Configure the Deal */}
-                        {wizardStep === 2 && (
+                        {wizardStep === 2 && !editingPromotion && (
                             <div className="space-y-6">
                                 {/* --- Spend Threshold (SPEND_X_* types) --- */}
                                 {typeFieldVisibility[formData.type].spendThreshold && (
@@ -674,8 +665,29 @@ export default function PromotionsPage() {
                                     </div>
                                 )}
 
+                                {(formData.type === "FREE_DELIVERY" || formData.type === "SPEND_X_GET_FREE") && (
+                                    <div className="space-y-2">
+                                        <Input
+                                            label="Driver payout per order (\u20ac) *"
+                                            type="number"
+                                            step="0.01"
+                                            value={formData.driverPayoutAmount}
+                                            onChange={(e) => setFormData({ ...formData, driverPayoutAmount: e.target.value })}
+                                            placeholder="2.50"
+                                        />
+                                        <div className="text-xs text-zinc-600">
+                                            Fixed euro amount that the driver should receive for orders using this promotion. Settlement rules are created automatically.
+                                        </div>
+                                        <div className="text-xs text-zinc-500">
+                                            {formData.creatorType === "BUSINESS"
+                                                ? "Business-created delivery promotion: business owes platform this amount; platform owes driver the same amount."
+                                                : "Platform-created delivery promotion: platform owes driver this amount."}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* --- Min Order Amount (simple types only — SPEND_X uses threshold instead) --- */}
-                                {!isSpendType(formData.type) && (
+                                {!isSpendType(formData.type) && formData.type !== "FREE_DELIVERY" && (
                                     <div className="space-y-2">
                                         <Input
                                             label="Minimum Order Amount (\u20ac)"
@@ -749,6 +761,17 @@ export default function PromotionsPage() {
                                 )}
 
                                 {/* --- Eligible Businesses --- */}
+                                {formData.creatorType === "BUSINESS" ? (
+                                    <div className="space-y-2">
+                                        <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-zinc-800 pb-2">
+                                            Business
+                                        </h3>
+                                        <div className="rounded-lg border border-orange-700/40 bg-orange-900/10 p-3 text-sm text-orange-200">
+                                            This promotion is restricted to: <strong>{businesses.find((b: any) => b.id === formData.creatorId)?.name ?? formData.creatorId}</strong>.
+                                            To change the business, go back to Step 1.
+                                        </div>
+                                    </div>
+                                ) : (
                                 <div className="space-y-4">
                                     <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-zinc-800 pb-2">
                                         Eligible Businesses (Optional)
@@ -794,11 +817,12 @@ export default function PromotionsPage() {
                                         Selected: {(formData.eligibleBusinessIds || []).length} {(formData.eligibleBusinessIds || []).length === 0 && "(applies to all businesses)"}
                                     </div>
                                 </div>
+                                )}
                             </div>
                         )}
 
                         {/* STEP 3: Limits, Schedule & Review */}
-                        {wizardStep === 3 && (
+                        {wizardStep === 3 && !editingPromotion && (
                             <div className="space-y-6">
                                 {/* Usage Limits */}
                                 <div className="space-y-4">
@@ -833,76 +857,20 @@ export default function PromotionsPage() {
                                     </div>
                                 </div>
                                 
-                                {/* Settlement Rules */}
+                                {/* Settlement Rules (automatic) */}
                                 {formData.creatorType === "BUSINESS" && formData.type !== "FREE_DELIVERY" && formData.type !== "SPEND_X_GET_FREE" ? (
                                     <div className="bg-orange-900/10 border border-orange-700/30 rounded-lg p-4 text-sm text-orange-200">
-                                        <strong>Business-funded item discount</strong> — no settlement rules will be created. The business price on each order will be reduced by the discount amount instead.
+                                        <strong>Business-funded item discount</strong> — no settlement rules will be created.
                                     </div>
                                 ) : (
-                                <div className="space-y-4 bg-zinc-800/20 border border-zinc-700/30 rounded-lg p-4">
-                                    <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-                                        <h3 className="text-white font-semibold text-sm">
-                                            Settlement Rules Integration
-                                        </h3>
-                                        <Checkbox 
-                                            checked={formData.createSettlementRules} 
-                                            onChange={() => setFormData({ ...formData, createSettlementRules: !formData.createSettlementRules })} 
-                                        />
-                                    </div>
-                                    
-                                    {formData.createSettlementRules && (
-                                        <div className="space-y-4 pt-2">
-                                            <div className="bg-violet-900/10 border border-violet-800/20 rounded p-3 text-xs text-violet-300">
-                                                If enabled, settlement rules will be automatically created for this promotion.
+                                    <div className="bg-zinc-800/20 border border-zinc-700/30 rounded-lg p-4 text-sm text-zinc-200">
+                                        <strong>Settlement rules:</strong> created automatically based on creator type and promotion type.
+                                        {(formData.type === "FREE_DELIVERY" || formData.type === "SPEND_X_GET_FREE") && (
+                                            <div className="text-xs text-zinc-400 mt-2">
+                                                Driver payout: &euro;{formData.driverPayoutAmount || "?"} (fixed)
                                             </div>
-                                            
-                                            {formData.type === "FREE_DELIVERY" || formData.type === "SPEND_X_GET_FREE" ? (
-                                                <div className="space-y-4">
-                                                    {formData.creatorType === "BUSINESS" && (
-                                                        <div className="bg-orange-900/10 border border-orange-700/30 rounded p-3 text-xs text-orange-200">
-                                                            Business-funded delivery promotion. Configure how the driver is compensated.
-                                                        </div>
-                                                    )}
-                                                    <div className="space-y-2">
-                                                        <div className="flex items-center justify-between">
-                                                            <label className="text-xs font-medium text-zinc-400">
-                                                                Platform owes Driver
-                                                            </label>
-                                                            <div className="flex bg-[#09090b] border border-zinc-800 rounded-md p-0.5">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => setFormData({ ...formData, driverRuleAmountType: "PERCENT" })}
-                                                                    className={`px-2 py-0.5 text-[10px] rounded ${formData.driverRuleAmountType === "PERCENT" ? "bg-violet-600 text-white" : "text-zinc-500 hover:text-zinc-300"}`}
-                                                                >
-                                                                    %
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => setFormData({ ...formData, driverRuleAmountType: "FIXED" })}
-                                                                    className={`px-2 py-0.5 text-[10px] rounded ${formData.driverRuleAmountType === "FIXED" ? "bg-violet-600 text-white" : "text-zinc-500 hover:text-zinc-300"}`}
-                                                                >
-                                                                    €
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                        <Input
-                                                            type="number"
-                                                            value={formData.driverRuleAmount}
-                                                            onChange={(e) => setFormData({ ...formData, driverRuleAmount: e.target.value })}
-                                                            placeholder={formData.driverRuleAmountType === "PERCENT" ? "100" : "2.50"}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="bg-zinc-900/50 p-3 rounded border border-zinc-800 text-xs text-zinc-400">
-                                                    For {promotionTypeLabels[formData.type]}, a rule will be created where the platform owes the driver 
-                                                    the amount of the promotion ({isPercentType(formData.type) ? `${formData.discountValue}%` : `\u20ac${formData.discountValue}`}) 
-                                                    from the order price.
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
+                                        )}
+                                    </div>
                                 )}
 
                                 {/* Priority & Stacking */}
@@ -1021,9 +989,11 @@ export default function PromotionsPage() {
                                         
                                         <div className="text-zinc-500">Businesses:</div>
                                         <div className="text-white">
-                                            {(formData.eligibleBusinessIds || []).length > 0 
-                                                ? `${formData.eligibleBusinessIds.length} selected` 
-                                                : "All businesses"}
+                                            {formData.creatorType === "BUSINESS"
+                                                ? businesses.find((b: any) => b.id === formData.creatorId)?.name ?? "1 selected"
+                                                : (formData.eligibleBusinessIds || []).length > 0
+                                                    ? `${formData.eligibleBusinessIds.length} selected`
+                                                    : "All businesses"}
                                         </div>
 
                                         {(formData.maxGlobalUsage || formData.maxUsagePerUser) && (
@@ -1043,44 +1013,54 @@ export default function PromotionsPage() {
                     </div>
 
                     {/* Navigation Buttons */}
-                    <div className="flex justify-between items-center pt-4 border-t border-zinc-800">
-                        <Button 
-                            variant="outline" 
-                            onClick={() => {
-                                if (wizardStep === 1) {
-                                    handleCloseModal();
-                                } else {
-                                    setWizardStep(wizardStep - 1);
-                                }
-                            }}
-                        >
-                            {wizardStep === 1 ? "Cancel" : "\u2190 Back"}
-                        </Button>
-                        
-                        <div className="text-xs text-zinc-500">
-                            Step {wizardStep} of 3
+                    {editingPromotion ? (
+                        <div className="flex justify-between items-center pt-4 border-t border-zinc-800">
+                            <Button variant="outline" onClick={handleCloseModal}>
+                                Cancel
+                            </Button>
+                            <Button onClick={handleSave} disabled={updating || !formData.name.trim()}>
+                                {updating ? "Saving..." : "Update Promotion"}
+                            </Button>
                         </div>
-                        
-                        {wizardStep < 3 ? (
-                            <Button 
-                                onClick={() => setWizardStep(wizardStep + 1)}
-                                disabled={
-                                    (wizardStep === 1 && !formData.name.trim()) ||
-                                    (wizardStep === 2 && typeFieldVisibility[formData.type].discountValue && !formData.discountValue.trim()) ||
-                                    (wizardStep === 2 && typeFieldVisibility[formData.type].spendThreshold && !formData.spendThreshold.trim())
-                                }
+                    ) : (
+                        <div className="flex justify-between items-center pt-4 border-t border-zinc-800">
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    if (wizardStep === 1) {
+                                        handleCloseModal();
+                                    } else {
+                                        setWizardStep(wizardStep - 1);
+                                    }
+                                }}
                             >
-                                Next &rarr;
+                                {wizardStep === 1 ? "Cancel" : "\u2190 Back"}
                             </Button>
-                        ) : (
-                            <Button 
-                                onClick={handleSave} 
-                                disabled={creating || updating || !formData.name.trim()}
-                            >
-                                {creating || updating ? "Saving..." : editingPromotion ? "Update Promotion" : "Create Promotion"}
-                            </Button>
-                        )}
-                    </div>
+
+                            <div className="text-xs text-zinc-500">
+                                Step {wizardStep} of 3
+                            </div>
+
+                            {wizardStep < 3 ? (
+                                <Button
+                                    onClick={() => setWizardStep(wizardStep + 1)}
+                                    disabled={
+                                        (wizardStep === 1 && !formData.name.trim()) ||
+                                        (wizardStep === 1 && formData.creatorType === "BUSINESS" && !formData.creatorId) ||
+                                        (wizardStep === 2 && typeFieldVisibility[formData.type].discountValue && !formData.discountValue.trim()) ||
+                                        (wizardStep === 2 && typeFieldVisibility[formData.type].spendThreshold && !formData.spendThreshold.trim()) ||
+                                        (wizardStep === 2 && (formData.type === "FREE_DELIVERY" || formData.type === "SPEND_X_GET_FREE") && !toOptionalNumber(formData.driverPayoutAmount))
+                                    }
+                                >
+                                    Next &rarr;
+                                </Button>
+                            ) : (
+                                <Button onClick={handleSave} disabled={creating || !formData.name.trim()}>
+                                    {creating ? "Saving..." : "Create Promotion"}
+                                </Button>
+                            )}
+                        </div>
+                    )}
                 </div>
             </Modal>
 

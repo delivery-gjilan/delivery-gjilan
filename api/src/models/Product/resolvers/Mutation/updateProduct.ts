@@ -66,7 +66,7 @@ export const updateProduct: NonNullable<MutationResolvers['updateProduct']> = as
     let action: any = 'PRODUCT_UPDATED';
     if (input.isAvailable !== undefined && oldProduct?.isAvailable !== input.isAvailable) {
         action = 'PRODUCT_AVAILABILITY_CHANGED';
-    } else if (input.price !== undefined || input.salePrice !== undefined) {
+    } else if (input.price !== undefined || input.saleDiscountPercentage !== undefined) {
         action = 'PRODUCT_PRICE_CHANGED';
     }
     

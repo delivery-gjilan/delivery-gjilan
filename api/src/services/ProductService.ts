@@ -29,7 +29,7 @@ export class ProductService {
             price: Number(product.basePrice), // DB: basePrice → GraphQL: price
             markupPrice: product.markupPrice ?? null,
             nightMarkedupPrice: product.nightMarkedupPrice ?? null,
-            salePrice: product.salePrice,
+            saleDiscountPercentage: product.saleDiscountPercentage ?? null,
             isOnSale: product.isOnSale ?? false,
             isAvailable: product.isAvailable ?? true,
             createdAt: product.createdAt ?? new Date().toISOString(),
@@ -66,7 +66,7 @@ export class ProductService {
             imageUrl: validatedInput.imageUrl,
             basePrice: validatedInput.price, // GraphQL input 'price' → DB 'basePrice'
             isOnSale: validatedInput.isOnSale,
-            salePrice: validatedInput.salePrice,
+            saleDiscountPercentage: validatedInput.saleDiscountPercentage,
             isAvailable: validatedInput.isAvailable ?? true,
         });
 

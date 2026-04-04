@@ -10,6 +10,7 @@ import { options, DbOption } from '@/database/schema/options';
 import { products, DbProduct } from '@/database/schema/products';
 import { orderItems, DbOrderItem } from '@/database/schema/orderItems';
 import { orderItemOptions, DbOrderItemOption } from '@/database/schema/orderItemOptions';
+import { PricingService } from '@/services/PricingService';
 import { eq, inArray } from 'drizzle-orm';
 
 /**
@@ -153,6 +154,23 @@ export function createVariantsByGroupIdLoader(db: DbType) {
 }
 
 /**
+ * Batch-loads the effective per-unit customer price for products (markup/night tier + sale discount).
+ */
+export function createEffectivePriceByProductIdLoader(db: DbType) {
+    return new DataLoader<string, number>(async (productIds) => {
+        const pricingService = new PricingService(db);
+        const timestamp = new Date();
+        const priceMap = await pricingService.calculateProductPrices([...productIds], { timestamp });
+
+        return productIds.map((id) => {
+            const res = priceMap.get(id);
+            if (!res) return new Error(`Product not found: ${id}`);
+            return res.finalAppliedPrice;
+        });
+    });
+}
+
+/**
  * Batch-loads order item options by orderItemId.
  * Resolves N+1 in OrderItem.selectedOptions field resolver.
  */
@@ -201,6 +219,7 @@ export interface DataLoaders {
     optionGroupsByProductIdLoader: DataLoader<string, DbOptionGroup[]>;
     optionsByOptionGroupIdLoader: DataLoader<string, DbOption[]>;
     variantsByGroupIdLoader: DataLoader<string, DbProduct[]>;
+    effectivePriceByProductIdLoader: DataLoader<string, number>;
     orderItemOptionsByOrderItemIdLoader: DataLoader<string, DbOrderItemOption[]>;
     childItemsByParentOrderItemIdLoader: DataLoader<string, DbOrderItem[]>;
 }
@@ -214,6 +233,7 @@ export function createDataLoaders(db: DbType): DataLoaders {
         optionGroupsByProductIdLoader: createOptionGroupsByProductIdLoader(db),
         optionsByOptionGroupIdLoader: createOptionsByOptionGroupIdLoader(db),
         variantsByGroupIdLoader: createVariantsByGroupIdLoader(db),
+        effectivePriceByProductIdLoader: createEffectivePriceByProductIdLoader(db),
         orderItemOptionsByOrderItemIdLoader: createOrderItemOptionsByOrderItemIdLoader(db),
         childItemsByParentOrderItemIdLoader: createChildItemsByParentOrderItemIdLoader(db),
     };

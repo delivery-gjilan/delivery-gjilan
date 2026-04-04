@@ -1,5 +1,5 @@
 {
-  "id": "ce66ecd2-ecd5-445e-a7d3-85ca048a4d5b",
+  "id": "c83c3827-ea30-4d7b-9585-67652383a809",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1103,6 +1103,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "business_price": {
+          "name": "business_price",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "original_delivery_price": {
           "name": "original_delivery_price",
           "type": "numeric(10, 2)",
@@ -1114,6 +1120,13 @@
           "type": "numeric(10, 2)",
           "primaryKey": false,
           "notNull": true
+        },
+        "priority_surcharge": {
+          "name": "priority_surcharge",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         },
         "payment_collection": {
           "name": "payment_collection",
@@ -1435,9 +1448,9 @@
           "primaryKey": false,
           "notNull": true
         },
-        "discounted_price": {
-          "name": "discounted_price",
-          "type": "numeric(10, 2)",
+        "sale_discount_percentage": {
+          "name": "sale_discount_percentage",
+          "type": "numeric(5, 2)",
           "primaryKey": false,
           "notNull": false
         },
@@ -1852,9 +1865,9 @@
           "notNull": false,
           "default": false
         },
-        "sale_price": {
-          "name": "sale_price",
-          "type": "numeric(10, 2)",
+        "sale_discount_percentage": {
+          "name": "sale_discount_percentage",
+          "type": "numeric(5, 2)",
           "primaryKey": false,
           "notNull": false
         },
@@ -5699,242 +5712,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.dynamic_pricing_rules": {
-      "name": "dynamic_pricing_rules",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "business_id": {
-          "name": "business_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "name": {
-          "name": "name",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "description": {
-          "name": "description",
-          "type": "varchar(500)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "condition_type": {
-          "name": "condition_type",
-          "type": "pricing_condition_type",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "condition_config": {
-          "name": "condition_config",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "adjustment_config": {
-          "name": "adjustment_config",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "applies_to": {
-          "name": "applies_to",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "is_active": {
-          "name": "is_active",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "priority": {
-          "name": "priority",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "valid_from": {
-          "name": "valid_from",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "valid_until": {
-          "name": "valid_until",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "CURRENT_TIMESTAMP"
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "CURRENT_TIMESTAMP"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "dynamic_pricing_rules_business_id_businesses_id_fk": {
-          "name": "dynamic_pricing_rules_business_id_businesses_id_fk",
-          "tableFrom": "dynamic_pricing_rules",
-          "tableTo": "businesses",
-          "columnsFrom": [
-            "business_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.product_pricing": {
-      "name": "product_pricing",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "product_id": {
-          "name": "product_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "business_id": {
-          "name": "business_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "business_price": {
-          "name": "business_price",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "platform_markup": {
-          "name": "platform_markup",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'0'"
-        },
-        "base_customer_price": {
-          "name": "base_customer_price",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "night_markup": {
-          "name": "night_markup",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "price_history": {
-          "name": "price_history",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "CURRENT_TIMESTAMP"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "CURRENT_TIMESTAMP"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "product_pricing_product_id_products_id_fk": {
-          "name": "product_pricing_product_id_products_id_fk",
-          "tableFrom": "product_pricing",
-          "tableTo": "products",
-          "columnsFrom": [
-            "product_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "product_pricing_business_id_businesses_id_fk": {
-          "name": "product_pricing_business_id_businesses_id_fk",
-          "tableFrom": "product_pricing",
-          "tableTo": "businesses",
-          "columnsFrom": [
-            "business_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "product_pricing_product_id_unique": {
-          "name": "product_pricing_product_id_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "product_id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.promotion_redemptions": {
       "name": "promotion_redemptions",
       "schema": "",
@@ -6402,18 +6179,6 @@
         "TOKEN_REGISTERED",
         "TOKEN_REFRESHED",
         "TOKEN_UNREGISTERED"
-      ]
-    },
-    "public.pricing_condition_type": {
-      "name": "pricing_condition_type",
-      "schema": "public",
-      "values": [
-        "TIME_OF_DAY",
-        "DAY_OF_WEEK",
-        "WEATHER",
-        "DEMAND",
-        "SPECIAL_EVENT",
-        "CUSTOM"
       ]
     }
   },

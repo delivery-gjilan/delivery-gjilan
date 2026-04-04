@@ -1,5 +1,5 @@
 import { type DbType } from '@/database';
-import { DbOrder, DbOrderItem, settlementRules, orderPromotions, products } from '@/database/schema';
+import { DbOrder, DbOrderItem, settlementRules, orderPromotions, products, drivers } from '@/database/schema';
 import { eq, and, or, inArray, isNull, sql } from 'drizzle-orm';
 import logger from '@/lib/logger';
 
@@ -28,7 +28,7 @@ export class SettlementCalculationEngine {
         driverId: string | null,
     ): Promise<SettlementCalculation[]> {
         try {
-            // 1. Collect business IDs from this order's products
+            // ── Step 1: Collect business IDs from this order's products ──
             const productIds = [...new Set(orderItems.map((i) => i.productId))];
             const productRows =
                 productIds.length > 0
@@ -39,14 +39,14 @@ export class SettlementCalculationEngine {
                     : [];
             const orderBusinessIds = [...new Set(productRows.map((p) => p.businessId).filter(Boolean))] as string[];
 
-            // 2. Collect promotion IDs applied to this order
+            // ── Step 2: Collect promotion IDs applied to this order ──
             const promoRows = await this.db
                 .select({ promotionId: orderPromotions.promotionId })
                 .from(orderPromotions)
                 .where(eq(orderPromotions.orderId, order.id));
             const orderPromotionIds = promoRows.map((r) => r.promotionId);
 
-            // 3. Fetch all applicable active rules
+            // ── Step 3: Fetch all active, applicable settlement rules ──
             const allRules = await this.db
                 .select()
                 .from(settlementRules)
@@ -54,23 +54,23 @@ export class SettlementCalculationEngine {
                     and(
                         eq(settlementRules.isActive, true),
                         or(
-                            // Global rules
+                            // Global rules (no business, no promotion scoping)
                             and(isNull(settlementRules.businessId), isNull(settlementRules.promotionId)),
-                            // Business rules
+                            // Business-scoped rules
                             orderBusinessIds.length > 0
                                 ? and(
                                       inArray(settlementRules.businessId, orderBusinessIds),
                                       isNull(settlementRules.promotionId),
                                   )
                                 : sql`false`,
-                            // Promotion rules
+                            // Promotion-scoped rules
                             orderPromotionIds.length > 0
                                 ? and(
                                       isNull(settlementRules.businessId),
                                       inArray(settlementRules.promotionId, orderPromotionIds),
                                   )
                                 : sql`false`,
-                            // Business + Promotion rules
+                            // Business + Promotion combo rules (most specific)
                             orderBusinessIds.length > 0 && orderPromotionIds.length > 0
                                 ? and(
                                       inArray(settlementRules.businessId, orderBusinessIds),
@@ -81,20 +81,31 @@ export class SettlementCalculationEngine {
                     ),
                 );
 
-            // Categorize into buckets for easier priority handling
-            const globalRules = allRules.filter((r) => !r.businessId && !r.promotionId);
-            const businessRules = allRules.filter((r) => r.businessId && !r.promotionId);
-            const promotionRules = allRules.filter((r) => !r.businessId && r.promotionId);
-            const businessPromoRules = allRules.filter((r) => r.businessId && r.promotionId);
+            // Categorize rules by specificity bucket
+            const globalRules        = allRules.filter((r) => !r.businessId && !r.promotionId);
+            const businessRules      = allRules.filter((r) =>  r.businessId && !r.promotionId);
+            const promotionRules     = allRules.filter((r) => !r.businessId &&  r.promotionId);
+            const businessPromoRules = allRules.filter((r) =>  r.businessId &&  r.promotionId);
 
-            console.log('rules', allRules);
-            console.log('businessPromoRules', businessPromoRules);
-            console.log('promotionRules', promotionRules);
-            console.log('businessRules', businessRules);
-            console.log('globalRules', globalRules);
+            console.log("potential rules:")
+            console.log("global rules:", globalRules);
+            console.log("business rules:", businessRules);
+            console.log("promotion rules:", promotionRules);
+            console.log("business + promotion rules:", businessPromoRules);
+
             const results: SettlementCalculation[] = [];
 
-            // ── DELIVERY_PRICE selection logic (BP > P > B > G) ──
+            // ── Automatic: markup remittance (CASH_TO_DRIVER only) ──
+            // Driver collected the marked-up cash from the customer and must remit
+            // the platform's markup margin back to the platform.
+            this.addMarkupSettlement(order, driverId, results);
+
+            // ── Automatic: priority surcharge remittance (CASH_TO_DRIVER only) ──
+            // Driver collected the priority surcharge cash and must remit it.
+            this.addPrioritySurchargeSettlement(order, driverId, results);
+
+            // ── Delivery fee rules (most-specific-wins: BP > P > B > G) ──
+            // If no rules at any level, fall back to the driver's own commission %.
             let selectedDeliveryRules: typeof allRules = [];
             if (businessPromoRules.some((r) => r.type === 'DELIVERY_PRICE')) {
                 selectedDeliveryRules = businessPromoRules.filter((r) => r.type === 'DELIVERY_PRICE');
@@ -106,30 +117,35 @@ export class SettlementCalculationEngine {
                 selectedDeliveryRules = globalRules.filter((r) => r.type === 'DELIVERY_PRICE');
             }
 
-            // ── ORDER_PRICE selection logic (G + B + BP or G + B + P) ──
+            if (selectedDeliveryRules.length > 0) {
+                console.log("selected delivery rules:", selectedDeliveryRules);
+                for (const rule of selectedDeliveryRules) {
+                    this.applyRule(rule, order, orderBusinessIds, driverId, results);
+                }
+            } else {
+                console.log("no delivery price rules found, applying driver commission fallback");
+                // Fallback: use the driver's individual commission rate applied to
+                // the actual delivery price (excluding priority surcharge).
+                await this.addDriverCommissionFallback(order, driverId, results);
+            }
+
+            // ── Order price rules (additive: G + B always; then at most one of BP or P) ──
             const selectedOrderRules: typeof allRules = [
-                ...globalRules.filter((r) => r.type === 'ORDER_PRICE'),
+                ...globalRules.filter((r)   => r.type === 'ORDER_PRICE'),
                 ...businessRules.filter((r) => r.type === 'ORDER_PRICE'),
             ];
-
+            // BP and P are mutually exclusive: BP wins if any BP rules exist
             if (businessPromoRules.some((r) => r.type === 'ORDER_PRICE')) {
                 selectedOrderRules.push(...businessPromoRules.filter((r) => r.type === 'ORDER_PRICE'));
-                // Mutually exclusive: BP rules win over P rules if both exist
             } else {
                 selectedOrderRules.push(...promotionRules.filter((r) => r.type === 'ORDER_PRICE'));
             }
 
-            const finalRules = [...selectedDeliveryRules, ...selectedOrderRules];
-
-            for (const rule of finalRules) {
+            console.log("selected order price rules:", selectedOrderRules);
+            for (const rule of selectedOrderRules) {
+                
                 this.applyRule(rule, order, orderBusinessIds, driverId, results);
             }
-
-            // ── Automatic markup remittance ──
-            this.addMarkupSettlement(order, driverId, results);
-
-            // ── Automatic priority surcharge remittance ──
-            this.addPrioritySurchargeSettlement(order, driverId, results);
 
             log.info(
                 {
@@ -149,10 +165,17 @@ export class SettlementCalculationEngine {
         }
     }
 
+    /**
+     * Automatic markup remittance: driver owes the platform the markup amount
+     * they collected in cash from the customer.
+     * Only applies to CASH_TO_DRIVER orders — for PREPAID_TO_PLATFORM the
+     * platform already collected the full amount directly from the customer.
+     */
     private addMarkupSettlement(order: DbOrder, driverId: string | null, results: SettlementCalculation[]): void {
         if (!driverId) return;
+        if (order.paymentCollection !== 'CASH_TO_DRIVER') return;
 
-        const markupPrice = Number(order.markupPrice);
+        const markupPrice = Number(order.markupPrice ?? 0);
         if (markupPrice <= 0) return;
 
         results.push({
@@ -166,15 +189,17 @@ export class SettlementCalculationEngine {
         });
     }
 
+    /**
+     * Automatic priority surcharge remittance: driver owes the platform the
+     * priority fee they collected in cash.
+     * Only applies to CASH_TO_DRIVER orders.
+     */
     private addPrioritySurchargeSettlement(order: DbOrder, driverId: string | null, results: SettlementCalculation[]): void {
         if (!driverId) return;
+        if (order.paymentCollection !== 'CASH_TO_DRIVER') return;
 
         const prioritySurcharge = Number(order.prioritySurcharge ?? 0);
         if (prioritySurcharge <= 0) return;
-
-        // Only applicable on cash orders: driver collected the surcharge from the customer
-        // and must remit it to the platform.
-        if (order.paymentCollection !== 'CASH_TO_DRIVER') return;
 
         results.push({
             type: 'DRIVER',
@@ -183,6 +208,45 @@ export class SettlementCalculationEngine {
             businessId: null,
             orderId: order.id,
             amount: Number(prioritySurcharge.toFixed(2)),
+            ruleId: null,
+        });
+    }
+
+    /**
+     * Fallback driver delivery commission: used when no DELIVERY_PRICE settlement
+     * rules are configured.  Reads the driver's individual commission rate from
+     * the drivers table and creates a DRIVER RECEIVABLE for their share of the
+     * final delivery fee.
+     */
+    private async addDriverCommissionFallback(
+        order: DbOrder,
+        driverId: string | null,
+        results: SettlementCalculation[],
+    ): Promise<void> {
+        if (!driverId) return;
+
+        const deliveryPrice = Number(order.deliveryPrice ?? 0);
+        if (deliveryPrice <= 0) return;
+
+        const [driverRow] = await this.db
+            .select({ commissionPercentage: drivers.commissionPercentage })
+            .from(drivers)
+            .where(eq(drivers.id, driverId))
+            .limit(1);
+
+        const commission = Number(driverRow?.commissionPercentage ?? 0);
+        if (commission <= 0) return;
+
+        const amount = Number(((deliveryPrice * commission) / 100).toFixed(2));
+        if (amount <= 0) return;
+
+        results.push({
+            type: 'DRIVER',
+            direction: 'RECEIVABLE',
+            driverId,
+            businessId: null,
+            orderId: order.id,
+            amount,
             ruleId: null,
         });
     }
@@ -196,9 +260,25 @@ export class SettlementCalculationEngine {
     ): void {
         if (rule.entityType === 'DRIVER' && !driverId) return;
 
-        const base = rule.type === 'DELIVERY_PRICE' ? Number(order.originalDeliveryPrice) : Number(order.actualPrice);
+        // Base selection:
+        //   DELIVERY_PRICE rules → the post-promotion delivery fee (excl. priority surcharge)
+        //   ORDER_PRICE / BUSINESS → businessPrice (what the business actually earns after
+        //                            business-funded discounts; falls back to basePrice)
+        //   ORDER_PRICE / DRIVER   → actualPrice (what the customer paid for items)
+        let base: number;
+        if (rule.type === 'DELIVERY_PRICE') {
+            base = Number(order.deliveryPrice ?? order.originalDeliveryPrice ?? 0);
+        } else if (rule.entityType === 'BUSINESS') {
+            // businessPrice: what the business actually earns (may be < basePrice when
+            // the business has funded a promotion discount on their products)
+            base = Number(order.businessPrice ?? order.basePrice ?? order.actualPrice ?? 0);
+        } else {
+            base = Number(order.actualPrice ?? 0);
+        }
 
-        const amount = rule.amountType === 'FIXED' ? Number(rule.amount) : (base * Number(rule.amount)) / 100;
+        const amount = rule.amountType === 'FIXED'
+            ? Number(rule.amount)
+            : (base * Number(rule.amount)) / 100;
 
         if (amount <= 0) return;
 

@@ -431,6 +431,7 @@ export type CreateOrderInput = {
   dropOffLocation: LocationInput;
   items: Array<CreateOrderItemInput>;
   paymentCollection?: InputMaybe<OrderPaymentCollection>;
+  priorityRequested?: InputMaybe<Scalars['Boolean']['input']>;
   prioritySurcharge?: InputMaybe<Scalars['Float']['input']>;
   promotionId?: InputMaybe<Scalars['ID']['input']>;
   totalPrice: Scalars['Float']['input'];
@@ -449,6 +450,7 @@ export type CreateOrderItemInput = {
 export type CreateOrderItemOptionInput = {
   optionGroupId: Scalars['ID']['input'];
   optionId: Scalars['ID']['input'];
+  price?: InputMaybe<Scalars['Float']['input']>;
 };
 
 export type CreateProductCategoryInput = {
@@ -467,7 +469,7 @@ export type CreateProductInput = {
   isOnSale?: InputMaybe<Scalars['Boolean']['input']>;
   name: Scalars['String']['input'];
   price: Scalars['Float']['input'];
-  salePrice?: InputMaybe<Scalars['Float']['input']>;
+  saleDiscountPercentage?: InputMaybe<Scalars['Float']['input']>;
   subcategoryId?: InputMaybe<Scalars['ID']['input']>;
   variantGroupId?: InputMaybe<Scalars['ID']['input']>;
 };
@@ -483,15 +485,12 @@ export type CreateProductVariantGroupInput = {
 };
 
 export type CreatePromotionInput = {
-  addDriverCommission?: InputMaybe<Scalars['Boolean']['input']>;
   code?: InputMaybe<Scalars['String']['input']>;
-  createSettlementRules?: InputMaybe<Scalars['Boolean']['input']>;
   creatorId?: InputMaybe<Scalars['ID']['input']>;
-  creatorType?: InputMaybe<Scalars['String']['input']>;
+  creatorType: PromotionCreatorType;
   description?: InputMaybe<Scalars['String']['input']>;
   discountValue?: InputMaybe<Scalars['Float']['input']>;
-  driverRuleAmount?: InputMaybe<Scalars['Float']['input']>;
-  driverRuleAmountType?: InputMaybe<SettlementAmountType>;
+  driverPayoutAmount?: InputMaybe<Scalars['Float']['input']>;
   eligibleBusinessIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   endsAt?: InputMaybe<Scalars['String']['input']>;
   isActive: Scalars['Boolean']['input'];
@@ -769,6 +768,15 @@ export type DriverMessageUser = {
   firstName: Scalars['String']['output'];
   id: Scalars['ID']['output'];
   lastName: Scalars['String']['output'];
+};
+
+export type DriverOrderFinancials = {
+  __typename?: 'DriverOrderFinancials';
+  amountToCollectFromCustomer: Scalars['Float']['output'];
+  amountToRemitToPlatform: Scalars['Float']['output'];
+  driverNetEarnings: Scalars['Float']['output'];
+  orderId: Scalars['ID']['output'];
+  paymentCollection: OrderPaymentCollection;
 };
 
 export type DriverPttSignal = {
@@ -1743,6 +1751,7 @@ export type Order = {
   pickupLocations: Array<Location>;
   preparationMinutes?: Maybe<Scalars['Int']['output']>;
   preparingAt?: Maybe<Scalars['Date']['output']>;
+  prioritySurcharge: Scalars['Float']['output'];
   readyAt?: Maybe<Scalars['Date']['output']>;
   status: OrderStatus;
   totalPrice: Scalars['Float']['output'];
@@ -1839,6 +1848,7 @@ export type Product = {
   categoryId: Scalars['ID']['output'];
   createdAt: Scalars['String']['output'];
   description?: Maybe<Scalars['String']['output']>;
+  effectivePrice: Scalars['Float']['output'];
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
   isAvailable: Scalars['Boolean']['output'];
@@ -1849,7 +1859,7 @@ export type Product = {
   nightMarkedupPrice?: Maybe<Scalars['Float']['output']>;
   optionGroups: Array<OptionGroup>;
   price: Scalars['Float']['output'];
-  salePrice?: Maybe<Scalars['Float']['output']>;
+  saleDiscountPercentage?: Maybe<Scalars['Float']['output']>;
   sortOrder: Scalars['Int']['output'];
   subcategoryId?: Maybe<Scalars['ID']['output']>;
   updatedAt: Scalars['String']['output'];
@@ -1913,7 +1923,7 @@ export type Promotion = {
   code?: Maybe<Scalars['String']['output']>;
   createdAt: Scalars['String']['output'];
   creatorId?: Maybe<Scalars['ID']['output']>;
-  creatorType: Scalars['String']['output'];
+  creatorType: PromotionCreatorType;
   currentGlobalUsage: Scalars['Int']['output'];
   description?: Maybe<Scalars['String']['output']>;
   discountValue?: Maybe<Scalars['Float']['output']>;
@@ -1951,6 +1961,10 @@ export type PromotionAnalyticsResult = {
 export type PromotionAppliesTo =
   | 'DELIVERY'
   | 'PRICE';
+
+export type PromotionCreatorType =
+  | 'BUSINESS'
+  | 'PLATFORM';
 
 export type PromotionResult = {
   __typename?: 'PromotionResult';
@@ -2062,6 +2076,7 @@ export type Query = {
   driverMessageThreads: Array<DriverMessageThread>;
   /** Admin: full conversation with a specific driver */
   driverMessages: Array<DriverMessage>;
+  driverOrderFinancials?: Maybe<DriverOrderFinancials>;
   drivers: Array<User>;
   getActiveGlobalPromotions: Array<Promotion>;
   /** Get Agora RTC credentials for the current authenticated user */
@@ -2096,6 +2111,7 @@ export type Query = {
   ordersByStatus: Array<Order>;
   peakHourAnalysis: PeakHourAnalysis;
   previewCampaignAudience: AudiencePreview;
+  prioritySurchargeAmount: Scalars['Float']['output'];
   product?: Maybe<Product>;
   productCategories: Array<ProductCategory>;
   productCategory?: Maybe<ProductCategory>;
@@ -2201,6 +2217,11 @@ export type QuerydriverMessagesArgs = {
   driverId: Scalars['ID']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QuerydriverOrderFinancialsArgs = {
+  orderId: Scalars['ID']['input'];
 };
 
 
@@ -2894,12 +2915,13 @@ export type UpdateProductInput = {
   description?: InputMaybe<Scalars['String']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   isAvailable?: InputMaybe<Scalars['Boolean']['input']>;
+  isOffer?: InputMaybe<Scalars['Boolean']['input']>;
   isOnSale?: InputMaybe<Scalars['Boolean']['input']>;
   markupPrice?: InputMaybe<Scalars['Float']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   nightMarkedupPrice?: InputMaybe<Scalars['Float']['input']>;
   price?: InputMaybe<Scalars['Float']['input']>;
-  salePrice?: InputMaybe<Scalars['Float']['input']>;
+  saleDiscountPercentage?: InputMaybe<Scalars['Float']['input']>;
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
   subcategoryId?: InputMaybe<Scalars['ID']['input']>;
   variantGroupId?: InputMaybe<Scalars['ID']['input']>;
@@ -2911,26 +2933,8 @@ export type UpdateProductSubcategoryInput = {
 
 export type UpdatePromotionInput = {
   code?: InputMaybe<Scalars['String']['input']>;
-  creatorId?: InputMaybe<Scalars['ID']['input']>;
-  creatorType?: InputMaybe<Scalars['String']['input']>;
-  description?: InputMaybe<Scalars['String']['input']>;
-  discountValue?: InputMaybe<Scalars['Float']['input']>;
-  eligibleBusinessIds?: InputMaybe<Array<Scalars['ID']['input']>>;
-  endsAt?: InputMaybe<Scalars['String']['input']>;
   id: Scalars['ID']['input'];
-  isActive?: InputMaybe<Scalars['Boolean']['input']>;
-  isStackable?: InputMaybe<Scalars['Boolean']['input']>;
-  maxDiscountCap?: InputMaybe<Scalars['Float']['input']>;
-  maxGlobalUsage?: InputMaybe<Scalars['Int']['input']>;
-  maxUsagePerUser?: InputMaybe<Scalars['Int']['input']>;
-  minOrderAmount?: InputMaybe<Scalars['Float']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
-  priority?: InputMaybe<Scalars['Int']['input']>;
-  spendThreshold?: InputMaybe<Scalars['Float']['input']>;
-  startsAt?: InputMaybe<Scalars['String']['input']>;
-  target?: InputMaybe<PromotionTarget>;
-  thresholdReward?: InputMaybe<Scalars['String']['input']>;
-  type?: InputMaybe<PromotionType>;
 };
 
 export type UpdateSettlementRuleInput = {
@@ -3238,6 +3242,7 @@ export type ResolversTypes = {
   DriverMessage: ResolverTypeWrapper<Omit<DriverMessage, 'alertType'> & { alertType: ResolversTypes['MessageAlertType'] }>;
   DriverMessageThread: ResolverTypeWrapper<Omit<DriverMessageThread, 'lastMessage'> & { lastMessage?: Maybe<ResolversTypes['DriverMessage']> }>;
   DriverMessageUser: ResolverTypeWrapper<DriverMessageUser>;
+  DriverOrderFinancials: ResolverTypeWrapper<Omit<DriverOrderFinancials, 'paymentCollection'> & { paymentCollection: ResolversTypes['OrderPaymentCollection'] }>;
   DriverPttSignal: ResolverTypeWrapper<Omit<DriverPttSignal, 'action'> & { action: ResolversTypes['DriverPttSignalAction'] }>;
   DriverPttSignalAction: ResolverTypeWrapper<'STARTED' | 'STOPPED' | 'MUTE' | 'UNMUTE'>;
   DriverRegisterInput: DriverRegisterInput;
@@ -3274,9 +3279,10 @@ export type ResolversTypes = {
   ProductOrderInput: ProductOrderInput;
   ProductSubcategory: ResolverTypeWrapper<ProductSubcategory>;
   ProductVariantGroup: ResolverTypeWrapper<ProductVariantGroup>;
-  Promotion: ResolverTypeWrapper<Omit<Promotion, 'assignedUsers' | 'eligibleBusinesses' | 'target' | 'type'> & { assignedUsers?: Maybe<Array<ResolversTypes['UserPromotion']>>, eligibleBusinesses?: Maybe<Array<ResolversTypes['Business']>>, target: ResolversTypes['PromotionTarget'], type: ResolversTypes['PromotionType'] }>;
+  Promotion: ResolverTypeWrapper<Omit<Promotion, 'assignedUsers' | 'creatorType' | 'eligibleBusinesses' | 'target' | 'type'> & { assignedUsers?: Maybe<Array<ResolversTypes['UserPromotion']>>, creatorType: ResolversTypes['PromotionCreatorType'], eligibleBusinesses?: Maybe<Array<ResolversTypes['Business']>>, target: ResolversTypes['PromotionTarget'], type: ResolversTypes['PromotionType'] }>;
   PromotionAnalyticsResult: ResolverTypeWrapper<Omit<PromotionAnalyticsResult, 'promotion'> & { promotion: ResolversTypes['Promotion'] }>;
   PromotionAppliesTo: ResolverTypeWrapper<'PRICE' | 'DELIVERY'>;
+  PromotionCreatorType: ResolverTypeWrapper<'PLATFORM' | 'BUSINESS'>;
   PromotionResult: ResolverTypeWrapper<Omit<PromotionResult, 'promotions'> & { promotions: Array<ResolversTypes['ApplicablePromotion']> }>;
   PromotionTarget: ResolverTypeWrapper<'ALL_USERS' | 'SPECIFIC_USERS' | 'FIRST_ORDER' | 'CONDITIONAL'>;
   PromotionThreshold: ResolverTypeWrapper<PromotionThreshold>;
@@ -3418,6 +3424,7 @@ export type ResolversParentTypes = {
   DriverMessage: DriverMessage;
   DriverMessageThread: Omit<DriverMessageThread, 'lastMessage'> & { lastMessage?: Maybe<ResolversParentTypes['DriverMessage']> };
   DriverMessageUser: DriverMessageUser;
+  DriverOrderFinancials: DriverOrderFinancials;
   DriverPttSignal: DriverPttSignal;
   DriverRegisterInput: DriverRegisterInput;
   HourlyDistribution: HourlyDistribution;
@@ -3901,6 +3908,15 @@ export type DriverMessageUserResolvers<ContextType = GraphQLContext, ParentType 
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
+export type DriverOrderFinancialsResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['DriverOrderFinancials'] = ResolversParentTypes['DriverOrderFinancials']> = {
+  amountToCollectFromCustomer?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  amountToRemitToPlatform?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  driverNetEarnings?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  orderId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  paymentCollection?: Resolver<ResolversTypes['OrderPaymentCollection'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
 export type DriverPttSignalResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['DriverPttSignal'] = ResolversParentTypes['DriverPttSignal']> = {
   action?: Resolver<ResolversTypes['DriverPttSignalAction'], ParentType, ContextType>;
   adminId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
@@ -4160,6 +4176,7 @@ export type OrderResolvers<ContextType = GraphQLContext, ParentType extends Reso
   pickupLocations?: Resolver<Array<ResolversTypes['Location']>, ParentType, ContextType>;
   preparationMinutes?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
   preparingAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
+  prioritySurcharge?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   readyAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   status?: Resolver<ResolversTypes['OrderStatus'], ParentType, ContextType>;
   totalPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
@@ -4242,6 +4259,7 @@ export type ProductResolvers<ContextType = GraphQLContext, ParentType extends Re
   categoryId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   description?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  effectivePrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   isAvailable?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
@@ -4252,7 +4270,7 @@ export type ProductResolvers<ContextType = GraphQLContext, ParentType extends Re
   nightMarkedupPrice?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   optionGroups?: Resolver<Array<ResolversTypes['OptionGroup']>, ParentType, ContextType>;
   price?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
-  salePrice?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  saleDiscountPercentage?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   sortOrder?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   subcategoryId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
@@ -4306,7 +4324,7 @@ export type PromotionResolvers<ContextType = GraphQLContext, ParentType extends 
   code?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   creatorId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
-  creatorType?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  creatorType?: Resolver<ResolversTypes['PromotionCreatorType'], ParentType, ContextType>;
   currentGlobalUsage?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   description?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   discountValue?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
@@ -4343,6 +4361,8 @@ export type PromotionAnalyticsResultResolvers<ContextType = GraphQLContext, Pare
 };
 
 export type PromotionAppliesToResolvers = EnumResolverSignature<{ DELIVERY?: any, PRICE?: any }, ResolversTypes['PromotionAppliesTo']>;
+
+export type PromotionCreatorTypeResolvers = EnumResolverSignature<{ BUSINESS?: any, PLATFORM?: any }, ResolversTypes['PromotionCreatorType']>;
 
 export type PromotionResultResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PromotionResult'] = ResolversParentTypes['PromotionResult']> = {
   finalDeliveryPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
@@ -4433,6 +4453,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   driverKPIs?: Resolver<Array<ResolversTypes['DriverKPI']>, ParentType, ContextType, RequireFields<QuerydriverKPIsArgs, 'endDate' | 'startDate'>>;
   driverMessageThreads?: Resolver<Array<ResolversTypes['DriverMessageThread']>, ParentType, ContextType>;
   driverMessages?: Resolver<Array<ResolversTypes['DriverMessage']>, ParentType, ContextType, RequireFields<QuerydriverMessagesArgs, 'driverId'>>;
+  driverOrderFinancials?: Resolver<Maybe<ResolversTypes['DriverOrderFinancials']>, ParentType, ContextType, RequireFields<QuerydriverOrderFinancialsArgs, 'orderId'>>;
   drivers?: Resolver<Array<ResolversTypes['User']>, ParentType, ContextType>;
   getActiveGlobalPromotions?: Resolver<Array<ResolversTypes['Promotion']>, ParentType, ContextType>;
   getAgoraRtcCredentials?: Resolver<ResolversTypes['AgoraRtcCredentials'], ParentType, ContextType, RequireFields<QuerygetAgoraRtcCredentialsArgs, 'channelName' | 'role'>>;
@@ -4463,6 +4484,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   ordersByStatus?: Resolver<Array<ResolversTypes['Order']>, ParentType, ContextType, RequireFields<QueryordersByStatusArgs, 'status'>>;
   peakHourAnalysis?: Resolver<ResolversTypes['PeakHourAnalysis'], ParentType, ContextType, RequireFields<QuerypeakHourAnalysisArgs, 'endDate' | 'startDate'>>;
   previewCampaignAudience?: Resolver<ResolversTypes['AudiencePreview'], ParentType, ContextType, RequireFields<QuerypreviewCampaignAudienceArgs, 'query'>>;
+  prioritySurchargeAmount?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   product?: Resolver<Maybe<ResolversTypes['Product']>, ParentType, ContextType, RequireFields<QueryproductArgs, 'id'>>;
   productCategories?: Resolver<Array<ResolversTypes['ProductCategory']>, ParentType, ContextType, RequireFields<QueryproductCategoriesArgs, 'businessId'>>;
   productCategory?: Resolver<Maybe<ResolversTypes['ProductCategory']>, ParentType, ContextType, RequireFields<QueryproductCategoryArgs, 'id'>>;
@@ -4852,6 +4874,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   DriverMessage?: DriverMessageResolvers<ContextType>;
   DriverMessageThread?: DriverMessageThreadResolvers<ContextType>;
   DriverMessageUser?: DriverMessageUserResolvers<ContextType>;
+  DriverOrderFinancials?: DriverOrderFinancialsResolvers<ContextType>;
   DriverPttSignal?: DriverPttSignalResolvers<ContextType>;
   DriverPttSignalAction?: DriverPttSignalActionResolvers;
   EntityType?: EntityTypeResolvers;
@@ -4884,6 +4907,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   Promotion?: PromotionResolvers<ContextType>;
   PromotionAnalyticsResult?: PromotionAnalyticsResultResolvers<ContextType>;
   PromotionAppliesTo?: PromotionAppliesToResolvers;
+  PromotionCreatorType?: PromotionCreatorTypeResolvers;
   PromotionResult?: PromotionResultResolvers<ContextType>;
   PromotionTarget?: PromotionTargetResolvers;
   PromotionThreshold?: PromotionThresholdResolvers<ContextType>;

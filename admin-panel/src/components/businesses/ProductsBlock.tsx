@@ -69,7 +69,7 @@ interface Product {
     imageUrl?: string | null;
     isOffer?: boolean;
     isOnSale: boolean;
-    salePrice?: number | null;
+    saleDiscountPercentage?: number | null;
     isAvailable: boolean;
     sortOrder: number;
 }
@@ -130,7 +130,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                         imageUrl: p.imageUrl ?? null,
                         price: p.price,
                         isOnSale: p.isOnSale,
-                        salePrice: p.salePrice ?? null,
+                        saleDiscountPercentage: p.saleDiscountPercentage ?? null,
                         isAvailable: p.isAvailable,
                         sortOrder: p.sortOrder,
                         isOffer: p.isOffer ?? false,
@@ -149,7 +149,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     imageUrl: p.imageUrl ?? null,
                     price: p.price,
                     isOnSale: p.isOnSale,
-                    salePrice: p.salePrice ?? null,
+                    saleDiscountPercentage: p.saleDiscountPercentage ?? null,
                     isAvailable: p.isAvailable,
                     sortOrder: p.sortOrder,
                     isOffer: p.isOffer ?? false,
@@ -251,7 +251,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         imageUrl: "",
         price: 0,
         isOnSale: false,
-        salePrice: undefined,
+        saleDiscountPercentage: undefined,
     });
 
     const [editForm, setEditForm] = useState<UpdateProductInput & { id: string }>({
@@ -265,7 +265,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         imageUrl: "",
         price: 0,
         isOnSale: false,
-        salePrice: undefined,
+        saleDiscountPercentage: undefined,
         isAvailable: true,
     });
 
@@ -440,7 +440,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             imageUrl: imageUrl || undefined,
             price: Number(createForm.price),
             isOnSale: createForm.isOnSale,
-            salePrice: createForm.isOnSale ? Number(createForm.salePrice) : undefined,
+            saleDiscountPercentage: createForm.isOnSale ? Number(createForm.saleDiscountPercentage) : undefined,
         };
 
         const { success, error, data } = await createProduct(input);
@@ -459,7 +459,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                 imageUrl: "",
                 price: 0,
                 isOnSale: false,
-                salePrice: undefined,
+                saleDiscountPercentage: undefined,
             });
             setCreateImageFile(null);
             setCreateImagePreview(null);
@@ -777,7 +777,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             imageUrl: p.imageUrl || "",
             price: p.price,
             isOnSale: p.isOnSale,
-            salePrice: p.salePrice || undefined,
+            saleDiscountPercentage: p.saleDiscountPercentage || undefined,
             isAvailable: p.isAvailable,
         });
         setEditImageFile(null);
@@ -818,7 +818,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             imageUrl: imageUrl || undefined,
             price: Number(input.price),
             isOnSale: input.isOnSale,
-            salePrice: input.isOnSale ? Number(input.salePrice) : undefined,
+            saleDiscountPercentage: input.isOnSale ? Number(input.saleDiscountPercentage) : undefined,
             isAvailable: input.isAvailable,
         };
 
@@ -1028,10 +1028,9 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
 
                                             <Td>
                                                 {p.isOnSale &&
-                                                p.salePrice != null ? (
+                                                p.saleDiscountPercentage != null ? (
                                                     <span className="text-green-400">
-                                                        $
-                                                        {p.salePrice.toFixed(2)}
+                                                        {p.saleDiscountPercentage}% off
                                                     </span>
                                                 ) : (
                                                     "-"
@@ -1312,17 +1311,19 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     {createForm.isOnSale && (
                         <div>
                             <label className="block text-sm font-medium text-gray-400 mb-1">
-                                Sale Price
+                                Discount % (0–100)
                             </label>
                             <Input
-                                placeholder="Sale Price"
+                                placeholder="e.g. 20"
                                 type="number"
-                                step="0.01"
-                                value={createForm.salePrice || ""}
+                                step="1"
+                                min="1"
+                                max="100"
+                                value={createForm.saleDiscountPercentage || ""}
                                 onChange={(e) =>
                                     setCreateForm({
                                         ...createForm,
-                                        salePrice: e.target.value ? Number(e.target.value) : undefined,
+                                        saleDiscountPercentage: e.target.value ? Number(e.target.value) : undefined,
                                     })
                                 }
                             />
@@ -1615,17 +1616,19 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     {editForm.isOnSale && (
                         <div>
                             <label className="block text-sm font-medium text-gray-400 mb-1">
-                                Sale Price
+                                Discount % (0–100)
                             </label>
                             <Input
-                                placeholder="Sale Price"
+                                placeholder="e.g. 20"
                                 type="number"
-                                step="0.01"
-                                value={editForm.salePrice || ""}
+                                step="1"
+                                min="1"
+                                max="100"
+                                value={editForm.saleDiscountPercentage || ""}
                                 onChange={(e) =>
                                     setEditForm({
                                         ...editForm,
-                                        salePrice: e.target.value ? Number(e.target.value) : undefined,
+                                        saleDiscountPercentage: e.target.value ? Number(e.target.value) : undefined,
                                     })
                                 }
                             />

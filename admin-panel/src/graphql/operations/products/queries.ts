@@ -23,7 +23,7 @@ export const GET_BUSINESS_PRODUCTS_AND_CATEGORIES = graphql(`
                 imageUrl
                 price
                 isOnSale
-                salePrice
+                saleDiscountPercentage
                 isAvailable
                 sortOrder
                 variantGroup {

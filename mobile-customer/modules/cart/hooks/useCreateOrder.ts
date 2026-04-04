@@ -20,6 +20,7 @@ export function useCreateOrder() {
         driverNotes?: string | null,
         prioritySurcharge?: number,
         userContextLocation?: { latitude: number; longitude: number; address: string } | null,
+        priorityRequested?: boolean,
     ) => {
         // Keep this as UX guidance only; backend remains source of truth.
         if (hasActiveOrders) {
@@ -72,6 +73,7 @@ export function useCreateOrder() {
                             : null,
                         deliveryPrice,
                         totalPrice,
+                        priorityRequested: priorityRequested ?? false,
                         prioritySurcharge: prioritySurcharge ?? 0,
                         promotionId: promotionId || null,
                         driverNotes: driverNotes || null,

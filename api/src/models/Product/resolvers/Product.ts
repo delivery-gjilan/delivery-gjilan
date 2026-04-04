@@ -5,6 +5,10 @@ export const Product: ProductResolvers = {
         return (parent as any).groupId ?? (parent as any).variantGroupId ?? null;
     },
 
+    effectivePrice: async (parent, _args, { loaders }) => {
+        return loaders.effectivePriceByProductIdLoader.load(parent.id);
+    },
+
     optionGroups: async (parent, _args, { loaders }) => {
         const groups = await loaders.optionGroupsByProductIdLoader.load(parent.id);
         return groups.map((g) => ({

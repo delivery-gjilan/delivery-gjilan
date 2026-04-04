@@ -829,6 +829,8 @@ export const CartScreen = () => {
             // BEFORE applying any promotion discounts.  Priority surcharge is passed
             // separately via prioritySurcharge so the backend can fold it into the
             // stored deliveryPrice while keeping zone/tier validation intact.
+            // deliveryPrice = base/promo delivery fee WITHOUT priority surcharge.
+            // prioritySurcharge is sent separately for independent server validation.
             const apiDeliveryPrice = deliveryPrice;
             const order = await createOrder(
                 selectedLocation,
@@ -838,6 +840,7 @@ export const CartScreen = () => {
                 driverNotes,
                 prioritySurcharge,
                 userContextLocation,
+                isPriority,
             );
             const orderId = order?.id || null;
             

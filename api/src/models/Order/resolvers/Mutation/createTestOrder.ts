@@ -83,7 +83,12 @@ export const createTestOrder: NonNullable<MutationResolvers['createTestOrder']> 
     const itemsData = selectedProducts.map((product) => ({
         productId: product.id,
         quantity: Math.floor(Math.random() * 2) + 1,
-        price: Number(product.isOnSale && product.salePrice ? product.salePrice : product.basePrice),
+        price: (() => {
+            const contextPrice = product.markupPrice != null ? Number(product.markupPrice) : Number(product.basePrice);
+            return (product.isOnSale && product.saleDiscountPercentage != null)
+                ? Number((contextPrice * (1 - Number(product.saleDiscountPercentage) / 100)).toFixed(2))
+                : contextPrice;
+        })(),
     }));
 
     const orderPrice = itemsData.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -153,7 +158,7 @@ export const createTestOrder: NonNullable<MutationResolvers['createTestOrder']> 
             quantity: item.quantity,
             finalAppliedPrice: item.price,
             basePrice: item.price,
-            discountedPrice: null,
+            saleDiscountPercentage: null,
             markupPrice: null,
             nightMarkedupPrice: null,
         })),

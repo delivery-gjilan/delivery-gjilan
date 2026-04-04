@@ -2,6 +2,7 @@ import { type DbType } from '@/database';
 import { products } from '@/database/schema';
 import { eq, inArray } from 'drizzle-orm';
 import logger from '@/lib/logger';
+import { applyPercentageDiscount, normalizeMoney } from '@/lib/utils/money';
 
 const log = logger.child({ service: 'PricingService' });
 
@@ -16,7 +17,8 @@ export interface PriceCalculationResult {
     basePrice: number;
     markupPrice: number | null;
     nightMarkedupPrice: number | null;
-    salePrice: number | null;
+    /** Discount percentage (0–100) that was applied, or null if not on sale. */
+    saleDiscountPercentage: number | null;
     isNightHours: boolean;
     finalAppliedPrice: number;
 }
@@ -26,7 +28,7 @@ type ProductPricingRow = {
     basePrice: number;
     markupPrice: number | null;
     nightMarkedupPrice: number | null;
-    salePrice: number | null;
+    saleDiscountPercentage: number | null;
     isOnSale: boolean;
 };
 
@@ -39,10 +41,14 @@ function isNightHours(timestamp: Date = new Date()): boolean {
  * PricingService – resolves the correct price for a product from the products table.
  *
  * Price precedence:
- *   1. salePrice  – when isOnSale is true and salePrice is set
- *   2. nightMarkedupPrice – when current time is in the night window and nightMarkedupPrice is set
- *   3. markupPrice – when set outside night window
- *   4. basePrice   – fallback
+ *   1. Context tier selection:
+ *      - nightMarkedupPrice – during night hours (23:00–05:59) when set
+ *      - markupPrice        – during day hours when set
+ *      - basePrice          – fallback always available
+ *   2. Discount application:
+ *      - If isOnSale && saleDiscountPercentage != null:
+ *          finalPrice = contextPrice * (1 - saleDiscountPercentage / 100), rounded to 2dp
+ *      Discount applies uniformly to whichever tier is active.
  */
 export class PricingService {
     constructor(private db: Database) {}
@@ -54,28 +60,29 @@ export class PricingService {
         const basePrice = Number(product.basePrice);
         const markupPrice = product.markupPrice != null ? Number(product.markupPrice) : null;
         const nightMarkedupPrice = product.nightMarkedupPrice != null ? Number(product.nightMarkedupPrice) : null;
-        const salePrice = product.salePrice != null ? Number(product.salePrice) : null;
+        const saleDiscountPercentage = product.saleDiscountPercentage != null ? Number(product.saleDiscountPercentage) : null;
         const nightHours = isNightHours(context.timestamp);
 
-        let finalAppliedPrice: number;
-        if (product.isOnSale && salePrice != null) {
-            finalAppliedPrice = salePrice;
-        } else if (nightHours && nightMarkedupPrice != null) {
-            finalAppliedPrice = nightMarkedupPrice;
-        } else if (markupPrice != null) {
-            finalAppliedPrice = markupPrice;
-        } else {
-            finalAppliedPrice = basePrice;
-        }
+        // Step 1: pick the context-appropriate tier price
+        const contextPrice = (nightHours && nightMarkedupPrice != null)
+            ? nightMarkedupPrice
+            : (markupPrice != null)
+                ? markupPrice
+                : basePrice;
+
+        // Step 2: apply discount if on sale
+        const finalAppliedPrice = (product.isOnSale && saleDiscountPercentage != null)
+            ? applyPercentageDiscount(contextPrice, saleDiscountPercentage)
+            : normalizeMoney(contextPrice);
 
         return {
             productId: product.id,
-            basePrice,
-            markupPrice,
-            nightMarkedupPrice,
-            salePrice,
+            basePrice: normalizeMoney(basePrice),
+            markupPrice: markupPrice != null ? normalizeMoney(markupPrice) : null,
+            nightMarkedupPrice: nightMarkedupPrice != null ? normalizeMoney(nightMarkedupPrice) : null,
+            saleDiscountPercentage,
             isNightHours: nightHours,
-            finalAppliedPrice: Number(finalAppliedPrice.toFixed(2)),
+            finalAppliedPrice,
         };
     }
 
@@ -90,7 +97,7 @@ export class PricingService {
                 basePrice: true,
                 markupPrice: true,
                 nightMarkedupPrice: true,
-                salePrice: true,
+                saleDiscountPercentage: true,
                 isOnSale: true,
             },
         });
@@ -122,7 +129,7 @@ export class PricingService {
                 basePrice: true,
                 markupPrice: true,
                 nightMarkedupPrice: true,
-                salePrice: true,
+                saleDiscountPercentage: true,
                 isOnSale: true,
             },
         });

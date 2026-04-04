@@ -53,7 +53,7 @@ export const startPreparing: NonNullable<MutationResolvers['startPreparing']> = 
             dbOrder.userId,
             'PENDING',
             'PREPARING',
-            dbOrder.actualPrice + dbOrder.deliveryPrice,
+            Number(dbOrder.actualPrice) + Number(dbOrder.deliveryPrice) + Number((dbOrder as any).prioritySurcharge ?? 0),
             dbOrder.orderDate || null,
         );
 

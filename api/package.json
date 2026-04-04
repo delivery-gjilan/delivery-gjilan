@@ -7,6 +7,8 @@
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
     "test:unit:coverage": "vitest run --coverage",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:integration:watch": "vitest --config vitest.integration.config.ts",
     "test:harness:settlement": "tsx --env-file=.env scripts/run-settlement-harness.ts",
     "test:api:preflight": "npm run test:harness:settlement",
     "test:api:strict": "npm run typecheck && npm run test:harness:settlement",

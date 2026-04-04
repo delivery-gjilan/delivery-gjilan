@@ -1,6 +1,6 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { getDB } from '@/database';
-import { promotions, promotionBusinessEligibility } from '@/database/schema';
+import { promotions } from '@/database/schema';
 import { eq } from 'drizzle-orm';
 import { AppError } from '@/lib/errors';
 
@@ -11,24 +11,10 @@ export const updatePromotion: NonNullable<MutationResolvers['updatePromotion']> 
 
   const db = await getDB();
   
+  // Editing promotions is intentionally limited for now (name + code only)
   const updateData: any = {};
   if (input.name !== undefined) updateData.name = input.name;
-  if (input.description !== undefined) updateData.description = input.description;
-  if (input.code !== undefined) updateData.code = input.code?.toUpperCase() || null;
-  if (input.type !== undefined) updateData.type = input.type;
-  if (input.target !== undefined) updateData.target = input.target;
-  if (input.discountValue !== undefined) updateData.discountValue = input.discountValue;
-  if (input.maxDiscountCap !== undefined) updateData.maxDiscountCap = input.maxDiscountCap;
-  if (input.minOrderAmount !== undefined) updateData.minOrderAmount = input.minOrderAmount;
-  if (input.spendThreshold !== undefined) updateData.spendThreshold = input.spendThreshold;
-  if (input.thresholdReward !== undefined) updateData.thresholdReward = input.thresholdReward;
-  if (input.maxGlobalUsage !== undefined) updateData.maxGlobalUsage = input.maxGlobalUsage;
-  if (input.maxUsagePerUser !== undefined) updateData.maxUsagePerUser = input.maxUsagePerUser;
-  if (input.isStackable !== undefined) updateData.isStackable = input.isStackable;
-  if (input.priority !== undefined) updateData.priority = input.priority;
-  if (input.isActive !== undefined) updateData.isActive = input.isActive;
-  if (input.startsAt !== undefined) updateData.startsAt = input.startsAt ? new Date(input.startsAt) : null;
-  if (input.endsAt !== undefined) updateData.endsAt = input.endsAt ? new Date(input.endsAt) : null;
+  if (input.code !== undefined) updateData.code = input.code?.trim() ? input.code.toUpperCase() : null;
 
   const [promo] = await db
     .update(promotions)
@@ -40,23 +26,6 @@ export const updatePromotion: NonNullable<MutationResolvers['updatePromotion']> 
     throw AppError.notFound('Promotion');
   }
 
-  // Update eligible businesses if provided
-  if (input.eligibleBusinessIds !== undefined) {
-    // Delete existing business eligibility records
-    await db
-      .delete(promotionBusinessEligibility)
-      .where(eq(promotionBusinessEligibility.promotionId, input.id));
-
-    // Insert new business eligibility records
-    if (input.eligibleBusinessIds.length > 0) {
-      await db.insert(promotionBusinessEligibility).values(
-        input.eligibleBusinessIds.map((businessId) => ({
-          promotionId: input.id,
-          businessId,
-        }))
-      );
-    }
-  }
 
   // Helper to ensure ISO string format
   const toISOString = (date: Date | string | null | undefined): string | null => {

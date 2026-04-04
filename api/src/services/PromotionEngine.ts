@@ -10,6 +10,7 @@ import { orders } from '@/database/schema';
 import { eq, and, or, sql, gte, lte, isNull, inArray } from 'drizzle-orm';
 import logger from '@/lib/logger';
 import { AppError } from '@/lib/errors';
+import { normalizeMoney } from '@/lib/utils/money';
 
 const log = logger.child({ service: 'PromotionEngine' });
 
@@ -160,7 +161,7 @@ export class PromotionEngine {
             if (!usageLimitOk) continue;
 
             // Calculate discount amount
-            const appliedAmount = this.calculateDiscount(promo, cart.subtotal);
+            const appliedAmount = normalizeMoney(this.calculateDiscount(promo, cart.subtotal));
             const freeDelivery = this.checkFreeDelivery(promo);
 
             applicable.push({
@@ -195,13 +196,15 @@ export class PromotionEngine {
         log.info({ count: applicable.length, promotions: applicable.map(p => ({ id: p.id, name: p.name })) }, 'promo:applicable');
 
         if (applicable.length === 0) {
+            const finalSubtotal = normalizeMoney(cart.subtotal);
+            const finalDeliveryPrice = normalizeMoney(cart.deliveryPrice);
             return {
                 promotions: [],
                 totalDiscount: 0,
                 freeDeliveryApplied: false,
-                finalSubtotal: cart.subtotal,
-                finalDeliveryPrice: cart.deliveryPrice,
-                finalTotal: cart.subtotal + cart.deliveryPrice,
+                finalSubtotal,
+                finalDeliveryPrice,
+                finalTotal: normalizeMoney(finalSubtotal + finalDeliveryPrice),
             };
         }
 
@@ -228,13 +231,13 @@ export class PromotionEngine {
             }
         }
 
-        const finalSubtotal = Math.max(0, cart.subtotal - totalDiscount);
-        const finalDeliveryPrice = freeDeliveryApplied ? 0 : cart.deliveryPrice;
-        const finalTotal = finalSubtotal + finalDeliveryPrice;
+        const finalSubtotal = normalizeMoney(Math.max(0, cart.subtotal - totalDiscount));
+        const finalDeliveryPrice = freeDeliveryApplied ? 0 : normalizeMoney(cart.deliveryPrice);
+        const finalTotal = normalizeMoney(finalSubtotal + finalDeliveryPrice);
 
         return {
             promotions: applied,
-            totalDiscount,
+            totalDiscount: normalizeMoney(totalDiscount),
             freeDeliveryApplied,
             finalSubtotal,
             finalDeliveryPrice,
@@ -331,7 +334,7 @@ export class PromotionEngine {
         }
 
         // 7. Calculate discount
-        const appliedAmount = this.calculateDiscount(promo, cart.subtotal);
+        const appliedAmount = normalizeMoney(this.calculateDiscount(promo, cart.subtotal));
         const freeDelivery = this.checkFreeDelivery(promo);
 
         const appliedPromo: ApplicablePromotion = {
@@ -348,13 +351,13 @@ export class PromotionEngine {
             appliedAmount,
         };
 
-        const finalSubtotal = Math.max(0, cart.subtotal - appliedAmount);
-        const finalDeliveryPrice = freeDelivery ? 0 : cart.deliveryPrice;
-        const finalTotal = finalSubtotal + finalDeliveryPrice;
+        const finalSubtotal = normalizeMoney(Math.max(0, cart.subtotal - appliedAmount));
+        const finalDeliveryPrice = freeDelivery ? 0 : normalizeMoney(cart.deliveryPrice);
+        const finalTotal = normalizeMoney(finalSubtotal + finalDeliveryPrice);
 
         return {
             promotions: [appliedPromo],
-            totalDiscount: appliedAmount,
+            totalDiscount: normalizeMoney(appliedAmount),
             freeDeliveryApplied: freeDelivery,
             finalSubtotal,
             finalDeliveryPrice,
@@ -508,7 +511,7 @@ export class PromotionEngine {
                 break;
         }
 
-        return Math.min(discount, subtotal); // Can't discount more than subtotal
+        return normalizeMoney(Math.min(discount, subtotal)); // Can't discount more than subtotal
     }
 
     private checkFreeDelivery(promo: any): boolean {

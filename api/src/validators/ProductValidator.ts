@@ -13,7 +13,7 @@ const createProductSchema = z.object({
     imageUrl: z.string().optional().nullable(),
     price: z.number().min(0, 'Price must be positive'),
     isOnSale: z.boolean().optional(),
-    salePrice: z.number().min(0, 'Sale price must be positive').optional().nullable(),
+    saleDiscountPercentage: z.number().min(0, 'Discount must be >= 0').max(100, 'Discount must be <= 100').optional().nullable(),
     isAvailable: z.boolean().optional(),
 });
 
@@ -26,7 +26,7 @@ const updateProductSchema = z.object({
     imageUrl: z.string().optional().nullable(),
     price: z.number().min(0, 'Price must be positive').optional(),
     isOnSale: z.boolean().optional(),
-    salePrice: z.number().min(0, 'Sale price must be positive').optional().nullable(),
+    saleDiscountPercentage: z.number().min(0, 'Discount must be >= 0').max(100, 'Discount must be <= 100').optional().nullable(),
     isAvailable: z.boolean().optional(),
     sortOrder: z.number().int().optional(),
     markupPrice: z.number().min(0, 'Markup price must be positive').optional().nullable(),

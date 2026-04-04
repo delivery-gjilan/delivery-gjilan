@@ -533,7 +533,7 @@ async function seed() {
                     basePrice: productData.price,
                     isAvailable: Math.random() > 0.1, // 90% available
                     isOnSale: isOnSale,
-                    salePrice: isOnSale ? productData.price * 0.85 : null,
+                    saleDiscountPercentage: isOnSale ? 15 : null,
                 };
                 const [createdProduct] = await db.insert(products).values(product).returning();
 
@@ -626,7 +626,7 @@ async function seed() {
                         basePrice: productData.price,
                         isAvailable: Math.random() > 0.05,
                         isOnSale: isOnSale,
-                        salePrice: isOnSale ? productData.price * 0.85 : null,
+                        saleDiscountPercentage: isOnSale ? 15 : null,
                     };
                     const [createdProduct] = await db.insert(products).values(product).returning();
 

@@ -12,7 +12,7 @@ export interface CreatePromotionInput {
     name: string;
     description?: string;
     code?: string;
-    type: 'FIXED_AMOUNT' | 'PERCENTAGE' | 'FREE_DELIVERY' | 'SPEND_X_PERCENT' | 'SPEND_X_FIXED';
+    type: 'FIXED_AMOUNT' | 'PERCENTAGE' | 'FREE_DELIVERY' | 'SPEND_X_PERCENT' | 'SPEND_X_FIXED' | 'SPEND_X_GET_FREE';
     target: 'ALL_USERS' | 'SPECIFIC_USERS' | 'FIRST_ORDER' | 'CONDITIONAL';
     discountValue?: number;
     maxDiscountCap?: number;
@@ -26,20 +26,21 @@ export interface CreatePromotionInput {
     isActive?: boolean;
     startsAt?: Date | string;
     endsAt?: Date | string;
-    creatorType?: 'PLATFORM' | 'BUSINESS';
+
+    creatorType: 'PLATFORM' | 'BUSINESS';
     creatorId?: string;
+
     targetUserIds?: string[];
     eligibleBusinessIds?: string[];
 
-    // Settlement Rule Integration
-    createSettlementRules?: boolean;
-    driverRuleAmount?: number;
-    driverRuleAmountType?: 'FIXED' | 'PERCENT';
-    addDriverCommission?: boolean;
+    /** Required for delivery-fee promotions (FREE_DELIVERY / SPEND_X_GET_FREE). Fixed euros per order. */
+    driverPayoutAmount?: number;
 }
 
-export interface UpdatePromotionInput extends Partial<CreatePromotionInput> {
+export interface UpdatePromotionInput {
     id: string;
+    name?: string;
+    code?: string;
 }
 
 export class PromotionService {
@@ -118,6 +119,20 @@ export class PromotionService {
             throw AppError.badInput('Fixed amount discount must be greater than 0');
         }
 
+        // Validate business creator constraint
+        if (input.creatorType === 'BUSINESS') {
+            if (!input.creatorId) {
+                throw AppError.badInput('creatorId is required when creatorType is BUSINESS.');
+            }
+            if (input.eligibleBusinessIds && input.eligibleBusinessIds.length > 0) {
+                if (input.eligibleBusinessIds.length !== 1 || input.eligibleBusinessIds[0] !== input.creatorId) {
+                    throw AppError.badInput(
+                        'For business-created promotions, eligibleBusinessIds (if provided) must contain only the creatorId.',
+                    );
+                }
+            }
+        }
+
         const promo = await this.repository.create({
             code: input.code ? input.code.toUpperCase() : null,
             name: input.name,
@@ -144,6 +159,8 @@ export class PromotionService {
                     ? input.endsAt
                     : (input.endsAt as any).toISOString()
                 : null,
+            creatorType: input.creatorType as any,
+            creatorId: input.creatorId ?? null,
             createdBy: null, // Will be set by GraphQL resolver
         } as NewDbPromotion);
 
@@ -152,79 +169,120 @@ export class PromotionService {
             await this.repository.assignToUsers(promo.id, input.targetUserIds);
         }
 
-        // Set business eligibility if provided
-        if (input.eligibleBusinessIds && input.eligibleBusinessIds.length > 0) {
-            await this.repository.setBusinessEligibility(promo.id, input.eligibleBusinessIds);
+        // Set business eligibility
+        const eligibleBusinessIdsToSet =
+            input.creatorType === 'BUSINESS'
+                ? [input.creatorId!]
+                : (input.eligibleBusinessIds ?? []);
+
+        if (eligibleBusinessIdsToSet.length > 0) {
+            await this.repository.setBusinessEligibility(promo.id, eligibleBusinessIdsToSet);
         }
 
-        // Auto-create settlement rules if requested
-        if (input.createSettlementRules) {
-            await this.createSettlementRulesForPromotion(promo, input);
-        }
+        // Settlement rules are derived from creatorType + promotion kind (not user-configurable)
+        await this.createSettlementRulesForPromotion(promo, input);
 
         return this.mapDbPromotionToGraphQL(promo);
     }
 
     private async createSettlementRulesForPromotion(promo: DbPromotion, input: CreatePromotionInput): Promise<void> {
+        const isDeliveryFeePromotion = promo.type === 'FREE_DELIVERY' || promo.type === 'SPEND_X_GET_FREE';
+
         log.info(
             {
                 promotionId: promo.id,
                 type: promo.type,
-                createSettlementRules: input.createSettlementRules,
+                creatorType: input.creatorType,
+                isDeliveryFeePromotion,
             },
             'promo:autoCreateRules:start',
         );
 
-        if (promo.type === 'FREE_DELIVERY') {
-            // For FREE_DELIVERY, settlement rules are optional but if requested, commission is mandatory
-            if (input.createSettlementRules) {
-                // Rule 1: Driver owes Platform commission (ALWAYS 10% of delivery fee)
+        if (isDeliveryFeePromotion) {
+            if (input.driverPayoutAmount === undefined || input.driverPayoutAmount === null || input.driverPayoutAmount <= 0) {
+                throw AppError.badInput('driverPayoutAmount is required and must be > 0 for delivery-fee promotions.');
+            }
+
+            const payout = input.driverPayoutAmount;
+
+            if (input.creatorType === 'BUSINESS') {
+                if (!input.creatorId) {
+                    throw AppError.badInput('creatorId is required when creatorType is BUSINESS.');
+                }
+
+                // 1) Business owes Platform (to reimburse the driver payout)
                 await this.settlementRuleRepository.createRule({
-                    name: `${promo.name} - Driver Commission (10%)`,
+                    name: `${promo.name} - Business Reimbursement`,
+                    type: 'DELIVERY_PRICE',
+                    entityType: 'BUSINESS',
+                    direction: 'RECEIVABLE',
+                    amountType: 'FIXED',
+                    amount: payout.toString(),
+                    businessId: input.creatorId,
+                    promotionId: promo.id,
+                    isActive: true,
+                    notes: `Auto-created for business-funded delivery promotion ${promo.id}`,
+                });
+
+                // 2) Platform owes Driver
+                await this.settlementRuleRepository.createRule({
+                    name: `${promo.name} - Driver Payout`,
                     type: 'DELIVERY_PRICE',
                     entityType: 'DRIVER',
-                    direction: 'RECEIVABLE',
-                    amountType: 'PERCENT',
-                    amount: '10',
-                    promotionId: promo.id,
-                    isActive: true,
-                    notes: `Mandatory 10% commission for free delivery promotion ${promo.id}`,
-                });
-
-                // Rule 2: Platform owes Driver (based on input amount/type)
-                if (input.driverRuleAmount !== undefined && input.driverRuleAmount !== null) {
-                    await this.settlementRuleRepository.createRule({
-                        name: `${promo.name} - Driver Payout`,
-                        type: 'DELIVERY_PRICE',
-                        entityType: 'DRIVER',
-                        direction: 'PAYABLE',
-                        amountType: input.driverRuleAmountType || 'PERCENT',
-                        amount: input.driverRuleAmount.toString(),
-                        promotionId: promo.id,
-                        isActive: true,
-                        notes: `Auto-created payout for free delivery promotion ${promo.id}`,
-                    });
-                }
-            }
-        } else {
-            // For other types, we always create a settlement rule where the platform owes 
-            // the driver the discount amount specified in the promotion.
-            const amountType = promo.type === 'PERCENTAGE' || promo.type === 'SPEND_X_PERCENT' ? 'PERCENT' : 'FIXED';
-            const amountValue = promo.discountValue || 0;
-
-            if (amountValue > 0) {
-                await this.settlementRuleRepository.createRule({
-                    name: `${promo.name} - Driver Subsidy`,
-                    type: 'ORDER_PRICE',
-                    entityType: 'DRIVER',
                     direction: 'PAYABLE',
-                    amountType: amountType,
-                    amount: amountValue.toString(),
+                    amountType: 'FIXED',
+                    amount: payout.toString(),
+                    businessId: input.creatorId,
                     promotionId: promo.id,
                     isActive: true,
-                    notes: `Auto-created platform subsidy for promotion ${promo.id}`,
+                    notes: `Auto-created payout for business-funded delivery promotion ${promo.id}`,
                 });
+
+                return;
             }
+
+            // PLATFORM-created delivery-fee promotion: Platform owes Driver
+            await this.settlementRuleRepository.createRule({
+                name: `${promo.name} - Driver Payout`,
+                type: 'DELIVERY_PRICE',
+                entityType: 'DRIVER',
+                direction: 'PAYABLE',
+                amountType: 'FIXED',
+                amount: payout.toString(),
+                promotionId: promo.id,
+                isActive: true,
+                notes: `Auto-created payout for platform-funded delivery promotion ${promo.id}`,
+            });
+
+            return;
+        }
+
+        // Order-price promotions
+        if (input.driverPayoutAmount !== undefined && input.driverPayoutAmount !== null) {
+            throw AppError.badInput('driverPayoutAmount is only allowed for delivery-fee promotions.');
+        }
+
+        // Business-funded order discount promotions do NOT create settlement rules.
+        if (input.creatorType === 'BUSINESS') {
+            return;
+        }
+
+        // Platform-funded order discount promotions: Platform owes Driver the promo amount.
+        const amountType = promo.type === 'PERCENTAGE' || promo.type === 'SPEND_X_PERCENT' ? 'PERCENT' : 'FIXED';
+        const amountValue = promo.discountValue || 0;
+
+        if (amountValue > 0) {
+            await this.settlementRuleRepository.createRule({
+                name: `${promo.name} - Driver Subsidy`,
+                type: 'ORDER_PRICE',
+                entityType: 'DRIVER',
+                direction: 'PAYABLE',
+                amountType,
+                amount: amountValue.toString(),
+                promotionId: promo.id,
+                isActive: true,
+                notes: `Auto-created platform subsidy for promotion ${promo.id}`,
+            });
         }
     }
 
@@ -241,37 +299,23 @@ export class PromotionService {
     }
 
     async updatePromotion(input: UpdatePromotionInput): Promise<DbPromotion> {
-        const { id, ...updates } = input;
+        // Editing promotions is intentionally limited for now (name + code only)
+        const updates: any = {};
 
-        // If updating code, check uniqueness
-        if (updates.code) {
-            const exists = await this.repository.checkCodeExists(updates.code, id);
-            if (exists) {
-                throw AppError.conflict(`Promotion code '${updates.code}' already exists`);
+        if (input.name !== undefined) updates.name = input.name;
+
+        if (input.code !== undefined) {
+            const normalized = input.code.trim() ? input.code.trim().toUpperCase() : null;
+            if (normalized) {
+                const exists = await this.repository.checkCodeExists(normalized, input.id);
+                if (exists) {
+                    throw AppError.conflict(`Promotion code '${normalized}' already exists`);
+                }
             }
-            updates.code = updates.code.toUpperCase();
+            updates.code = normalized;
         }
 
-        // Validate percentage discount
-        if (updates.type === 'PERCENTAGE' && updates.discountValue) {
-            if (updates.discountValue <= 0 || updates.discountValue > 100) {
-                throw AppError.badInput('Percentage discount must be between 0 and 100');
-            }
-        }
-
-        // Convert dates if necessary
-        const updateObj: any = {};
-        for (const [key, value] of Object.entries(updates)) {
-            if (key === 'startsAt' || key === 'endsAt') {
-                updateObj[key] = value 
-                    ? (typeof value === 'string' ? value : (value as any).toISOString()) 
-                    : null;
-            } else {
-                updateObj[key] = value;
-            }
-        }
-
-        return this.repository.update(id, updateObj);
+        return this.repository.update(input.id, updates);
     }
 
     async deletePromotion(id: string): Promise<boolean> {

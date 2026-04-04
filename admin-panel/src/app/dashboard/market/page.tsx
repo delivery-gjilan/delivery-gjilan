@@ -91,7 +91,7 @@ interface Product {
     imageUrl?: string | null;
     isOffer: boolean;
     isOnSale: boolean;
-    salePrice?: number | null;
+    saleDiscountPercentage?: number | null;
     isAvailable: boolean;
     sortOrder: number;
 }
@@ -366,7 +366,7 @@ function MarketContent({ businessId }: { businessId: string }) {
     const toggleSale = async (product: Product) => {
         await updateProduct(product.id, {
             isOnSale: !product.isOnSale,
-            salePrice: !product.isOnSale && !product.salePrice ? product.price * 0.8 : product.salePrice,
+            saleDiscountPercentage: !product.isOnSale && !product.saleDiscountPercentage ? 20 : product.saleDiscountPercentage ?? undefined,
         });
         await refetchProducts();
     };
@@ -996,10 +996,10 @@ function ProductRow({
             {/* Price */}
             <td className="px-4 py-3">
                 <div className="flex flex-col gap-0.5">
-                    {product.isOnSale && product.salePrice ? (
+                    {product.isOnSale && product.saleDiscountPercentage != null ? (
                         <>
                             <span className="font-bold text-green-400">
-                                ${product.salePrice.toFixed(2)}
+                                ${(product.price * (1 - product.saleDiscountPercentage / 100)).toFixed(2)}
                             </span>
                             <span className="text-xs text-gray-500 line-through">
                                 ${product.price.toFixed(2)}
@@ -1316,7 +1316,7 @@ function ProductModal({
         name: '',
         description: '',
         price: '',
-        salePrice: '',
+        saleDiscountPercentage: '',
         imageUrl: '',
         isOffer: false,
         isVariant: false,
@@ -1346,7 +1346,7 @@ function ProductModal({
                     name: modal.data.name,
                     description: modal.data.description || '',
                     price: modal.data.price.toString(),
-                    salePrice: modal.data.salePrice?.toString() || '',
+                    saleDiscountPercentage: modal.data.saleDiscountPercentage?.toString() || '',
                     imageUrl: modal.data.imageUrl || '',
                     isOffer: modal.data.isOffer || false,
                     isVariant: Boolean(modal.data.variantGroupId),
@@ -1362,7 +1362,7 @@ function ProductModal({
                     name: '',
                     description: '',
                     price: '',
-                    salePrice: '',
+                    saleDiscountPercentage: '',
                     imageUrl: '',
                     isOffer: false,
                     isVariant: false,
@@ -1468,7 +1468,7 @@ function ProductModal({
             price: parseFloat(form.price),
             isOffer: form.isOffer,
             isOnSale: form.isOnSale,
-            salePrice: form.isOnSale && form.salePrice ? parseFloat(form.salePrice) : undefined,
+            saleDiscountPercentage: form.isOnSale && form.saleDiscountPercentage ? parseFloat(form.saleDiscountPercentage) : undefined,
             isAvailable: form.isAvailable,
         };
 
@@ -1570,14 +1570,16 @@ function ProductModal({
 
                     <div>
                         <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Sale Price ($)
+                            Discount % (0–90)
                         </label>
                         <Input
                             type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={form.salePrice}
-                            onChange={(e) => setForm({ ...form, salePrice: e.target.value })}
+                            step="1"
+                            min="1"
+                            max="90"
+                            placeholder="e.g. 20"
+                            value={form.saleDiscountPercentage}
+                            onChange={(e) => setForm({ ...form, saleDiscountPercentage: e.target.value })}
                             disabled={!form.isOnSale}
                         />
                     </div>

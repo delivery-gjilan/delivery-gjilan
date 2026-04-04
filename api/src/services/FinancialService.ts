@@ -57,6 +57,7 @@ export class FinancialService {
                     normalizedDriverId,
                 );
 
+                console.log("calculated settlements:", calculated);
                 for (const settlement of calculated) {
                     await tx
                         .insert(settlements)

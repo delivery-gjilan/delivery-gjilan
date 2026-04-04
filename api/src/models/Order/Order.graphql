@@ -80,6 +80,17 @@ input SubscriptionInput {
     token: String
 }
 
+type DriverOrderFinancials {
+    orderId: ID!
+    paymentCollection: OrderPaymentCollection!
+    # The total the driver collects from the customer (totalPrice for CASH_TO_DRIVER, 0 for PREPAID)
+    amountToCollectFromCustomer: Float!
+    # What the driver must remit to the platform (markup + surcharge + delivery commission share)
+    amountToRemitToPlatform: Float!
+    # Driver net earnings after remittance = amountToCollect - amountToRemit
+    driverNetEarnings: Float!
+}
+
 type Order {
     id: ID!
     displayId: String!
@@ -88,6 +99,7 @@ type Order {
     # Final prices
     deliveryPrice: Float!
     totalPrice: Float!
+    prioritySurcharge: Float!
     # Legacy fields kept for backward compatibility (map to new columns)
     orderPrice: Float!
     originalPrice: Float
@@ -124,6 +136,8 @@ type Query {
     ordersByStatus(status: OrderStatus!, limit: Int, offset: Int): [Order!]!
     cancelledOrders(limit: Int, offset: Int): [Order!]!
     uncompletedOrders: [Order!]!
+    prioritySurchargeAmount: Float!
+    driverOrderFinancials(orderId: ID!): DriverOrderFinancials
 }
 
 type Mutation {
@@ -150,6 +164,9 @@ type Subscription {
 input CreateOrderItemOptionInput {
     optionGroupId: ID!
     optionId: ID!
+    # Price the user pays for this option (extraPrice) at checkout time.
+    # Required when extraPrice > 0, otherwise optional/0.
+    price: Float
 }
 
 input CreateOrderChildItemInput {
@@ -170,8 +187,11 @@ input CreateOrderInput {
     items: [CreateOrderItemInput!]!
     dropOffLocation: LocationInput!
     userContextLocation: LocationInput
+    # FINAL delivery fee the customer will pay (after promotion is applied).
     deliveryPrice: Float!
+    # FINAL total (items + options + delivery + priority surcharge - discounts).
     totalPrice: Float!
+    priorityRequested: Boolean
     prioritySurcharge: Float
     paymentCollection: OrderPaymentCollection
     promotionId: ID

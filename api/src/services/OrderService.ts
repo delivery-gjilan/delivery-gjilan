@@ -17,6 +17,8 @@ import {
     optionGroups as optionGroupsTable,
     options as optionsDbTable,
     users as usersTable,
+    settlements as settlementsTable,
+    promotions as promotionsTable,
 } from '@/database/schema';
 import { userPromoMetadata } from '@/database/schema';
 import { and, asc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
@@ -26,12 +28,15 @@ import { PubSub, publish, subscribe, topics } from '@/lib/pubsub';
 import { AppError } from '@/lib/errors';
 import { PromotionEngine } from '@/services/PromotionEngine';
 import type { PromotionResult, CartContext } from '@/services/PromotionEngine';
+import { PricingService } from '@/services/PricingService';
 import { FinancialService } from '@/services/FinancialService';
+import { applyPercentageDiscount, moneyEquals, normalizeMoney } from '@/lib/utils/money';
 import { calculateDrivingDistanceKm } from '@/lib/haversine';
 import { isPointInPolygon } from '@/lib/pointInPolygon';
 import { parseDbTimestamp } from '@/lib/dateTime';
 import logger from '@/lib/logger';
 import { ApiContextInterface } from '@/graphql/context';
+import type { GraphQLContext } from '@/graphql/context';
 import {
     notifyCustomerOrderStatus,
     notifyAdminsNewOrder,
@@ -45,6 +50,7 @@ import { getLiveDriverEta } from '@/lib/driverEtaCache';
 import { cache } from '@/lib/cache';
 import { emitOrderEvent } from '@/repositories/OrderEventRepository';
 import { createAuditLogger } from '@/services/AuditLogger';
+import { getPrioritySurchargeAmount } from '@/config/prioritySurcharge';
 
 const log = logger.child({ service: 'OrderService' });
 const TRUSTED_CUSTOMER_MARKER = '[TRUSTED_CUSTOMER]';
@@ -118,7 +124,7 @@ export class OrderService {
             (zone) => !zone.isServiceZone && isPointInPolygon(dropoffPoint, zone.polygon),
         );
         if (matchedZone) {
-            return matchedZone.deliveryFee;
+            return normalizeMoney(Number(matchedZone.deliveryFee));
         }
 
         const tiers = await db
@@ -128,7 +134,7 @@ export class OrderService {
             .orderBy(asc(deliveryPricingTiersTable.sortOrder), asc(deliveryPricingTiersTable.minDistanceKm));
 
         if (tiers.length === 0) {
-            return DEFAULT_DELIVERY_PRICE;
+            return normalizeMoney(DEFAULT_DELIVERY_PRICE);
         }
 
         const matchedTier = tiers.find((tier) => {
@@ -142,10 +148,10 @@ export class OrderService {
 
         if (!matchedTier) {
             const lastTier = tiers[tiers.length - 1];
-            return lastTier?.price ?? DEFAULT_DELIVERY_PRICE;
+            return normalizeMoney(Number(lastTier?.price ?? DEFAULT_DELIVERY_PRICE));
         }
 
-        return matchedTier.price;
+        return normalizeMoney(Number(matchedTier.price));
     }
 
     async createOrder(userId: string, input: CreateOrderInput): Promise<Order> {
@@ -173,20 +179,25 @@ export class OrderService {
         const allProducts = await this.productRepository.findByIds([...allProductIds]);
         const productMap = new Map(allProducts.map((p) => [p.id, p]));
 
+        // Use a single timestamp for all pricing decisions (night vs day).
+        const pricingTimestamp = new Date();
+        const pricingService = new PricingService(this.db);
+        const priceByProductId = await pricingService.calculateProductPrices([...allProductIds], { timestamp: pricingTimestamp });
+
         let calculatedItemsTotal = 0;
         const itemsToCreate: Array<{
             productId: string;
             quantity: number;
             finalAppliedPrice: number;
             basePrice: number;
-            discountedPrice: number | null;
+            saleDiscountPercentage: number | null;
             markupPrice: number | null;
             nightMarkedupPrice: number | null;
             notes: string | null;
-            selectedOptions?: Array<{ optionGroupId: string; optionId: string }>;
+            selectedOptions?: Array<{ optionGroupId: string; optionId: string; price?: number | null }>;
             childItems?: Array<{
                 productId: string;
-                selectedOptions: Array<{ optionGroupId: string; optionId: string }>;
+                selectedOptions: Array<{ optionGroupId: string; optionId: string; price?: number | null }>;
             }>;
         }> = [];
         const cartItems = [] as Array<{ productId: string; businessId: string; quantity: number; price: number }>;
@@ -245,7 +256,7 @@ export class OrderService {
         }
 
         const validateSelectedOptions = (
-            selectedOptions: Array<{ optionGroupId: string; optionId: string }> | undefined,
+            selectedOptions: Array<{ optionGroupId: string; optionId: string; price?: number | null }> | undefined,
             ownerProductId: string,
             label: string,
             enforceMinimumSelections: boolean,
@@ -299,8 +310,10 @@ export class OrderService {
         };
 
         // Track order-level price breakdown
-        let orderBasePrice = 0;   // sum of items' effective price × qty + options' extraPrice × qty (respects discounts)
-        let orderMarkupPrice = 0; // sum of products' markup amounts × qty (platform margin, additional amount only)
+        // orderBasePrice  = sum of discounted business base prices + option extras (what the business earns before promos)
+        // orderMarkupPrice = sum of platform markup deltas only (finalAppliedPrice − discountedBasePrice)
+        let orderBasePrice = 0;
+        let orderMarkupPrice = 0;
 
         for (const itemInput of input.items) {
             const product = productMap.get(itemInput.productId);
@@ -311,43 +324,86 @@ export class OrderService {
                 throw AppError.badInput(`Product ${product.name} is currently unavailable`);
             }
 
-            // Use DB price for security — snapshot all price fields at order time
-            const basePrice = Number(product.basePrice);
-            const markupPrice = product.markupPrice != null ? Number(product.markupPrice) : null;
-            const nightMarkedupPrice = product.nightMarkedupPrice != null ? Number(product.nightMarkedupPrice) : null;
-            const discountedPrice = product.salePrice != null ? Number(product.salePrice) : null;
-            const isNightHours = (() => { const h = new Date().getHours(); return h >= 23 || h < 6; })();
-            const finalAppliedPrice = (product.isOnSale && discountedPrice != null)
-                ? discountedPrice
-                : (isNightHours && nightMarkedupPrice != null)
-                    ? nightMarkedupPrice
-                    : (markupPrice != null)
-                        ? markupPrice
-                        : basePrice;
-            log.debug({ finalAppliedPrice, quantity: itemInput.quantity, productId: itemInput.productId }, 'order:item:price');
+            // Server-authoritative product pricing (rounded/normalized to 2dp)
+            const priceResult = priceByProductId.get(itemInput.productId);
+            if (!priceResult) {
+                throw AppError.notFound(`Product with ID ${itemInput.productId}`);
+            }
+
+            const finalAppliedPrice = normalizeMoney(priceResult.finalAppliedPrice);
+
+            // Snapshot all DB price fields at order time (used downstream for auditing/settlement)
+            const basePrice = normalizeMoney(Number(product.basePrice));
+            const markupPrice = product.markupPrice != null ? normalizeMoney(Number(product.markupPrice)) : null;
+            const nightMarkedupPrice = product.nightMarkedupPrice != null ? normalizeMoney(Number(product.nightMarkedupPrice)) : null;
+            const saleDiscountPercentage = product.saleDiscountPercentage != null ? Number(product.saleDiscountPercentage) : null;
+
+            const discountedBasePrice = (product.isOnSale && saleDiscountPercentage != null)
+                ? applyPercentageDiscount(basePrice, saleDiscountPercentage)
+                : normalizeMoney(basePrice);
+
+            // ── Strict client pricing validation ──
+            // The client must send the exact per-unit price the user will pay for the product
+            // (after sale discount + tier selection). If they tamper with any unit price, we reject.
+            const clientUnitPrice = normalizeMoney(Number(itemInput.price));
+            if (!moneyEquals(clientUnitPrice, finalAppliedPrice)) {
+                throw AppError.badInput(
+                    `Item price mismatch for product ${itemInput.productId}: expected ${finalAppliedPrice}, received ${clientUnitPrice}`,
+                );
+            }
+
+            log.debug({ finalAppliedPrice, discountedBasePrice, quantity: itemInput.quantity, productId: itemInput.productId }, 'order:item:price');
 
             validateSelectedOptions(itemInput.selectedOptions ?? [], product.id, `Product ${product.id}`, true);
 
-            // Calculate options extra price
+            // Calculate + strictly validate options extra price
             let optionsExtra = 0;
             if (itemInput.selectedOptions) {
                 for (const so of itemInput.selectedOptions) {
                     const opt = optionById.get(so.optionId);
                     if (!opt) throw AppError.badInput(`Option ${so.optionId} not found`);
-                    optionsExtra += opt.extraPrice;
+
+                    const expectedOptionPrice = normalizeMoney(Number(opt.extraPrice ?? 0));
+                    const clientOptionPriceRaw = so.price;
+                    const clientOptionPrice = clientOptionPriceRaw == null ? null : normalizeMoney(Number(clientOptionPriceRaw));
+
+                    // If the option costs extra, the client MUST send its price and it must match.
+                    if (expectedOptionPrice > 0.01) {
+                        if (clientOptionPrice == null) {
+                            throw AppError.badInput(
+                                `Missing option price for option ${so.optionId} (expected ${expectedOptionPrice})`,
+                            );
+                        }
+                        if (!moneyEquals(clientOptionPrice, expectedOptionPrice)) {
+                            throw AppError.badInput(
+                                `Option price mismatch for option ${so.optionId}: expected ${expectedOptionPrice}, received ${clientOptionPrice}`,
+                            );
+                        }
+                    } else {
+                        // Free option: tolerate missing price or 0.
+                        if (clientOptionPrice != null && !moneyEquals(clientOptionPrice, 0)) {
+                            throw AppError.badInput(
+                                `Option price mismatch for option ${so.optionId}: expected 0, received ${clientOptionPrice}`,
+                            );
+                        }
+                    }
+
+                    optionsExtra = normalizeMoney(optionsExtra + expectedOptionPrice);
                 }
             }
 
-            calculatedItemsTotal += (finalAppliedPrice + optionsExtra) * itemInput.quantity;
+            const itemLineTotal = normalizeMoney((finalAppliedPrice + optionsExtra) * itemInput.quantity);
+            calculatedItemsTotal = normalizeMoney(calculatedItemsTotal + itemLineTotal);
 
             // Accumulate order-level price breakdown
-            // basePrice uses the effective item price (respecting discounts/sale prices):
-            // if product is on sale, use discountedPrice; otherwise use the raw basePrice
-            const effectiveItemBase = (product.isOnSale && discountedPrice != null) ? discountedPrice : basePrice;
-            orderBasePrice += (effectiveItemBase + optionsExtra) * itemInput.quantity;
-            // markupPrice = additional amount on top of basePrice (pure margin, clamped ≥ 0)
-            const productMarkup = Math.max(0, finalAppliedPrice - basePrice);
-            orderMarkupPrice += productMarkup * itemInput.quantity;
+            // orderBasePrice = discounted business base price + option extras
+            // This represents what the business set as pricing (before platform markup)
+            const baseLineTotal = normalizeMoney((discountedBasePrice + optionsExtra) * itemInput.quantity);
+            orderBasePrice = normalizeMoney(orderBasePrice + baseLineTotal);
+
+            // markupPrice = platform margin: difference between what customer pays and the business base
+            const productMarkup = Math.max(0, normalizeMoney(finalAppliedPrice - discountedBasePrice));
+            orderMarkupPrice = normalizeMoney(orderMarkupPrice + normalizeMoney(productMarkup * itemInput.quantity));
 
             // Also calculate child item options extra (child finalAppliedPrice is 0, but options may cost extra)
             if (itemInput.childItems) {
@@ -381,12 +437,38 @@ export class OrderService {
                         for (const so of child.selectedOptions) {
                             const opt = optionById.get(so.optionId);
                             if (!opt) throw AppError.badInput(`Option ${so.optionId} not found`);
-                            childOptionsExtra += opt.extraPrice;
+
+                            const expectedOptionPrice = normalizeMoney(Number(opt.extraPrice ?? 0));
+                            const clientOptionPriceRaw = so.price;
+                            const clientOptionPrice = clientOptionPriceRaw == null ? null : normalizeMoney(Number(clientOptionPriceRaw));
+
+                            if (expectedOptionPrice > 0.01) {
+                                if (clientOptionPrice == null) {
+                                    throw AppError.badInput(
+                                        `Missing option price for option ${so.optionId} (expected ${expectedOptionPrice})`,
+                                    );
+                                }
+                                if (!moneyEquals(clientOptionPrice, expectedOptionPrice)) {
+                                    throw AppError.badInput(
+                                        `Option price mismatch for option ${so.optionId}: expected ${expectedOptionPrice}, received ${clientOptionPrice}`,
+                                    );
+                                }
+                            } else {
+                                if (clientOptionPrice != null && !moneyEquals(clientOptionPrice, 0)) {
+                                    throw AppError.badInput(
+                                        `Option price mismatch for option ${so.optionId}: expected 0, received ${clientOptionPrice}`,
+                                    );
+                                }
+                            }
+
+                            childOptionsExtra = normalizeMoney(childOptionsExtra + expectedOptionPrice);
                         }
                     }
-                    calculatedItemsTotal += childOptionsExtra * itemInput.quantity;
-                    // Child option extras also count as base price for the order
-                    orderBasePrice += childOptionsExtra * itemInput.quantity;
+
+                    // Child option extras are charged (covered by offer), so they count into subtotal/base.
+                    calculatedItemsTotal = normalizeMoney(calculatedItemsTotal + normalizeMoney(childOptionsExtra * itemInput.quantity));
+                    // Child option extras count as base price for the order (no markup on child options)
+                    orderBasePrice = normalizeMoney(orderBasePrice + normalizeMoney(childOptionsExtra * itemInput.quantity));
                 }
             }
 
@@ -395,7 +477,7 @@ export class OrderService {
                 quantity: itemInput.quantity,
                 finalAppliedPrice,
                 basePrice,
-                discountedPrice,
+                saleDiscountPercentage,
                 markupPrice,
                 nightMarkedupPrice,
                 notes: itemInput.notes || null,
@@ -512,24 +594,34 @@ export class OrderService {
             dropoffLng: input.dropOffLocation.longitude,
         });
 
-        // prioritySurcharge is an opt-in fee the customer pays on top of the base
-        // delivery fee for expedited handling.  It is validated and stored
-        // separately from zone/tier-based delivery pricing.
-        const prioritySurcharge = input.prioritySurcharge ?? 0;
-        if (prioritySurcharge < 0) {
-            throw AppError.badInput('Priority surcharge cannot be negative');
+        // ── Priority surcharge validation ──
+        // The surcharge amount is server-authoritative.  The client tells us
+        // whether priority was requested via `priorityRequested`.  If so the
+        // surcharge must match the server constant exactly (within float tolerance).
+        // If not requested the surcharge must be absent or zero.
+        const serverPrioritySurchargeAmount = normalizeMoney(getPrioritySurchargeAmount());
+        const priorityRequested = Boolean(input.priorityRequested);
+        const clientSurcharge = normalizeMoney(Number(input.prioritySurcharge ?? 0));
+
+        let prioritySurcharge: number;
+        if (priorityRequested) {
+            if (!moneyEquals(clientSurcharge, serverPrioritySurchargeAmount)) {
+                throw AppError.badInput(
+                    `Priority surcharge mismatch: expected ${serverPrioritySurchargeAmount}, received ${clientSurcharge}`,
+                );
+            }
+            prioritySurcharge = serverPrioritySurchargeAmount;
+        } else {
+            if (clientSurcharge > 0.01) {
+                throw AppError.badInput('Priority surcharge provided but priorityRequested is false');
+            }
+            prioritySurcharge = 0;
         }
 
-        // Allow the client to send a value ≤ expectedDeliveryPrice (e.g. 0 when a
-        // free-delivery promo was pre-applied on the client).  Only reject if the
-        // client is trying to inflate the base delivery price beyond what the server
-        // calculated — that would indicate tampering.  Priority surcharge is handled
-        // separately and is not subject to this zone/tier check.
-        if (input.deliveryPrice - expectedDeliveryPrice > 0.01) {
-            throw AppError.badInput(
-                `Delivery price mismatch: Calculated ${expectedDeliveryPrice}, provided ${input.deliveryPrice}`,
-            );
-        }
+        // Delivery fee is validated AFTER promotions are applied.
+        // Here we only compute the authoritative base delivery fee (pre-promo) for:
+        // - promo engine inputs
+        // - recording delivery discounts
 
         // 3. Apply Promotion (server-side validation)
         const promotionEngine = new PromotionEngine(this.db);
@@ -553,22 +645,32 @@ export class OrderService {
                 promotions: [],
                 totalDiscount: 0,
                 freeDeliveryApplied: false,
-                finalSubtotal: cartContext.subtotal,
-                finalDeliveryPrice: cartContext.deliveryPrice,
-                finalTotal: cartContext.subtotal + cartContext.deliveryPrice,
+                finalSubtotal: normalizeMoney(cartContext.subtotal),
+                finalDeliveryPrice: normalizeMoney(cartContext.deliveryPrice),
+                finalTotal: normalizeMoney(cartContext.subtotal + cartContext.deliveryPrice),
             };
         }
 
-        const effectiveOrderPrice = promoResult.finalSubtotal;
-        const effectiveDeliveryPrice = promoResult.finalDeliveryPrice;
-        const totalOrderPrice = promoResult.finalTotal;
+        const effectiveOrderPrice = normalizeMoney(promoResult.finalSubtotal);
+        const effectiveDeliveryPrice = normalizeMoney(promoResult.finalDeliveryPrice);
+        const totalOrderPrice = normalizeMoney(promoResult.finalTotal);
 
-        // Verify total price matches client input (allow small float error).
+        // ── Strict client pricing validation (delivery + totals) ──
+        // deliveryPrice in input is the FINAL delivery fee the customer will pay (after promotions).
+        const clientDeliveryPrice = normalizeMoney(Number(input.deliveryPrice));
+        if (!moneyEquals(clientDeliveryPrice, effectiveDeliveryPrice)) {
+            throw AppError.badInput(
+                `Delivery price mismatch: expected ${effectiveDeliveryPrice}, received ${clientDeliveryPrice}`,
+            );
+        }
+
         // Priority surcharge is layered on top of the promo-engine totals.
-        const matchesEffectiveTotal = Math.abs((totalOrderPrice + prioritySurcharge) - input.totalPrice) <= 0.01;
-
-        if (!matchesEffectiveTotal) {
-            throw AppError.badInput(`Price mismatch: Calculated ${totalOrderPrice + prioritySurcharge}, provided ${input.totalPrice}`);
+        const expectedTotalWithSurcharge = normalizeMoney(totalOrderPrice + prioritySurcharge);
+        const clientTotal = normalizeMoney(Number(input.totalPrice));
+        if (!moneyEquals(clientTotal, expectedTotalWithSurcharge)) {
+            throw AppError.badInput(
+                `Total price mismatch: expected ${expectedTotalWithSurcharge}, received ${clientTotal}`,
+            );
         }
 
         // 4b. Check if drop-off is outside service coverage (flag for admin)
@@ -607,23 +709,47 @@ export class OrderService {
         if (locationFlagged) approvalReasons.push('OUT_OF_ZONE');
         const requiresApproval = approvalReasons.length > 0;
 
+        // ── Compute businessPrice ──
+        // businessPrice = orderBasePrice minus any ORDER_PRICE discounts from BUSINESS-created promos.
+        // Platform-created promos don't reduce businessPrice (the platform absorbs that discount).
+        let businessFundedOrderDiscount = 0;
+        if (promoResult.promotions.length > 0) {
+            // Fetch the promotions to check creatorType
+            const promoIds = promoResult.promotions.map((p) => p.id);
+            const promoDbRows = promoIds.length > 0
+                ? await db.select({ id: promotionsTable.id, creatorType: promotionsTable.creatorType })
+                      .from(promotionsTable)
+                      .where(inArray(promotionsTable.id, promoIds))
+                : [];
+            const promoCreatorMap = new Map(promoDbRows.map((r) => [r.id, r.creatorType]));
+
+            for (const promo of promoResult.promotions) {
+                // Only count non-delivery (ORDER_PRICE) discounts from BUSINESS-created promotions
+                if (!promo.freeDelivery && promoCreatorMap.get(promo.id) === 'BUSINESS') {
+                    businessFundedOrderDiscount += Math.max(0, Number(promo.appliedAmount ?? 0));
+                }
+            }
+        }
+        const computedBusinessPrice = Math.max(0, Number((orderBasePrice - businessFundedOrderDiscount).toFixed(2)));
+
         const orderData = {
             displayId: this.generateDisplayId(),
             userId,
             businessId: orderBusinessId,
             // Price breakdown:
-            // basePrice              = sum of items' effective price (respecting discounts) + option extras
-            // markupPrice            = sum of products' markup amounts (platform margin, additional amount only)
-            // actualPrice            = final item price after promotions (what customer pays for items)
-            // originalDeliveryPrice  = server-calculated delivery fee (before promotions)
-            // deliveryPrice          = final delivery fee after promotions + priority surcharge
+            // basePrice              = sum of discounted business base prices + option extras (what business set)
+            // markupPrice            = platform margin delta (contextPrice − businessBasePrice, both after discount)
+            // businessPrice          = basePrice minus business-funded promo ORDER_PRICE discounts
+            // actualPrice            = final item price after ALL promotions (what customer pays for items)
+            // originalDeliveryPrice  = server-calculated delivery fee (before promotions/waivers)
+            // deliveryPrice          = final delivery fee after promotions, excluding priority surcharge
+            // prioritySurcharge      = opt-in expedited delivery fee (stored and settled separately)
             basePrice: Number(orderBasePrice.toFixed(2)),
             markupPrice: Number(orderMarkupPrice.toFixed(2)),
+            businessPrice: computedBusinessPrice,
             actualPrice: effectiveOrderPrice,
             originalDeliveryPrice: expectedDeliveryPrice,
-            // Fold priority surcharge into the stored delivery price so that
-            // total (actualPrice + deliveryPrice) always equals what the customer paid.
-            deliveryPrice: effectiveDeliveryPrice + prioritySurcharge,
+            deliveryPrice: effectiveDeliveryPrice,
             prioritySurcharge: prioritySurcharge,
             paymentCollection: input.paymentCollection ?? 'CASH_TO_DRIVER',
             originalPrice:
@@ -644,7 +770,7 @@ export class OrderService {
             quantity: item.quantity,
             finalAppliedPrice: item.finalAppliedPrice,
             basePrice: item.basePrice,
-            discountedPrice: item.discountedPrice,
+            saleDiscountPercentage: item.saleDiscountPercentage,
             markupPrice: item.markupPrice,
             nightMarkedupPrice: item.nightMarkedupPrice,
             notes: item.notes,
@@ -741,7 +867,7 @@ export class OrderService {
                             quantity: inputItem.quantity,
                             finalAppliedPrice: 0, // child items are covered by the offer price
                             basePrice: 0,
-                            discountedPrice: null,
+                            saleDiscountPercentage: null,
                             markupPrice: null,
                             nightMarkedupPrice: null,
                             notes: null,
@@ -789,7 +915,11 @@ export class OrderService {
             );
 
             // Store promotions in orderPromotions table
-            let deliveryDiscountRemaining = Math.max(0, Number(input.deliveryPrice) - Number(effectiveDeliveryPrice));
+            // Delivery discounts are computed against the authoritative base delivery fee.
+            let deliveryDiscountRemaining = Math.max(
+                0,
+                normalizeMoney(Number(expectedDeliveryPrice) - Number(effectiveDeliveryPrice)),
+            );
             for (const promo of promoResult.promotions) {
                 const appliesTo = promo.freeDelivery ? 'DELIVERY' : 'PRICE';
                 const discountAmount = promo.freeDelivery
@@ -997,10 +1127,11 @@ export class OrderService {
             userId: dbOrder.userId,
             businessId: dbOrder.businessId,
             deliveryPrice: Number(dbOrder.deliveryPrice),
-            totalPrice: Number(dbOrder.actualPrice) + Number(dbOrder.deliveryPrice),
+            totalPrice:
+                Number(dbOrder.actualPrice) + Number(dbOrder.deliveryPrice) + Number((dbOrder as any).prioritySurcharge ?? 0),
             // Legacy backward-compat fields
             orderPrice: Number(dbOrder.actualPrice),
-            originalPrice: undefined,
+            originalPrice: dbOrder.originalPrice != null ? Number(dbOrder.originalPrice) : undefined,
             orderDate: parseDbTimestamp(dbOrder.orderDate) ?? new Date(),
             updatedAt: parseDbTimestamp(dbOrder.updatedAt) ?? new Date(),
             status: dbOrder.status as OrderStatus,
@@ -1056,6 +1187,7 @@ export class OrderService {
                 if (totalPrice > 20) reasons.push('HIGH_VALUE');
                 return reasons;
             })(),
+            prioritySurcharge: Number((dbOrder as any).prioritySurcharge ?? 0),
             businesses: businessOrderList,
             orderPromotions: dbPromotions.map((p) => ({
                 id: p.id,
@@ -1091,6 +1223,91 @@ export class OrderService {
         const dbOrder = await this.orderRepository.findById(id);
         if (!dbOrder) return null;
         return this.mapToOrder(dbOrder);
+    }
+
+    /**
+     * Returns a driver-specific financial breakdown for an order.
+     * - CASH_TO_DRIVER: driver collects totalPrice from customer and must remit
+     *   the platform's share (markup + priority surcharge + delivery commission).
+     * - PREPAID_TO_PLATFORM: customer paid the platform directly; driver earns
+     *   only the PAYABLE settlement amounts.
+     * If the order is DELIVERED, actual settlement records are used for accuracy.
+     * Otherwise the amounts are estimated from the order's stored price columns.
+     */
+    async getDriverOrderFinancials(
+        orderId: string,
+        driverId: string,
+    ): Promise<{
+        orderId: string;
+        paymentCollection: OrderPaymentCollection;
+        amountToCollectFromCustomer: number;
+        amountToRemitToPlatform: number;
+        driverNetEarnings: number;
+    } | null> {
+        const dbOrder = await this.orderRepository.findById(orderId);
+        if (!dbOrder) return null;
+        if (dbOrder.driverId !== driverId) return null;
+
+        const paymentCollection = dbOrder.paymentCollection;
+        const totalPrice =
+            Number(dbOrder.actualPrice) +
+            Number(dbOrder.deliveryPrice ?? 0) +
+            Number((dbOrder as any).prioritySurcharge ?? 0);
+
+        // For PREPAID orders the driver doesn't collect cash from the customer.
+        const amountToCollectFromCustomer =
+            paymentCollection === 'CASH_TO_DRIVER' ? totalPrice : 0;
+
+        let amountToRemitToPlatform: number;
+
+        if (dbOrder.status === 'DELIVERED') {
+            // Use actual settled amounts: sum all DRIVER RECEIVABLE entries for this order.
+            const driverSettlements = await this.db
+                .select({ amount: settlementsTable.amount, direction: settlementsTable.direction })
+                .from(settlementsTable)
+                .where(
+                    and(
+                        eq(settlementsTable.orderId, orderId),
+                        eq(settlementsTable.type, 'DRIVER'),
+                    ),
+                );
+
+            const receivable = driverSettlements
+                .filter((s) => s.direction === 'RECEIVABLE')
+                .reduce((sum, s) => sum + Number(s.amount), 0);
+            const payable = driverSettlements
+                .filter((s) => s.direction === 'PAYABLE')
+                .reduce((sum, s) => sum + Number(s.amount), 0);
+
+            if (paymentCollection === 'CASH_TO_DRIVER') {
+                amountToRemitToPlatform = receivable - payable;
+            } else {
+                // PREPAID: driver earns the PAYABLE settlements (platform pays driver)
+                amountToRemitToPlatform = -(payable - receivable);
+            }
+        } else {
+            // Estimate from stored order columns (pre-delivery preview).
+            // markup + prioritySurcharge are known; delivery commission is approximated to 0
+            // until the settlement engine runs on delivery.
+            if (paymentCollection === 'CASH_TO_DRIVER') {
+                amountToRemitToPlatform =
+                    Number((dbOrder as any).markupPrice ?? 0) +
+                    Number((dbOrder as any).prioritySurcharge ?? 0);
+            } else {
+                // Delivery fee share for PREPAID case is unknown pre-delivery — show 0
+                amountToRemitToPlatform = 0;
+            }
+        }
+
+        const driverNetEarnings = Number((amountToCollectFromCustomer - amountToRemitToPlatform).toFixed(2));
+
+        return {
+            orderId,
+            paymentCollection,
+            amountToCollectFromCustomer: Number(amountToCollectFromCustomer.toFixed(2)),
+            amountToRemitToPlatform: Number(amountToRemitToPlatform.toFixed(2)),
+            driverNetEarnings,
+        };
     }
 
     async getOrdersByStatus(status: OrderStatus, limit = 500, offset = 0): Promise<Order[]> {
@@ -1199,7 +1416,7 @@ export class OrderService {
         return this.mapToOrder(updated);
     }
 
-    async updateStatusWithSideEffects(id: string, status: OrderStatus, context: ApiContextInterface): Promise<Order> {
+    async updateStatusWithSideEffects(id: string, status: OrderStatus, context: GraphQLContext): Promise<Order> {
         const { userData, db, notificationService, financialService } = context;
         log.info({ orderId: id, status }, 'order:updateStatusWithSideEffects');
 
@@ -1286,7 +1503,7 @@ export class OrderService {
             dbOrder.userId,
             currentStatus,
             status,
-            dbOrder.actualPrice + dbOrder.deliveryPrice,
+            Number(dbOrder.actualPrice) + Number(dbOrder.deliveryPrice) + Number((dbOrder as any).prioritySurcharge ?? 0),
             dbOrder.orderDate || null,
         );
 
@@ -1443,7 +1660,7 @@ export class OrderService {
             dbOrder.userId,
             dbOrder.status as OrderStatus,
             'CANCELLED',
-            dbOrder.actualPrice + dbOrder.deliveryPrice,
+            Number(dbOrder.actualPrice) + Number(dbOrder.deliveryPrice) + Number((dbOrder as any).prioritySurcharge ?? 0),
             dbOrder.orderDate || null,
         );
         return order;
@@ -1491,7 +1708,7 @@ export class OrderService {
             dbOrder.userId,
             dbOrder.status as OrderStatus,
             'CANCELLED',
-            dbOrder.actualPrice + dbOrder.deliveryPrice,
+            Number(dbOrder.actualPrice) + Number(dbOrder.deliveryPrice) + Number((dbOrder as any).prioritySurcharge ?? 0),
             dbOrder.orderDate || null,
         );
 
@@ -1719,10 +1936,9 @@ export class OrderService {
     async createOrderWithSideEffects(
         userId: string,
         input: CreateOrderInput,
-        context: ApiContextInterface,
+        context: GraphQLContext,
     ): Promise<Order> {
         const order = await this.createOrder(userId, input);
-
         // Best-effort side effects
         try {
             await this.publishSingleUserOrder(userId, String(order.id));

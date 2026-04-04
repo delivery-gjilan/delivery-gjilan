@@ -30,7 +30,9 @@ export const products = pgTable(
         markupPrice: numeric('markup_price', { mode: 'number', precision: 10, scale: 2 }),
         nightMarkedupPrice: numeric('night_marked_up_price', { mode: 'number', precision: 10, scale: 2 }),
         isOnSale: boolean('is_on_sale').default(false),
-        salePrice: numeric('sale_price', { mode: 'number', precision: 10, scale: 2 }),
+        // Discount percentage (0–100). Applied to the active price tier (night → markup → base).
+        // When isOnSale=false this column is ignored.
+        saleDiscountPercentage: numeric('sale_discount_percentage', { mode: 'number', precision: 5, scale: 2 }),
 
         isAvailable: boolean('is_available').default(true),
         sortOrder: integer('sort_order').default(0).notNull(),

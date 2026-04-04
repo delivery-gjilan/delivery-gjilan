@@ -25,6 +25,8 @@ export const GET_PROMOTIONS = graphql(`
             createdAt
             totalUsageCount
             totalRevenue
+            creatorType
+            creatorId
         }
     }
 `);
@@ -54,6 +56,8 @@ export const GET_PROMOTION = graphql(`
             createdAt
             totalUsageCount
             totalRevenue
+            creatorType
+            creatorId
         }
     }
 `);

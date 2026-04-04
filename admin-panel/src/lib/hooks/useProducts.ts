@@ -99,7 +99,7 @@ export function useProducts(businessId: string): UseProductsResult {
                 price: product?.price ?? card?.basePrice ?? 0,
                 isOffer: card?.isOffer ?? false,
                 isOnSale: product?.isOnSale ?? false,
-                salePrice: product?.salePrice ?? null,
+                saleDiscountPercentage: product?.saleDiscountPercentage ?? null,
                 isAvailable: product?.isAvailable ?? true,
                 sortOrder: product?.sortOrder ?? 0,
             };

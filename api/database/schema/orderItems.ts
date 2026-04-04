@@ -21,7 +21,8 @@ export const orderItems = pgTable(
         quantity: integer('quantity').notNull(),
         // Price snapshot at time of order
         basePrice: numeric('base_price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
-        discountedPrice: numeric('discounted_price', { mode: 'number', precision: 10, scale: 2 }),
+        // Discount % that was active at the time the order was placed (null = no discount).
+        saleDiscountPercentage: numeric('sale_discount_percentage', { mode: 'number', precision: 5, scale: 2 }),
         markupPrice: numeric('markup_price', { mode: 'number', precision: 10, scale: 2 }),
         nightMarkedupPrice: numeric('night_marked_up_price', { mode: 'number', precision: 10, scale: 2 }),
         finalAppliedPrice: numeric('final_applied_price', { mode: 'number', precision: 10, scale: 2 }).notNull(),

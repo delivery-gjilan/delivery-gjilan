@@ -16,6 +16,11 @@ enum PromotionTarget {
   CONDITIONAL
 }
 
+enum PromotionCreatorType {
+  PLATFORM
+  BUSINESS
+}
+
 type Promotion {
   id: ID!
   name: String!
@@ -43,7 +48,7 @@ type Promotion {
   totalRevenue: Float!
 
   # Creator
-  creatorType: String!
+  creatorType: PromotionCreatorType!
   creatorId: ID
   
   # Relations
@@ -145,44 +150,26 @@ input CreatePromotionInput {
   isActive: Boolean!
   startsAt: String
   endsAt: String
-  creatorType: String
+
+  # Creator
+  creatorType: PromotionCreatorType!
   creatorId: ID
-  
+
   # Optional: Assign to specific users
   targetUserIds: [ID!]
-  
+
   # Optional: Restrict to specific businesses
   eligibleBusinessIds: [ID!]
 
-  # Settlement Rule Integration
-  createSettlementRules: Boolean
-  driverRuleAmount: Float
-  driverRuleAmountType: SettlementAmountType
-  addDriverCommission: Boolean
+  # Required for delivery-fee promotions (FREE_DELIVERY / SPEND_X_GET_FREE)
+  # This is always a FIXED euro amount per order.
+  driverPayoutAmount: Float
 }
 
 input UpdatePromotionInput {
   id: ID!
   name: String
-  description: String
   code: String
-  type: PromotionType
-  target: PromotionTarget
-  discountValue: Float
-  maxDiscountCap: Float
-  minOrderAmount: Float
-  spendThreshold: Float
-  thresholdReward: String
-  maxGlobalUsage: Int
-  maxUsagePerUser: Int
-  isStackable: Boolean
-  priority: Int
-  isActive: Boolean
-  startsAt: String
-  endsAt: String
-  creatorType: String
-  creatorId: ID
-  eligibleBusinessIds: [ID!]
 }
 
 input AssignPromotionToUserInput {

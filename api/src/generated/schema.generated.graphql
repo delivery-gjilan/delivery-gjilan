@@ -406,6 +406,7 @@ input CreateOrderInput {
   dropOffLocation: LocationInput!
   items: [CreateOrderItemInput!]!
   paymentCollection: OrderPaymentCollection
+  priorityRequested: Boolean
   prioritySurcharge: Float
   promotionId: ID
   totalPrice: Float!
@@ -424,6 +425,7 @@ input CreateOrderItemInput {
 input CreateOrderItemOptionInput {
   optionGroupId: ID!
   optionId: ID!
+  price: Float
 }
 
 input CreateProductCategoryInput {
@@ -442,7 +444,7 @@ input CreateProductInput {
   isOnSale: Boolean
   name: String!
   price: Float!
-  salePrice: Float
+  saleDiscountPercentage: Float
   subcategoryId: ID
   variantGroupId: ID
 }
@@ -458,15 +460,12 @@ input CreateProductVariantGroupInput {
 }
 
 input CreatePromotionInput {
-  addDriverCommission: Boolean
   code: String
-  createSettlementRules: Boolean
   creatorId: ID
-  creatorType: String
+  creatorType: PromotionCreatorType!
   description: String
   discountValue: Float
-  driverRuleAmount: Float
-  driverRuleAmountType: SettlementAmountType
+  driverPayoutAmount: Float
   eligibleBusinessIds: [ID!]
   endsAt: String
   isActive: Boolean!
@@ -761,6 +760,14 @@ type DriverMessageUser {
   firstName: String!
   id: ID!
   lastName: String!
+}
+
+type DriverOrderFinancials {
+  amountToCollectFromCustomer: Float!
+  amountToRemitToPlatform: Float!
+  driverNetEarnings: Float!
+  orderId: ID!
+  paymentCollection: OrderPaymentCollection!
 }
 
 type DriverPttSignal {
@@ -1133,6 +1140,7 @@ type Order {
   pickupLocations: [Location!]!
   preparationMinutes: Int
   preparingAt: Date
+  prioritySurcharge: Float!
   readyAt: Date
   status: OrderStatus!
   totalPrice: Float!
@@ -1223,6 +1231,7 @@ type Product {
   categoryId: ID!
   createdAt: String!
   description: String
+  effectivePrice: Float!
   id: ID!
   imageUrl: String
   isAvailable: Boolean!
@@ -1233,7 +1242,7 @@ type Product {
   nightMarkedupPrice: Float
   optionGroups: [OptionGroup!]!
   price: Float!
-  salePrice: Float
+  saleDiscountPercentage: Float
   sortOrder: Int!
   subcategoryId: ID
   updatedAt: String!
@@ -1292,7 +1301,7 @@ type Promotion {
   code: String
   createdAt: String!
   creatorId: ID
-  creatorType: String!
+  creatorType: PromotionCreatorType!
   currentGlobalUsage: Int!
   description: String
   discountValue: Float
@@ -1329,6 +1338,11 @@ type PromotionAnalyticsResult {
 enum PromotionAppliesTo {
   DELIVERY
   PRICE
+}
+
+enum PromotionCreatorType {
+  BUSINESS
+  PLATFORM
 }
 
 type PromotionResult {
@@ -1442,6 +1456,7 @@ type Query {
 
   """Admin: full conversation with a specific driver"""
   driverMessages(driverId: ID!, limit: Int, offset: Int): [DriverMessage!]!
+  driverOrderFinancials(orderId: ID!): DriverOrderFinancials
   drivers: [User!]!
   getActiveGlobalPromotions: [Promotion!]!
 
@@ -1480,6 +1495,7 @@ type Query {
   ordersByStatus(limit: Int, offset: Int, status: OrderStatus!): [Order!]!
   peakHourAnalysis(businessId: ID, endDate: String!, startDate: String!): PeakHourAnalysis!
   previewCampaignAudience(query: JSON!): AudiencePreview!
+  prioritySurchargeAmount: Float!
   product(id: ID!): Product
   productCategories(businessId: ID!): [ProductCategory!]!
   productCategory(id: ID!): ProductCategory
@@ -1893,12 +1909,13 @@ input UpdateProductInput {
   description: String
   imageUrl: String
   isAvailable: Boolean
+  isOffer: Boolean
   isOnSale: Boolean
   markupPrice: Float
   name: String
   nightMarkedupPrice: Float
   price: Float
-  salePrice: Float
+  saleDiscountPercentage: Float
   sortOrder: Int
   subcategoryId: ID
   variantGroupId: ID
@@ -1910,26 +1927,8 @@ input UpdateProductSubcategoryInput {
 
 input UpdatePromotionInput {
   code: String
-  creatorId: ID
-  creatorType: String
-  description: String
-  discountValue: Float
-  eligibleBusinessIds: [ID!]
-  endsAt: String
   id: ID!
-  isActive: Boolean
-  isStackable: Boolean
-  maxDiscountCap: Float
-  maxGlobalUsage: Int
-  maxUsagePerUser: Int
-  minOrderAmount: Float
   name: String
-  priority: Int
-  spendThreshold: Float
-  startsAt: String
-  target: PromotionTarget
-  thresholdReward: String
-  type: PromotionType
 }
 
 input UpdateSettlementRuleInput {

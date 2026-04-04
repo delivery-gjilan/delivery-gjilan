@@ -1,5 +1,5 @@
 import { AuditLogRepository, CreateAuditLogInput } from '@/repositories/AuditLogRepository';
-import { Database } from '@/database';
+import { type DbType as Database } from '@/database';
 import { ActionType, EntityType, ActorType } from '@/database/schema/auditLogs';
 import { GraphQLContext } from '@/graphql/context';
 import logger from '@/lib/logger';

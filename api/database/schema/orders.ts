@@ -42,6 +42,14 @@ export const orders = pgTable(
         basePrice: numeric('base_price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
         markupPrice: numeric('markup_price', { mode: 'number', precision: 10, scale: 2 }).notNull().default(0),
         actualPrice: numeric('actual_price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
+        /**
+         * businessPrice — what the business actually earns from this order's items.
+         * Starts equal to basePrice. When business-funded promotions are applied by
+         * the business, their discount reduces this value (the business absorbs the
+         * discount rather than the platform). Used as the commission base for
+         * business settlement rules.
+         */
+        businessPrice: numeric('business_price', { mode: 'number', precision: 10, scale: 2 }),
         originalDeliveryPrice: numeric('original_delivery_price', { mode: 'number', precision: 10, scale: 2 }),
         deliveryPrice: numeric('delivery_price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
         prioritySurcharge: numeric('priority_surcharge', { mode: 'number', precision: 10, scale: 2 }).notNull().default(0),

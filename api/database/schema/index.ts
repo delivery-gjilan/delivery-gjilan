@@ -13,7 +13,7 @@ export * from './settlements';
 export * from './settlementRules';
 export * from './settlementRequests';
 export * from './settlementPayments';
-// productPricing removed — pricing lives on the products table (basePrice, markupPrice, nightMarkedupPrice, salePrice)
+// productPricing removed — pricing lives on the products table (basePrice, markupPrice, nightMarkedupPrice, saleDiscountPercentage)
 export * from './auditLogs';
 export * from './userBehaviors';
 export * from './promotions';

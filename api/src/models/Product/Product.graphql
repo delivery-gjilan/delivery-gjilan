@@ -37,8 +37,10 @@ type Product {
     description: String
     imageUrl: String
     price: Float!
+    # Per-unit price the customer will pay right now (markup/night tier + sale discount), rounded to 2dp.
+    effectivePrice: Float!
     isOnSale: Boolean!
-    salePrice: Float
+    saleDiscountPercentage: Float
     isAvailable: Boolean!
     sortOrder: Int!
     markupPrice: Float
@@ -114,7 +116,7 @@ input CreateProductInput {
     imageUrl: String
     price: Float!
     isOnSale: Boolean
-    salePrice: Float
+    saleDiscountPercentage: Float
     isAvailable: Boolean
 }
 
@@ -126,8 +128,9 @@ input UpdateProductInput {
     description: String
     imageUrl: String
     price: Float
+    isOffer: Boolean
     isOnSale: Boolean
-    salePrice: Float
+    saleDiscountPercentage: Float
     isAvailable: Boolean
     sortOrder: Int
     markupPrice: Float

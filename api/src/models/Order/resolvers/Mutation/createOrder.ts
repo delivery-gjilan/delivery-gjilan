@@ -10,5 +10,6 @@ export const createOrder: NonNullable<MutationResolvers['createOrder']> = async 
     if (!userData.userId) {
         throw AppError.unauthorized();
     }
+    // All validation (including priority surcharge) is delegated to the service layer.
     return await orderService.createOrderWithSideEffects(userData.userId, input, context);
 };
