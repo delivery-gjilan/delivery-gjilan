@@ -4,12 +4,15 @@ import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { useAuthStore } from '@/store/authStore';
 import { useState, useRef } from 'react';
 import { useRouter, type Href } from 'expo-router';
-import { SignupStep } from '@/gql/graphql';
+import { AppLanguage, SetMyPreferredLanguageDocument, SignupStep } from '@/gql/graphql';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useTheme } from '@/hooks/useTheme';
 import type { Translation } from '@/localization/schema';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
+import { useMutation } from '@apollo/client/react';
+import { useLocaleStore } from '@/store/useLocaleStore';
+import type { LanguageChoice } from '@/utils/types';
 
 const getStepConfig = (t: Translation): Record<SignupStep, { number: number; title: string; description: string }> => ({
     INITIAL: { number: 1, title: t.auth.signup.step_titles.create_account, description: t.auth.signup.step_titles.create_account_desc },
@@ -114,6 +117,9 @@ export default function SignupScreen() {
     const { t } = useTranslations();
     const theme = useTheme();
 
+    const { languageChoice, setLanguageChoice } = useLocaleStore();
+    const [setPreferredLanguage] = useMutation(SetMyPreferredLanguageDocument);
+
     const STEP_CONFIG = getStepConfig(t);
 
     // Step 1: Account details
@@ -129,6 +135,10 @@ export default function SignupScreen() {
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    const handleLanguageSelect = (choice: LanguageChoice) => {
+        setLanguageChoice(choice);
+    };
 
     // EMAIL_SENT is a legacy step no longer used — treat it as EMAIL_VERIFIED (phone entry)
     const rawStep: SignupStep = user?.signupStep ?? SignupStep.Initial;
@@ -153,6 +163,9 @@ export default function SignupScreen() {
         setLoading(true);
         try {
             await initiateSignup(email, password, firstName, lastName);
+            // Persist the chosen language to the user's profile
+            const apiLanguage = languageChoice === 'al' ? AppLanguage.Al : AppLanguage.En;
+            setPreferredLanguage({ variables: { language: apiLanguage } }).catch(() => {});
             setFirstName('');
             setLastName('');
             setEmail('');
@@ -264,6 +277,51 @@ export default function SignupScreen() {
                                     {step.label}
                                 </Text>
                             </View>
+                        );
+                    })}
+                </View>
+            </View>
+        );
+    };
+
+    /* ── Language Picker ── */
+    const LanguagePicker = () => {
+        const options: { choice: LanguageChoice; label: string; flag: string }[] = [
+            { choice: 'en', label: t.auth.signup.language_en, flag: '🇬🇧' },
+            { choice: 'al', label: t.auth.signup.language_al, flag: '🇦🇱' },
+        ];
+        return (
+            <View style={{ marginBottom: 20 }}>
+                <Text style={{ color: theme.colors.subtext, fontSize: 13, fontWeight: '500', marginBottom: 8 }}>
+                    {t.auth.signup.language_picker_label}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                    {options.map(({ choice, label, flag }) => {
+                        const isSelected = languageChoice === choice;
+                        return (
+                            <TouchableOpacity
+                                key={choice}
+                                onPress={() => handleLanguageSelect(choice)}
+                                activeOpacity={0.75}
+                                style={{
+                                    flex: 1,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 6,
+                                    paddingVertical: 12,
+                                    borderRadius: 14,
+                                    borderWidth: 1,
+                                    borderColor: theme.colors.border,
+                                    backgroundColor: theme.colors.card,
+                                }}
+                            >
+                                <Text style={{ fontSize: 18 }}>{flag}</Text>
+                                <Text style={{ color: theme.colors.text, fontSize: 14 }}>{label}</Text>
+                                {isSelected && (
+                                    <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+                                )}
+                            </TouchableOpacity>
                         );
                     })}
                 </View>
@@ -396,6 +454,7 @@ export default function SignupScreen() {
                         {/* ── Step 1: Account Details ── */}
                         {currentStep === 'INITIAL' && (
                             <Animated.View entering={FadeInDown.delay(100).duration(400)}>
+                                <LanguagePicker />
                                 <InputRow icon="person-outline" theme={theme}>
                                     <TextInput
                                         style={inputStyle}

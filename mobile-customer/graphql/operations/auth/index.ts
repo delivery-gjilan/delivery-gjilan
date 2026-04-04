@@ -7,3 +7,4 @@ export { LOGIN_MUTATION } from './login';
 export { RESEND_EMAIL_VERIFICATION_MUTATION } from './resendEmailVerification';
 export { DELETE_MY_ACCOUNT_MUTATION } from './deleteMyAccount';
 export { SET_MY_PREFERRED_LANGUAGE_MUTATION } from './setMyPreferredLanguage';
+export { UPDATE_MY_PROFILE_MUTATION } from './updateMyProfile';

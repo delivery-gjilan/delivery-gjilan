@@ -207,12 +207,15 @@ export type Business = {
   commissionPercentage: Scalars['Float']['output'];
   createdAt: Scalars['Date']['output'];
   description?: Maybe<Scalars['String']['output']>;
+  featuredSortOrder: Scalars['Int']['output'];
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
   isActive: Scalars['Boolean']['output'];
+  isFeatured: Scalars['Boolean']['output'];
   isOpen: Scalars['Boolean']['output'];
   isTemporarilyClosed: Scalars['Boolean']['output'];
   location: Location;
+  minOrderAmount: Scalars['Float']['output'];
   name: Scalars['String']['output'];
   phoneNumber?: Maybe<Scalars['String']['output']>;
   prepTimeOverrideMinutes?: Maybe<Scalars['Int']['output']>;
@@ -382,6 +385,7 @@ export type CreateBusinessInput = {
   description?: InputMaybe<Scalars['String']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   location: LocationInput;
+  minOrderAmount?: InputMaybe<Scalars['Float']['input']>;
   name: Scalars['String']['input'];
   phoneNumber?: InputMaybe<Scalars['String']['input']>;
   workingHours: WorkingHoursInput;
@@ -999,6 +1003,7 @@ export type Mutation = {
   /** Admin sends a message to a driver */
   sendDriverMessage: DriverMessage;
   sendPushNotification: SendNotificationResult;
+  setBusinessFeatured: Business;
   setBusinessSchedule: Array<BusinessDayHours>;
   setDefaultAddress: Scalars['Boolean']['output'];
   setDeliveryPricingTiers: Array<DeliveryPricingTier>;
@@ -1021,6 +1026,7 @@ export type Mutation = {
   updateDeliveryZone: DeliveryZone;
   updateDriverLocation: User;
   updateDriverOnlineStatus: User;
+  updateMyProfile: User;
   updateOption: Option;
   updateOptionGroup: OptionGroup;
   updateOrderStatus: Order;
@@ -1466,6 +1472,13 @@ export type MutationsendPushNotificationArgs = {
 };
 
 
+export type MutationsetBusinessFeaturedArgs = {
+  id: Scalars['ID']['input'];
+  isFeatured: Scalars['Boolean']['input'];
+  sortOrder?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
 export type MutationsetBusinessScheduleArgs = {
   businessId: Scalars['ID']['input'];
   schedule: Array<BusinessDayHoursInput>;
@@ -1577,6 +1590,11 @@ export type MutationupdateDriverLocationArgs = {
 
 export type MutationupdateDriverOnlineStatusArgs = {
   isOnline: Scalars['Boolean']['input'];
+};
+
+
+export type MutationupdateMyProfileArgs = {
+  input: UpdateMyProfileInput;
 };
 
 
@@ -2104,6 +2122,7 @@ export type Query = {
   /** Admin: full conversation with a specific driver */
   driverMessages: Array<DriverMessage>;
   drivers: Array<User>;
+  featuredBusinesses: Array<Business>;
   getActiveBanners: Array<Banner>;
   getActiveGlobalPromotions: Array<Promotion>;
   /** Get Agora RTC credentials for the current authenticated user */
@@ -2899,6 +2918,7 @@ export type UpdateBusinessInput = {
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
   isTemporarilyClosed?: InputMaybe<Scalars['Boolean']['input']>;
   location?: InputMaybe<LocationInput>;
+  minOrderAmount?: InputMaybe<Scalars['Float']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   phoneNumber?: InputMaybe<Scalars['String']['input']>;
   prepTimeOverrideMinutes?: InputMaybe<Scalars['Int']['input']>;
@@ -2921,6 +2941,12 @@ export type UpdateDeliveryZoneInput = {
   name?: InputMaybe<Scalars['String']['input']>;
   polygon?: InputMaybe<Array<PolygonPointInput>>;
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type UpdateMyProfileInput = {
+  firstName: Scalars['String']['input'];
+  lastName: Scalars['String']['input'];
+  phoneNumber?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type UpdateOptionGroupInput = {
@@ -3385,6 +3411,7 @@ export type ResolversTypes = {
   UpdateBusinessInput: UpdateBusinessInput;
   UpdateDeliveryPricingTierInput: UpdateDeliveryPricingTierInput;
   UpdateDeliveryZoneInput: UpdateDeliveryZoneInput;
+  UpdateMyProfileInput: UpdateMyProfileInput;
   UpdateOptionGroupInput: UpdateOptionGroupInput;
   UpdateOptionInput: UpdateOptionInput;
   UpdateProductCategoryInput: UpdateProductCategoryInput;
@@ -3544,6 +3571,7 @@ export type ResolversParentTypes = {
   UpdateBusinessInput: UpdateBusinessInput;
   UpdateDeliveryPricingTierInput: UpdateDeliveryPricingTierInput;
   UpdateDeliveryZoneInput: UpdateDeliveryZoneInput;
+  UpdateMyProfileInput: UpdateMyProfileInput;
   UpdateOptionGroupInput: UpdateOptionGroupInput;
   UpdateOptionInput: UpdateOptionInput;
   UpdateProductCategoryInput: UpdateProductCategoryInput;
@@ -3674,12 +3702,15 @@ export type BusinessResolvers<ContextType = GraphQLContext, ParentType extends R
   commissionPercentage?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
   description?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  featuredSortOrder?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   isActive?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  isFeatured?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   isOpen?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   isTemporarilyClosed?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   location?: Resolver<ResolversTypes['Location'], ParentType, ContextType>;
+  minOrderAmount?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   phoneNumber?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   prepTimeOverrideMinutes?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
@@ -4092,6 +4123,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   sendCampaign?: Resolver<ResolversTypes['NotificationCampaign'], ParentType, ContextType, RequireFields<MutationsendCampaignArgs, 'id'>>;
   sendDriverMessage?: Resolver<ResolversTypes['DriverMessage'], ParentType, ContextType, RequireFields<MutationsendDriverMessageArgs, 'alertType' | 'body' | 'driverId'>>;
   sendPushNotification?: Resolver<ResolversTypes['SendNotificationResult'], ParentType, ContextType, RequireFields<MutationsendPushNotificationArgs, 'input'>>;
+  setBusinessFeatured?: Resolver<ResolversTypes['Business'], ParentType, ContextType, RequireFields<MutationsetBusinessFeaturedArgs, 'id' | 'isFeatured'>>;
   setBusinessSchedule?: Resolver<Array<ResolversTypes['BusinessDayHours']>, ParentType, ContextType, RequireFields<MutationsetBusinessScheduleArgs, 'businessId' | 'schedule'>>;
   setDefaultAddress?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationsetDefaultAddressArgs, 'id'>>;
   setDeliveryPricingTiers?: Resolver<Array<ResolversTypes['DeliveryPricingTier']>, ParentType, ContextType, RequireFields<MutationsetDeliveryPricingTiersArgs, 'input'>>;
@@ -4112,6 +4144,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   updateDeliveryZone?: Resolver<ResolversTypes['DeliveryZone'], ParentType, ContextType, RequireFields<MutationupdateDeliveryZoneArgs, 'id' | 'input'>>;
   updateDriverLocation?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationupdateDriverLocationArgs, 'latitude' | 'longitude'>>;
   updateDriverOnlineStatus?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationupdateDriverOnlineStatusArgs, 'isOnline'>>;
+  updateMyProfile?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationupdateMyProfileArgs, 'input'>>;
   updateOption?: Resolver<ResolversTypes['Option'], ParentType, ContextType, RequireFields<MutationupdateOptionArgs, 'id' | 'input'>>;
   updateOptionGroup?: Resolver<ResolversTypes['OptionGroup'], ParentType, ContextType, RequireFields<MutationupdateOptionGroupArgs, 'id' | 'input'>>;
   updateOrderStatus?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationupdateOrderStatusArgs, 'id' | 'status'>>;
@@ -4508,6 +4541,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   driverMessageThreads?: Resolver<Array<ResolversTypes['DriverMessageThread']>, ParentType, ContextType>;
   driverMessages?: Resolver<Array<ResolversTypes['DriverMessage']>, ParentType, ContextType, RequireFields<QuerydriverMessagesArgs, 'driverId'>>;
   drivers?: Resolver<Array<ResolversTypes['User']>, ParentType, ContextType>;
+  featuredBusinesses?: Resolver<Array<ResolversTypes['Business']>, ParentType, ContextType>;
   getActiveBanners?: Resolver<Array<ResolversTypes['Banner']>, ParentType, ContextType, Partial<QuerygetActiveBannersArgs>>;
   getActiveGlobalPromotions?: Resolver<Array<ResolversTypes['Promotion']>, ParentType, ContextType>;
   getAgoraRtcCredentials?: Resolver<ResolversTypes['AgoraRtcCredentials'], ParentType, ContextType, RequireFields<QuerygetAgoraRtcCredentialsArgs, 'channelName' | 'role'>>;

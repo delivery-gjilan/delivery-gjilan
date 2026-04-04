@@ -133,6 +133,12 @@ input UpdateUserInput {
     isDemoAccount: Boolean
 }
 
+input UpdateMyProfileInput {
+    firstName: String!
+    lastName: String!
+    phoneNumber: String
+}
+
 enum ReferralStatus {
     PENDING
     COMPLETED
@@ -192,6 +198,7 @@ type Mutation {
     generateReferralCode: String!
     setMyPreferredLanguage(language: AppLanguage!): User!
     changeMyPassword(currentPassword: String!, newPassword: String!): Boolean!
+    updateMyProfile(input: UpdateMyProfileInput!): User!
 }
 
 type Subscription {

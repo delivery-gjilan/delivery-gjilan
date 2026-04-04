@@ -117,7 +117,12 @@
     "remaining": "mbetur",
     "overdue": "me vonesë",
     "just_now": "Tani",
-    "ago": "më parë"
+    "ago": "më parë",
+    "add_time": "Shto Kohë",
+    "add_time_title": "Zgjat Kohën e Përgatitjes",
+    "add_time_subtext": "Sa minuta shtesë i duhet kësaj porosie?",
+    "add_time_confirm": "Konfirmo",
+    "add_time_success": "Koha e përgatitjes u përditësua"
   },
   "products": {
     "title": "Produktet",

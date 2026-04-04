@@ -547,3 +547,102 @@ export function notifyCustomerFromDriver(
             logger.error({ err, customerId, orderId, kind }, 'Failed to send driver-to-customer notification'),
         );
 }
+
+/**
+ * Notify the customer that the restaurant extended the preparation time.
+ */
+export function notifyCustomerPrepTimeUpdated(
+    notificationService: NotificationService,
+    customerId: string,
+    orderId: string,
+    newMinutes: number,
+): void {
+    const payload: NotificationPayload = {
+        title: 'Your order is taking a bit longer',
+        body: `The restaurant updated your order preparation time to ${newMinutes} minutes.`,
+        localeContent: {
+            en: {
+                title: 'Your order is taking a bit longer',
+                body: `The restaurant updated your order preparation time to ${newMinutes} minutes.`,
+            },
+            al: {
+                title: 'Porosia juaj po merr pak me shume kohe',
+                body: `Restoranti e perditesoi kohen e pergatitjes se porosise suaj ne ${newMinutes} minuta.`,
+            },
+        },
+        data: { orderId, screen: 'orders/active', type: 'PREP_TIME_UPDATED' },
+        timeSensitive: true,
+        relevanceScore: 0.75,
+    };
+
+    notificationService
+        .sendToUser(customerId, payload, 'ORDER_STATUS')
+        .catch((err) => logger.error({ err, customerId, orderId }, 'Failed to send prep-time-updated to customer'));
+}
+
+/**
+ * Notify the assigned driver that preparation time was extended.
+ */
+export function notifyDriverPrepTimeUpdated(
+    notificationService: NotificationService,
+    driverId: string,
+    orderId: string,
+    newMinutes: number,
+): void {
+    const payload: NotificationPayload = {
+        title: 'Prep time updated',
+        body: `The restaurant updated preparation time to ${newMinutes} min for your pickup.`,
+        localeContent: {
+            en: {
+                title: 'Prep time updated',
+                body: `The restaurant updated preparation time to ${newMinutes} min for your pickup.`,
+            },
+            al: {
+                title: 'Koha e pergatitjes u perditesua',
+                body: `Restoranti e perditesoi kohen e pergatitjes ne ${newMinutes} minuta per marrjen tuaj.`,
+            },
+        },
+        data: { orderId, screen: 'orders', type: 'PREP_TIME_UPDATED' },
+        timeSensitive: true,
+        relevanceScore: 0.8,
+    };
+
+    notificationService
+        .sendToUserByAppType(driverId, 'DRIVER', payload, 'ORDER_STATUS')
+        .catch((err) => logger.error({ err, driverId, orderId }, 'Failed to send prep-time-updated to driver'));
+}
+
+/**
+ * Notify admins that preparation time was significantly extended (>= 10 min delay).
+ */
+export function notifyAdminsPrepTimeExtended(
+    notificationService: NotificationService,
+    adminUserIds: string[],
+    orderId: string,
+    addedMinutes: number,
+    newTotalMinutes: number,
+): void {
+    if (adminUserIds.length === 0) return;
+
+    const payload: NotificationPayload = {
+        title: '⚠ Prep time extended',
+        body: `A restaurant added ${addedMinutes} min — order is now at ${newTotalMinutes} min total.`,
+        localeContent: {
+            en: {
+                title: '⚠ Prep time extended',
+                body: `A restaurant added ${addedMinutes} min — order is now at ${newTotalMinutes} min total.`,
+            },
+            al: {
+                title: '⚠ Koha e pergatitjes u zgjat',
+                body: `Restoranti shtoi ${addedMinutes} min — porosia tani eshte ${newTotalMinutes} min gjithsej.`,
+            },
+        },
+        data: { orderId, screen: 'orders', type: 'PREP_TIME_EXTENDED_ADMIN' },
+        timeSensitive: true,
+        relevanceScore: 0.85,
+    };
+
+    notificationService
+        .sendToUsersByAppType(adminUserIds, 'ADMIN', payload, 'ADMIN_ALERT')
+        .catch((err) => logger.error({ err, orderId }, 'Failed to send prep-time-extended to admins'));
+}

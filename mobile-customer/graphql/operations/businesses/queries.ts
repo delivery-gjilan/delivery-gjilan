@@ -36,6 +36,7 @@ export const GET_BUSINESSES = graphql(`
                 type
                 discountValue
             }
+            minOrderAmount
             createdAt
             updatedAt
         }
@@ -71,8 +72,18 @@ export const GET_BUSINESS = graphql(`
                 closesAt
             }
             isOpen
+            minOrderAmount
             createdAt
             updatedAt
+        }
+    }
+`);
+
+export const GET_BUSINESS_MINIMUM = graphql(`
+    query GetBusinessMinimum($id: ID!) {
+        business(id: $id) {
+            id
+            minOrderAmount
         }
     }
 `);

@@ -185,12 +185,15 @@ type Business {
   commissionPercentage: Float!
   createdAt: Date!
   description: String
+  featuredSortOrder: Int!
   id: ID!
   imageUrl: String
   isActive: Boolean!
+  isFeatured: Boolean!
   isOpen: Boolean!
   isTemporarilyClosed: Boolean!
   location: Location!
+  minOrderAmount: Float!
   name: String!
   phoneNumber: String
   prepTimeOverrideMinutes: Int
@@ -360,6 +363,7 @@ input CreateBusinessInput {
   description: String
   imageUrl: String
   location: LocationInput!
+  minOrderAmount: Float
   name: String!
   phoneNumber: String
   workingHours: WorkingHoursInput!
@@ -1028,6 +1032,7 @@ type Mutation {
   """Admin sends a message to a driver"""
   sendDriverMessage(alertType: MessageAlertType!, body: String!, driverId: ID!): DriverMessage!
   sendPushNotification(input: SendPushNotificationInput!): SendNotificationResult!
+  setBusinessFeatured(id: ID!, isFeatured: Boolean!, sortOrder: Int): Business!
   setBusinessSchedule(businessId: ID!, schedule: [BusinessDayHoursInput!]!): [BusinessDayHours!]!
   setDefaultAddress(id: ID!): Boolean!
   setDeliveryPricingTiers(input: SetDeliveryPricingTiersInput!): [DeliveryPricingTier!]!
@@ -1054,6 +1059,7 @@ type Mutation {
   updateDeliveryZone(id: ID!, input: UpdateDeliveryZoneInput!): DeliveryZone!
   updateDriverLocation(latitude: Float!, longitude: Float!): User!
   updateDriverOnlineStatus(isOnline: Boolean!): User!
+  updateMyProfile(input: UpdateMyProfileInput!): User!
   updateOption(id: ID!, input: UpdateOptionInput!): Option!
   updateOptionGroup(id: ID!, input: UpdateOptionGroupInput!): OptionGroup!
   updateOrderStatus(id: ID!, status: OrderStatus!): Order!
@@ -1486,6 +1492,7 @@ type Query {
   """Admin: full conversation with a specific driver"""
   driverMessages(driverId: ID!, limit: Int, offset: Int): [DriverMessage!]!
   drivers: [User!]!
+  featuredBusinesses: [Business!]!
   getActiveBanners(displayContext: BannerDisplayContext): [Banner!]!
   getActiveGlobalPromotions: [Promotion!]!
 
@@ -1895,6 +1902,7 @@ input UpdateBusinessInput {
   isActive: Boolean
   isTemporarilyClosed: Boolean
   location: LocationInput
+  minOrderAmount: Float
   name: String
   phoneNumber: String
   prepTimeOverrideMinutes: Int
@@ -1917,6 +1925,12 @@ input UpdateDeliveryZoneInput {
   name: String
   polygon: [PolygonPointInput!]
   sortOrder: Int
+}
+
+input UpdateMyProfileInput {
+  firstName: String!
+  lastName: String!
+  phoneNumber: String
 }
 
 input UpdateOptionGroupInput {

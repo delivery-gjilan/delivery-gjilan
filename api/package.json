@@ -26,6 +26,10 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx --env-file=.env database/seed.ts",
+    "db:seed:stress": "tsx --env-file=.env scripts/seed-stress-test.ts",
+    "test:stress": "powershell -ExecutionPolicy Bypass -File tests/k6/run.ps1",
+    "test:stress:smoke": "powershell -ExecutionPolicy Bypass -File tests/k6/run.ps1 -Smoke",
+    "test:stress:analyze": "node tests/k6/analyze.js",
     "db:reset": "bash scripts/reset-db.sh",
     "typecheck": "tsc --noEmit"
   },

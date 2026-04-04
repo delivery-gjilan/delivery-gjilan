@@ -163,6 +163,12 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
     const thresholdAmountRemaining = thresholdSpend ? Math.max(0, Number(thresholdSpend) - Number(businessCartTotal)) : 0;
     const formatCurrency = (value: number) => `€${Number(value).toFixed(2)}`;
 
+    // Minimum order progress
+    const minOrderAmount = Number((business as any)?.minOrderAmount ?? 0);
+    const minimumMet = minOrderAmount <= 0 || businessCartTotal >= minOrderAmount;
+    const minOrderProgress = minOrderAmount > 0 ? Math.min(businessCartTotal / minOrderAmount, 1) : 1;
+    const amountUntilMinimum = Math.max(0, minOrderAmount - businessCartTotal);
+
 
 
     const { data: categoriesData, refetch: refetchCategories } = useQuery(GET_PRODUCT_CATEGORIES, {
@@ -590,6 +596,31 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                             <Ionicons name="chevron-down" size={14} color={theme.colors.subtext} />
                         </TouchableOpacity>
                         </Animated.View>
+
+                        {/* Minimum order badge */}
+                        {Number((business as any)?.minOrderAmount ?? 0) > 0 && (
+                            <Animated.View
+                                entering={FadeInDown.delay(360).duration(350).springify().damping(28).stiffness(140)}
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    alignSelf: 'center',
+                                    marginTop: 6,
+                                    gap: 4,
+                                    backgroundColor: theme.colors.card,
+                                    borderWidth: 1,
+                                    borderColor: theme.colors.border,
+                                    borderRadius: 20,
+                                    paddingHorizontal: 12,
+                                    paddingVertical: 5,
+                                }}
+                            >
+                                <Ionicons name="cart-outline" size={13} color={theme.colors.subtext} />
+                                <Text style={{ fontSize: 12, color: theme.colors.subtext }}>
+                                    Min. order €{Number((business as any).minOrderAmount).toFixed(2)}
+                                </Text>
+                            </Animated.View>
+                        )}
                     </View>
                 </Animated.View>
 
@@ -945,17 +976,43 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                             />
                         </View>
                     )}
+                    {minOrderAmount > 0 && !minimumMet && (
+                        <View style={{ marginBottom: 10 }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                                <Text style={{ fontSize: 12, color: theme.colors.subtext, fontWeight: '600' }}>
+                                    {t.cart.minimum_order_label}
+                                </Text>
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.expense }}>
+                                    {formatCurrency(minOrderAmount)}
+                                </Text>
+                            </View>
+                            <View style={{ height: 5, borderRadius: 3, backgroundColor: theme.colors.border, overflow: 'hidden' }}>
+                                <View
+                                    style={{
+                                        height: 5,
+                                        borderRadius: 3,
+                                        width: `${minOrderProgress * 100}%`,
+                                        backgroundColor: theme.colors.expense,
+                                    }}
+                                />
+                            </View>
+                            <Text style={{ fontSize: 11, color: theme.colors.subtext, marginTop: 3 }}>
+                                {t.cart.minimum_not_met.replace('{amount}', formatCurrency(amountUntilMinimum))}
+                            </Text>
+                        </View>
+                    )}
                     <TouchableOpacity
-                        activeOpacity={0.9}
-                        onPress={() => expoRouter.push('/cart')}
+                        activeOpacity={minimumMet ? 0.9 : 1}
+                        onPress={() => { if (minimumMet) expoRouter.push('/cart'); }}
                         style={{
-                            backgroundColor: theme.colors.primary,
+                            backgroundColor: minimumMet ? theme.colors.primary : theme.colors.border,
                             borderRadius: 14,
                             paddingVertical: 14,
                             paddingHorizontal: 16,
                             flexDirection: 'row',
                             alignItems: 'center',
                             justifyContent: 'space-between',
+                            opacity: minimumMet ? 1 : 0.7,
                         }}
                     >
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -965,14 +1022,14 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                 </Text>
                             </View>
                             <Text style={{ color: 'white', fontWeight: '600', fontSize: 16 }}>
-                                {t.cart.view_cart}
+                                {minimumMet ? t.cart.view_cart : t.cart.minimum_order_label}
                             </Text>
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                             <Text style={{ color: 'white', fontWeight: '700', fontSize: 16 }}>
                                 {formatCurrency(businessCartTotal)}
                             </Text>
-                            <Ionicons name="chevron-forward" size={18} color="white" />
+                            <Ionicons name={minimumMet ? 'chevron-forward' : 'lock-closed-outline'} size={18} color="white" />
                         </View>
                     </TouchableOpacity>
                 </Animated.View>

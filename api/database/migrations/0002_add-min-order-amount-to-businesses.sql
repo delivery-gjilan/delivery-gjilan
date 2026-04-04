@@ -1,0 +1,1 @@
+ALTER TABLE "businesses" ADD COLUMN "min_order_amount" numeric(10, 2) DEFAULT '0' NOT NULL;

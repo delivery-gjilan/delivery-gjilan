@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { View, Text, ScrollView, Dimensions } from 'react-native';
+import { View, Text, ScrollView, Dimensions, TouchableOpacity } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -15,6 +16,7 @@ import { useEstimatedDeliveryPrice } from '@/hooks/useEstimatedDeliveryPrice';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useQuery } from '@apollo/client/react';
 import { GET_ACTIVE_BANNERS } from '@/graphql/operations/banners';
+import { GET_FEATURED_BUSINESSES } from '@/graphql/operations/businesses';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import type { WoltHeaderBannerType } from '@/components/WoltHeader';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
@@ -22,16 +24,19 @@ import { useServiceZoneCheck } from '@/hooks/useServiceZoneCheck';
 import { useHasActiveOrder } from '@/hooks/useHasActiveOrder';
 import { OutOfZoneSheet } from '@/components/OutOfZoneSheet';
 import { useActiveOrdersStore } from '@/modules/orders/store/activeOrdersStore';
+import { useAuthStore } from '@/store/authStore';
 
-// Keep prompt evaluation session-scoped (until full app re-init), not component-mount scoped.
+// Keep prompt evaluation session-scoped per user identity.
+// Reset when a different user logs in so the zone check always fires for new sessions.
 let hasEvaluatedInitPromptForSession = false;
 let sessionPromptSuppressedForSession = false;
+let lastEvaluatedUserId: string | null | undefined = undefined;
 
 function HorizontalCardSkeleton() {
     const theme = useTheme();
     const sw = Dimensions.get('window').width;
-    const cardWidth = Math.round(sw * 0.75);
-    const imgHeight = Math.round(cardWidth * 0.52);
+    const cardWidth = Math.round(sw * 0.47);
+    const imgHeight = Math.round(cardWidth * 0.7);
     return (
         <View
             style={{
@@ -66,6 +71,16 @@ export default function Discover() {
     const storeHasActiveOrders = useActiveOrdersStore((state) => state.hasActiveOrders);
     const hasActiveOrder = queriedHasActiveOrder || storeHasActiveOrders;
     const [zoneSheetVisible, setZoneSheetVisible] = useState(false);
+    const userId = useAuthStore((state) => state.user?.id);
+
+    // Reset flags when a different user logs in so the zone prompt fires for every new session.
+    useEffect(() => {
+        if (lastEvaluatedUserId !== undefined && lastEvaluatedUserId !== userId) {
+            hasEvaluatedInitPromptForSession = false;
+            sessionPromptSuppressedForSession = false;
+        }
+        lastEvaluatedUserId = userId;
+    }, [userId]);
 
     useEffect(() => {
         if (hasActiveOrder) {
@@ -73,7 +88,7 @@ export default function Discover() {
         }
     }, [hasActiveOrder]);
 
-    // Evaluate this only once per app init. We do not re-open the sheet during this session
+    // Evaluate this only once per user session. We do not re-open the sheet during this session
     // when order state changes (e.g. delivered while user is already in-app).
     useEffect(() => {
         if (hasEvaluatedInitPromptForSession) return;
@@ -100,6 +115,11 @@ export default function Discover() {
         variables: { displayContext: 'HOME' },
         fetchPolicy: 'cache-and-network',
     });
+
+    const { data: featuredData } = useQuery(GET_FEATURED_BUSINESSES, {
+        fetchPolicy: 'cache-and-network',
+    });
+    const featuredBusinesses = useMemo(() => (featuredData as any)?.featuredBusinesses ?? [], [featuredData]);
 
     const restaurants = useMemo(
         () => (businesses || []).filter((b) => b.businessType === 'RESTAURANT'),
@@ -216,15 +236,11 @@ export default function Discover() {
                 <WoltHeader
                     bannerMessage={showBanner ? bannerMessage : undefined}
                     bannerType={(bannerType as WoltHeaderBannerType) ?? 'INFO'}
+                    onPressProfile={() => router.push('/(tabs)/profile')}
                 />
 
                 {isFirstLoad ? (
                     <ScrollView showsVerticalScrollIndicator={false}>
-                        {/* Category Icons */}
-                        <View style={{ marginBottom: 20, marginTop: 4 }}>
-                            <CategoryIcons categories={categories} />
-                        </View>
-
                         <View style={{ marginBottom: 24 }}>
                             <PromoSlider banners={promoBanners} />
                         </View>
@@ -252,11 +268,6 @@ export default function Discover() {
                     </View>
                 ) : (
                     <ScrollView showsVerticalScrollIndicator={false}>
-                        {/* Category Icons */}
-                        <Animated.View entering={hasAnimated.current ? undefined : FadeIn.duration(500)} style={{ marginBottom: 20, marginTop: 4 }}>
-                            <CategoryIcons categories={categories} />
-                        </Animated.View>
-
                         {/* Promo Banners */}
                         <Animated.View entering={hasAnimated.current ? undefined : FadeInDown.delay(100).duration(500)} style={{ marginBottom: 20 }}>
                             <PromoSlider banners={promoBanners} />
@@ -284,6 +295,61 @@ export default function Discover() {
                                     {renderCards(promoRestaurants)}
                                 </DiscoverSection>
                             </Animated.View>
+                        )}
+
+                        {/* Featured Section */}
+                        {featuredBusinesses.length > 0 && (
+                        <Animated.View entering={hasAnimated.current ? undefined : FadeInDown.delay(350).duration(500)} style={{ marginBottom: 20 }}>
+                            <View style={{
+                                borderRadius: 0,
+                                overflow: 'hidden',
+                                backgroundColor: '#1A0E00',
+                            }}>
+                                {/* Header row */}
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: 18, paddingHorizontal: 16, paddingBottom: 4 }}>
+                                    <View>
+                                        <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: -0.4 }}>
+                                            Featured on Zipp
+                                        </Text>
+                                        <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 }}>
+                                            Sponsored
+                                        </Text>
+                                    </View>
+                                    <Image
+                                        source={require('@/assets/images/icon.png')}
+                                        style={{ width: 54, height: 54, borderRadius: 14, marginTop: -4 }}
+                                        contentFit="cover"
+                                    />
+                                </View>
+
+                                {/* Cards */}
+                                <ScrollView
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    contentContainerStyle={{ paddingLeft: 16, paddingRight: 8, paddingTop: 12, paddingBottom: 18 }}
+                                >
+                                    {renderCards(featuredBusinesses)}
+                                </ScrollView>
+
+                                {/* See all button */}
+                                <TouchableOpacity
+                                    onPress={goToRestaurants}
+                                    activeOpacity={0.8}
+                                    style={{
+                                        marginHorizontal: 16,
+                                        marginBottom: 16,
+                                        paddingVertical: 13,
+                                        borderRadius: 12,
+                                        backgroundColor: '#F59E0B26',
+                                        borderWidth: 1,
+                                        borderColor: '#F59E0B44',
+                                        alignItems: 'center',
+                                    }}
+                                >
+                                    <Text style={{ color: '#F59E0B', fontSize: 14, fontWeight: '700' }}>See all</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </Animated.View>
                         )}
 
                         {/* Open Now */}

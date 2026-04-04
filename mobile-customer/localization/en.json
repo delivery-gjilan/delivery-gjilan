@@ -106,7 +106,10 @@
             "enter_phone": "Please enter your phone number",
             "phone_submit_failed": "Failed to submit phone number",
             "phone_verification_failed": "Phone verification failed",
-            "resend_failed": "Failed to resend code"
+            "resend_failed": "Failed to resend code",
+            "language_picker_label": "Choose your language",
+            "language_en": "English",
+            "language_al": "Albanian (Shqip)"
         }
     },
     "auth_gate": {
@@ -338,7 +341,9 @@
         "included": "Included",
         "priority_fee": "Priority fee",
         "your_items": "Your Items",
-        "edit_cart": "Edit"
+        "edit_cart": "Edit",
+        "minimum_order_label": "Minimum order",
+        "minimum_not_met": "Add {amount} more to reach the minimum order"
     },
     "orders": {
         "banner_connection_lost": "Connection lost. Reconnecting...",

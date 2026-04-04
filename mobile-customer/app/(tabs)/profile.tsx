@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, Modal, Pressable, Animated, PanResponder, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Alert, Modal, Pressable, Animated, PanResponder, Linking, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,7 +10,7 @@ import { useQuery, useMutation } from '@apollo/client/react';
 import { ProfileRow } from '@/components/ProfileRow';
 import { useAuthStore } from '@/store/authStore';
 import { useTranslations } from '@/hooks/useTranslations';
-import { DELETE_MY_ACCOUNT_MUTATION, SET_MY_PREFERRED_LANGUAGE_MUTATION } from '@/graphql/operations/auth';
+import { DELETE_MY_ACCOUNT_MUTATION, SET_MY_PREFERRED_LANGUAGE_MUTATION, UPDATE_MY_PROFILE_MUTATION } from '@/graphql/operations/auth';
 import { AppLanguage } from '@/gql/graphql';
 
 const SLIDER_TRACK_WIDTH = 272;
@@ -123,7 +123,45 @@ export default function Profile() {
 
     const [deleteMyAccount, { loading: deletingAccount }] = useMutation(DELETE_MY_ACCOUNT_MUTATION);
     const [setMyPreferredLanguage] = useMutation(SET_MY_PREFERRED_LANGUAGE_MUTATION);
+    const [updateMyProfile, { loading: savingProfile }] = useMutation(UPDATE_MY_PROFILE_MUTATION);
     const [deleteModalStep, setDeleteModalStep] = useState<0 | 1 | 2>(0);
+    const updateUser = useAuthStore((state) => state.updateUser);
+
+    const [editProfileVisible, setEditProfileVisible] = useState(false);
+    const [editFirstName, setEditFirstName] = useState('');
+    const [editLastName, setEditLastName] = useState('');
+    const [editPhone, setEditPhone] = useState('');
+
+    const openEditProfile = () => {
+        setEditFirstName(user?.firstName ?? '');
+        setEditLastName(user?.lastName ?? '');
+        setEditPhone(user?.phoneNumber ?? '');
+        setEditProfileVisible(true);
+    };
+
+    const handleSaveProfile = async () => {
+        if (!editFirstName.trim() || !editLastName.trim()) {
+            Alert.alert('Error', 'First name and last name are required');
+            return;
+        }
+        try {
+            const result = await updateMyProfile({
+                variables: {
+                    input: {
+                        firstName: editFirstName.trim(),
+                        lastName: editLastName.trim(),
+                        phoneNumber: editPhone.trim() || null,
+                    },
+                },
+            });
+            if (result.data?.updateMyProfile && user) {
+                updateUser({ ...user, ...result.data.updateMyProfile } as any);
+            }
+            setEditProfileVisible(false);
+        } catch {
+            Alert.alert('Error', 'Failed to update profile');
+        }
+    };
 
     const handleDeleteAccount = () => setDeleteModalStep(1);
 
@@ -191,44 +229,12 @@ export default function Profile() {
                             {user.email}
                         </Text>
                     ) : null}
-
-                    {/* Stats row */}
-                    <View style={{ flexDirection: 'row', marginTop: 20, gap: 12 }}>
-                        <View style={{
-                            backgroundColor: theme.colors.card,
-                            borderRadius: 14,
-                            paddingVertical: 12,
-                            paddingHorizontal: 20,
-                            alignItems: 'center',
-                            borderWidth: 1,
-                            borderColor: theme.colors.border,
-                            minWidth: 100,
-                        }}>
-                            <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '800' }}>
-                                {orders.length}
-                            </Text>
-                            <Text style={{ color: theme.colors.subtext, fontSize: 11, fontWeight: '600', marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.3 }}>
-                                Orders
-                            </Text>
-                        </View>
-                        <View style={{
-                            backgroundColor: theme.colors.card,
-                            borderRadius: 14,
-                            paddingVertical: 12,
-                            paddingHorizontal: 20,
-                            alignItems: 'center',
-                            borderWidth: 1,
-                            borderColor: theme.colors.border,
-                            minWidth: 100,
-                        }}>
-                            <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '800' }}>
-                                {deliveredOrders.length}
-                            </Text>
-                            <Text style={{ color: theme.colors.subtext, fontSize: 11, fontWeight: '600', marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.3 }}>
-                                Delivered
-                            </Text>
-                        </View>
-                    </View>
+                    {/* Phone */}
+                    {user?.phoneNumber ? (
+                        <Text style={{ color: theme.colors.subtext, fontSize: 13, marginTop: 2, textAlign: 'center' }}>
+                            {user.phoneNumber}
+                        </Text>
+                    ) : null}
                 </View>
 
                 {/* ── Orders Section ──────────────────────────────────── */}
@@ -244,6 +250,7 @@ export default function Profile() {
 
                 {/* ── Account Section ─────────────────────────────────── */}
                 <View style={{ marginHorizontal: 16, marginBottom: 14, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
+                    <ProfileRow title="Edit Profile" icon="person-outline" onPress={openEditProfile} />
                     <ProfileRow title={t.profile.my_addresses} icon="location-outline" onPress={() => router.push('/addresses')} />
                     <ProfileRow title={t.profile.contact_support} icon="chatbubble-outline" onPress={() => Linking.openURL('mailto:support@zippdelivery.com')} />
                     <ProfileRow title="Privacy Policy" icon="shield-checkmark-outline" onPress={() => Linking.openURL('https://zippdelivery.com/privacy')} />
@@ -267,9 +274,9 @@ export default function Profile() {
                                         flex: 1,
                                         paddingVertical: 12,
                                         borderRadius: 14,
-                                        borderWidth: active ? 2 : 1.5,
-                                        borderColor: active ? theme.colors.primary : theme.colors.border,
-                                        backgroundColor: active ? theme.colors.primary + '15' : theme.colors.card,
+                                        borderWidth: 1.5,
+                                        borderColor: theme.colors.border,
+                                        backgroundColor: theme.colors.card,
                                         alignItems: 'center',
                                         flexDirection: 'row',
                                         justifyContent: 'center',
@@ -277,10 +284,10 @@ export default function Profile() {
                                     }}
                                 >
                                     <Text style={{ fontSize: 18 }}>{lang === 'en' ? '🇬🇧' : '🇦🇱'}</Text>
-                                    <Text style={{ color: active ? theme.colors.primary : theme.colors.text, fontSize: 14, fontWeight: active ? '700' : '500' }}>
+                                    <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '500' }}>
                                         {lang === 'en' ? 'English' : 'Shqip'}
                                     </Text>
-                                    {active && <Ionicons name="checkmark-circle" size={16} color={theme.colors.primary} />}
+                                    {active && <Ionicons name="checkmark" size={16} color="#16A34A" />}
                                 </TouchableOpacity>
                             );
                         })}
@@ -321,6 +328,115 @@ export default function Profile() {
                     </TouchableOpacity>
                 </View>
             </ScrollView>
+
+            {/* ── Edit Profile Modal ── */}
+            <Modal
+                visible={editProfileVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setEditProfileVisible(false)}
+            >
+                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+                    <Pressable
+                        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+                        onPress={() => setEditProfileVisible(false)}
+                    >
+                        <Pressable onPress={() => {}}>
+                            <View style={{
+                                backgroundColor: theme.colors.card,
+                                borderTopLeftRadius: 24,
+                                borderTopRightRadius: 24,
+                                paddingHorizontal: 20,
+                                paddingTop: 20,
+                                paddingBottom: 40,
+                            }}>
+                                {/* Handle */}
+                                <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: theme.colors.border, alignSelf: 'center', marginBottom: 20 }} />
+                                <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700', marginBottom: 20 }}>Edit Profile</Text>
+
+                                {/* First Name */}
+                                <Text style={{ color: theme.colors.subtext, fontSize: 12, fontWeight: '600', marginBottom: 6 }}>First Name</Text>
+                                <TextInput
+                                    value={editFirstName}
+                                    onChangeText={setEditFirstName}
+                                    placeholder="First name"
+                                    placeholderTextColor={theme.colors.subtext}
+                                    style={{
+                                        backgroundColor: theme.colors.background,
+                                        borderRadius: 12,
+                                        borderWidth: 1,
+                                        borderColor: theme.colors.border,
+                                        color: theme.colors.text,
+                                        fontSize: 15,
+                                        paddingHorizontal: 14,
+                                        paddingVertical: 12,
+                                        marginBottom: 14,
+                                    }}
+                                />
+
+                                {/* Last Name */}
+                                <Text style={{ color: theme.colors.subtext, fontSize: 12, fontWeight: '600', marginBottom: 6 }}>Last Name</Text>
+                                <TextInput
+                                    value={editLastName}
+                                    onChangeText={setEditLastName}
+                                    placeholder="Last name"
+                                    placeholderTextColor={theme.colors.subtext}
+                                    style={{
+                                        backgroundColor: theme.colors.background,
+                                        borderRadius: 12,
+                                        borderWidth: 1,
+                                        borderColor: theme.colors.border,
+                                        color: theme.colors.text,
+                                        fontSize: 15,
+                                        paddingHorizontal: 14,
+                                        paddingVertical: 12,
+                                        marginBottom: 14,
+                                    }}
+                                />
+
+                                {/* Phone */}
+                                <Text style={{ color: theme.colors.subtext, fontSize: 12, fontWeight: '600', marginBottom: 6 }}>Phone Number</Text>
+                                <TextInput
+                                    value={editPhone}
+                                    onChangeText={setEditPhone}
+                                    placeholder="Phone number (optional)"
+                                    placeholderTextColor={theme.colors.subtext}
+                                    keyboardType="phone-pad"
+                                    style={{
+                                        backgroundColor: theme.colors.background,
+                                        borderRadius: 12,
+                                        borderWidth: 1,
+                                        borderColor: theme.colors.border,
+                                        color: theme.colors.text,
+                                        fontSize: 15,
+                                        paddingHorizontal: 14,
+                                        paddingVertical: 12,
+                                        marginBottom: 24,
+                                    }}
+                                />
+
+                                {/* Save button */}
+                                <TouchableOpacity
+                                    onPress={handleSaveProfile}
+                                    disabled={savingProfile}
+                                    activeOpacity={0.8}
+                                    style={{
+                                        backgroundColor: theme.colors.primary,
+                                        borderRadius: 14,
+                                        paddingVertical: 15,
+                                        alignItems: 'center',
+                                        opacity: savingProfile ? 0.6 : 1,
+                                    }}
+                                >
+                                    <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>
+                                        {savingProfile ? 'Saving...' : 'Save Changes'}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </Pressable>
+                    </Pressable>
+                </KeyboardAvoidingView>
+            </Modal>
 
             {/* ── Delete Account Modal ── */}
             <Modal

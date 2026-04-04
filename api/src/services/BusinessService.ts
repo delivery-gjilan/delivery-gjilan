@@ -52,6 +52,8 @@ export class BusinessService {
             isTemporarilyClosed: business.isTemporarilyClosed,
             temporaryClosureReason: business.temporaryClosureReason ?? null,
             isActive: business.isActive ?? true,
+            commissionPercentage: Number(business.commissionPercentage ?? 0),
+            minOrderAmount: Number(business.minOrderAmount ?? 0),
             createdAt: new Date(business.createdAt),
             updatedAt: new Date(business.updatedAt),
             isOpen: true, // computed by field resolver
@@ -79,6 +81,9 @@ export class BusinessService {
             isTemporarilyClosed: false,
             temporaryClosureReason: null,
             isActive: true,
+            ...(input.minOrderAmount !== null && input.minOrderAmount !== undefined
+                ? { minOrderAmount: String(input.minOrderAmount) }
+                : {}),
         });
 
         return this.mapToBusiness(createdBusiness, []);
@@ -162,7 +167,12 @@ export class BusinessService {
             updateData.temporaryClosureReason = null;
         }
 
-        const updatedBusiness = await this.businessRepository.update(id, updateData);
+        const updatedBusiness = await this.businessRepository.update(id, {
+            ...updateData,
+            ...(input.minOrderAmount !== null && input.minOrderAmount !== undefined
+                ? { minOrderAmount: String(input.minOrderAmount) }
+                : {}),
+        });
         if (!updatedBusiness) throw AppError.notFound('Business');
 
         const schedule = await this.businessHoursRepository.findByBusinessId(id);
@@ -171,6 +181,28 @@ export class BusinessService {
 
     async deleteBusiness(id: string): Promise<boolean> {
         return this.businessRepository.delete(id);
+    }
+
+    async getFeaturedBusinesses(): Promise<Business[]> {
+        const featured = await this.businessRepository.findFeatured();
+        if (featured.length === 0) return [];
+
+        const ids = featured.map((b) => b.id);
+        const allHours = await this.businessHoursRepository.findByBusinessIds(ids);
+        const hoursByBiz = new Map<string, DbBusinessHours[]>();
+        for (const h of allHours) {
+            const arr = hoursByBiz.get(h.businessId) ?? [];
+            arr.push(h);
+            hoursByBiz.set(h.businessId, arr);
+        }
+        return featured.map((b) => this.mapToBusiness(b, hoursByBiz.get(b.id) ?? []));
+    }
+
+    async setBusinessFeatured(id: string, isFeatured: boolean, sortOrder: number): Promise<Business> {
+        const updated = await this.businessRepository.setFeatured(id, isFeatured, sortOrder);
+        if (!updated) throw AppError.notFound('Business');
+        const schedule = await this.businessHoursRepository.findByBusinessId(id);
+        return this.mapToBusiness(updated, schedule);
     }
 
     // ── Schedule (per-day hours) ────────────────────────────────

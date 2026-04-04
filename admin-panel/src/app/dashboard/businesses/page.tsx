@@ -112,6 +112,7 @@ export default function BusinessesPage() {
             opensAt: "08:00",
             closesAt: "23:00",
         },
+        minOrderAmount: 0,
     });
 
     const [editForm, setEditForm] = useState({
@@ -128,6 +129,7 @@ export default function BusinessesPage() {
             opensAt: "08:00",
             closesAt: "23:00",
         },
+        minOrderAmount: 0,
     });
 
     /* --------------------------
@@ -253,6 +255,7 @@ export default function BusinessesPage() {
                 opensAt: createForm.workingHours.opensAt,
                 closesAt: createForm.workingHours.closesAt,
             },
+            minOrderAmount: createForm.minOrderAmount,
         };
 
         if (createForm.createOwnerNow) {
@@ -303,6 +306,7 @@ export default function BusinessesPage() {
                 opensAt: "08:00",
                 closesAt: "23:00",
             },
+            minOrderAmount: 0,
         });
         setCreateImageFile(null);
         setCreateImagePreview(null);
@@ -324,6 +328,7 @@ export default function BusinessesPage() {
                 opensAt: business.workingHours?.opensAt || "08:00",
                 closesAt: business.workingHours?.closesAt || "23:00",
             },
+            minOrderAmount: business.minOrderAmount ?? 0,
         });
         setEditImageFile(null);
         setEditImagePreview(business.imageUrl || null);
@@ -371,6 +376,7 @@ export default function BusinessesPage() {
                         opensAt: editForm.workingHours.opensAt,
                         closesAt: editForm.workingHours.closesAt,
                     },
+                    minOrderAmount: editForm.minOrderAmount,
                 },
             },
         });
@@ -804,6 +810,27 @@ export default function BusinessesPage() {
                         </div>
                     </div>
 
+                    {/* Minimum Order */}
+                    <div className="border-t border-gray-700 pt-4">
+                        <label className="block text-xs text-gray-500 mb-1">
+                            Minimum Order Amount (€)
+                        </label>
+                        <Input
+                            type="number"
+                            min={0}
+                            step={0.5}
+                            placeholder="0 = no minimum"
+                            value={createForm.minOrderAmount}
+                            onChange={(e) =>
+                                setCreateForm({
+                                    ...createForm,
+                                    minOrderAmount: parseFloat(e.target.value) || 0,
+                                })
+                            }
+                        />
+                        <p className="text-xs text-gray-600 mt-1">Set to 0 to disable minimum order enforcement</p>
+                    </div>
+
                     <Button
                         variant="primary"
                         className="w-full mt-2"
@@ -1013,6 +1040,29 @@ export default function BusinessesPage() {
                                     }
                                 />
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Minimum Order */}
+                    <div className="border-t border-gray-700 pt-6 space-y-4">
+                        <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Ordering Rules</h3>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-400 mb-1">
+                                Minimum Order Amount (€)
+                            </label>
+                            <Input
+                                type="number"
+                                min={0}
+                                step={0.5}
+                                value={editForm.minOrderAmount}
+                                onChange={(e) =>
+                                    setEditForm({
+                                        ...editForm,
+                                        minOrderAmount: parseFloat(e.target.value) || 0,
+                                    })
+                                }
+                            />
+                            <p className="text-xs text-gray-500 mt-1">Set to 0 to disable. Customers cannot place an order below this subtotal.</p>
                         </div>
                     </div>
 

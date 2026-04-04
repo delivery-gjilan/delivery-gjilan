@@ -112,6 +112,9 @@ export const translationSchema = z.object(
                 phone_submit_failed: s(),
                 phone_verification_failed: s(),
                 resend_failed: s(),
+                language_picker_label: s(),
+                language_en: s(),
+                language_al: s(),
             }),
         }),
         auth_gate: z.object({
@@ -339,6 +342,8 @@ export const translationSchema = z.object(
             priority_fee: s(),
             your_items: s(),
             edit_cart: s(),
+            minimum_order_label: s(),
+            minimum_not_met: s(),
         }),
         orders: z.object({
             banner_connection_lost: s(),

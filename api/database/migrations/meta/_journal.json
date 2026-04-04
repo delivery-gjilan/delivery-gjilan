@@ -5,22 +5,22 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1774922981603,
-      "tag": "0000_tranquil_alex_wilder",
+      "when": 1775225278258,
+      "tag": "0000_mute_lila_cheney",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1774991411350,
-      "tag": "0001_add-priority-surcharge-to-orders",
+      "when": 1775236486321,
+      "tag": "0001_absent_living_lightning",
       "breakpoints": true
     },
     {
       "idx": 2,
       "version": "7",
-      "when": 1775080000000,
-      "tag": "0002_add-is-demo-account-to-users",
+      "when": 1775241647715,
+      "tag": "0002_add-min-order-amount-to-businesses",
       "breakpoints": true
     }
   ]

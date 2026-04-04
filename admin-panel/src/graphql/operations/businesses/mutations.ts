@@ -11,6 +11,7 @@ export const CREATE_BUSINESS = graphql(`
             isActive
             avgPrepTimeMinutes
             prepTimeOverrideMinutes
+            minOrderAmount
             location {
                 latitude
                 longitude
@@ -42,6 +43,7 @@ export const CREATE_BUSINESS_WITH_OWNER = graphql(`
                 isActive
                 avgPrepTimeMinutes
                 prepTimeOverrideMinutes
+                minOrderAmount
                 location {
                     latitude
                     longitude
@@ -82,6 +84,7 @@ export const UPDATE_BUSINESS = graphql(`
             isActive
             avgPrepTimeMinutes
             prepTimeOverrideMinutes
+            minOrderAmount
             location {
                 latitude
                 longitude
@@ -114,6 +117,17 @@ export const SET_BUSINESS_SCHEDULE = graphql(`
             dayOfWeek
             opensAt
             closesAt
+        }
+    }
+`);
+
+export const SET_BUSINESS_FEATURED = graphql(`
+    mutation SetBusinessFeatured($id: ID!, $isFeatured: Boolean!, $sortOrder: Int) {
+        setBusinessFeatured(id: $id, isFeatured: $isFeatured, sortOrder: $sortOrder) {
+            id
+            name
+            isFeatured
+            featuredSortOrder
         }
     }
 `);

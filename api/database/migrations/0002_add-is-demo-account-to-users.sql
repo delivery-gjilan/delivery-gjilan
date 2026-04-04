@@ -1,1 +1,0 @@
-ALTER TABLE "users" ADD COLUMN "is_demo_account" boolean DEFAULT false NOT NULL;

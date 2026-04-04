@@ -132,7 +132,19 @@ const SYSTEM_OPERATIONS = new Set([
     'BusinessDeviceOrderSignal',
 ]);
 
+// Secret header value that bypasses rate limiting for local stress tests.
+// Set STRESS_TEST_SECRET in .env (never set in production).
+const STRESS_TEST_SECRET = process.env.NODE_ENV !== 'production' ? process.env.STRESS_TEST_SECRET : undefined;
+
 app.use('/graphql', (req, res, next) => {
+    // Bypass rate limiting entirely in test env or when bypass header matches
+    if (
+        process.env.NODE_ENV === 'test' ||
+        (STRESS_TEST_SECRET && req.headers['x-stress-secret'] === STRESS_TEST_SECRET)
+    ) {
+        return next();
+    }
+
     const operationName = req.body?.operationName;
 
     // Skip rate limiting for critical system operations (heartbeats, etc.)

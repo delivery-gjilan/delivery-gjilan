@@ -65,7 +65,7 @@ function AppContent() {
                                 gestureEnabled: false,
                             }} 
                         />
-                        <Stack.Screen name="product/[productId]" options={{ headerShown: false }} />
+
                         <Stack.Screen
                             name="cart"
                             options={{

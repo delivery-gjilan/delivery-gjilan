@@ -106,7 +106,10 @@
             "enter_phone": "Ju lutem shkruani numrin tuaj të telefonit",
             "phone_submit_failed": "Dështoi dërgimi i numrit të telefonit",
             "phone_verification_failed": "Verifikimi i telefonit dështoi",
-            "resend_failed": "Dështoi ridërgimi i kodit"
+            "resend_failed": "Dështoi ridërgimi i kodit",
+            "language_picker_label": "Zgjidhni gjuhën tuaj",
+            "language_en": "Anglisht (English)",
+            "language_al": "Shqip"
         }
     },
     "auth_gate": {
@@ -338,7 +341,9 @@
         "included": "Përfshirë",
         "priority_fee": "Tarifa e prioritetit",
         "your_items": "Artikujt Tuaj",
-        "edit_cart": "Ndrysho"
+        "edit_cart": "Ndrysho",
+        "minimum_order_label": "Porosia minimale",
+        "minimum_not_met": "Shto edhe {amount} për të arritur porosinë minimale"
     },
     "orders": {
         "banner_connection_lost": "Lidhja u humb. Po rilidhemi...",

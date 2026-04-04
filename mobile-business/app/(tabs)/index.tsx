@@ -23,6 +23,7 @@ import {
     UPDATE_ORDER_STATUS,
     START_PREPARING,
     ORDERS_SUBSCRIPTION,
+    UPDATE_PREPARATION_TIME,
 } from '@/graphql/orders';
 import {
     GET_BUSINESS_OPERATIONS,
@@ -193,6 +194,9 @@ export default function OrdersScreen() {
     const pendingOrderIdsRef = useRef<Set<string>>(new Set());
     const soundRef = useRef<Audio.Sound | null>(null);
     const [productModalOrder, setProductModalOrder] = useState<Order | null>(null);
+    const [addTimeModalOrder, setAddTimeModalOrder] = useState<Order | null>(null);
+    const [addTimeAmount, setAddTimeAmount] = useState(10);
+    const [customAddTime, setCustomAddTime] = useState('');
     const { width } = useWindowDimensions();
     const isTablet = width >= 768;
     const businessId = user?.businessId ?? '';
@@ -308,6 +312,7 @@ export default function OrdersScreen() {
 
     const [updateStatus] = useMutation(UPDATE_ORDER_STATUS);
     const [startPreparing, { loading: startingPrep }] = useMutation(START_PREPARING);
+    const [updatePreparationTimeMutation] = useMutation(UPDATE_PREPARATION_TIME);
     const [updateBusinessOperations, { loading: updatingBusinessOps }] = useMutation(UPDATE_BUSINESS_OPERATIONS);
 
     const businessOps = businessData?.business;
@@ -482,6 +487,27 @@ export default function OrdersScreen() {
         setCustomEta('');
         setEtaModalVisible(true);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    };
+
+    const ADD_TIME_PRESETS = [5, 10, 15, 20, 30];
+
+    const handleAddTime = async () => {
+        if (!addTimeModalOrder) return;
+        const customVal = customAddTime.trim() ? Number(customAddTime.trim()) : NaN;
+        const extra = Number.isFinite(customVal) && customVal > 0 ? customVal : addTimeAmount;
+        const currentMinutes = addTimeModalOrder.preparationMinutes ?? 0;
+        const newMinutes = Math.min(180, currentMinutes + Math.round(extra));
+        try {
+            await updatePreparationTimeMutation({
+                variables: { id: addTimeModalOrder.id, preparationMinutes: newMinutes },
+            });
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            setAddTimeModalOrder(null);
+            setCustomAddTime('');
+            refetch();
+        } catch (error: any) {
+            Alert.alert(t('common.error', 'Error'), error.message);
+        }
     };
 
     const handleOpenStore = async () => {
@@ -845,14 +871,29 @@ export default function OrdersScreen() {
                     )}
 
                     {isPreparing && (
-                        <TouchableOpacity
-                            className="py-3 flex-row items-center justify-center border-t border-gray-700"
-                            style={{ backgroundColor: '#10b98115' }}
-                            onPress={() => handleMarkReady(order.id)}
-                        >
-                            <Ionicons name="checkmark-done-circle" size={18} color="#10b981" />
-                            <Text className="text-success font-bold text-sm ml-1.5">{t('orders.mark_ready', 'Mark Ready')}</Text>
-                        </TouchableOpacity>
+                        <View className="flex-row border-t border-gray-700">
+                            <TouchableOpacity
+                                className="py-3 flex-row items-center justify-center border-r border-gray-700"
+                                style={{ flex: 1, backgroundColor: '#f59e0b15' }}
+                                onPress={() => {
+                                    setAddTimeModalOrder(order);
+                                    setAddTimeAmount(10);
+                                    setCustomAddTime('');
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                }}
+                            >
+                                <Ionicons name="add-circle-outline" size={18} color="#f59e0b" />
+                                <Text className="font-bold text-sm ml-1.5" style={{ color: '#f59e0b' }}>{t('orders.add_time', 'Add Time')}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                className="py-3 flex-row items-center justify-center"
+                                style={{ flex: 2, backgroundColor: '#10b98115' }}
+                                onPress={() => handleMarkReady(order.id)}
+                            >
+                                <Ionicons name="checkmark-done-circle" size={18} color="#10b981" />
+                                <Text className="text-success font-bold text-sm ml-1.5">{t('orders.mark_ready', 'Mark Ready')}</Text>
+                            </TouchableOpacity>
+                        </View>
                     )}
                 </View>
             </Pressable>
@@ -1233,6 +1274,101 @@ export default function OrdersScreen() {
                                 ) : (
                                     <Text className="text-white font-bold">{t('common.save', 'Save')}</Text>
                                 )}
+                            </TouchableOpacity>
+                        </View>
+                    </Pressable>
+                </Pressable>
+            </Modal>
+
+            {/* ── Add Time Modal ── */}
+            <Modal
+                visible={!!addTimeModalOrder}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setAddTimeModalOrder(null)}
+            >
+                <Pressable
+                    className="flex-1 items-center justify-center"
+                    style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
+                    onPress={() => setAddTimeModalOrder(null)}
+                >
+                    <Pressable
+                        className="bg-card rounded-3xl overflow-hidden"
+                        style={{ width: '92%', maxWidth: 560 }}
+                        onPress={(e) => e.stopPropagation()}
+                    >
+                        <View className="p-5 border-b border-gray-700 items-center">
+                            <View className="w-14 h-14 rounded-full items-center justify-center mb-3" style={{ backgroundColor: '#f59e0b22' }}>
+                                <Ionicons name="add-circle-outline" size={28} color="#f59e0b" />
+                            </View>
+                            <Text className="text-text font-bold text-xl mb-1">
+                                {t('orders.add_time_title', 'Extend Preparation Time')}
+                            </Text>
+                            {addTimeModalOrder && (
+                                <Text className="text-subtext text-sm">
+                                    #{addTimeModalOrder.displayId} · {t('orders.prep_time', 'Preparation Time')}: {addTimeModalOrder.preparationMinutes ?? 0} min
+                                </Text>
+                            )}
+                            <Text className="text-subtext text-sm text-center mt-1">
+                                {t('orders.add_time_subtext', 'How many extra minutes does this order need?')}
+                            </Text>
+                        </View>
+
+                        <View className="p-5 pt-4 flex-row flex-wrap justify-center gap-2">
+                            {ADD_TIME_PRESETS.map((preset) => (
+                                <TouchableOpacity
+                                    key={preset}
+                                    className="px-4 py-2.5 rounded-xl"
+                                    style={{
+                                        backgroundColor: addTimeAmount === preset ? '#f59e0b' : '#374151',
+                                        minWidth: 72,
+                                        alignItems: 'center',
+                                    }}
+                                    onPress={() => {
+                                        setAddTimeAmount(preset);
+                                        setCustomAddTime('');
+                                    }}
+                                >
+                                    <Text
+                                        className="font-bold"
+                                        style={{ color: addTimeAmount === preset ? '#fff' : '#9ca3af' }}
+                                    >
+                                        +{preset}m
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+
+                            <View className="w-full mt-2">
+                                <Text className="text-subtext text-sm mb-2">
+                                    {t('orders.custom_minutes', 'Custom minutes')}
+                                </Text>
+                                <TextInput
+                                    value={customAddTime}
+                                    onChangeText={(value) => {
+                                        const sanitized = value.replace(/[^0-9]/g, '');
+                                        setCustomAddTime(sanitized);
+                                    }}
+                                    keyboardType="number-pad"
+                                    placeholder={t('orders.write_minutes', 'Write minutes...')}
+                                    placeholderTextColor="#6b7280"
+                                    className="bg-background text-text rounded-xl px-4 py-3 border border-gray-700"
+                                />
+                            </View>
+                        </View>
+
+                        <View className="p-5 pt-2 flex-row gap-3">
+                            <TouchableOpacity
+                                className="flex-1 py-3 rounded-xl bg-gray-700 items-center"
+                                onPress={() => setAddTimeModalOrder(null)}
+                            >
+                                <Text className="text-subtext font-bold">{t('common.cancel', 'Cancel')}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                className="flex-1 py-3 rounded-xl items-center"
+                                style={{ backgroundColor: '#f59e0b' }}
+                                onPress={handleAddTime}
+                            >
+                                <Text className="text-white font-bold">{t('orders.add_time_confirm', 'Confirm')}</Text>
                             </TouchableOpacity>
                         </View>
                     </Pressable>

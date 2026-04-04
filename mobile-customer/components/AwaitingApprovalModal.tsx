@@ -49,7 +49,7 @@ export default function AwaitingApprovalModal({ visible, onClose, approvalReason
     }, [approvalReasons, t]);
 
     return (
-        <Modal visible={visible} animationType="fade" transparent onRequestClose={locked ? undefined : onClose}>
+        <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
             <View className="flex-1 items-center justify-center px-4" style={{ backgroundColor: 'rgba(15,23,42,0.62)' }}>
                 <View
                     className="w-full rounded-3xl px-6 pt-7 pb-6"
@@ -98,15 +98,15 @@ export default function AwaitingApprovalModal({ visible, onClose, approvalReason
                         {t.orders.awaiting_approval_modal.agent_call_note}
                     </Text>
 
-                    {!locked && (
-                        <Pressable
-                            onPress={onClose}
-                            className="mt-6 py-4 rounded-2xl items-center"
-                            style={{ backgroundColor: theme.colors.primary }}
-                        >
-                            <Text className="text-white font-bold text-base">{t.orders.awaiting_approval_modal.dismiss}</Text>
-                        </Pressable>
-                    )}
+                    <Pressable
+                        onPress={onClose}
+                        className="mt-6 py-4 rounded-2xl items-center"
+                        style={{ backgroundColor: locked ? theme.colors.card : theme.colors.primary, borderWidth: locked ? 1 : 0, borderColor: theme.colors.border }}
+                    >
+                        <Text className="font-bold text-base" style={{ color: locked ? theme.colors.subtext : '#fff' }}>
+                            {locked ? t.orders.awaiting_approval_modal.dismiss_locked ?? t.orders.awaiting_approval_modal.dismiss : t.orders.awaiting_approval_modal.dismiss}
+                        </Text>
+                    </Pressable>
                 </View>
             </View>
         </Modal>

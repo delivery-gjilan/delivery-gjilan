@@ -1,6 +1,8 @@
 CREATE TYPE "public"."action_type" AS ENUM('USER_CREATED', 'USER_UPDATED', 'USER_DELETED', 'USER_ROLE_CHANGED', 'BUSINESS_CREATED', 'BUSINESS_UPDATED', 'BUSINESS_DELETED', 'BUSINESS_APPROVED', 'BUSINESS_REJECTED', 'PRODUCT_CREATED', 'PRODUCT_UPDATED', 'PRODUCT_DELETED', 'PRODUCT_PUBLISHED', 'PRODUCT_UNPUBLISHED', 'PRODUCT_AVAILABILITY_CHANGED', 'PRODUCT_PRICE_CHANGED', 'ORDER_CREATED', 'ORDER_UPDATED', 'ORDER_STATUS_CHANGED', 'ORDER_CANCELLED', 'ORDER_ASSIGNED', 'ORDER_DELIVERED', 'SETTLEMENT_CREATED', 'SETTLEMENT_PAID', 'SETTLEMENT_PARTIAL_PAID', 'SETTLEMENT_UNSETTLED', 'DRIVER_CREATED', 'DRIVER_UPDATED', 'DRIVER_APPROVED', 'DRIVER_REJECTED', 'DRIVER_STATUS_CHANGED', 'USER_LOGIN', 'USER_LOGOUT', 'PASSWORD_CHANGED', 'PASSWORD_RESET', 'CATEGORY_CREATED', 'CATEGORY_UPDATED', 'CATEGORY_DELETED', 'SUBCATEGORY_CREATED', 'SUBCATEGORY_UPDATED', 'SUBCATEGORY_DELETED');--> statement-breakpoint
 CREATE TYPE "public"."actor_type" AS ENUM('ADMIN', 'BUSINESS', 'DRIVER', 'CUSTOMER', 'SYSTEM');--> statement-breakpoint
 CREATE TYPE "public"."entity_type" AS ENUM('USER', 'BUSINESS', 'PRODUCT', 'ORDER', 'SETTLEMENT', 'DRIVER', 'CATEGORY', 'SUBCATEGORY', 'DELIVERY_ZONE');--> statement-breakpoint
+CREATE TYPE "public"."banner_display_context" AS ENUM('HOME', 'BUSINESS', 'CATEGORY', 'PRODUCT', 'CART', 'ALL');--> statement-breakpoint
+CREATE TYPE "public"."banner_media_type" AS ENUM('IMAGE', 'GIF', 'VIDEO');--> statement-breakpoint
 CREATE TYPE "public"."business_type" AS ENUM('MARKET', 'PHARMACY', 'RESTAURANT');--> statement-breakpoint
 CREATE TYPE "public"."business_message_sender_role" AS ENUM('ADMIN', 'BUSINESS');--> statement-breakpoint
 CREATE TYPE "public"."message_alert_type" AS ENUM('INFO', 'WARNING', 'URGENT');--> statement-breakpoint
@@ -48,8 +50,15 @@ CREATE TABLE "banners" (
 	"title" text,
 	"subtitle" text,
 	"image_url" text NOT NULL,
+	"media_type" "banner_media_type" DEFAULT 'IMAGE' NOT NULL,
+	"business_id" uuid,
+	"product_id" uuid,
+	"promotion_id" uuid,
 	"link_type" text,
 	"link_target" text,
+	"display_context" "banner_display_context" DEFAULT 'HOME' NOT NULL,
+	"starts_at" timestamp with time zone,
+	"ends_at" timestamp with time zone,
 	"sort_order" integer DEFAULT 0 NOT NULL,
 	"is_active" boolean DEFAULT true NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -179,6 +188,7 @@ CREATE TABLE "orders" (
 	"actual_price" numeric(10, 2) NOT NULL,
 	"original_delivery_price" numeric(10, 2),
 	"delivery_price" numeric(10, 2) NOT NULL,
+	"priority_surcharge" numeric(10, 2) DEFAULT 0 NOT NULL,
 	"payment_collection" "order_payment_collection" DEFAULT 'CASH_TO_DRIVER' NOT NULL,
 	"status" "order_status" NOT NULL,
 	"dropoff_lat" double precision NOT NULL,
@@ -287,6 +297,7 @@ CREATE TABLE "users" (
 	"phone_verification_code" text,
 	"admin_note" text,
 	"flag_color" text DEFAULT 'yellow',
+	"is_demo_account" boolean DEFAULT false NOT NULL,
 	"image_url" text,
 	"referral_code" text,
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -673,6 +684,9 @@ CREATE TABLE "promotion_redemptions" (
 );
 --> statement-breakpoint
 ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_actor_id_users_id_fk" FOREIGN KEY ("actor_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "banners" ADD CONSTRAINT "banners_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "banners" ADD CONSTRAINT "banners_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "banners" ADD CONSTRAINT "banners_promotion_id_promotions_id_fk" FOREIGN KEY ("promotion_id") REFERENCES "public"."promotions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "business_hours" ADD CONSTRAINT "business_hours_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "business_messages" ADD CONSTRAINT "business_messages_admin_id_users_id_fk" FOREIGN KEY ("admin_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "business_messages" ADD CONSTRAINT "business_messages_business_user_id_users_id_fk" FOREIGN KEY ("business_user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

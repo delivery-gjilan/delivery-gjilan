@@ -435,6 +435,7 @@ export class OrderService {
                 businessType: businessesTable.businessType,
                 opensAt: businessesTable.opensAt,
                 closesAt: businessesTable.closesAt,
+                minOrderAmount: businessesTable.minOrderAmount,
             })
             .from(businessesTable)
             .where(inArray(businessesTable.id, businessIdList));
@@ -563,6 +564,15 @@ export class OrderService {
         const effectiveOrderPrice = promoResult.finalSubtotal;
         const effectiveDeliveryPrice = promoResult.finalDeliveryPrice;
         const totalOrderPrice = promoResult.finalTotal;
+
+        // Enforce minimum order amount
+        const orderBusiness = businessesById.get(orderBusinessId);
+        const minOrderAmount = Number(orderBusiness?.minOrderAmount ?? 0);
+        if (minOrderAmount > 0 && effectiveOrderPrice < minOrderAmount) {
+            throw AppError.badInput(
+                `Minimum order amount for this business is €${minOrderAmount.toFixed(2)}. Your subtotal is €${effectiveOrderPrice.toFixed(2)}.`
+            );
+        }
 
         // Verify total price matches client input (allow small float error).
         // Priority surcharge is layered on top of the promo-engine totals.
@@ -970,6 +980,9 @@ export class OrderService {
                         },
                         avgPrepTimeMinutes: business.avgPrepTimeMinutes,
                         commissionPercentage: Number(business.commissionPercentage),
+                        minOrderAmount: Number(business.minOrderAmount ?? 0),
+                        isFeatured: business.isFeatured ?? false,
+                        featuredSortOrder: business.featuredSortOrder ?? 0,
                         createdAt: new Date(business.createdAt),
                         updatedAt: new Date(business.updatedAt),
                         isOpen: true,
@@ -1298,9 +1311,24 @@ export class OrderService {
         if (status === 'READY' && currentStatus !== 'READY') {
             try {
                 const dispatchService = getDispatchService();
-                dispatchService.dispatchOrder(id, notificationService).catch((err) =>
-                    log.error({ err, orderId: id }, 'updateStatus:dispatch:error'),
-                );
+                // Check whether an early dispatch was already scheduled or fired from
+                // startPreparing.  If 'fired' → skip (drivers already notified).
+                // If 'pending' → the order became ready before the timer fired; cancel
+                // the timer and dispatch immediately.  If absent → legacy path (order
+                // skipped PREPARING), dispatch normally.
+                const earlyState = await cache.get<string>(`dispatch:early:${id}`);
+                if (earlyState === 'fired') {
+                    log.info({ orderId: id }, 'updateStatus:READY — early dispatch already fired, skipping');
+                } else {
+                    if (earlyState === 'pending') {
+                        dispatchService.cancelEarlyDispatch(id);
+                        log.info({ orderId: id }, 'updateStatus:READY — order ready before early timer, dispatching now');
+                    }
+                    await cache.set(`dispatch:early:${id}`, 'fired', 3600);
+                    dispatchService.dispatchOrder(id, notificationService).catch((err) =>
+                        log.error({ err, orderId: id }, 'updateStatus:dispatch:error'),
+                    );
+                }
             } catch (err) {
                 log.warn({ err }, 'updateStatus:dispatch:serviceNotReady');
             }
@@ -1452,6 +1480,17 @@ export class OrderService {
 
             notifyCustomerOrderStatus(context.notificationService, dbOrder.userId, id, 'PREPARING');
 
+            // Schedule driver dispatch to fire EARLY_DISPATCH_LEAD_MIN minutes before ready
+            // so drivers have time to reach the business before the food is ready.
+            try {
+                const dispatchService = getDispatchService();
+                dispatchService
+                    .scheduleEarlyDispatch(id, preparationMinutes, context.notificationService)
+                    .catch((err) => log.error({ err, orderId: id }, 'startPreparing:earlyDispatch:error'));
+            } catch (err) {
+                log.warn({ err }, 'startPreparing:dispatch:serviceNotReady');
+            }
+
             emitOrderEvent({
                 orderId: id,
                 eventType: 'ORDER_PREPARING',
@@ -1542,9 +1581,11 @@ export class OrderService {
                             ? (parseDbTimestamp(dbOrder.outForDeliveryAt)?.getTime() ?? Date.now())
                             : Date.now();
 
-            if (!(status === 'OUT_FOR_DELIVERY' && estimatedMinutes === 0)) {
-                updateLiveActivity(notificationService, id, liveActivityStatus, driverName, estimatedMinutes, phaseInitialMinutes, phaseStartedAt);
-            }
+            // Always push the Live Activity update. When OFD has no GPS ETA yet,
+            // fall back to 15 minutes so the Dynamic Island transitions immediately.
+            // The frontend JS-side OFD grace period will refine the ETA once GPS arrives.
+            const safeEstimatedMinutes = (status === 'OUT_FOR_DELIVERY' && estimatedMinutes === 0) ? 15 : estimatedMinutes;
+            updateLiveActivity(notificationService, id, liveActivityStatus, driverName, safeEstimatedMinutes, phaseInitialMinutes, phaseStartedAt);
 
             if (status === 'DELIVERED' || status === 'CANCELLED') {
                 endLiveActivity(notificationService, id, status === 'CANCELLED' ? 'cancelled' : 'delivered');

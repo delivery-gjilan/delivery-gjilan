@@ -28,6 +28,7 @@ import { getInitials, getAvatarColor } from "@/lib/avatarUtils";
 import { gql } from "@apollo/client";
 import { useMapRealtimeData } from "@/lib/hooks/useMapRealtimeData";
 import { useOrderRouteDistances } from "@/lib/hooks/useOrderRouteDistances";
+import { usePrepTimeAlerts, type PrepTimeAlert } from "@/lib/hooks/usePrepTimeAlerts";
 import { toast } from 'sonner';
 
 // ╔══════════════════════════════════════════════════════════╗
@@ -737,6 +738,8 @@ export default function MapPage() {
   const [approvalModalOrderId, setApprovalModalOrderId] = useState<string | null>(null);
   const [dismissedApprovalOrderIds, setDismissedApprovalOrderIds] = useState<Set<string>>(new Set());
   const seenFlaggedOrderIdsRef = useRef<Set<string>>(new Set());
+  const [prepTimeAlerts, setPrepTimeAlerts] = useState<PrepTimeAlert[]>([]);
+  const { dismiss: dismissPrepAlert } = usePrepTimeAlerts(setPrepTimeAlerts);
   const [adminCancelOrder, { loading: cancellingOrder }] = useMutation(ADMIN_CANCEL_ORDER, { refetchQueries: ['GetOrders'] });
   const [approveOrder, { loading: approvingOrder }] = useMutation(APPROVE_ORDER, { fetchPolicy: 'no-cache' });
   const [setOrderAdminNote] = useMutation(SET_ORDER_ADMIN_NOTE);
@@ -1926,6 +1929,7 @@ export default function MapPage() {
           const isPending = order.status === "PENDING";
           const orderDateMs = order.orderDate ? new Date(order.orderDate).getTime() : now;
           const pendingTooLong = isPending && (now - orderDateMs) > PENDING_WARNING_MS;
+          const hasPrepAlert = prepTimeAlerts.some((a) => a.orderId === order.id);
 
           return (
             <Marker key={`o-${order.id}`} latitude={drop.latitude} longitude={drop.longitude} anchor="bottom"
@@ -1938,6 +1942,9 @@ export default function MapPage() {
                 )}
                 {pendingTooLong && (
                   <div className="absolute -inset-1 w-7 h-7 rounded-full bg-red-500/40 animate-pulse" />
+                )}
+                {hasPrepAlert && !pendingTooLong && (
+                  <div className="absolute -inset-2 w-9 h-9 rounded-full ring-2 ring-amber-400 animate-pulse opacity-80" />
                 )}
                 {isSelected && (
                   <div className="absolute -inset-1.5 w-8 h-8 rounded-full border-2 border-violet-400 animate-pulse" />
@@ -2222,6 +2229,22 @@ export default function MapPage() {
                   
                   {/* Business name */}
                   <div className="text-sm font-medium text-white truncate mb-1">{businessName}</div>
+
+                  {/* Prep time extended alert */}
+                  {(() => {
+                    const alert = prepTimeAlerts.find((a) => a.orderId === order.id);
+                    if (!alert) return null;
+                    return (
+                      <div className="flex items-center gap-1.5 mb-2 px-2 py-1 rounded-md bg-amber-500/15 border border-amber-500/30">
+                        <Clock size={11} className="text-amber-400 flex-shrink-0" />
+                        <span className="text-amber-400 text-[10px] font-semibold flex-1">+{alert.addedMinutes}m (now {alert.newTotalMinutes}m)</span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); dismissPrepAlert(alert.orderId); }}
+                          className="text-amber-400/60 hover:text-amber-400 text-xs leading-none"
+                        >×</button>
+                      </div>
+                    );
+                  })()}
                   
                   {/* Customer */}
                   <div className="mb-2">

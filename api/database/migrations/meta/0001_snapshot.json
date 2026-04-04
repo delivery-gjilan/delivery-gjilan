@@ -1,6 +1,6 @@
 {
-  "id": "970e83a3-c7bd-4f99-b277-3233b061d1a3",
-  "prevId": "ce66ecd2-ecd5-445e-a7d3-85ca048a4d5b",
+  "id": "ffd859dc-4e41-492d-a658-fbe6b99646c5",
+  "prevId": "1beabb7a-2948-430b-8c86-b7e40242af2f",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -177,6 +177,32 @@
           "primaryKey": false,
           "notNull": true
         },
+        "media_type": {
+          "name": "media_type",
+          "type": "banner_media_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'IMAGE'"
+        },
+        "business_id": {
+          "name": "business_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "promotion_id": {
+          "name": "promotion_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "link_type": {
           "name": "link_type",
           "type": "text",
@@ -186,6 +212,26 @@
         "link_target": {
           "name": "link_target",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "display_context": {
+          "name": "display_context",
+          "type": "banner_display_context",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'HOME'"
+        },
+        "starts_at": {
+          "name": "starts_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ends_at": {
+          "name": "ends_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
@@ -219,7 +265,47 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "banners_business_id_businesses_id_fk": {
+          "name": "banners_business_id_businesses_id_fk",
+          "tableFrom": "banners",
+          "tableTo": "businesses",
+          "columnsFrom": [
+            "business_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "banners_product_id_products_id_fk": {
+          "name": "banners_product_id_products_id_fk",
+          "tableFrom": "banners",
+          "tableTo": "products",
+          "columnsFrom": [
+            "product_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "banners_promotion_id_promotions_id_fk": {
+          "name": "banners_promotion_id_promotions_id_fk",
+          "tableFrom": "banners",
+          "tableTo": "promotions",
+          "columnsFrom": [
+            "promotion_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -337,6 +423,20 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'0'"
+        },
+        "is_featured": {
+          "name": "is_featured",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "featured_sort_order": {
+          "name": "featured_sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         },
         "created_at": {
           "name": "created_at",
@@ -2259,6 +2359,13 @@
           "primaryKey": false,
           "notNull": false,
           "default": "'yellow'"
+        },
+        "is_demo_account": {
+          "name": "is_demo_account",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "image_url": {
           "name": "image_url",
@@ -6133,6 +6240,27 @@
         "CATEGORY",
         "SUBCATEGORY",
         "DELIVERY_ZONE"
+      ]
+    },
+    "public.banner_display_context": {
+      "name": "banner_display_context",
+      "schema": "public",
+      "values": [
+        "HOME",
+        "BUSINESS",
+        "CATEGORY",
+        "PRODUCT",
+        "CART",
+        "ALL"
+      ]
+    },
+    "public.banner_media_type": {
+      "name": "banner_media_type",
+      "schema": "public",
+      "values": [
+        "IMAGE",
+        "GIF",
+        "VIDEO"
       ]
     },
     "public.business_type": {
