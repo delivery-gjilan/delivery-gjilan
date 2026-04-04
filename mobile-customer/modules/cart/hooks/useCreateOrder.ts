@@ -43,6 +43,7 @@ export function useCreateOrder() {
             selectedOptions: item.selectedOptions.map((opt) => ({
                 optionGroupId: opt.optionGroupId,
                 optionId: opt.optionId,
+                price: opt.extraPrice > 0 ? opt.extraPrice : null,
             })),
             childItems:
                 item.childItems?.map((child) => ({
