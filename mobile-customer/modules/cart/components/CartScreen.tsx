@@ -15,7 +15,7 @@ import { useCreateOrder } from '../hooks/useCreateOrder';
 import { useSuccessModalStore } from '@/store/useSuccessModalStore';
 import { useActiveOrdersStore } from '@/modules/orders/store/activeOrdersStore';
 import { useApolloClient, useLazyQuery, useQuery, useMutation } from '@apollo/client/react';
-import { GET_ORDERS } from '@/graphql/operations/orders';
+import { GET_ORDERS, GET_PRIORITY_SURCHARGE_AMOUNT } from '@/graphql/operations/orders';
 import { GET_PRODUCT } from '@/graphql/operations/products';
 import { VALIDATE_PROMOTIONS, GET_APPLICABLE_PROMOTIONS, GET_PROMOTION_THRESHOLDS } from '@/graphql/operations/promotions';
 import { GET_MY_ADDRESSES, ADD_USER_ADDRESS, SET_DEFAULT_ADDRESS } from '@/graphql/operations/addresses';
@@ -41,7 +41,6 @@ const _celebrationShownPromoIds = new Set<string>();
 type CheckoutLocation = SelectedAddress;
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
-const PRIORITY_SURCHARGE = 1.50;
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -239,6 +238,11 @@ export const CartScreen = () => {
         fetchPolicy: 'cache-and-network',
     });
     const minOrderAmount = Number(businessMinData?.business?.minOrderAmount ?? 0);
+
+    const { data: surchargeData } = useQuery(GET_PRIORITY_SURCHARGE_AMOUNT, {
+        fetchPolicy: 'cache-and-network',
+    });
+    const serverPrioritySurcharge = Number(surchargeData?.prioritySurchargeAmount ?? 0);
     const minimumMet = minOrderAmount <= 0 || total >= minOrderAmount;
     const amountUntilMinimum = Math.max(0, minOrderAmount - total);
 
@@ -688,7 +692,7 @@ export const CartScreen = () => {
         ? promoResult?.discountAmount ?? 0
         : 0;
 
-    const prioritySurcharge = isPriority ? PRIORITY_SURCHARGE : 0;
+    const prioritySurcharge = isPriority ? serverPrioritySurcharge : 0;
 
     const baseDeliveryPrice = manualPromoApplied
         ? promoResult?.effectiveDeliveryPrice ?? deliveryPrice
@@ -828,7 +832,7 @@ export const CartScreen = () => {
             // stored deliveryPrice while keeping zone/tier validation intact.
             // deliveryPrice = base/promo delivery fee WITHOUT priority surcharge.
             // prioritySurcharge is sent separately for independent server validation.
-            const apiDeliveryPrice = deliveryPrice;
+            const apiDeliveryPrice = baseDeliveryPrice;
             const order = await createOrder(
                 selectedLocation,
                 apiDeliveryPrice,
@@ -1336,7 +1340,7 @@ export const CartScreen = () => {
                                         {t.cart.estimated_time_priority}
                                     </Text>
                                     <Text className="text-xs font-semibold" style={{ color: isPriority ? theme.colors.primary : theme.colors.subtext }}>
-                                        +{formatCurrency(PRIORITY_SURCHARGE)}
+                                        +{formatCurrency(serverPrioritySurcharge)}
                                     </Text>
                                 </TouchableOpacity>
                             </View>
@@ -1424,7 +1428,7 @@ export const CartScreen = () => {
                                         <Text className="text-sm" style={{ color: theme.colors.subtext }}>{t.cart.priority_fee}</Text>
                                     </View>
                                     <Text className="text-sm font-semibold" style={{ color: theme.colors.primary }}>
-                                        +{formatCurrency(PRIORITY_SURCHARGE)}
+                                        +{formatCurrency(serverPrioritySurcharge)}
                                     </Text>
                                 </View>
                             )}

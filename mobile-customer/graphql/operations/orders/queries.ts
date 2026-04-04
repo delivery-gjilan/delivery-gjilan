@@ -371,3 +371,9 @@ export const UNCOMPLETED_ORDERS = graphql(`
         }
     }
 `);
+
+export const GET_PRIORITY_SURCHARGE_AMOUNT = graphql(`
+    query GetPrioritySurchargeAmount {
+        prioritySurchargeAmount
+    }
+`);
