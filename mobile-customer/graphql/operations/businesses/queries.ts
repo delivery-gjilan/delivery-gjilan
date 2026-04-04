@@ -35,6 +35,7 @@ export const GET_BUSINESSES = graphql(`
                 description
                 type
                 discountValue
+                spendThreshold
             }
             minOrderAmount
             createdAt

@@ -53,6 +53,7 @@ export class SettlementCalculationEngine {
                 .where(
                     and(
                         eq(settlementRules.isActive, true),
+                        eq(settlementRules.isDeleted, false),
                         or(
                             // Global rules (no business, no promotion scoping)
                             and(isNull(settlementRules.businessId), isNull(settlementRules.promotionId)),
@@ -276,9 +277,17 @@ export class SettlementCalculationEngine {
             base = Number(order.actualPrice ?? 0);
         }
 
-        const amount = rule.amountType === 'FIXED'
+        let amount = rule.amountType === 'FIXED'
             ? Number(rule.amount)
             : (base * Number(rule.amount)) / 100;
+
+        // For PERCENT rules: cap at maxAmount if configured
+        if (rule.amountType === 'PERCENT' && rule.maxAmount != null) {
+            const cap = Number(rule.maxAmount);
+            if (cap > 0 && amount > cap) {
+                amount = cap;
+            }
+        }
 
         if (amount <= 0) return;
 

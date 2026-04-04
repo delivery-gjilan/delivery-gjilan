@@ -82,6 +82,7 @@ opsWallRouter.get('/', async (req: Request, res: Response) => {
                         count: sql<number>`count(*)::int`,
                     })
                     .from(driversTable)
+                    .where(eq(driversTable.isDeleted, false))
                     .groupBy(driversTable.connectionStatus),
 
                 // Drivers marked CONNECTED but heartbeat is stale (> 60s)
@@ -90,6 +91,7 @@ opsWallRouter.get('/', async (req: Request, res: Response) => {
                     .from(driversTable)
                     .where(
                         and(
+                            eq(driversTable.isDeleted, false),
                             eq(driversTable.connectionStatus, 'CONNECTED'),
                             isNotNull(driversTable.lastHeartbeatAt),
                             sql`${driversTable.lastHeartbeatAt} < now() - interval '60 seconds'`,
@@ -104,6 +106,7 @@ opsWallRouter.get('/', async (req: Request, res: Response) => {
                     .from(driversTable)
                     .where(
                         and(
+                            eq(driversTable.isDeleted, false),
                             eq(driversTable.connectionStatus, 'CONNECTED'),
                             isNotNull(driversTable.lastHeartbeatAt),
                         ),
@@ -123,6 +126,7 @@ opsWallRouter.get('/', async (req: Request, res: Response) => {
                     .innerJoin(usersTable, eq(usersTable.id, driversTable.userId))
                     .where(
                         and(
+                            eq(driversTable.isDeleted, false),
                             eq(driversTable.connectionStatus, 'DISCONNECTED'),
                             isNotNull(driversTable.disconnectedAt),
                         ),

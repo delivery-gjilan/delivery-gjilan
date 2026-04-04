@@ -1,6 +1,6 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { getDB } from '@/database';
-import { promotions, userPromotions, promotionBusinessEligibility } from '@/database/schema';
+import { promotions } from '@/database/schema';
 import { eq } from 'drizzle-orm';
 import { AppError } from '@/lib/errors';
 
@@ -11,12 +11,8 @@ export const deletePromotion: NonNullable<MutationResolvers['deletePromotion']> 
 
   const db = await getDB();
   
-  // Delete related records first
-  await db.delete(userPromotions).where(eq(userPromotions.promotionId, id));
-  await db.delete(promotionBusinessEligibility).where(eq(promotionBusinessEligibility.promotionId, id));
-  
-  // Delete the promotion
-  await db.delete(promotions).where(eq(promotions.id, id));
+  // Soft-delete: mark as deleted and deactivate (preserves FK references from orders, settlements, etc.)
+  await db.update(promotions).set({ isDeleted: true, isActive: false }).where(eq(promotions.id, id));
   
   return true;
 };

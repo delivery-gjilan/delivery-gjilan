@@ -7,6 +7,7 @@
 
 ## Recent Updates
 
+- 2026-04-04: `Business.activePromotion` resolver uses subquery-based eligibility (not INNER JOIN) so promotions with no `promotionBusinessEligibility` entries (global promos) appear on all business cards. `BusinessPromotion` type now includes `spendThreshold`. Mobile-customer cards use localized customer-friendly labels for all six promotion types.
 - 2026-03-31: Priority surcharge (opt-in expedited delivery fee) is now stored as a separate `priority_surcharge` column on orders and automatically creates a `DRIVER / RECEIVABLE` settlement for cash orders (`rule_id = null`).
 - 2026-03-31: Added business-funded promotion flow: `orders.business_price` column, business-funded item discounts stored as `businessPrice`, settlement rules skipped for business-funded item promos, ORDER_PRICE settlements use business-funded base when present, admin wizard exposes creator type toggle + business selector with settlement rules info box.
 - 2026-03-25: Comprehensive doc refresh — added PromotionEngine service docs, stacking logic, progression bar (mobile-customer), corrected promotions table fields to match actual schema, added mobile-customer key files.
@@ -80,10 +81,12 @@ A rule says: _"For every matching order, create a settlement of X between the pl
 | `direction` | `RECEIVABLE` \| `PAYABLE` | From the platform's POV |
 | `amount_type` | `FIXED` \| `PERCENT` | How to calculate the amount |
 | `amount` | numeric(10,2) | EUR if FIXED, percentage (0–100) if PERCENT |
+| `max_amount` | numeric(10,2) (nullable) | Cap for PERCENT rules; calculated amount is clamped to this ceiling |
 | `applies_to` | `SUBTOTAL` \| `DELIVERY_FEE` | Base for PERCENT rules (ignored for FIXED) |
 | `business_id` | UUID (nullable) | Scoped to a specific business (null = all) |
 | `promotion_id` | UUID (nullable) | Scoped to a specific promotion (null = all) |
 | `is_active` | boolean | Only active rules are applied |
+| `is_deleted` | boolean | Soft-delete flag (default false). See `api/SOFT_DELETE_CONVENTION.md`. |
 | `notes` | varchar(500) | Internal notes |
 
 ### Scoping
@@ -100,7 +103,7 @@ Rules can be targeted:
 ### Amount Calculation
 
 - **FIXED**: settlement amount = `rule.amount` (flat EUR per order)
-- **PERCENT**: settlement amount = `base × rule.amount / 100`
+- **PERCENT**: settlement amount = `base × rule.amount / 100`, capped at `rule.max_amount` if set
   - If `applies_to = SUBTOTAL` → base = `order.price` (the items total)
   - If `applies_to = DELIVERY_FEE` → base = `order.deliveryPrice`
 
@@ -330,6 +333,43 @@ Called after order creation:
 Called on order cancellation:
 - Deletes `promotion_usage` records for the order
 - Decrements promotion and user metadata counters with `GREATEST(0, val - 1)`
+
+---
+
+## Business Card Promotion Badges
+
+The `Business.activePromotion` field resolver (`api/src/models/Business/resolvers/Business.ts`) determines which promotion badge appears on each business card in mobile-customer.
+
+### Resolver Logic
+
+Returns the single highest-priority active promotion for a business:
+1. Query promotions where `isActive = true`, `isDeleted = false`, within time window
+2. Eligibility: promotion is either explicitly linked via `promotion_business_eligibility` OR has no eligibility entries (global promo applying to all businesses)
+3. Order by `priority DESC`, limit 1
+4. Returns `BusinessPromotion { id, name, description, type, discountValue, spendThreshold }`
+
+### Customer-Facing Labels (mobile-customer)
+
+`RestaurantCard` (full-size) shows localized labels with threshold info. `CompactRestaurantCard` (horizontal scroll) shows abbreviated labels.
+
+| Type | RestaurantCard label (Albanian) | CompactRestaurantCard label |
+|------|------|------|
+| `PERCENTAGE` | `-20% Zbritje` | `-20% Zbritje` |
+| `FIXED_AMOUNT` | `-€2.00 Zbritje` | `-€2.00 Zbritje` |
+| `FREE_DELIVERY` | `Transporti Falas` | `Transporti Falas` |
+| `SPEND_X_GET_FREE` | `Transport Falas mbi €15` | `Transporti Falas` |
+| `SPEND_X_PERCENT` | `-20% mbi €15` | `-20% Zbritje` |
+| `SPEND_X_FIXED` | `-€2.00 mbi €15` | `-€2.00 Zbritje` |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `api/src/models/Business/resolvers/Business.ts` | `activePromotion` field resolver |
+| `api/src/models/Business/Business.graphql` | `BusinessPromotion` type definition |
+| `mobile-customer/modules/business/components/RestaurantCard.tsx` | Full business card with promotion badge |
+| `mobile-customer/modules/business/components/CompactRestaurantCard.tsx` | Compact card with abbreviated badge |
+| `mobile-customer/localization/schema.ts` | Locale keys: `business.item_discount`, `flat_discount`, `free_delivery`, `free_delivery_over`, `percent_off_over`, `flat_off_over` |
 
 ---
 

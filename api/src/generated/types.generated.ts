@@ -334,6 +334,7 @@ export type BusinessPromotion = {
   discountValue?: Maybe<Scalars['Float']['output']>;
   id: Scalars['ID']['output'];
   name: Scalars['String']['output'];
+  spendThreshold?: Maybe<Scalars['Float']['output']>;
   type: PromotionType;
 };
 
@@ -551,6 +552,7 @@ export type CreateSettlementRuleInput = {
   businessId?: InputMaybe<Scalars['ID']['input']>;
   direction: SettlementDirection;
   entityType: SettlementEntityType;
+  maxAmount?: InputMaybe<Scalars['Float']['input']>;
   name: Scalars['String']['input'];
   notes?: InputMaybe<Scalars['String']['input']>;
   promotionId?: InputMaybe<Scalars['ID']['input']>;
@@ -2702,6 +2704,7 @@ export type SettlementRule = {
   entityType: SettlementEntityType;
   id: Scalars['ID']['output'];
   isActive: Scalars['Boolean']['output'];
+  maxAmount?: Maybe<Scalars['Float']['output']>;
   name: Scalars['String']['output'];
   notes?: Maybe<Scalars['String']['output']>;
   promotion?: Maybe<Promotion>;
@@ -3023,6 +3026,7 @@ export type UpdateSettlementRuleInput = {
   appliesTo?: InputMaybe<Scalars['String']['input']>;
   direction?: InputMaybe<SettlementDirection>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  maxAmount?: InputMaybe<Scalars['Float']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   notes?: InputMaybe<Scalars['String']['input']>;
   type?: InputMaybe<SettlementRuleType>;
@@ -3812,6 +3816,7 @@ export type BusinessPromotionResolvers<ContextType = GraphQLContext, ParentType 
   discountValue?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  spendThreshold?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   type?: Resolver<ResolversTypes['PromotionType'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
@@ -4739,6 +4744,7 @@ export type SettlementRuleResolvers<ContextType = GraphQLContext, ParentType ext
   entityType?: Resolver<ResolversTypes['SettlementEntityType'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   isActive?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  maxAmount?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   notes?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   promotion?: Resolver<Maybe<ResolversTypes['Promotion']>, ParentType, ContextType>;

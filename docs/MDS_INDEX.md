@@ -65,6 +65,7 @@
 | O14 | [OPERATIONS/MONITORING_FUTURE_PLAN.md](OPERATIONS/MONITORING_FUTURE_PLAN.md) | Operations | Forward monitoring roadmap: dispatch, freshness, SLOs, integrity, business-impact signals |
 | O15 | [APP_STORE_DEPLOYMENT.md](APP_STORE_DEPLOYMENT.md) | Operations | Workspace-level App Store submission tracker for the four mobile apps, including completed/skipped phases and release blockers |
 | O17 | [OPERATIONS/ANDROID_PLAY_STORE_DEPLOYMENT.md](OPERATIONS/ANDROID_PLAY_STORE_DEPLOYMENT.md) | Operations | Android Play Store deployment plan for Zipp Go, Zipp Driver, and Zipp Business — map bug root cause, config gap matrix, build/submit phases, Data Safety form requirements |
+| O18 | [OPERATIONS/HA_DEPLOYMENT_PLAN.md](OPERATIONS/HA_DEPLOYMENT_PLAN.md) | Operations | High-availability deployment plan: load balancer (Nginx/Caddy), 2–3 API instances (PM2/Docker), shared Redis + Postgres, WebSocket upgrade config, health check endpoint, risk matrix, 2-VPS launch stack |
 | O16 | [DEMO_MODE_PLAN.md](DEMO_MODE_PLAN.md) | Operations | Apple review demo-account flow, auto-progression behavior, reviewer credentials strategy, and admin-panel demo-account operations |
 | UI1 | [ADMIN_MOBILEBUSINESS_UI_CONTEXT.md](ADMIN_MOBILEBUSINESS_UI_CONTEXT.md) | UI | Product types, variant groups, admin/mobile-business UX |
 | UI2 | [ADMIN_PANEL_BUSINESS_SETTLEMENTS.md](ADMIN_PANEL_BUSINESS_SETTLEMENTS.md) | UI | Business-facing settlements semantics, filters, lazy order details |
@@ -75,7 +76,9 @@
 |----|------|--------|---------|
 | R1 | [../README.md](../README.md) | Root | Workspace layout, quick start, schema change guide |
 | R2 | [OPERATIONS/TYPECHECK_AGENT_HANDOFF.md](OPERATIONS/TYPECHECK_AGENT_HANDOFF.md) | Operations | Typecheck report, error hotspots, fix order |
+| R3 | [../api/SOFT_DELETE_CONVENTION.md](../api/SOFT_DELETE_CONVENTION.md) | Backend | Soft-delete rules, affected tables, repository pattern enforcement |
 | P1 | [../.prompts/mobile-rules.md](../.prompts/mobile-rules.md) | Prompts | mobile-customer/driver coding guidelines |
+| P2 | [../.github/copilot-instructions.md](../.github/copilot-instructions.md) | Prompts | API repository-first rule, soft-delete enforcement for AI agents |
 | PKG1 | [../admin-panel/README.md](../admin-panel/README.md) | Package | Admin panel structure, realtime model |
 | PKG2 | [../mobile-business/README.md](../mobile-business/README.md) | Package | Business app features, GraphQL ops, structure |
 | PKG3 | [../mobile-customer/README.md](../mobile-customer/README.md) | Package | Mobile customer app module structure |

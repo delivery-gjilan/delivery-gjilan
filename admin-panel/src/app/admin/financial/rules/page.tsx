@@ -41,7 +41,8 @@ function formatAmount(rule: SettlementRule): string {
         return `€${Number(rule.amount).toFixed(2)}`;
     }
     const base = rule.type === SettlementRuleType.DeliveryPrice ? 'delivery fee' : 'subtotal';
-    return `${Number(rule.amount)}% of ${base}`;
+    const cap = rule.maxAmount ? ` (max €${Number(rule.maxAmount).toFixed(2)})` : '';
+    return `${Number(rule.amount)}% of ${base}${cap}`;
 }
 
 function formatScope(rule: SettlementRule): string {
@@ -436,6 +437,7 @@ function SettlementRuleForm({
     const [direction, setDirection] = useState(initialValues?.direction || 'RECEIVABLE');
     const [amountType, setAmountType] = useState(initialValues?.amountType || 'PERCENT');
     const [amount, setAmount] = useState(initialValues?.amount || '');
+    const [maxAmount, setMaxAmount] = useState(initialValues?.maxAmount?.toString() || '');
     const [businessId, setBusinessId] = useState(initialValues?.business?.id || 'none');
     const [promotionId, setPromotionId] = useState(initialValues?.promotion?.id || 'none');
     const [notes, setNotes] = useState(initialValues?.notes || '');
@@ -461,6 +463,7 @@ function SettlementRuleForm({
             direction,
             amountType,
             amount: parsedAmount,
+            maxAmount: amountType === 'PERCENT' && maxAmount.trim() ? Number(maxAmount) : null,
             businessId: businessId !== 'none' ? businessId : null,
             promotionId: promotionId !== 'none' ? promotionId : null,
             notes: notes || null,
@@ -523,7 +526,10 @@ function SettlementRuleForm({
 
                 <div className="space-y-2">
                     <Label>Amount Type</Label>
-                    <Select value={amountType} onValueChange={setAmountType}>
+                    <Select value={amountType} onValueChange={(v) => {
+                        setAmountType(v);
+                        if (v !== 'PERCENT') setMaxAmount('');
+                    }}>
                         <SelectTrigger className="bg-zinc-900 border-zinc-800">
                             <SelectValue />
                         </SelectTrigger>
@@ -546,6 +552,24 @@ function SettlementRuleForm({
                     className="bg-zinc-900 border-zinc-800"
                 />
             </div>
+
+            {amountType === 'PERCENT' && (
+                <div className="space-y-2">
+                    <Label>Max Amount Cap (EUR, optional)</Label>
+                    <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={maxAmount}
+                        onChange={(e) => setMaxAmount(e.target.value)}
+                        placeholder="e.g. 5.00 — leave empty for no cap"
+                        className="bg-zinc-900 border-zinc-800"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                        If set, the calculated percentage amount will never exceed this value.
+                    </p>
+                </div>
+            )}
 
             <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">

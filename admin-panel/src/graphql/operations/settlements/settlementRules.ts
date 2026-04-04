@@ -10,6 +10,7 @@ export const GET_SETTLEMENT_RULES = graphql(`
             direction
             amountType
             amount
+            maxAmount
             appliesTo
             business {
                 id
@@ -31,6 +32,7 @@ export const CREATE_SETTLEMENT_RULE = graphql(`
         createSettlementRule(input: $input) {
             id
             name
+            maxAmount
         }
     }
 `);
@@ -40,6 +42,7 @@ export const UPDATE_SETTLEMENT_RULE = graphql(`
         updateSettlementRule(id: $id, input: $input) {
             id
             isActive
+            maxAmount
         }
     }
 `);

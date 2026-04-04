@@ -10,6 +10,9 @@ import {
 } from '@/database/schema';
 import { eq, and, or, isNull, lte, gte, ne, desc } from 'drizzle-orm';
 
+/** NOTE: The promotions table has an isDeleted column. All queries MUST filter by isDeleted=false.
+ *  Deletions MUST set isDeleted=true instead of removing the row. See SOFT_DELETE_CONVENTION.md. */
+
 export interface PromotionFilters {
     isActive?: boolean;
     type?: string;
@@ -40,7 +43,7 @@ export class PromotionRepository {
         const [promo] = await this.db
             .select()
             .from(promotions)
-            .where(eq(promotions.id, id))
+            .where(and(eq(promotions.id, id), eq(promotions.isDeleted, false)))
             .limit(1);
         
         return promo || null;
@@ -50,7 +53,7 @@ export class PromotionRepository {
         const [promo] = await this.db
             .select()
             .from(promotions)
-            .where(eq(promotions.code, code.toUpperCase()))
+            .where(and(eq(promotions.code, code.toUpperCase()), eq(promotions.isDeleted, false)))
             .limit(1);
         
         return promo || null;
@@ -60,6 +63,9 @@ export class PromotionRepository {
         let query: any = this.db.select().from(promotions);
 
         const conditions = [];
+
+        // Always exclude soft-deleted
+        conditions.push(eq(promotions.isDeleted, false));
 
         if (filters.isActive !== undefined) {
             conditions.push(eq(promotions.isActive, filters.isActive));
@@ -121,34 +127,29 @@ export class PromotionRepository {
     }
 
     async delete(id: string): Promise<boolean> {
-        // Delete related records first
-        await this.db
-            .delete(userPromotions)
-            .where(eq(userPromotions.promotionId, id));
-        
-        await this.db
-            .delete(promotionBusinessEligibility)
-            .where(eq(promotionBusinessEligibility.promotionId, id));
-        
-        // Delete the promotion
-        const result = await this.db
-            .delete(promotions)
-            .where(eq(promotions.id, id));
+        // Soft-delete: mark as deleted instead of removing
+        const [result] = await this.db
+            .update(promotions)
+            .set({ isDeleted: true, isActive: false })
+            .where(eq(promotions.id, id))
+            .returning();
         
         return !!result;
     }
 
     async checkCodeExists(code: string, excludeId?: string): Promise<boolean> {
-        let query: any = this.db
+        const conditions: any[] = [
+            eq(promotions.code, code.toUpperCase()),
+            eq(promotions.isDeleted, false),
+        ];
+        if (excludeId) {
+            conditions.push(ne(promotions.id, excludeId));
+        }
+        const [result] = await this.db
             .select()
             .from(promotions)
-            .where(eq(promotions.code, code.toUpperCase()));
-        
-        if (excludeId) {
-            query = query.where(ne(promotions.id, excludeId)) as any;
-        }
-        
-        const [result] = await query.limit(1);
+            .where(and(...conditions))
+            .limit(1);
         return !!result;
     }
 

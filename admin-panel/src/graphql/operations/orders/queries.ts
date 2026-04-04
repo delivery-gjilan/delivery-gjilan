@@ -22,6 +22,12 @@ export const GET_ORDERS = graphql(`
             needsApproval
             locationFlagged
             approvalReasons
+            driver {
+                id
+                firstName
+                lastName
+                email
+            }
             user {
                 id
                 firstName
@@ -84,6 +90,12 @@ export const GET_ORDER = graphql(`
             needsApproval
             locationFlagged
             approvalReasons
+            driver {
+                id
+                firstName
+                lastName
+                email
+            }
             user {
                 id
                 firstName
@@ -139,6 +151,12 @@ export const GET_ORDERS_BY_STATUS = graphql(`
             needsApproval
             locationFlagged
             approvalReasons
+            driver {
+                id
+                firstName
+                lastName
+                email
+            }
             dropOffLocation {
                 latitude
                 longitude

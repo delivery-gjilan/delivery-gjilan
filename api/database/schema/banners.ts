@@ -40,6 +40,7 @@ export const banners = pgTable('banners', {
   // Ordering and status
   sortOrder: integer('sort_order').notNull().default(0),
   isActive: boolean('is_active').notNull().default(true),
+  isDeleted: boolean('is_deleted').default(false).notNull(),
   
   // Metadata
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

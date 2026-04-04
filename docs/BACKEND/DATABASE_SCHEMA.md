@@ -3,11 +3,19 @@
 <!-- MDS:B7 | Domain: Backend | Updated: 2026-03-18 -->
 <!-- Depends-On: B1 -->
 <!-- Depended-By: B2, B5, B6, BL1, BL2 -->
-<!-- Nav: Any schema change (new table, new column, migration) → update this file and the relevant domain MDS. Settlement tables → BL1. Auth tables → B5. Pricing tables → B6. Order tables → B2. -->
+<!-- Nav: Any schema change (new table, new column, migration) → update this file and the relevant domain MDS. Settlement tables → BL1. Auth tables → B5. Pricing tables → B6. Order tables → B2. Soft-delete rules → api/SOFT_DELETE_CONVENTION.md. -->
 
 ## Overview
 
 All tables are defined in `api/database/schema/` as Drizzle ORM table definitions. New tables must be exported from `api/database/schema/index.ts`.
+
+### Soft-Delete Pattern
+
+Eight tables use an `isDeleted: boolean` column (default `false`). Rows are never physically deleted — the column is set to `true` instead. All reads MUST filter `isDeleted = false` unless doing a historical lookup (e.g., resolving a product name from an existing order). Full rules and table list in [`api/SOFT_DELETE_CONVENTION.md`](../../api/SOFT_DELETE_CONVENTION.md).
+
+**Soft-delete tables:** `promotions`, `settlement_rules`, `products`, `product_categories`, `drivers`, `option_groups`, `options`, `banners`.
+
+**Legacy soft-delete (timestamp):** `users` (`deleted_at`), `businesses` (`deleted_at`).
 
 **Migration commands:**
 ```bash
@@ -49,15 +57,15 @@ npm run db:studio     # open Drizzle Studio at https://local.drizzle.studio
 | `businesses` | `businesses.ts` | Soft delete via `deleted_at`. Location, hours, type (RESTAURANT etc). |
 | `business_hours` | `businessHoursRepository.ts` | Weekly schedule; `opens_at`/`closes_at` in **minutes from midnight**. Atomic replace strategy. |
 | `store_settings` | `storeSettings.ts` | Per-store configuration flags. |
-| `product_categories` | `productCategories.ts` | Top-level categories; hard delete cascades to products. |
+| `product_categories` | `productCategories.ts` | Top-level categories. Soft-delete via `is_deleted`. |
 | `product_subcategories` | `productSubcategories.ts` | Subcategories; hard delete sets `product.subcategory_id = null`. |
 | `product_variant_groups` | `productVariantGroups.ts` | Groups variants of same base item. |
-| `products` | `products.ts` | See pricing fields below. FK: businessId, categoryId, subcategoryId, groupId. |
-| `option_groups` | `optionGroups.ts` | Named groups of options (e.g., "Size", "Toppings"). |
-| `options` | `options.ts` | Individual option choices; each has a price delta. |
+| `products` | `products.ts` | Soft-delete via `is_deleted`. See pricing fields below. FK: businessId, categoryId, subcategoryId, groupId. |
+| `option_groups` | `optionGroups.ts` | Named groups of options (e.g., "Size", "Toppings"). Soft-delete via `is_deleted`. |
+| `options` | `options.ts` | Individual option choices; each has a price delta. Soft-delete via `is_deleted`. |
 | `product_pricing` | `productPricing.ts` | Business/platform price split + pricing history JSONB. Not yet live in PricingService. |
 | `dynamic_pricing_rules` | `productPricing.ts` | Condition-based price adjustment rules (schema only; not evaluated yet). |
-| `banners` | `banners.ts` | Promotional banners shown in the customer app. |
+| `banners` | `banners.ts` | Promotional banners shown in the customer app. Soft-delete via `is_deleted`. |
 
 **Key `products` pricing fields:**
 
@@ -95,13 +103,13 @@ npm run db:studio     # open Drizzle Studio at https://local.drizzle.studio
 
 | Table | File | Notes |
 |-------|------|-------|
-| `promotions` | `promotions.ts` | 6 types: FIXED_AMOUNT, PERCENTAGE, FREE_DELIVERY, SPEND_X_GET_FREE, SPEND_X_PERCENT, SPEND_X_FIXED. |
+| `promotions` | `promotions.ts` | 6 types: FIXED_AMOUNT, PERCENTAGE, FREE_DELIVERY, SPEND_X_GET_FREE, SPEND_X_PERCENT, SPEND_X_FIXED. Soft-delete via `is_deleted`. |
 | `promotion_redemptions` | `promotionRedemptions.ts` | Per-user redemption log. |
 | `promotion_business_eligibility` | `promotionBusinessEligibility.ts` | Restrict promo to specific businesses. |
 | `user_promotions` | `userPromotions.ts` | Assign promos to specific users. |
 | `user_promo_metadata` | `userPromoMetadata.ts` | Per-user stats (first-order-promo-used, total-savings). |
 | `settlements` | `settlements.ts` | DRIVER \| BUSINESS, RECEIVABLE \| PAYABLE. Lifecycle: PENDING → PAID/OVERDUE/CANCELLED/DISPUTED. |
-| `settlement_rules` | `settlementRules.ts` | Admin-configured commission rules. Scoped: global, business, promotion, or both. |
+| `settlement_rules` | `settlementRules.ts` | Admin-configured commission rules. Scoped: global, business, promotion, or both. Has `max_amount` cap for PERCENT rules. Soft-delete via `is_deleted`. |
 
 ---
 
@@ -109,7 +117,7 @@ npm run db:studio     # open Drizzle Studio at https://local.drizzle.studio
 
 | Table | File | Notes |
 |-------|------|-------|
-| `drivers` | `drivers.ts` | `connection_status`: CONNECTED, STALE, LOST, DISCONNECTED. Throttled location writes (5m min distance, 10s interval). |
+| `drivers` | `drivers.ts` | `connection_status`: CONNECTED, STALE, LOST, DISCONNECTED. Throttled location writes (5m min distance, 10s interval). Soft-delete via `is_deleted`. |
 
 ---
 
@@ -171,8 +179,8 @@ npm run db:studio     # open Drizzle Studio at https://local.drizzle.studio
 | Column names | `snake_case` |
 | Primary keys | `uuid` with `defaultRandom()` |
 | Timestamps | `created_at`, `updated_at` (with timezone), auto-managed |
-| Soft delete | `deleted_at` timestamp (currently: users, businesses) |
-| Hard delete | product categories, subcategories, products, orders |
+| Soft delete | `is_deleted` boolean (8 tables: promotions, settlementRules, products, productCategories, drivers, optionGroups, options, banners). `deleted_at` timestamp for users and businesses (legacy). All queries must go through the repository layer — see `api/SOFT_DELETE_CONVENTION.md`. |
+| Hard delete | subcategories only (sets `product.subcategory_id = null`). Orders use status tracking (`CANCELLED`). |
 | Enums | Defined in schema file, exported, aligned with GraphQL generated types |
 
 ---

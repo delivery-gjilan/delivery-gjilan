@@ -24,6 +24,10 @@ export const SettlementRule: SettlementRuleResolvers = {
     amount: (rule) => {
         return Number(rule.amount);
     },
+    maxAmount: (rule) => {
+        const val = (rule as any).maxAmount;
+        return val != null ? Number(val) : null;
+    },
     // Backward-compat: derive appliesTo from type
     appliesTo: (rule) => {
         const ruleType = (rule as any).type;

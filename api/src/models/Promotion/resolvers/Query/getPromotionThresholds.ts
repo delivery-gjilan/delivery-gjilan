@@ -18,6 +18,7 @@ export const getPromotionThresholds: NonNullable<QueryResolvers['getPromotionThr
     .where(
       and(
         eq(promotions.isActive, true),
+        eq(promotions.isDeleted, false),
         or(
           eq(promotions.target, 'CONDITIONAL'),
           eq(promotions.target, 'ALL_USERS')

@@ -4,6 +4,9 @@ import {
 } from '@/database/schema';
 import { eq, and, or, isNull, isNotNull, inArray, type SQL } from 'drizzle-orm';
 
+/** NOTE: The settlement_rules table has an isDeleted column. All queries MUST filter by isDeleted=false.
+ *  Deletions MUST set isDeleted=true instead of removing the row. See SOFT_DELETE_CONVENTION.md. */
+
 type Database = DbType;
 
 export interface SettlementRuleFilters {
@@ -22,7 +25,7 @@ export class SettlementRuleRepository {
         const result = await this.db
             .select()
             .from(settlementRules)
-            .where(eq(settlementRules.id, id));
+            .where(and(eq(settlementRules.id, id), eq(settlementRules.isDeleted, false)));
         
         return result[0] || null;
     }
@@ -30,6 +33,9 @@ export class SettlementRuleRepository {
     async getRules(filters: SettlementRuleFilters): Promise<DbSettlementRule[]> {
         let query = this.db.select().from(settlementRules);
         const conditions = [];
+
+        // Always exclude soft-deleted
+        conditions.push(eq(settlementRules.isDeleted, false));
 
         if (filters.entityTypes && filters.entityTypes.length > 0) {
             conditions.push(inArray(settlementRules.entityType, filters.entityTypes as any));
@@ -124,11 +130,13 @@ export class SettlementRuleRepository {
     }
 
     async deleteRule(id: string): Promise<boolean> {
-        const result = await this.db
-            .delete(settlementRules)
+        // Soft-delete: mark as deleted instead of removing
+        const [result] = await this.db
+            .update(settlementRules)
+            .set({ isDeleted: true, isActive: false })
             .where(eq(settlementRules.id, id))
-            .returning({ id: settlementRules.id });
+            .returning();
 
-        return result.length > 0;
+        return !!result;
     }
 }

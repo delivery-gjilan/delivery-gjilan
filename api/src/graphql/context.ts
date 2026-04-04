@@ -13,6 +13,7 @@ import type { Logger } from '@/lib/logger';
 import { NotificationService } from '@/services/NotificationService';
 import { PromotionService } from '@/services/PromotionService';
 import { FinancialService } from '@/services/FinancialService';
+import { BannerRepository } from '@/repositories/BannerRepository';
 import { DataLoaders } from './dataloaders';
 
 export interface ApiContextInterface {
@@ -41,6 +42,7 @@ export interface ApiContextInterface {
     notificationService: NotificationService;
     promotionService: PromotionService;
     financialService: FinancialService;
+    bannerRepository: BannerRepository;
     pubsub: PubSub;
     loaders: DataLoaders;
 }

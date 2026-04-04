@@ -1,12 +1,12 @@
 import { ProductRepository } from '@/repositories/ProductRepository';
+import { OptionGroupRepository } from '@/repositories/OptionGroupRepository';
+import { OptionRepository } from '@/repositories/OptionRepository';
 import { Product, CreateProductInput, UpdateProductInput, ProductCard } from '@/generated/types.generated';
 import { productValidator } from '@/validators/ProductValidator';
 import { DbProduct } from '@/database/schema/products';
 import type { DbType } from '@/database';
 import { businesses } from '@/database/schema/businesses';
 import { productVariantGroups } from '@/database/schema/productVariantGroups';
-import { optionGroups } from '@/database/schema/optionGroups';
-import { options as optionsTable } from '@/database/schema/options';
 import { products as productsTable } from '@/database/schema/products';
 import { and, eq, isNull, inArray } from 'drizzle-orm';
 import logger from '@/lib/logger';
@@ -16,10 +16,18 @@ import { cache } from '@/lib/cache';
 const log = logger.child({ service: 'ProductService' });
 
 export class ProductService {
+    private optionGroupRepository?: OptionGroupRepository;
+    private optionRepository?: OptionRepository;
+
     constructor(
         private productRepository: ProductRepository,
         private db?: DbType,
-    ) {}
+    ) {
+        if (db) {
+            this.optionGroupRepository = new OptionGroupRepository(db);
+            this.optionRepository = new OptionRepository(db);
+        }
+    }
 
     private mapToProduct(product: DbProduct): Product {
         return {
@@ -114,13 +122,10 @@ export class ProductService {
         // Batch-query which products have option groups
         const allProductIds = allProducts.map((p) => p.id);
         const productsWithOptionGroups = new Set<string>();
-        if (this.db && allProductIds.length > 0) {
-            const rows = await this.db
-                .selectDistinct({ productId: optionGroups.productId })
-                .from(optionGroups)
-                .where(inArray(optionGroups.productId, allProductIds));
-            for (const row of rows) {
-                productsWithOptionGroups.add(row.productId);
+        if (this.optionGroupRepository && allProductIds.length > 0) {
+            const ids = await this.optionGroupRepository.findDistinctProductIdsWithGroups(allProductIds);
+            for (const id of ids) {
+                productsWithOptionGroups.add(id);
             }
         }
 
@@ -264,16 +269,15 @@ export class ProductService {
             displayOrder?: number | null;
         }>;
     }) {
-        if (!this.db) throw AppError.businessRule('Database not available');
+        if (!this.optionGroupRepository || !this.optionRepository || !this.db) {
+            throw AppError.businessRule('Database not available');
+        }
 
         // Validate linked products are not offers
         const linkedProductIds = input.options.map((o) => o.linkedProductId).filter((id): id is string => !!id);
 
         if (linkedProductIds.length > 0) {
-            const linkedProducts = await this.db
-                .select({ id: productsTable.id, isOffer: productsTable.isOffer })
-                .from(productsTable)
-                .where(inArray(productsTable.id, linkedProductIds));
+            const linkedProducts = await this.productRepository.findByIds(linkedProductIds);
             for (const lp of linkedProducts) {
                 if (lp.isOffer) {
                     throw AppError.badInput(`Linked product ${lp.id} cannot be an offer`);
@@ -281,20 +285,17 @@ export class ProductService {
             }
         }
 
-        const [createdGroup] = await this.db
-            .insert(optionGroups)
-            .values({
-                productId: input.productId,
-                name: input.name,
-                minSelections: input.minSelections,
-                maxSelections: input.maxSelections,
-                displayOrder: input.displayOrder ?? 0,
-            })
-            .returning();
+        const createdGroup = await this.optionGroupRepository.create({
+            productId: input.productId,
+            name: input.name,
+            minSelections: input.minSelections,
+            maxSelections: input.maxSelections,
+            displayOrder: input.displayOrder ?? 0,
+        });
 
         // Insert options
         if (input.options.length > 0) {
-            await this.db.insert(optionsTable).values(
+            await this.optionRepository.createMany(
                 input.options.map((opt, idx) => ({
                     optionGroupId: createdGroup.id,
                     name: opt.name,
@@ -317,7 +318,7 @@ export class ProductService {
             displayOrder?: number | null;
         },
     ) {
-        if (!this.db) throw AppError.businessRule('Database not available');
+        if (!this.optionGroupRepository) throw AppError.businessRule('Database not available');
         const updateData: Record<string, unknown> = {};
         if (input.name !== undefined && input.name !== null) updateData.name = input.name;
         if (input.minSelections !== undefined && input.minSelections !== null)
@@ -327,15 +328,14 @@ export class ProductService {
         if (input.displayOrder !== undefined && input.displayOrder !== null)
             updateData.displayOrder = input.displayOrder;
 
-        const [updated] = await this.db.update(optionGroups).set(updateData).where(eq(optionGroups.id, id)).returning();
+        const updated = await this.optionGroupRepository.update(id, updateData);
         if (!updated) throw AppError.notFound('OptionGroup');
         return updated;
     }
 
     async deleteOptionGroup(id: string): Promise<boolean> {
-        if (!this.db) throw AppError.businessRule('Database not available');
-        const [deleted] = await this.db.delete(optionGroups).where(eq(optionGroups.id, id)).returning();
-        return !!deleted;
+        if (!this.optionGroupRepository) throw AppError.businessRule('Database not available');
+        return this.optionGroupRepository.delete(id);
     }
 
     // ─── Options ──────────────────────────────────────────────────────
@@ -349,30 +349,23 @@ export class ProductService {
             displayOrder?: number | null;
         },
     ) {
-        if (!this.db) throw AppError.businessRule('Database not available');
+        if (!this.optionRepository) throw AppError.businessRule('Database not available');
 
         // Validate linked product is not an offer
         if (input.linkedProductId) {
-            const [linkedProduct] = await this.db
-                .select({ isOffer: productsTable.isOffer })
-                .from(productsTable)
-                .where(eq(productsTable.id, input.linkedProductId));
+            const linkedProduct = await this.productRepository.findById(input.linkedProductId);
             if (linkedProduct?.isOffer) {
                 throw AppError.badInput('Linked product cannot be an offer');
             }
         }
 
-        const [created] = await this.db
-            .insert(optionsTable)
-            .values({
-                optionGroupId,
-                name: input.name,
-                extraPrice: input.extraPrice ?? 0,
-                linkedProductId: input.linkedProductId,
-                displayOrder: input.displayOrder ?? 0,
-            })
-            .returning();
-        return created;
+        return this.optionRepository.create({
+            optionGroupId,
+            name: input.name,
+            extraPrice: input.extraPrice ?? 0,
+            linkedProductId: input.linkedProductId,
+            displayOrder: input.displayOrder ?? 0,
+        });
     }
 
     async updateOption(
@@ -384,13 +377,10 @@ export class ProductService {
             displayOrder?: number | null;
         },
     ) {
-        if (!this.db) throw AppError.businessRule('Database not available');
+        if (!this.optionRepository) throw AppError.businessRule('Database not available');
 
         if (input.linkedProductId) {
-            const [linkedProduct] = await this.db
-                .select({ isOffer: productsTable.isOffer })
-                .from(productsTable)
-                .where(eq(productsTable.id, input.linkedProductId));
+            const linkedProduct = await this.productRepository.findById(input.linkedProductId);
             if (linkedProduct?.isOffer) {
                 throw AppError.badInput('Linked product cannot be an offer');
             }
@@ -403,14 +393,13 @@ export class ProductService {
         if (input.displayOrder !== undefined && input.displayOrder !== null)
             updateData.displayOrder = input.displayOrder;
 
-        const [updated] = await this.db.update(optionsTable).set(updateData).where(eq(optionsTable.id, id)).returning();
+        const updated = await this.optionRepository.update(id, updateData);
         if (!updated) throw AppError.notFound('Option');
         return updated;
     }
 
     async deleteOption(id: string): Promise<boolean> {
-        if (!this.db) throw AppError.businessRule('Database not available');
-        const [deleted] = await this.db.delete(optionsTable).where(eq(optionsTable.id, id)).returning();
-        return !!deleted;
+        if (!this.optionRepository) throw AppError.businessRule('Database not available');
+        return this.optionRepository.delete(id);
     }
 }

@@ -310,6 +310,7 @@ type BusinessPromotion {
   discountValue: Float
   id: ID!
   name: String!
+  spendThreshold: Float
   type: PromotionType!
 }
 
@@ -528,6 +529,7 @@ input CreateSettlementRuleInput {
   businessId: ID
   direction: SettlementDirection!
   entityType: SettlementEntityType!
+  maxAmount: Float
   name: String!
   notes: String
   promotionId: ID
@@ -1734,6 +1736,7 @@ type SettlementRule {
   entityType: SettlementEntityType!
   id: ID!
   isActive: Boolean!
+  maxAmount: Float
   name: String!
   notes: String
   promotion: Promotion
@@ -2002,6 +2005,7 @@ input UpdateSettlementRuleInput {
   appliesTo: String
   direction: SettlementDirection
   isActive: Boolean
+  maxAmount: Float
   name: String
   notes: String
   type: SettlementRuleType

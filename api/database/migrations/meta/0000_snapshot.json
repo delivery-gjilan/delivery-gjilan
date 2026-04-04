@@ -1,9 +1,5 @@
 {
-<<<<<<< HEAD
-  "id": "18bdba9d-03ef-4bd5-8aba-0f512e58752b",
-=======
-  "id": "e4d6bf37-81b5-47d2-a8f8-a47de0417ccf",
->>>>>>> 769e1433ecdde3f8ea4ee27baeb85db2626ebf7b
+  "id": "a1f9dc7b-328d-4479-87b6-a9de357412f4",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -252,6 +248,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": true
+        },
+        "is_deleted": {
+          "name": "is_deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -1108,6 +1111,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'2'"
+        },
+        "is_deleted": {
+          "name": "is_deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -1989,6 +1999,13 @@
           "notNull": false,
           "default": true
         },
+        "is_deleted": {
+          "name": "is_deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "sort_order": {
           "name": "sort_order",
           "type": "integer",
@@ -2125,6 +2142,13 @@
           "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true
+        },
+        "is_deleted": {
+          "name": "is_deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "sort_order": {
           "name": "sort_order",
@@ -2833,6 +2857,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "max_amount": {
+          "name": "max_amount",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "business_id": {
           "name": "business_id",
           "type": "uuid",
@@ -2851,6 +2881,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": true
+        },
+        "is_deleted": {
+          "name": "is_deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "notes": {
           "name": "notes",
@@ -3777,6 +3814,13 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
+        },
+        "is_deleted": {
+          "name": "is_deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "created_by": {
           "name": "created_by",
@@ -5546,6 +5590,13 @@
           "notNull": true,
           "default": 0
         },
+        "is_deleted": {
+          "name": "is_deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -5641,6 +5692,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
+        },
+        "is_deleted": {
+          "name": "is_deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "created_at": {
           "name": "created_at",

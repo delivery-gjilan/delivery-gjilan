@@ -41,6 +41,7 @@ interface CompactRestaurantCardProps {
         description?: string | null;
         type: string;
         discountValue?: number | null;
+        spendThreshold?: number | null;
     } | null;
 }
 
@@ -111,17 +112,17 @@ export const CompactRestaurantCard = React.memo(function CompactRestaurantCard({
                         <Ionicons name="pricetag" size={9} color="black" />
                         <Text style={{ color: 'black', fontWeight: '600', fontSize: 9 }}>
                             {activePromotion.type === 'PERCENTAGE' && activePromotion.discountValue
-                                ? `-${Math.round(activePromotion.discountValue)}%`
+                                ? t.business.item_discount.replace('{{percent}}', String(Math.round(activePromotion.discountValue)))
                                 : activePromotion.type === 'FIXED_AMOUNT' && activePromotion.discountValue
-                                  ? `-€${activePromotion.discountValue.toFixed(2)}`
+                                  ? t.business.flat_discount.replace('{{amount}}', activePromotion.discountValue.toFixed(2))
                                   : activePromotion.type === 'FREE_DELIVERY'
                                     ? t.business.free_delivery
                                     : activePromotion.type === 'SPEND_X_GET_FREE'
                                       ? t.business.free_delivery
                                       : activePromotion.type === 'SPEND_X_PERCENT' && activePromotion.discountValue
-                                        ? `-${Math.round(activePromotion.discountValue)}%`
+                                        ? t.business.item_discount.replace('{{percent}}', String(Math.round(activePromotion.discountValue)))
                                         : activePromotion.type === 'SPEND_X_FIXED' && activePromotion.discountValue
-                                          ? `-€${activePromotion.discountValue.toFixed(2)}`
+                                          ? t.business.flat_discount.replace('{{amount}}', activePromotion.discountValue.toFixed(2))
                                           : activePromotion.name}
                         </Text>
                     </View>

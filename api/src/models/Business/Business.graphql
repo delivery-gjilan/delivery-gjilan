@@ -35,6 +35,7 @@ type BusinessPromotion {
     description: String
     type: PromotionType!
     discountValue: Float
+    spendThreshold: Float
 }
 
 type Query {

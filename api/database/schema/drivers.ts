@@ -112,6 +112,9 @@ export const drivers = pgTable('drivers', {
    */
   maxActiveOrders: numeric('max_active_orders', { precision: 3, scale: 0 }).default('2').notNull(),
 
+  // Soft-delete
+  isDeleted: boolean('is_deleted').default(false).notNull(),
+
   // Metadata
   createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
     .default(sql`CURRENT_TIMESTAMP`)

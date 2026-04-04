@@ -1,4 +1,4 @@
-import { pgTable, varchar, timestamp, uuid, index, integer } from 'drizzle-orm/pg-core';
+import { pgTable, varchar, timestamp, uuid, index, integer, boolean } from 'drizzle-orm/pg-core';
 import { businesses } from './businesses';
 import { products } from './products';
 import { relations, sql } from 'drizzle-orm';
@@ -10,6 +10,7 @@ export const productCategories = pgTable('product_categories', {
         .notNull()
         .references(() => businesses.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 255 }).notNull(),
+    isDeleted: boolean('is_deleted').default(false).notNull(),
     sortOrder: integer('sort_order').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
         .default(sql`CURRENT_TIMESTAMP`)

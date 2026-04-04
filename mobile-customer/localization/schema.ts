@@ -479,6 +479,9 @@ export const translationSchema = z.object(
             item_discount: s(),
             flat_discount: s(),
             free_delivery: s(),
+            free_delivery_over: s(),
+            percent_off_over: s(),
+            flat_off_over: s(),
         }),
         product: z.object({
             not_found: s(),

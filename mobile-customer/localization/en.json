@@ -476,9 +476,12 @@
         "not_found": "Business not found",
         "busy_title": "Restaurant is busy right now",
         "busy_message": "Food is going to take about {{minutes}} min.",
-        "item_discount": "-{{percent}}% Item Discount",
-        "flat_discount": "-€{{amount}} Discount",
-        "free_delivery": "Free Delivery"
+        "item_discount": "-{{percent}}% Off",
+        "flat_discount": "-€{{amount}} Off",
+        "free_delivery": "Free Delivery",
+        "free_delivery_over": "Free Delivery over €{{threshold}}",
+        "percent_off_over": "-{{percent}}% over €{{threshold}}",
+        "flat_off_over": "-€{{amount}} over €{{threshold}}"
     },
     "product": {
         "not_found": "Product not found",

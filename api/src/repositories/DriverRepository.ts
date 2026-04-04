@@ -3,6 +3,9 @@ import { drivers as driversTable, DbDriver, NewDbDriver, DriverConnectionStatusT
 import { eq, sql, and, isNotNull, or } from 'drizzle-orm';
 import { cache } from '@/lib/cache';
 
+/** NOTE: The drivers table has an isDeleted column. All queries MUST filter by isDeleted=false.
+ *  Deletions MUST set isDeleted=true instead of removing the row. See SOFT_DELETE_CONVENTION.md. */
+
 // Thresholds for connection state transitions (in seconds)
 export const CONNECTION_THRESHOLDS = {
   STALE: 45,      // No heartbeat for 45s -> STALE (warning state)
@@ -47,7 +50,7 @@ export class DriverRepository {
     const [driver] = await this.db
       .select()
       .from(driversTable)
-      .where(eq(driversTable.userId, userId));
+      .where(and(eq(driversTable.userId, userId), eq(driversTable.isDeleted, false)));
     return driver;
   }
 
@@ -57,7 +60,7 @@ export class DriverRepository {
   async getAllDrivers(): Promise<DbDriver[]> {
     const cached = await cache.get<DbDriver[]>(cache.keys.drivers());
     if (cached) return cached;
-    const rows = await this.db.select().from(driversTable);
+    const rows = await this.db.select().from(driversTable).where(eq(driversTable.isDeleted, false));
     await cache.set(cache.keys.drivers(), rows, cache.TTL.DRIVERS);
     return rows;
   }
@@ -71,7 +74,7 @@ export class DriverRepository {
     return this.db
       .select()
       .from(driversTable)
-      .where(eq(driversTable.connectionStatus, connectionStatus));
+      .where(and(eq(driversTable.connectionStatus, connectionStatus), eq(driversTable.isDeleted, false)));
   }
 
   /**
@@ -184,6 +187,7 @@ export class DriverRepository {
       })
       .where(
         and(
+          eq(driversTable.isDeleted, false),
           isNotNull(driversTable.lastHeartbeatAt),
           // Between stale and disconnected thresholds (use raw SQL for interval to avoid parameterization)
           sql`${driversTable.lastHeartbeatAt} < now() - interval '${sql.raw(String(CONNECTION_THRESHOLDS.STALE))} seconds'`,
@@ -210,6 +214,7 @@ export class DriverRepository {
       })
       .where(
         and(
+          eq(driversTable.isDeleted, false),
           isNotNull(driversTable.lastHeartbeatAt),
           // Older than lost threshold (use raw SQL for interval to avoid parameterization)
           sql`${driversTable.lastHeartbeatAt} < now() - interval '${sql.raw(String(CONNECTION_THRESHOLDS.LOST))} seconds'`,
@@ -237,6 +242,7 @@ export class DriverRepository {
       })
       .where(
         and(
+          eq(driversTable.isDeleted, false),
           eq(driversTable.userId, userId),
           isNotNull(driversTable.lastHeartbeatAt),
           sql`${driversTable.lastHeartbeatAt} < now() - interval '${sql.raw(String(CONNECTION_THRESHOLDS.STALE))} seconds'`,
@@ -261,6 +267,7 @@ export class DriverRepository {
       })
       .where(
         and(
+          eq(driversTable.isDeleted, false),
           eq(driversTable.userId, userId),
           isNotNull(driversTable.lastHeartbeatAt),
           sql`${driversTable.lastHeartbeatAt} < now() - interval '${sql.raw(String(CONNECTION_THRESHOLDS.LOST))} seconds'`,
@@ -288,6 +295,7 @@ export class DriverRepository {
       })
       .where(
         and(
+          eq(driversTable.isDeleted, false),
           isNotNull(driversTable.lastHeartbeatAt),
           sql`${driversTable.lastHeartbeatAt} < now() - interval '${sql.raw(String(CONNECTION_THRESHOLDS.DISCONNECTED))} seconds'`,
           or(
@@ -315,6 +323,7 @@ export class DriverRepository {
       })
       .where(
         and(
+          eq(driversTable.isDeleted, false),
           eq(driversTable.userId, userId),
           isNotNull(driversTable.lastHeartbeatAt),
           sql`${driversTable.lastHeartbeatAt} < now() - interval '${sql.raw(String(CONNECTION_THRESHOLDS.DISCONNECTED))} seconds'`,
@@ -372,6 +381,7 @@ export class DriverRepository {
         count: sql<number>`COUNT(*)::INT`,
       })
       .from(driversTable)
+      .where(eq(driversTable.isDeleted, false))
       .groupBy(driversTable.connectionStatus);
 
     const counts: Record<DriverConnectionStatusType, number> = {
@@ -390,10 +400,12 @@ export class DriverRepository {
    * Delete driver (cascade delete via FK)
    */
   async deleteDriver(userId: string): Promise<boolean> {
-    const result = await this.db
-      .delete(driversTable)
+    // Soft-delete: mark as deleted instead of removing
+    const [result] = await this.db
+      .update(driversTable)
+      .set({ isDeleted: true, connectionStatus: 'DISCONNECTED', onlinePreference: false })
       .where(eq(driversTable.userId, userId))
       .returning();
-    return result.length > 0;
+    return !!result;
   }
 }

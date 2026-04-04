@@ -476,9 +476,12 @@
         "not_found": "Biznesi nuk u gjet",
         "busy_title": "Restoranti është i zënë tani",
         "busy_message": "Ushqimi do të marrë rreth {{minutes}} min.",
-        "item_discount": "-{{percent}}% Zbritje Artikulli",
+        "item_discount": "-{{percent}}% Zbritje",
         "flat_discount": "-€{{amount}} Zbritje",
-        "free_delivery": "Transporti Falas"
+        "free_delivery": "Transporti Falas",
+        "free_delivery_over": "Transport Falas mbi €{{threshold}}",
+        "percent_off_over": "-{{percent}}% mbi €{{threshold}}",
+        "flat_off_over": "-€{{amount}} mbi €{{threshold}}"
     },
     "product": {
         "not_found": "Produkti nuk u gjet",

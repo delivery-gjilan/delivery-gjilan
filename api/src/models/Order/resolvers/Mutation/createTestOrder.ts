@@ -4,7 +4,7 @@ import { getDB } from '@/database';
 import { orders, orderItems, deliveryPricingTiers } from '@/database/schema';
 import { businesses as businessesTable, products as productsTable } from '@/database/schema';
 import { users as usersTable } from '@/database/schema';
-import { eq, asc, isNull } from 'drizzle-orm';
+import { eq, and, asc, isNull } from 'drizzle-orm';
 import { AppError } from '@/lib/errors';
 
 export const createTestOrder: NonNullable<MutationResolvers['createTestOrder']> = async (
@@ -43,7 +43,7 @@ export const createTestOrder: NonNullable<MutationResolvers['createTestOrder']> 
         const businessProducts = await db
             .select()
             .from(productsTable)
-            .where(eq(productsTable.businessId, business.id));
+            .where(and(eq(productsTable.businessId, business.id), eq(productsTable.isDeleted, false)));
 
         if (businessProducts.length > 0) {
             businessesWithProducts.push({

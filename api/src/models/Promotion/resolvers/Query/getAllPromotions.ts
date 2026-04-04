@@ -12,7 +12,7 @@ export const getAllPromotions: NonNullable<QueryResolvers['getAllPromotions']> =
 
   const db = await getDB();
   
-  let query = db.select().from(promotions);
+  let query = db.select().from(promotions).where(eq(promotions.isDeleted, false));
   
   // Filter by isActive if provided
   if (args.isActive !== undefined && args.isActive !== null) {

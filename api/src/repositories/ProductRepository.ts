@@ -2,6 +2,9 @@ import { DbType } from '@/database';
 import { DbProduct, NewDbProduct, products } from '@/database/schema/products';
 import { eq, and, inArray, asc } from 'drizzle-orm';
 
+/** NOTE: The products table has an isDeleted column. All queries MUST filter by isDeleted=false.
+ *  Deletions MUST set isDeleted=true instead of removing the row. See SOFT_DELETE_CONVENTION.md. */
+
 export class ProductRepository {
     constructor(private db: DbType) {}
 
@@ -12,20 +15,20 @@ export class ProductRepository {
 
     async findById(id: string): Promise<DbProduct | undefined> {
         return this.db.query.products.findFirst({
-            where: eq(products.id, id),
+            where: and(eq(products.id, id), eq(products.isDeleted, false)),
         });
     }
 
     async findByIds(ids: string[]): Promise<DbProduct[]> {
         if (ids.length === 0) return [];
         return this.db.query.products.findMany({
-            where: inArray(products.id, ids),
+            where: and(inArray(products.id, ids), eq(products.isDeleted, false)),
         });
     }
 
     async findByBusinessId(businessId: string): Promise<DbProduct[]> {
         return this.db.query.products.findMany({
-            where: eq(products.businessId, businessId),
+            where: and(eq(products.businessId, businessId), eq(products.isDeleted, false)),
             orderBy: (products, { asc }) => [
                 asc(products.categoryId),
                 asc(products.subcategoryId),
@@ -40,8 +43,9 @@ export class ProductRepository {
     }
 
     async delete(id: string): Promise<boolean> {
-        const [deletedProduct] = await this.db.delete(products).where(eq(products.id, id)).returning();
-        return !!deletedProduct;
+        // Soft-delete: mark as deleted instead of removing
+        const [result] = await this.db.update(products).set({ isDeleted: true, isAvailable: false }).where(eq(products.id, id)).returning();
+        return !!result;
     }
 
     async updateProductsOrder(businessId: string, productsOrder: { id: string; sortOrder: number }[]): Promise<void> {

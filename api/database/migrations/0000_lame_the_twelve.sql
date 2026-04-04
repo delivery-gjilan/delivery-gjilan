@@ -60,6 +60,7 @@ CREATE TABLE "banners" (
 	"ends_at" timestamp with time zone,
 	"sort_order" integer DEFAULT 0 NOT NULL,
 	"is_active" boolean DEFAULT true NOT NULL,
+	"is_deleted" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -173,6 +174,7 @@ CREATE TABLE "drivers" (
 	"commission_percentage" numeric(5, 2) DEFAULT '0' NOT NULL,
 	"has_own_vehicle" boolean DEFAULT false NOT NULL,
 	"max_active_orders" numeric(3, 0) DEFAULT '2' NOT NULL,
+	"is_deleted" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	CONSTRAINT "drivers_user_id_unique" UNIQUE("user_id")
@@ -260,6 +262,7 @@ CREATE TABLE "products" (
 	"is_on_sale" boolean DEFAULT false,
 	"sale_discount_percentage" numeric(5, 2),
 	"is_available" boolean DEFAULT true,
+	"is_deleted" boolean DEFAULT false NOT NULL,
 	"sort_order" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -269,6 +272,7 @@ CREATE TABLE "product_categories" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"business_id" uuid NOT NULL,
 	"name" varchar(255) NOT NULL,
+	"is_deleted" boolean DEFAULT false NOT NULL,
 	"sort_order" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -341,9 +345,11 @@ CREATE TABLE "settlement_rules" (
 	"direction" "settlement_direction" NOT NULL,
 	"amount_type" "settlement_rule_amount_type" NOT NULL,
 	"amount" numeric(10, 2) NOT NULL,
+	"max_amount" numeric(10, 2),
 	"business_id" uuid,
 	"promotion_id" uuid,
 	"is_active" boolean DEFAULT true NOT NULL,
+	"is_deleted" boolean DEFAULT false NOT NULL,
 	"notes" varchar(500),
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -435,6 +441,7 @@ CREATE TABLE "promotions" (
 	"total_usage_count" integer DEFAULT 0 NOT NULL,
 	"creator_type" "promotion_creator_type" DEFAULT 'PLATFORM' NOT NULL,
 	"creator_id" uuid,
+	"is_deleted" boolean DEFAULT false NOT NULL,
 	"created_by" uuid,
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -619,6 +626,7 @@ CREATE TABLE "option_groups" (
 	"min_selections" integer DEFAULT 0 NOT NULL,
 	"max_selections" integer DEFAULT 1 NOT NULL,
 	"display_order" integer DEFAULT 0 NOT NULL,
+	"is_deleted" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -630,6 +638,7 @@ CREATE TABLE "options" (
 	"extra_price" numeric(10, 2) DEFAULT 0 NOT NULL,
 	"linked_product_id" uuid,
 	"display_order" integer DEFAULT 0 NOT NULL,
+	"is_deleted" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );

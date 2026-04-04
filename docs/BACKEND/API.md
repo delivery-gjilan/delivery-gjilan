@@ -24,7 +24,7 @@ The backend follows a practical layered layout rather than strict clean architec
 
 - `api/src/models` contains GraphQL schema modules and resolver entrypoints
 - `api/src/services` contains orchestration and domain logic
-- `api/src/repositories` contains database-facing logic
+- `api/src/repositories` contains database-facing logic. **Repository-first rule:** all tables with `isDeleted` columns must be queried through their repository to ensure soft-delete filtering. See `api/SOFT_DELETE_CONVENTION.md`.
 - `api/src/graphql` contains schema assembly and context wiring
 - `api/src/generated` contains codegen output derived from schema and resolver definitions
 

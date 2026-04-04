@@ -279,6 +279,9 @@ export class PromotionService {
                 direction: 'PAYABLE',
                 amountType,
                 amount: amountValue.toString(),
+                maxAmount: amountType === 'PERCENT' && promo.maxDiscountCap
+                    ? promo.maxDiscountCap.toString()
+                    : null,
                 promotionId: promo.id,
                 isActive: true,
                 notes: `Auto-created platform subsidy for promotion ${promo.id}`,

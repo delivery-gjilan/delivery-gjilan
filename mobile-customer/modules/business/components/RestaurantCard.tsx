@@ -4,6 +4,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { useEstimatedDeliveryPrice } from '@/hooks/useEstimatedDeliveryPrice';
+import { useTranslations } from '@/localization/useTranslations';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IMAGE_HEIGHT = 192; // h-48 equivalent
@@ -52,6 +53,7 @@ interface RestaurantCardProps {
         description?: string | null;
         type: string;
         discountValue?: number | null;
+        spendThreshold?: number | null;
     } | null;
 }
 
@@ -76,6 +78,7 @@ export function RestaurantCard({
     activePromotion,
 }: RestaurantCardProps) {
     const theme = useTheme();
+    const { t } = useTranslations();
     const isFavorite = useFavoritesStore((state) => state.isFavorite(id));
     const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
     const { estimateDeliveryPrice } = useEstimatedDeliveryPrice();
@@ -181,12 +184,28 @@ export function RestaurantCard({
                             <Ionicons name="pricetag" size={14} color="black" />
                             <Text className="text-black font-semibold text-xs">
                                 {activePromotion.type === 'PERCENTAGE' && activePromotion.discountValue
-                                    ? `${Math.round(activePromotion.discountValue)}% Zbritje`
+                                    ? t.business.item_discount.replace('{{percent}}', String(Math.round(activePromotion.discountValue)))
                                     : activePromotion.type === 'FIXED_AMOUNT' && activePromotion.discountValue
-                                      ? `€${activePromotion.discountValue.toFixed(2)} Zbritje`
+                                      ? t.business.flat_discount.replace('{{amount}}', activePromotion.discountValue.toFixed(2))
                                       : activePromotion.type === 'FREE_DELIVERY'
-                                        ? 'Transporti Falas'
-                                        : activePromotion.name}
+                                        ? t.business.free_delivery
+                                        : activePromotion.type === 'SPEND_X_GET_FREE' && activePromotion.spendThreshold
+                                          ? t.business.free_delivery_over.replace('{{threshold}}', String(Math.round(activePromotion.spendThreshold)))
+                                          : activePromotion.type === 'SPEND_X_GET_FREE'
+                                            ? t.business.free_delivery
+                                            : activePromotion.type === 'SPEND_X_PERCENT' && activePromotion.discountValue
+                                              ? (activePromotion.spendThreshold
+                                                  ? t.business.percent_off_over
+                                                      .replace('{{percent}}', String(Math.round(activePromotion.discountValue)))
+                                                      .replace('{{threshold}}', String(Math.round(activePromotion.spendThreshold)))
+                                                  : t.business.item_discount.replace('{{percent}}', String(Math.round(activePromotion.discountValue))))
+                                              : activePromotion.type === 'SPEND_X_FIXED' && activePromotion.discountValue
+                                                ? (activePromotion.spendThreshold
+                                                    ? t.business.flat_off_over
+                                                        .replace('{{amount}}', activePromotion.discountValue.toFixed(2))
+                                                        .replace('{{threshold}}', String(Math.round(activePromotion.spendThreshold)))
+                                                    : t.business.flat_discount.replace('{{amount}}', activePromotion.discountValue.toFixed(2)))
+                                                : activePromotion.name}
                             </Text>
                         </View>
                     )}

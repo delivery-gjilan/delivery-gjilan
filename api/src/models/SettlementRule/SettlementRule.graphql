@@ -21,6 +21,7 @@ type SettlementRule {
   direction: SettlementDirection!
   amountType: SettlementAmountType!
   amount: Float!
+  maxAmount: Float
   # Legacy field kept for backward compatibility - derived from type
   appliesTo: String
   business: Business
@@ -38,6 +39,7 @@ input CreateSettlementRuleInput {
   direction: SettlementDirection!
   amountType: SettlementAmountType!
   amount: Float!
+  maxAmount: Float
   # Legacy field kept for backward compatibility - ignored, use type instead
   appliesTo: String
   businessId: ID
@@ -51,6 +53,7 @@ input UpdateSettlementRuleInput {
   direction: SettlementDirection
   amountType: SettlementAmountType
   amount: Float
+  maxAmount: Float
   # Legacy field kept for backward compatibility - ignored, use type instead
   appliesTo: String
   isActive: Boolean

@@ -82,6 +82,9 @@ export const promotions = pgTable(
         creatorType: promotionCreatorTypeEnum('creator_type').default('PLATFORM').notNull(),
         creatorId: uuid('creator_id').references(() => businesses.id, { onDelete: 'set null' }), // null = platform
 
+        // Soft-delete
+        isDeleted: boolean('is_deleted').default(false).notNull(),
+
         // Metadata
         createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
         createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })

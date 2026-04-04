@@ -1,6 +1,6 @@
 import type { BusinessResolvers } from './../../../generated/types.generated';
 import { getDB } from '@/database';
-import { promotions, promotionBusinessEligibility } from '@/database/schema/promotions';
+import { promotions } from '@/database/schema/promotions';
 import { eq, and, isNull, lte, gte, or, sql } from 'drizzle-orm';
 
 /**
@@ -57,7 +57,9 @@ export const Business: BusinessResolvers = {
         const db = await getDB();
         const now = new Date().toISOString();
 
-        // Find active promotions for this business
+        // Find active promotions for this business.
+        // A promotion applies if it is explicitly linked to this business
+        // OR has no business eligibility entries (applies to all businesses).
         const activePromotions = await db
             .select({
                 id: promotions.id,
@@ -65,17 +67,14 @@ export const Business: BusinessResolvers = {
                 description: promotions.description,
                 type: promotions.type,
                 discountValue: promotions.discountValue,
+                spendThreshold: promotions.spendThreshold,
                 priority: promotions.priority,
             })
             .from(promotions)
-            .innerJoin(
-                promotionBusinessEligibility,
-                eq(promotionBusinessEligibility.promotionId, promotions.id)
-            )
             .where(
                 and(
-                    eq(promotionBusinessEligibility.businessId, parent.id),
                     eq(promotions.isActive, true),
+                    eq(promotions.isDeleted, false),
                     or(
                         isNull(promotions.startsAt),
                         lte(promotions.startsAt, now)
@@ -83,6 +82,12 @@ export const Business: BusinessResolvers = {
                     or(
                         isNull(promotions.endsAt),
                         gte(promotions.endsAt, now)
+                    ),
+                    or(
+                        // Explicitly linked to this business
+                        sql`EXISTS (SELECT 1 FROM promotion_business_eligibility WHERE promotion_id = ${promotions.id} AND business_id = ${parent.id})`,
+                        // No business restrictions → applies to all
+                        sql`NOT EXISTS (SELECT 1 FROM promotion_business_eligibility WHERE promotion_id = ${promotions.id})`
                     )
                 )
             )
@@ -100,6 +105,7 @@ export const Business: BusinessResolvers = {
             description: promo.description ?? null,
             type: promo.type,
             discountValue: promo.discountValue ?? null,
+            spendThreshold: promo.spendThreshold ?? null,
         };
     },
 };

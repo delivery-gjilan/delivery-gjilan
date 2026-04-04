@@ -87,6 +87,7 @@ export class PromotionEngine {
             .where(
                 and(
                     eq(promotions.isActive, true),
+                    eq(promotions.isDeleted, false),
                     or(
                         isNull(promotions.startsAt),
                         lte(promotions.startsAt, now)
@@ -261,7 +262,7 @@ export class PromotionEngine {
         const [promo] = await this.db
             .select()
             .from(promotions)
-            .where(eq(promotions.id, promotionId))
+            .where(and(eq(promotions.id, promotionId), eq(promotions.isDeleted, false)))
             .limit(1);
 
         if (!promo) {

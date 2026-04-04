@@ -1,14 +1,9 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
-import { db } from '../../../../../database';
-import { banners } from '../../../../../database/schema';
-import { eq } from 'drizzle-orm';
 
-export const updateBanner: NonNullable<MutationResolvers['updateBanner']> = async (_parent, args, _ctx) => {
+export const updateBanner: NonNullable<MutationResolvers['updateBanner']> = async (_parent, args, ctx) => {
   const { id, input } = args;
 
-  const updateData: any = {
-    updatedAt: new Date(),
-  };
+  const updateData: any = {};
 
   if (input.title !== undefined) updateData.title = input.title;
   if (input.subtitle !== undefined) updateData.subtitle = input.subtitle;
@@ -25,11 +20,7 @@ export const updateBanner: NonNullable<MutationResolvers['updateBanner']> = asyn
   if (input.sortOrder !== undefined) updateData.sortOrder = input.sortOrder;
   if (input.isActive !== undefined) updateData.isActive = input.isActive;
 
-  const [banner] = await db
-    .update(banners)
-    .set(updateData)
-    .where(eq(banners.id, id))
-    .returning();
+  const banner = await ctx.bannerRepository.update(id, updateData);
 
   return banner as any;
 };

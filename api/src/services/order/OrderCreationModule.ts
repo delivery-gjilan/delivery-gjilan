@@ -246,18 +246,18 @@ export class OrderCreationModule {
                 ? db
                       .select()
                       .from(optionsDbTable)
-                      .where(inArray(optionsDbTable.id, [...allOptionIds]))
+                      .where(and(inArray(optionsDbTable.id, [...allOptionIds]), eq(optionsDbTable.isDeleted, false)))
                 : Promise.resolve([]),
             allOptionGroupIds.size > 0
                 ? db
                       .select()
                       .from(optionGroupsTable)
-                      .where(inArray(optionGroupsTable.id, [...allOptionGroupIds]))
+                      .where(and(inArray(optionGroupsTable.id, [...allOptionGroupIds]), eq(optionGroupsTable.isDeleted, false)))
                 : Promise.resolve([]),
             db
                 .select()
                 .from(optionGroupsTable)
-                .where(inArray(optionGroupsTable.productId, [...allProductIds])),
+                .where(and(inArray(optionGroupsTable.productId, [...allProductIds]), eq(optionGroupsTable.isDeleted, false))),
         ]);
         const optionById = new Map<string, any>(optionRows.map((o) => [o.id, o]));
         const optionGroupById = new Map<string, any>(optionGroupRows.map((og) => [og.id, og]));

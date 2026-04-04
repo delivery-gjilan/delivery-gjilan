@@ -55,11 +55,16 @@ export const settlementRules = pgTable('settlement_rules', {
     amountType: settlementRuleAmountType('amount_type').notNull(),
     amount: numeric('amount', { precision: 10, scale: 2 }).notNull(),
 
+    // For PERCENT rules only: cap the calculated amount at this value (euros).
+    // null = no cap.
+    maxAmount: numeric('max_amount', { precision: 10, scale: 2 }),
+
     // Scope (both null = global rule)
     businessId: uuid('business_id').references(() => businesses.id, { onDelete: 'set null' }),
     promotionId: uuid('promotion_id').references(() => promotions.id, { onDelete: 'set null' }),
 
     isActive: boolean('is_active').default(true).notNull(),
+    isDeleted: boolean('is_deleted').default(false).notNull(),
     notes: varchar('notes', { length: 500 }),
 
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })

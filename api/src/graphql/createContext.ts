@@ -27,6 +27,7 @@ import { NotificationService } from '@/services/NotificationService';
 import { PromotionService } from '@/services/PromotionService';
 import { FinancialService } from '@/services/FinancialService';
 import { SettlementCalculationEngine } from '@/services/SettlementCalculationEngine';
+import { BannerRepository } from '@/repositories/BannerRepository';
 
 /**
  * Extracts and verifies JWT token from request Authorization header or WebSocket connection params
@@ -113,6 +114,7 @@ async function getOrCreateServices(db: any) {
         notificationService: new NotificationService(new NotificationRepository(db)),
         promotionService: new PromotionService(db),
         financialService: new FinancialService(db),
+        bannerRepository: new BannerRepository(db),
     };
     return cachedServices;
 }

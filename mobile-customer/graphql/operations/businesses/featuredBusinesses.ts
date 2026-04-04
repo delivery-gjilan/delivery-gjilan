@@ -20,6 +20,7 @@ export const GET_FEATURED_BUSINESSES = graphql(`
                 description
                 type
                 discountValue
+                spendThreshold
             }
         }
     }

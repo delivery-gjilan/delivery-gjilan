@@ -2,6 +2,9 @@ import { DbType } from '@/database';
 import { DbProductCategory, NewDbProductCategory, productCategories } from '@/database/schema/productCategories';
 import { and, asc, eq } from 'drizzle-orm';
 
+/** NOTE: The product_categories table has an isDeleted column. All queries MUST filter by isDeleted=false.
+ *  Deletions MUST set isDeleted=true instead of removing the row. See SOFT_DELETE_CONVENTION.md. */
+
 export class ProductCategoryRepository {
     constructor(private db: DbType) {}
 
@@ -11,7 +14,7 @@ export class ProductCategoryRepository {
     }
 
     async findById(id: string): Promise<DbProductCategory | undefined> {
-        const [category] = await this.db.select().from(productCategories).where(eq(productCategories.id, id));
+        const [category] = await this.db.select().from(productCategories).where(and(eq(productCategories.id, id), eq(productCategories.isDeleted, false)));
         return category;
     }
 
@@ -19,7 +22,7 @@ export class ProductCategoryRepository {
         return this.db
             .select()
             .from(productCategories)
-            .where(eq(productCategories.businessId, businessId))
+            .where(and(eq(productCategories.businessId, businessId), eq(productCategories.isDeleted, false)))
             .orderBy(asc(productCategories.sortOrder), asc(productCategories.name));
     }
 
@@ -33,11 +36,13 @@ export class ProductCategoryRepository {
     }
 
     async delete(id: string): Promise<boolean> {
-        const [deletedCategory] = await this.db
-            .delete(productCategories)
+        // Soft-delete: mark category as deleted instead of removing
+        const [result] = await this.db
+            .update(productCategories)
+            .set({ isDeleted: true })
             .where(eq(productCategories.id, id))
             .returning();
-        return !!deletedCategory;
+        return !!result;
     }
 
     async updateCategoriesOrder(businessId: string, categoriesOrder: { id: string; sortOrder: number }[]): Promise<void> {

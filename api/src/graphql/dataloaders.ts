@@ -11,7 +11,7 @@ import { products, DbProduct } from '@/database/schema/products';
 import { orderItems, DbOrderItem } from '@/database/schema/orderItems';
 import { orderItemOptions, DbOrderItemOption } from '@/database/schema/orderItemOptions';
 import { PricingService } from '@/services/PricingService';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, and } from 'drizzle-orm';
 
 /**
  * Batch-loads users by their IDs.
@@ -52,7 +52,7 @@ export function createDriverByUserIdLoader(db: DbType) {
         const rows = await db
             .select()
             .from(drivers)
-            .where(inArray(drivers.userId, [...userIds]));
+            .where(and(inArray(drivers.userId, [...userIds]), eq(drivers.isDeleted, false)));
         const map = new Map(rows.map((r) => [r.userId, r]));
         return userIds.map((id) => map.get(id) ?? null);
     });
@@ -99,7 +99,7 @@ export function createOptionGroupsByProductIdLoader(db: DbType) {
         const rows = await db
             .select()
             .from(optionGroups)
-            .where(inArray(optionGroups.productId, [...productIds]))
+            .where(and(inArray(optionGroups.productId, [...productIds]), eq(optionGroups.isDeleted, false)))
             .orderBy(optionGroups.displayOrder);
         const map = new Map<string, DbOptionGroup[]>();
         for (const row of rows) {
@@ -120,7 +120,7 @@ export function createOptionsByOptionGroupIdLoader(db: DbType) {
         const rows = await db
             .select()
             .from(options)
-            .where(inArray(options.optionGroupId, [...groupIds]))
+            .where(and(inArray(options.optionGroupId, [...groupIds]), eq(options.isDeleted, false)))
             .orderBy(options.displayOrder);
         const map = new Map<string, DbOption[]>();
         for (const row of rows) {
@@ -141,7 +141,7 @@ export function createVariantsByGroupIdLoader(db: DbType) {
         const rows = await db
             .select()
             .from(products)
-            .where(inArray(products.groupId, [...groupIds]));
+            .where(and(inArray(products.groupId, [...groupIds]), eq(products.isDeleted, false)));
         const map = new Map<string, DbProduct[]>();
         for (const row of rows) {
             if (!row.groupId) continue;

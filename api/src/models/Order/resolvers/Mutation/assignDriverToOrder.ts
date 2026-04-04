@@ -2,7 +2,7 @@ import type { MutationResolvers } from './../../../../generated/types.generated'
 import { createAuditLogger } from '@/services/AuditLogger';
 import logger from '@/lib/logger';
 import { drivers as driversTable } from '@/database/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { notifyDriverOrderAssigned, notifyDriverOrderReassigned } from '@/services/orderNotifications';
 import { getDispatchService } from '@/services/driverServices.init';
 import { AppError } from '@/lib/errors';
@@ -77,7 +77,7 @@ export const assignDriverToOrder: NonNullable<MutationResolvers['assignDriverToO
 
         // Fetch driver's maxActiveOrders from drivers table
         const driverRecord = await db.query.drivers.findFirst({
-            where: eq(driversTable.userId, effectiveDriverId),
+            where: and(eq(driversTable.userId, effectiveDriverId), eq(driversTable.isDeleted, false)),
         });
 
         if (driverRecord?.maxActiveOrders) {

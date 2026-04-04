@@ -1,6 +1,6 @@
 import { type DbType } from '@/database';
 import { products } from '@/database/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import logger from '@/lib/logger';
 import { applyPercentageDiscount, normalizeMoney } from '@/lib/utils/money';
 
@@ -91,7 +91,7 @@ export class PricingService {
         context: { timestamp?: Date } = {}
     ): Promise<PriceCalculationResult> {
         const product = await this.db.query.products.findFirst({
-            where: eq(products.id, productId),
+            where: and(eq(products.id, productId), eq(products.isDeleted, false)),
             columns: {
                 id: true,
                 basePrice: true,
@@ -123,7 +123,7 @@ export class PricingService {
         }
 
         const rows = await this.db.query.products.findMany({
-            where: inArray(products.id, uniqueProductIds),
+            where: and(inArray(products.id, uniqueProductIds), eq(products.isDeleted, false)),
             columns: {
                 id: true,
                 basePrice: true,

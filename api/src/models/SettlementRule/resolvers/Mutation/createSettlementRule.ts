@@ -37,6 +37,18 @@ export const createSettlementRule: NonNullable<MutationResolvers['createSettleme
         });
     }
 
+    if (input.maxAmount != null && input.amountType !== 'PERCENT') {
+        throw new GraphQLError('maxAmount can only be set for PERCENT amount type', {
+            extensions: { code: 'BAD_USER_INPUT' },
+        });
+    }
+
+    if (input.maxAmount != null && input.maxAmount <= 0) {
+        throw new GraphQLError('maxAmount must be a positive number', {
+            extensions: { code: 'BAD_USER_INPUT' },
+        });
+    }
+
     const repo = new SettlementRuleRepository(db);
 
     const rule = await repo.createRule({
@@ -46,6 +58,7 @@ export const createSettlementRule: NonNullable<MutationResolvers['createSettleme
         direction: input.direction,
         amountType: input.amountType,
         amount: input.amount.toString(),
+        maxAmount: input.maxAmount != null ? input.maxAmount.toString() : null,
         businessId: input.businessId || null,
         promotionId: input.promotionId || null,
         notes: input.notes || null,

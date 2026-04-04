@@ -72,7 +72,7 @@ Use this as a dependency map before refactoring.
 2. Resolver loads product (`getProduct`) first for authorization metadata
 3. For `BUSINESS_EMPLOYEE`, enforces `manage_products` + same business restriction
 4. Calls `productService.deleteProduct(id)`
-5. Repository hard deletes from `products`
+5. Repository soft-deletes the product (`isDeleted = true`, `isAvailable = false`)
 6. Resolver writes audit log `PRODUCT_DELETED` when deletion succeeds
 
 ### Files
@@ -134,7 +134,7 @@ Use this as a dependency map before refactoring.
 1. `deleteProductCategory(id)`
 2. Resolver fetches category first (to get `businessId` for cache invalidation)
 3. Service calls repository delete
-4. Repository hard deletes category row
+4. Repository soft-deletes category row (`isDeleted = true`)
 5. Resolver invalidates category cache
 
 ### Files
@@ -146,7 +146,7 @@ Use this as a dependency map before refactoring.
 ### FK side effects
 - `product_categories.business_id -> businesses.id onDelete: cascade`
 - `products.category_id -> product_categories.id onDelete: cascade`
-- Deleting a category hard deletes all products in that category.
+- Deleting a category soft-deletes it. Products in that category remain but may need cleanup.
 
 ---
 
@@ -256,15 +256,21 @@ Files:
 - Related product/category rows remain unless explicitly deleted elsewhere
 
 ### Category
-- Hard delete
-- Cascades to products by FK
+- Soft delete (`isDeleted = true`) via `ProductCategoryRepository`
+- Products in the category are not cascade-deleted
 
 ### Subcategory
 - Hard delete
 - Product FK set null
 
 ### Product
-- Hard delete
+- Soft delete (`isDeleted = true`, `isAvailable = false`) via `ProductRepository`
+
+### Option Group
+- Soft delete (`isDeleted = true`) via `OptionGroupRepository`
+
+### Option
+- Soft delete (`isDeleted = true`) via `OptionRepository`
 
 ---
 
@@ -336,9 +342,10 @@ If you refactor create/delete flows, update these together:
 - Keep a single `useBusiness` and a single `useProducts` implementation.
 - Standardize fetch policy and refetch behavior.
 
-3. Make delete semantics explicit
-- Decide and document: soft delete or hard delete per entity.
-- Enforce consistent behavior in service + repository + GraphQL docs.
+3. ~~Make delete semantics explicit~~ **DONE**
+- Products, categories, option groups, and options use `isDeleted` soft-delete via their repositories.
+- Businesses use `deletedAt` timestamp (legacy). Subcategories use hard delete.
+- Full convention documented in `api/SOFT_DELETE_CONVENTION.md`.
 
 4. Normalize category active state
 - Either add real DB field + query field, or remove `isActive` usage from UI.
@@ -361,7 +368,7 @@ If you refactor create/delete flows, update these together:
 GraphQL Mutation -> Resolver (permission checks) -> ProductService (validate) -> ProductRepository (insert product) -> AuditLog
 
 ### Delete Product
-GraphQL Mutation -> Resolver (load product + permission checks) -> ProductService -> ProductRepository (hard delete) -> AuditLog
+GraphQL Mutation -> Resolver (load product + permission checks) -> ProductService -> ProductRepository (soft delete: isDeleted=true) -> AuditLog
 
 ### Delete Business
 GraphQL Mutation -> BusinessService -> BusinessRepository (soft delete) -> cache.invalidateBusiness

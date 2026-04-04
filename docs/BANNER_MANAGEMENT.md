@@ -83,6 +83,9 @@ CREATE TABLE banners (
   sort_order integer NOT NULL DEFAULT 0,
   is_active boolean NOT NULL DEFAULT true,
   
+  -- Soft Delete
+  is_deleted boolean NOT NULL DEFAULT false,
+  
   -- Metadata
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now()
@@ -261,7 +264,9 @@ Update an existing banner.
 
 #### `deleteBanner(id: ID!): Boolean!`
 
-Delete a banner.
+Soft-delete a banner (sets `isDeleted = true` and `isActive = false`). All banner queries automatically exclude soft-deleted banners.
+
+All banner CRUD operations go through `BannerRepository` (see `api/SOFT_DELETE_CONVENTION.md`).
 
 #### `updateBannerOrder(bannerId: ID!, newSortOrder: Int!): Banner!`
 
