@@ -14,7 +14,7 @@ import { getDB } from '../database';
 import { businesses, NewDbBusiness } from '../database/schema/businesses';
 import { businessHours } from '../database/schema/businessHours';
 import { productCategories } from '../database/schema/productCategories';
-import { products } from '../database/schema/products';
+import { products, NewDbProduct } from '../database/schema/products';
 import { users, NewDbUser } from '../database/schema/users';
 import { drivers } from '../database/schema/drivers';
 import { eq } from 'drizzle-orm';
@@ -145,8 +145,8 @@ async function main() {
                     name: bizName,
                     description: `Auto-generated stress test business #${b}`,
                     businessType: 'RESTAURANT',
-                    locationLat: jitter(GJILAN.lat, 0.01).toString(),
-                    locationLng: jitter(GJILAN.lng, 0.01).toString(),
+                    locationLat: jitter(GJILAN.lat, 0.01),
+                    locationLng: jitter(GJILAN.lng, 0.01),
                     locationAddress: `Gjilan Street ${b}`,
                     opensAt: 0,
                     closesAt: 1439,
@@ -215,11 +215,11 @@ async function main() {
                         categoryId,
                         name: `${name} (Stress)`,
                         description: `Stress test product ${p + 1}`,
-                        basePrice: price.toString(),
-                        markupPrice: (price * 1.1).toString(),
+                        basePrice: price,
+                        markupPrice: +(price * 1.1).toFixed(2),
                         isAvailable: true,
                         sortOrder: p,
-                    })
+                    } satisfies NewDbProduct)
                     .returning();
                 bizProducts.push({ id: prod!.id, name: prod!.name, price });
             }
@@ -241,10 +241,9 @@ async function main() {
         sampleOrders: businessFixtures.map((biz) => {
             const product = biz.products[0]!;
             const markupPrice = +(product.price * 1.1).toFixed(2);
-            // Server always returns DEFAULT_DELIVERY_PRICE=2.0 when no zone/tier matches.
-            // deliveryPrice: 0 is accepted (client can send ≤ server value).
-            // totalPrice MUST equal markupPrice + expectedDeliveryPrice(2.0) because
-            // the promo engine always uses the server-calculated delivery price.
+            // The local stress fixture currently targets the default delivery fee path.
+            // Keep deliveryPrice aligned with the server-authoritative value so the
+            // benchmark measures order creation work instead of validation failures.
             const expectedDelivery = 2.0;
             return {
                 businessId: biz.id,
@@ -259,7 +258,7 @@ async function main() {
                         },
                     ],
                     totalPrice: +(markupPrice + expectedDelivery).toFixed(2),
-                    deliveryPrice: 0,
+                    deliveryPrice: expectedDelivery,
                     dropOffLocation: {
                         latitude: jitter(GJILAN.lat, 0.01),
                         longitude: jitter(GJILAN.lng, 0.01),

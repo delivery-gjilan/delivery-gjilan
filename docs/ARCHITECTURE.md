@@ -46,6 +46,10 @@ At a high level the backend is split into:
 - `lib` for shared utilities like pubsub, logger, auth helpers, and cache helpers
 - `generated` for schema/types/resolver glue from codegen
 
+Services that grow beyond a single file are split into a subdirectory with domain modules and a facade:
+
+- `api/src/services/order/` — OrderService facade + 6 domain modules (Creation, Query, Lifecycle, Mapping, Publishing, UserBehavior) behind an `IOrderService` interface. A re-export shim at `api/src/services/OrderService.ts` preserves existing imports.
+
 The critical path for live delivery behavior goes through:
 
 - `api/src/index.ts`

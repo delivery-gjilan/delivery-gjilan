@@ -1,6 +1,7 @@
 import { DbType } from '@/database';
 import { drivers as driversTable, DbDriver, NewDbDriver, DriverConnectionStatusType } from '@/database/schema/drivers';
 import { eq, sql, and, isNotNull, or } from 'drizzle-orm';
+import { cache } from '@/lib/cache';
 
 // Thresholds for connection state transitions (in seconds)
 export const CONNECTION_THRESHOLDS = {
@@ -54,7 +55,11 @@ export class DriverRepository {
    * Get all drivers
    */
   async getAllDrivers(): Promise<DbDriver[]> {
-    return this.db.select().from(driversTable);
+    const cached = await cache.get<DbDriver[]>(cache.keys.drivers());
+    if (cached) return cached;
+    const rows = await this.db.select().from(driversTable);
+    await cache.set(cache.keys.drivers(), rows, cache.TTL.DRIVERS);
+    return rows;
   }
 
   /**

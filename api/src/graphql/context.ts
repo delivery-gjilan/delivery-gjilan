@@ -5,7 +5,7 @@ import { ProductCategoryService } from '@/services/ProductCategoryService';
 import { ProductSubcategoryService } from '@/services/ProductSubcategoryService';
 import { ProductService } from '@/services/ProductService';
 import { AuthService } from '@/services/AuthService';
-import { OrderService } from '@/services/OrderService';
+import type { IOrderService } from '@/services/OrderService';
 import { DriverService } from '@/services/DriverService';
 import { DriverAuthService } from '@/services/DriverAuthService';
 import { PubSub } from '@/lib/pubsub';
@@ -35,7 +35,7 @@ export interface ApiContextInterface {
     productSubcategoryService: ProductSubcategoryService;
     productService: ProductService;
     authService: AuthService;
-    orderService: OrderService;
+    orderService: IOrderService;
     driverAuthService?: DriverAuthService;
     driverService?: DriverService;
     notificationService: NotificationService;

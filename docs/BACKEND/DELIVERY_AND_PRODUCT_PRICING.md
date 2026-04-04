@@ -1,6 +1,6 @@
 # Delivery Pricing & Product Pricing
 
-<!-- MDS:B6 | Domain: Backend | Updated: 2026-03-18 -->
+<!-- MDS:B6 | Domain: Backend | Updated: 2026-04-04 -->
 <!-- Depends-On: B2, B3 -->
 <!-- Depended-By: BL1, M4 -->
 <!-- Nav: Price precedence changes → update B2 (Order Creation), B3 (Validation). Zone/tier admin changes → review BL1 (Settlements). Any change here may affect what mobile sends in checkout — update M4 (Order Creation Audit). -->
@@ -103,6 +103,8 @@ Adjustment types: `PERCENTAGE`, `FIXED_AMOUNT`, `MULTIPLIER`. Priority field con
 2. Fall back to pricing tiers (distance-based)
    → calculate driving distance (Mapbox API → haversine fallback)
    → find matching [minDistanceKm, maxDistanceKm) tier → use tier.price
+
+`OrderService` reads active zones and active tiers through the optional Redis cache layer before falling back to Postgres. Cached keys are `cache:delivery-zones:active` and `cache:delivery-pricing-tiers:active`, both with 5-minute TTLs. The cached data is reference-only; order totals are still recalculated per request using current business coordinates and current dropoff coordinates.
 ```
 
 ### Delivery Zones (`delivery_zones`)
