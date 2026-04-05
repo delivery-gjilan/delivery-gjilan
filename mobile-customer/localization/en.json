@@ -217,7 +217,9 @@
         "delete_account_title": "Delete Account",
         "delete_account_message": "Are you sure you want to delete your account? This action cannot be undone. All your data will be permanently removed.",
         "delete_account_confirm": "Delete",
-        "delete_account_error": "Failed to delete account. Please try again later."
+        "delete_account_error": "Failed to delete account. Please try again later.",
+        "email_receipts": "Email Receipts",
+        "email_receipts_desc": "Receive an email receipt after each delivery"
     },
     "addresses": {
         "title": "My Addresses",
@@ -497,7 +499,14 @@
         "repeat_last": "Same as before",
         "customize_new": "Choose new options",
         "current_options": "Current options",
-        "offers": "Offers"
+        "offers": "Offers",
+        "choose_size": "Choose your size",
+        "required_badge": "Required",
+        "optional_badge": "Optional",
+        "select_one": "Select one",
+        "select_up_to": "Select up to {{max}}",
+        "included": "Included",
+        "select_required": "Select required options"
     },
     "store_closed": {
         "title": "Store Temporarily Closed",

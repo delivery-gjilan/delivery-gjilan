@@ -71,6 +71,7 @@ export const GET_PRODUCT_WITH_OPTIONS = graphql(`
                     id
                     name
                     extraPrice
+                    imageUrl
                     displayOrder
                 }
             }

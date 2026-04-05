@@ -218,6 +218,13 @@ export const translationSchema = z.object(
             my_addresses: s(),
             account: s(),
             user_fallback: s(),
+            delete_account: s(),
+            delete_account_title: s(),
+            delete_account_message: s(),
+            delete_account_confirm: s(),
+            delete_account_error: s(),
+            email_receipts: s(),
+            email_receipts_desc: s(),
         }),
         addresses: z.object({
             title: s(),

@@ -8,6 +8,20 @@
       "when": 1775408947177,
       "tag": "0000_reflective_alex_wilder",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1775400507717,
+      "tag": "0001_add_email_opt_out",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775404074125,
+      "tag": "0002_add-option-image-url",
+      "breakpoints": true
     }
   ]
 }

@@ -23,6 +23,7 @@ export function toUserParent(user: DbUser): ResolversParentTypes['User'] {
         imageUrl: user.imageUrl || null,
         referralCode: user.referralCode || null,
         preferredLanguage: toAppLanguage(user.preferredLanguage),
+        emailOptOut: user.emailOptOut ?? false,
         isDemoAccount: user.isDemoAccount,
         permissions: [],
         isOnline: false,

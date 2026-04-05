@@ -11,6 +11,7 @@ import uploadRoutes from './routes/uploadRoutes';
 import debugRoutes from './routes/debugRoutes';
 import { directionsRouter } from './routes/directionsRoutes';
 import { opsWallRouter } from './routes/opsWall';
+import emailRoutes from './routes/emailRoutes';
 import { decodeJwtToken } from '@/lib/utils/authUtils';
 import { requestLogger } from '@/lib/middleware/requestLogger';
 import { globalErrorHandler } from '@/lib/middleware/errorHandler';
@@ -246,6 +247,9 @@ app.use('/api/upload', uploadRoutes);
 
 // Directions proxy — keeps MAPBOX_TOKEN server-side, caches in Redis
 app.use('/api/directions', directionsRouter);
+
+// Email unsubscribe (public, token-verified)
+app.use('/api/email', emailRoutes);
 
 // Debug routes (non-production only)
 if (!isProduction) {

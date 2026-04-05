@@ -429,6 +429,7 @@ input CreateOptionGroupInput {
 input CreateOptionInput {
   displayOrder: Int
   extraPrice: Float
+  imageUrl: String
   linkedProductId: ID
   name: String!
 }
@@ -1072,6 +1073,7 @@ type Mutation {
   setBusinessSchedule(businessId: ID!, schedule: [BusinessDayHoursInput!]!): [BusinessDayHours!]!
   setDefaultAddress(id: ID!): Boolean!
   setDeliveryPricingTiers(input: SetDeliveryPricingTiersInput!): [DeliveryPricingTier!]!
+  setMyEmailOptOut(optOut: Boolean!): User!
   setMyPreferredLanguage(language: AppLanguage!): User!
   setOrderAdminNote(id: ID!, note: String): Order!
   setUserPermissions(permissions: [UserPermission!]!, userId: ID!): User!
@@ -1174,6 +1176,7 @@ type Option {
   displayOrder: Int!
   extraPrice: Float!
   id: ID!
+  imageUrl: String
   linkedProduct: Product
   linkedProductId: ID
   name: String!
@@ -2046,6 +2049,7 @@ input UpdateOptionGroupInput {
 input UpdateOptionInput {
   displayOrder: Int
   extraPrice: Float
+  imageUrl: String
   linkedProductId: ID
   name: String
 }
@@ -2132,6 +2136,7 @@ type User {
   driverLocation: Location
   driverLocationUpdatedAt: Date
   email: String!
+  emailOptOut: Boolean!
   emailVerified: Boolean!
   firstName: String!
   flagColor: String

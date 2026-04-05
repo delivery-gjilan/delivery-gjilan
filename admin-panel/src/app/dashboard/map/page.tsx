@@ -3124,7 +3124,13 @@ function BottomDetailPanel({
 
   const recommendedDriver = !order.driver ? (allDriversSorted.find((d: any) => d.isAssignable && d.isFree) ?? null) : null;
   const prepTimeMinutes = orderBusinesses[0]?.business?.avgPrepTimeMinutes;
-  const prepProgress = (isPending || order.status === "READY") && prepTimeMinutes
+  const prepRemainingMin = order.status === "PREPARING" && order.estimatedReadyAt
+    ? Math.max(0, Math.round((new Date(order.estimatedReadyAt).getTime() - now) / 60000))
+    : null;
+  const prepTotalMs = order.preparationMinutes ? order.preparationMinutes * 60 * 1000 : prepTimeMinutes ? prepTimeMinutes * 60 * 1000 : null;
+  const prepProgress = order.status === "PREPARING" && prepTotalMs && order.estimatedReadyAt
+    ? Math.min(1 - (new Date(order.estimatedReadyAt).getTime() - now) / prepTotalMs, 1)
+    : (isPending || order.status === "READY") && prepTimeMinutes
     ? Math.min(statusElapsed / (prepTimeMinutes * 60 * 1000), 1)
     : order.status === "OUT_FOR_DELIVERY" ? (driverProgressOnRoute[order.driver?.id] || 0) : 0;
 
@@ -3183,7 +3189,7 @@ function BottomDetailPanel({
             <div className={`text-[11px] font-bold leading-none ${
               slaRisk.level === 'critical' ? 'text-red-400' : slaRisk.level === 'warning' ? 'text-amber-400' : statusColor.text
             }`}>
-              {etaMin ? `${etaMin}m` : isPending ? `${Math.floor(elapsed / 60000)}m` : '—'}
+              {order.status === 'PREPARING' && prepRemainingMin !== null ? `${prepRemainingMin}m` : etaMin ? `${etaMin}m` : isPending ? `${Math.floor(elapsed / 60000)}m` : '—'}
             </div>
           </PrepTimeRing>
           <div className="flex-1 min-w-0">

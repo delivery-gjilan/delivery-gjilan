@@ -8,6 +8,7 @@ export const OptionGroup: OptionGroupResolvers = {
             optionGroupId: o.optionGroupId,
             name: o.name,
             extraPrice: o.extraPrice,
+            imageUrl: o.imageUrl ?? undefined,
             linkedProductId: o.linkedProductId ?? undefined,
             displayOrder: o.displayOrder,
         }));

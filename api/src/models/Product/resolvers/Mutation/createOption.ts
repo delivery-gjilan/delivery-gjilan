@@ -11,6 +11,7 @@ export const createOption: NonNullable<MutationResolvers['createOption']> = asyn
         optionGroupId: created.optionGroupId,
         name: created.name,
         extraPrice: created.extraPrice,
+        imageUrl: created.imageUrl ?? undefined,
         linkedProductId: created.linkedProductId ?? undefined,
         displayOrder: created.displayOrder,
     };

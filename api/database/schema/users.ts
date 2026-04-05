@@ -28,6 +28,7 @@ export const users = pgTable('users', {
     signupStep: signupStepEnum('signup_step').default('INITIAL').notNull(),
     role: userRoleEnum('role').default('CUSTOMER').notNull(),
     preferredLanguage: text('preferred_language').default('en').notNull(),
+    emailOptOut: boolean('email_opt_out').default(false).notNull(),
     businessId: uuid('business_id').references(() => businesses.id, { onDelete: 'set null' }),
     emailVerificationCode: text('email_verification_code'),
     phoneVerificationCode: text('phone_verification_code'),

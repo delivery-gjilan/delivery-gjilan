@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { useApolloClient, useMutation, useQuery, useSubscription } from '@apollo/client/react';
 import { GET_ORDERS, ALL_ORDERS_UPDATED, ASSIGN_DRIVER_TO_ORDER } from '@/graphql/operations/orders';
@@ -103,6 +103,22 @@ export function useGlobalOrderAccept() {
         };
     }, [currentDriverId, refreshOrders]);
 
+    // ── Precise per-order timers: fire exactly when each PREPARING order crosses
+    //    the 5-min threshold instead of polling every 30s.
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        const orders = (data as any)?.orders ?? [];
+        const timers: ReturnType<typeof setTimeout>[] = [];
+        for (const o of orders) {
+            if (o.status !== 'PREPARING' || o.driver?.id || !o.estimatedReadyAt) continue;
+            const thresholdMs = new Date(o.estimatedReadyAt).getTime() - 5 * 60 * 1000;
+            const delayMs = thresholdMs - Date.now();
+            if (delayMs <= 0) continue; // already past threshold — useMemo handles it immediately
+            timers.push(setTimeout(() => setNow(Date.now()), delayMs));
+        }
+        return () => timers.forEach(clearTimeout);
+    }, [data]);
+
     // ── Derived order lists ──
     const assignedOrders = useMemo(() => {
         const orders = (data as any)?.orders ?? [];
@@ -115,8 +131,17 @@ export function useGlobalOrderAccept() {
     const availableOrders = useMemo(() => {
         if (dispatchModeEnabled) return [];
         const orders = (data as any)?.orders ?? [];
-        return orders.filter((o: any) => o.status === 'READY' && !o.driver?.id);
-    }, [data, dispatchModeEnabled]);
+        return orders.filter((o: any) => {
+            if (o.driver?.id) return false;
+            if (o.status === 'READY') return true;
+            if (o.status === 'PREPARING') {
+                // Only show in pool once we're within 5 min of ready (mirrors server early-dispatch threshold)
+                const estimatedReadyAt = o.estimatedReadyAt ? new Date(o.estimatedReadyAt).getTime() : null;
+                return estimatedReadyAt !== null && estimatedReadyAt - now <= 5 * 60 * 1000;
+            }
+            return false;
+        });
+    }, [data, dispatchModeEnabled, now]);
 
     // ── Auto-present (capacity-aware) ──
     useEffect(() => {

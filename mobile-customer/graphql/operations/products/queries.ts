@@ -88,6 +88,7 @@ export const GET_PRODUCT = graphql(`
                     id
                     name
                     extraPrice
+                    imageUrl
                     linkedProductId
                     displayOrder
                     linkedProduct {

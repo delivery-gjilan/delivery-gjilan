@@ -5,6 +5,7 @@ import { AuthRepository } from '@/repositories/AuthRepository';
 import { NotificationService } from '@/services/NotificationService';
 import { NotificationRepository } from '@/repositories/NotificationRepository';
 import { OrderDispatchService } from '@/services/OrderDispatchService';
+import { startEarlyDispatchWorker } from '@/queues/earlyDispatchQueue';
 import { getDB } from '@/database';
 import logger from '@/lib/logger';
 
@@ -62,6 +63,16 @@ export async function initializeDriverServices() {
 
     // Start the watchdog
     watchdogService.start();
+
+    // Start the BullMQ worker that processes early-dispatch jobs.
+    // The worker is process-local but the jobs are persisted in Redis —
+    // any instance that comes online will pick up pending delayed jobs.
+    startEarlyDispatchWorker(async (orderId) => {
+        await dispatchService!.dispatchOrder(orderId, notificationService);
+        // Mark as fired in Redis so the READY path skips a duplicate dispatch.
+        const { cache } = await import('@/lib/cache');
+        await cache.set(`dispatch:early:${orderId}`, 'fired', 3600);
+    });
 
     log.info('driverServices:ready');
 

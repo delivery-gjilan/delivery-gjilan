@@ -265,6 +265,7 @@ export class ProductService {
         options: Array<{
             name: string;
             extraPrice?: number | null;
+            imageUrl?: string | null;
             linkedProductId?: string | null;
             displayOrder?: number | null;
         }>;
@@ -300,6 +301,7 @@ export class ProductService {
                     optionGroupId: createdGroup.id,
                     name: opt.name,
                     extraPrice: opt.extraPrice ?? 0,
+                    imageUrl: opt.imageUrl,
                     linkedProductId: opt.linkedProductId,
                     displayOrder: opt.displayOrder ?? idx,
                 })),
@@ -345,6 +347,7 @@ export class ProductService {
         input: {
             name: string;
             extraPrice?: number | null;
+            imageUrl?: string | null;
             linkedProductId?: string | null;
             displayOrder?: number | null;
         },
@@ -363,6 +366,7 @@ export class ProductService {
             optionGroupId,
             name: input.name,
             extraPrice: input.extraPrice ?? 0,
+            imageUrl: input.imageUrl,
             linkedProductId: input.linkedProductId,
             displayOrder: input.displayOrder ?? 0,
         });
@@ -373,6 +377,7 @@ export class ProductService {
         input: {
             name?: string | null;
             extraPrice?: number | null;
+            imageUrl?: string | null;
             linkedProductId?: string | null;
             displayOrder?: number | null;
         },
@@ -389,6 +394,7 @@ export class ProductService {
         const updateData: Record<string, unknown> = {};
         if (input.name !== undefined && input.name !== null) updateData.name = input.name;
         if (input.extraPrice !== undefined && input.extraPrice !== null) updateData.extraPrice = input.extraPrice;
+        if (input.imageUrl !== undefined) updateData.imageUrl = input.imageUrl;
         if (input.linkedProductId !== undefined) updateData.linkedProductId = input.linkedProductId;
         if (input.displayOrder !== undefined && input.displayOrder !== null)
             updateData.displayOrder = input.displayOrder;

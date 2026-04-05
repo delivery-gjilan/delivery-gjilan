@@ -51,6 +51,7 @@ type User {
     driverLocationUpdatedAt: Date
     referralCode: String
     preferredLanguage: AppLanguage!
+    emailOptOut: Boolean!
     totalOrders: Int!
     isTrustedCustomer: Boolean!
     isDemoAccount: Boolean!
@@ -197,6 +198,7 @@ type Mutation {
     updateDriverOnlineStatus(isOnline: Boolean!): User!
     generateReferralCode: String!
     setMyPreferredLanguage(language: AppLanguage!): User!
+    setMyEmailOptOut(optOut: Boolean!): User!
     changeMyPassword(currentPassword: String!, newPassword: String!): Boolean!
     updateMyProfile(input: UpdateMyProfileInput!): User!
 }

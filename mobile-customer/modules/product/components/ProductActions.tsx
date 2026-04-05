@@ -3,10 +3,10 @@ import { View, Text, TouchableOpacity, Platform } from 'react-native';
 import Reanimated, { useSharedValue, useAnimatedStyle, withSequence, withSpring, withTiming, withDelay } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Product } from '@/gql/graphql';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useProductActions } from '../hooks/useProductActions';
+import { getEffectiveProductPrice } from '../utils/pricing';
 
 const AnimatedTouchable = Reanimated.createAnimatedComponent(TouchableOpacity);
 
@@ -22,15 +22,8 @@ export function ProductActions({ product, selectedOptions, parentProduct, editin
     const { t } = useTranslations();
     const insets = useSafeAreaInsets();
     const buttonScale = useSharedValue(1);
-    const [showFloatingNumber, setShowFloatingNumber] = useState(false);
-    const floatingOpacity = useSharedValue(0);
-    const floatingTranslateY = useSharedValue(0);
 
     const buttonScaleStyle = useAnimatedStyle(() => ({ transform: [{ scale: buttonScale.value }] }));
-    const floatingStyle = useAnimatedStyle(() => ({
-        opacity: floatingOpacity.value,
-        transform: [{ translateY: floatingTranslateY.value }],
-    }));
 
     const {
         localQuantity,
@@ -55,46 +48,43 @@ export function ProductActions({ product, selectedOptions, parentProduct, editin
         });
     }, [product, selectedOptions, parentProduct]);
 
-    const triggerFloatingAnimation = () => {
-        setShowFloatingNumber(true);
-        floatingOpacity.value = 1;
-        floatingTranslateY.value = 0;
-        floatingOpacity.value = withDelay(0, withTiming(0, { duration: 800 }));
-        floatingTranslateY.value = withTiming(-40, { duration: 800 }, (finished) => {
-            if (finished) {
-                // reset handled by re-setting on next trigger
+    // Calculate running total (base price + extras) * quantity
+    const runningTotal = useMemo(() => {
+        const basePrice = getEffectiveProductPrice(product);
+        let extrasTotal = 0;
+        const optionGroups =
+            product.optionGroups && product.optionGroups.length > 0
+                ? product.optionGroups
+                : (parentProduct?.optionGroups ?? []);
+        for (const group of optionGroups) {
+            const selectedIds = selectedOptions[group.id] || [];
+            for (const opt of group.options) {
+                if (selectedIds.includes(opt.id) && opt.extraPrice > 0) {
+                    extrasTotal += opt.extraPrice;
+                }
             }
-        });
-        setTimeout(() => setShowFloatingNumber(false), 820);
-    };
-
-    const handleIncrementPress = () => {
-        triggerFloatingAnimation();
-        incrementQuantity();
-    };
+        }
+        return (basePrice + extrasTotal) * localQuantity;
+    }, [product, parentProduct, selectedOptions, localQuantity]);
 
     if (!product.isAvailable) {
         return (
             <View
-                className="bg-card border-t border-border px-6"
                 style={{
+                    backgroundColor: theme.colors.card,
+                    borderTopWidth: 1,
+                    borderTopColor: theme.colors.border,
+                    paddingHorizontal: 24,
                     paddingBottom: Platform.OS === 'ios' ? insets.bottom + 16 : 24,
                     paddingTop: 16,
                 }}
             >
                 <View style={{ backgroundColor: theme.colors.expense + '20', paddingVertical: 16, borderRadius: 16, alignItems: 'center' }}>
-                    <Text className="text-expense text-base font-semibold">{t.product.unavailable_message}</Text>
+                    <Text style={{ color: theme.colors.expense, fontSize: 16, fontWeight: '600' }}>{t.product.unavailable_message}</Text>
                 </View>
             </View>
         );
     }
-
-    const getButtonText = () => {
-        if (!isSelectionValid) return 'Please select required options';
-        if (!isInCart) return t.product.add_to_order;
-        if (hasQuantityChanged) return t.product.update_order;
-        return t.product.in_cart;
-    };
 
     const handleMainAction = () => {
         if (!isSelectionValid) return;
@@ -109,107 +99,116 @@ export function ProductActions({ product, selectedOptions, parentProduct, editin
         }
     };
 
+    const isDisabled = !isSelectionValid || (isInCart && !hasQuantityChanged);
+
+    const getButtonLabel = () => {
+        if (!isSelectionValid) return t.product.select_required;
+        if (!isInCart) return t.product.add_to_order;
+        if (hasQuantityChanged) return t.product.update_order;
+        return t.product.in_cart;
+    };
+
     return (
         <View
-            className="bg-card border-t border-border px-6"
             style={{
-                paddingBottom: Platform.OS === 'ios' ? insets.bottom + 16 : 24,
-                paddingTop: 16,
+                backgroundColor: theme.colors.card,
+                borderTopWidth: 1,
+                borderTopColor: theme.colors.border,
+                paddingHorizontal: 20,
+                paddingBottom: Platform.OS === 'ios' ? insets.bottom + 12 : 20,
+                paddingTop: 14,
             }}
         >
-            {/* Quantity Controls */}
-            <View className="flex-row items-center justify-between mb-4">
-                <Text className="text-foreground text-lg font-semibold">{t.product.quantity}</Text>
-
-                <View style={{ position: 'relative' }}>
-                    <View className="flex-row items-center bg-background border border-border" style={{ borderRadius: 24 }}>
-                        <TouchableOpacity
-                            onPress={decrementQuantity}
-                            className="w-12 h-12 items-center justify-center"
-                            activeOpacity={0.7}
-                        >
-                            <Ionicons name="remove" size={24} color={theme.colors.primary} />
-                        </TouchableOpacity>
-
-                        <View className="px-6 min-w-[60px] items-center">
-                            <Text className="text-foreground text-xl font-bold">{localQuantity}</Text>
-                        </View>
-
-                        <TouchableOpacity
-                            onPress={handleIncrementPress}
-                            className="w-12 h-12 items-center justify-center"
-                            activeOpacity={0.7}
-                        >
-                            <Ionicons name="add" size={24} color={theme.colors.primary} />
-                        </TouchableOpacity>
-                    </View>
-                    
-                    {showFloatingNumber && (
-                        <Reanimated.Text
-                            style={[
-                                floatingStyle,
-                                {
-                                    position: 'absolute',
-                                    top: -20,
-                                    right: 10,
-                                    fontSize: 22,
-                                    fontWeight: 'bold',
-                                    color: theme.colors.primary,
-                                },
-                            ]}
-                        >
-                            +1
-                        </Reanimated.Text>
-                    )}
-                </View>
-            </View>
-
-            {/* Action Buttons */}
-            <View className="gap-3">
-                {/* Main Action Button */}
-                <AnimatedTouchable
-                    onPress={handleMainAction}
-                    disabled={!isSelectionValid || (isInCart && !hasQuantityChanged)}
-                    style={[
-                        buttonScaleStyle,
-                        {
-                        backgroundColor: (!isSelectionValid || (isInCart && !hasQuantityChanged)) ? theme.colors.subtext : theme.colors.primary,
-                        opacity: (!isSelectionValid || (isInCart && !hasQuantityChanged)) ? 0.5 : 1,
-                        paddingVertical: 16,
-                        borderRadius: 16,
-                        alignItems: 'center' as const,
-                        },
-                    ]}
+            {/* Quantity row */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+                <TouchableOpacity
+                    onPress={decrementQuantity}
                     activeOpacity={0.7}
+                    style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 22,
+                        backgroundColor: theme.colors.background,
+                        borderWidth: 1.5,
+                        borderColor: theme.colors.border,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                    }}
                 >
-                    <View className="flex-row items-center gap-2">
-                        <Ionicons name={isInCart ? 'checkmark-circle' : 'cart'} size={24} color="#ffffff" />
-                        <Text className="text-white text-lg font-bold">{getButtonText()}</Text>
-                    </View>
-                </AnimatedTouchable>
+                    <Ionicons name="remove" size={22} color={localQuantity <= 1 ? theme.colors.border : theme.colors.primary} />
+                </TouchableOpacity>
 
-                {/* Remove Button (only show if in cart) */}
-                {isInCart && (
-                    <TouchableOpacity
-                        onPress={removeFromCart}
-                        activeOpacity={0.7}
-                        style={{
-                            paddingVertical: 16,
-                            borderRadius: 16,
-                            alignItems: 'center',
-                            borderWidth: 1.5,
-                            borderColor: theme.colors.expense,
-                        }}
-                    >
-                        <View className="flex-row items-center gap-2">
-                            <Ionicons name="trash-outline" size={20} color={theme.colors.expense} />
-                            <Text className="text-base font-semibold" style={{ color: theme.colors.expense }}>
-                                {t.product.remove_from_cart}
-                            </Text>
-                        </View>
-                    </TouchableOpacity>
-                )}
+                <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '800', minWidth: 56, textAlign: 'center' }}>
+                    {localQuantity}
+                </Text>
+
+                <TouchableOpacity
+                    onPress={incrementQuantity}
+                    activeOpacity={0.7}
+                    style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 22,
+                        backgroundColor: theme.colors.primary + '15',
+                        borderWidth: 1.5,
+                        borderColor: theme.colors.primary,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                    }}
+                >
+                    <Ionicons name="add" size={22} color={theme.colors.primary} />
+                </TouchableOpacity>
             </View>
+
+            {/* Main action button with total */}
+            <AnimatedTouchable
+                onPress={handleMainAction}
+                disabled={isDisabled}
+                activeOpacity={0.75}
+                style={[
+                    buttonScaleStyle,
+                    {
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        backgroundColor: isDisabled ? theme.colors.subtext : theme.colors.primary,
+                        opacity: isDisabled ? 0.45 : 1,
+                        paddingVertical: 17,
+                        paddingHorizontal: 24,
+                        borderRadius: 18,
+                    },
+                ]}
+            >
+                <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700' }}>
+                    {getButtonLabel()}
+                </Text>
+                {isSelectionValid && (
+                    <Text style={{ color: '#fff', fontSize: 17, fontWeight: '800' }}>
+                        €{runningTotal.toFixed(2)}
+                    </Text>
+                )}
+            </AnimatedTouchable>
+
+            {/* Remove button */}
+            {isInCart && (
+                <TouchableOpacity
+                    onPress={removeFromCart}
+                    activeOpacity={0.7}
+                    style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        marginTop: 10,
+                        paddingVertical: 12,
+                    }}
+                >
+                    <Ionicons name="trash-outline" size={18} color={theme.colors.expense} />
+                    <Text style={{ color: theme.colors.expense, fontSize: 15, fontWeight: '600' }}>
+                        {t.product.remove_from_cart}
+                    </Text>
+                </TouchableOpacity>
+            )}
         </View>
     );
 }
