@@ -1,12 +1,11 @@
-import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
-import { Product, OptionGroup, Option, BusinessType } from '@/gql/graphql';
+import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useTheme } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { getEffectiveProductPrice, getPreDiscountProductPrice } from '@/modules/product/utils/pricing';
 
 interface ProductDetailsProps {
-    product: any; // Using any for simplicity with complex GQL types
+    product: any;
     activeProduct: any;
     selectedVariantId: string | null;
     setSelectedVariantId: (id: string) => void;
@@ -22,14 +21,14 @@ export function ProductDetails({
     selectedOptions,
     setSelectedOptions,
 }: ProductDetailsProps) {
-        const selectableVariants = [product, ...(product.variants ?? [])].filter(
-            (v: any, idx: number, arr: any[]) => arr.findIndex((x) => x.id === v.id) === idx,
-        );
+    const selectableVariants = [product, ...(product.variants ?? [])].filter(
+        (v: any, idx: number, arr: any[]) => arr.findIndex((x) => x.id === v.id) === idx,
+    );
 
-        const optionGroupsForSelection =
-            activeProduct.optionGroups && activeProduct.optionGroups.length > 0
-                ? activeProduct.optionGroups
-                : (product.optionGroups ?? []);
+    const optionGroupsForSelection =
+        activeProduct.optionGroups && activeProduct.optionGroups.length > 0
+            ? activeProduct.optionGroups
+            : (product.optionGroups ?? []);
 
     const { t } = useTranslations();
     const theme = useTheme();
@@ -48,7 +47,7 @@ export function ProductDetails({
             } else if (current.length < maxSelections) {
                 updated = [...current, optionId];
             } else {
-                return; // Max reached
+                return;
             }
         }
 
@@ -58,140 +57,300 @@ export function ProductDetails({
         });
     };
 
-    return (
-        <View style={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 100 }}>
-            {/* Product Name */}
-            <Text style={{ color: theme.colors.text, fontSize: 24, fontWeight: '700', marginBottom: 6 }}>
-                {activeProduct.name}
-            </Text>
+    const selectedCount = (groupId: string) => (selectedOptions[groupId] || []).length;
 
-            {/* Price Section */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
-                {preDiscountPrice != null ? (
-                    <>
-                        <Text style={{ color: theme.colors.expense, fontSize: 22, fontWeight: '700', marginRight: 10 }}>
-                            €{effectivePrice.toFixed(2)}
-                        </Text>
-                        <Text style={{ color: theme.colors.subtext, fontSize: 17, textDecorationLine: 'line-through' }}>
-                            €{preDiscountPrice.toFixed(2)}
-                        </Text>
-                    </>
-                ) : (
-                    <Text style={{ color: theme.colors.primary, fontSize: 22, fontWeight: '700' }}>
-                        €{effectivePrice.toFixed(2)}
+    return (
+        <View style={{ paddingBottom: 120 }}>
+            {/* ── Name + Price + Description ── */}
+            <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8 }}>
+                <Text style={{ color: theme.colors.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.3 }}>
+                    {activeProduct.name}
+                </Text>
+
+                {(activeProduct.description || product.description) && (
+                    <Text style={{ color: theme.colors.subtext, fontSize: 15, lineHeight: 22, marginTop: 6 }}>
+                        {activeProduct.description || product.description}
                     </Text>
                 )}
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
+                    {preDiscountPrice != null ? (
+                        <>
+                            <Text style={{ color: theme.colors.expense, fontSize: 22, fontWeight: '800' }}>
+                                €{effectivePrice.toFixed(2)}
+                            </Text>
+                            <Text style={{ color: theme.colors.subtext, fontSize: 16, textDecorationLine: 'line-through', marginLeft: 10 }}>
+                                €{preDiscountPrice.toFixed(2)}
+                            </Text>
+                        </>
+                    ) : (
+                        <Text style={{ color: theme.colors.primary, fontSize: 22, fontWeight: '800' }}>
+                            €{effectivePrice.toFixed(2)}
+                        </Text>
+                    )}
+                </View>
             </View>
 
-            {/* Variants Selector */}
+            {/* ── Size / Variant Picker ── */}
             {selectableVariants.length > 1 && (
-                <View style={{ marginBottom: 28 }}>
-                    <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '700', marginBottom: 12 }}>
-                        Select Variant
-                    </Text>
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-                        {selectableVariants.map((v: any) => (
-                            <TouchableOpacity
-                                key={v.id}
-                                onPress={() => setSelectedVariantId(v.id)}
-                                style={{
-                                    paddingHorizontal: 16,
-                                    paddingVertical: 10,
-                                    borderRadius: 14,
-                                    borderWidth: 1.5,
-                                    borderColor: selectedVariantId === v.id ? theme.colors.primary : theme.colors.border,
-                                    backgroundColor: selectedVariantId === v.id ? theme.colors.primary + '10' : 'transparent',
-                                }}
-                            >
-                                <Text
+                <View style={{ marginTop: 20 }}>
+                    <SectionHeader
+                        title={t.product.choose_size}
+                        badge={t.product.required_badge}
+                        badgeColor={theme.colors.primary}
+                        theme={theme}
+                    />
+                    <View style={{ flexDirection: 'row', paddingHorizontal: 20, gap: 10 }}>
+                        {selectableVariants.map((v: any) => {
+                            const isActive = selectedVariantId === v.id;
+                            const variantPrice = getEffectiveProductPrice(v);
+                            return (
+                                <TouchableOpacity
+                                    key={v.id}
+                                    onPress={() => setSelectedVariantId(v.id)}
+                                    activeOpacity={0.7}
                                     style={{
-                                        fontWeight: '600',
-                                        fontSize: 14,
-                                        color: selectedVariantId === v.id ? theme.colors.primary : theme.colors.subtext,
+                                        flex: 1,
+                                        paddingVertical: 14,
+                                        paddingHorizontal: 10,
+                                        borderRadius: 16,
+                                        borderWidth: 2,
+                                        borderColor: isActive ? theme.colors.primary : theme.colors.border,
+                                        backgroundColor: isActive ? theme.colors.primary + '12' : theme.colors.card,
+                                        alignItems: 'center',
                                     }}
                                 >
-                                    {v.name}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
+                                    <Text
+                                        style={{
+                                            fontWeight: '700',
+                                            fontSize: 15,
+                                            color: isActive ? theme.colors.primary : theme.colors.text,
+                                        }}
+                                        numberOfLines={1}
+                                    >
+                                        {v.name}
+                                    </Text>
+                                    <Text
+                                        style={{
+                                            fontWeight: '600',
+                                            fontSize: 13,
+                                            color: isActive ? theme.colors.primary : theme.colors.subtext,
+                                            marginTop: 2,
+                                        }}
+                                    >
+                                        €{variantPrice.toFixed(2)}
+                                    </Text>
+                                    {isActive && (
+                                        <View
+                                            style={{
+                                                position: 'absolute',
+                                                top: -1,
+                                                right: -1,
+                                                width: 22,
+                                                height: 22,
+                                                borderRadius: 11,
+                                                backgroundColor: theme.colors.primary,
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                            }}
+                                        >
+                                            <Ionicons name="checkmark" size={14} color="#fff" />
+                                        </View>
+                                    )}
+                                </TouchableOpacity>
+                            );
+                        })}
                     </View>
                 </View>
             )}
 
-            {/* Option Groups */}
-            {optionGroupsForSelection.length > 0 && (
-                <View>
-                    {optionGroupsForSelection.map((group: any) => (
-                        <View key={group.id} style={{ marginBottom: 28 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
-                                <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '700' }}>
-                                    {group.name}
-                                </Text>
-                                <Text style={{ color: theme.colors.subtext, fontSize: 11, textTransform: 'uppercase', fontWeight: '600' }}>
-                                    {group.minSelections > 0 ? 'Required' : 'Optional'}
-                                    {group.maxSelections > 1 ? ` (Max ${group.maxSelections})` : ''}
-                                </Text>
-                            </View>
+            {/* ── Option Groups ── */}
+            {optionGroupsForSelection.map((group: any) => {
+                const isRequired = group.minSelections > 0;
+                const isSingleSelect = group.maxSelections === 1;
+                const count = selectedCount(group.id);
 
-                            <View style={{ gap: 8 }}>
-                                {group.options.map((option: any) => {
-                                    const isSelected = selectedOptions[group.id]?.includes(option.id);
-                                    return (
-                                        <TouchableOpacity
-                                            key={option.id}
-                                            onPress={() => handleOptionToggle(group.id, option.id, group.maxSelections)}
+                return (
+                    <View key={group.id} style={{ marginTop: 24 }}>
+                        <SectionHeader
+                            title={group.name}
+                            badge={
+                                isRequired
+                                    ? count >= group.minSelections
+                                        ? undefined
+                                        : t.product.required_badge
+                                    : t.product.optional_badge
+                            }
+                            badgeColor={
+                                isRequired && count < group.minSelections
+                                    ? theme.colors.expense
+                                    : theme.colors.subtext
+                            }
+                            subtitle={
+                                isSingleSelect
+                                    ? t.product.select_one
+                                    : group.maxSelections > 1
+                                        ? t.product.select_up_to.replace('{{max}}', String(group.maxSelections))
+                                        : undefined
+                            }
+                            theme={theme}
+                        />
+
+                        <View style={{ paddingHorizontal: 20, gap: 6 }}>
+                            {group.options.map((option: any, idx: number) => {
+                                const isSelected = selectedOptions[group.id]?.includes(option.id);
+                                const isFirst = idx === 0;
+                                const isLast = idx === group.options.length - 1;
+
+                                return (
+                                    <TouchableOpacity
+                                        key={option.id}
+                                        onPress={() => handleOptionToggle(group.id, option.id, group.maxSelections)}
+                                        activeOpacity={0.65}
+                                        style={{
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            paddingVertical: option.imageUrl ? 10 : 15,
+                                            paddingHorizontal: 16,
+                                            backgroundColor: isSelected ? theme.colors.primary + '0D' : theme.colors.card,
+                                            borderWidth: 1.5,
+                                            borderColor: isSelected ? theme.colors.primary : theme.colors.border,
+                                            borderTopLeftRadius: isFirst ? 16 : 6,
+                                            borderTopRightRadius: isFirst ? 16 : 6,
+                                            borderBottomLeftRadius: isLast ? 16 : 6,
+                                            borderBottomRightRadius: isLast ? 16 : 6,
+                                        }}
+                                    >
+                                        {/* Radio / Checkbox indicator */}
+                                        <View
                                             style={{
-                                                flexDirection: 'row',
-                                                alignItems: 'center',
-                                                justifyContent: 'space-between',
-                                                paddingVertical: 14,
-                                                paddingHorizontal: 16,
-                                                borderRadius: 14,
-                                                borderWidth: 1,
+                                                width: 24,
+                                                height: 24,
+                                                borderRadius: isSingleSelect ? 12 : 7,
+                                                borderWidth: 2,
                                                 borderColor: isSelected ? theme.colors.primary : theme.colors.border,
-                                                backgroundColor: isSelected ? theme.colors.primary + '08' : theme.colors.card,
+                                                backgroundColor: isSelected ? theme.colors.primary : 'transparent',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                marginRight: option.imageUrl ? 12 : 14,
                                             }}
                                         >
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                                                <Ionicons
-                                                    name={isSelected
-                                                        ? (group.maxSelections === 1 ? 'radio-button-on' : 'checkbox')
-                                                        : (group.maxSelections === 1 ? 'radio-button-off' : 'square-outline')
-                                                    }
-                                                    size={22}
-                                                    color={isSelected ? theme.colors.primary : theme.colors.subtext}
-                                                />
-                                                <Text style={{ color: theme.colors.text, fontSize: 15, marginLeft: 12, flex: 1 }}>
-                                                    {option.name}
-                                                </Text>
-                                            </View>
-                                            {option.extraPrice > 0 && (
-                                                <Text style={{ color: theme.colors.primary, fontWeight: '600', fontSize: 14 }}>
+                                            {isSelected && (
+                                                <Ionicons name="checkmark" size={15} color="#fff" />
+                                            )}
+                                        </View>
+
+                                        {/* Option thumbnail */}
+                                        {option.imageUrl && (
+                                            <Image
+                                                source={{ uri: option.imageUrl }}
+                                                style={{
+                                                    width: 44,
+                                                    height: 44,
+                                                    borderRadius: 10,
+                                                    marginRight: 12,
+                                                    backgroundColor: theme.colors.background,
+                                                }}
+                                                resizeMode="cover"
+                                            />
+                                        )}
+
+                                        {/* Option name */}
+                                        <Text
+                                            style={{
+                                                flex: 1,
+                                                fontSize: 15,
+                                                fontWeight: isSelected ? '600' : '500',
+                                                color: isSelected ? theme.colors.text : theme.colors.text,
+                                            }}
+                                        >
+                                            {option.name}
+                                        </Text>
+
+                                        {/* Price badge */}
+                                        {option.extraPrice > 0 && (
+                                            <View
+                                                style={{
+                                                    backgroundColor: isSelected ? theme.colors.primary + '18' : theme.colors.background,
+                                                    paddingHorizontal: 10,
+                                                    paddingVertical: 4,
+                                                    borderRadius: 10,
+                                                }}
+                                            >
+                                                <Text
+                                                    style={{
+                                                        color: isSelected ? theme.colors.primary : theme.colors.subtext,
+                                                        fontWeight: '700',
+                                                        fontSize: 13,
+                                                    }}
+                                                >
                                                     +€{option.extraPrice.toFixed(2)}
                                                 </Text>
-                                            )}
-                                        </TouchableOpacity>
-                                    );
-                                })}
-                            </View>
+                                            </View>
+                                        )}
+                                        {option.extraPrice === 0 && (
+                                            <Text style={{ color: theme.colors.subtext, fontSize: 12, fontWeight: '500' }}>
+                                                {t.product.included}
+                                            </Text>
+                                        )}
+                                    </TouchableOpacity>
+                                );
+                            })}
                         </View>
-                    ))}
-                </View>
-            )}
+                    </View>
+                );
+            })}
+        </View>
+    );
+}
 
-            {/* Divider */}
-            <View style={{ height: 1, backgroundColor: theme.colors.border, marginBottom: 20 }} />
-
-            {/* Description */}
-            {(activeProduct.description || product.description) && (
-                <View style={{ marginBottom: 20 }}>
-                    <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '600', marginBottom: 10 }}>
-                        {t.product.description}
-                    </Text>
-                    <Text style={{ color: theme.colors.subtext, fontSize: 15, lineHeight: 22 }}>
-                        {activeProduct.description || product.description}
-                    </Text>
-                </View>
+/* ── Section Header ── */
+function SectionHeader({
+    title,
+    badge,
+    badgeColor,
+    subtitle,
+    theme,
+}: {
+    title: string;
+    badge?: string;
+    badgeColor?: string;
+    subtitle?: string;
+    theme: any;
+}) {
+    return (
+        <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '700', flex: 1 }}>
+                    {title}
+                </Text>
+                {badge && (
+                    <View
+                        style={{
+                            backgroundColor: (badgeColor ?? theme.colors.primary) + '18',
+                            paddingHorizontal: 10,
+                            paddingVertical: 3,
+                            borderRadius: 8,
+                        }}
+                    >
+                        <Text
+                            style={{
+                                color: badgeColor ?? theme.colors.primary,
+                                fontSize: 11,
+                                fontWeight: '700',
+                                textTransform: 'uppercase',
+                                letterSpacing: 0.5,
+                            }}
+                        >
+                            {badge}
+                        </Text>
+                    </View>
+                )}
+            </View>
+            {subtitle && (
+                <Text style={{ color: theme.colors.subtext, fontSize: 13, marginTop: 3 }}>
+                    {subtitle}
+                </Text>
             )}
         </View>
     );

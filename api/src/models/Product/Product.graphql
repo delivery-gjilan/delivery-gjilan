@@ -19,6 +19,7 @@ type Option {
     optionGroupId: ID!
     name: String!
     extraPrice: Float!
+    imageUrl: String
     linkedProductId: ID
     linkedProduct: Product
     displayOrder: Int!
@@ -82,6 +83,7 @@ input CreateOptionGroupInput {
 input CreateOptionInput {
     name: String!
     extraPrice: Float
+    imageUrl: String
     linkedProductId: ID
     displayOrder: Int
 }
@@ -96,6 +98,7 @@ input UpdateOptionGroupInput {
 input UpdateOptionInput {
     name: String
     extraPrice: Float
+    imageUrl: String
     linkedProductId: ID
     displayOrder: Int
 }

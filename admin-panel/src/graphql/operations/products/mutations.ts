@@ -77,6 +77,7 @@ export const CREATE_OPTION = graphql(`
             id
             name
             extraPrice
+            imageUrl
             displayOrder
         }
     }
@@ -88,6 +89,7 @@ export const UPDATE_OPTION = graphql(`
             id
             name
             extraPrice
+            imageUrl
             displayOrder
         }
     }

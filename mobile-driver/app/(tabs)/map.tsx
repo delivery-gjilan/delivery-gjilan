@@ -92,6 +92,22 @@ export default function MapScreen() {
         nextFetchPolicy: 'cache-first',
     });
 
+    // ── Precise per-order timers: fire exactly when each PREPARING order crosses
+    //    the 5-min threshold for map pin/pool button visibility.
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        const orders = (data as any)?.orders ?? [];
+        const timers: ReturnType<typeof setTimeout>[] = [];
+        for (const o of orders) {
+            if (o.status !== 'PREPARING' || o.driver?.id || !o.estimatedReadyAt) continue;
+            const thresholdMs = new Date(o.estimatedReadyAt).getTime() - 5 * 60 * 1000;
+            const delayMs = thresholdMs - Date.now();
+            if (delayMs <= 0) continue;
+            timers.push(setTimeout(() => setNow(Date.now()), delayMs));
+        }
+        return () => timers.forEach(clearTimeout);
+    }, [data]);
+
     // ── Filter orders ──
     const assignedOrders = useMemo(() => {
         const orders = (data as any)?.orders ?? [];
@@ -147,10 +163,15 @@ export default function MapScreen() {
         if (dispatchModeEnabled) return [];
         const orders = (data as any)?.orders ?? [];
         return orders.filter((order: any) => {
-            if (order.status !== 'READY') return false;
-            return !order.driver?.id;
+            if (order.driver?.id) return false;
+            if (order.status === 'READY') return true;
+            if (order.status === 'PREPARING') {
+                const estimatedReadyAt = order.estimatedReadyAt ? new Date(order.estimatedReadyAt).getTime() : null;
+                return estimatedReadyAt !== null && estimatedReadyAt - now <= 5 * 60 * 1000;
+            }
+            return false;
         });
-    }, [data, dispatchModeEnabled]);
+    }, [data, dispatchModeEnabled, now]);
 
     const allMapOrders = useMemo(
         () => [...assignedOrders, ...availableOrders],

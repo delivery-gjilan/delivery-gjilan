@@ -217,7 +217,9 @@
         "delete_account_title": "Fshij Llogarinë",
         "delete_account_message": "A jeni i sigurt se dëshironi të fshini llogarinë tuaj? Ky veprim nuk mund të kthehet. Të gjitha të dhënat tuaja do të fshihen përgjithmonë.",
         "delete_account_confirm": "Fshij",
-        "delete_account_error": "Dështoi fshirja e llogarisë. Ju lutem provoni përsëri më vonë."
+        "delete_account_error": "Dështoi fshirja e llogarisë. Ju lutem provoni përsëri më vonë.",
+        "email_receipts": "Faturat me Email",
+        "email_receipts_desc": "Merr faturë me email pas çdo dërgese"
     },
     "addresses": {
         "title": "Adresat e Mia",
@@ -497,7 +499,14 @@
         "repeat_last": "Njëjtë si më parë",
         "customize_new": "Zgjedh opsione të reja",
         "current_options": "Opsionet aktuale",
-        "offers": "Oferta"
+        "offers": "Oferta",
+        "choose_size": "Zgjidhni madhësinë",
+        "required_badge": "E detyrueshme",
+        "optional_badge": "Opsionale",
+        "select_one": "Zgjidhni një",
+        "select_up_to": "Zgjidhni deri në {{max}}",
+        "included": "Përfshirë",
+        "select_required": "Zgjidhni opsionet e detyrueshme"
     },
     "store_closed": {
         "title": "Dyqani Mbyllur Përkohësisht",

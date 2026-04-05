@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, Modal, Pressable, Animated, PanResponder, Linking, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Alert, Modal, Pressable, Animated, PanResponder, Linking, TextInput, KeyboardAvoidingView, Platform, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,7 +10,7 @@ import { useQuery, useMutation } from '@apollo/client/react';
 import { ProfileRow } from '@/components/ProfileRow';
 import { useAuthStore } from '@/store/authStore';
 import { useTranslations } from '@/hooks/useTranslations';
-import { DELETE_MY_ACCOUNT_MUTATION, SET_MY_PREFERRED_LANGUAGE_MUTATION, UPDATE_MY_PROFILE_MUTATION } from '@/graphql/operations/auth';
+import { DELETE_MY_ACCOUNT_MUTATION, SET_MY_PREFERRED_LANGUAGE_MUTATION, SET_MY_EMAIL_OPT_OUT_MUTATION, UPDATE_MY_PROFILE_MUTATION } from '@/graphql/operations/auth';
 import { AppLanguage } from '@/gql/graphql';
 
 const SLIDER_TRACK_WIDTH = 272;
@@ -123,9 +123,13 @@ export default function Profile() {
 
     const [deleteMyAccount, { loading: deletingAccount }] = useMutation(DELETE_MY_ACCOUNT_MUTATION);
     const [setMyPreferredLanguage] = useMutation(SET_MY_PREFERRED_LANGUAGE_MUTATION);
+    const [setMyEmailOptOut] = useMutation(SET_MY_EMAIL_OPT_OUT_MUTATION);
     const [updateMyProfile, { loading: savingProfile }] = useMutation(UPDATE_MY_PROFILE_MUTATION);
     const [deleteModalStep, setDeleteModalStep] = useState<0 | 1 | 2>(0);
     const updateUser = useAuthStore((state) => state.updateUser);
+
+    // Email receipts toggle — local state so it reacts immediately
+    const [emailReceipts, setEmailReceipts] = useState(!((user as any)?.emailOptOut ?? false));
 
     const [editProfileVisible, setEditProfileVisible] = useState(false);
     const [editFirstName, setEditFirstName] = useState('');
@@ -291,6 +295,36 @@ export default function Profile() {
                                 </TouchableOpacity>
                             );
                         })}
+                    </View>
+                </View>
+
+                {/* ── Email Receipts ───────────────────────────────────── */}
+                <View style={{ marginHorizontal: 16, marginBottom: 14, borderRadius: 16, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 }}>
+                        <Ionicons name="mail-outline" size={20} color={theme.colors.subtext} style={{ marginRight: 12 }} />
+                        <View style={{ flex: 1 }}>
+                            <Text style={{ color: theme.colors.text, fontSize: 15, fontWeight: '600' }}>
+                                {(t.profile as any).email_receipts || 'Email Receipts'}
+                            </Text>
+                            <Text style={{ color: theme.colors.subtext, fontSize: 12, marginTop: 2 }}>
+                                {(t.profile as any).email_receipts_desc || 'Receive an email receipt after each delivery'}
+                            </Text>
+                        </View>
+                        <Switch
+                            value={emailReceipts}
+                            onValueChange={(enabled: boolean) => {
+                                setEmailReceipts(enabled);
+                                const optOut = !enabled;
+                                if (user) updateUser({ ...user, emailOptOut: optOut } as any);
+                                setMyEmailOptOut({ variables: { optOut } }).catch((err) => {
+                                    console.error('[Profile] setMyEmailOptOut failed:', err);
+                                    setEmailReceipts(!enabled);
+                                    if (user) updateUser({ ...user, emailOptOut: !optOut } as any);
+                                });
+                            }}
+                            trackColor={{ false: '#D1D5DB', true: '#7C3AED' }}
+                            thumbColor="#ffffff"
+                        />
                     </View>
                 </View>
 

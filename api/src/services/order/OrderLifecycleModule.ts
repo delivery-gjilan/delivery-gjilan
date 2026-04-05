@@ -1,6 +1,10 @@
 import {
     orderItems as orderItemsTable,
     users as usersTable,
+    businesses as businessesTable,
+    products as productsTable,
+    orderPromotions as orderPromotionsTable,
+    promotions as promotionsTable,
 } from '@/database/schema';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type { Order, OrderStatus } from '@/generated/types.generated';
@@ -199,6 +203,11 @@ export class OrderLifecycleModule {
         if (status === 'DELIVERED' && currentStatus !== 'DELIVERED') {
             const items = await this.deps.db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, id));
             await financialService.createOrderSettlements(dbOrder, items, dbOrder.driverId);
+
+            // Fire-and-forget: send order receipt email
+            this.sendReceiptEmail(id, dbOrder, items, context).catch((err) =>
+                log.error({ err, orderId: id }, 'email:receipt:trigger_failed'),
+            );
         }
 
         await this.userBehavior.updateUserBehaviorOnStatusChange(
@@ -221,7 +230,8 @@ export class OrderLifecycleModule {
                     log.info({ orderId: id }, 'updateStatus:READY — early dispatch already fired, skipping');
                 } else {
                     if (earlyState === 'pending') {
-                        dispatchService.cancelEarlyDispatch(id);
+                        // Remove the pending BullMQ job so it doesn't fire after READY dispatch.
+                        dispatchService.cancelDispatch(id);
                         log.info({ orderId: id }, 'updateStatus:READY — order ready before early timer, dispatching now');
                     }
                     await cache.set(`dispatch:early:${id}`, 'fired', 3600);
@@ -488,6 +498,101 @@ export class OrderLifecycleModule {
                 endLiveActivity(notificationService, id, status === 'CANCELLED' ? 'cancelled' : 'delivered');
             }
         }
+    }
+
+    /**
+     * Gather receipt data and send via EmailService (fire-and-forget).
+     */
+    private async sendReceiptEmail(
+        orderId: string,
+        dbOrder: DbOrder,
+        items: (typeof orderItemsTable.$inferSelect)[],
+        context: GraphQLContext,
+    ): Promise<void> {
+        const { db } = this.deps;
+
+        // Fetch user email
+        const [user] = await db
+            .select({ email: usersTable.email, firstName: usersTable.firstName, lastName: usersTable.lastName, preferredLanguage: usersTable.preferredLanguage, emailOptOut: usersTable.emailOptOut })
+            .from(usersTable)
+            .where(eq(usersTable.id, dbOrder.userId));
+
+        if (!user?.email || user.emailOptOut) return;
+
+        // Fetch business name (historical lookup — may be deleted)
+        const [business] = await db
+            .select({ name: businessesTable.name })
+            .from(businessesTable)
+            .where(eq(businessesTable.id, dbOrder.businessId));
+
+        // Fetch product names for each item (historical lookup)
+        const productIds = [...new Set(items.map((i) => i.productId))];
+        const productRows = productIds.length
+            ? await db
+                  .select({ id: productsTable.id, name: productsTable.name })
+                  .from(productsTable)
+                  .where(inArray(productsTable.id, productIds))
+            : [];
+        const productNameMap = new Map(productRows.map((p) => [p.id, p.name]));
+
+        // Fetch promotions applied to this order (with promo name/code)
+        const promos = await db
+            .select({
+                discountAmount: orderPromotionsTable.discountAmount,
+                appliesTo: orderPromotionsTable.appliesTo,
+                name: promotionsTable.name,
+                code: promotionsTable.code,
+            })
+            .from(orderPromotionsTable)
+            .innerJoin(promotionsTable, eq(orderPromotionsTable.promotionId, promotionsTable.id))
+            .where(eq(orderPromotionsTable.orderId, orderId));
+        const discountTotal = promos.reduce((sum, p) => sum + Number(p.discountAmount), 0);
+
+        // Only include top-level items (not option/child items)
+        const topLevelItems = items.filter((i) => !i.parentOrderItemId);
+
+        const subtotal = Number(dbOrder.actualPrice);
+        const originalDeliveryPrice = Number((dbOrder as any).originalDeliveryPrice ?? dbOrder.deliveryPrice);
+        const deliveryPrice = Number(dbOrder.deliveryPrice);
+        const prioritySurcharge = Number((dbOrder as any).prioritySurcharge ?? 0);
+        const total = subtotal + deliveryPrice + prioritySurcharge;
+
+        // Build unsubscribe URL with signed token
+        const { createUnsubscribeToken } = require('@/routes/emailRoutes');
+        const unsubToken = createUnsubscribeToken(dbOrder.userId);
+        const apiBase = process.env.PUBLIC_API_URL || 'https://colloquial-deadra-cursorily.ngrok-free.dev';
+        const unsubscribeUrl = `${apiBase}/api/email/unsubscribe?token=${unsubToken}`;
+
+        void context.emailService.sendOrderReceipt({
+            toEmail: user.email,
+            toName: `${user.firstName} ${user.lastName}`,
+            language: (user.preferredLanguage === 'al' ? 'al' : 'en') as 'en' | 'al',
+            unsubscribeUrl,
+            order: {
+                displayId: dbOrder.displayId,
+                orderDate: dbOrder.orderDate ?? null,
+                businessName: business?.name ?? 'Unknown',
+                items: topLevelItems.map((item) => ({
+                    name: productNameMap.get(item.productId) ?? 'Item',
+                    quantity: item.quantity,
+                    unitPrice: Number(item.finalAppliedPrice),
+                })),
+                subtotal,
+                originalDeliveryPrice,
+                deliveryPrice,
+                prioritySurcharge,
+                discountTotal,
+                promotions: promos.map((p) => ({
+                    name: p.name,
+                    code: p.code,
+                    appliesTo: p.appliesTo,
+                    discountAmount: Number(p.discountAmount),
+                })),
+                total,
+                paymentCollection: dbOrder.paymentCollection,
+                dropoffAddress: dbOrder.dropoffAddress,
+            },
+        });
     }
 
     private emitAnalyticsEvent(id: string, status: string, currentStatus: string, dbOrder: DbOrder, userData: any, isDriver: boolean, isBusinessAdmin: boolean, isSuperAdmin: boolean) {

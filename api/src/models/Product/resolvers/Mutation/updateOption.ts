@@ -11,6 +11,7 @@ export const updateOption: NonNullable<MutationResolvers['updateOption']> = asyn
         optionGroupId: updated.optionGroupId,
         name: updated.name,
         extraPrice: updated.extraPrice,
+        imageUrl: updated.imageUrl ?? undefined,
         linkedProductId: updated.linkedProductId ?? undefined,
         displayOrder: updated.displayOrder,
     };

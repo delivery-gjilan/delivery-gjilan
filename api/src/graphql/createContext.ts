@@ -27,6 +27,7 @@ import { NotificationService } from '@/services/NotificationService';
 import { PromotionService } from '@/services/PromotionService';
 import { FinancialService } from '@/services/FinancialService';
 import { SettlementCalculationEngine } from '@/services/SettlementCalculationEngine';
+import { EmailService } from '@/services/EmailService';
 import { BannerRepository } from '@/repositories/BannerRepository';
 
 /**
@@ -87,6 +88,7 @@ let cachedServices: {
     notificationService: NotificationService;
     promotionService: PromotionService;
     financialService: FinancialService;
+    emailService: EmailService;
 } | null = null;
 
 async function getOrCreateServices(db: any) {
@@ -114,6 +116,7 @@ async function getOrCreateServices(db: any) {
         notificationService: new NotificationService(new NotificationRepository(db)),
         promotionService: new PromotionService(db),
         financialService: new FinancialService(db),
+        emailService: new EmailService(),
         bannerRepository: new BannerRepository(db),
     };
     return cachedServices;

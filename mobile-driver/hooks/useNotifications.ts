@@ -150,6 +150,14 @@ export function useNotifications() {
                 campaignId: typeof notification.request.content.data?.campaignId === 'string' ? notification.request.content.data.campaignId : undefined,
                 orderId: typeof notification.request.content.data?.orderId === 'string' ? notification.request.content.data.orderId : undefined,
             });
+            // Refresh the orders list when an early-dispatch push arrives so the
+            // accept modal appears immediately without requiring a manual app restart.
+            const notifType = notification.request.content.data?.type;
+            if (notifType === 'ORDER_READY_POOL') {
+                apolloClient
+                    .query({ query: GET_ORDERS, fetchPolicy: 'network-only' })
+                    .catch(() => null);
+            }
         });
 
         // Listen for notification taps (foreground + background)

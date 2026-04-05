@@ -14,6 +14,7 @@ export const ME_QUERY = graphql(`
             address
             role
             preferredLanguage
+            emailOptOut
         }
     }
 `);

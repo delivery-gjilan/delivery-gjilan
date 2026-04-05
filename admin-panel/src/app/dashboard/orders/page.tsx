@@ -465,6 +465,11 @@ export default function OrdersPage() {
     const [suppressionUpdatingUserId, setSuppressionUpdatingUserId] = useState<string | null>(null);
     const [dismissedApprovalOrderIds, setDismissedApprovalOrderIds] = useState<Set<string>>(new Set());
     const seenFlaggedOrderIdsRef = useRef<Set<string>>(new Set());
+    const [now, setNow] = useState(Date.now());
+    useEffect(() => {
+        const interval = setInterval(() => setNow(Date.now()), 30_000);
+        return () => clearInterval(interval);
+    }, []);
 
     const [prepTimeAlerts, setPrepTimeAlerts] = useState<PrepTimeAlert[]>([]);
     const { dismiss: dismissPrepAlert } = usePrepTimeAlerts(setPrepTimeAlerts);
@@ -990,7 +995,7 @@ export default function OrdersPage() {
                                             <div className="mb-3 flex items-center justify-between bg-violet-500/10 border border-violet-500/20 rounded-lg px-3 py-2">
                                                 <div className="flex items-center gap-2 text-violet-400 text-sm">
                                                     <Timer size={14} />
-                                                    <span>~{order.preparationMinutes} min</span>
+                                                    <span>~{order.estimatedReadyAt ? Math.max(0, Math.round((new Date(order.estimatedReadyAt).getTime() - now) / 60000)) : order.preparationMinutes} min</span>
                                                 </div>
                                                 <Button
                                                     variant="ghost"

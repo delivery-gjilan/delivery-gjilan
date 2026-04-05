@@ -452,6 +452,7 @@ export type CreateOptionGroupInput = {
 export type CreateOptionInput = {
   displayOrder?: InputMaybe<Scalars['Int']['input']>;
   extraPrice?: InputMaybe<Scalars['Float']['input']>;
+  imageUrl?: InputMaybe<Scalars['String']['input']>;
   linkedProductId?: InputMaybe<Scalars['ID']['input']>;
   name: Scalars['String']['input'];
 };
@@ -1017,6 +1018,7 @@ export type Mutation = {
   setBusinessSchedule: Array<BusinessDayHours>;
   setDefaultAddress: Scalars['Boolean']['output'];
   setDeliveryPricingTiers: Array<DeliveryPricingTier>;
+  setMyEmailOptOut: User;
   setMyPreferredLanguage: User;
   setOrderAdminNote: Order;
   setUserPermissions: User;
@@ -1505,6 +1507,11 @@ export type MutationsetDeliveryPricingTiersArgs = {
 };
 
 
+export type MutationsetMyEmailOptOutArgs = {
+  optOut: Scalars['Boolean']['input'];
+};
+
+
 export type MutationsetMyPreferredLanguageArgs = {
   language: AppLanguage;
 };
@@ -1766,6 +1773,7 @@ export type Option = {
   displayOrder: Scalars['Int']['output'];
   extraPrice: Scalars['Float']['output'];
   id: Scalars['ID']['output'];
+  imageUrl?: Maybe<Scalars['String']['output']>;
   linkedProduct?: Maybe<Product>;
   linkedProductId?: Maybe<Scalars['ID']['output']>;
   name: Scalars['String']['output'];
@@ -2983,6 +2991,7 @@ export type UpdateOptionGroupInput = {
 export type UpdateOptionInput = {
   displayOrder?: InputMaybe<Scalars['Int']['input']>;
   extraPrice?: InputMaybe<Scalars['Float']['input']>;
+  imageUrl?: InputMaybe<Scalars['String']['input']>;
   linkedProductId?: InputMaybe<Scalars['ID']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
 };
@@ -3070,6 +3079,7 @@ export type User = {
   driverLocation?: Maybe<Location>;
   driverLocationUpdatedAt?: Maybe<Scalars['Date']['output']>;
   email: Scalars['String']['output'];
+  emailOptOut: Scalars['Boolean']['output'];
   emailVerified: Scalars['Boolean']['output'];
   firstName: Scalars['String']['output'];
   flagColor?: Maybe<Scalars['String']['output']>;
@@ -4148,6 +4158,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   setBusinessSchedule?: Resolver<Array<ResolversTypes['BusinessDayHours']>, ParentType, ContextType, RequireFields<MutationsetBusinessScheduleArgs, 'businessId' | 'schedule'>>;
   setDefaultAddress?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationsetDefaultAddressArgs, 'id'>>;
   setDeliveryPricingTiers?: Resolver<Array<ResolversTypes['DeliveryPricingTier']>, ParentType, ContextType, RequireFields<MutationsetDeliveryPricingTiersArgs, 'input'>>;
+  setMyEmailOptOut?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationsetMyEmailOptOutArgs, 'optOut'>>;
   setMyPreferredLanguage?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationsetMyPreferredLanguageArgs, 'language'>>;
   setOrderAdminNote?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationsetOrderAdminNoteArgs, 'id'>>;
   setUserPermissions?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationsetUserPermissionsArgs, 'permissions' | 'userId'>>;
@@ -4242,6 +4253,7 @@ export type OptionResolvers<ContextType = GraphQLContext, ParentType extends Res
   displayOrder?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   extraPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   linkedProduct?: Resolver<Maybe<ResolversTypes['Product']>, ParentType, ContextType>;
   linkedProductId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
@@ -4859,6 +4871,7 @@ export type UserResolvers<ContextType = GraphQLContext, ParentType extends Resol
   driverLocation?: Resolver<Maybe<ResolversTypes['Location']>, ParentType, ContextType>;
   driverLocationUpdatedAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   email?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  emailOptOut?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   emailVerified?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   firstName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   flagColor?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;

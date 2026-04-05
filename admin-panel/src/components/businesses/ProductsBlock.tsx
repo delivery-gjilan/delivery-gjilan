@@ -218,9 +218,9 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
     ]);
     const [optionsError, setOptionsError] = useState("");
     const [optionsLoading, setOptionsLoading] = useState(false);
-    const [newOptionByGroup, setNewOptionByGroup] = useState<Record<string, { name: string; extraPrice: number }>>({});
+    const [newOptionByGroup, setNewOptionByGroup] = useState<Record<string, { name: string; extraPrice: number; imageFile?: File | null; imagePreview?: string | null }>>({});
     const [optionGroupDrafts, setOptionGroupDrafts] = useState<Record<string, { name: string; min: number; max: number }>>({});
-    const [optionDrafts, setOptionDrafts] = useState<Record<string, { name: string; extraPrice: number }>>({});
+    const [optionDrafts, setOptionDrafts] = useState<Record<string, { name: string; extraPrice: number; imageFile?: File | null; imagePreview?: string | null }>>({});
     const [optionsDeleteTarget, setOptionsDeleteTarget] = useState<
         | { kind: "group"; id: string; name: string }
         | { kind: "option"; id: string; name: string }
@@ -637,12 +637,19 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         setOptionsLoading(true);
         setOptionsError("");
         try {
+            let imageUrl: string | undefined;
+            if (draft.imageFile) {
+                const url = await uploadImage(draft.imageFile, 'options');
+                if (url) imageUrl = url;
+            }
+
             await createOption({
                 variables: {
                     optionGroupId,
                     input: {
                         name,
                         extraPrice: Number(draft.extraPrice) || 0,
+                        imageUrl: imageUrl ?? null,
                         displayOrder,
                     },
                 },
@@ -650,7 +657,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
 
             setNewOptionByGroup((prev) => ({
                 ...prev,
-                [optionGroupId]: { name: "", extraPrice: 0 },
+                [optionGroupId]: { name: "", extraPrice: 0, imageFile: null, imagePreview: null },
             }));
             await refetchProductOptions();
         } catch (error) {
@@ -672,15 +679,29 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         setOptionsLoading(true);
         setOptionsError("");
         try {
+            let imageUrl: string | undefined;
+            if (draft.imageFile) {
+                const url = await uploadImage(draft.imageFile, 'options');
+                if (url) imageUrl = url;
+            }
+
             await updateOption({
                 variables: {
                     id: optionId,
                     input: {
                         name,
                         extraPrice: Number(draft.extraPrice) || 0,
+                        ...(imageUrl !== undefined ? { imageUrl } : {}),
                     },
                 },
             });
+            // Clear the draft image after successful save
+            if (draft.imageFile) {
+                setOptionDrafts((prev) => ({
+                    ...prev,
+                    [optionId]: { ...prev[optionId]!, imageFile: null, imagePreview: null },
+                }));
+            }
             await refetchProductOptions();
         } catch (error) {
             setOptionsError((error as Error).message || "Failed to update answer");
@@ -1936,9 +1957,42 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                 </Button>
                                             </div>
                                         </div>
-                                        <div className="mt-2 space-y-1">
+                                        <div className="mt-2 space-y-2">
                                             {group.options.map((opt) => (
-                                                <div key={opt.id} className="grid grid-cols-[1fr_110px_auto_auto] gap-2 items-center">
+                                                <div key={opt.id} className="grid grid-cols-[48px_1fr_110px_auto_auto] gap-2 items-center">
+                                                    <div className="relative">
+                                                        <label className="block text-xs text-gray-400 mb-1">Image</label>
+                                                        <label className="cursor-pointer block">
+                                                            {(optionDrafts[opt.id]?.imagePreview || opt.imageUrl) ? (
+                                                                <img
+                                                                    src={optionDrafts[opt.id]?.imagePreview || opt.imageUrl!}
+                                                                    alt=""
+                                                                    className="w-10 h-10 rounded-lg object-cover border border-gray-600"
+                                                                />
+                                                            ) : (
+                                                                <div className="w-10 h-10 rounded-lg border border-dashed border-gray-600 flex items-center justify-center text-gray-500 text-xs">+</div>
+                                                            )}
+                                                            <input
+                                                                type="file"
+                                                                accept="image/*"
+                                                                className="hidden"
+                                                                onChange={(e) => {
+                                                                    const file = e.target.files?.[0];
+                                                                    if (!file) return;
+                                                                    const preview = URL.createObjectURL(file);
+                                                                    setOptionDrafts((prev) => ({
+                                                                        ...prev,
+                                                                        [opt.id]: {
+                                                                            name: prev[opt.id]?.name ?? opt.name,
+                                                                            extraPrice: prev[opt.id]?.extraPrice ?? opt.extraPrice,
+                                                                            imageFile: file,
+                                                                            imagePreview: preview,
+                                                                        },
+                                                                    }));
+                                                                }}
+                                                            />
+                                                        </label>
+                                                    </div>
                                                     <div>
                                                         <label className="block text-xs text-gray-400 mb-1">Answer text</label>
                                                         <Input
@@ -1949,11 +2003,12 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                                     [opt.id]: {
                                                                         name: e.target.value,
                                                                         extraPrice: prev[opt.id]?.extraPrice ?? opt.extraPrice,
+                                                                        imageFile: prev[opt.id]?.imageFile,
+                                                                        imagePreview: prev[opt.id]?.imagePreview,
                                                                     },
                                                                 }))
                                                             }
                                                         />
-                                                        <p className="text-[11px] text-gray-500 mt-1">Example: Large, No Onions, Extra Cheese</p>
                                                     </div>
                                                     <div>
                                                         <label className="block text-xs text-gray-400 mb-1">Extra price</label>
@@ -1967,11 +2022,12 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                                     [opt.id]: {
                                                                         name: prev[opt.id]?.name ?? opt.name,
                                                                         extraPrice: Number(e.target.value) || 0,
+                                                                        imageFile: prev[opt.id]?.imageFile,
+                                                                        imagePreview: prev[opt.id]?.imagePreview,
                                                                     },
                                                                 }))
                                                             }
                                                         />
-                                                        <p className="text-[11px] text-gray-500 mt-1">Use 0 for no extra cost</p>
                                                     </div>
                                                     <Button
                                                         variant="outline"
@@ -1992,7 +2048,40 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                 </div>
                                             ))}
 
-                                            <div className="grid grid-cols-[1fr_110px_auto] gap-2 items-center border-t border-gray-700 pt-2 mt-2">
+                                            <div className="grid grid-cols-[48px_1fr_110px_auto] gap-2 items-center border-t border-gray-700 pt-2 mt-2">
+                                                <div>
+                                                    <label className="block text-xs text-gray-400 mb-1">Image</label>
+                                                    <label className="cursor-pointer block">
+                                                        {newOptionByGroup[group.id]?.imagePreview ? (
+                                                            <img
+                                                                src={newOptionByGroup[group.id]!.imagePreview!}
+                                                                alt=""
+                                                                className="w-10 h-10 rounded-lg object-cover border border-gray-600"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-10 h-10 rounded-lg border border-dashed border-gray-600 flex items-center justify-center text-gray-500 text-xs">+</div>
+                                                        )}
+                                                        <input
+                                                            type="file"
+                                                            accept="image/*"
+                                                            className="hidden"
+                                                            onChange={(e) => {
+                                                                const file = e.target.files?.[0];
+                                                                if (!file) return;
+                                                                const preview = URL.createObjectURL(file);
+                                                                setNewOptionByGroup((prev) => ({
+                                                                    ...prev,
+                                                                    [group.id]: {
+                                                                        name: prev[group.id]?.name ?? "",
+                                                                        extraPrice: prev[group.id]?.extraPrice ?? 0,
+                                                                        imageFile: file,
+                                                                        imagePreview: preview,
+                                                                    },
+                                                                }));
+                                                            }}
+                                                        />
+                                                    </label>
+                                                </div>
                                                 <div>
                                                     <label className="block text-xs text-gray-400 mb-1">New answer text</label>
                                                     <Input
@@ -2004,6 +2093,8 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                                 [group.id]: {
                                                                     name: e.target.value,
                                                                     extraPrice: prev[group.id]?.extraPrice ?? 0,
+                                                                    imageFile: prev[group.id]?.imageFile,
+                                                                    imagePreview: prev[group.id]?.imagePreview,
                                                                 },
                                                             }))
                                                         }
@@ -2023,6 +2114,8 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                                 [group.id]: {
                                                                     name: prev[group.id]?.name ?? "",
                                                                     extraPrice: Number(e.target.value) || 0,
+                                                                    imageFile: prev[group.id]?.imageFile,
+                                                                    imagePreview: prev[group.id]?.imagePreview,
                                                                 },
                                                             }))
                                                         }

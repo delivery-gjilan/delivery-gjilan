@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, numeric, integer, timestamp, index, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, numeric, integer, timestamp, index, boolean, text } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import { optionGroups } from './optionGroups';
 import { products } from './products';
@@ -13,6 +13,7 @@ export const options = pgTable(
             .references(() => optionGroups.id, { onDelete: 'cascade' }),
         name: varchar('name', { length: 255 }).notNull(),
         extraPrice: numeric('extra_price', { mode: 'number', precision: 10, scale: 2 }).default(0).notNull(),
+        imageUrl: text('image_url'),
         linkedProductId: uuid('linked_product_id').references(() => products.id, { onDelete: 'set null' }),
         displayOrder: integer('display_order').default(0).notNull(),
         isDeleted: boolean('is_deleted').default(false).notNull(),
