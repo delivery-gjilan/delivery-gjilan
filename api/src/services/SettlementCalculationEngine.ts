@@ -15,6 +15,7 @@ export interface SettlementCalculation {
     orderId: string;
     amount: number;
     ruleId: string | null;
+    reason: string;
 }
 
 type DbSettlementRule = typeof settlementRules.$inferSelect;
@@ -187,6 +188,7 @@ export class SettlementCalculationEngine {
             orderId: order.id,
             amount: Number(markupPrice.toFixed(2)),
             ruleId: null,
+            reason: `Markup remittance (€${markupPrice.toFixed(2)} cash collected)`,
         });
     }
 
@@ -210,6 +212,7 @@ export class SettlementCalculationEngine {
             orderId: order.id,
             amount: Number(prioritySurcharge.toFixed(2)),
             ruleId: null,
+            reason: `Priority surcharge remittance (€${prioritySurcharge.toFixed(2)} cash collected)`,
         });
     }
 
@@ -249,6 +252,7 @@ export class SettlementCalculationEngine {
             orderId: order.id,
             amount,
             ruleId: null,
+            reason: `Driver delivery commission (${commission}% of €${deliveryPrice.toFixed(2)})`,
         });
     }
 
@@ -291,6 +295,12 @@ export class SettlementCalculationEngine {
 
         if (amount <= 0) return;
 
+        const ruleLabel = rule.amountType === 'FIXED'
+            ? `€${Number(rule.amount).toFixed(2)} fixed`
+            : `${Number(rule.amount)}% of €${base.toFixed(2)}`;
+        const typeLabel = rule.type === 'DELIVERY_PRICE' ? 'delivery fee' : 'order price';
+        const dirLabel = rule.direction === 'RECEIVABLE' ? 'receivable' : 'payable';
+
         if (rule.entityType === 'BUSINESS') {
             const targetBusinessIds = rule.businessId ? [rule.businessId] : orderBusinessIds;
             for (const bizId of targetBusinessIds) {
@@ -302,6 +312,7 @@ export class SettlementCalculationEngine {
                     orderId: order.id,
                     amount: Number(amount.toFixed(2)),
                     ruleId: rule.id,
+                    reason: `Business ${dirLabel} on ${typeLabel} (${ruleLabel})`,
                 });
             }
         } else {
@@ -313,6 +324,7 @@ export class SettlementCalculationEngine {
                 orderId: order.id,
                 amount: Number(amount.toFixed(2)),
                 ruleId: rule.id,
+                reason: `Driver ${dirLabel} on ${typeLabel} (${ruleLabel})`,
             });
         }
     }

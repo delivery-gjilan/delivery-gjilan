@@ -2,7 +2,7 @@ import { type DbType } from '@/database';
 import { 
     settlementRules, DbSettlementRule, NewDbSettlementRule 
 } from '@/database/schema';
-import { eq, and, or, isNull, isNotNull, inArray, type SQL } from 'drizzle-orm';
+import { eq, and, or, isNull, isNotNull, inArray, sql, type SQL } from 'drizzle-orm';
 
 /** NOTE: The settlement_rules table has an isDeleted column. All queries MUST filter by isDeleted=false.
  *  Deletions MUST set isDeleted=true instead of removing the row. See SOFT_DELETE_CONVENTION.md. */
@@ -30,9 +30,49 @@ export class SettlementRuleRepository {
         return result[0] || null;
     }
 
-    async getRules(filters: SettlementRuleFilters): Promise<DbSettlementRule[]> {
+    async getRules(filters: SettlementRuleFilters, limit?: number, offset?: number): Promise<DbSettlementRule[]> {
         let query = this.db.select().from(settlementRules);
-        const conditions = [];
+        const conditions = this.buildFilterConditions(filters);
+
+        if (conditions.length > 0) {
+            const combined = and(...conditions);
+            if (combined) {
+                query = query.where(combined) as any;
+            }
+        }
+
+        let orderedQuery: any = query.orderBy(settlementRules.createdAt);
+
+        if (limit !== undefined && limit > 0) {
+            orderedQuery = orderedQuery.limit(limit);
+        }
+
+        if (offset !== undefined && offset > 0) {
+            orderedQuery = orderedQuery.offset(offset);
+        }
+
+        const rules = await orderedQuery;
+        return rules.map((rule: any) => ({
+            ...rule,
+            amount: parseFloat(rule.amount as any),
+        })) as any;
+    }
+
+    async getRulesCount(filters: SettlementRuleFilters): Promise<number> {
+        const conditions = this.buildFilterConditions(filters);
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+        const result = await this.db
+            .select({ count: sql<number>`COUNT(*)::INT` })
+            .from(settlementRules)
+            .where(whereClause)
+            .then((rows: any[]) => rows[0]);
+
+        return result?.count ?? 0;
+    }
+
+    private buildFilterConditions(filters: SettlementRuleFilters): SQL[] {
+        const conditions: SQL[] = [];
 
         // Always exclude soft-deleted
         conditions.push(eq(settlementRules.isDeleted, false));
@@ -76,18 +116,7 @@ export class SettlementRuleRepository {
             conditions.push(eq(settlementRules.isActive, filters.isActive));
         }
 
-        if (conditions.length > 0) {
-            const combined = and(...conditions);
-            if (combined) {
-                query = query.where(combined) as any;
-            }
-        }
-
-        const rules = await query.orderBy(settlementRules.createdAt);
-        return rules.map((rule) => ({
-            ...rule,
-            amount: parseFloat(rule.amount as any),
-        })) as any;
+        return conditions;
     }
 
     async createRule(rule: NewDbSettlementRule): Promise<DbSettlementRule> {

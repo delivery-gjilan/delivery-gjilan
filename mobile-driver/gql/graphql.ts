@@ -110,6 +110,12 @@ export type ApplicablePromotion = {
   type: PromotionType;
 };
 
+export enum ApprovalReason {
+  FirstOrder = 'FIRST_ORDER',
+  HighValue = 'HIGH_VALUE',
+  OutOfZone = 'OUT_OF_ZONE'
+}
+
 export type AssignPromotionToUserInput = {
   expiresAt?: InputMaybe<Scalars['String']['input']>;
   promotionId: Scalars['ID']['input'];
@@ -154,17 +160,42 @@ export type AuthResponse = {
 
 export type Banner = {
   __typename?: 'Banner';
+  business?: Maybe<Business>;
+  businessId?: Maybe<Scalars['ID']['output']>;
   createdAt: Scalars['DateTime']['output'];
+  displayContext: BannerDisplayContext;
+  endsAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['ID']['output'];
   imageUrl: Scalars['String']['output'];
   isActive: Scalars['Boolean']['output'];
   linkTarget?: Maybe<Scalars['String']['output']>;
   linkType?: Maybe<Scalars['String']['output']>;
+  mediaType: BannerMediaType;
+  product?: Maybe<Product>;
+  productId?: Maybe<Scalars['ID']['output']>;
+  promotion?: Maybe<Promotion>;
+  promotionId?: Maybe<Scalars['ID']['output']>;
   sortOrder: Scalars['Int']['output'];
+  startsAt?: Maybe<Scalars['DateTime']['output']>;
   subtitle?: Maybe<Scalars['String']['output']>;
   title?: Maybe<Scalars['String']['output']>;
   updatedAt: Scalars['DateTime']['output'];
 };
+
+export enum BannerDisplayContext {
+  All = 'ALL',
+  Business = 'BUSINESS',
+  Cart = 'CART',
+  Category = 'CATEGORY',
+  Home = 'HOME',
+  Product = 'PRODUCT'
+}
+
+export enum BannerMediaType {
+  Gif = 'GIF',
+  Image = 'IMAGE',
+  Video = 'VIDEO'
+}
 
 export enum BannerType {
   Info = 'INFO',
@@ -180,12 +211,15 @@ export type Business = {
   commissionPercentage: Scalars['Float']['output'];
   createdAt: Scalars['Date']['output'];
   description?: Maybe<Scalars['String']['output']>;
+  featuredSortOrder: Scalars['Int']['output'];
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
   isActive: Scalars['Boolean']['output'];
+  isFeatured: Scalars['Boolean']['output'];
   isOpen: Scalars['Boolean']['output'];
   isTemporarilyClosed: Scalars['Boolean']['output'];
   location: Location;
+  minOrderAmount: Scalars['Float']['output'];
   name: Scalars['String']['output'];
   phoneNumber?: Maybe<Scalars['String']['output']>;
   prepTimeOverrideMinutes?: Maybe<Scalars['Int']['output']>;
@@ -305,6 +339,7 @@ export type BusinessPromotion = {
   discountValue?: Maybe<Scalars['Float']['output']>;
   id: Scalars['ID']['output'];
   name: Scalars['String']['output'];
+  spendThreshold?: Maybe<Scalars['Float']['output']>;
   type: PromotionType;
 };
 
@@ -336,11 +371,18 @@ export type CartItemInput = {
 };
 
 export type CreateBannerInput = {
+  businessId?: InputMaybe<Scalars['ID']['input']>;
+  displayContext?: InputMaybe<BannerDisplayContext>;
+  endsAt?: InputMaybe<Scalars['DateTime']['input']>;
   imageUrl: Scalars['String']['input'];
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
   linkTarget?: InputMaybe<Scalars['String']['input']>;
   linkType?: InputMaybe<Scalars['String']['input']>;
+  mediaType?: InputMaybe<BannerMediaType>;
+  productId?: InputMaybe<Scalars['ID']['input']>;
+  promotionId?: InputMaybe<Scalars['ID']['input']>;
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
+  startsAt?: InputMaybe<Scalars['DateTime']['input']>;
   subtitle?: InputMaybe<Scalars['String']['input']>;
   title?: InputMaybe<Scalars['String']['input']>;
 };
@@ -351,6 +393,7 @@ export type CreateBusinessInput = {
   description?: InputMaybe<Scalars['String']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   location: LocationInput;
+  minOrderAmount?: InputMaybe<Scalars['Float']['input']>;
   name: Scalars['String']['input'];
   phoneNumber?: InputMaybe<Scalars['String']['input']>;
   workingHours: WorkingHoursInput;
@@ -359,6 +402,7 @@ export type CreateBusinessInput = {
 export type CreateBusinessOwnerInput = {
   email: Scalars['String']['input'];
   firstName: Scalars['String']['input'];
+  isDemoAccount?: InputMaybe<Scalars['Boolean']['input']>;
   lastName: Scalars['String']['input'];
   password: Scalars['String']['input'];
 };
@@ -430,9 +474,11 @@ export type CreateOrderInput = {
   dropOffLocation: LocationInput;
   items: Array<CreateOrderItemInput>;
   paymentCollection?: InputMaybe<OrderPaymentCollection>;
+  priorityRequested?: InputMaybe<Scalars['Boolean']['input']>;
   prioritySurcharge?: InputMaybe<Scalars['Float']['input']>;
   promotionId?: InputMaybe<Scalars['ID']['input']>;
   totalPrice: Scalars['Float']['input'];
+  userContextLocation?: InputMaybe<LocationInput>;
 };
 
 export type CreateOrderItemInput = {
@@ -447,6 +493,7 @@ export type CreateOrderItemInput = {
 export type CreateOrderItemOptionInput = {
   optionGroupId: Scalars['ID']['input'];
   optionId: Scalars['ID']['input'];
+  price?: InputMaybe<Scalars['Float']['input']>;
 };
 
 export type CreateProductCategoryInput = {
@@ -465,7 +512,7 @@ export type CreateProductInput = {
   isOnSale?: InputMaybe<Scalars['Boolean']['input']>;
   name: Scalars['String']['input'];
   price: Scalars['Float']['input'];
-  salePrice?: InputMaybe<Scalars['Float']['input']>;
+  saleDiscountPercentage?: InputMaybe<Scalars['Float']['input']>;
   subcategoryId?: InputMaybe<Scalars['ID']['input']>;
   variantGroupId?: InputMaybe<Scalars['ID']['input']>;
 };
@@ -481,15 +528,12 @@ export type CreateProductVariantGroupInput = {
 };
 
 export type CreatePromotionInput = {
-  addDriverCommission?: InputMaybe<Scalars['Boolean']['input']>;
   code?: InputMaybe<Scalars['String']['input']>;
-  createSettlementRules?: InputMaybe<Scalars['Boolean']['input']>;
   creatorId?: InputMaybe<Scalars['ID']['input']>;
-  creatorType?: InputMaybe<Scalars['String']['input']>;
+  creatorType: PromotionCreatorType;
   description?: InputMaybe<Scalars['String']['input']>;
   discountValue?: InputMaybe<Scalars['Float']['input']>;
-  driverRuleAmount?: InputMaybe<Scalars['Float']['input']>;
-  driverRuleAmountType?: InputMaybe<SettlementAmountType>;
+  driverPayoutAmount?: InputMaybe<Scalars['Float']['input']>;
   eligibleBusinessIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   endsAt?: InputMaybe<Scalars['String']['input']>;
   isActive: Scalars['Boolean']['input'];
@@ -515,6 +559,7 @@ export type CreateSettlementRuleInput = {
   businessId?: InputMaybe<Scalars['ID']['input']>;
   direction: SettlementDirection;
   entityType: SettlementEntityType;
+  maxAmount?: InputMaybe<Scalars['Float']['input']>;
   name: Scalars['String']['input'];
   notes?: InputMaybe<Scalars['String']['input']>;
   promotionId?: InputMaybe<Scalars['ID']['input']>;
@@ -525,6 +570,7 @@ export type CreateUserInput = {
   businessId?: InputMaybe<Scalars['ID']['input']>;
   email: Scalars['String']['input'];
   firstName: Scalars['String']['input'];
+  isDemoAccount?: InputMaybe<Scalars['Boolean']['input']>;
   lastName: Scalars['String']['input'];
   password: Scalars['String']['input'];
   role: UserRole;
@@ -642,6 +688,23 @@ export type DriverBasicInfo = {
   lastName: Scalars['String']['output'];
   onlinePreference: Scalars['Boolean']['output'];
   phoneNumber?: Maybe<Scalars['String']['output']>;
+};
+
+/** Summary of a driver's cash position and settlement breakdown. */
+export type DriverCashSummary = {
+  __typename?: 'DriverCashSummary';
+  /** Total cash collected from delivered CASH_TO_DRIVER orders (totalPrice - businessPrice). */
+  cashCollected: Scalars['Float']['output'];
+  /** Net settlement balance: platformOwesYou - youOwePlatform. */
+  netSettlement: Scalars['Float']['output'];
+  /** Sum of unsettled PAYABLE settlements (platform owes driver). */
+  platformOwesYou: Scalars['Float']['output'];
+  /** Cash driver keeps after all settlements: cashCollected + netSettlement. */
+  takeHome: Scalars['Float']['output'];
+  /** Number of delivered orders in the period. */
+  totalDeliveries: Scalars['Int']['output'];
+  /** Sum of unsettled RECEIVABLE settlements (driver owes platform). */
+  youOwePlatform: Scalars['Float']['output'];
 };
 
 export type DriverConnection = {
@@ -773,6 +836,15 @@ export type DriverMessageUser = {
   lastName: Scalars['String']['output'];
 };
 
+export type DriverOrderFinancials = {
+  __typename?: 'DriverOrderFinancials';
+  amountToCollectFromCustomer: Scalars['Float']['output'];
+  amountToRemitToPlatform: Scalars['Float']['output'];
+  driverNetEarnings: Scalars['Float']['output'];
+  orderId: Scalars['ID']['output'];
+  paymentCollection: OrderPaymentCollection;
+};
+
 export type DriverPttSignal = {
   __typename?: 'DriverPttSignal';
   action: DriverPttSignalAction;
@@ -809,6 +881,15 @@ export enum EntityType {
   Subcategory = 'SUBCATEGORY',
   User = 'USER'
 }
+
+export type GetBannersFilter = {
+  activeOnly?: InputMaybe<Scalars['Boolean']['input']>;
+  businessId?: InputMaybe<Scalars['ID']['input']>;
+  displayContext?: InputMaybe<BannerDisplayContext>;
+  includeScheduled?: InputMaybe<Scalars['Boolean']['input']>;
+  productId?: InputMaybe<Scalars['ID']['input']>;
+  promotionId?: InputMaybe<Scalars['ID']['input']>;
+};
 
 export type HourlyDistribution = {
   __typename?: 'HourlyDistribution';
@@ -897,7 +978,7 @@ export type Mutation = {
   createProductSubcategory: ProductSubcategory;
   createProductVariantGroup: ProductVariantGroup;
   createPromotion: Promotion;
-  /** Admin creates a settlement request, notifying the business via push. */
+  /** Admin creates a settlement request, notifying the business or driver via push. */
   createSettlementRequest: SettlementRequest;
   createSettlementRule: SettlementRule;
   createTestOrder: Order;
@@ -963,6 +1044,7 @@ export type Mutation = {
   /** Admin sends a message to a driver */
   sendDriverMessage: DriverMessage;
   sendPushNotification: SendNotificationResult;
+  setBusinessFeatured: Business;
   setBusinessSchedule: Array<BusinessDayHours>;
   setDefaultAddress: Scalars['Boolean']['output'];
   setDeliveryPricingTiers: Array<DeliveryPricingTier>;
@@ -971,7 +1053,7 @@ export type Mutation = {
   setUserPermissions: User;
   /** Settle all unsettled settlements for a business. Supports partial payment. */
   settleWithBusiness: SettleResult;
-  /** Settle all unsettled settlements for a driver (always full). */
+  /** Settle unsettled settlements for a driver. Supports partial payment. */
   settleWithDriver: SettleResult;
   startPreparing: Order;
   submitPhoneNumber: SignupStepResponse;
@@ -985,6 +1067,7 @@ export type Mutation = {
   updateDeliveryZone: DeliveryZone;
   updateDriverLocation: User;
   updateDriverOnlineStatus: User;
+  updateMyProfile: User;
   updateOption: Option;
   updateOptionGroup: OptionGroup;
   updateOrderStatus: Order;
@@ -1179,7 +1262,8 @@ export type MutationCreatePromotionArgs = {
 
 export type MutationCreateSettlementRequestArgs = {
   amount: Scalars['Float']['input'];
-  businessId: Scalars['ID']['input'];
+  businessId?: InputMaybe<Scalars['ID']['input']>;
+  driverId?: InputMaybe<Scalars['ID']['input']>;
   note?: InputMaybe<Scalars['String']['input']>;
   periodEnd: Scalars['Date']['input'];
   periodStart: Scalars['Date']['input'];
@@ -1430,6 +1514,13 @@ export type MutationSendPushNotificationArgs = {
 };
 
 
+export type MutationSetBusinessFeaturedArgs = {
+  id: Scalars['ID']['input'];
+  isFeatured: Scalars['Boolean']['input'];
+  sortOrder?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
 export type MutationSetBusinessScheduleArgs = {
   businessId: Scalars['ID']['input'];
   schedule: Array<BusinessDayHoursInput>;
@@ -1473,7 +1564,11 @@ export type MutationSettleWithBusinessArgs = {
 
 
 export type MutationSettleWithDriverArgs = {
+  amount?: InputMaybe<Scalars['Float']['input']>;
   driverId: Scalars['ID']['input'];
+  note?: InputMaybe<Scalars['String']['input']>;
+  paymentMethod?: InputMaybe<Scalars['String']['input']>;
+  paymentReference?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -1541,6 +1636,11 @@ export type MutationUpdateDriverLocationArgs = {
 
 export type MutationUpdateDriverOnlineStatusArgs = {
   isOnline: Scalars['Boolean']['input'];
+};
+
+
+export type MutationUpdateMyProfileArgs = {
+  input: UpdateMyProfileInput;
 };
 
 
@@ -1723,6 +1823,7 @@ export type OptionGroup = {
 export type Order = {
   __typename?: 'Order';
   adminNote?: Maybe<Scalars['String']['output']>;
+  approvalReasons?: Maybe<Array<ApprovalReason>>;
   businessId: Scalars['ID']['output'];
   businesses: Array<OrderBusiness>;
   cancellationReason?: Maybe<Scalars['String']['output']>;
@@ -1748,7 +1849,9 @@ export type Order = {
   pickupLocations: Array<Location>;
   preparationMinutes?: Maybe<Scalars['Int']['output']>;
   preparingAt?: Maybe<Scalars['Date']['output']>;
+  prioritySurcharge: Scalars['Float']['output'];
   readyAt?: Maybe<Scalars['Date']['output']>;
+  settlementPreview?: Maybe<OrderSettlementPreview>;
   status: OrderStatus;
   totalPrice: Scalars['Float']['output'];
   updatedAt: Scalars['Date']['output'];
@@ -1760,6 +1863,13 @@ export type OrderBusiness = {
   __typename?: 'OrderBusiness';
   business: Business;
   items: Array<OrderItem>;
+};
+
+export type OrderConnection = {
+  __typename?: 'OrderConnection';
+  hasMore: Scalars['Boolean']['output'];
+  orders: Array<Order>;
+  totalCount: Scalars['Int']['output'];
 };
 
 export type OrderDriverLiveTracking = {
@@ -1811,6 +1921,26 @@ export type OrderPromotion = {
   promotionId: Scalars['ID']['output'];
 };
 
+export type OrderSettlementLineItem = {
+  __typename?: 'OrderSettlementLineItem';
+  amount: Scalars['Float']['output'];
+  businessId?: Maybe<Scalars['ID']['output']>;
+  direction: Scalars['String']['output'];
+  driverId?: Maybe<Scalars['ID']['output']>;
+  reason: Scalars['String']['output'];
+  ruleId?: Maybe<Scalars['ID']['output']>;
+  type: Scalars['String']['output'];
+};
+
+export type OrderSettlementPreview = {
+  __typename?: 'OrderSettlementPreview';
+  driverAssigned: Scalars['Boolean']['output'];
+  lineItems: Array<OrderSettlementLineItem>;
+  netMargin: Scalars['Float']['output'];
+  totalPayable: Scalars['Float']['output'];
+  totalReceivable: Scalars['Float']['output'];
+};
+
 export enum OrderStatus {
   AwaitingApproval = 'AWAITING_APPROVAL',
   Cancelled = 'CANCELLED',
@@ -1846,6 +1976,7 @@ export type Product = {
   categoryId: Scalars['ID']['output'];
   createdAt: Scalars['String']['output'];
   description?: Maybe<Scalars['String']['output']>;
+  effectivePrice: Scalars['Float']['output'];
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
   isAvailable: Scalars['Boolean']['output'];
@@ -1856,7 +1987,7 @@ export type Product = {
   nightMarkedupPrice?: Maybe<Scalars['Float']['output']>;
   optionGroups: Array<OptionGroup>;
   price: Scalars['Float']['output'];
-  salePrice?: Maybe<Scalars['Float']['output']>;
+  saleDiscountPercentage?: Maybe<Scalars['Float']['output']>;
   sortOrder: Scalars['Int']['output'];
   subcategoryId?: Maybe<Scalars['ID']['output']>;
   updatedAt: Scalars['String']['output'];
@@ -1920,7 +2051,7 @@ export type Promotion = {
   code?: Maybe<Scalars['String']['output']>;
   createdAt: Scalars['String']['output'];
   creatorId?: Maybe<Scalars['ID']['output']>;
-  creatorType: Scalars['String']['output'];
+  creatorType: PromotionCreatorType;
   currentGlobalUsage: Scalars['Int']['output'];
   description?: Maybe<Scalars['String']['output']>;
   discountValue?: Maybe<Scalars['Float']['output']>;
@@ -1958,6 +2089,11 @@ export type PromotionAnalyticsResult = {
 export enum PromotionAppliesTo {
   Delivery = 'DELIVERY',
   Price = 'PRICE'
+}
+
+export enum PromotionCreatorType {
+  Business = 'BUSINESS',
+  Platform = 'PLATFORM'
 }
 
 export type PromotionResult = {
@@ -2068,12 +2204,17 @@ export type Query = {
   deliveryZones: Array<DeliveryZone>;
   deviceTokens: Array<DeviceToken>;
   driverBalance: SettlementSummary;
+  /** Driver cash summary with settlement breakdown. Auto-scoped to current driver. */
+  driverCashSummary: DriverCashSummary;
   driverKPIs: Array<DriverKpi>;
   /** Admin: list of all driver threads with unread counts */
   driverMessageThreads: Array<DriverMessageThread>;
   /** Admin: full conversation with a specific driver */
   driverMessages: Array<DriverMessage>;
+  driverOrderFinancials?: Maybe<DriverOrderFinancials>;
   drivers: Array<User>;
+  featuredBusinesses: Array<Business>;
+  getActiveBanners: Array<Banner>;
   getActiveGlobalPromotions: Array<Promotion>;
   /** Get Agora RTC credentials for the current authenticated user */
   getAgoraRtcCredentials: AgoraRtcCredentials;
@@ -2103,10 +2244,11 @@ export type Query = {
   offers: Array<Product>;
   operationalKPIs: OperationalKpIs;
   order?: Maybe<Order>;
-  orders: Array<Order>;
+  orders: OrderConnection;
   ordersByStatus: Array<Order>;
   peakHourAnalysis: PeakHourAnalysis;
   previewCampaignAudience: AudiencePreview;
+  prioritySurchargeAmount: Scalars['Float']['output'];
   product?: Maybe<Product>;
   productCategories: Array<ProductCategory>;
   productCategory?: Maybe<ProductCategory>;
@@ -2115,11 +2257,14 @@ export type Query = {
   products: Array<ProductCard>;
   pushTelemetryEvents: Array<PushTelemetryEvent>;
   pushTelemetrySummary: PushTelemetrySummary;
+  /** Grouped settlement breakdown by category. */
+  settlementBreakdown: Array<SettlementBreakdownItem>;
   settlementPayment?: Maybe<SettlementPayment>;
   settlementPayments: Array<SettlementPayment>;
   settlementRequests: Array<SettlementRequest>;
   settlementRule?: Maybe<SettlementRule>;
   settlementRules: Array<SettlementRule>;
+  settlementRulesCount: Scalars['Int']['output'];
   settlementScenarioDefinitions: Array<SettlementScenarioDefinition>;
   settlementSummary: SettlementSummary;
   settlements: Array<Settlement>;
@@ -2201,6 +2346,12 @@ export type QueryDriverBalanceArgs = {
 };
 
 
+export type QueryDriverCashSummaryArgs = {
+  endDate?: InputMaybe<Scalars['Date']['input']>;
+  startDate?: InputMaybe<Scalars['Date']['input']>;
+};
+
+
 export type QueryDriverKpIsArgs = {
   driverId?: InputMaybe<Scalars['ID']['input']>;
   endDate: Scalars['String']['input'];
@@ -2212,6 +2363,16 @@ export type QueryDriverMessagesArgs = {
   driverId: Scalars['ID']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QueryDriverOrderFinancialsArgs = {
+  orderId: Scalars['ID']['input'];
+};
+
+
+export type QueryGetActiveBannersArgs = {
+  displayContext?: InputMaybe<BannerDisplayContext>;
 };
 
 
@@ -2238,7 +2399,7 @@ export type QueryGetBannerArgs = {
 
 
 export type QueryGetBannersArgs = {
-  activeOnly?: InputMaybe<Scalars['Boolean']['input']>;
+  filter?: InputMaybe<GetBannersFilter>;
 };
 
 
@@ -2316,6 +2477,7 @@ export type QueryOrderArgs = {
 export type QueryOrdersArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
+  statuses?: InputMaybe<Array<OrderStatus>>;
 };
 
 
@@ -2382,6 +2544,16 @@ export type QueryPushTelemetrySummaryArgs = {
 };
 
 
+export type QuerySettlementBreakdownArgs = {
+  businessId?: InputMaybe<Scalars['ID']['input']>;
+  driverId?: InputMaybe<Scalars['ID']['input']>;
+  endDate?: InputMaybe<Scalars['Date']['input']>;
+  isSettled?: InputMaybe<Scalars['Boolean']['input']>;
+  startDate?: InputMaybe<Scalars['Date']['input']>;
+  type?: InputMaybe<SettlementType>;
+};
+
+
 export type QuerySettlementPaymentArgs = {
   id: Scalars['ID']['input'];
 };
@@ -2400,6 +2572,8 @@ export type QuerySettlementPaymentsArgs = {
 
 export type QuerySettlementRequestsArgs = {
   businessId?: InputMaybe<Scalars['ID']['input']>;
+  driverId?: InputMaybe<Scalars['ID']['input']>;
+  entityType?: InputMaybe<SettlementType>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   status?: InputMaybe<SettlementRequestStatus>;
@@ -2413,13 +2587,24 @@ export type QuerySettlementRuleArgs = {
 
 export type QuerySettlementRulesArgs = {
   filter?: InputMaybe<SettlementRuleFilterInput>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QuerySettlementRulesCountArgs = {
+  filter?: InputMaybe<SettlementRuleFilterInput>;
 };
 
 
 export type QuerySettlementSummaryArgs = {
   businessId?: InputMaybe<Scalars['ID']['input']>;
+  direction?: InputMaybe<SettlementDirection>;
   driverId?: InputMaybe<Scalars['ID']['input']>;
   endDate?: InputMaybe<Scalars['Date']['input']>;
+  isSettled?: InputMaybe<Scalars['Boolean']['input']>;
+  orderId?: InputMaybe<Scalars['ID']['input']>;
+  promotionId?: InputMaybe<Scalars['ID']['input']>;
   startDate?: InputMaybe<Scalars['Date']['input']>;
   type?: InputMaybe<SettlementType>;
 };
@@ -2433,6 +2618,8 @@ export type QuerySettlementsArgs = {
   isSettled?: InputMaybe<Scalars['Boolean']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
+  orderId?: InputMaybe<Scalars['ID']['input']>;
+  promotionId?: InputMaybe<Scalars['ID']['input']>;
   startDate?: InputMaybe<Scalars['Date']['input']>;
   status?: InputMaybe<SettlementStatus>;
   type?: InputMaybe<SettlementType>;
@@ -2546,6 +2733,7 @@ export type Settlement = {
   paidAt?: Maybe<Scalars['Date']['output']>;
   paymentMethod?: Maybe<Scalars['String']['output']>;
   paymentReference?: Maybe<Scalars['String']['output']>;
+  rule?: Maybe<SettlementRule>;
   ruleId?: Maybe<Scalars['ID']['output']>;
   settlementPayment?: Maybe<SettlementPayment>;
   sourcePayment?: Maybe<SettlementPayment>;
@@ -2558,6 +2746,21 @@ export enum SettlementAmountType {
   Fixed = 'FIXED',
   Percent = 'PERCENT'
 }
+
+/** Grouped settlement totals by category. */
+export type SettlementBreakdownItem = {
+  __typename?: 'SettlementBreakdownItem';
+  /** Category key (e.g. PLATFORM_COMMISSION, PROMOTION_COST, MARKUP_REMITTANCE, DELIVERY_COMMISSION). */
+  category: Scalars['String']['output'];
+  /** Number of settlements in this category. */
+  count: Scalars['Int']['output'];
+  /** Direction of these settlements. */
+  direction: SettlementDirection;
+  /** Human-readable label for the category. */
+  label: Scalars['String']['output'];
+  /** Total amount for this category. */
+  totalAmount: Scalars['Float']['output'];
+};
 
 export enum SettlementDirection {
   Payable = 'PAYABLE',
@@ -2593,10 +2796,12 @@ export enum SettlementPaymentDirection {
 export type SettlementRequest = {
   __typename?: 'SettlementRequest';
   amount: Scalars['Float']['output'];
-  business: Business;
+  business?: Maybe<Business>;
   createdAt: Scalars['Date']['output'];
   currency: Scalars['String']['output'];
   disputeReason?: Maybe<Scalars['String']['output']>;
+  driver?: Maybe<User>;
+  entityType: SettlementType;
   expiresAt: Scalars['Date']['output'];
   id: Scalars['ID']['output'];
   note?: Maybe<Scalars['String']['output']>;
@@ -2633,6 +2838,7 @@ export type SettlementRule = {
   entityType: SettlementEntityType;
   id: Scalars['ID']['output'];
   isActive: Scalars['Boolean']['output'];
+  maxAmount?: Maybe<Scalars['Float']['output']>;
   name: Scalars['String']['output'];
   notes?: Maybe<Scalars['String']['output']>;
   promotion?: Maybe<Promotion>;
@@ -2850,11 +3056,18 @@ export type TrackPushTelemetryInput = {
 };
 
 export type UpdateBannerInput = {
+  businessId?: InputMaybe<Scalars['ID']['input']>;
+  displayContext?: InputMaybe<BannerDisplayContext>;
+  endsAt?: InputMaybe<Scalars['DateTime']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
   linkTarget?: InputMaybe<Scalars['String']['input']>;
   linkType?: InputMaybe<Scalars['String']['input']>;
+  mediaType?: InputMaybe<BannerMediaType>;
+  productId?: InputMaybe<Scalars['ID']['input']>;
+  promotionId?: InputMaybe<Scalars['ID']['input']>;
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
+  startsAt?: InputMaybe<Scalars['DateTime']['input']>;
   subtitle?: InputMaybe<Scalars['String']['input']>;
   title?: InputMaybe<Scalars['String']['input']>;
 };
@@ -2868,6 +3081,7 @@ export type UpdateBusinessInput = {
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
   isTemporarilyClosed?: InputMaybe<Scalars['Boolean']['input']>;
   location?: InputMaybe<LocationInput>;
+  minOrderAmount?: InputMaybe<Scalars['Float']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   phoneNumber?: InputMaybe<Scalars['String']['input']>;
   prepTimeOverrideMinutes?: InputMaybe<Scalars['Int']['input']>;
@@ -2890,6 +3104,12 @@ export type UpdateDeliveryZoneInput = {
   name?: InputMaybe<Scalars['String']['input']>;
   polygon?: InputMaybe<Array<PolygonPointInput>>;
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type UpdateMyProfileInput = {
+  firstName: Scalars['String']['input'];
+  lastName: Scalars['String']['input'];
+  phoneNumber?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type UpdateOptionGroupInput = {
@@ -2917,12 +3137,13 @@ export type UpdateProductInput = {
   description?: InputMaybe<Scalars['String']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   isAvailable?: InputMaybe<Scalars['Boolean']['input']>;
+  isOffer?: InputMaybe<Scalars['Boolean']['input']>;
   isOnSale?: InputMaybe<Scalars['Boolean']['input']>;
   markupPrice?: InputMaybe<Scalars['Float']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   nightMarkedupPrice?: InputMaybe<Scalars['Float']['input']>;
   price?: InputMaybe<Scalars['Float']['input']>;
-  salePrice?: InputMaybe<Scalars['Float']['input']>;
+  saleDiscountPercentage?: InputMaybe<Scalars['Float']['input']>;
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
   subcategoryId?: InputMaybe<Scalars['ID']['input']>;
   variantGroupId?: InputMaybe<Scalars['ID']['input']>;
@@ -2934,26 +3155,8 @@ export type UpdateProductSubcategoryInput = {
 
 export type UpdatePromotionInput = {
   code?: InputMaybe<Scalars['String']['input']>;
-  creatorId?: InputMaybe<Scalars['ID']['input']>;
-  creatorType?: InputMaybe<Scalars['String']['input']>;
-  description?: InputMaybe<Scalars['String']['input']>;
-  discountValue?: InputMaybe<Scalars['Float']['input']>;
-  eligibleBusinessIds?: InputMaybe<Array<Scalars['ID']['input']>>;
-  endsAt?: InputMaybe<Scalars['String']['input']>;
   id: Scalars['ID']['input'];
-  isActive?: InputMaybe<Scalars['Boolean']['input']>;
-  isStackable?: InputMaybe<Scalars['Boolean']['input']>;
-  maxDiscountCap?: InputMaybe<Scalars['Float']['input']>;
-  maxGlobalUsage?: InputMaybe<Scalars['Int']['input']>;
-  maxUsagePerUser?: InputMaybe<Scalars['Int']['input']>;
-  minOrderAmount?: InputMaybe<Scalars['Float']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
-  priority?: InputMaybe<Scalars['Int']['input']>;
-  spendThreshold?: InputMaybe<Scalars['Float']['input']>;
-  startsAt?: InputMaybe<Scalars['String']['input']>;
-  target?: InputMaybe<PromotionTarget>;
-  thresholdReward?: InputMaybe<Scalars['String']['input']>;
-  type?: InputMaybe<PromotionType>;
 };
 
 export type UpdateSettlementRuleInput = {
@@ -2962,6 +3165,7 @@ export type UpdateSettlementRuleInput = {
   appliesTo?: InputMaybe<Scalars['String']['input']>;
   direction?: InputMaybe<SettlementDirection>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  maxAmount?: InputMaybe<Scalars['Float']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   notes?: InputMaybe<Scalars['String']['input']>;
   type?: InputMaybe<SettlementRuleType>;
@@ -2989,6 +3193,7 @@ export type UpdateUserInput = {
   businessId?: InputMaybe<Scalars['ID']['input']>;
   firstName: Scalars['String']['input'];
   id: Scalars['ID']['input'];
+  isDemoAccount?: InputMaybe<Scalars['Boolean']['input']>;
   lastName: Scalars['String']['input'];
   role: UserRole;
 };
@@ -3010,7 +3215,9 @@ export type User = {
   hasOwnVehicle?: Maybe<Scalars['Boolean']['output']>;
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
+  isDemoAccount: Scalars['Boolean']['output'];
   isOnline: Scalars['Boolean']['output'];
+  isTrustedCustomer: Scalars['Boolean']['output'];
   lastName: Scalars['String']['output'];
   maxActiveOrders?: Maybe<Scalars['Int']['output']>;
   permissions: Array<UserPermission>;
@@ -3020,6 +3227,7 @@ export type User = {
   referralCode?: Maybe<Scalars['String']['output']>;
   role: UserRole;
   signupStep: SignupStep;
+  totalOrders: Scalars['Int']['output'];
 };
 
 export type UserAddress = {

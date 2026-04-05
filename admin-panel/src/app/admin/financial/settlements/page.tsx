@@ -1,7 +1,7 @@
-'use client';
+﻿'use client';
 
-import { useState } from 'react';
-import { useQuery, useMutation } from '@apollo/client/react';
+import { useState, useMemo, useEffect } from 'react';
+import { useQuery, useMutation, useLazyQuery } from '@apollo/client/react';
 import { useToast } from '@/hooks/use-toast';
 import {
   Table,
@@ -16,1397 +16,674 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Building2, ChevronRight, RefreshCw, Search, Send, User, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import {
-  SettlementType,
-  SettlementStatus,
-  SettlementDirection,
-  type SettlementsPageQuery,
-} from '@/gql/graphql';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
+import { ChevronLeft, ChevronRight, RefreshCw, Banknote } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import {
+  SettlementType,
+  SettlementDirection,
+  type SettlementsPageQuery,
+} from '@/gql/graphql';
+import {
+  GET_SETTLEMENTS_PAGE,
+  GET_SETTLEMENT_SUMMARY,
+  CREATE_SETTLEMENT_REQUEST,
+  GET_UNSETTLED_BALANCE,
+  GET_DRIVERS_WITH_BALANCE,
+} from '@/graphql/operations/settlements/queries';
+import {
+  GET_BUSINESSES_SELECTION,
+  GET_PROMOTIONS_SELECTION,
+} from '@/graphql/operations/settlements/settlementRules';
 
 type SettlementRecord = SettlementsPageQuery['settlements'][number];
 
-type SettlementGroup = {
-  id: string;
-  name: string;
-  subtitle: string;
-  settlements: SettlementRecord[];
-  totalAmount: number;
-  pendingAmount: number;
-  paidAmount: number;
-  pendingCount: number;
-  paidCount: number;
-};
-
-import {
-  GET_SETTLEMENTS_PAGE,
-  MARK_SETTLEMENT_PAID,
-  MARK_SETTLEMENTS_PAID_OP,
-  MARK_SETTLEMENT_PARTIAL,
-  BACKFILL_SETTLEMENTS,
-  CREATE_SETTLEMENT_REQUEST,
-  CANCEL_SETTLEMENT_REQUEST,
-  GET_SETTLEMENT_REQUESTS,
-  SETTLE_WITH_DRIVER,
-  SETTLE_WITH_BUSINESS,
-} from '@/graphql/operations/settlements/queries';
+const PAGE_SIZE_OPTIONS = [25, 50, 100];
 
 export default function SettlementsPage() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<'business' | 'driver'>('business');
-  const [directionFilter, setDirectionFilter] = useState<'all' | SettlementDirection>('all');
+
+  // Filters
+  const [typeFilter, setTypeFilter] = useState<SettlementType | 'ALL'>('ALL');
+  const [directionFilter, setDirectionFilter] = useState<SettlementDirection | 'ALL'>('ALL');
   const [settledFilter, setSettledFilter] = useState<'all' | 'settled' | 'unsettled'>('unsettled');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
-  const [selectedSettlement, setSelectedSettlement] = useState<SettlementRecord | null>(null);
-  const [bulkPartialAmount, setBulkPartialAmount] = useState('');
-  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [businessFilter, setBusinessFilter] = useState<string>('all');
+  const [driverSearch, setDriverSearch] = useState('');
+  const [orderSearch, setOrderSearch] = useState('');
+  const [promotionFilter, setPromotionFilter] = useState<string>('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
   // Settle dialog state
   const [settleDialogOpen, setSettleDialogOpen] = useState(false);
+  const [settleEntityType, setSettleEntityType] = useState<'BUSINESS' | 'DRIVER' | ''>('');
+  const [settleEntityId, setSettleEntityId] = useState('');
   const [settleAmount, setSettleAmount] = useState('');
-  const [settlePaymentMethod, setSettlePaymentMethod] = useState('');
-  const [settlePaymentRef, setSettlePaymentRef] = useState('');
   const [settleNote, setSettleNote] = useState('');
   const [settleSubmitting, setSettleSubmitting] = useState(false);
 
-  // Request settlement dialog state
-  const [requestDialogOpen, setRequestDialogOpen] = useState(false);
-  const [reqAmount, setReqAmount] = useState('');
-  const [reqPeriodStart, setReqPeriodStart] = useState(() =>
-    new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+  // Data
+  const { data: businessesData } = useQuery(GET_BUSINESSES_SELECTION);
+  const { data: promotionsData } = useQuery(GET_PROMOTIONS_SELECTION);
+  const { data: driversData } = useQuery(GET_DRIVERS_WITH_BALANCE);
+  const businesses = useMemo(() => (businessesData?.businesses ?? []) as { id: string; name: string }[], [businessesData]);
+  const promotions = useMemo(() =>
+    (promotionsData?.getAllPromotions || []).map((p: any) => ({ id: p.id, name: p.name, code: p.code })),
+    [promotionsData],
   );
-  const [reqPeriodEnd, setReqPeriodEnd] = useState(() =>
-    new Date().toISOString().split('T')[0],
-  );
-  const [reqNote, setReqNote] = useState('');
-  const [reqSubmitting, setReqSubmitting] = useState(false);
-
-  // Query for business settlements
-  const {
-    data: businessData,
-    loading: businessLoading,
-    refetch: refetchBusiness,
-  } = useQuery(GET_SETTLEMENTS_PAGE, {
-    variables: {
-      type: SettlementType.Business,
-      direction: directionFilter === 'all' ? null : directionFilter,
-      isSettled: settledFilter === 'all' ? null : settledFilter === 'settled',
-      limit: 200,
-    },
-  });
-
-  // Query for driver settlements
-  const {
-    data: driverData,
-    loading: driverLoading,
-    refetch: refetchDriver,
-  } = useQuery(GET_SETTLEMENTS_PAGE, {
-    variables: {
-      type: SettlementType.Driver,
-      direction: directionFilter === 'all' ? null : directionFilter,
-      isSettled: settledFilter === 'all' ? null : settledFilter === 'settled',
-      limit: 200,
-    },
-  });
-
-  const businessSettlements = businessData?.settlements || [];
-  const driverSettlements = driverData?.settlements || [];
-
-  const currentSettlements = activeTab === 'business' ? businessSettlements : driverSettlements;
-  const loading = activeTab === 'business' ? businessLoading : driverLoading;
-
-  const getEntityId = (settlement: SettlementRecord) => {
-    if (activeTab === 'business') {
-      return settlement.business?.id || `unknown-business-${settlement.id}`;
-    }
-
-    return settlement.driver?.id || `unknown-driver-${settlement.id}`;
-  };
-
-  const getEntityName = (settlement: SettlementRecord) => {
-    if (activeTab === 'business') {
-      return settlement.business?.name || 'Unknown business';
-    }
-
-    if (!settlement.driver) {
-      return 'Unknown driver';
-    }
-
-    return `${settlement.driver.firstName} ${settlement.driver.lastName}`.trim() || 'Unknown driver';
-  };
-
-  const getEntitySubtitle = (settlement: SettlementRecord) => {
-    if (activeTab === 'business') {
-      return settlement.business?.id || 'No business id';
-    }
-
-    return settlement.driver?.phoneNumber || settlement.driver?.id || 'No driver reference';
-  };
-
-  const settlementGroupsMap = new Map<string, SettlementGroup>();
-
-  currentSettlements.forEach((settlement: SettlementRecord) => {
-    const groupId = getEntityId(settlement);
-    const existingGroup = settlementGroupsMap.get(groupId);
-    const amount = Number(settlement.amount || 0);
-
-    if (existingGroup) {
-      existingGroup.settlements.push(settlement);
-      existingGroup.totalAmount += amount;
-
-      if (!settlement.isSettled) {
-        existingGroup.pendingAmount += amount;
-        existingGroup.pendingCount += 1;
-      } else {
-        existingGroup.paidAmount += amount;
-        existingGroup.paidCount += 1;
-      }
-
-      return;
-    }
-
-    settlementGroupsMap.set(groupId, {
-      id: groupId,
-      name: getEntityName(settlement),
-      subtitle: getEntitySubtitle(settlement),
-      settlements: [settlement],
-      totalAmount: amount,
-      pendingAmount: !settlement.isSettled ? amount : 0,
-      paidAmount: settlement.isSettled ? amount : 0,
-      pendingCount: !settlement.isSettled ? 1 : 0,
-      paidCount: settlement.isSettled ? 1 : 0,
-    });
-  });
-
-  const settlementGroups = Array.from(settlementGroupsMap.values()).sort(
-    (left, right) => right.totalAmount - left.totalAmount
+  const drivers = useMemo(() =>
+    (driversData?.drivers ?? []).map((d: any) => ({ id: d.id, name: `${d.firstName} ${d.lastName}`.trim(), phone: d.phoneNumber })),
+    [driversData],
   );
 
-  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
-
-  const matchesSettlementSearch = (settlement: SettlementRecord) => {
-    if (!normalizedSearchQuery) {
-      return true;
-    }
-
-    return [
-      settlement.id,
-      settlement.order?.id,
-      settlement.paymentReference,
-      settlement.paymentMethod,
-      settlement.driver?.firstName,
-      settlement.driver?.lastName,
-      settlement.driver?.phoneNumber,
-      settlement.business?.name,
-    ]
-      .filter(Boolean)
-      .some((value) => value!.toString().toLowerCase().includes(normalizedSearchQuery));
-  };
-
-  const filteredGroups = settlementGroups.filter((group) => {
-    if (!normalizedSearchQuery) {
-      return true;
-    }
-
-    return [group.id, group.name, group.subtitle]
-      .filter(Boolean)
-      .some((value) => value.toLowerCase().includes(normalizedSearchQuery));
-  });
-
-  const selectedGroup = selectedEntityId
-    ? settlementGroups.find((group) => group.id === selectedEntityId) || null
-    : null;
-
-  const filteredSettlements = selectedGroup
-    ? selectedGroup.settlements.filter(matchesSettlementSearch)
-    : [];
-
-  const isEmpty = selectedGroup
-    ? filteredSettlements.length === 0
-    : filteredGroups.length === 0;
-
-  const settlementsInCurrentView = selectedGroup
-    ? filteredSettlements
-    : filteredGroups.flatMap((group) => group.settlements);
-
-  const pendingSettlements = settlementsInCurrentView.filter(
-    (settlement) => !settlement.isSettled,
-  );
-
-  const pendingSettlementIds = pendingSettlements.map((settlement) => settlement.id);
-  const pendingTotalAmount = pendingSettlements.reduce(
-    (sum, settlement) => sum + Number(settlement.amount || 0),
-    0,
-  );
-
-  const aggregateScopeLabel = selectedGroup
-    ? selectedGroup.name
-    : activeTab === 'business'
-      ? 'all visible businesses'
-      : 'all visible drivers';
-
-  // Mark as paid mutation
-  const [markAsPaid] = useMutation(MARK_SETTLEMENT_PAID);
-  const [markAsPartiallyPaid] = useMutation(MARK_SETTLEMENT_PARTIAL);
-  const [markSettlementsAsPaid] = useMutation(MARK_SETTLEMENTS_PAID_OP);
-  const [backfillSettlements, { loading: backfillLoading }] = useMutation(BACKFILL_SETTLEMENTS);
-  const [cancelSettlementRequest] = useMutation(CANCEL_SETTLEMENT_REQUEST);
-  const [createSettlementRequest] = useMutation(CREATE_SETTLEMENT_REQUEST);
-
-  // New settling mutations (Moved to imported from queries if possible, otherwise use local ones for now)
-  // These were missing from queries.ts so I'll keep them here or add them to queries.ts
-  const [settleWithDriver] = useMutation(SETTLE_WITH_DRIVER);
-  const [settleWithBusiness] = useMutation(SETTLE_WITH_BUSINESS);
-
-  // Fetch settlement requests for selected business
-  const { data: settlementRequestsData, loading: settlementRequestsLoading, refetch: refetchSettlementRequests } = useQuery(GET_SETTLEMENT_REQUESTS, {
-    variables: { businessId: selectedGroup?.id, limit: 10 },
-    skip: !selectedGroup || activeTab !== 'business',
+  // Lazy query for unsettled balance
+  const [fetchBalance, { data: balanceData, loading: balanceLoading }] = useLazyQuery(GET_UNSETTLED_BALANCE, {
     fetchPolicy: 'network-only',
   });
 
-  const settlementRequests = (settlementRequestsData as any)?.settlementRequests ?? [];
+  const unsettledBalance = balanceData?.unsettledBalance ?? null;
 
+  // When entity is selected, fetch balance
+  useEffect(() => {
+    if (settleEntityType && settleEntityId) {
+      fetchBalance({ variables: { entityType: settleEntityType as SettlementType, entityId: settleEntityId } });
+    }
+  }, [settleEntityType, settleEntityId, fetchBalance]);
 
-  // Calculate totals for current view
-  const totalsSource = selectedGroup ? filteredSettlements : filteredGroups;
-  const totals = {
-    total: totalsSource.reduce(
-      (sum: number, item: SettlementRecord | SettlementGroup) =>
-        sum + ('amount' in item ? Number(item.amount || 0) : item.totalAmount),
-      0
-    ),
-    pending: totalsSource.reduce(
-      (sum: number, item: SettlementRecord | SettlementGroup) =>
-        sum + ('amount' in item
-          ? !item.isSettled
-            ? Number(item.amount || 0)
-            : 0
-          : item.pendingAmount),
-      0
-    ),
-    paid: totalsSource.reduce(
-      (sum: number, item: SettlementRecord | SettlementGroup) =>
-        sum + ('amount' in item
-          ? item.isSettled
-            ? Number(item.amount || 0)
-            : 0
-          : item.paidAmount),
-      0
-    ),
-  };
+  // When balance loads, set default amount
+  useEffect(() => {
+    if (unsettledBalance !== null && settleEntityId) {
+      setSettleAmount(Math.abs(unsettledBalance).toFixed(2));
+    }
+  }, [unsettledBalance, settleEntityId]);
+
+  // Build query variables
+  const queryVars = useMemo(() => ({
+    type: typeFilter === 'ALL' ? undefined : typeFilter,
+    direction: directionFilter === 'ALL' ? undefined : directionFilter,
+    isSettled: settledFilter === 'all' ? undefined : settledFilter === 'settled',
+    businessId: businessFilter !== 'all' ? businessFilter : undefined,
+    promotionId: promotionFilter !== 'all' ? promotionFilter : undefined,
+    startDate: startDate || undefined,
+    endDate: endDate ? endDate + 'T23:59:59.999Z' : undefined,
+    limit: pageSize,
+    offset: (page - 1) * pageSize,
+  }), [typeFilter, directionFilter, settledFilter, businessFilter, promotionFilter, startDate, endDate, page, pageSize]);
+
+  const summaryVars = useMemo(() => ({
+    type: typeFilter === 'ALL' ? undefined : typeFilter,
+    direction: directionFilter === 'ALL' ? undefined : directionFilter,
+    isSettled: settledFilter === 'all' ? undefined : settledFilter === 'settled',
+    businessId: businessFilter !== 'all' ? businessFilter : undefined,
+    promotionId: promotionFilter !== 'all' ? promotionFilter : undefined,
+    startDate: startDate || undefined,
+    endDate: endDate ? endDate + 'T23:59:59.999Z' : undefined,
+  }), [typeFilter, directionFilter, settledFilter, businessFilter, promotionFilter, startDate, endDate]);
+
+  const {
+    data: settlementsData,
+    loading: settlementsLoading,
+    refetch: refetchSettlements,
+  } = useQuery(GET_SETTLEMENTS_PAGE, { variables: queryVars, fetchPolicy: 'cache-and-network' });
+
+  const {
+    data: summaryData,
+    refetch: refetchSummary,
+  } = useQuery(GET_SETTLEMENT_SUMMARY, { variables: summaryVars, fetchPolicy: 'cache-and-network' });
+
+  const settlementsList = settlementsData?.settlements ?? [];
+  const summary = summaryData?.settlementSummary;
+
+  // Mutations
+  const [createSettlementRequest] = useMutation(CREATE_SETTLEMENT_REQUEST);
+
+  // Client-side search filtering for driver name / order ID
+  const filteredSettlements = useMemo(() => {
+    let result = settlementsList as SettlementRecord[];
+    if (driverSearch.trim()) {
+      const q = driverSearch.trim().toLowerCase();
+      result = result.filter((s) => {
+        const name = s.driver ? `${s.driver.firstName} ${s.driver.lastName}`.toLowerCase() : '';
+        const phone = s.driver?.phoneNumber?.toLowerCase() ?? '';
+        return name.includes(q) || phone.includes(q);
+      });
+    }
+    if (orderSearch.trim()) {
+      const q = orderSearch.trim().toLowerCase();
+      result = result.filter((s) => {
+        const orderId = s.order?.id?.toLowerCase() ?? '';
+        const displayId = s.order?.displayId?.toString() ?? '';
+        return orderId.includes(q) || displayId.includes(q);
+      });
+    }
+    return result;
+  }, [settlementsList, driverSearch, orderSearch]);
+
+  const totalCount = summary?.count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+
+  // Net balance: receivable - payable (from current filters)
+  const netBalance = (summary?.totalReceivable ?? 0) - (summary?.totalPayable ?? 0);
 
   const handleRefresh = async () => {
-    if (activeTab === 'business') {
-      await refetchBusiness();
-      if (selectedEntityId) await refetchSettlementRequests();
-    } else {
-      await refetchDriver();
-    }
+    await Promise.all([refetchSettlements(), refetchSummary()]);
   };
 
-
-  const handleBulkPartialSettle = async () => {
-    const amountToSettle = Number(bulkPartialAmount);
-
-    if (!Number.isFinite(amountToSettle) || amountToSettle <= 0) {
-      toast({
-        title: 'Invalid amount',
-        description: 'Enter a partial amount greater than 0.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (pendingSettlements.length === 0) {
-      toast({
-        title: 'Nothing to settle',
-        description: `No pending settlements found for ${aggregateScopeLabel}.`,
-      });
-      return;
-    }
-
-    if (amountToSettle - pendingTotalAmount > 0.0001) {
-      toast({
-        title: 'Amount too high',
-        description: `Partial amount cannot exceed pending total (${pendingTotalAmount.toFixed(2)}).`,
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const orderedPending = [...pendingSettlements].sort(
-      (a, b) => new Date(String(a.createdAt)).getTime() - new Date(String(b.createdAt)).getTime(),
-    );
-
-    let remaining = Math.round(amountToSettle * 100) / 100;
-    let fullySettledCount = 0;
-    let partiallySettledCount = 0;
-
-    setBulkProcessing(true);
-    try {
-      for (const settlement of orderedPending) {
-        if (remaining <= 0) {
-          break;
-        }
-
-        const settlementAmount = Math.round(Number(settlement.amount || 0) * 100) / 100;
-        if (settlementAmount <= 0) {
-          continue;
-        }
-
-        if (remaining + 0.0001 >= settlementAmount) {
-          await markAsPaid({
-            variables: {
-              settlementId: settlement.id,
-            },
-          });
-          remaining = Math.round((remaining - settlementAmount) * 100) / 100;
-          fullySettledCount += 1;
-        } else {
-          await markAsPartiallyPaid({
-            variables: {
-              settlementId: settlement.id,
-              amount: remaining,
-            },
-          });
-          remaining = 0;
-          partiallySettledCount += 1;
-        }
-      }
-
-      toast({
-        title: 'Success',
-        description: `Recorded partial settlement for ${aggregateScopeLabel}: ${amountToSettle.toFixed(2)} applied (${fullySettledCount} full, ${partiallySettledCount} partial).`,
-      });
-
-      setBulkPartialAmount('');
-      await handleRefresh();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error?.message || 'Failed to apply partial settlement',
-        variant: 'destructive',
-      });
-    } finally {
-      setBulkProcessing(false);
-    }
+  const resetFilters = () => {
+    setTypeFilter('ALL');
+    setDirectionFilter('ALL');
+    setSettledFilter('unsettled');
+    setBusinessFilter('all');
+    setDriverSearch('');
+    setOrderSearch('');
+    setPromotionFilter('all');
+    setStartDate('');
+    setEndDate('');
+    setPage(1);
   };
 
-  const resetGroupSelection = () => {
-    setSelectedEntityId(null);
-    setSearchQuery('');
-  };
-
-  const openRequestDialog = () => {
-    if (!selectedGroup) return;
-    const pending = selectedGroup.pendingAmount;
-    setReqAmount(pending > 0 ? pending.toFixed(2) : '');
-    setReqPeriodStart(
-      new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    );
-    setReqPeriodEnd(new Date().toISOString().split('T')[0]);
-    setReqNote('');
-    setRequestDialogOpen(true);
-  };
-
-  const handleSubmitSettlementRequest = async () => {
-    if (!selectedEntityId) return;
-    const amount = parseFloat(reqAmount);
-    if (!reqAmount || !Number.isFinite(amount) || amount <= 0) {
-      toast({ title: 'Invalid amount', description: 'Enter a valid amount greater than 0.', variant: 'destructive' });
-      return;
-    }
-    if (!reqPeriodStart || !reqPeriodEnd) {
-      toast({ title: 'Missing dates', description: 'Period start and end are required.', variant: 'destructive' });
-      return;
-    }
-    setReqSubmitting(true);
-    try {
-      await createSettlementRequest({
-        variables: {
-          businessId: selectedEntityId,
-          amount,
-          periodStart: new Date(reqPeriodStart).toISOString(),
-          periodEnd: new Date(reqPeriodEnd + 'T23:59:59').toISOString(),
-          note: reqNote.trim() || undefined,
-        },
-      });
-      toast({ title: 'Request sent', description: `Settlement request of €${amount.toFixed(2)} sent to ${selectedGroup?.name}.` });
-      setRequestDialogOpen(false);
-      await refetchSettlementRequests();
-    } catch (err: any) {
-      toast({ title: 'Error', description: err?.message ?? 'Failed to create request', variant: 'destructive' });
-    } finally {
-      setReqSubmitting(false);
-    }
-  };
-
-  const handleCancelSettlementRequest = async (requestId: string) => {
-    try {
-      await cancelSettlementRequest({ variables: { requestId } });
-      toast({ title: 'Cancelled', description: 'Settlement request cancelled.' });
-      await refetchSettlementRequests();
-    } catch (err: any) {
-      toast({ title: 'Error', description: err?.message ?? 'Failed to cancel', variant: 'destructive' });
-    }
-  };
-
+  // Open settle dialog
   const openSettleDialog = () => {
-    if (!selectedGroup) return;
-    const pending = selectedGroup.pendingAmount;
-    setSettleAmount(pending > 0 ? pending.toFixed(2) : '');
-    setSettlePaymentMethod('');
-    setSettlePaymentRef('');
+    setSettleEntityType('');
+    setSettleEntityId('');
+    setSettleAmount('');
     setSettleNote('');
     setSettleDialogOpen(true);
   };
 
-  const handleSettle = async () => {
-    if (!selectedEntityId || !selectedGroup) return;
+  // Compute remainder info for the dialog
+  const totalBalance = unsettledBalance !== null ? Math.abs(unsettledBalance) : 0;
+  const enteredAmount = parseFloat(settleAmount) || 0;
+  const remainder = totalBalance - enteredAmount;
+  const balanceDirection = unsettledBalance !== null
+    ? (unsettledBalance >= 0 ? 'ENTITY_TO_PLATFORM' : 'PLATFORM_TO_ENTITY')
+    : null;
 
+  // Settle handler — creates a settlement REQUEST (not a direct payment)
+  const handleSettle = async () => {
+    if (!settleEntityType || !settleEntityId) return;
+    const amount = parseFloat(settleAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast({ title: 'Invalid amount', variant: 'destructive' });
+      return;
+    }
+    if (amount > totalBalance) {
+      toast({ title: 'Amount exceeds balance', variant: 'destructive' });
+      return;
+    }
     setSettleSubmitting(true);
     try {
-      if (activeTab === 'driver') {
-        const { data } = await settleWithDriver({
-          variables: { driverId: selectedEntityId },
-        });
-        const result = data?.settleWithDriver;
-        const remainderAmount = result?.remainderAmount ?? 0;
-        const remainderMsg = remainderAmount > 0
-          ? ` Remainder: €${remainderAmount.toFixed(2)} carried forward.`
-          : '';
-        toast({
-          title: 'Driver settled',
-          description: `${result?.settledCount ?? 0} settlements settled. Net: €${(result?.netAmount ?? 0).toFixed(2)} (${result?.direction}).${remainderMsg}`,
-        });
-      } else {
-        const amount = parseFloat(settleAmount);
-        if (!Number.isFinite(amount) || amount <= 0) {
-          toast({ title: 'Invalid amount', description: 'Enter a valid amount > 0.', variant: 'destructive' });
-          setSettleSubmitting(false);
-          return;
-        }
-        const { data } = await settleWithBusiness({
-          variables: {
-            businessId: selectedEntityId,
-            amount,
-            paymentMethod: settlePaymentMethod.trim() || undefined,
-            paymentReference: settlePaymentRef.trim() || undefined,
-            note: settleNote.trim() || undefined,
-          },
-        });
-        const result = data?.settleWithBusiness;
-        const remainderAmount = result?.remainderAmount ?? 0;
-        const remainderMsg = remainderAmount > 0
-          ? ` Remainder: €${remainderAmount.toFixed(2)} carried forward.`
-          : '';
-        toast({
-          title: 'Business settled',
-          description: `${result?.settledCount ?? 0} settlements settled. Paid: €${(result?.netAmount ?? 0).toFixed(2)}.${remainderMsg}`,
-        });
-      }
-
+      const now = new Date().toISOString();
+      const { data } = await createSettlementRequest({
+        variables: {
+          businessId: settleEntityType === 'BUSINESS' ? settleEntityId : undefined,
+          driverId: settleEntityType === 'DRIVER' ? settleEntityId : undefined,
+          amount,
+          periodStart: now,
+          periodEnd: now,
+          note: settleNote.trim() || undefined,
+        },
+      });
+      const result = data?.createSettlementRequest;
+      toast({
+        title: 'Settlement request created',
+        description: `Request for EUR ${amount.toFixed(2)} sent to ${settleEntityType === 'DRIVER' ? 'driver' : 'business'}. Awaiting their approval.`,
+      });
       setSettleDialogOpen(false);
       await handleRefresh();
     } catch (err: any) {
-      toast({ title: 'Error', description: err?.message ?? 'Failed to settle', variant: 'destructive' });
+      toast({ title: 'Error', description: err?.message ?? 'Failed to create request', variant: 'destructive' });
     } finally {
       setSettleSubmitting(false);
     }
   };
 
-  const renderContent = () => (
-    <Card className="shadow-sm">
-      {/* Filters and Stats Bar */}
-      <div className="bg-muted/30">
-        <div className="p-4">
-          {selectedGroup && (
-            <div className="mb-4 flex items-center justify-between rounded-lg border bg-background px-3 py-2">
-              <div>
-                <div className="text-sm font-semibold text-foreground">{selectedGroup.name}</div>
-                <div className="text-xs text-muted-foreground">
-                  {selectedGroup.subtitle} • {selectedGroup.settlements.length} settlements
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  onClick={openSettleDialog}
-                  className="gap-2 bg-green-600 hover:bg-green-700 text-white"
-                >
-                  Settle
-                </Button>
-                {activeTab === 'business' && (
-                  <Button
-                    size="sm"
-                    onClick={openRequestDialog}
-                    className="gap-2 bg-amber-600 hover:bg-amber-700 text-white"
-                  >
-                    <Send className="h-3.5 w-3.5" />
-                    Request Settlement
-                  </Button>
-                )}
-                <Button variant="ghost" size="sm" onClick={resetGroupSelection} className="gap-2">
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to {activeTab === 'business' ? 'businesses' : 'drivers'}
-                </Button>
-              </div>
-            </div>
-          )}
+  const getEntityInfo = (s: SettlementRecord) => {
+    if (s.type === 'BUSINESS' && s.business) {
+      return { type: 'business' as const, id: s.business.id, name: s.business.name };
+    }
+    if (s.type === 'DRIVER' && s.driver) {
+      return { type: 'driver' as const, id: s.driver.id, name: `${s.driver.firstName} ${s.driver.lastName}`.trim() };
+    }
+    return null;
+  };
 
-          {/* Controls Row */}
-            <div className="flex items-center gap-2">
-
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-muted-foreground mr-1">Direction:</span>
-              <div className="flex gap-1 rounded-md bg-muted/30 p-1 mr-4">
-                <Button
-                  variant={directionFilter === 'all' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setDirectionFilter('all')}
-                  className="h-7 px-3"
-                >
-                  All
-                </Button>
-                <Button
-                  variant={directionFilter === SettlementDirection.Receivable ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setDirectionFilter(SettlementDirection.Receivable)}
-                  className="h-7 px-3"
-                >
-                  Receivable
-                </Button>
-                <Button
-                  variant={directionFilter === SettlementDirection.Payable ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setDirectionFilter(SettlementDirection.Payable)}
-                  className="h-7 px-3"
-                >
-                  Payable
-                </Button>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-muted-foreground mr-1">Settled:</span>
-              <div className="flex gap-1 rounded-md bg-muted/30 p-1">
-                <Button
-                  variant={settledFilter === 'all' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setSettledFilter('all')}
-                  className="h-7 px-3"
-                >
-                  All
-                </Button>
-                <Button
-                  variant={settledFilter === 'unsettled' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setSettledFilter('unsettled')}
-                  className="h-7 px-3 text-orange-600"
-                >
-                  Unsettled
-                </Button>
-                <Button
-                  variant={settledFilter === 'settled' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setSettledFilter('settled')}
-                  className="h-7 px-3 text-green-600"
-                >
-                  Settled
-                </Button>
-              </div>
-            </div>
-
-            <Button variant="ghost" size="sm" onClick={handleRefresh} className="ml-auto h-10">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
+  return (
+    <div className="flex flex-col gap-4 p-6 pb-10">
+      {/* Filters */}
+      <Card className="p-4 relative z-10">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Type</Label>
+            <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v as any); setPage(1); }}>
+              <SelectTrigger className="w-[130px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Types</SelectItem>
+                <SelectItem value={SettlementType.Business}>Business</SelectItem>
+                <SelectItem value={SettlementType.Driver}>Driver</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Summary Stats Row */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-background rounded-lg p-3">
-              <div className="text-xs font-medium text-muted-foreground mb-1">Total Amount</div>
-              <div className="text-2xl font-bold tracking-tight">€{totals.total.toFixed(2)}</div>
-            </div>
-            <div className="bg-background rounded-lg p-3">
-              <div className="text-xs font-medium text-muted-foreground mb-1">Pending</div>
-              <div className="text-2xl font-bold tracking-tight text-orange-600">€{totals.pending.toFixed(2)}</div>
-            </div>
-            <div className="bg-background rounded-lg p-3">
-              <div className="text-xs font-medium text-muted-foreground mb-1">Paid</div>
-              <div className="text-2xl font-bold tracking-tight text-green-600">€{totals.paid.toFixed(2)}</div>
-            </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Direction</Label>
+            <Select value={directionFilter} onValueChange={(v) => { setDirectionFilter(v as any); setPage(1); }}>
+              <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All</SelectItem>
+                <SelectItem value={SettlementDirection.Receivable}>Receivable</SelectItem>
+                <SelectItem value={SettlementDirection.Payable}>Payable</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Status</Label>
+            <Select value={settledFilter} onValueChange={(v) => { setSettledFilter(v as any); setPage(1); }}>
+              <SelectTrigger className="w-[130px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unsettled">Unsettled</SelectItem>
+                <SelectItem value="settled">Settled</SelectItem>
+                <SelectItem value="all">All</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Business</Label>
+            <Select value={businessFilter} onValueChange={(v) => { setBusinessFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-[180px]"><SelectValue placeholder="All Businesses" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Businesses</SelectItem>
+                {businesses.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Promotion</Label>
+            <Select value={promotionFilter} onValueChange={(v) => { setPromotionFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-[180px]"><SelectValue placeholder="All Promotions" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Promotions</SelectItem>
+                {promotions.map((p: any) => (
+                  <SelectItem key={p.id} value={p.id}>{p.code ? `${p.name} (${p.code})` : p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Driver</Label>
+            <Input
+              placeholder="Search driver..."
+              value={driverSearch}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDriverSearch(e.target.value)}
+              className="w-[150px] h-9"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Order</Label>
+            <Input
+              placeholder="Order ID..."
+              value={orderSearch}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setOrderSearch(e.target.value)}
+              className="w-[130px] h-9"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">From</Label>
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setStartDate(e.target.value); setPage(1); }}
+              className="w-[150px] h-9"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">To</Label>
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setEndDate(e.target.value); setPage(1); }}
+              className="w-[150px] h-9"
+            />
+          </div>
+
+          <Button variant="ghost" size="sm" onClick={resetFilters} className="h-9 text-xs">
+            Reset
+          </Button>
+          <Button variant="ghost" size="sm" onClick={handleRefresh} className="h-9">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
         </div>
+      </Card>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+        <Card className="p-3">
+          <div className="text-xs font-medium text-muted-foreground">Total</div>
+          <div className="text-xl font-bold tabular-nums">EUR {(summary?.totalAmount ?? 0).toFixed(2)}</div>
+          <div className="text-xs text-muted-foreground">{summary?.count ?? 0} settlements</div>
+        </Card>
+        <Card className="p-3">
+          <div className="text-xs font-medium text-muted-foreground">Pending</div>
+          <div className="text-xl font-bold tabular-nums text-orange-500">EUR {(summary?.totalPending ?? 0).toFixed(2)}</div>
+          <div className="text-xs text-muted-foreground">{summary?.pendingCount ?? 0} pending</div>
+        </Card>
+        <Card className="p-3">
+          <div className="text-xs font-medium text-muted-foreground">Paid</div>
+          <div className="text-xl font-bold tabular-nums text-green-500">EUR {(summary?.totalPaid ?? 0).toFixed(2)}</div>
+        </Card>
+        <Card className="p-3">
+          <div className="text-xs font-medium text-muted-foreground">Receivable</div>
+          <div className="text-xl font-bold tabular-nums text-amber-400">EUR {(summary?.totalReceivable ?? 0).toFixed(2)}</div>
+        </Card>
+        <Card className="p-3">
+          <div className="text-xs font-medium text-muted-foreground">Payable</div>
+          <div className="text-xl font-bold tabular-nums text-violet-400">EUR {(summary?.totalPayable ?? 0).toFixed(2)}</div>
+        </Card>
+        <Card className={cn('p-3 border', netBalance >= 0 ? 'border-green-500/30' : 'border-red-500/30')}>
+          <div className="text-xs font-medium text-muted-foreground">Net Balance</div>
+          <div className={cn('text-xl font-bold tabular-nums', netBalance >= 0 ? 'text-green-400' : 'text-red-400')}>
+            {netBalance >= 0 ? '+' : '-'}EUR {Math.abs(netBalance).toFixed(2)}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {netBalance >= 0 ? 'You will earn this much' : 'You will owe this much'}
+          </div>
+        </Card>
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto border border-zinc-800 rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent border-b border-zinc-800 bg-[#09090b]">
-              {selectedGroup ? (
-                <>
-                  <TableHead className="font-semibold text-zinc-500">{activeTab === 'business' ? 'Business' : 'Driver'}</TableHead>
-                  <TableHead className="font-semibold text-zinc-500">Direction</TableHead>
-                  <TableHead className="font-semibold text-right text-zinc-500">Amount</TableHead>
-                  <TableHead className="font-semibold text-zinc-500">Status</TableHead>
-                  <TableHead className="font-semibold text-zinc-500">Order ID</TableHead>
-                  <TableHead className="font-semibold text-zinc-500">Payment Ref</TableHead>
-                  <TableHead className="font-semibold text-right text-zinc-500">Date</TableHead>
-                  <TableHead className="font-semibold text-right text-zinc-500">Actions</TableHead>
-                </>
-              ) : (
-                <>
-                  <TableHead className="font-semibold text-zinc-500">{activeTab === 'business' ? 'Business' : 'Driver'}</TableHead>
-                  <TableHead className="font-semibold text-zinc-500">Reference</TableHead>
-                  <TableHead className="font-semibold text-right text-zinc-500">Settlements</TableHead>
-                  <TableHead className="font-semibold text-right text-zinc-500">Pending</TableHead>
-                  <TableHead className="font-semibold text-right text-zinc-500">Paid</TableHead>
-                  <TableHead className="font-semibold text-right text-zinc-500">Total</TableHead>
-                  <TableHead className="font-semibold text-right text-zinc-500">Actions</TableHead>
-                </>
-              )}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              Array.from({ length: 10 }).map((_, i) => (
-                <TableRow key={i} className="border-b border-zinc-800">
-                  <TableCell colSpan={selectedGroup ? 8 : 7}>
-                    <Skeleton className="h-9 w-full" />
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : isEmpty ? (
-              <TableRow>
-                <TableCell colSpan={selectedGroup ? 8 : 7} className="text-center text-zinc-500 py-20">
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="text-lg font-medium">
-                      {selectedGroup ? 'No settlements found' : `No ${activeTab === 'business' ? 'businesses' : 'drivers'} found`}
-                    </div>
-                    <div className="text-sm text-zinc-600">Try adjusting your filters or search query</div>
-                  </div>
-                </TableCell>
+      <Card>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+          <h3 className="text-sm font-medium text-zinc-300">Settlements</h3>
+          <Button size="sm" onClick={openSettleDialog} className="bg-green-600 hover:bg-green-700">
+            <Banknote className="h-4 w-4 mr-1.5" />
+            Request Settlement Payment
+          </Button>
+        </div>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-b border-zinc-800 bg-[#09090b]">
+                <TableHead className="text-zinc-500">Entity</TableHead>
+                <TableHead className="text-zinc-500">Type</TableHead>
+                <TableHead className="text-zinc-500">Direction</TableHead>
+                <TableHead className="text-zinc-500 text-right">Amount</TableHead>
+                <TableHead className="text-zinc-500">Status</TableHead>
+                <TableHead className="text-zinc-500">Order</TableHead>
+                <TableHead className="text-zinc-500">Date</TableHead>
               </TableRow>
-            ) : selectedGroup ? (
-              filteredSettlements.map((settlement: SettlementRecord) => (
-                <TableRow 
-                  key={settlement.id}
-                  className="border-b border-zinc-800 hover:bg-[#131313] transition-colors"
-                >
-                  <TableCell 
-                    className="font-medium cursor-pointer text-zinc-300"
-                    onClick={() => setSelectedSettlement(settlement)}
-                  >
-                    {activeTab === 'business' && settlement.business
-                      ? settlement.business.name
-                      : activeTab === 'driver' && settlement.driver
-                      ? `${settlement.driver.firstName} ${settlement.driver.lastName}`
-                      : '-'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={settlement.direction === SettlementDirection.Receivable ? 'default' : 'secondary'}
-                      className={cn(
-                        'font-medium',
-                        settlement.direction === SettlementDirection.Receivable
-                          ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30'
-                          : 'bg-violet-500/20 text-violet-300 hover:bg-violet-500/30'
-                      )}
-                    >
-                      {settlement.direction}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-bold text-right tabular-nums text-zinc-300">
-                    {settlement.currency} {Number(settlement.amount).toFixed(2)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge 
-                      variant={settlement.status === SettlementStatus.Paid ? 'default' : 'secondary'}
-                      className={cn(
-                        'font-medium',
-                        settlement.status === SettlementStatus.Paid && 'bg-green-500/20 text-green-300 hover:bg-green-500/30',
-                        settlement.status === SettlementStatus.Pending && 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30',
-                        settlement.status === SettlementStatus.Overdue && 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30',
-                        settlement.status === SettlementStatus.Disputed && 'bg-red-500/20 text-red-300 hover:bg-red-500/30',
-                        settlement.status === SettlementStatus.Cancelled && 'bg-zinc-700/30 text-zinc-300 hover:bg-zinc-700/40'
-                      )}
-                    >
-                      {settlement.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-zinc-400">
-                    {settlement.order
-                      ? `#${settlement.order.displayId || settlement.order.id?.slice(-6)}`
-                      : <span className="text-zinc-600 italic">carry-forward</span>}
-                  </TableCell>
-                  <TableCell className="text-sm text-zinc-400">
-                    {settlement.paymentReference || '-'}
-                  </TableCell>
-                  <TableCell className="text-sm text-right text-zinc-500 tabular-nums">
-                    {new Date(settlement.createdAt).toLocaleString('en-GB', {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 bg-zinc-800 hover:bg-zinc-700 text-white"
-                      onClick={() => setSelectedSettlement(settlement)}
-                    >
-                      View
-                    </Button>
+            </TableHeader>
+            <TableBody>
+              {settlementsLoading ? (
+                Array.from({ length: 8 }).map((_, i) => (
+                  <TableRow key={i} className="border-b border-zinc-800">
+                    <TableCell colSpan={7}><Skeleton className="h-9 w-full" /></TableCell>
+                  </TableRow>
+                ))
+              ) : filteredSettlements.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-zinc-500 py-16">
+                    No settlements found. Try adjusting filters.
                   </TableCell>
                 </TableRow>
-              ))
-            ) : (
-              filteredGroups.map((group) => (
-                <TableRow 
-                  key={group.id}
-                  className="border-b border-zinc-800 hover:bg-[#131313] transition-colors"
-                >
-                  <TableCell className="font-medium text-zinc-300">
-                    <div>{group.name}</div>
-                    <div className="text-xs text-zinc-500 mt-1">{group.id}</div>
-                  </TableCell>
-                  <TableCell className="text-sm text-zinc-500">
-                    {group.subtitle}
-                  </TableCell>
-                  <TableCell className="text-right font-medium tabular-nums text-zinc-300">
-                    {group.settlements.length}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-amber-300 font-medium">
-                    €{group.pendingAmount.toFixed(2)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-green-300 font-medium">
-                    €{group.paidAmount.toFixed(2)}
-                  </TableCell>
-                  <TableCell className="text-right font-bold tabular-nums text-violet-300">
-                    €{group.totalAmount.toFixed(2)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setSelectedEntityId(group.id);
-                        setSearchQuery('');
-                      }}
-                      className="gap-2 border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800"
-                    >
-                      View settlements
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      
-      {!loading && selectedGroup && filteredSettlements.length > 0 && (
-        <div className="px-4 py-3 bg-muted/30 border-t">
-          <p className="text-sm text-muted-foreground">
-            {selectedGroup ? (
-              <>
-                Showing <span className="font-semibold text-foreground">{filteredSettlements.length}</span> of <span className="font-semibold text-foreground">{selectedGroup.settlements.length}</span> settlements for <span className="font-semibold text-foreground">{selectedGroup.name}</span>
-              </>
-            ) : (
-              <>
-                Showing <span className="font-semibold text-foreground">{filteredGroups.length}</span> of <span className="font-semibold text-foreground">{settlementGroups.length}</span> {activeTab === 'business' ? 'businesses' : 'drivers'}
-              </>
-            )}
-          </p>
-
-          <div className="mt-3 flex flex-col gap-3 rounded-lg border bg-background p-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <div className="text-sm font-semibold text-foreground">Settlement actions</div>
-              <div className="text-xs text-muted-foreground">
-                Pending for {aggregateScopeLabel}: {pendingSettlements.length} settlements · EUR {pendingTotalAmount.toFixed(2)}.
-                Use <span className="font-semibold text-amber-400">Request Settlement</span> to send a request to the business — they must accept before anything is marked paid.
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-              <div className="w-full sm:w-48">
-                <Label htmlFor="bulk-partial-amount" className="mb-1 block text-xs text-muted-foreground">
-                  Partial amount (EUR)
-                </Label>
-                <Input
-                  id="bulk-partial-amount"
-                  type="number"
-                  min="0"
-                  max={pendingTotalAmount}
-                  step="0.01"
-                  placeholder={`Max ${pendingTotalAmount.toFixed(2)}`}
-                  value={bulkPartialAmount}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBulkPartialAmount(e.target.value)}
-                />
-              </div>
-
-              <Button
-                variant="outline"
-                onClick={handleBulkPartialSettle}
-                disabled={bulkProcessing || pendingSettlements.length === 0 || !bulkPartialAmount}
-                title="Admin override — bypasses the request flow. Use only for exceptional cases."
-              >
-                Force Partial (Admin Override)
-              </Button>
-
-              <Button
-                className="bg-amber-600 hover:bg-amber-700"
-                onClick={openRequestDialog}
-                disabled={!selectedGroup}
-              >
-                <Send className="h-3.5 w-3.5 mr-2" />
-                Request Settlement
-              </Button>
-
-              <Button
-                className="bg-green-600 hover:bg-green-700"
-                onClick={openSettleDialog}
-                disabled={!selectedGroup}
-              >
-                Settle
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Settlement Requests History */}
-      {selectedGroup && activeTab === 'business' && (
-        <div className="px-4 py-4 border-t">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-sm font-semibold text-foreground">Settlement Requests</div>
-            {settlementRequestsLoading && (
-              <span className="text-xs text-muted-foreground">Loading…</span>
-            )}
-          </div>
-          {!settlementRequestsLoading && settlementRequests.length === 0 ? (
-            <div className="text-xs text-zinc-500 py-3">No settlement requests for this business.</div>
-          ) : (
-            <div className="space-y-2">
-              {(settlementRequests || []).map((req: any) => {
-                const statusColors: Record<string, string> = {
-                  PENDING_APPROVAL: 'bg-amber-500/20 text-amber-300',
-                  ACCEPTED: 'bg-green-500/20 text-green-300',
-                  DISPUTED: 'bg-red-500/20 text-red-300',
-                  EXPIRED: 'bg-zinc-600/30 text-zinc-300',
-                  CANCELLED: 'bg-zinc-600/30 text-zinc-300',
-                };
-                const colorClass = statusColors[req.status] ?? 'bg-zinc-600/30 text-zinc-300';
-                const requestedBy = req.requestedBy
-                  ? `${req.requestedBy.firstName ?? ''} ${req.requestedBy.lastName ?? ''}`.trim()
-                  : 'Admin';
-                const periodLabel = req.periodStart && req.periodEnd
-                  ? `${new Date(req.periodStart).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} – ${new Date(req.periodEnd).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`
-                  : null;
-
-                return (
-                  <div
-                    key={req.id}
-                    className="flex items-start justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-2 text-xs"
-                  >
-                    <div className="space-y-0.5 flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-white">€{Number(req.amount).toFixed(2)}</span>
-                        <span className={`inline-block px-2 py-0.5 rounded font-bold ${colorClass}`}>
-                          {req.status}
-                        </span>
-                      </div>
-                      {periodLabel && (
-                        <div className="text-zinc-400">{periodLabel}</div>
-                      )}
-                      {req.note && (
-                        <div className="text-zinc-500 italic truncate">&quot;{req.note}&quot;</div>
-                      )}
-                      <div className="text-zinc-600">
-                        By {requestedBy} ·{' '}
-                        {new Date(req.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                        {req.disputeReason && (
-                          <span className="ml-2 text-red-400">Dispute: {req.disputeReason}</span>
-                        )}
-                      </div>
-                    </div>
-                    {req.status === 'PENDING_APPROVAL' && (
-                      <button
-                        onClick={() => handleCancelSettlementRequest(req.id)}
-                        className="shrink-0 text-zinc-500 hover:text-red-400 transition-colors p-1"
-                        title="Cancel request"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-    </Card>
-  );
-
-  return (
-    <div className="h-full flex flex-col p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex gap-1 bg-muted/30 p-1 rounded-lg">
-          <Button
-            variant={activeTab === 'business' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => {
-              setActiveTab('business');
-              setSelectedEntityId(null);
-              setSearchQuery('');
-            }}
-            className="gap-2 h-9 px-4"
-          >
-            <Building2 className="h-4 w-4" />
-            Business
-          </Button>
-          <Button
-            variant={activeTab === 'driver' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => {
-              setActiveTab('driver');
-              setSelectedEntityId(null);
-              setSearchQuery('');
-            }}
-            className="gap-2 h-9 px-4"
-          >
-            <User className="h-4 w-4" />
-            Driver
-          </Button>
-        </div>
-
-        <div className="relative w-full max-w-md mx-4">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder={selectedGroup
-              ? `Search ${activeTab === 'business' ? 'business' : 'driver'} settlements...`
-              : `Search ${activeTab === 'business' ? 'businesses' : 'drivers'}...`}
-            value={searchQuery}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
-            className="pl-9 h-9 bg-background"
-          />
-        </div>
-
-        <Button
-          onClick={() => backfillSettlements()}
-          disabled={backfillLoading}
-          variant="outline"
-          size="sm"
-        >
-          Backfill from Delivered Orders
-        </Button>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 min-h-0">
-        {renderContent()}
-      </div>
-
-      {/* Settlement Detail Modal */}
-      <Dialog open={!!selectedSettlement} onOpenChange={(open) => {
-        if (!open) {
-          setSelectedSettlement(null);
-        }
-      }}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-lg">
-              {activeTab === 'business' && selectedSettlement?.business
-                ? `Business: ${selectedSettlement.business.name}`
-                : activeTab === 'driver' && selectedSettlement?.driver
-                ? `Driver: ${selectedSettlement.driver.firstName} ${selectedSettlement.driver.lastName}`
-                : 'Settlement Details'}
-            </DialogTitle>
-          </DialogHeader>
-
-          {selectedSettlement && (
-            <div className="space-y-6">
-              {/* Settlement Info */}
-              <div className="grid grid-cols-2 gap-4 pb-4 border-b">
-                <div>
-                  <Label className="text-xs text-muted-foreground">Settlement ID</Label>
-                  <div className="font-mono text-sm mt-1">{selectedSettlement.id.slice(0, 12)}...</div>
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Order ID</Label>
-                  <div className="font-mono text-sm mt-1">{selectedSettlement.order ? `${selectedSettlement.order.id.slice(0, 12)}...` : <span className="text-muted-foreground italic">Carry-forward (no order)</span>}</div>
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Created At</Label>
-                  <div className="text-sm mt-1">{new Date(selectedSettlement.createdAt).toLocaleString('en-GB')}</div>
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Direction</Label>
-                  <Badge 
-                    variant={selectedSettlement.direction === SettlementDirection.Receivable ? 'default' : 'secondary'}
-                    className="mt-1"
-                  >
-                    {selectedSettlement.direction}
-                  </Badge>
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Status</Label>
-                  <Badge 
-                    variant={selectedSettlement.status === SettlementStatus.Paid ? 'default' : 'secondary'}
-                    className={cn(
-                      "mt-1",
-                      selectedSettlement.status === SettlementStatus.Paid && "bg-green-600",
-                      selectedSettlement.status === SettlementStatus.Pending && "bg-orange-500"
-                    )}
-                  >
-                    {selectedSettlement.status}
-                  </Badge>
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Settled</Label>
-                  <Badge 
-                    variant={selectedSettlement.isSettled ? 'default' : 'secondary'}
-                    className={cn(
-                      "mt-1",
-                      selectedSettlement.isSettled ? "bg-green-600" : "bg-orange-500"
-                    )}
-                  >
-                    {selectedSettlement.isSettled ? 'Yes' : 'No'}
-                  </Badge>
-                </div>
-              </div>
-
-              {/* Amount Info */}
-              <div className="bg-muted/50 rounded-lg p-4 space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="font-medium">Settlement Amount</span>
-                  <span className="text-2xl font-bold">{selectedSettlement.currency} {Number(selectedSettlement.amount).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground">
-                    {activeTab === 'driver' ? 'Delivery Fee (driver context)' : 'Delivery Fee'}
-                  </span>
-                  <span className="font-medium">EUR {Number(selectedSettlement.order?.deliveryPrice || 0).toFixed(2)}</span>
-                </div>
-                {selectedSettlement.paidAt && (
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">Paid At</span>
-                    <span>{new Date(selectedSettlement.paidAt).toLocaleString('en-GB')}</span>
-                  </div>
-                )}
-                {selectedSettlement.paymentReference && (
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">Payment Reference</span>
-                    <span className="font-mono">{selectedSettlement.paymentReference}</span>
-                  </div>
-                )}
-                {selectedSettlement.paymentMethod && (
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">Payment Method</span>
-                    <span>{selectedSettlement.paymentMethod}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-lg border bg-background p-4 space-y-3">
-                <div className="text-sm font-semibold">Order Details</div>
-
-                {!selectedSettlement.order ? (
-                  <div className="text-sm text-muted-foreground italic py-2">
-                    This is a carry-forward settlement from a partial payment — no associated order.
-                  </div>
-                ) : (
-                <><div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
-                  <div>
-                    <span className="text-muted-foreground">Display ID:</span>{' '}
-                    <span className="font-medium">{selectedSettlement.order?.displayId || '-'}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Order Date:</span>{' '}
-                    <span className="font-medium">
-                      {selectedSettlement.order?.orderDate
-                        ? new Date(selectedSettlement.order.orderDate).toLocaleString('en-GB')
-                        : '-'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Base Price:</span>{' '}
-                    <span className="font-medium">EUR {Number(selectedSettlement.order?.basePrice || 0).toFixed(2)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Markup Price:</span>{' '}
-                    <span className="font-medium">EUR {Number(selectedSettlement.order?.markupPrice || 0).toFixed(2)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Actual Price:</span>{' '}
-                    <span className="font-medium">EUR {Number(selectedSettlement.order?.actualPrice || 0).toFixed(2)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Total Price:</span>{' '}
-                    <span className="font-medium">EUR {Number(selectedSettlement.order?.totalPrice || 0).toFixed(2)}</span>
-                  </div>
-                </div>
-
-                <div className="space-y-3 pt-2 border-t">
-                  {(selectedSettlement.order?.businesses || []).length === 0 ? (
-                    <div className="text-sm text-muted-foreground">No business/item details available for this order.</div>
-                  ) : (
-                    (selectedSettlement.order?.businesses || []).map((orderBusiness, index) => (
-                      <div key={`${orderBusiness.business?.id || 'business'}-${index}`} className="rounded-md border p-3">
-                        <div className="text-sm font-medium mb-2">
-                          {orderBusiness.business?.name || 'Business'}
-                          {orderBusiness.business?.businessType ? ` (${orderBusiness.business.businessType})` : ''}
+              ) : (
+                filteredSettlements.map((s) => {
+                  const entity = getEntityInfo(s);
+                  return (
+                    <TableRow key={s.id} className="border-b border-zinc-800 hover:bg-zinc-900/50">
+                      <TableCell className="text-zinc-300 font-medium">
+                        {entity?.name ?? '-'}
+                        <div className="text-xs text-zinc-600">
+                          {s.type === 'DRIVER' && s.driver?.phoneNumber}
+                          {s.type === 'BUSINESS' && s.business?.id?.slice(0, 8)}
                         </div>
-
-                        {(orderBusiness.items || []).length === 0 ? (
-                          <div className="text-xs text-muted-foreground">No items found.</div>
-                        ) : (
-                          <div className="space-y-2">
-                            {(orderBusiness.items || []).map((item) => (
-                              <div key={item.id} className="rounded bg-muted/40 p-2 text-xs">
-                                <div className="flex items-start justify-between gap-2">
-                                  <div>
-                                    <div className="font-medium">{item.name}</div>
-                                    <div className="text-muted-foreground">Qty {item.quantity}</div>
-                                  </div>
-                                  <div className="font-medium">EUR {Number(item.unitPrice || 0).toFixed(2)}</div>
-                                </div>
-
-                                {item.notes ? (
-                                  <div className="mt-1 text-muted-foreground">Notes: {item.notes}</div>
-                                ) : null}
-
-                                {(item.selectedOptions || []).length > 0 ? (
-                                  <div className="mt-1 text-muted-foreground">
-                                    Options: {(item.selectedOptions || [])
-                                      .map((opt: any) => `${opt.optionName} (+${Number(opt.priceAtOrder || 0).toFixed(2)})`)
-                                      .join(', ')}
-                                  </div>
-                                ) : null}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
-                </>
-                )}
-              </div>
-
-              {selectedSettlement.status === SettlementStatus.Pending && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                  Single-settlement settling is disabled. Use the aggregate row at the bottom to settle pending totals fully or partially.
-                </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={cn(
+                          'text-xs',
+                          s.type === 'BUSINESS' ? 'border-blue-500/30 text-blue-400' : 'border-emerald-500/30 text-emerald-400'
+                        )}>
+                          {s.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className={cn(
+                          'text-xs',
+                          s.direction === 'RECEIVABLE'
+                            ? 'bg-amber-500/15 text-amber-300'
+                            : 'bg-violet-500/15 text-violet-300'
+                        )}>
+                          {s.direction}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-bold tabular-nums text-zinc-200">
+                        EUR {Number(s.amount).toFixed(2)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className={cn(
+                          'text-xs',
+                          s.isSettled
+                            ? 'bg-green-500/15 text-green-300'
+                            : 'bg-orange-500/15 text-orange-300'
+                        )}>
+                          {s.isSettled ? 'Settled' : 'Pending'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-zinc-400">
+                        {s.order
+                          ? `#${s.order.displayId || s.order.id?.slice(-6)}`
+                          : <span className="text-zinc-600 italic">carry-forward</span>}
+                      </TableCell>
+                      <TableCell className="text-xs text-zinc-500 tabular-nums">
+                        {new Date(s.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
+            </TableBody>
+          </Table>
+        </div>
 
-              {selectedSettlement.status === SettlementStatus.Paid && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-                  <div className="text-green-700 font-medium">✓ Settlement Completed</div>
-                  <div className="text-sm text-green-600 mt-1">
-                    Paid on {selectedSettlement.paidAt ? new Date(selectedSettlement.paidAt).toLocaleString('en-GB') : 'N/A'}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Request Settlement Dialog */}
-      <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Request Settlement — {selectedGroup?.name}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              The business will receive a push notification and must accept or dispute this request within 48 hours.
-            </p>
-
-            <div>
-              <Label htmlFor="req-amount" className="text-xs text-muted-foreground mb-1 block">
-                Amount (EUR) *
-              </Label>
-              <Input
-                id="req-amount"
-                type="number"
-                min="0.01"
-                step="0.01"
-                placeholder="0.00"
-                value={reqAmount}
-                onChange={(e) => setReqAmount(e.target.value)}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="req-period-start" className="text-xs text-muted-foreground mb-1 block">
-                  Period Start *
-                </Label>
-                <Input
-                  id="req-period-start"
-                  type="date"
-                  value={reqPeriodStart}
-                  onChange={(e) => setReqPeriodStart(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="req-period-end" className="text-xs text-muted-foreground mb-1 block">
-                  Period End *
-                </Label>
-                <Input
-                  id="req-period-end"
-                  type="date"
-                  value={reqPeriodEnd}
-                  onChange={(e) => setReqPeriodEnd(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="req-note" className="text-xs text-muted-foreground mb-1 block">
-                Note (optional)
-              </Label>
-              <textarea
-                id="req-note"
-                rows={3}
-                placeholder="E.g. Settlement for March commissions…"
-                value={reqNote}
-                onChange={(e) => setReqNote(e.target.value)}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button
-                variant="ghost"
-                onClick={() => setRequestDialogOpen(false)}
-                disabled={reqSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button
-                className="bg-amber-600 hover:bg-amber-700"
-                onClick={handleSubmitSettlementRequest}
-                disabled={reqSubmitting}
-              >
-                {reqSubmitting ? 'Sending…' : 'Send Request'}
-              </Button>
-            </div>
+        {/* Pagination */}
+        <div className="flex items-center justify-between border-t border-zinc-800 px-4 py-3">
+          <div className="flex items-center gap-2 text-sm text-zinc-500">
+            <span>Rows per page:</span>
+            <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
+              <SelectTrigger className="w-[70px] h-8"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map((s) => (
+                  <SelectItem key={s} value={String(s)}>{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="ml-2">
+              {totalCount > 0 ? `${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, totalCount)} of ${totalCount}` : '0 results'}
+            </span>
           </div>
-        </DialogContent>
-      </Dialog>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm text-zinc-400 px-2">Page {page} of {totalPages}</span>
+            <Button variant="ghost" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </Card>
 
       {/* Settle Dialog */}
       <Dialog open={settleDialogOpen} onOpenChange={setSettleDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              Settle — {selectedGroup?.name}
-              {activeTab === 'driver' ? ' (Driver, full settlement)' : ''}
-            </DialogTitle>
+            <DialogTitle>Request Settlement Payment</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {activeTab === 'driver' ? (
-              <p className="text-sm text-muted-foreground">
-                All unsettled settlements for this driver will be marked as settled and a payment record will be created.
-              </p>
-            ) : (
-              <>
-                <p className="text-sm text-muted-foreground">
-                  Enter the payment amount. If less than the total balance, a carry-forward settlement will be created for the remainder.
-                </p>
-                <div>
-                  <Label htmlFor="settle-amount" className="text-xs text-muted-foreground mb-1 block">
-                    Amount (EUR) *
-                  </Label>
-                  <Input
-                    id="settle-amount"
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={settleAmount}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSettleAmount(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="settle-method" className="text-xs text-muted-foreground mb-1 block">
-                    Payment Method
-                  </Label>
-                  <Input
-                    id="settle-method"
-                    placeholder="e.g. Bank Transfer, Cash"
-                    value={settlePaymentMethod}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSettlePaymentMethod(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="settle-ref" className="text-xs text-muted-foreground mb-1 block">
-                    Payment Reference
-                  </Label>
-                  <Input
-                    id="settle-ref"
-                    placeholder="e.g. TXN-123456"
-                    value={settlePaymentRef}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSettlePaymentRef(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="settle-note" className="text-xs text-muted-foreground mb-1 block">
-                    Note
-                  </Label>
-                  <textarea
-                    id="settle-note"
-                    rows={2}
-                    placeholder="Optional note…"
-                    value={settleNote}
-                    onChange={(e) => setSettleNote(e.target.value)}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
-                  />
-                </div>
-              </>
+            {/* Step 1: Entity type */}
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Settle with</Label>
+              <Select
+                value={settleEntityType || ''}
+                onValueChange={(v) => {
+                  setSettleEntityType(v as 'BUSINESS' | 'DRIVER');
+                  setSettleEntityId('');
+                  setSettleAmount('');
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder="Select type..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BUSINESS">Business</SelectItem>
+                  <SelectItem value="DRIVER">Driver</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Step 2: Entity selection */}
+            {settleEntityType === 'BUSINESS' && (
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Select Business</Label>
+                <Select value={settleEntityId || ''} onValueChange={(v) => { setSettleEntityId(v); setSettleAmount(''); }}>
+                  <SelectTrigger><SelectValue placeholder="Choose a business..." /></SelectTrigger>
+                  <SelectContent>
+                    {businesses.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
 
-            <div className="flex justify-end gap-2 pt-2">
-              <Button
-                variant="ghost"
-                onClick={() => setSettleDialogOpen(false)}
-                disabled={settleSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button
-                className="bg-green-600 hover:bg-green-700"
-                onClick={handleSettle}
-                disabled={settleSubmitting}
-              >
-                {settleSubmitting ? 'Settling…' : 'Confirm Settle'}
-              </Button>
-            </div>
+            {settleEntityType === 'DRIVER' && (
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Select Driver</Label>
+                <Select value={settleEntityId || ''} onValueChange={(v) => { setSettleEntityId(v); setSettleAmount(''); }}>
+                  <SelectTrigger><SelectValue placeholder="Choose a driver..." /></SelectTrigger>
+                  <SelectContent>
+                    {drivers.map((d: any) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.name}{d.phone ? ` (${d.phone})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Step 3: Balance + amount */}
+            {settleEntityId && (
+              <>
+                {balanceLoading ? (
+                  <Skeleton className="h-16 w-full" />
+                ) : unsettledBalance !== null ? (
+                  <Card className={cn(
+                    'p-3 border',
+                    Math.abs(unsettledBalance) === 0 ? 'border-zinc-700' : unsettledBalance >= 0 ? 'border-amber-500/30' : 'border-violet-500/30',
+                  )}>
+                    <div className="text-xs text-muted-foreground">Unsettled balance</div>
+                    <div className={cn(
+                      'text-lg font-bold tabular-nums',
+                      Math.abs(unsettledBalance) === 0 ? 'text-zinc-400' : unsettledBalance >= 0 ? 'text-amber-400' : 'text-violet-400',
+                    )}>
+                      EUR {Math.abs(unsettledBalance).toFixed(2)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {Math.abs(unsettledBalance) === 0
+                        ? 'No unsettled balance'
+                        : unsettledBalance >= 0
+                          ? 'They owe the platform'
+                          : 'The platform owes them'}
+                    </div>
+                  </Card>
+                ) : null}
+
+                {totalBalance > 0 && (
+                  <>
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">Payment Amount (EUR)</Label>
+                      <Input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        max={totalBalance.toFixed(2)}
+                        value={settleAmount}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSettleAmount(e.target.value)}
+                      />
+                    </div>
+
+                    {/* Remainder indicator */}
+                    {enteredAmount > 0 && enteredAmount < totalBalance && (
+                      <div className="rounded-md border border-orange-500/30 bg-orange-500/5 px-3 py-2 text-sm">
+                        <span className="text-orange-400 font-medium">Partial payment.</span>{' '}
+                        <span className="text-muted-foreground">
+                          {balanceDirection === 'ENTITY_TO_PLATFORM'
+                            ? `They will still owe EUR ${remainder.toFixed(2)}`
+                            : `You will still owe them EUR ${remainder.toFixed(2)}`}
+                        </span>
+                      </div>
+                    )}
+
+                    {enteredAmount > 0 && enteredAmount >= totalBalance && (
+                      <div className="rounded-md border border-green-500/30 bg-green-500/5 px-3 py-2 text-sm">
+                        <span className="text-green-400 font-medium">Full settlement.</span>{' '}
+                        <span className="text-muted-foreground">All unsettled balances will be cleared.</span>
+                      </div>
+                    )}
+
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">Note (optional)</Label>
+                      <textarea
+                        rows={2}
+                        placeholder="Optional note..."
+                        value={settleNote}
+                        onChange={(e) => setSettleNote(e.target.value)}
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                      <Button variant="ghost" onClick={() => setSettleDialogOpen(false)} disabled={settleSubmitting}>Cancel</Button>
+                      <Button
+                        className="bg-green-600 hover:bg-green-700"
+                        onClick={handleSettle}
+                        disabled={settleSubmitting || enteredAmount <= 0 || enteredAmount > totalBalance}
+                      >
+                        {settleSubmitting ? 'Sending...' : `Request EUR ${enteredAmount > 0 ? enteredAmount.toFixed(2) : '0.00'}`}
+                      </Button>
+                    </div>
+                  </>
+                )}
+
+                {!balanceLoading && totalBalance === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-2">
+                    No unsettled balance for this entity.
+                  </p>
+                )}
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>
     </div>
   );
 }
+

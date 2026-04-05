@@ -654,6 +654,31 @@ type DriverBasicInfo {
   phoneNumber: String
 }
 
+"""Summary of a driver's cash position and settlement breakdown."""
+type DriverCashSummary {
+  """
+  Total cash collected from delivered CASH_TO_DRIVER orders (totalPrice - businessPrice).
+  """
+  cashCollected: Float!
+
+  """Net settlement balance: platformOwesYou - youOwePlatform."""
+  netSettlement: Float!
+
+  """Sum of unsettled PAYABLE settlements (platform owes driver)."""
+  platformOwesYou: Float!
+
+  """
+  Cash driver keeps after all settlements: cashCollected + netSettlement.
+  """
+  takeHome: Float!
+
+  """Number of delivered orders in the period."""
+  totalDeliveries: Int!
+
+  """Sum of unsettled RECEIVABLE settlements (driver owes platform)."""
+  youOwePlatform: Float!
+}
+
 type DriverConnection {
   """Current navigation order this ETA belongs to"""
   activeOrderId: ID
@@ -962,8 +987,10 @@ type Mutation {
   createProductVariantGroup(input: CreateProductVariantGroupInput!): ProductVariantGroup!
   createPromotion(input: CreatePromotionInput!): Promotion!
 
-  """Admin creates a settlement request, notifying the business via push."""
-  createSettlementRequest(amount: Float!, businessId: ID!, note: String, periodEnd: Date!, periodStart: Date!): SettlementRequest!
+  """
+  Admin creates a settlement request, notifying the business or driver via push.
+  """
+  createSettlementRequest(amount: Float!, businessId: ID, driverId: ID, note: String, periodEnd: Date!, periodStart: Date!): SettlementRequest!
   createSettlementRule(input: CreateSettlementRuleInput!): SettlementRule!
   createTestOrder: Order!
   createUser(input: CreateUserInput!): AuthResponse!
@@ -1054,8 +1081,8 @@ type Mutation {
   """
   settleWithBusiness(amount: Float!, businessId: ID!, note: String, paymentMethod: String, paymentReference: String): SettleResult!
 
-  """Settle all unsettled settlements for a driver (always full)."""
-  settleWithDriver(driverId: ID!): SettleResult!
+  """Settle unsettled settlements for a driver. Supports partial payment."""
+  settleWithDriver(amount: Float, driverId: ID!, note: String, paymentMethod: String, paymentReference: String): SettleResult!
   startPreparing(id: ID!, preparationMinutes: Int!): Order!
   submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
   trackPushTelemetry(input: TrackPushTelemetryInput!): Boolean!
@@ -1193,6 +1220,7 @@ type Order {
   preparingAt: Date
   prioritySurcharge: Float!
   readyAt: Date
+  settlementPreview: OrderSettlementPreview
   status: OrderStatus!
   totalPrice: Float!
   updatedAt: Date!
@@ -1203,6 +1231,12 @@ type Order {
 type OrderBusiness {
   business: Business!
   items: [OrderItem!]!
+}
+
+type OrderConnection {
+  hasMore: Boolean!
+  orders: [Order!]!
+  totalCount: Int!
 }
 
 type OrderDriverLiveTracking {
@@ -1248,6 +1282,24 @@ type OrderPromotion {
   id: ID!
   promoCode: String
   promotionId: ID!
+}
+
+type OrderSettlementLineItem {
+  amount: Float!
+  businessId: ID
+  direction: String!
+  driverId: ID
+  reason: String!
+  ruleId: ID
+  type: String!
+}
+
+type OrderSettlementPreview {
+  driverAssigned: Boolean!
+  lineItems: [OrderSettlementLineItem!]!
+  netMargin: Float!
+  totalPayable: Float!
+  totalReceivable: Float!
 }
 
 enum OrderStatus {
@@ -1500,6 +1552,11 @@ type Query {
   deliveryZones: [DeliveryZone!]!
   deviceTokens(userId: ID): [DeviceToken!]!
   driverBalance(driverId: ID!): SettlementSummary!
+
+  """
+  Driver cash summary with settlement breakdown. Auto-scoped to current driver.
+  """
+  driverCashSummary(endDate: Date, startDate: Date): DriverCashSummary!
   driverKPIs(driverId: ID, endDate: String!, startDate: String!): [DriverKPI!]!
 
   """Admin: list of all driver threads with unread counts"""
@@ -1544,7 +1601,7 @@ type Query {
   offers(businessId: ID!): [Product!]!
   operationalKPIs(businessId: ID, endDate: String!, startDate: String!): OperationalKPIs!
   order(id: ID!): Order
-  orders(limit: Int, offset: Int): [Order!]!
+  orders(limit: Int, offset: Int, statuses: [OrderStatus!]): OrderConnection!
   ordersByStatus(limit: Int, offset: Int, status: OrderStatus!): [Order!]!
   peakHourAnalysis(businessId: ID, endDate: String!, startDate: String!): PeakHourAnalysis!
   previewCampaignAudience(query: JSON!): AudiencePreview!
@@ -1557,14 +1614,18 @@ type Query {
   products(businessId: ID!): [ProductCard!]!
   pushTelemetryEvents(appType: DeviceAppType, eventType: PushTelemetryEventType, hours: Int, limit: Int, platform: DevicePlatform): [PushTelemetryEvent!]!
   pushTelemetrySummary(hours: Int): PushTelemetrySummary!
+
+  """Grouped settlement breakdown by category."""
+  settlementBreakdown(businessId: ID, driverId: ID, endDate: Date, isSettled: Boolean, startDate: Date, type: SettlementType): [SettlementBreakdownItem!]!
   settlementPayment(id: ID!): SettlementPayment
   settlementPayments(businessId: ID, driverId: ID, endDate: Date, entityType: SettlementType, limit: Int, offset: Int, startDate: Date): [SettlementPayment!]!
-  settlementRequests(businessId: ID, limit: Int, offset: Int, status: SettlementRequestStatus): [SettlementRequest!]!
+  settlementRequests(businessId: ID, driverId: ID, entityType: SettlementType, limit: Int, offset: Int, status: SettlementRequestStatus): [SettlementRequest!]!
   settlementRule(id: ID!): SettlementRule
-  settlementRules(filter: SettlementRuleFilterInput): [SettlementRule!]!
+  settlementRules(filter: SettlementRuleFilterInput, limit: Int, offset: Int): [SettlementRule!]!
+  settlementRulesCount(filter: SettlementRuleFilterInput): Int!
   settlementScenarioDefinitions: [SettlementScenarioDefinition!]!
-  settlementSummary(businessId: ID, driverId: ID, endDate: Date, startDate: Date, type: SettlementType): SettlementSummary!
-  settlements(businessId: ID, direction: SettlementDirection, driverId: ID, endDate: Date, isSettled: Boolean, limit: Int, offset: Int, startDate: Date, status: SettlementStatus, type: SettlementType): [Settlement!]!
+  settlementSummary(businessId: ID, direction: SettlementDirection, driverId: ID, endDate: Date, isSettled: Boolean, orderId: ID, promotionId: ID, startDate: Date, type: SettlementType): SettlementSummary!
+  settlements(businessId: ID, direction: SettlementDirection, driverId: ID, endDate: Date, isSettled: Boolean, limit: Int, offset: Int, orderId: ID, promotionId: ID, startDate: Date, status: SettlementStatus, type: SettlementType): [Settlement!]!
   uncompletedOrders: [Order!]!
   unsettledBalance(entityId: ID!, entityType: SettlementType!): Float!
   userBehavior(userId: ID!): UserBehavior
@@ -1652,6 +1713,7 @@ type Settlement {
   paidAt: Date
   paymentMethod: String
   paymentReference: String
+  rule: SettlementRule
   ruleId: ID
   settlementPayment: SettlementPayment
   sourcePayment: SettlementPayment
@@ -1663,6 +1725,26 @@ type Settlement {
 enum SettlementAmountType {
   FIXED
   PERCENT
+}
+
+"""Grouped settlement totals by category."""
+type SettlementBreakdownItem {
+  """
+  Category key (e.g. PLATFORM_COMMISSION, PROMOTION_COST, MARKUP_REMITTANCE, DELIVERY_COMMISSION).
+  """
+  category: String!
+
+  """Number of settlements in this category."""
+  count: Int!
+
+  """Direction of these settlements."""
+  direction: SettlementDirection!
+
+  """Human-readable label for the category."""
+  label: String!
+
+  """Total amount for this category."""
+  totalAmount: Float!
 }
 
 enum SettlementDirection {
@@ -1697,10 +1779,12 @@ enum SettlementPaymentDirection {
 
 type SettlementRequest {
   amount: Float!
-  business: Business!
+  business: Business
   createdAt: Date!
   currency: String!
   disputeReason: String
+  driver: User
+  entityType: SettlementType!
   expiresAt: Date!
   id: ID!
   note: String

@@ -1,10 +1,11 @@
+
 import type { QueryResolvers } from './../../../../generated/types.generated';
 import { SettlementRuleRepository } from '@/repositories/SettlementRuleRepository';
 import { GraphQLError } from 'graphql';
 
-export const settlementRules: NonNullable<QueryResolvers['settlementRules']> = async (
+export const settlementRulesCount: NonNullable<QueryResolvers['settlementRulesCount']> = async (
   _parent,
-  { filter, limit, offset },
+  { filter },
   { db, userData },
 ) => {
   if (!userData?.userId) {
@@ -26,10 +27,5 @@ export const settlementRules: NonNullable<QueryResolvers['settlementRules']> = a
       }
     : {};
 
-  const rules = await repo.getRules(cleanFilter as any, limit ?? undefined, offset ?? undefined);
-
-  return rules.map((rule) => ({
-    ...rule,
-    amount: parseFloat(rule.amount as any),
-  }));
+  return repo.getRulesCount(cleanFilter as any);
 };

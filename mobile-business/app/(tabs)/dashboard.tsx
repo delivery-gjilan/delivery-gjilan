@@ -52,10 +52,10 @@ export default function DashboardScreen() {
         if (!businessId) {
             return [];
         }
-        return (ordersData?.orders || []).filter((order: any) =>
+        return (ordersData?.orders?.orders || []).filter((order: any) =>
             (order.businesses || []).some((b: any) => b.business?.id === businessId),
         );
-    }, [ordersData?.orders, businessId]);
+    }, [ordersData?.orders?.orders, businessId]);
 
     const deliveredOrders = useMemo(
         () => businessOrders.filter((order: any) => order.status === 'DELIVERED'),

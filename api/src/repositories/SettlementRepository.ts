@@ -1,5 +1,5 @@
 import { type DbType } from '@/database';
-import { settlements } from '@/database/schema';
+import { settlements, settlementRules } from '@/database/schema';
 import { eq, and, gte, lte, sql, inArray, isNotNull } from 'drizzle-orm';
 import { DbSettlement } from '@/database/schema/settlements';
 
@@ -10,6 +10,7 @@ export interface SettlementFilters {
     driverId?: string;
     businessId?: string;
     orderId?: string;
+    promotionId?: string;
     startDate?: string;
     endDate?: string;
     limit?: number;
@@ -18,8 +19,12 @@ export interface SettlementFilters {
 
 export interface SettlementSummaryFilters {
     type?: string;
+    direction?: string;
+    isSettled?: boolean;
     driverId?: string;
     businessId?: string;
+    orderId?: string;
+    promotionId?: string;
     startDate?: string;
     endDate?: string;
 }
@@ -60,6 +65,17 @@ export class SettlementRepository {
             conditions.push(eq(settlements.orderId, filters.orderId));
         }
 
+        if (filters.promotionId) {
+            // Filter by settlements whose rule has this promotionId
+            const ruleIds = await this.db
+                .select({ id: settlementRules.id })
+                .from(settlementRules)
+                .where(eq(settlementRules.promotionId, filters.promotionId));
+            const ids = ruleIds.map(r => r.id);
+            if (ids.length === 0) return [];
+            conditions.push(inArray(settlements.ruleId, ids));
+        }
+
         if (filters.startDate) {
             conditions.push(gte(settlements.createdAt, filters.startDate));
         }
@@ -90,12 +106,39 @@ export class SettlementRepository {
             conditions.push(eq(settlements.type, filters.type as any));
         }
 
+        if (filters.direction) {
+            conditions.push(eq(settlements.direction, filters.direction as any));
+        }
+
+        if (filters.isSettled !== undefined) {
+            conditions.push(eq(settlements.isSettled, filters.isSettled));
+        }
+
         if (filters.driverId) {
             conditions.push(eq(settlements.driverId, filters.driverId));
         }
 
         if (filters.businessId) {
             conditions.push(eq(settlements.businessId, filters.businessId));
+        }
+
+        if (filters.orderId) {
+            conditions.push(eq(settlements.orderId, filters.orderId));
+        }
+
+        if (filters.promotionId) {
+            const ruleIds = await this.db
+                .select({ id: settlementRules.id })
+                .from(settlementRules)
+                .where(eq(settlementRules.promotionId, filters.promotionId));
+            const ids = ruleIds.map(r => r.id);
+            if (ids.length === 0) {
+                return {
+                    totalAmount: 0, totalPending: 0, totalPaid: 0,
+                    totalReceivable: 0, totalPayable: 0, count: 0, pendingCount: 0,
+                };
+            }
+            conditions.push(inArray(settlements.ruleId, ids));
         }
 
         if (filters.startDate) {

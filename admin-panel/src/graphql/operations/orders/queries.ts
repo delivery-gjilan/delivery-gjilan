@@ -1,70 +1,89 @@
 import { graphql } from '@/gql';
 
 export const GET_ORDERS = graphql(`
-    query GetOrders($limit: Int, $offset: Int) {
-        orders(limit: $limit, offset: $offset) {
-            id
-            displayId
-            orderPrice
-            deliveryPrice
-            originalPrice
-            totalPrice
-            orderDate
-            updatedAt
-            status
-            preparationMinutes
-            estimatedReadyAt
-            preparingAt
-            cancelledAt
-            cancellationReason
-            adminNote
-            driverNotes
-            needsApproval
-            locationFlagged
-            approvalReasons
-            driver {
+    query GetOrders($limit: Int, $offset: Int, $statuses: [OrderStatus!]) {
+        orders(limit: $limit, offset: $offset, statuses: $statuses) {
+            totalCount
+            hasMore
+            orders {
                 id
-                firstName
-                lastName
-                email
-            }
-            user {
-                id
-                firstName
-                lastName
-                email
-                phoneNumber
+                displayId
+                orderPrice
+                deliveryPrice
+                originalPrice
+                totalPrice
+                orderDate
+                updatedAt
+                status
+                preparationMinutes
+                estimatedReadyAt
+                preparingAt
+                cancelledAt
+                cancellationReason
                 adminNote
-                flagColor
-                totalOrders
-                isTrustedCustomer
-                commissionPercentage
-                commissionPercentage
-            }
-            dropOffLocation {
-                latitude
-                longitude
-                address
-            }
-            businesses {
-                business {
+                driverNotes
+                needsApproval
+                locationFlagged
+                approvalReasons
+                driver {
                     id
-                    name
+                    firstName
+                    lastName
+                    email
+                }
+                user {
+                    id
+                    firstName
+                    lastName
+                    email
                     phoneNumber
-                    businessType
+                    adminNote
+                    flagColor
+                    totalOrders
+                    isTrustedCustomer
                     commissionPercentage
-                    location {
-                        latitude
-                        longitude
-                        address
+                    commissionPercentage
+                }
+                dropOffLocation {
+                    latitude
+                    longitude
+                    address
+                }
+                businesses {
+                    business {
+                        id
+                        name
+                        phoneNumber
+                        businessType
+                        commissionPercentage
+                        location {
+                            latitude
+                            longitude
+                            address
+                        }
+                    }
+                    items {
+                        productId
+                        name
+                        imageUrl
+                        quantity
+                        unitPrice
                     }
                 }
-                items {
-                    productId
-                    name
-                    imageUrl
-                    quantity
-                    unitPrice
+                settlementPreview {
+                    lineItems {
+                        type
+                        direction
+                        amount
+                        reason
+                        businessId
+                        driverId
+                        ruleId
+                    }
+                    totalReceivable
+                    totalPayable
+                    netMargin
+                    driverAssigned
                 }
             }
         }
@@ -132,6 +151,21 @@ export const GET_ORDER = graphql(`
                     quantity
                     unitPrice
                 }
+            }
+            settlementPreview {
+                lineItems {
+                    type
+                    direction
+                    amount
+                    reason
+                    businessId
+                    driverId
+                    ruleId
+                }
+                totalReceivable
+                totalPayable
+                netMargin
+                driverAssigned
             }
         }
     }

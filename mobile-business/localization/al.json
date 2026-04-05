@@ -69,7 +69,8 @@
     "next": "Pas",
     "accept_request_title": "Prano shlyerjen",
     "accept_request_text": "Pranimi do të shlyejë deri në {{amount}} për këtë periudhë. Vazhdon?",
-    "accept_request_fallback": "Ta pranosh këtë kërkesë për shlyerje?"
+    "accept_request_fallback": "Ta pranosh këtë kërkesë për shlyerje?",
+    "breakdown_title": "Ndarja e Kostove"
   },
   "dashboard": {
     "title": "Paneli",

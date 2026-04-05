@@ -97,7 +97,8 @@ export function useMapRealtimeData() {
     }, [driverData]);
 
     useEffect(() => {
-        const currentOrders = Array.isArray((orderData as any)?.orders) ? (orderData as any).orders : [];
+        const connection = (orderData as any)?.orders;
+        const currentOrders = Array.isArray(connection?.orders) ? connection.orders : [];
         if (currentOrders.length === 0) return;
 
         currentOrders.forEach((order: any) => {
@@ -148,7 +149,8 @@ export function useMapRealtimeData() {
 
                 setRealtimeHealth((prev) => ({ ...prev, orderLastSubAtMs: Date.now() }));
                 apolloClient.cache.updateQuery({ query: GetOrdersDocument }, (existing: any) => {
-                    const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
+                    const connection = existing?.orders;
+                    const currentOrders = Array.isArray(connection?.orders) ? connection.orders : [];
                     const byId = new globalThis.Map<string, any>(
                         currentOrders.map((order: any) => [String(order?.id), order]),
                     );
@@ -160,7 +162,10 @@ export function useMapRealtimeData() {
 
                     return {
                         ...(existing ?? {}),
-                        orders: Array.from(byId.values()),
+                        orders: {
+                            ...(connection ?? {}),
+                            orders: Array.from(byId.values()),
+                        },
                     };
                 });
                 return;
@@ -198,7 +203,8 @@ export function useMapRealtimeData() {
     });
 
     const businesses = useMemo(() => (businessData as any)?.businesses ?? [], [businessData]);
-    const orders = useMemo(() => ((orderData as any)?.orders ?? []) as any[], [orderData]);
+    const connection = (orderData as any)?.orders;
+    const orders = useMemo(() => (Array.isArray(connection?.orders) ? connection.orders : []) as any[], [connection]);
     const drivers = useMemo(() => driversLive ?? [], [driversLive]);
 
     return {

@@ -344,7 +344,7 @@ export default function PromotionsPage() {
                                             </div>
                                             {promotion.maxDiscountCap && (
                                                 <div className="text-xs text-zinc-500">
-                                                    Cap: â‚¬{promotion.maxDiscountCap.toFixed(2)}
+                                                    Cap: EUR {promotion.maxDiscountCap.toFixed(2)}
                                                 </div>
                                             )}
                                         </Td>

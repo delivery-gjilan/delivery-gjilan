@@ -30,6 +30,7 @@ type Settlement {
     business: Business
     order: Order
     ruleId: ID
+    rule: SettlementRule
     amount: Float!
     # Legacy fields kept for backward compatibility (derived from isSettled)
     currency: String!
@@ -88,6 +89,8 @@ type Query {
         isSettled: Boolean
         driverId: ID
         businessId: ID
+        orderId: ID
+        promotionId: ID
         startDate: Date
         endDate: Date
         limit: Int
@@ -96,8 +99,12 @@ type Query {
     
     settlementSummary(
         type: SettlementType
+        direction: SettlementDirection
+        isSettled: Boolean
         driverId: ID
         businessId: ID
+        orderId: ID
+        promotionId: ID
         startDate: Date
         endDate: Date
     ): SettlementSummary!
@@ -121,6 +128,50 @@ type Query {
     settlementPayment(id: ID!): SettlementPayment
 }
 
+"""Summary of a driver's cash position and settlement breakdown."""
+type DriverCashSummary {
+    """Total cash collected from delivered CASH_TO_DRIVER orders (totalPrice - businessPrice)."""
+    cashCollected: Float!
+    """Number of delivered orders in the period."""
+    totalDeliveries: Int!
+    """Sum of unsettled RECEIVABLE settlements (driver owes platform)."""
+    youOwePlatform: Float!
+    """Sum of unsettled PAYABLE settlements (platform owes driver)."""
+    platformOwesYou: Float!
+    """Net settlement balance: platformOwesYou - youOwePlatform."""
+    netSettlement: Float!
+    """Cash driver keeps after all settlements: cashCollected + netSettlement."""
+    takeHome: Float!
+}
+
+"""Grouped settlement totals by category."""
+type SettlementBreakdownItem {
+    """Category key (e.g. PLATFORM_COMMISSION, PROMOTION_COST, MARKUP_REMITTANCE, DELIVERY_COMMISSION)."""
+    category: String!
+    """Human-readable label for the category."""
+    label: String!
+    """Total amount for this category."""
+    totalAmount: Float!
+    """Number of settlements in this category."""
+    count: Int!
+    """Direction of these settlements."""
+    direction: SettlementDirection!
+}
+
+extend type Query {
+    """Driver cash summary with settlement breakdown. Auto-scoped to current driver."""
+    driverCashSummary(startDate: Date, endDate: Date): DriverCashSummary!
+    """Grouped settlement breakdown by category."""
+    settlementBreakdown(
+        type: SettlementType
+        businessId: ID
+        driverId: ID
+        isSettled: Boolean
+        startDate: Date
+        endDate: Date
+    ): [SettlementBreakdownItem!]!
+}
+
 type Mutation {
     markSettlementAsPaid(settlementId: ID!, paymentReference: String, paymentMethod: String): Settlement!
     markSettlementsAsPaid(ids: [ID!]!, paymentReference: String, paymentMethod: String): [Settlement!]!
@@ -129,9 +180,10 @@ type Mutation {
     backfillSettlementsForDeliveredOrders: Int!
     runSettlementScenarioHarness(scenarioIds: [String!]): SettlementScenarioHarnessResult!
 
-    """Admin creates a settlement request, notifying the business via push."""
+    """Admin creates a settlement request, notifying the business or driver via push."""
     createSettlementRequest(
-        businessId: ID!
+        businessId: ID
+        driverId: ID
         amount: Float!
         periodStart: Date!
         periodEnd: Date!
@@ -148,8 +200,14 @@ type Mutation {
     """Admin cancels an outstanding settlement request."""
     cancelSettlementRequest(requestId: ID!): SettlementRequest!
 
-    """Settle all unsettled settlements for a driver (always full)."""
-    settleWithDriver(driverId: ID!): SettleResult!
+    """Settle unsettled settlements for a driver. Supports partial payment."""
+    settleWithDriver(
+        driverId: ID!
+        amount: Float
+        paymentMethod: String
+        paymentReference: String
+        note: String
+    ): SettleResult!
 
     """Settle all unsettled settlements for a business. Supports partial payment."""
     settleWithBusiness(
@@ -178,7 +236,9 @@ enum SettlementRequestAction {
 
 type SettlementRequest {
     id: ID!
-    business: Business!
+    entityType: SettlementType!
+    business: Business
+    driver: User
     requestedBy: User
     amount: Float!
     currency: String!
@@ -197,6 +257,8 @@ type SettlementRequest {
 extend type Query {
     settlementRequests(
         businessId: ID
+        driverId: ID
+        entityType: SettlementType
         status: SettlementRequestStatus
         limit: Int
         offset: Int

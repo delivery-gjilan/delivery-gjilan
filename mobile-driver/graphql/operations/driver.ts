@@ -44,6 +44,12 @@ export const GET_MY_SETTLEMENTS = gql`
                     }
                 }
             }
+            rule {
+                id
+                name
+                type
+                direction
+            }
         }
     }
 `;
@@ -60,6 +66,78 @@ export const GET_MY_SETTLEMENT_SUMMARY = gql`
             totalPaid
             count
             pendingCount
+        }
+    }
+`;
+
+export const GET_DRIVER_CASH_SUMMARY = gql`
+    query GetDriverCashSummary($startDate: Date, $endDate: Date) {
+        driverCashSummary(startDate: $startDate, endDate: $endDate) {
+            cashCollected
+            totalDeliveries
+            youOwePlatform
+            platformOwesYou
+            netSettlement
+            takeHome
+        }
+    }
+`;
+
+export const GET_SETTLEMENT_BREAKDOWN = gql`
+    query GetSettlementBreakdown($isSettled: Boolean, $startDate: Date, $endDate: Date) {
+        settlementBreakdown(
+            type: DRIVER
+            isSettled: $isSettled
+            startDate: $startDate
+            endDate: $endDate
+        ) {
+            category
+            label
+            totalAmount
+            count
+            direction
+        }
+    }
+`;
+
+export const GET_MY_SETTLEMENT_REQUESTS = gql`
+    query GetMyDriverSettlementRequests($status: SettlementRequestStatus, $limit: Int) {
+        settlementRequests(status: $status, limit: $limit) {
+            id
+            amount
+            currency
+            periodStart
+            periodEnd
+            note
+            status
+            expiresAt
+            createdAt
+            requestedBy {
+                id
+                firstName
+                lastName
+            }
+            respondedAt
+            disputeReason
+        }
+    }
+`;
+
+export const RESPOND_TO_SETTLEMENT_REQUEST = gql`
+    mutation RespondToSettlementRequest(
+        $requestId: ID!
+        $action: SettlementRequestAction!
+        $disputeReason: String
+    ) {
+        respondToSettlementRequest(
+            requestId: $requestId
+            action: $action
+            disputeReason: $disputeReason
+        ) {
+            id
+            status
+            respondedAt
+            disputeReason
         }
     }
 `;

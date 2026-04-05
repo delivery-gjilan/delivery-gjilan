@@ -18,7 +18,7 @@ export default function TabLayout() {
     const canManageSettings = hasBusinessPermission(user, UserPermission.ManageSettings);
     const canViewAnalytics = hasBusinessPermission(user, UserPermission.ViewAnalytics);
 
-    const pendingCount = (data?.orders || []).filter(
+    const pendingCount = (data?.orders?.orders || []).filter(
         (o: any) =>
             o.status === 'PENDING' &&
             o.businesses.some((b: any) => b.business.id === user?.businessId)

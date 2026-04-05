@@ -1,7 +1,9 @@
 import { pgTable, uuid, numeric, varchar, text, timestamp, pgEnum, index } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import { businesses } from './businesses';
+import { drivers } from './drivers';
 import { users } from './users';
+import { settlementEntityType } from './settlementRules';
 
 const settlementRequestStatusValues = [
     'PENDING_APPROVAL',
@@ -19,15 +21,15 @@ export const settlementRequestStatus = pgEnum(
 export type SettlementRequestStatusValue = (typeof settlementRequestStatusValues)[number];
 
 /**
- * settlement_requests — admin-initiated requests asking a business to
- * acknowledge and approve a financial settlement for a given period.
+ * settlement_requests — admin-initiated requests asking a business or driver
+ * to acknowledge and approve a financial settlement for a given period.
  *
  * Flow:
  *  1. Admin calls createSettlementRequest  → row inserted (PENDING_APPROVAL),
- *     push notification sent to business.
- *  2. Business taps Accept                 → status becomes ACCEPTED,
- *     matching PENDING RECEIVABLE settlements are marked as PAID.
- *  3. Business taps Dispute               → status becomes DISPUTED,
+ *     push notification sent to business/driver.
+ *  2. Entity taps Accept                   → status becomes ACCEPTED,
+ *     matching unsettled settlements are settled via SettlingService.
+ *  3. Entity taps Dispute                  → status becomes DISPUTED,
  *     admin notified for manual review.
  */
 export const settlementRequests = pgTable(
@@ -35,9 +37,14 @@ export const settlementRequests = pgTable(
     {
         id: uuid('id').primaryKey().defaultRandom().notNull(),
 
+        /** DRIVER or BUSINESS — who this request targets */
+        entityType: settlementEntityType('entity_type').default('BUSINESS').notNull(),
+
         businessId: uuid('business_id')
-            .notNull()
             .references(() => businesses.id, { onDelete: 'cascade' }),
+
+        driverId: uuid('driver_id')
+            .references(() => drivers.id, { onDelete: 'cascade' }),
 
         requestedByUserId: uuid('requested_by_user_id').references(() => users.id, {
             onDelete: 'set null',
@@ -78,6 +85,8 @@ export const settlementRequests = pgTable(
     },
     (t) => ([
         index('idx_settlement_requests_business_id').on(t.businessId),
+        index('idx_settlement_requests_driver_id').on(t.driverId),
+        index('idx_settlement_requests_entity_type').on(t.entityType),
         index('idx_settlement_requests_status').on(t.status),
         index('idx_settlement_requests_created_at').on(t.createdAt),
     ]),
@@ -87,6 +96,10 @@ export const settlementRequestsRelations = relations(settlementRequests, ({ one 
     business: one(businesses, {
         fields: [settlementRequests.businessId],
         references: [businesses.id],
+    }),
+    driver: one(drivers, {
+        fields: [settlementRequests.driverId],
+        references: [drivers.id],
     }),
     requestedBy: one(users, {
         fields: [settlementRequests.requestedByUserId],

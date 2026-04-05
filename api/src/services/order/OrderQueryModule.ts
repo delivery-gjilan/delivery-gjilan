@@ -18,6 +18,25 @@ export class OrderQueryModule {
         private mapping: OrderMappingModule,
     ) {}
 
+    /** Default active statuses — everything except DELIVERED and CANCELLED. */
+    static readonly ACTIVE_STATUSES: OrderStatus[] = [
+        'PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'AWAITING_APPROVAL',
+    ];
+
+    async getOrdersPaginated(
+        limit: number,
+        offset: number,
+        statuses?: OrderStatus[] | null,
+    ): Promise<{ orders: Order[]; totalCount: number; hasMore: boolean }> {
+        const effectiveStatuses = statuses ?? OrderQueryModule.ACTIVE_STATUSES;
+        const [dbOrders, totalCount] = await Promise.all([
+            this.deps.orderRepository.findByStatuses(effectiveStatuses, limit, offset),
+            this.deps.orderRepository.countByStatuses(effectiveStatuses),
+        ]);
+        const orders = await this.mapping.mapOrders(dbOrders);
+        return { orders, totalCount, hasMore: offset + orders.length < totalCount };
+    }
+
     async getAllOrders(limit = 500, offset = 0): Promise<Order[]> {
         const dbOrders = await this.deps.orderRepository.findAll(limit, offset);
         return this.mapping.mapOrders(dbOrders);

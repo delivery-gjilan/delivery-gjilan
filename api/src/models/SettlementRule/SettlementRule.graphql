@@ -78,7 +78,8 @@ input SettlementRuleFilterInput {
 
 extend type Query {
   settlementRule(id: ID!): SettlementRule
-  settlementRules(filter: SettlementRuleFilterInput): [SettlementRule!]!
+  settlementRules(filter: SettlementRuleFilterInput, limit: Int, offset: Int): [SettlementRule!]!
+  settlementRulesCount(filter: SettlementRuleFilterInput): Int!
 }
 
 extend type Mutation {

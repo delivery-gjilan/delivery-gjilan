@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useMutation, useQuery } from "@apollo/client/react";
-import { gql } from "@apollo/client";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Dropdown from "@/components/ui/Dropdown";
@@ -176,48 +175,6 @@ const INCIDENT_TAG_LABELS: Record<string, string> = {
     other: 'Other',
 };
 
-interface OrderEarningsBreakdown {
-    total: number;
-    deliveryCommission: number;
-    deliveryCommissionPotential: number;
-    restaurantCommission: number;
-    driverCommission: number;
-    markup: number;
-    grossReceivable: number;
-    grossPayable: number;
-    deliveryIncluded: boolean;
-    driverCommissionRate: number;
-    marginSeverity: 'healthy' | 'thin' | 'negative';
-}
-
-interface BusinessSettlementRule {
-    id: string;
-    entityType: 'BUSINESS' | 'DRIVER';
-    direction: 'RECEIVABLE' | 'PAYABLE';
-    amountType: 'FIXED' | 'PERCENT';
-    amount: number;
-    appliesTo?: string | null;
-    isActive: boolean;
-    business?: { id: string } | null;
-}
-
-const GET_BUSINESS_SETTLEMENT_RULES = gql`
-    query OrdersBusinessSettlementRules($filter: SettlementRuleFilterInput) {
-        settlementRules(filter: $filter) {
-            id
-            entityType
-            direction
-            amountType
-            amount
-            appliesTo
-            isActive
-            business {
-                id
-            }
-        }
-    }
-`;
-
 const normalizeOrderBusinesses = (order: any): OrderBusiness[] => {
     if (!Array.isArray(order?.businesses)) return [];
     return order.businesses.map((biz: any) => ({
@@ -236,113 +193,9 @@ const getBusinessItemsSafe = (business: any): OrderItem[] => {
 
 const roundMoney = (value: number) => Math.round(value * 100) / 100;
 
-const computeOrderEarnings = (order: Order, rules: BusinessSettlementRule[]): OrderEarningsBreakdown => {
-    const subtotalBase = Number((order as any)?.businessPrice ?? order.orderPrice ?? 0);
-    const deliveryBase = Number((order as any)?.originalDeliveryPrice ?? order.deliveryPrice ?? 0);
-    const hasDriver = Boolean(order.driver?.id);
-    const paymentCollection = (order as any)?.paymentCollection ?? 'CASH_TO_DRIVER';
-
-    const deliveryIncluded = hasDriver || order.status === 'OUT_FOR_DELIVERY' || order.status === 'DELIVERED';
-
-    const orderBusinessIds = Array.from(new Set(
-        getOrderBusinessesSafe(order)
-            .map((biz) => biz.business?.id)
-            .filter((id): id is string => Boolean(id)),
-    ));
-
-    let settlementReceivable = 0;
-    let settlementPayable = 0;
-    let restaurantCommission = 0;
-    let driverCommissionReceivable = 0;
-    let driverCommissionPayable = 0;
-    let deliveryCommissionPotential = 0;
-    let grossItemValue = 0;
-    let markupFromSnapshots = 0;
-    let hasBasePriceSnapshots = false;
-
-    (rules || []).filter((rule) => rule.isActive).forEach((rule) => {
-        if (rule.entityType === 'DRIVER' && !hasDriver) return;
-
-        const appliesToDelivery = rule.appliesTo === 'DELIVERY_FEE' || rule.appliesTo === 'DELIVERY_PRICE';
-        const base = appliesToDelivery ? deliveryBase : subtotalBase;
-        const amount = rule.amountType === 'FIXED'
-            ? Number(rule.amount || 0)
-            : (base * Number(rule.amount || 0)) / 100;
-
-        if (amount <= 0) return;
-
-        const multiplier = rule.entityType === 'BUSINESS'
-            ? (rule.business?.id ? (orderBusinessIds.includes(rule.business.id) ? 1 : 0) : orderBusinessIds.length)
-            : 1;
-        if (multiplier <= 0) return;
-
-        const totalAmount = amount * multiplier;
-        if (rule.direction === 'RECEIVABLE') settlementReceivable += totalAmount;
-        if (rule.direction === 'PAYABLE') settlementPayable += totalAmount;
-
-        if (rule.entityType === 'BUSINESS' && rule.direction === 'RECEIVABLE') {
-            restaurantCommission += totalAmount;
-        }
-
-        if (rule.entityType === 'DRIVER' && rule.direction === 'RECEIVABLE') {
-            driverCommissionReceivable += totalAmount;
-        }
-
-        if (rule.entityType === 'DRIVER' && rule.direction === 'PAYABLE') {
-            driverCommissionPayable += totalAmount;
-        }
-
-        if (rule.entityType === 'DRIVER' && rule.direction === 'PAYABLE' && appliesToDelivery) {
-            deliveryCommissionPotential += totalAmount;
-        }
-    });
-
-    getOrderBusinessesSafe(order).forEach((biz) => {
-        const businessItems = getBusinessItemsSafe(biz);
-        const businessGross = businessItems.reduce((sum, item) => sum + Number(item.unitPrice || 0) * Number(item.quantity || 0), 0);
-        grossItemValue += businessGross;
-
-        businessItems.forEach((item) => {
-            const quantity = Number(item.quantity || 0);
-            const finalUnitPrice = Number(item.unitPrice || 0);
-            const baseUnitPrice = item.basePrice != null ? Number(item.basePrice) : null;
-
-            if (baseUnitPrice != null) {
-                hasBasePriceSnapshots = true;
-                markupFromSnapshots += Math.max(0, finalUnitPrice - baseUnitPrice) * quantity;
-            }
-        });
-    });
-
-    restaurantCommission = roundMoney(restaurantCommission);
-    deliveryCommissionPotential = roundMoney(deliveryCommissionPotential);
-    const deliveryCommission = deliveryIncluded ? deliveryCommissionPotential : 0;
-
-    const subtotal = Number(order.orderPrice || 0);
-    const fallbackMarkup = grossItemValue > 0 ? roundMoney(Math.max(0, subtotal - grossItemValue)) : 0;
-    const markup = hasBasePriceSnapshots ? roundMoney(markupFromSnapshots) : fallbackMarkup;
-
-    const markupAsReceivable = paymentCollection === 'CASH_TO_DRIVER' && !hasDriver ? 0 : markup;
-    const grossReceivable = roundMoney(settlementReceivable + markupAsReceivable);
-    const grossPayable = roundMoney(settlementPayable);
-    const total = roundMoney(grossReceivable - grossPayable);
-    const driverCommission = roundMoney(driverCommissionReceivable - driverCommissionPayable);
-    const marginSeverity: 'healthy' | 'thin' | 'negative' = total < 0 ? 'negative' : total < 1.5 ? 'thin' : 'healthy';
-
-    return {
-        total,
-        deliveryCommission,
-        deliveryCommissionPotential,
-        restaurantCommission,
-        driverCommission,
-        markup,
-        grossReceivable,
-        grossPayable,
-        deliveryIncluded,
-        driverCommissionRate: Number(order.driver?.commissionPercentage || 0),
-        marginSeverity,
-    };
-};
+function getMarginSeverity(netMargin: number): 'healthy' | 'thin' | 'negative' {
+    return netMargin < 0 ? 'negative' : netMargin < 1.5 ? 'thin' : 'healthy';
+}
 
 /* ---------------------------------------------------------
    STATUS CONFIG
@@ -430,9 +283,16 @@ function CopyableId({ displayId }: { displayId: string }) {
 --------------------------------------------------------- */
 
 const ORDERS_PAGE_SIZE = 100;
+const COMPLETED_PAGE_SIZE = 50;
 export default function OrdersPage() {
     const [ordersPage, setOrdersPage] = useState(0);
-    const { orders, loading } = useOrders({ limit: ORDERS_PAGE_SIZE, offset: ordersPage * ORDERS_PAGE_SIZE });
+    const [completedPage, setCompletedPage] = useState(0);
+    const { orders, totalCount, hasMore, loading } = useOrders({ limit: ORDERS_PAGE_SIZE, offset: ordersPage * ORDERS_PAGE_SIZE });
+    const { orders: completedOrdersRaw, totalCount: completedTotalCount, hasMore: completedHasMore, loading: completedLoading } = useOrders({
+        limit: COMPLETED_PAGE_SIZE,
+        offset: completedPage * COMPLETED_PAGE_SIZE,
+        statuses: ['DELIVERED', 'CANCELLED'],
+    });
     const { update: updateStatus, loading: updateLoading } = useUpdateOrderStatus();
     const { admin } = useAuth();
     const { data: driversData } = useQuery(DRIVERS_QUERY, { pollInterval: 10000 });
@@ -508,15 +368,6 @@ export default function OrdersPage() {
             setTrustUpdatingUserId(null);
         }
     };
-
-    const { data: settlementRulesData } = useQuery(GET_BUSINESS_SETTLEMENT_RULES, {
-        variables: { filter: { entityTypes: ['BUSINESS', 'DRIVER'] } },
-        fetchPolicy: 'cache-and-network',
-    });
-
-    const settlementRules = useMemo(() => {
-        return ((settlementRulesData as any)?.settlementRules || []) as BusinessSettlementRule[];
-    }, [settlementRulesData]);
 
     const drivers = useMemo(() => driversData?.drivers ?? [], [driversData]);
     const driverOptions = useMemo(() => [
@@ -595,7 +446,6 @@ export default function OrdersPage() {
 
     const activeOrders = useMemo(() =>
         filteredOrders
-            .filter(o => o.status !== 'DELIVERED' && o.status !== 'CANCELLED')
             .sort((a, b) => {
                 if (a.status === 'AWAITING_APPROVAL' && b.status !== 'AWAITING_APPROVAL') return -1;
                 if (a.status !== 'AWAITING_APPROVAL' && b.status === 'AWAITING_APPROVAL') return 1;
@@ -621,20 +471,18 @@ export default function OrdersPage() {
         }
     }, [activeOrders, approvalModalOrder, isAdmin]);
 
-    const completedOrders = useMemo(() =>
-        filteredOrders.filter(o => o.status === 'DELIVERED' || o.status === 'CANCELLED'),
-        [filteredOrders]
-    );
+    const completedOrders = useMemo(() => {
+        const source = Array.isArray(completedOrdersRaw) ? completedOrdersRaw : [];
+        return source.map((order: any) => ({
+            ...order,
+            businesses: normalizeOrderBusinesses(order),
+        })) as Order[];
+    }, [completedOrdersRaw]);
 
     const filteredCompletedOrders = useMemo(() => {
         if (completedStatusFilter === "ALL") return completedOrders;
         return completedOrders.filter((order) => order.status === completedStatusFilter);
     }, [completedOrders, completedStatusFilter]);
-
-    const selectedOrderEarnings = useMemo(() => {
-        if (!selectedOrder) return null;
-        return computeOrderEarnings(selectedOrder, settlementRules);
-    }, [settlementRules, selectedOrder]);
 
     const selectedOrderTotals = useMemo(() => {
         if (!selectedOrder) {
@@ -842,7 +690,8 @@ export default function OrdersPage() {
                         activeOrders.map((order) => {
                             const nextStatus = STATUS_FLOW[order.status];
                             const businessNames = getOrderBusinessesSafe(order).map(b => b.business.name).join(", ");
-                            const earnings = !isBusinessUser ? computeOrderEarnings(order, settlementRules) : null;
+                            const preview = !isBusinessUser ? (order as any).settlementPreview : null;
+                            const marginSeverity = preview ? getMarginSeverity(preview.netMargin) : null;
                             const approvalReasons = deriveApprovalReasons(order);
                             return (
                                 <div
@@ -1023,28 +872,38 @@ export default function OrdersPage() {
                                         <div className="flex items-center justify-between pt-3 border-t border-zinc-800/60">
                                             <div>
                                                 <div className="text-lg font-bold text-white">${order.totalPrice.toFixed(2)}</div>
-                                                {earnings && (
+                                                {preview && (
                                                     <div className="group relative">
                                                         <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
-                                                            earnings.marginSeverity === 'healthy'
+                                                            marginSeverity === 'healthy'
                                                                 ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
-                                                                : earnings.marginSeverity === 'thin'
+                                                                : marginSeverity === 'thin'
                                                                     ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
                                                                     : 'bg-rose-500/15 border-rose-500/30 text-rose-300'
                                                         }`}>
-                                                            M {earnings.total >= 0 ? '+' : ''}${earnings.total.toFixed(2)}
+                                                            M {preview.netMargin >= 0 ? '+' : ''}${preview.netMargin.toFixed(2)}
                                                         </span>
-                                                        {earnings.deliveryIncluded && earnings.deliveryCommission > 0 && (
-                                                            <span className="ml-1 inline-flex items-center rounded-full bg-cyan-500/15 border border-cyan-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300">
-                                                                DEL+
+                                                        {!preview.driverAssigned && (
+                                                            <span className="ml-1 inline-flex items-center rounded-full bg-zinc-500/15 border border-zinc-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400">
+                                                                No driver
                                                             </span>
                                                         )}
-                                                        <div className="pointer-events-none absolute left-0 bottom-full z-[120] mb-2 w-56 rounded-md border border-zinc-700 bg-[#0a0a0d] p-2 text-left text-[11px] text-zinc-300 opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
-                                                            <div className="font-semibold text-zinc-200 mb-1">Margin breakdown</div>
-                                                            <div className="flex justify-between"><span className="text-zinc-500">Restaurant commission</span><span className="text-emerald-300">+${earnings.restaurantCommission.toFixed(2)}</span></div>
-                                                            <div className="flex justify-between"><span className="text-zinc-500">Markup</span><span className="text-emerald-300">+${earnings.markup.toFixed(2)}</span></div>
-                                                            <div className="flex justify-between"><span className="text-zinc-500">{earnings.driverCommission >= 0 ? 'Driver commission' : 'Driver payout'}</span><span className={earnings.driverCommission >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{earnings.driverCommission >= 0 ? '+' : ''}${earnings.driverCommission.toFixed(2)}</span></div>
-                                                            <div className="flex justify-between"><span className="text-zinc-500">Net margin</span><span className={earnings.total >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{earnings.total >= 0 ? '+' : ''}${earnings.total.toFixed(2)}</span></div>
+                                                        <div className="pointer-events-none absolute left-0 bottom-full z-[120] mb-2 rounded-md border border-zinc-700 bg-[#0a0a0d] p-2 text-left text-[11px] text-zinc-300 opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+                                                            <div className="font-semibold text-zinc-200 mb-1">Settlement breakdown</div>
+                                                            {preview.lineItems.map((item: any, i: number) => (
+                                                                <div key={i} className="flex justify-between gap-2">
+                                                                    <span className="text-zinc-500 truncate">{item.reason}</span>
+                                                                    <span className={item.direction === 'RECEIVABLE' ? 'text-emerald-300' : 'text-rose-300'}>
+                                                                        {item.direction === 'RECEIVABLE' ? '+' : '-'}${item.amount.toFixed(2)}
+                                                                    </span>
+                                                                </div>
+                                                            ))}
+                                                            <div className="flex justify-between border-t border-zinc-700 mt-1 pt-1">
+                                                                <span className="text-zinc-500">Net margin</span>
+                                                                <span className={preview.netMargin >= 0 ? 'text-emerald-300' : 'text-rose-300'}>
+                                                                    {preview.netMargin >= 0 ? '+' : ''}${preview.netMargin.toFixed(2)}
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 )}
@@ -1113,7 +972,7 @@ export default function OrdersPage() {
                                 onClick={() => setCompletedStatusFilter("ALL")}
                                 className="h-8 px-3 text-xs"
                             >
-                                All ({completedOrders.length})
+                                All ({completedTotalCount})
                             </Button>
                             <Button
                                 size="sm"
@@ -1165,7 +1024,8 @@ export default function OrdersPage() {
                                 ) : (
                                     filteredCompletedOrders.map((order) => {
                                         const businessNames = getOrderBusinessesSafe(order).map((b) => b.business.name).join(", ");
-                                        const earnings = !isBusinessUser ? computeOrderEarnings(order, settlementRules) : null;
+                                        const preview = !isBusinessUser ? (order as any).settlementPreview : null;
+                                        const marginSeverity = preview ? getMarginSeverity(preview.netMargin) : null;
                                         return (
                                             <tr key={order.id} className="border-b border-zinc-800/70 hover:bg-zinc-900/40">
                                                 <td className="px-3 py-3 align-top">
@@ -1228,15 +1088,15 @@ export default function OrdersPage() {
                                                 </td>
                                                 {!isBusinessUser && (
                                                     <td className="px-3 py-3 align-top">
-                                                        {earnings ? (
+                                                        {preview ? (
                                                             <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
-                                                                earnings.marginSeverity === 'healthy'
+                                                                marginSeverity === 'healthy'
                                                                     ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
-                                                                    : earnings.marginSeverity === 'thin'
-                                                                        ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
-                                                                        : 'bg-rose-500/15 border-rose-500/30 text-rose-300'
+                                                                    : marginSeverity === 'negative'
+                                                                        ? 'bg-rose-500/15 border-rose-500/30 text-rose-300'
+                                                                        : 'bg-amber-500/15 border-amber-500/30 text-amber-300'
                                                             }`}>
-                                                                M {earnings.total >= 0 ? '+' : ''}${earnings.total.toFixed(2)}
+                                                                M {preview.netMargin >= 0 ? '+' : ''}€{preview.netMargin.toFixed(2)}
                                                             </span>
                                                         ) : (
                                                             <span className="text-zinc-600">-</span>
@@ -1269,14 +1129,39 @@ export default function OrdersPage() {
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Completed orders pagination */}
+                    <div className="flex items-center justify-between py-3 border-t border-zinc-800 mt-2">
+                        <span className="text-xs text-zinc-500">
+                            Page {completedPage + 1} · {completedTotalCount} completed orders total
+                        </span>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCompletedPage(p => Math.max(0, p - 1))}
+                                disabled={completedPage === 0 || completedLoading}
+                            >
+                                ← Prev
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCompletedPage(p => p + 1)}
+                                disabled={!completedHasMore || completedLoading}
+                            >
+                                Next →
+                            </Button>
+                        </div>
+                    </div>
                 </div>
             )}
 
-            {/* ════════════════ PAGINATION ════════════════ */}
+            {/* ════════════════ ACTIVE ORDERS PAGINATION ════════════════ */}
             {!searchQuery && (
                 <div className="flex items-center justify-between py-4 border-t border-zinc-800 mb-8">
                     <span className="text-xs text-zinc-500">
-                        Page {ordersPage + 1} · showing {ORDERS_PAGE_SIZE} orders per page
+                        Page {ordersPage + 1} · {totalCount} active orders total
                     </span>
                     <div className="flex items-center gap-2">
                         <Button
@@ -1291,7 +1176,7 @@ export default function OrdersPage() {
                             variant="outline"
                             size="sm"
                             onClick={() => setOrdersPage(p => p + 1)}
-                            disabled={orders.length < ORDERS_PAGE_SIZE || loading}
+                            disabled={!hasMore || loading}
                         >
                             Next →
                         </Button>
@@ -1527,39 +1412,43 @@ export default function OrdersPage() {
                             </div>
                         </div>
 
-                        {!isBusinessUser && selectedOrderEarnings && (
-                            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[10px] text-emerald-300 uppercase tracking-wider">Platform Margin</span>
-                                    <div className="flex items-center gap-2">
-                                        {selectedOrderEarnings.deliveryIncluded && selectedOrderEarnings.deliveryCommission > 0 && (
-                                            <span className="inline-flex items-center rounded-full bg-cyan-500/15 border border-cyan-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300">
-                                                DEL+
+                        {!isBusinessUser && (selectedOrder as any).settlementPreview && (() => {
+                            const sp = (selectedOrder as any).settlementPreview;
+                            const severity = getMarginSeverity(sp.netMargin);
+                            return (
+                                <div className={`border rounded-xl p-3 space-y-2 ${severity === 'healthy' ? 'bg-emerald-500/10 border-emerald-500/30' : severity === 'negative' ? 'bg-rose-500/10 border-rose-500/30' : 'bg-zinc-500/10 border-zinc-500/30'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <span className={`text-[10px] uppercase tracking-wider ${severity === 'healthy' ? 'text-emerald-300' : severity === 'negative' ? 'text-rose-300' : 'text-zinc-400'}`}>Platform Margin</span>
+                                        <div className="flex items-center gap-2">
+                                            {!sp.driverAssigned && (
+                                                <span className="inline-flex items-center rounded-full bg-amber-500/15 border border-amber-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">
+                                                    No driver
+                                                </span>
+                                            )}
+                                            <span className={`text-lg font-bold ${severity === 'healthy' ? 'text-emerald-300' : severity === 'negative' ? 'text-rose-300' : 'text-zinc-400'}`}>
+                                                {sp.netMargin >= 0 ? '+' : ''}€{sp.netMargin.toFixed(2)}
                                             </span>
-                                        )}
-                                        <span className={`text-lg font-bold ${selectedOrderEarnings.total >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
-                                            {selectedOrderEarnings.total >= 0 ? '+' : ''}${selectedOrderEarnings.total.toFixed(2)}
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
-                                    <div className="rounded-lg border border-emerald-500/20 bg-[#09090b]/70 p-2">
-                                        <div className="text-zinc-500">Restaurant commission</div>
-                                        <div className="text-emerald-200 font-semibold mt-1">+${selectedOrderEarnings.restaurantCommission.toFixed(2)}</div>
-                                    </div>
-                                    <div className="rounded-lg border border-emerald-500/20 bg-[#09090b]/70 p-2">
-                                        <div className="text-zinc-500">{selectedOrderEarnings.driverCommission >= 0 ? 'Driver commission' : 'Driver payout'}</div>
-                                        <div className={`font-semibold mt-1 ${selectedOrderEarnings.driverCommission >= 0 ? 'text-emerald-200' : 'text-rose-300'}`}>
-                                            {selectedOrderEarnings.driverCommission >= 0 ? '+' : ''}${selectedOrderEarnings.driverCommission.toFixed(2)}
                                         </div>
                                     </div>
-                                    <div className="rounded-lg border border-emerald-500/20 bg-[#09090b]/70 p-2">
-                                        <div className="text-zinc-500">Markup</div>
-                                        <div className="text-emerald-200 font-semibold mt-1">+${selectedOrderEarnings.markup.toFixed(2)}</div>
+
+                                    <div className="flex items-center gap-3 text-xs text-zinc-400">
+                                        <span>Receivable <span className="text-emerald-300 font-semibold">€{sp.totalReceivable.toFixed(2)}</span></span>
+                                        <span>Payable <span className="text-rose-300 font-semibold">€{sp.totalPayable.toFixed(2)}</span></span>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 gap-1.5 text-xs">
+                                        {sp.lineItems.map((li: any, i: number) => (
+                                            <div key={i} className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-[#09090b]/70 px-2 py-1.5">
+                                                <span className="text-zinc-500 truncate mr-2">{li.reason}</span>
+                                                <span className={`font-semibold whitespace-nowrap ${li.direction === 'RECEIVABLE' ? 'text-emerald-200' : 'text-rose-300'}`}>
+                                                    {li.direction === 'RECEIVABLE' ? '+' : '-'}€{li.amount.toFixed(2)}
+                                                </span>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
-                            </div>
-                        )}
+                            );
+                        })()}
 
                         {/* Comp delivery action — only available for non-cancelled/delivered orders where there is a user */}
                         {isAdmin && selectedOrder.user && selectedOrder.status !== 'DELIVERED' && selectedOrder.status !== 'CANCELLED' && (
@@ -1670,8 +1559,14 @@ export default function OrdersPage() {
 
             {/* ════════════════ CANCEL ORDER MODAL ════════════════ */}
             <Modal isOpen={!!cancelModalOrder} onClose={() => { setCancelModalOrder(null); setCancelReason(""); setCancelSettleDriver(false); setCancelSettleBusiness(false); }} title="Cancel Order">                {cancelModalOrder && (() => {
-                    const earnings = !isBusinessUser ? computeOrderEarnings(cancelModalOrder, settlementRules) : null;
+                    const preview = !isBusinessUser ? (cancelModalOrder as any).settlementPreview : null;
                     const hasDriver = !!cancelModalOrder.driver;
+                    const businessReceivable = preview
+                        ? preview.lineItems.filter((li: any) => li.direction === 'RECEIVABLE' && li.businessId).reduce((s: number, li: any) => s + li.amount, 0)
+                        : 0;
+                    const driverPayable = preview
+                        ? preview.lineItems.filter((li: any) => li.direction === 'PAYABLE' && li.driverId).reduce((s: number, li: any) => s + li.amount, 0)
+                        : 0;
                     return (
                         <div className="space-y-4">
                             {/* Order summary */}
@@ -1686,7 +1581,7 @@ export default function OrdersPage() {
                             </div>
 
                             {/* Financial impact */}
-                            {earnings && (
+                            {preview && (
                                 <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-3 space-y-2">
                                     <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Settlement on Cancellation</div>
                                     <div className="text-[10px] text-zinc-600 mb-1">Check to create a settlement for that party even though the order is cancelled.</div>
@@ -1711,7 +1606,7 @@ export default function OrdersPage() {
                                                 <span className={`font-semibold text-sm transition-colors ${
                                                     cancelSettleBusiness ? "text-sky-300" : "text-zinc-500"
                                                 }`}>
-                                                    ~${(earnings.restaurantCommission + earnings.markup).toFixed(2)}
+                                                    ~€{businessReceivable.toFixed(2)}
                                                 </span>
                                                 <span className={`text-[10px] font-normal ${
                                                     cancelSettleBusiness ? "text-sky-400" : "text-zinc-600"
@@ -1750,7 +1645,7 @@ export default function OrdersPage() {
                                                         ? cancelSettleDriver ? "text-amber-300" : "text-zinc-500"
                                                         : "text-zinc-600"
                                                 }`}>
-                                                    ~${earnings.deliveryCommissionPotential.toFixed(2)}
+                                                    ~€{driverPayable.toFixed(2)}
                                                 </span>
                                                 <span className={`text-[10px] font-normal ${
                                                     !hasDriver ? "text-zinc-600" :

@@ -25,7 +25,7 @@ import { ADMIN_BUSINESS_MESSAGE_RECEIVED } from "@/graphql/operations/businessMe
 import { GET_BUSINESS_DEVICE_HEALTH } from "@/graphql/operations/notifications";
 import AgoraRTC, { IAgoraRTCClient, IMicrophoneAudioTrack } from 'agora-rtc-sdk-ng';
 import { getInitials, getAvatarColor } from "@/lib/avatarUtils";
-import { gql } from "@apollo/client";
+
 import { useMapRealtimeData } from "@/lib/hooks/useMapRealtimeData";
 import { useOrderRouteDistances } from "@/lib/hooks/useOrderRouteDistances";
 import { usePrepTimeAlerts, type PrepTimeAlert } from "@/lib/hooks/usePrepTimeAlerts";
@@ -45,88 +45,8 @@ const APPROVAL_MODAL_SUPPRESS_MARKER = '[SUPPRESS_APPROVAL_MODAL]';
 
 const PENDING_WARNING_MS = 2 * 60 * 1000; // 2 minutes
 
-// ── Settlement rules for cancel modal ─────────────────────────────────────────
-interface MapSettlementRule {
-  id: string; entityType: 'BUSINESS' | 'DRIVER'; direction: 'RECEIVABLE' | 'PAYABLE';
-  amountType: 'FIXED' | 'PERCENT'; amount: number; appliesTo?: string | null;
-  isActive: boolean; business?: { id: string } | null;
-}
-interface MapOrderEarnings {
-  restaurantCommission: number; markup: number; deliveryCommissionPotential: number;
-}
-
-const MAP_GET_SETTLEMENT_RULES = gql`
-  query MapSettlementRules($filter: SettlementRuleFilterInput) {
-    settlementRules(filter: $filter) {
-      id entityType direction amountType amount appliesTo isActive
-      business { id }
-    }
-  }
-`;
-
-function computeMapOrderEarnings(order: any, rules: MapSettlementRule[]): MapOrderEarnings {
-  const subtotalBase = Number((order as any)?.businessPrice ?? order?.orderPrice ?? 0);
-  const deliveryBase = Number((order as any)?.originalDeliveryPrice ?? order?.deliveryPrice ?? 0);
-  const hasDriver = Boolean(order?.driver?.id);
-  const businessIds = Array.from(new Set(
-    getOrderBusinesses(order)
-      .map((entry: any) => entry?.business?.id)
-      .filter((id: any) => Boolean(id)),
-  ));
-
-  let restaurantCommission = 0;
-  let deliveryCommissionPotential = 0;
-
-  (rules || []).filter((rule) => rule.isActive).forEach((rule) => {
-    if (rule.entityType === 'DRIVER' && !hasDriver) return;
-
-    const appliesToDelivery = rule.appliesTo === 'DELIVERY_FEE' || rule.appliesTo === 'DELIVERY_PRICE';
-    const base = appliesToDelivery ? deliveryBase : subtotalBase;
-    const amount = rule.amountType === 'FIXED' ? Number(rule.amount || 0) : (base * Number(rule.amount || 0)) / 100;
-    if (amount <= 0) return;
-
-    if (rule.entityType === 'BUSINESS' && rule.direction === 'RECEIVABLE') {
-      const businessCount = rule.business?.id ? (businessIds.includes(rule.business.id) ? 1 : 0) : businessIds.length;
-      if (businessCount > 0) restaurantCommission += amount * businessCount;
-    }
-
-    if (rule.entityType === 'DRIVER' && rule.direction === 'PAYABLE' && appliesToDelivery) {
-      deliveryCommissionPotential += amount;
-    }
-  });
-
-  let grossItemValue = 0;
-  let markupFromSnapshots = 0;
-  let hasBasePrice = false;
-  getOrderBusinesses(order).forEach((biz: any) => {
-    const items = getOrderBusinessItems(biz);
-    const businessGross = items.reduce((sum: number, item: any) => {
-      return sum + Number(item?.unitPrice || 0) * Number(item?.quantity || 0);
-    }, 0);
-    grossItemValue += businessGross;
-
-    items.forEach((item: any) => {
-      const qty = Number(item?.quantity || 0);
-      const basePrice = item?.basePrice != null ? Number(item.basePrice) : null;
-      if (basePrice != null) {
-        hasBasePrice = true;
-        markupFromSnapshots += Math.max(0, Number(item?.unitPrice || 0) - basePrice) * qty;
-      }
-    });
-  });
-
-  const subtotal = Number(order?.orderPrice || 0);
-  const markup = hasBasePrice
-    ? Math.round(markupFromSnapshots * 100) / 100
-    : grossItemValue > 0
-      ? Math.round(Math.max(0, subtotal - grossItemValue) * 100) / 100
-      : 0;
-
-  return {
-    restaurantCommission: Math.round(restaurantCommission * 100) / 100,
-    markup,
-    deliveryCommissionPotential: Math.round(deliveryCommissionPotential * 100) / 100,
-  };
+function getMarginSeverity(netMargin: number): 'healthy' | 'thin' | 'negative' {
+  return netMargin < 0 ? 'negative' : netMargin < 1.5 ? 'thin' : 'healthy';
 }
 const READY_WARNING_MS = 3 * 60 * 1000;
 const OUT_FOR_DELIVERY_WARNING_MS = 10 * 60 * 1000;
@@ -142,7 +62,6 @@ const DRIVER_TELEPORT_GUARD_METERS = 800;
 const DRIVER_JITTER_DEAD_ZONE_METERS = 5; // ignore GPS jitter below this threshold
 const INCIDENT_STORAGE_KEY = 'admin.map.incidentNotes.v1';
 
-type MarginSeverity = 'healthy' | 'thin' | 'negative';
 type IncidentNote = { tag: string; rootCause: string; updatedAt: number };
 type RealtimeHealth = {
   driverLastSubAtMs: number;
@@ -367,90 +286,6 @@ const getOrderSlaRisk = (order: any, nowMs: number, statusChangeTime: Record<str
     if (statusElapsedMs > OUT_FOR_DELIVERY_WARNING_MS) return { level: 'warning', delayMs: statusElapsedMs - OUT_FOR_DELIVERY_WARNING_MS };
   }
   return { level: 'ok', delayMs: 0 };
-};
-
-const estimateOrderEconomics = (order: any, rules: MapSettlementRule[]) => {
-  const subtotalBase = Number((order as any)?.businessPrice ?? order?.orderPrice ?? 0);
-  const deliveryBase = Number((order as any)?.originalDeliveryPrice ?? order?.deliveryPrice ?? 0);
-  const hasDriver = Boolean(order?.driver?.id);
-  const businessIds = Array.from(new Set(
-    getOrderBusinesses(order)
-      .map((entry: any) => entry?.business?.id)
-      .filter((id: any) => Boolean(id)),
-  ));
-
-  let settlementReceivable = 0;
-  let settlementPayable = 0;
-  let restaurantCommission = 0;
-  let driverCommissionReceivable = 0;
-  let driverCommissionPayable = 0;
-
-  (rules || []).filter((rule) => rule.isActive).forEach((rule) => {
-    if (rule.entityType === 'DRIVER' && !hasDriver) return;
-
-    const appliesToDelivery = rule.appliesTo === 'DELIVERY_FEE' || rule.appliesTo === 'DELIVERY_PRICE';
-    const base = appliesToDelivery ? deliveryBase : subtotalBase;
-    const amount = rule.amountType === 'FIXED' ? Number(rule.amount || 0) : (base * Number(rule.amount || 0)) / 100;
-    if (amount <= 0) return;
-
-    const multiplier = rule.entityType === 'BUSINESS'
-      ? (rule.business?.id ? (businessIds.includes(rule.business.id) ? 1 : 0) : businessIds.length)
-      : 1;
-    if (multiplier <= 0) return;
-
-    const totalAmount = amount * multiplier;
-    if (rule.direction === 'RECEIVABLE') settlementReceivable += totalAmount;
-    if (rule.direction === 'PAYABLE') settlementPayable += totalAmount;
-
-    if (rule.entityType === 'BUSINESS' && rule.direction === 'RECEIVABLE') {
-      restaurantCommission += totalAmount;
-    }
-    if (rule.entityType === 'DRIVER' && rule.direction === 'RECEIVABLE') {
-      driverCommissionReceivable += totalAmount;
-    }
-    if (rule.entityType === 'DRIVER' && rule.direction === 'PAYABLE') {
-      driverCommissionPayable += totalAmount;
-    }
-  });
-
-  const itemMarkupRevenue = getOrderBusinesses(order)
-    .flatMap((entry: any) => getOrderBusinessItems(entry))
-    .reduce((sum: number, item: any) => {
-      const base = Number(item?.basePrice ?? 0);
-      const unit = Number(item?.unitPrice ?? 0);
-      const qty = Number(item?.quantity ?? 0);
-      return sum + Math.max(0, unit - base) * qty;
-    }, 0);
-
-  const paymentCollection = (order as any)?.paymentCollection ?? 'CASH_TO_DRIVER';
-  const markupRevenue = paymentCollection === 'CASH_TO_DRIVER' && !hasDriver ? 0 : itemMarkupRevenue;
-  const driverCommission = driverCommissionReceivable - driverCommissionPayable;
-
-  const platformRevenueEstimate = settlementReceivable + markupRevenue;
-  const driverCostEstimate = settlementPayable;
-
-  const customerTotal = Number(order?.totalPrice ?? 0);
-  const originalSubtotal = Number(order?.originalPrice ?? order?.orderPrice ?? 0);
-  const originalDelivery = Number((order as any)?.originalDeliveryPrice ?? order?.deliveryPrice ?? 0);
-  const promoDiscountEstimate = Math.max(0, originalSubtotal + originalDelivery - customerTotal);
-  const platformPromoShareEstimate = 0;
-  const businessPromoShareEstimate = 0;
-
-  const marginEstimate = platformRevenueEstimate - driverCostEstimate;
-  const marginSeverity: MarginSeverity = marginEstimate < 0 ? 'negative' : marginEstimate < 1.5 ? 'thin' : 'healthy';
-
-  return {
-    platformRevenueEstimate,
-    driverCostEstimate,
-    restaurantCommission,
-    markupRevenue,
-    driverCommission,
-    promoDiscountEstimate,
-    platformPromoShareEstimate,
-    businessPromoShareEstimate,
-    marginEstimate,
-    marginSeverity,
-  };
 };
 
 const ROUTE_SNAP_MAX_DISTANCE_M = 50;
@@ -746,8 +581,6 @@ export default function MapPage() {
   const [updateUserNote] = useMutation(UPDATE_USER_NOTE_MUTATION, { refetchQueries: ['GetOrders'] });
   const [trustUpdatingUserId, setTrustUpdatingUserId] = useState<string | null>(null);
   const [suppressionUpdatingUserId, setSuppressionUpdatingUserId] = useState<string | null>(null);
-  const { data: settlementRulesData } = useQuery(MAP_GET_SETTLEMENT_RULES, { variables: { filter: { entityTypes: ['BUSINESS', 'DRIVER'] } }, fetchPolicy: 'cache-and-network' });
-  const settlementRules: MapSettlementRule[] = useMemo(() => (settlementRulesData as any)?.settlementRules || [], [settlementRulesData]);
   const cancelModalOrder = useMemo(() => cancelModalOrderId ? activeOrders.find((o: any) => o.id === cancelModalOrderId) ?? null : null, [cancelModalOrderId, activeOrders]);
   const approvalModalOrder = useMemo(() => approvalModalOrderId ? activeOrders.find((o: any) => o.id === approvalModalOrderId) ?? null : null, [approvalModalOrderId, activeOrders]);
   const dismissApprovalModal = useCallback(() => {
@@ -2188,7 +2021,8 @@ export default function MapPage() {
               const customerName = order.user ? `${order.user.firstName} ${order.user.lastName}` : "Unknown";
               const customerPhone = order.user?.phoneNumber || "";
               const distanceData = orderDistances[order.id];
-              const economics = estimateOrderEconomics(order, settlementRules);
+              const preview = (order as any).settlementPreview;
+              const marginSeverity = preview ? getMarginSeverity(preview.netMargin) : null;
               const etaMin = getOrderEtaMinutes(
                 order,
                 distanceData,
@@ -2271,11 +2105,44 @@ export default function MapPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span
-                        title={`Restaurant +€${economics.restaurantCommission.toFixed(2)} | Markup +€${economics.markupRevenue.toFixed(2)} | ${economics.driverCommission >= 0 ? 'Driver commission' : 'Driver payout'} ${economics.driverCommission >= 0 ? '+' : ''}€${economics.driverCommission.toFixed(2)}`}
-                        className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${economics.marginSeverity === 'healthy' ? 'bg-emerald-500/15 text-emerald-300' : economics.marginSeverity === 'thin' ? 'bg-amber-500/15 text-amber-300' : 'bg-rose-500/15 text-rose-300'}`}>
-                        M {economics.marginEstimate >= 0 ? '+' : ''}{economics.marginEstimate.toFixed(2)}
-                      </span>
+                      {preview ? (
+                        <div className="group/pill relative"
+                          onMouseEnter={(e) => {
+                            const pill = e.currentTarget;
+                            const tip = pill.querySelector('[data-settlement-tip]') as HTMLElement;
+                            if (!tip) return;
+                            const rect = pill.getBoundingClientRect();
+                            tip.style.left = `${rect.left}px`;
+                            tip.style.top = `${rect.bottom + 6}px`;
+                          }}>
+                          <span
+                            className={`text-[10px] px-1.5 py-0.5 rounded font-medium cursor-default ${marginSeverity === 'healthy' ? 'bg-emerald-500/15 text-emerald-300' : marginSeverity === 'thin' ? 'bg-amber-500/15 text-amber-300' : 'bg-rose-500/15 text-rose-300'}`}>
+                            M {preview.netMargin >= 0 ? '+' : ''}€{preview.netMargin.toFixed(2)}
+                          </span>
+                          <div data-settlement-tip className="pointer-events-none fixed z-[9999] w-56 rounded-lg border border-zinc-700 bg-[#0a0a0d] p-2 text-[10px] text-zinc-300 opacity-0 shadow-2xl transition-opacity group-hover/pill:opacity-100">
+                            <div className="font-semibold text-zinc-200 mb-1 text-[11px]">Settlement breakdown</div>
+                            {preview.lineItems.map((li: any, i: number) => (
+                              <div key={i} className="flex justify-between gap-2 py-0.5">
+                                <span className="text-zinc-500 truncate">{li.reason}</span>
+                                <span className={`whitespace-nowrap font-medium ${li.direction === 'RECEIVABLE' ? 'text-emerald-300' : 'text-rose-300'}`}>
+                                  {li.direction === 'RECEIVABLE' ? '+' : '-'}€{li.amount.toFixed(2)}
+                                </span>
+                              </div>
+                            ))}
+                            <div className="flex justify-between border-t border-zinc-700 mt-1 pt-1 font-semibold">
+                              <span className="text-zinc-400">Net margin</span>
+                              <span className={preview.netMargin >= 0 ? 'text-emerald-300' : 'text-rose-300'}>
+                                {preview.netMargin >= 0 ? '+' : ''}€{preview.netMargin.toFixed(2)}
+                              </span>
+                            </div>
+                            {!preview.driverAssigned && (
+                              <div className="mt-1 text-[9px] text-amber-400 font-semibold">No driver assigned</div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-zinc-500/15 text-zinc-400">M —</span>
+                      )}
                       {etaMin && (
                         <span className="text-[10px] text-zinc-500">{etaMin}m</span>
                       )}
@@ -2358,7 +2225,6 @@ export default function MapPage() {
                 incident={incidentNotes[selectedOrder.id] || { tag: '', rootCause: '', updatedAt: 0 }}
                 onIncidentUpdate={handleIncidentUpdate}
                 workingDriverIds={workingDriverIds}
-                settlementRules={settlementRules}
                 onToggleTrustedCustomer={handleToggleTrustedCustomer}
                 trustUpdatingUserId={trustUpdatingUserId}
               />
@@ -2953,8 +2819,14 @@ export default function MapPage() {
 
       {/* Cancel Order Modal */}
       {cancelModalOrder && (() => {
-        const earnings = computeMapOrderEarnings(cancelModalOrder, settlementRules);
+        const cancelPreview = (cancelModalOrder as any).settlementPreview;
         const hasDriver = !!cancelModalOrder.driver;
+        const businessReceivable = cancelPreview
+          ? cancelPreview.lineItems.filter((li: any) => li.direction === 'RECEIVABLE' && li.businessId).reduce((s: number, li: any) => s + li.amount, 0)
+          : 0;
+        const driverPayable = cancelPreview
+          ? cancelPreview.lineItems.filter((li: any) => li.direction === 'PAYABLE' && li.driverId).reduce((s: number, li: any) => s + li.amount, 0)
+          : 0;
         return (
           <div className="fixed inset-0 z-[200] flex items-center justify-center">
             <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setCancelModalOrderId(null)} />
@@ -2982,7 +2854,7 @@ export default function MapPage() {
                         <span className="text-xs text-zinc-400"><span className="text-sky-400 font-medium">Business</span> <span className="text-zinc-600">→</span> Platform <span className="text-zinc-600 text-[10px]">(commission + markup)</span></span>
                       </div>
                       <span className={`text-sm font-semibold flex-shrink-0 ${cancelSettleBusiness ? 'text-sky-300' : 'text-zinc-600'}`}>
-                        ~€{(earnings.restaurantCommission + earnings.markup).toFixed(2)}
+                        ~€{businessReceivable.toFixed(2)}
                       </span>
                     </label>
                     <label className={`flex items-center justify-between gap-3 ${hasDriver ? 'cursor-pointer' : 'cursor-not-allowed opacity-40'}`}>
@@ -2992,7 +2864,7 @@ export default function MapPage() {
                         <span className="text-xs text-zinc-400">Platform <span className="text-zinc-600">→</span> <span className={hasDriver ? 'text-amber-400 font-medium' : 'text-zinc-500'}>{hasDriver ? `${cancelModalOrder.driver.firstName} ${cancelModalOrder.driver.lastName}` : 'Driver (none)'}</span> <span className="text-zinc-600 text-[10px]">(delivery commission)</span></span>
                       </div>
                       <span className={`text-sm font-semibold flex-shrink-0 ${cancelSettleDriver ? 'text-amber-300' : 'text-zinc-600'}`}>
-                        ~€{earnings.deliveryCommissionPotential.toFixed(2)}
+                        ~€{driverPayable.toFixed(2)}
                       </span>
                     </label>
                   </div>
@@ -3190,7 +3062,7 @@ function BottomDetailPanel({
   onApproveOrder,
   onTogglePolyline, showPolyline, onToggleBothRoutes, showBothRoutes,
   onFocus, driverProgressOnRoute, onNotifyDriver, onNotifyBusiness, incident, onIncidentUpdate,
-  workingDriverIds, settlementRules, onToggleTrustedCustomer, trustUpdatingUserId,
+  workingDriverIds, onToggleTrustedCustomer, trustUpdatingUserId,
 }: any) {
   const [selectedDriverId, setSelectedDriverId] = useState(order.driver?.id || "");
   const statusColor = ORDER_STATUS_COLORS[order.status as keyof typeof ORDER_STATUS_COLORS] || ORDER_STATUS_COLORS.PENDING;
@@ -3217,7 +3089,8 @@ function BottomDetailPanel({
   const pickupLocation = orderBusinesses
     ?.map((entry: any) => entry?.business?.location)
     ?.find((location: any) => isValidLatLng(location?.latitude, location?.longitude));
-  const economics = estimateOrderEconomics(order, settlementRules);
+  const preview = (order as any).settlementPreview;
+  const previewSeverity = preview ? getMarginSeverity(preview.netMargin) : null;
 
   const allDriversSorted = useMemo(() => {
     return drivers
@@ -3550,31 +3423,39 @@ function BottomDetailPanel({
         {/* ── Economics ── */}
         <div className="px-5 py-3 border-b border-white/5">
           <div className="text-[10px] uppercase tracking-widest text-zinc-600 font-semibold mb-2">Economics</div>
-          <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-lg bg-white/4 px-3 py-2">
-              <div className="text-[10px] text-zinc-500 mb-0.5">Restaurant</div>
-              <div className="text-sm font-semibold text-emerald-300">+€{economics.restaurantCommission.toFixed(2)}</div>
-            </div>
-            <div className="rounded-lg bg-white/4 px-3 py-2">
-              <div className="text-[10px] text-zinc-500 mb-0.5">{economics.driverCommission >= 0 ? 'Driver commission' : 'Driver payout'}</div>
-              <div className={`text-sm font-semibold ${economics.driverCommission >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
-                {economics.driverCommission >= 0 ? '+' : ''}€{economics.driverCommission.toFixed(2)}
+          {preview ? (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2 text-xs text-zinc-400">
+                  <span>Receivable <span className="text-emerald-300 font-semibold">€{preview.totalReceivable.toFixed(2)}</span></span>
+                  <span>Payable <span className="text-rose-300 font-semibold">€{preview.totalPayable.toFixed(2)}</span></span>
+                </div>
+                <div className={`rounded-lg px-2 py-1 ${
+                  previewSeverity === 'healthy' ? 'bg-emerald-500/10' :
+                  previewSeverity === 'thin' ? 'bg-amber-500/10' : 'bg-rose-500/10'
+                }`}>
+                  <span className={`text-sm font-semibold ${
+                    previewSeverity === 'healthy' ? 'text-emerald-300' :
+                    previewSeverity === 'thin' ? 'text-amber-300' : 'text-rose-300'
+                  }`}>{preview.netMargin >= 0 ? '+' : ''}€{preview.netMargin.toFixed(2)}</span>
+                </div>
               </div>
-            </div>
-            <div className={`rounded-lg px-3 py-2 ${
-              economics.marginSeverity === 'healthy' ? 'bg-emerald-500/10' :
-              economics.marginSeverity === 'thin' ? 'bg-amber-500/10' : 'bg-rose-500/10'
-            }`}>
-              <div className="text-[10px] text-zinc-500 mb-0.5">Margin</div>
-              <div className={`text-sm font-semibold ${
-                economics.marginSeverity === 'healthy' ? 'text-emerald-300' :
-                economics.marginSeverity === 'thin' ? 'text-amber-300' : 'text-rose-300'
-              }`}>{economics.marginEstimate >= 0 ? '+' : ''}€{economics.marginEstimate.toFixed(2)}</div>
-            </div>
-          </div>
-          <div className="mt-1.5 text-xs text-zinc-500">Markup: +€{economics.markupRevenue.toFixed(2)}</div>
-          {economics.promoDiscountEstimate > 0 && (
-            <div className="mt-1.5 text-xs text-zinc-600">Promo discount: €{economics.promoDiscountEstimate.toFixed(2)}</div>
+              {!preview.driverAssigned && (
+                <div className="mb-2 text-[10px] px-2 py-1 rounded bg-amber-500/15 text-amber-300 font-semibold inline-block">No driver assigned</div>
+              )}
+              <div className="space-y-1">
+                {preview.lineItems.map((li: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between text-xs">
+                    <span className="text-zinc-500 truncate mr-2">{li.reason}</span>
+                    <span className={`font-semibold whitespace-nowrap ${li.direction === 'RECEIVABLE' ? 'text-emerald-300' : 'text-rose-300'}`}>
+                      {li.direction === 'RECEIVABLE' ? '+' : '-'}€{li.amount.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="text-xs text-zinc-600">No settlement data</div>
           )}
         </div>
 

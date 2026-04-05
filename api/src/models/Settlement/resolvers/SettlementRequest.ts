@@ -1,5 +1,5 @@
 import type { SettlementRequestResolvers } from './../../../generated/types.generated';
-import { businesses, users } from '@/database/schema';
+import { businesses, users, drivers as driversTable } from '@/database/schema';
 import { eq } from 'drizzle-orm';
 
 const normalizeDate = (v: string | Date | null | undefined): Date | null => {
@@ -10,13 +10,32 @@ const normalizeDate = (v: string | Date | null | undefined): Date | null => {
 };
 
 export const SettlementRequest: SettlementRequestResolvers = {
+    entityType: (req) => (req as any).entityType ?? 'BUSINESS',
+
     business: async (req, _, { db }) => {
+        if (!req.businessId) return null;
         const result = await db
             .select()
             .from(businesses)
             .where(eq(businesses.id, req.businessId))
             .limit(1);
-        return result[0] as any;
+        return (result[0] as any) ?? null;
+    },
+
+    driver: async (req, _, { db }) => {
+        const driverId = (req as any).driverId;
+        if (!driverId) return null;
+        // Join drivers + users to return a User object
+        const driverRecord = await db.query.drivers.findFirst({
+            where: eq(driversTable.id, driverId),
+        });
+        if (!driverRecord?.userId) return null;
+        const result = await db
+            .select()
+            .from(users)
+            .where(eq(users.id, driverRecord.userId))
+            .limit(1);
+        return (result[0] as any) ?? null;
     },
 
     requestedBy: async (req, _, { db }) => {

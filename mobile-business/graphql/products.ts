@@ -19,7 +19,7 @@ export const GET_BUSINESS_PRODUCTS = graphql(`
                 imageUrl
                 price
                 isOnSale
-                salePrice
+                saleDiscountPercentage
                 isAvailable
                 sortOrder
                 createdAt
@@ -58,7 +58,7 @@ export const UPDATE_PRODUCT = graphql(`
             imageUrl
             price
             isOnSale
-            salePrice
+            saleDiscountPercentage
             isAvailable
         }
     }

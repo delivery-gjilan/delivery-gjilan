@@ -48,6 +48,26 @@ export class OrderRepository {
         return row?.count ?? 0;
     }
 
+    async findByStatuses(statuses: OrderStatus[], limit = 100, offset = 0): Promise<DbOrder[]> {
+        const db = await getDB();
+        return await db
+            .select()
+            .from(ordersTable)
+            .where(inArray(ordersTable.status, statuses))
+            .orderBy(desc(ordersTable.orderDate))
+            .limit(limit)
+            .offset(offset);
+    }
+
+    async countByStatuses(statuses: OrderStatus[]): Promise<number> {
+        const db = await getDB();
+        const [row] = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(ordersTable)
+            .where(inArray(ordersTable.status, statuses));
+        return row?.count ?? 0;
+    }
+
     async findByIds(ids: string[]): Promise<DbOrder[]> {
         if (ids.length === 0) return [];
         const db = await getDB();

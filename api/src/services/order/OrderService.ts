@@ -73,6 +73,9 @@ export class OrderService implements IOrderService {
     }
 
     // ── Queries ──
+    getOrdersPaginated(limit: number, offset: number, statuses?: OrderStatus[] | null) {
+        return this.query.getOrdersPaginated(limit, offset, statuses);
+    }
     getAllOrders(limit = 500, offset = 0): Promise<Order[]> {
         return this.query.getAllOrders(limit, offset);
     }

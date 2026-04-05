@@ -4,49 +4,52 @@ import { graphql } from '@/gql';
 export const GET_BUSINESS_ORDERS = graphql(`
     query GetBusinessOrders {
         orders {
-            id
-            displayId
-            userId
-            orderPrice
-            deliveryPrice
-            totalPrice
-            orderDate
-            updatedAt
-            status
-            preparationMinutes
-            estimatedReadyAt
-            preparingAt
-            readyAt
-            user {
+            orders {
                 id
-                firstName
-                lastName
-                phoneNumber
-            }
-            driver {
-                id
-                firstName
-                lastName
-            }
-            dropOffLocation {
-                address
-                latitude
-                longitude
-            }
-            businesses {
-                business {
+                displayId
+                userId
+                orderPrice
+                deliveryPrice
+                totalPrice
+                orderDate
+                updatedAt
+                status
+                preparationMinutes
+                estimatedReadyAt
+                preparingAt
+                readyAt
+                user {
                     id
-                    name
+                    firstName
+                    lastName
+                    phoneNumber
                 }
-                items {
-                    productId
-                    name
-                    imageUrl
-                    quantity
-                    unitPrice
-                    notes
+                driver {
+                    id
+                    firstName
+                    lastName
+                }
+                dropOffLocation {
+                    address
+                    latitude
+                    longitude
+                }
+                businesses {
+                    business {
+                        id
+                        name
+                    }
+                    items {
+                        productId
+                        name
+                        imageUrl
+                        quantity
+                        unitPrice
+                        notes
+                    }
                 }
             }
+            totalCount
         }
     }
 `);

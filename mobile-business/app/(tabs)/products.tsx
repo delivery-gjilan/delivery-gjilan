@@ -36,7 +36,7 @@ interface Product {
     imageUrl?: string | null;
     price: number;
     isOnSale: boolean;
-    salePrice?: number | null;
+    saleDiscountPercentage?: number | null;
     isAvailable: boolean;
     categoryId: string;
 }
@@ -102,7 +102,7 @@ export default function ProductsScreen() {
                 imageUrl: product?.imageUrl ?? card?.imageUrl ?? null,
                 price: Number(product?.price ?? card?.basePrice ?? 0),
                 isOnSale: product?.isOnSale ?? false,
-                salePrice: product?.salePrice ?? null,
+                saleDiscountPercentage: product?.saleDiscountPercentage ?? null,
                 isAvailable: product?.isAvailable ?? true,
                 categoryId: product?.categoryId ?? '',
             };
@@ -141,7 +141,7 @@ export default function ProductsScreen() {
         setFormPrice(String(product.price));
         setFormIsAvailable(product.isAvailable);
         setFormIsOnSale(product.isOnSale);
-        setFormSalePrice(product.salePrice != null ? String(product.salePrice) : '');
+        setFormSalePrice(product.saleDiscountPercentage != null ? String(product.saleDiscountPercentage) : '');
         setFormCategoryId(product.categoryId);
         setShowFormModal(true);
     };
@@ -193,9 +193,9 @@ export default function ProductsScreen() {
             return;
         }
 
-        const salePrice = formIsOnSale ? Number(formSalePrice) : undefined;
-        if (formIsOnSale && (!Number.isFinite(salePrice) || salePrice! <= 0 || salePrice! >= price)) {
-            Alert.alert(t('common.error', 'Error'), 'Sale price must be > 0 and lower than regular price.');
+        const saleDiscount = formIsOnSale ? Number(formSalePrice) : undefined;
+        if (formIsOnSale && (!Number.isFinite(saleDiscount) || saleDiscount! <= 0 || saleDiscount! > 100)) {
+            Alert.alert(t('common.error', 'Error'), 'Sale discount must be between 1 and 100%.');
             return;
         }
 
@@ -213,7 +213,7 @@ export default function ProductsScreen() {
                             categoryId: formCategoryId,
                             isAvailable: formIsAvailable,
                             isOnSale: formIsOnSale,
-                            salePrice: formIsOnSale ? salePrice : null,
+                            saleDiscountPercentage: formIsOnSale ? saleDiscount : null,
                         },
                     },
                 });
@@ -229,7 +229,7 @@ export default function ProductsScreen() {
                             price,
                             isAvailable: formIsAvailable,
                             isOnSale: formIsOnSale,
-                            salePrice: formIsOnSale ? salePrice : undefined,
+                            saleDiscountPercentage: formIsOnSale ? saleDiscount : undefined,
                         },
                     },
                 });
@@ -256,7 +256,9 @@ export default function ProductsScreen() {
     };
 
     const renderProductCard = ({ item: product }: { item: Product }) => {
-        const displayPrice = product.isOnSale && product.salePrice ? product.salePrice : product.price;
+        const displayPrice = product.isOnSale && product.saleDiscountPercentage
+            ? product.price * (1 - product.saleDiscountPercentage / 100)
+            : product.price;
         const categoryName = categories.find((category) => category.id === product.categoryId)?.name;
 
         return (
@@ -441,8 +443,8 @@ export default function ProductsScreen() {
 
                             {formIsOnSale && (
                                 <>
-                                    <Text className="text-subtext mb-1">Sale Price (€)</Text>
-                                    <TextInput value={formSalePrice} onChangeText={setFormSalePrice} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor="#6b7280" className="bg-card text-text rounded-xl px-4 py-3 mb-3" />
+                                    <Text className="text-subtext mb-1">Sale Discount (%)</Text>
+                                    <TextInput value={formSalePrice} onChangeText={setFormSalePrice} keyboardType="decimal-pad" placeholder="10" placeholderTextColor="#6b7280" className="bg-card text-text rounded-xl px-4 py-3 mb-3" />
                                 </>
                             )}
 

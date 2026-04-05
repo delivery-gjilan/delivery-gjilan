@@ -284,7 +284,7 @@ export default function OrdersScreen() {
             if (incomingOrders && incomingOrders.length > 0) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 apolloClient.cache.updateQuery({ query: GET_BUSINESS_ORDERS }, (existing: any) => {
-                    const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
+                    const currentOrders = Array.isArray(existing?.orders?.orders) ? existing.orders.orders : [];
                     const byId = new Map(currentOrders.map((order: any) => [String(order?.id), order]));
 
                     incomingOrders.forEach((order: any) => {
@@ -300,7 +300,10 @@ export default function OrdersScreen() {
 
                     return {
                         ...(existing ?? {}),
-                        orders: Array.from(byId.values()),
+                        orders: {
+                            ...(existing?.orders ?? {}),
+                            orders: Array.from(byId.values()),
+                        },
                     };
                 });
                 return;
@@ -321,7 +324,7 @@ export default function OrdersScreen() {
     const avgPrepTime = businessOps?.avgPrepTimeMinutes ?? 20;
 
     // Show only upcoming orders for this business.
-    const businessOrders = ((data?.orders as unknown as Order[]) || []).filter((order: any) => {
+    const businessOrders = ((data?.orders?.orders as unknown as Order[]) || []).filter((order: any) => {
         const belongsToBusiness = order.businesses.some((b: any) => b.business.id === user?.businessId);
         const isUpcoming = UPCOMING_ORDER_STATUSES.includes(order.status as OrderStatus);
         return belongsToBusiness && isUpcoming;

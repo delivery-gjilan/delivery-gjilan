@@ -7,6 +7,8 @@ export const GET_SETTLEMENTS_PAGE = graphql(`
         $isSettled: Boolean
         $driverId: ID
         $businessId: ID
+        $orderId: ID
+        $promotionId: ID
         $startDate: Date
         $endDate: Date
         $limit: Int
@@ -18,6 +20,8 @@ export const GET_SETTLEMENTS_PAGE = graphql(`
             isSettled: $isSettled
             driverId: $driverId
             businessId: $businessId
+            orderId: $orderId
+            promotionId: $promotionId
             startDate: $startDate
             endDate: $endDate
             limit: $limit
@@ -44,33 +48,10 @@ export const GET_SETTLEMENTS_PAGE = graphql(`
                 status
                 deliveryPrice
                 totalPrice
-                businesses {
-                  business {
-                    id
-                    name
-                    businessType
-                  }
-                  items {
-                    id
-                    productId
-                    name
-                    quantity
-                    unitPrice
-                    notes
-                    selectedOptions {
-                      id
-                      optionName
-                      priceAtOrder
-                    }
-                  }
-                }
             }
             amount
             currency
             status
-            paymentMethod
-            paymentReference
-            paidAt
             ruleId
             createdAt
         }
@@ -80,21 +61,31 @@ export const GET_SETTLEMENTS_PAGE = graphql(`
 export const GET_SETTLEMENT_SUMMARY = graphql(`
     query GetSettlementSummary(
         $type: SettlementType
+        $direction: SettlementDirection
+        $isSettled: Boolean
         $driverId: ID
         $businessId: ID
+        $orderId: ID
+        $promotionId: ID
         $startDate: Date
         $endDate: Date
     ) {
         settlementSummary(
             type: $type
+            direction: $direction
+            isSettled: $isSettled
             driverId: $driverId
             businessId: $businessId
+            orderId: $orderId
+            promotionId: $promotionId
             startDate: $startDate
             endDate: $endDate
         ) {
             totalAmount
             totalPending
             totalPaid
+            totalReceivable
+            totalPayable
             count
             pendingCount
         }
@@ -196,7 +187,8 @@ export const UNSETTLE_SETTLEMENT = graphql(`
 
 export const CREATE_SETTLEMENT_REQUEST = graphql(`
     mutation CreateSettlementRequest(
-        $businessId: ID!
+        $businessId: ID
+        $driverId: ID
         $amount: Float!
         $periodStart: Date!
         $periodEnd: Date!
@@ -204,12 +196,14 @@ export const CREATE_SETTLEMENT_REQUEST = graphql(`
     ) {
         createSettlementRequest(
             businessId: $businessId
+            driverId: $driverId
             amount: $amount
             periodStart: $periodStart
             periodEnd: $periodEnd
             note: $note
         ) {
             id
+            entityType
             status
             amount
             currency
@@ -232,9 +226,10 @@ export const CANCEL_SETTLEMENT_REQUEST = graphql(`
 `);
 
 export const GET_SETTLEMENT_REQUESTS = graphql(`
-    query GetSettlementRequests($businessId: ID, $status: SettlementRequestStatus, $limit: Int) {
-        settlementRequests(businessId: $businessId, status: $status, limit: $limit) {
+    query GetSettlementRequests($businessId: ID, $driverId: ID, $entityType: SettlementType, $status: SettlementRequestStatus, $limit: Int) {
+        settlementRequests(businessId: $businessId, driverId: $driverId, entityType: $entityType, status: $status, limit: $limit) {
             id
+            entityType
             amount
             currency
             periodStart
@@ -245,6 +240,15 @@ export const GET_SETTLEMENT_REQUESTS = graphql(`
             createdAt
             respondedAt
             disputeReason
+            business {
+                id
+                name
+            }
+            driver {
+                id
+                firstName
+                lastName
+            }
             requestedBy {
                 id
                 firstName
@@ -260,8 +264,20 @@ export const GET_SETTLEMENT_REQUESTS = graphql(`
 `);
 
 export const SETTLE_WITH_DRIVER = graphql(`
-    mutation SettleWithDriver($driverId: ID!) {
-        settleWithDriver(driverId: $driverId) {
+    mutation SettleWithDriver(
+        $driverId: ID!
+        $amount: Float
+        $paymentMethod: String
+        $paymentReference: String
+        $note: String
+    ) {
+        settleWithDriver(
+            driverId: $driverId
+            amount: $amount
+            paymentMethod: $paymentMethod
+            paymentReference: $paymentReference
+            note: $note
+        ) {
             payment {
                 id
                 amount

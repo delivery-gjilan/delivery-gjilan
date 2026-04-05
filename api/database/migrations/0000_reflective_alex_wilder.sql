@@ -357,7 +357,9 @@ CREATE TABLE "settlement_rules" (
 --> statement-breakpoint
 CREATE TABLE "settlement_requests" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"business_id" uuid NOT NULL,
+	"entity_type" "settlement_entity_type" DEFAULT 'BUSINESS' NOT NULL,
+	"business_id" uuid,
+	"driver_id" uuid,
 	"requested_by_user_id" uuid,
 	"amount" numeric(10, 2) NOT NULL,
 	"currency" varchar(3) DEFAULT 'EUR' NOT NULL,
@@ -700,6 +702,7 @@ ALTER TABLE "settlements" ADD CONSTRAINT "settlements_source_payment_id_settleme
 ALTER TABLE "settlement_rules" ADD CONSTRAINT "settlement_rules_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "settlement_rules" ADD CONSTRAINT "settlement_rules_promotion_id_promotions_id_fk" FOREIGN KEY ("promotion_id") REFERENCES "public"."promotions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "settlement_requests" ADD CONSTRAINT "settlement_requests_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "settlement_requests" ADD CONSTRAINT "settlement_requests_driver_id_drivers_id_fk" FOREIGN KEY ("driver_id") REFERENCES "public"."drivers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "settlement_requests" ADD CONSTRAINT "settlement_requests_requested_by_user_id_users_id_fk" FOREIGN KEY ("requested_by_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "settlement_requests" ADD CONSTRAINT "settlement_requests_responded_by_user_id_users_id_fk" FOREIGN KEY ("responded_by_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "settlement_payments" ADD CONSTRAINT "settlement_payments_driver_id_drivers_id_fk" FOREIGN KEY ("driver_id") REFERENCES "public"."drivers"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -773,6 +776,8 @@ CREATE INDEX "idx_settlements_business_id" ON "settlements" USING btree ("busine
 CREATE INDEX "idx_settlements_is_settled" ON "settlements" USING btree ("is_settled");--> statement-breakpoint
 CREATE INDEX "idx_settlements_type_direction" ON "settlements" USING btree ("type","direction");--> statement-breakpoint
 CREATE INDEX "idx_settlement_requests_business_id" ON "settlement_requests" USING btree ("business_id");--> statement-breakpoint
+CREATE INDEX "idx_settlement_requests_driver_id" ON "settlement_requests" USING btree ("driver_id");--> statement-breakpoint
+CREATE INDEX "idx_settlement_requests_entity_type" ON "settlement_requests" USING btree ("entity_type");--> statement-breakpoint
 CREATE INDEX "idx_settlement_requests_status" ON "settlement_requests" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "idx_settlement_requests_created_at" ON "settlement_requests" USING btree ("created_at");--> statement-breakpoint
 CREATE INDEX "idx_settlement_payments_entity_type" ON "settlement_payments" USING btree ("entity_type");--> statement-breakpoint

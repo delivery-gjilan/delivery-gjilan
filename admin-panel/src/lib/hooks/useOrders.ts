@@ -14,6 +14,8 @@ import { playNewOrderAlert } from '@/lib/audio/orderAlert';
 
 export interface UseOrdersResult {
     orders: any[];
+    totalCount: number;
+    hasMore: boolean;
     loading: boolean;
     error?: string;
     refetch: () => void;
@@ -54,15 +56,19 @@ export interface UseCancelOrderResult {
 export interface UseOrdersOptions {
     limit?: number;
     offset?: number;
+    statuses?: string[];
 }
 
 export function useOrders(options: UseOrdersOptions = {}): UseOrdersResult {
-    const { limit = 100, offset = 0 } = options;
+    const { limit = 100, offset = 0, statuses } = options;
     const apolloClient = useApolloClient();
+    const variables: any = { limit, offset };
+    if (statuses) variables.statuses = statuses;
+
     // Initial query to load data - use network-only to avoid stale cache
     const { data, loading, error, refetch } = useQuery(GET_ORDERS, {
-        variables: { limit, offset },
-        fetchPolicy: 'network-only', // Changed from 'cache-and-network' to always fetch fresh data
+        variables,
+        fetchPolicy: 'network-only',
     });
 
     const refetchCooldownRef = useRef(0);
@@ -71,16 +77,20 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersResult {
     const knownOrderIdsRef = useRef<Set<string>>(new Set());
     const hasInitializedKnownIdsRef = useRef(false);
 
-    useEffect(() => {
-        const currentOrders = Array.isArray((data as any)?.orders) ? (data as any).orders : [];
-        if (currentOrders.length === 0) return;
+    const connection = (data as any)?.orders;
+    const ordersList = Array.isArray(connection?.orders) ? connection.orders : [];
+    const totalCount: number = connection?.totalCount ?? 0;
+    const hasMore: boolean = connection?.hasMore ?? false;
 
-        currentOrders.forEach((order: any) => {
+    useEffect(() => {
+        if (ordersList.length === 0) return;
+
+        ordersList.forEach((order: any) => {
             if (order?.id) knownOrderIdsRef.current.add(String(order.id));
         });
 
         hasInitializedKnownIdsRef.current = true;
-    }, [data]);
+    }, [ordersList]);
 
     useEffect(() => {
         return () => {
@@ -158,28 +168,34 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersResult {
                 void playNewOrderAlert();
             }
 
-            apolloClient.cache.updateQuery({ query: GET_ORDERS, variables: { limit, offset } }, (existing: any) => {
-                const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
+            apolloClient.cache.updateQuery({ query: GET_ORDERS, variables }, (existing: any) => {
+                const currentConnection = existing?.orders;
+                const currentOrders = Array.isArray(currentConnection?.orders) ? currentConnection.orders : [];
                 const byId = new Map(currentOrders.map((order: any) => [String(order?.id), order]));
 
                 validIncomingOrders.forEach((order: any) => {
                     const existingOrder = byId.get(String(order?.id));
-                    byId.set(String(order?.id), { ...existingOrder, ...order });
+                    byId.set(String(order?.id), existingOrder ? { ...existingOrder, ...order } : order);
                 });
 
                 return {
                     ...(existing ?? {}),
-                    orders: Array.from(byId.values()),
+                    orders: {
+                        ...(currentConnection ?? {}),
+                        orders: Array.from(byId.values()),
+                    },
                 };
             });
         },
     });
 
     return {
-        orders: (data as any)?.orders || [],
+        orders: ordersList,
+        totalCount,
+        hasMore,
         loading,
         error: error?.message,
-        refetch: () => refetch({ limit, offset }),
+        refetch: () => refetch(variables),
     };
 }
 

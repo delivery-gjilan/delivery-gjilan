@@ -1071,7 +1071,7 @@ export const CartScreen = () => {
                                     {item.imageUrl ? (
                                         <Image
                                             source={{ uri: item.imageUrl }}
-                                            className="w-20 h-20 rounded-lg"
+                                            style={{ width: 80, height: 80, borderRadius: 8 }}
                                             contentFit="cover"
                                             cachePolicy="memory-disk"
                                             transition={200}
@@ -1367,7 +1367,7 @@ export const CartScreen = () => {
                                     {item.imageUrl ? (
                                         <Image
                                             source={{ uri: item.imageUrl }}
-                                            className="w-10 h-10 rounded-lg mr-3"
+                                            style={{ width: 40, height: 40, borderRadius: 8, marginRight: 12 }}
                                             contentFit="cover"
                                             cachePolicy="memory-disk"
                                         />

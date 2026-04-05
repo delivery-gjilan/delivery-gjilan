@@ -4,6 +4,7 @@ import {
     settlements,
     users,
     businesses,
+    drivers as driversTable,
 } from '@/database/schema';
 import { eq, and, gte, lte, inArray, sql } from 'drizzle-orm';
 import type { DbSettlementRequest } from '@/database/schema/settlementRequests';
@@ -15,7 +16,9 @@ export interface SettlementRequestAcceptanceResult {
 }
 
 export interface CreateSettlementRequestInput {
-    businessId: string;
+    entityType: 'DRIVER' | 'BUSINESS';
+    businessId?: string | null;
+    driverId?: string | null;
     requestedByUserId?: string | null;
     amount: number;
     periodStart: string;
@@ -39,6 +42,8 @@ export class SettlementRequestRepository {
 
     async getMany(filters: {
         businessId?: string;
+        driverId?: string;
+        entityType?: string;
         status?: string;
         limit?: number;
         offset?: number;
@@ -48,6 +53,12 @@ export class SettlementRequestRepository {
 
         if (filters.businessId) {
             conditions.push(eq(settlementRequests.businessId, filters.businessId));
+        }
+        if (filters.driverId) {
+            conditions.push(eq(settlementRequests.driverId, filters.driverId));
+        }
+        if (filters.entityType) {
+            conditions.push(eq(settlementRequests.entityType, filters.entityType as any));
         }
         if (filters.status) {
             conditions.push(eq(settlementRequests.status, filters.status as any));
@@ -77,7 +88,9 @@ export class SettlementRequestRepository {
         const result = await this.db
             .insert(settlementRequests)
             .values({
-                businessId: input.businessId,
+                entityType: input.entityType,
+                businessId: input.businessId ?? null,
+                driverId: input.driverId ?? null,
                 requestedByUserId: input.requestedByUserId,
                 amount: String(input.amount),
                 periodStart: input.periodStart,
@@ -250,5 +263,15 @@ export class SettlementRequestRepository {
                 ),
             );
         return rows.map((r) => r.id);
+    }
+
+    /** Find the user ID for a given driver record ID */
+    async findDriverUserId(driverId: string): Promise<string | null> {
+        const row = await this.db
+            .select({ userId: driversTable.userId })
+            .from(driversTable)
+            .where(eq(driversTable.id, driverId))
+            .limit(1);
+        return row[0]?.userId ?? null;
     }
 }

@@ -1,8 +1,8 @@
 import { graphql } from '@/gql';
 
 export const GET_SETTLEMENT_RULES = graphql(`
-    query SettlementRules($filter: SettlementRuleFilterInput) {
-        settlementRules(filter: $filter) {
+    query SettlementRules($filter: SettlementRuleFilterInput, $limit: Int, $offset: Int) {
+        settlementRules(filter: $filter, limit: $limit, offset: $offset) {
             id
             name
             entityType
@@ -50,6 +50,12 @@ export const UPDATE_SETTLEMENT_RULE = graphql(`
 export const DELETE_SETTLEMENT_RULE = graphql(`
     mutation DeleteSettlementRule($id: ID!) {
         deleteSettlementRule(id: $id)
+    }
+`);
+
+export const GET_SETTLEMENT_RULES_COUNT = graphql(`
+    query SettlementRulesCount($filter: SettlementRuleFilterInput) {
+        settlementRulesCount(filter: $filter)
     }
 `);
 

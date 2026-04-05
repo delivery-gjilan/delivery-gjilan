@@ -3,6 +3,8 @@ import { SettlementRequestRepository } from '@/repositories/SettlementRequestRep
 import { SettlingService } from '@/services/SettlingService';
 import { GraphQLError } from 'graphql';
 import logger from '@/lib/logger';
+import { drivers as driversTable } from '@/database/schema';
+import { eq } from 'drizzle-orm';
 
 export const respondToSettlementRequest: NonNullable<
     MutationResolvers['respondToSettlementRequest']
@@ -13,7 +15,7 @@ export const respondToSettlementRequest: NonNullable<
         throw new GraphQLError('Unauthorized', { extensions: { code: 'UNAUTHORIZED' } });
     }
 
-    const allowedRoles = ['BUSINESS_OWNER', 'BUSINESS_EMPLOYEE', 'ADMIN', 'SUPER_ADMIN'];
+    const allowedRoles = ['BUSINESS_OWNER', 'BUSINESS_EMPLOYEE', 'DRIVER', 'ADMIN', 'SUPER_ADMIN'];
     if (!userData.role || !allowedRoles.includes(userData.role)) {
         throw new GraphQLError('Forbidden', { extensions: { code: 'FORBIDDEN' } });
     }
@@ -34,51 +36,89 @@ export const respondToSettlementRequest: NonNullable<
         );
     }
 
-    // Business users can only respond to their own requests
-    if (
-        (userData.role === 'BUSINESS_OWNER' || userData.role === 'BUSINESS_EMPLOYEE') &&
-        existing.businessId !== userData.businessId
-    ) {
-        throw new GraphQLError('Forbidden — this request belongs to a different business', {
-            extensions: { code: 'FORBIDDEN' },
-        });
+    // Authorization: scope check based on entity type
+    const entityType = existing.entityType ?? 'BUSINESS';
+
+    if (entityType === 'BUSINESS') {
+        if (
+            (userData.role === 'BUSINESS_OWNER' || userData.role === 'BUSINESS_EMPLOYEE') &&
+            existing.businessId !== userData.businessId
+        ) {
+            throw new GraphQLError('Forbidden — this request belongs to a different business', {
+                extensions: { code: 'FORBIDDEN' },
+            });
+        }
+    } else if (entityType === 'DRIVER') {
+        if (userData.role === 'DRIVER') {
+            // Verify this driver owns the request
+            const driverRecord = await db.query.drivers.findFirst({
+                where: eq(driversTable.userId, userData.userId),
+            });
+            if (!driverRecord || driverRecord.id !== existing.driverId) {
+                throw new GraphQLError('Forbidden — this request belongs to a different driver', {
+                    extensions: { code: 'FORBIDDEN' },
+                });
+            }
+        }
     }
 
     if (action === 'ACCEPT') {
         const requestedAmount = Number(existing.amount ?? 0);
-
-        // Use the SettlingService to settle ALL unsettled settlements for this
-        // business, with the request amount as the payment.
         const settlingService = new SettlingService(db);
-        const settleResult = await settlingService.settleWithBusiness(
-            existing.businessId,
-            requestedAmount,
-            userData.userId,
-            'SETTLEMENT_REQUEST_ACCEPTED',
-            `request:${requestId}`,
-        );
 
-        logger.info(
-            {
-                requestId,
-                businessId: existing.businessId,
+        if (entityType === 'BUSINESS' && existing.businessId) {
+            const settleResult = await settlingService.settleWithBusiness(
+                existing.businessId,
                 requestedAmount,
-                settledCount: settleResult.settledCount,
-                netAmount: settleResult.netAmount,
-                remainderAmount: settleResult.remainderAmount,
-                paymentId: settleResult.paymentId,
-            },
-            'settlementRequest:accept — settled via SettlingService',
-        );
+                userData.userId,
+                'SETTLEMENT_REQUEST_ACCEPTED',
+                `request:${requestId}`,
+            );
+
+            logger.info(
+                {
+                    requestId,
+                    businessId: existing.businessId,
+                    requestedAmount,
+                    settledCount: settleResult.settledCount,
+                    netAmount: settleResult.netAmount,
+                    remainderAmount: settleResult.remainderAmount,
+                    paymentId: settleResult.paymentId,
+                },
+                'settlementRequest:accept — settled business via SettlingService',
+            );
+        } else if (entityType === 'DRIVER' && existing.driverId) {
+            const settleResult = await settlingService.settleWithDriver(
+                existing.driverId,
+                userData.userId,
+                requestedAmount,
+                'SETTLEMENT_REQUEST_ACCEPTED',
+                `request:${requestId}`,
+            );
+
+            logger.info(
+                {
+                    requestId,
+                    driverId: existing.driverId,
+                    requestedAmount,
+                    settledCount: settleResult.settledCount,
+                    netAmount: settleResult.netAmount,
+                    remainderAmount: settleResult.remainderAmount,
+                    paymentId: settleResult.paymentId,
+                },
+                'settlementRequest:accept — settled driver via SettlingService',
+            );
+        }
 
         const updated = await repo.accept(requestId, userData.userId);
 
-        // Notify admins (via topic) that the request was accepted
+        // Notify admins
         try {
             if (notificationService) {
+                const entityLabel = entityType === 'BUSINESS' ? 'Business' : 'Driver';
                 await notificationService.sendToTopic('admins', {
-                    title: '✅ Settlement Accepted',
-                    body: `Business accepted settlement of €${requestedAmount.toFixed(2)}. ${settleResult.settledCount} settlement(s) settled.${settleResult.remainderAmount > 0 ? ` Remainder: €${settleResult.remainderAmount.toFixed(2)}` : ''}`,
+                    title: 'Settlement Accepted',
+                    body: `${entityLabel} accepted settlement of EUR ${requestedAmount.toFixed(2)}.`,
                     data: {
                         type: 'SETTLEMENT_REQUEST_ACCEPTED',
                         requestId,
@@ -98,9 +138,10 @@ export const respondToSettlementRequest: NonNullable<
 
     try {
         if (notificationService) {
+            const entityLabel = entityType === 'BUSINESS' ? 'Business' : 'Driver';
             await notificationService.sendToTopic('admins', {
-                title: '⚠️ Settlement Disputed',
-                body: `Business disputed settlement of €${Number(existing.amount).toFixed(2)}. Reason: ${disputeReason ?? 'No reason provided'}`,
+                title: 'Settlement Disputed',
+                body: `${entityLabel} disputed settlement of EUR ${Number(existing.amount).toFixed(2)}. Reason: ${disputeReason ?? 'No reason provided'}`,
                 data: {
                     type: 'SETTLEMENT_REQUEST_DISPUTED',
                     requestId,

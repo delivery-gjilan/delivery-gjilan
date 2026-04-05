@@ -91,6 +91,24 @@ type DriverOrderFinancials {
     driverNetEarnings: Float!
 }
 
+type OrderSettlementLineItem {
+    type: String!
+    direction: String!
+    amount: Float!
+    reason: String!
+    businessId: ID
+    driverId: ID
+    ruleId: ID
+}
+
+type OrderSettlementPreview {
+    lineItems: [OrderSettlementLineItem!]!
+    totalReceivable: Float!
+    totalPayable: Float!
+    netMargin: Float!
+    driverAssigned: Boolean!
+}
+
 type Order {
     id: ID!
     displayId: String!
@@ -128,10 +146,17 @@ type Order {
     approvalReasons: [ApprovalReason!]
     businesses: [OrderBusiness!]!
     orderPromotions: [OrderPromotion!]
+    settlementPreview: OrderSettlementPreview
+}
+
+type OrderConnection {
+    orders: [Order!]!
+    totalCount: Int!
+    hasMore: Boolean!
 }
 
 type Query {
-    orders(limit: Int, offset: Int): [Order!]!
+    orders(limit: Int, offset: Int, statuses: [OrderStatus!]): OrderConnection!
     order(id: ID!): Order
     ordersByStatus(status: OrderStatus!, limit: Int, offset: Int): [Order!]!
     cancelledOrders(limit: Int, offset: Int): [Order!]!

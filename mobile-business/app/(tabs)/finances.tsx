@@ -21,6 +21,7 @@ import {
     GET_LAST_BUSINESS_PAID_SETTLEMENT,
     GET_MY_SETTLEMENT_REQUESTS,
     RESPOND_TO_SETTLEMENT_REQUEST,
+    GET_BUSINESS_SETTLEMENT_BREAKDOWN,
 } from '@/graphql/settlements';
 import { useAuthStore } from '@/store/authStore';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -214,8 +215,19 @@ export default function FinancesScreen() {
         fetchPolicy: 'network-only',
     });
 
+    const {
+        data: breakdownData,
+        loading: breakdownLoading,
+        refetch: refetchBreakdown,
+    } = useQuery(GET_BUSINESS_SETTLEMENT_BREAKDOWN, {
+        variables: { businessId, startDate, endDate },
+        skip: !businessId,
+        fetchPolicy: 'network-only',
+    });
+
     const summary = (summaryData as any)?.settlementSummary;
     const settlements: any[] = (settlementsData as any)?.settlements ?? [];
+    const breakdownItems: any[] = (breakdownData as any)?.settlementBreakdown ?? [];
 
     // Compute revenue generated & commission owed from settlement rows
     const computed = useMemo(() => {
@@ -262,6 +274,7 @@ export default function FinancesScreen() {
             refetchSettlements(),
             refetchLastPaid(),
             refetchRequests(),
+            refetchBreakdown(),
         ]);
         setRefreshing(false);
     };
@@ -500,6 +513,78 @@ export default function FinancesScreen() {
                         })}
                     </ScrollView>
                 </View>
+
+                {/* ── Settlement Breakdown ── */}
+                {!breakdownLoading && breakdownItems.length > 0 && (
+                    <View className="px-5 mt-5">
+                        <Text
+                            style={{
+                                fontSize: 14,
+                                fontWeight: '700',
+                                color: '#fff',
+                                marginBottom: 10,
+                            }}
+                        >
+                            {t('finances.breakdown_title', 'Cost Breakdown')}
+                        </Text>
+                        <View style={{ gap: 8 }}>
+                            {breakdownItems.map((item: any, idx: number) => {
+                                const isReceivable = item.direction === 'RECEIVABLE';
+                                const color = isReceivable ? '#ef4444' : '#22c55e';
+                                return (
+                                    <View
+                                        key={`${item.category}-${idx}`}
+                                        style={{
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            borderRadius: 16,
+                                            padding: 14,
+                                            backgroundColor: '#1a2233',
+                                            borderWidth: 1,
+                                            borderColor: '#263145',
+                                        }}
+                                    >
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10 }}>
+                                            <View
+                                                style={{
+                                                    width: 8,
+                                                    height: 8,
+                                                    borderRadius: 4,
+                                                    backgroundColor: color,
+                                                }}
+                                            />
+                                            <View style={{ flex: 1 }}>
+                                                <Text
+                                                    style={{
+                                                        fontSize: 13,
+                                                        fontWeight: '600',
+                                                        color: '#e2e8f0',
+                                                    }}
+                                                    numberOfLines={1}
+                                                >
+                                                    {item.label}
+                                                </Text>
+                                                <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
+                                                    {item.count} {item.count === 1 ? t('finances.record', 'record') : t('finances.records', 'records')}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                        <Text
+                                            style={{
+                                                fontSize: 15,
+                                                fontWeight: '700',
+                                                color,
+                                            }}
+                                        >
+                                            {isReceivable ? '-' : '+'}{formatCurrency(item.totalAmount)}
+                                        </Text>
+                                    </View>
+                                );
+                            })}
+                        </View>
+                    </View>
+                )}
 
                 {/* ── Settlement Requests ── */}
                 {(requestsLoading || pendingRequests.length > 0) && (

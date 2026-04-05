@@ -29,9 +29,18 @@ export class SettlingService {
     constructor(private db: Database) {}
 
     /**
-     * Settle all unsettled settlements for a driver (always full settlement).
+     * Settle unsettled settlements for a driver.
+     * If paymentAmount is provided and less than net balance, a carry-forward
+     * settlement is created for the remainder (same as business flow).
      */
-    async settleWithDriver(driverId: string, createdByUserId: string): Promise<SettleResult> {
+    async settleWithDriver(
+        driverId: string,
+        createdByUserId: string,
+        paymentAmount?: number,
+        _paymentMethod?: string,
+        _paymentReference?: string,
+        note?: string,
+    ): Promise<SettleResult> {
         return this.db.transaction(async (tx) => {
             await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${driverId}))`);
 
@@ -64,7 +73,22 @@ export class SettlingService {
             const direction: 'ENTITY_TO_PLATFORM' | 'PLATFORM_TO_ENTITY' =
                 netCents >= 0 ? 'ENTITY_TO_PLATFORM' : 'PLATFORM_TO_ENTITY';
             const absNet = Math.abs(netCents);
-            const netAmount = Number((absNet / 100).toFixed(2));
+
+            // If paymentAmount provided, use it; otherwise settle fully
+            const paymentCents = paymentAmount != null
+                ? Math.round(paymentAmount * 100)
+                : absNet;
+
+            if (paymentCents <= 0) {
+                throw new Error('Payment amount must be a positive number');
+            }
+            if (paymentCents > absNet) {
+                throw new Error(
+                    `Payment amount (${(paymentCents / 100).toFixed(2)}) exceeds net balance (${(absNet / 100).toFixed(2)})`,
+                );
+            }
+
+            const actualPayment = Number((paymentCents / 100).toFixed(2));
             const now = new Date().toISOString();
 
             const [payment] = await tx
@@ -72,7 +96,8 @@ export class SettlingService {
                 .values({
                     entityType: 'DRIVER',
                     driverId,
-                    amount: netAmount,
+                    amount: actualPayment,
+                    note: note ?? null,
                     createdByUserId,
                 })
                 .returning();
@@ -88,12 +113,38 @@ export class SettlingService {
                 .where(inArray(settlements.id, unsettledIds))
                 .execute();
 
+            // If partial payment, create carry-forward settlement for the remainder
+            let remainderAmount = 0;
+            let remainderSettlementId: string | null = null;
+
+            const remainderCents = absNet - paymentCents;
+            if (remainderCents > 0) {
+                remainderAmount = Number((remainderCents / 100).toFixed(2));
+                const remainderDirection = netCents >= 0 ? 'RECEIVABLE' : 'PAYABLE';
+
+                const [remainderSettlement] = await tx
+                    .insert(settlements)
+                    .values({
+                        type: 'DRIVER',
+                        direction: remainderDirection as any,
+                        driverId,
+                        orderId: null,
+                        amount: remainderAmount,
+                        isSettled: false,
+                        sourcePaymentId: payment.id,
+                    })
+                    .returning();
+
+                remainderSettlementId = remainderSettlement.id;
+            }
+
             log.info(
                 {
                     driverId,
                     paymentId: payment.id,
                     settledCount: unsettled.length,
-                    netAmount,
+                    netAmount: actualPayment,
+                    remainderAmount,
                     direction,
                 },
                 'settling:driver:completed',
@@ -102,10 +153,10 @@ export class SettlingService {
             return {
                 paymentId: payment.id,
                 settledCount: unsettled.length,
-                netAmount,
+                netAmount: actualPayment,
                 direction,
-                remainderAmount: 0,
-                remainderSettlementId: null,
+                remainderAmount,
+                remainderSettlementId,
             };
         });
     }

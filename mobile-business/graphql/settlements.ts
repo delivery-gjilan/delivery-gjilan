@@ -29,6 +29,12 @@ export const GET_MY_BUSINESS_SETTLEMENTS = gql`
             paymentReference
             paymentMethod
             createdAt
+            rule {
+                id
+                name
+                type
+                direction
+            }
             order {
                 id
                 displayId
@@ -144,6 +150,29 @@ export const RESPOND_TO_SETTLEMENT_REQUEST = gql`
             status
             respondedAt
             disputeReason
+        }
+    }
+`;
+
+export const GET_BUSINESS_SETTLEMENT_BREAKDOWN = gql`
+    query GetBusinessSettlementBreakdown(
+        $businessId: ID
+        $isSettled: Boolean
+        $startDate: Date
+        $endDate: Date
+    ) {
+        settlementBreakdown(
+            type: BUSINESS
+            businessId: $businessId
+            isSettled: $isSettled
+            startDate: $startDate
+            endDate: $endDate
+        ) {
+            category
+            label
+            totalAmount
+            count
+            direction
         }
     }
 `;

@@ -1,5 +1,5 @@
 {
-  "id": "a1f9dc7b-328d-4479-87b6-a9de357412f4",
+  "id": "6d67f21a-d978-4cb9-84ea-c7a898dd9707",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -2956,11 +2956,25 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
+        "entity_type": {
+          "name": "entity_type",
+          "type": "settlement_entity_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'BUSINESS'"
+        },
         "business_id": {
           "name": "business_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "driver_id": {
+          "name": "driver_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         },
         "requested_by_user_id": {
           "name": "requested_by_user_id",
@@ -3062,6 +3076,36 @@
           "method": "btree",
           "with": {}
         },
+        "idx_settlement_requests_driver_id": {
+          "name": "idx_settlement_requests_driver_id",
+          "columns": [
+            {
+              "expression": "driver_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_settlement_requests_entity_type": {
+          "name": "idx_settlement_requests_entity_type",
+          "columns": [
+            {
+              "expression": "entity_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "idx_settlement_requests_status": {
           "name": "idx_settlement_requests_status",
           "columns": [
@@ -3100,6 +3144,19 @@
           "tableTo": "businesses",
           "columnsFrom": [
             "business_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "settlement_requests_driver_id_drivers_id_fk": {
+          "name": "settlement_requests_driver_id_drivers_id_fk",
+          "tableFrom": "settlement_requests",
+          "tableTo": "drivers",
+          "columnsFrom": [
+            "driver_id"
           ],
           "columnsTo": [
             "id"

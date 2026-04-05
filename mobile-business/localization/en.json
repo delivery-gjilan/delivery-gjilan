@@ -69,7 +69,8 @@
     "next": "Next",
     "accept_request_title": "Accept Settlement",
     "accept_request_text": "Accepting will settle up to {{amount}} for this request period. Continue?",
-    "accept_request_fallback": "Accept this settlement request?"
+    "accept_request_fallback": "Accept this settlement request?",
+    "breakdown_title": "Cost Breakdown"
   },
   "dashboard": {
     "title": "Dashboard",

@@ -1,6 +1,6 @@
 import type { SettlementResolvers } from './../../../generated/types.generated';
 import { eq } from 'drizzle-orm';
-import { businesses, drivers, users, settlementPayments } from '@/database/schema';
+import { businesses, drivers, users, settlementPayments, settlementRules } from '@/database/schema';
 
 const normalizeDateValue = (value: string | Date | null | undefined): Date | null => {
     if (!value) return null;
@@ -43,6 +43,17 @@ export const Settlement: SettlementResolvers = {
         if (!settlement.orderId) return null;
         const order = await orderService.getOrderById(String(settlement.orderId));
         return order || null;
+    },
+
+    rule: async (settlement, _, { db }) => {
+        const ruleId = (settlement as any).ruleId;
+        if (!ruleId) return null;
+        const result = await db
+            .select()
+            .from(settlementRules)
+            .where(eq(settlementRules.id, ruleId))
+            .limit(1);
+        return result[0] ?? null;
     },
 
     isSettled: (settlement) => {
