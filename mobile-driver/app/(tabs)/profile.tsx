@@ -1,4 +1,4 @@
-﻿import { View, Text, ScrollView, Pressable, Alert, Linking, StyleSheet } from "react-native";
+﻿import { View, Text, ScrollView, TouchableOpacity, Alert, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/hooks/useTheme";
@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "expo-router";
 import { useMutation } from "@apollo/client/react";
 import { SET_MY_PREFERRED_LANGUAGE_MUTATION, DELETE_MY_ACCOUNT_MUTATION } from "@/graphql/operations/auth";
+import { ProfileRow } from "@/components/ProfileRow";
 
 const AVATAR_COLORS = ["#7C3AED", "#2563EB", "#DB2777", "#EA580C", "#16A34A", "#0891B2"];
 
@@ -15,50 +16,6 @@ function getAvatarColor(seed: string): string {
     let hash = 0;
     for (let i = 0; i < seed.length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash);
     return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
-
-function SettingsRow({
-    icon,
-    iconBg,
-    iconColor,
-    label,
-    sublabel,
-    onPress,
-    chevron = true,
-    danger = false,
-    right,
-}: {
-    icon: string;
-    iconBg: string;
-    iconColor: string;
-    label: string;
-    sublabel?: string;
-    onPress?: () => void;
-    chevron?: boolean;
-    danger?: boolean;
-    right?: React.ReactNode;
-}) {
-    const theme = useTheme();
-    return (
-        <Pressable
-            onPress={onPress}
-            style={({ pressed }) => [
-                s.settingsRow,
-                { backgroundColor: pressed ? theme.colors.border : "transparent" },
-            ]}
-        >
-            <View style={[s.rowIcon, { backgroundColor: iconBg }]}>
-                <Ionicons name={icon as any} size={18} color={iconColor} />
-            </View>
-            <View style={s.rowContent}>
-                <Text style={[s.rowLabel, { color: danger ? "#ef4444" : theme.colors.text }]}>{label}</Text>
-                {sublabel ? <Text style={[s.rowSub, { color: theme.colors.subtext }]}>{sublabel}</Text> : null}
-            </View>
-            {right ?? (chevron && !danger ? (
-                <Ionicons name="chevron-forward" size={16} color={theme.colors.subtext} />
-            ) : null)}
-        </Pressable>
-    );
 }
 
 export default function Profile() {
@@ -79,8 +36,6 @@ export default function Profile() {
         ? `${firstName[0]}${lastName[0]}`.toUpperCase()
         : (user?.email?.substring(0, 2) ?? "DR").toUpperCase();
     const avatarColor = getAvatarColor(user?.id ?? user?.email ?? "driver");
-
-    const currentLangLabel = languageChoice === "en" ? "English" : "Shqip";
 
     const handleLogout = () => {
         Alert.alert(t.profile.logout_title, t.profile.logout_confirm, [
@@ -123,167 +78,134 @@ export default function Profile() {
         );
     };
 
-    const toggleLanguage = async () => {
-        const newLang = languageChoice === "en" ? "al" : "en";
-        setLanguageChoice(newLang);
+    const handleLanguageChoice = async (choice: "en" | "al") => {
+        setLanguageChoice(choice);
         try {
             await setMyPreferredLanguage({
-                variables: { language: newLang === "al" ? "AL" : "EN" },
+                variables: { language: choice === "al" ? "AL" : "EN" },
             });
         } catch {
             setLanguageChoice(languageChoice);
         }
     };
 
-    const isDark = theme.colors.background === "#111827" || theme.colors.card === "#1f2937";
-
     return (
-        <SafeAreaView style={[s.safe, { backgroundColor: theme.colors.background }]} edges={["top"]}>
-            <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 48 }}
-            >
-                {/* ── Avatar + name hero ── */}
-                <View style={[s.hero, { backgroundColor: theme.colors.card }]}>
-                    <View style={[s.avatar, { backgroundColor: avatarColor }]}>
-                        <Text style={s.avatarText}>{initials}</Text>
+        <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={["top"]}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 48 }}>
+
+                {/* ── Avatar + Name Header ── */}
+                <View style={{ paddingHorizontal: 20, paddingTop: 28, paddingBottom: 24, alignItems: "center" }}>
+                    <View style={{
+                        width: 84,
+                        height: 84,
+                        borderRadius: 42,
+                        backgroundColor: avatarColor,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        marginBottom: 14,
+                        shadowColor: avatarColor,
+                        shadowOffset: { width: 0, height: 6 },
+                        shadowOpacity: 0.35,
+                        shadowRadius: 10,
+                        elevation: 8,
+                    }}>
+                        <Text style={{ color: "#fff", fontSize: 30, fontWeight: "800", letterSpacing: -0.5 }}>
+                            {initials}
+                        </Text>
                     </View>
-                    <Text style={[s.heroName, { color: theme.colors.text }]}>{displayName}</Text>
-                    <Text style={[s.heroEmail, { color: theme.colors.subtext }]}>{user?.email ?? "—"}</Text>
-                    <View style={[s.driverBadge, { backgroundColor: theme.colors.primary + "20" }]}>
-                        <Text style={[s.driverBadgeText, { color: theme.colors.primary }]}>
+                    <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: "800", letterSpacing: -0.5, textAlign: "center" }}>
+                        {displayName}
+                    </Text>
+                    {user?.email ? (
+                        <Text style={{ color: theme.colors.subtext, fontSize: 13, marginTop: 3, textAlign: "center" }}>
+                            {user.email}
+                        </Text>
+                    ) : null}
+                    <View style={{ marginTop: 10, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5, backgroundColor: theme.colors.primary + "20" }}>
+                        <Text style={{ fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, color: theme.colors.primary }}>
                             {t.profile.driver_badge}
                         </Text>
                     </View>
                 </View>
 
-                {/* ── Settings sections ── */}
-                <View style={s.sections}>
+                {/* ── Account Section ── */}
+                <View style={{ marginHorizontal: 16, marginBottom: 14, borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
+                    <ProfileRow title="Contact Support" icon="chatbubble-outline" onPress={() => Linking.openURL("mailto:support@zippdelivery.com")} />
+                    <ProfileRow title="Privacy Policy" icon="shield-checkmark-outline" onPress={() => Linking.openURL("https://zippdelivery.com/privacy")} />
+                    <ProfileRow title="Terms of Service" icon="document-text-outline" onPress={() => Linking.openURL("https://zippdelivery.com/terms")} showDivider={false} />
+                </View>
 
-                    {/* Preferences */}
-                    <View style={[s.section, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                        <Text style={[s.sectionTitle, { color: theme.colors.subtext }]}>
-                            {t.profile.language_section}
+                {/* ── Language ── */}
+                <View style={{ marginHorizontal: 16, marginBottom: 14 }}>
+                    <Text style={{ color: theme.colors.subtext, fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 8, marginLeft: 4 }}>
+                        Language / Gjuha
+                    </Text>
+                    <View style={{ flexDirection: "row", gap: 10 }}>
+                        {(["en", "al"] as const).map((lang) => {
+                            const active = languageChoice === lang;
+                            return (
+                                <TouchableOpacity
+                                    key={lang}
+                                    onPress={() => handleLanguageChoice(lang)}
+                                    activeOpacity={0.75}
+                                    style={{
+                                        flex: 1,
+                                        paddingVertical: 12,
+                                        borderRadius: 14,
+                                        borderWidth: 1.5,
+                                        borderColor: active ? theme.colors.primary : theme.colors.border,
+                                        backgroundColor: theme.colors.card,
+                                        alignItems: "center",
+                                        flexDirection: "row",
+                                        justifyContent: "center",
+                                        gap: 6,
+                                    }}
+                                >
+                                    <Text style={{ fontSize: 18 }}>{lang === "en" ? "🇬🇧" : "🇦🇱"}</Text>
+                                    <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: "500" }}>
+                                        {lang === "en" ? "English" : "Shqip"}
+                                    </Text>
+                                    {active && <Ionicons name="checkmark" size={16} color="#16A34A" />}
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+                </View>
+
+                {/* ── Danger Zone ── */}
+                <View style={{ marginHorizontal: 16, marginBottom: 14, borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: "#EF444430", backgroundColor: theme.colors.card }}>
+                    <ProfileRow
+                        title="Delete Account"
+                        icon="trash-outline"
+                        onPress={handleDeleteAccount}
+                        showDivider={false}
+                    />
+                </View>
+
+                {/* ── Logout ── */}
+                <View style={{ marginHorizontal: 16, marginBottom: 36 }}>
+                    <TouchableOpacity
+                        onPress={handleLogout}
+                        activeOpacity={0.8}
+                        style={{
+                            paddingVertical: 15,
+                            borderRadius: 14,
+                            alignItems: "center",
+                            backgroundColor: "#EF444415",
+                            borderWidth: 1.5,
+                            borderColor: "#EF444440",
+                            flexDirection: "row",
+                            justifyContent: "center",
+                            gap: 8,
+                        }}
+                    >
+                        <Ionicons name="log-out-outline" size={18} color="#EF4444" />
+                        <Text style={{ color: "#EF4444", fontSize: 15, fontWeight: "700" }}>
+                            {t.profile.logout}
                         </Text>
-                        <SettingsRow
-                            icon="language-outline"
-                            iconBg={isDark ? "#1e3a5f" : "#eff6ff"}
-                            iconColor="#3b82f6"
-                            label={t.profile.language_toggle}
-                            sublabel={currentLangLabel}
-                            onPress={toggleLanguage}
-                        />
-                    </View>
-
-                    {/* Legal */}
-                    <View style={[s.section, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                        <Text style={[s.sectionTitle, { color: theme.colors.subtext }]}>Legal</Text>
-                        <SettingsRow
-                            icon="shield-checkmark-outline"
-                            iconBg={isDark ? "#1a2e1a" : "#f0fdf4"}
-                            iconColor="#22c55e"
-                            label="Privacy Policy"
-                            onPress={() => Linking.openURL("https://zippdelivery.com/privacy")}
-                        />
-                        <View style={[s.rowDivider, { backgroundColor: theme.colors.border }]} />
-                        <SettingsRow
-                            icon="document-text-outline"
-                            iconBg={isDark ? "#1a2338" : "#eff6ff"}
-                            iconColor="#3b82f6"
-                            label="Terms of Service"
-                            onPress={() => Linking.openURL("https://zippdelivery.com/terms")}
-                        />
-                    </View>
-
-                    {/* Account actions */}
-                    <View style={[s.section, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                        <Text style={[s.sectionTitle, { color: theme.colors.subtext }]}>Account</Text>
-                        <SettingsRow
-                            icon="log-out-outline"
-                            iconBg="rgba(239,68,68,0.12)"
-                            iconColor="#ef4444"
-                            label={t.profile.logout}
-                            onPress={handleLogout}
-                            danger
-                            chevron={false}
-                        />
-                        <View style={[s.rowDivider, { backgroundColor: theme.colors.border }]} />
-                        <SettingsRow
-                            icon="trash-outline"
-                            iconBg="rgba(239,68,68,0.08)"
-                            iconColor="#ef4444"
-                            label="Delete Account"
-                            onPress={handleDeleteAccount}
-                            danger
-                            chevron={false}
-                        />
-                    </View>
+                    </TouchableOpacity>
                 </View>
             </ScrollView>
         </SafeAreaView>
     );
 }
-
-const s = StyleSheet.create({
-    safe: { flex: 1 },
-
-    /* Hero */
-    hero: {
-        alignItems: "center",
-        paddingTop: 36,
-        paddingBottom: 28,
-        paddingHorizontal: 20,
-        marginBottom: 20,
-    },
-    avatar: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        alignItems: "center",
-        justifyContent: "center",
-        marginBottom: 14,
-    },
-    avatarText: { fontSize: 28, fontWeight: "800", color: "#fff" },
-    heroName: { fontSize: 22, fontWeight: "800", letterSpacing: -0.3, marginBottom: 4 },
-    heroEmail: { fontSize: 13, marginBottom: 12 },
-    driverBadge: { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5 },
-    driverBadgeText: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
-
-    /* Sections */
-    sections: { paddingHorizontal: 16, gap: 12 },
-    section: {
-        borderRadius: 20,
-        overflow: "hidden",
-        borderWidth: 1,
-    },
-    sectionTitle: {
-        fontSize: 10,
-        fontWeight: "700",
-        textTransform: "uppercase",
-        letterSpacing: 1,
-        paddingHorizontal: 16,
-        paddingTop: 14,
-        paddingBottom: 6,
-    },
-
-    /* Row */
-    settingsRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        gap: 12,
-    },
-    rowIcon: {
-        width: 36,
-        height: 36,
-        borderRadius: 11,
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-    },
-    rowContent: { flex: 1 },
-    rowLabel: { fontSize: 15, fontWeight: "600" },
-    rowSub: { fontSize: 12, marginTop: 1 },
-    rowDivider: { height: 1, marginHorizontal: 16 },
-});

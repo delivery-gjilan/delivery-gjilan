@@ -7,7 +7,6 @@ import {
     ScrollView,
     RefreshControl,
     ActivityIndicator,
-    StyleSheet,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery } from "@apollo/client/react";
@@ -87,28 +86,37 @@ export default function Home() {
     const capacityColor = capacityPct >= 1 ? "#ef4444" : capacityPct >= 0.75 ? "#f59e0b" : "#22c55e";
 
     return (
-        <SafeAreaView style={[s.safe, { backgroundColor: theme.colors.background }]}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
             <ScrollView
-                contentContainerStyle={s.scroll}
+                contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 48 }}
                 showsVerticalScrollIndicator={false}
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
                 }
             >
-                {/* ── Header row ── */}
-                <View style={s.headerRow}>
+                {/* ── Header ── */}
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
                     <View>
-                        <Text style={[s.greetingLabel, { color: theme.colors.subtext }]}>{greeting}</Text>
-                        <Text style={[s.greetingName, { color: theme.colors.text }]}>{firstName} 👋</Text>
+                        <Text style={{ fontSize: 13, color: theme.colors.subtext, marginBottom: 2 }}>{greeting}</Text>
+                        <Text style={{ fontSize: 26, fontWeight: "800", color: theme.colors.text, letterSpacing: -0.5 }}>
+                            {firstName} 👋
+                        </Text>
                     </View>
 
-                    {/* Online pill + switch */}
-                    <View style={[s.onlinePill, {
+                    {/* Online toggle */}
+                    <View style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 6,
                         backgroundColor: isOnline ? "#f0fdf4" : theme.colors.card,
+                        borderRadius: 28,
+                        paddingHorizontal: 10,
+                        paddingVertical: 7,
+                        borderWidth: 1,
                         borderColor: isOnline ? "#86efac" : theme.colors.border,
-                    }]}>
-                        <View style={[s.onlineDot, { backgroundColor: isOnline ? "#22c55e" : "#9ca3af" }]} />
-                        <Text style={[s.onlineLabel, { color: isOnline ? "#15803d" : theme.colors.subtext }]}>
+                    }}>
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isOnline ? "#22c55e" : "#9ca3af" }} />
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: isOnline ? "#15803d" : theme.colors.subtext }}>
                             {isOnline ? t.home.online : t.home.offline}
                         </Text>
                         <Switch
@@ -124,81 +132,105 @@ export default function Home() {
 
                 {/* ── Dispatch banner ── */}
                 {dispatchModeEnabled && isOnline && (
-                    <View style={s.dispatchBanner}>
+                    <View style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 10,
+                        backgroundColor: "#fffbeb",
+                        borderRadius: 16,
+                        paddingHorizontal: 14,
+                        paddingVertical: 12,
+                        marginBottom: 14,
+                        borderWidth: 1,
+                        borderColor: "#fde68a",
+                    }}>
                         <Ionicons name="car-outline" size={16} color="#92400e" />
                         <View style={{ flex: 1 }}>
-                            <Text style={s.dispatchTitle}>{t.home.dispatch_mode_title}</Text>
-                            <Text style={s.dispatchSub}>{t.home.dispatch_mode_sub}</Text>
+                            <Text style={{ fontSize: 13, fontWeight: "700", color: "#92400e" }}>{t.home.dispatch_mode_title}</Text>
+                            <Text style={{ fontSize: 11, color: "#b45309", marginTop: 1 }}>{t.home.dispatch_mode_sub}</Text>
                         </View>
                     </View>
                 )}
 
-                {/* ── Earnings hero card ── */}
-                <View style={[s.earningsCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                    <View style={s.earningsHeader}>
-                        <Text style={[s.sectionLabel, { color: theme.colors.subtext }]}>{t.home.earnings_today}</Text>
+                {/* ── Earnings hero ── */}
+                <View style={{
+                    borderRadius: 24,
+                    padding: 22,
+                    marginBottom: 12,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                    backgroundColor: theme.colors.card,
+                }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                        <Text style={{ fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 1.2, color: theme.colors.subtext }}>
+                            {t.home.earnings_today}
+                        </Text>
                         {metricsLoading && !m && <ActivityIndicator size="small" color={theme.colors.subtext} />}
                     </View>
 
-                    <Text style={[s.earningsAmount, { color: theme.colors.text }]}>€{netToday.toFixed(2)}</Text>
-                    <Text style={[s.earningsSub, { color: theme.colors.subtext }]}>
+                    <Text style={{ fontSize: 44, fontWeight: "900", letterSpacing: -1.5, color: theme.colors.text, marginBottom: 4 }}>
+                        €{netToday.toFixed(2)}
+                    </Text>
+                    <Text style={{ fontSize: 13, color: theme.colors.subtext, marginBottom: grossToday > 0 ? 14 : 0 }}>
                         {t.home.your_take} · €{grossToday.toFixed(2)} {t.home.gross}
                     </Text>
 
                     {grossToday > 0 && (
-                        <View style={s.commissionRow}>
-                            <View style={s.commissionBadge}>
-                                <Text style={s.commissionBadgeText}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            <View style={{ backgroundColor: "#fef3c7", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
+                                <Text style={{ color: "#92400e", fontSize: 11, fontWeight: "700" }}>
                                     {commissionPct > 0
                                         ? `${commissionPct.toFixed(0)}% ${t.home.commission}`
                                         : `€${commissionTaken.toFixed(2)} ${t.home.commission}`}
                                 </Text>
                             </View>
-                            <Text style={[s.commissionDeduct, { color: theme.colors.subtext }]}>
+                            <Text style={{ fontSize: 11, color: theme.colors.subtext }}>
                                 −€{commissionTaken.toFixed(2)} {t.home.deducted}
                             </Text>
                         </View>
                     )}
                 </View>
 
-                {/* ── Metric tiles ── */}
-                <View style={s.tilesRow}>
-                    <View style={[s.tile, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                        <View style={[s.tileIcon, { backgroundColor: "#eff6ff" }]}>
+                {/* ── Stat tiles ── */}
+                <View style={{ flexDirection: "row", gap: 12, marginBottom: 12 }}>
+                    <View style={{ flex: 1, borderRadius: 20, padding: 18, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
+                        <View style={{ width: 40, height: 40, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: "#eff6ff", marginBottom: 12 }}>
                             <Ionicons name="bicycle-outline" size={20} color="#3b82f6" />
                         </View>
-                        <Text style={[s.tileValue, { color: theme.colors.text }]}>{deliveredToday}</Text>
-                        <Text style={[s.tileLabel, { color: theme.colors.subtext }]}>{t.home.delivered_today}</Text>
+                        <Text style={{ fontSize: 26, fontWeight: "900", letterSpacing: -0.5, color: theme.colors.text, marginBottom: 2 }}>
+                            {deliveredToday}
+                        </Text>
+                        <Text style={{ fontSize: 11, fontWeight: "600", color: theme.colors.subtext }}>{t.home.delivered_today}</Text>
                     </View>
-                    <View style={[s.tile, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                        <View style={[s.tileIcon, { backgroundColor: "#f0fdf4" }]}>
+
+                    <View style={{ flex: 1, borderRadius: 20, padding: 18, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
+                        <View style={{ width: 40, height: 40, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: "#f0fdf4", marginBottom: 12 }}>
                             <Ionicons name="trending-up-outline" size={20} color="#22c55e" />
                         </View>
-                        <Text style={[s.tileValue, { color: theme.colors.text }]}>
+                        <Text style={{ fontSize: 26, fontWeight: "900", letterSpacing: -0.5, color: theme.colors.text, marginBottom: 2 }}>
                             {deliveredToday > 0 ? `€${avgPerDelivery.toFixed(2)}` : "—"}
                         </Text>
-                        <Text style={[s.tileLabel, { color: theme.colors.subtext }]}>{t.home.avg_per_delivery}</Text>
+                        <Text style={{ fontSize: 11, fontWeight: "600", color: theme.colors.subtext }}>{t.home.avg_per_delivery}</Text>
                     </View>
                 </View>
 
-                {/* ── Capacity bar ── */}
-                <View style={[s.card, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                    <View style={s.cardRow}>
-                        <Text style={[s.cardTitle, { color: theme.colors.text }]}>{t.home.active_orders}</Text>
-                        <Text style={[s.cardBadge, {
-                            color: capacityColor,
-                            backgroundColor: capacityColor + "20",
-                        }]}>
-                            {activeOrders} / {maxOrders}
-                        </Text>
+                {/* ── Capacity ── */}
+                <View style={{ borderRadius: 20, padding: 18, marginBottom: 12, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: theme.colors.text }}>{t.home.active_orders}</Text>
+                        <View style={{ backgroundColor: capacityColor + "20", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3 }}>
+                            <Text style={{ fontSize: 13, fontWeight: "800", color: capacityColor }}>{activeOrders} / {maxOrders}</Text>
+                        </View>
                     </View>
-                    <View style={[s.progressTrack, { backgroundColor: theme.colors.border }]}>
-                        <View style={[s.progressFill, {
+                    <View style={{ height: 6, borderRadius: 3, overflow: "hidden", backgroundColor: theme.colors.border, marginBottom: 10 }}>
+                        <View style={{
+                            height: "100%",
+                            borderRadius: 3,
                             width: `${Math.min(100, Math.round(capacityPct * 100))}%` as any,
                             backgroundColor: capacityColor,
-                        }]} />
+                        }} />
                     </View>
-                    <Text style={[s.progressLabel, { color: theme.colors.subtext }]}>
+                    <Text style={{ fontSize: 12, color: theme.colors.subtext }}>
                         {activeOrders === 0
                             ? t.home.no_active_orders
                             : capacityPct >= 1
@@ -208,86 +240,17 @@ export default function Home() {
                 </View>
 
                 {/* ── Connection status ── */}
-                <View style={[s.connRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                    <View style={[s.connDot, { backgroundColor: connColor }]} />
-                    <Text style={[s.connText, { color: theme.colors.subtext }]}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: connColor }} />
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: theme.colors.subtext, flex: 1 }}>
                         {t.home.heartbeat}:{" "}
                         <Text style={{ color: connColor, fontWeight: "700" }}>{connLabel}</Text>
+                        {connectionStatus === "STALE" ? <Text>{"  —  "}{t.home.check_signal}</Text> : null}
                     </Text>
-                    {connectionStatus === "STALE" && (
-                        <Text style={[s.connHint, { color: theme.colors.subtext }]}>— {t.home.check_signal}</Text>
-                    )}
                 </View>
             </ScrollView>
         </SafeAreaView>
     );
 }
 
-const s = StyleSheet.create({
-    safe: { flex: 1 },
-    scroll: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 48 },
 
-    /* header */
-    headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 },
-    greetingLabel: { fontSize: 12, fontWeight: "500", marginBottom: 2 },
-    greetingName: { fontSize: 24, fontWeight: "900", letterSpacing: -0.4 },
-    onlinePill: {
-        flexDirection: "row", alignItems: "center", gap: 5,
-        borderRadius: 28, paddingHorizontal: 10, paddingVertical: 6,
-        borderWidth: 1,
-    },
-    onlineDot: { width: 8, height: 8, borderRadius: 4 },
-    onlineLabel: { fontSize: 13, fontWeight: "700" },
-
-    /* dispatch banner */
-    dispatchBanner: {
-        flexDirection: "row", alignItems: "center", gap: 10,
-        backgroundColor: "#fffbeb", borderRadius: 16,
-        paddingHorizontal: 14, paddingVertical: 12, marginBottom: 14,
-        borderWidth: 1, borderColor: "#fde68a",
-    },
-    dispatchTitle: { fontSize: 13, fontWeight: "700", color: "#92400e" },
-    dispatchSub: { fontSize: 11, color: "#b45309", marginTop: 1 },
-
-    /* earnings card */
-    earningsCard: {
-        borderRadius: 24, padding: 22, marginBottom: 12,
-        borderWidth: 1,
-    },
-    earningsHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
-    sectionLabel: { fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 1.2 },
-    earningsAmount: { fontSize: 42, fontWeight: "900", letterSpacing: -1, marginBottom: 4 },
-    earningsSub: { fontSize: 13, marginBottom: 12 },
-    commissionRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
-    commissionBadge: { backgroundColor: "#fef3c7", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-    commissionBadgeText: { color: "#92400e", fontSize: 11, fontWeight: "700" },
-    commissionDeduct: { fontSize: 11 },
-
-    /* metric tiles */
-    tilesRow: { flexDirection: "row", gap: 12, marginBottom: 12 },
-    tile: {
-        flex: 1, borderRadius: 20, padding: 18,
-        borderWidth: 1,
-    },
-    tileIcon: { width: 40, height: 40, borderRadius: 14, alignItems: "center", justifyContent: "center", marginBottom: 12 },
-    tileValue: { fontSize: 24, fontWeight: "900", letterSpacing: -0.5, marginBottom: 4 },
-    tileLabel: { fontSize: 11, fontWeight: "600" },
-
-    /* generic card */
-    card: { borderRadius: 20, padding: 18, marginBottom: 12, borderWidth: 1 },
-    cardRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
-    cardTitle: { fontSize: 13, fontWeight: "700" },
-    cardBadge: { fontSize: 13, fontWeight: "800", paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10 },
-    progressTrack: { height: 8, borderRadius: 4, overflow: "hidden", marginBottom: 8 },
-    progressFill: { height: "100%", borderRadius: 4 },
-    progressLabel: { fontSize: 11 },
-
-    /* conn status */
-    connRow: {
-        flexDirection: "row", alignItems: "center", gap: 8,
-        borderRadius: 16, padding: 14, borderWidth: 1,
-    },
-    connDot: { width: 8, height: 8, borderRadius: 4 },
-    connText: { fontSize: 12, fontWeight: "600" },
-    connHint: { fontSize: 11 },
-});
