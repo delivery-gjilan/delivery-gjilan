@@ -82,6 +82,12 @@ export const promotions = pgTable(
         creatorType: promotionCreatorTypeEnum('creator_type').default('PLATFORM').notNull(),
         creatorId: uuid('creator_id').references(() => businesses.id, { onDelete: 'set null' }), // null = platform
 
+        // Recovery / compensation flag — hidden from main promotions list
+        isRecovery: boolean('is_recovery').default(false).notNull(),
+
+        // For recovery promos: the order that triggered the compensation
+        orderId: uuid('order_id').references(() => orders.id, { onDelete: 'set null' }),
+
         // Soft-delete
         isDeleted: boolean('is_deleted').default(false).notNull(),
 

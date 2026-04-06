@@ -35,6 +35,9 @@ export interface CreatePromotionInput {
 
     /** Required for delivery-fee promotions (FREE_DELIVERY / SPEND_X_GET_FREE). Fixed euros per order. */
     driverPayoutAmount?: number;
+
+    /** Recovery/compensation promotion — hidden from main promotions list */
+    isRecovery?: boolean;
 }
 
 export interface UpdatePromotionInput {
@@ -88,6 +91,7 @@ export class PromotionService {
             totalRevenue: promo.totalRevenue || 0,
             creatorType: promo.creatorType,
             creatorId: promo.creatorId,
+            isRecovery: promo.isRecovery,
         };
     }
 
@@ -162,6 +166,7 @@ export class PromotionService {
             creatorType: input.creatorType as any,
             creatorId: input.creatorId ?? null,
             createdBy: null, // Will be set by GraphQL resolver
+            isRecovery: input.isRecovery ?? false,
         } as NewDbPromotion);
 
         // Assign to specific users if provided
@@ -325,12 +330,61 @@ export class PromotionService {
         return this.repository.delete(id);
     }
 
-    async assignPromotionToUsers(promotionId: string, userIds: string[]): Promise<void> {
+    async assignPromotionToUsers(promotionId: string, userIds: string[], expiresAt?: string): Promise<void> {
         const promo = await this.getPromotion(promotionId);
         if (promo.target !== 'SPECIFIC_USERS') {
             log.warn({ promotionId }, 'promo:assignUsers:wrongTarget');
         }
-        await this.repository.assignToUsers(promotionId, userIds);
+        await this.repository.assignToUsers(promotionId, userIds, expiresAt ?? null);
+    }
+
+    /**
+     * One-shot helper: create a recovery/compensation promotion and immediately assign it
+     * to the specified users. The promotion is marked `isRecovery: true` so it will not
+     * appear on the main promotions listing.
+     */
+    async issueRecoveryPromotion(
+        input: {
+            type: CreatePromotionInput['type'];
+            discountValue?: number;
+            userIds: string[];
+            orderId: string;
+            reason: string;
+            expiresAt?: string;
+        },
+        userData: { role?: string; userId?: string },
+    ): Promise<any[]> {
+        const expiresAt = input.expiresAt ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+        const promo = await this.createPromotion(
+            {
+                name: `[Recovery] ${input.reason}`,
+                description: input.reason,
+                type: input.type,
+                target: 'SPECIFIC_USERS',
+                discountValue: input.discountValue,
+                maxUsagePerUser: 1,
+                maxGlobalUsage: input.userIds.length,
+                isStackable: false,
+                priority: 10,
+                isActive: true,
+                isRecovery: true,
+                creatorType: 'PLATFORM',
+                // driverPayoutAmount required for free delivery — default to a sensible value
+                ...(input.type === 'FREE_DELIVERY' ? { driverPayoutAmount: input.discountValue ?? 2 } : {}),
+            },
+            userData,
+        );
+
+        // Store the orderId reference on this recovery promotion
+        if (input.orderId) {
+            await this.repository.update(promo.id, { orderId: input.orderId } as any);
+        }
+
+        await this.repository.assignToUsers(promo.id, input.userIds, expiresAt);
+
+        const assignments = await this.repository.getUserAssignmentsForPromotion(promo.id);
+        return assignments;
     }
 
     async setBusinessRestriction(promotionId: string, businessIds: string[]): Promise<void> {

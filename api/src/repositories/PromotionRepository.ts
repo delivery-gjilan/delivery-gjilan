@@ -198,7 +198,14 @@ export class PromotionRepository {
         return await query;
     }
 
-    async assignToUsers(promotionId: string, userIds: string[]): Promise<void> {
+    async getUserAssignmentsForPromotion(promotionId: string): Promise<any[]> {
+        return this.db
+            .select()
+            .from(userPromotions)
+            .where(eq(userPromotions.promotionId, promotionId));
+    }
+
+    async assignToUsers(promotionId: string, userIds: string[], expiresAt?: string | null): Promise<void> {
         if (userIds.length === 0) return;
         
         await this.db
@@ -207,6 +214,7 @@ export class PromotionRepository {
                 userIds.map(userId => ({
                     userId,
                     promotionId,
+                    ...(expiresAt ? { expiresAt } : {}),
                 }))
             );
     }

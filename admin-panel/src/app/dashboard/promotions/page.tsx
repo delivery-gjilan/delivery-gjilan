@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@apollo/client/react";
-import { Tag, Plus, Edit, Trash2 } from "lucide-react";
+import { Tag, Plus, Edit, Trash2, HeartHandshake, CheckCircle2, Clock, Users } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
@@ -10,9 +10,9 @@ import Select from "@/components/ui/Select";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { GET_BUSINESSES } from "@/graphql/operations/businesses";
 import { Table, Th, Td } from "@/components/ui/Table";
-import { GET_PROMOTIONS } from "@/graphql/operations/promotions/queries";
+import { GET_PROMOTIONS, GET_RECOVERY_PROMOTIONS } from "@/graphql/operations/promotions/queries";
 import { CREATE_PROMOTION, UPDATE_PROMOTION, DELETE_PROMOTION } from "@/graphql/operations/promotions/mutations";
-import type { PromotionType, PromotionTarget, GetPromotionsQuery } from "@/gql/graphql";
+import type { PromotionType, PromotionTarget, GetPromotionsQuery, GetRecoveryPromotionsQuery } from "@/gql/graphql";
 
 const promotionTypeLabels: Record<PromotionType, string> = {
     FIXED_AMOUNT: "Fixed Amount",
@@ -131,6 +131,7 @@ export default function PromotionsPage() {
         onCompleted: () => refetch(),
     });
 
+    const [activeTab, setActiveTab] = useState<"promotions" | "compensations">("promotions");
     const [showModal, setShowModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [editingPromotion, setEditingPromotion] = useState<GetPromotionsQuery["getAllPromotions"][number] | null>(null);
@@ -138,6 +139,11 @@ export default function PromotionsPage() {
     const [formData, setFormData] = useState<PromotionFormState>(emptyForm);
     const [searchTerm, setSearchTerm] = useState("");
     const [wizardStep, setWizardStep] = useState(1);
+
+    const { data: recoveryData, loading: recoveryLoading } = useQuery<GetRecoveryPromotionsQuery>(GET_RECOVERY_PROMOTIONS, {
+        fetchPolicy: "cache-and-network",
+    });
+    const recoveryPromotions = useMemo(() => (recoveryData as any)?.getRecoveryPromotions ?? [], [recoveryData]);
 
     const { data: businessesData, loading: businessesLoading } = useQuery(GET_BUSINESSES);
     const businesses = businessesData?.businesses || [];
@@ -260,6 +266,13 @@ export default function PromotionsPage() {
             : "bg-neutral-500/10 text-zinc-500 border-neutral-500/30";
     };
 
+    const formatCompensationValue = (promo: GetRecoveryPromotionsQuery["getRecoveryPromotions"][number]) => {
+        if (promo.type === "FREE_DELIVERY") return "Free Delivery";
+        if (promo.type === "PERCENTAGE") return `${promo.discountValue}% off`;
+        if (promo.discountValue != null) return `€${promo.discountValue.toFixed(2)} off`;
+        return "-";
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -272,10 +285,43 @@ export default function PromotionsPage() {
                         Manage promotions, wallet credits, and targeted campaigns.
                     </p>
                 </div>
-                <Button onClick={handleOpenCreate}>
-                    <Plus size={18} className="mr-2" />
-                    Create Promotion
-                </Button>
+                {activeTab === "promotions" && (
+                    <Button onClick={handleOpenCreate}>
+                        <Plus size={18} className="mr-2" />
+                        Create Promotion
+                    </Button>
+                )}
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-1 border-b border-zinc-800">
+                <button
+                    onClick={() => setActiveTab("promotions")}
+                    className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                        activeTab === "promotions"
+                            ? "border-violet-500 text-violet-300"
+                            : "border-transparent text-zinc-500 hover:text-zinc-300"
+                    }`}
+                >
+                    <span className="flex items-center gap-2"><Tag size={14} /> Promotions</span>
+                </button>
+                <button
+                    onClick={() => setActiveTab("compensations")}
+                    className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                        activeTab === "compensations"
+                            ? "border-violet-500 text-violet-300"
+                            : "border-transparent text-zinc-500 hover:text-zinc-300"
+                    }`}
+                >
+                    <span className="flex items-center gap-2">
+                        <HeartHandshake size={14} /> Compensations
+                        {recoveryPromotions.length > 0 && (
+                            <span className="ml-1 bg-violet-900/60 text-violet-300 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-violet-700/50">
+                                {recoveryPromotions.length}
+                            </span>
+                        )}
+                    </span>
+                </button>
             </div>
 
             {error && (
@@ -284,6 +330,8 @@ export default function PromotionsPage() {
                 </div>
             )}
 
+            {/* ── Promotions Tab ── */}
+            {activeTab === "promotions" && (
             <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
                 {loading ? (
                     <div className="p-6 text-zinc-500">Loading promotions...</div>
@@ -380,6 +428,121 @@ export default function PromotionsPage() {
                     </Table>
                 )}
             </div>
+            )} {/* end promotions tab */}
+
+            {/* ── Compensations Tab ── */}
+            {activeTab === "compensations" && (
+                <div className="space-y-4">
+                    <div className="bg-violet-950/30 border border-violet-800/40 rounded-lg p-4 text-sm text-violet-200 flex gap-3">
+                        <HeartHandshake size={16} className="mt-0.5 shrink-0 text-violet-400" />
+                        <div>
+                            <div className="font-medium mb-1">How compensation promotions work</div>
+                            <div className="text-violet-300/80">
+                                When you issue a compensation from the Cancelled Orders page, a one-time hidden promotion is created
+                                for that specific user. It has <code className="text-violet-300 bg-violet-900/40 px-1 rounded">target: SPECIFIC_USERS</code> and{" "}
+                                <code className="text-violet-300 bg-violet-900/40 px-1 rounded">maxUsagePerUser: 1</code>, so it can
+                                only be used once. It <strong>auto-applies at checkout</strong> — the customer never needs to enter a code.
+                                Recovery promotions are excluded from the regular Promotions list.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+                        {recoveryLoading ? (
+                            <div className="p-6 text-zinc-500">Loading compensations...</div>
+                        ) : (
+                            <Table>
+                                <thead>
+                                    <tr>
+                                        <Th>Reason</Th>
+                                        <Th>Value</Th>
+                                        <Th>Assigned To</Th>
+                                        <Th>Status</Th>
+                                        <Th>Usage</Th>
+                                        <Th>Expires</Th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {recoveryPromotions.length === 0 ? (
+                                        <tr>
+                                            <Td colSpan={6}>
+                                                <div className="text-center py-10 text-zinc-500">
+                                                    No compensation promotions issued yet.
+                                                </div>
+                                            </Td>
+                                        </tr>
+                                    ) : (
+                                        recoveryPromotions.map((promo: GetRecoveryPromotionsQuery["getRecoveryPromotions"][number]) => {
+                                            const assignments = promo.assignedUsers ?? [];
+                                            const usedCount = assignments.filter((a) => a.usageCount > 0).length;
+                                            return (
+                                                <tr key={promo.id}>
+                                                    <Td>
+                                                        <div className="text-white font-semibold text-sm">{promo.name}</div>
+                                                        {promo.description && (
+                                                            <div className="text-xs text-zinc-400 mt-0.5 max-w-[220px]">{promo.description}</div>
+                                                        )}
+                                                    </Td>
+                                                    <Td>
+                                                        <div className="text-sm text-white">{formatCompensationValue(promo)}</div>
+                                                    </Td>
+                                                    <Td>
+                                                        {assignments.length > 0 ? (
+                                                            <div className="space-y-1">
+                                                                {assignments.map((a) => (
+                                                                    <div key={a.userId} className="text-sm">
+                                                                        {a.user ? (
+                                                                            <>
+                                                                                <div className="text-white font-medium">{a.user.firstName} {a.user.lastName}</div>
+                                                                                {a.user.phoneNumber && (
+                                                                                    <div className="text-xs text-zinc-500">{a.user.phoneNumber}</div>
+                                                                                )}
+                                                                            </>
+                                                                        ) : (
+                                                                            <div className="text-zinc-500 text-xs font-mono">{a.userId}</div>
+                                                                        )}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-zinc-600 text-sm">—</span>
+                                                        )}
+                                                    </Td>
+                                                    <Td>
+                                                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${promo.isActive ? "bg-green-500/10 text-green-400 border-green-500/30" : "bg-neutral-500/10 text-zinc-500 border-neutral-500/30"}`}>
+                                                            {promo.isActive ? <><CheckCircle2 size={10} /> Active</> : "Inactive"}
+                                                        </span>
+                                                    </Td>
+                                                    <Td>
+                                                        {assignments.length > 0 ? (
+                                                            <div className="text-sm">
+                                                                {usedCount > 0 ? (
+                                                                    <span className="text-green-400">{usedCount} used</span>
+                                                                ) : (
+                                                                    <span className="text-zinc-500 flex items-center gap-1"><Clock size={11} /> Pending</span>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-zinc-600 text-sm">—</span>
+                                                        )}
+                                                    </Td>
+                                                    <Td>
+                                                        {assignments[0]?.expiresAt ? (
+                                                            <span className="text-xs text-zinc-400">{formatDate(assignments[0].expiresAt)}</span>
+                                                        ) : (
+                                                            <span className="text-zinc-600 text-sm">No expiry</span>
+                                                        )}
+                                                    </Td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </Table>
+                        )}
+                    </div>
+                </div>
+            )} {/* end compensations tab */}
 
             {/* Create/Edit Modal - Wizard */}
             <Modal isOpen={showModal} onClose={handleCloseModal} title={editingPromotion ? "Edit Promotion" : "Create Promotion"}>

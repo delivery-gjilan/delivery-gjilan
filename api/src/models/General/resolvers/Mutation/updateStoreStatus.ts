@@ -4,6 +4,7 @@ import { storeSettings } from '@/database/schema/storeSettings';
 import { eq } from 'drizzle-orm';
 import { publish, pubsub, topics } from '@/lib/pubsub';
 import { GraphQLError } from 'graphql';
+import { cache } from '@/lib/cache';
 
 export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus']> = async (
   _parent,
@@ -85,6 +86,8 @@ export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus
     bannerType: result.bannerType,
     dispatchModeEnabled: result.dispatchModeEnabled,
   } as any);
+
+  await cache.invalidateStoreStatus();
 
   return result as any;
 };

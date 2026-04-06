@@ -3,21 +3,33 @@
 import { ReactNode } from "react";
 import { X } from "lucide-react";
 
+const SIZE_CLASSES: Record<string, string> = {
+  sm: "max-w-md",
+  md: "max-w-xl",
+  lg: "max-w-3xl",
+  xl: "max-w-5xl",
+  "2xl": "max-w-7xl",
+};
+
 export default function Modal({
   isOpen,
   open,
   onClose,
   title,
   children,
+  size = "md",
 }: {
   isOpen?: boolean;
   open?: boolean;
   title: string;
   onClose: () => void;
   children: ReactNode;
+  size?: "sm" | "md" | "lg" | "xl" | "2xl";
 }) {
   const visible = isOpen ?? open ?? false;
   if (!visible) return null;
+
+  const maxW = SIZE_CLASSES[size] ?? SIZE_CLASSES.md;
 
   return (
     <div 
@@ -25,7 +37,7 @@ export default function Modal({
       onClick={onClose}
     >
       <div 
-        className="bg-[#111113] border border-[#1e1e22] rounded-xl w-full max-w-xl my-12 p-5 shadow-2xl"
+        className={`bg-[#111113] border border-[#1e1e22] rounded-xl w-full ${maxW} my-8 p-6 shadow-2xl`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-5 pb-3 border-b border-zinc-800/50">
@@ -37,7 +49,7 @@ export default function Modal({
             <X size={16} />
           </button>
         </div>
-        <div className="max-h-[calc(100vh-12rem)] overflow-y-auto">
+        <div className="max-h-[calc(100vh-10rem)] overflow-y-auto">
           {children}
         </div>
       </div>

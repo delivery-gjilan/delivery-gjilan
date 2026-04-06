@@ -222,6 +222,14 @@ export class OrderLifecycleModule {
         await this.publishing.publishAllOrders();
         notifyCustomerOrderStatus(notificationService, dbOrder.userId, id, status);
 
+        // If the order is being reverted away from READY (e.g. admin pushes it back to
+        // PENDING or PREPARING), clear the dispatch cache key so that when it becomes
+        // READY again a fresh dispatch fires and drivers are re-notified.
+        if (currentStatus === 'READY' && (status === 'PENDING' || status === 'PREPARING')) {
+            await cache.del(`dispatch:early:${id}`).catch(() => null);
+            log.info({ orderId: id }, 'updateStatus — order reverted from READY, dispatch cache cleared');
+        }
+
         if (status === 'READY' && currentStatus !== 'READY') {
             try {
                 const dispatchService = getDispatchService();
@@ -394,6 +402,9 @@ export class OrderLifecycleModule {
 
             try {
                 const dispatchService = getDispatchService();
+                // Clear any stale 'fired' dispatch state — admin may be re-starting prep
+                // after reverting the order, and drivers should be re-notified when READY.
+                await cache.del(`dispatch:early:${id}`).catch(() => null);
                 dispatchService
                     .scheduleEarlyDispatch(id, preparationMinutes, context.notificationService)
                     .catch((err) => log.error({ err, orderId: id }, 'startPreparing:earlyDispatch:error'));

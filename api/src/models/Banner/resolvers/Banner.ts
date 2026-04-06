@@ -1,44 +1,18 @@
 import type { BannerResolvers } from './../../../generated/types.generated';
-import { db } from '../../../../database';
-import { businesses } from '../../../../database/schema/businesses';
-import { products } from '../../../../database/schema/products';
-import { promotions } from '../../../../database/schema/promotions';
-import { eq } from 'drizzle-orm';
 
 export const Banner: BannerResolvers = {
-  business: async (parent, _args, _ctx) => {
+  business: async (parent, _args, { loaders }) => {
     if (!parent.businessId) return null;
-    
-    const [business] = await db
-      .select()
-      .from(businesses)
-      .where(eq(businesses.id, parent.businessId as string))
-      .limit(1);
-    
-    return (business || null) as any;
+    return loaders.businessByIdLoader.load(parent.businessId as string) as any;
   },
-  
-  product: async (parent, _args, _ctx) => {
+
+  product: async (parent, _args, { loaders }) => {
     if (!parent.productId) return null;
-    
-    const [product] = await db
-      .select()
-      .from(products)
-      .where(eq(products.id, parent.productId as string))
-      .limit(1);
-    
-    return (product || null) as any;
+    return loaders.productByIdLoader.load(parent.productId as string) as any;
   },
-  
-  promotion: async (parent, _args, _ctx) => {
+
+  promotion: async (parent, _args, { loaders }) => {
     if (!parent.promotionId) return null;
-    
-    const [promotion] = await db
-      .select()
-      .from(promotions)
-      .where(eq(promotions.id, parent.promotionId as string))
-      .limit(1);
-    
-    return (promotion || null) as any;
+    return loaders.promotionByIdLoader.load(parent.promotionId as string) as any;
   },
 };

@@ -5,6 +5,8 @@ import { useTheme } from '@/hooks/useTheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useAuth } from '@/hooks/useAuth';
+import { useEffect } from 'react';
+import { useNavigationStore } from '@/store/navigationStore';
 
 export default function TabLayout() {
     const theme = useTheme();
@@ -12,6 +14,17 @@ export default function TabLayout() {
     const insets = useSafeAreaInsets();
     const { t } = useTranslations();
     const { logout } = useAuth();
+    const isNavigating = useNavigationStore((s) => s.isNavigating);
+
+    // If the driver had an active navigation session before the app was killed,
+    // restore them to the navigation screen immediately on mount.
+    useEffect(() => {
+        if (isNavigating) {
+            router.replace('/navigation' as any);
+        }
+    // Only run on mount — we don't want to force-redirect every time isNavigating changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleLogout = async () => {
         try {
@@ -45,7 +58,7 @@ export default function TabLayout() {
             />
 
             <Tabs.Screen
-                name="map"
+                name="drive"
                 options={{
                     title: t.tabs.map,
                     tabBarIcon: ({ color, size }) => <Ionicons name="map" size={size} color={color} />,
@@ -53,7 +66,7 @@ export default function TabLayout() {
             />
 
             <Tabs.Screen
-                name="add"
+                name="earnings"
                 options={{
                     title: t.tabs.earnings,
                     tabBarIcon: ({ color, size }) => <Ionicons name="cash-outline" size={size} color={color} />,

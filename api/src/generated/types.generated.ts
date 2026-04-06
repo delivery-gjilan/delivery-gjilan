@@ -531,6 +531,7 @@ export type CreatePromotionInput = {
   eligibleBusinessIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   endsAt?: InputMaybe<Scalars['String']['input']>;
   isActive: Scalars['Boolean']['input'];
+  isRecovery?: InputMaybe<Scalars['Boolean']['input']>;
   isStackable: Scalars['Boolean']['input'];
   maxDiscountCap?: InputMaybe<Scalars['Float']['input']>;
   maxGlobalUsage?: InputMaybe<Scalars['Int']['input']>;
@@ -895,6 +896,15 @@ export type InitiateSignupInput = {
   referralCode?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type IssueRecoveryPromotionInput = {
+  discountValue?: InputMaybe<Scalars['Float']['input']>;
+  expiresAt?: InputMaybe<Scalars['String']['input']>;
+  orderId: Scalars['ID']['input'];
+  reason: Scalars['String']['input'];
+  type: PromotionType;
+  userIds: Array<Scalars['ID']['input']>;
+};
+
 export type Location = {
   __typename?: 'Location';
   address: Scalars['String']['output'];
@@ -1002,6 +1012,7 @@ export type Mutation = {
   generateReferralCode: Scalars['String']['output'];
   grantFreeDelivery: Scalars['Boolean']['output'];
   initiateSignup: AuthResponse;
+  issueRecoveryPromotion: Array<UserPromotion>;
   login: AuthResponse;
   logoutAllSessions: Scalars['Boolean']['output'];
   logoutCurrentSession: Scalars['Boolean']['output'];
@@ -1386,6 +1397,11 @@ export type MutationinitiateSignupArgs = {
 };
 
 
+export type MutationissueRecoveryPromotionArgs = {
+  input: IssueRecoveryPromotionInput;
+};
+
+
 export type MutationloginArgs = {
   input: LoginInput;
 };
@@ -1487,6 +1503,7 @@ export type MutationsendBusinessMessageArgs = {
 
 export type MutationsendCampaignArgs = {
   id: Scalars['ID']['input'];
+  promotionId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 
@@ -2050,12 +2067,14 @@ export type Promotion = {
   endsAt?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
   isActive: Scalars['Boolean']['output'];
+  isRecovery: Scalars['Boolean']['output'];
   isStackable: Scalars['Boolean']['output'];
   maxDiscountCap?: Maybe<Scalars['Float']['output']>;
   maxGlobalUsage?: Maybe<Scalars['Int']['output']>;
   maxUsagePerUser?: Maybe<Scalars['Int']['output']>;
   minOrderAmount?: Maybe<Scalars['Float']['output']>;
   name: Scalars['String']['output'];
+  orderId?: Maybe<Scalars['ID']['output']>;
   priority: Scalars['Int']['output'];
   spendThreshold?: Maybe<Scalars['Float']['output']>;
   startsAt?: Maybe<Scalars['String']['output']>;
@@ -2212,6 +2231,7 @@ export type Query = {
   getPromotionAnalytics: PromotionAnalyticsResult;
   getPromotionThresholds: Array<PromotionThreshold>;
   getPromotionUsage: Array<PromotionUsage>;
+  getRecoveryPromotions: Array<Promotion>;
   getStoreStatus: StoreStatus;
   getUserPromoMetadata?: Maybe<UserPromoMetadata>;
   getUserPromotions: Array<UserPromotion>;
@@ -2369,6 +2389,7 @@ export type QuerygetAgoraRtcCredentialsArgs = {
 
 
 export type QuerygetAllPromotionsArgs = {
+  includeRecovery?: InputMaybe<Scalars['Boolean']['input']>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
@@ -3454,6 +3475,7 @@ export type ResolversTypes = {
   GetBannersFilter: GetBannersFilter;
   HourlyDistribution: ResolverTypeWrapper<HourlyDistribution>;
   InitiateSignupInput: InitiateSignupInput;
+  IssueRecoveryPromotionInput: IssueRecoveryPromotionInput;
   JSON: ResolverTypeWrapper<Scalars['JSON']['output']>;
   Location: ResolverTypeWrapper<Location>;
   LocationInput: LocationInput;
@@ -3641,6 +3663,7 @@ export type ResolversParentTypes = {
   GetBannersFilter: GetBannersFilter;
   HourlyDistribution: HourlyDistribution;
   InitiateSignupInput: InitiateSignupInput;
+  IssueRecoveryPromotionInput: IssueRecoveryPromotionInput;
   JSON: Scalars['JSON']['output'];
   Location: Location;
   LocationInput: LocationInput;
@@ -4257,6 +4280,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   generateReferralCode?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   grantFreeDelivery?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationgrantFreeDeliveryArgs, 'orderId' | 'userId'>>;
   initiateSignup?: Resolver<ResolversTypes['AuthResponse'], ParentType, ContextType, RequireFields<MutationinitiateSignupArgs, 'input'>>;
+  issueRecoveryPromotion?: Resolver<Array<ResolversTypes['UserPromotion']>, ParentType, ContextType, RequireFields<MutationissueRecoveryPromotionArgs, 'input'>>;
   login?: Resolver<ResolversTypes['AuthResponse'], ParentType, ContextType, RequireFields<MutationloginArgs, 'input'>>;
   logoutAllSessions?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   logoutCurrentSession?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationlogoutCurrentSessionArgs, 'refreshToken'>>;
@@ -4609,12 +4633,14 @@ export type PromotionResolvers<ContextType = GraphQLContext, ParentType extends 
   endsAt?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   isActive?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  isRecovery?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   isStackable?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   maxDiscountCap?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   maxGlobalUsage?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
   maxUsagePerUser?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
   minOrderAmount?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  orderId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   priority?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   spendThreshold?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   startsAt?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
@@ -4745,6 +4771,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   getPromotionAnalytics?: Resolver<ResolversTypes['PromotionAnalyticsResult'], ParentType, ContextType, RequireFields<QuerygetPromotionAnalyticsArgs, 'promotionId'>>;
   getPromotionThresholds?: Resolver<Array<ResolversTypes['PromotionThreshold']>, ParentType, ContextType, RequireFields<QuerygetPromotionThresholdsArgs, 'cart'>>;
   getPromotionUsage?: Resolver<Array<ResolversTypes['PromotionUsage']>, ParentType, ContextType, RequireFields<QuerygetPromotionUsageArgs, 'promotionId'>>;
+  getRecoveryPromotions?: Resolver<Array<ResolversTypes['Promotion']>, ParentType, ContextType>;
   getStoreStatus?: Resolver<ResolversTypes['StoreStatus'], ParentType, ContextType, Partial<QuerygetStoreStatusArgs>>;
   getUserPromoMetadata?: Resolver<Maybe<ResolversTypes['UserPromoMetadata']>, ParentType, ContextType, RequireFields<QuerygetUserPromoMetadataArgs, 'userId'>>;
   getUserPromotions?: Resolver<Array<ResolversTypes['UserPromotion']>, ParentType, ContextType, RequireFields<QuerygetUserPromotionsArgs, 'userId'>>;

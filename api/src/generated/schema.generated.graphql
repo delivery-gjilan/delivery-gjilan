@@ -508,6 +508,7 @@ input CreatePromotionInput {
   eligibleBusinessIds: [ID!]
   endsAt: String
   isActive: Boolean!
+  isRecovery: Boolean
   isStackable: Boolean!
   maxDiscountCap: Float
   maxGlobalUsage: Int
@@ -896,6 +897,15 @@ input InitiateSignupInput {
   referralCode: String
 }
 
+input IssueRecoveryPromotionInput {
+  discountValue: Float
+  expiresAt: String
+  orderId: ID!
+  reason: String!
+  type: PromotionType!
+  userIds: [ID!]!
+}
+
 scalar JSON
 
 type Location {
@@ -1033,6 +1043,7 @@ type Mutation {
   generateReferralCode: String!
   grantFreeDelivery(orderId: ID!, userId: ID!): Boolean!
   initiateSignup(input: InitiateSignupInput!): AuthResponse!
+  issueRecoveryPromotion(input: IssueRecoveryPromotionInput!): [UserPromotion!]!
   login(input: LoginInput!): AuthResponse!
   logoutAllSessions: Boolean!
   logoutCurrentSession(refreshToken: String!): Boolean!
@@ -1064,7 +1075,7 @@ type Mutation {
 
   """Admin sends a message to a business user"""
   sendBusinessMessage(alertType: MessageAlertType!, body: String!, businessUserId: ID!): BusinessMessage!
-  sendCampaign(id: ID!): NotificationCampaign!
+  sendCampaign(id: ID!, promotionId: ID): NotificationCampaign!
 
   """Admin sends a message to a driver"""
   sendDriverMessage(alertType: MessageAlertType!, body: String!, driverId: ID!): DriverMessage!
@@ -1415,12 +1426,14 @@ type Promotion {
   endsAt: String
   id: ID!
   isActive: Boolean!
+  isRecovery: Boolean!
   isStackable: Boolean!
   maxDiscountCap: Float
   maxGlobalUsage: Int
   maxUsagePerUser: Int
   minOrderAmount: Float
   name: String!
+  orderId: ID
   priority: Int!
   spendThreshold: Float
   startsAt: String
@@ -1575,7 +1588,7 @@ type Query {
 
   """Get Agora RTC credentials for the current authenticated user"""
   getAgoraRtcCredentials(channelName: String!, role: AgoraRtcRole!): AgoraRtcCredentials!
-  getAllPromotions(isActive: Boolean): [Promotion!]!
+  getAllPromotions(includeRecovery: Boolean, isActive: Boolean): [Promotion!]!
   getApplicablePromotions(cart: CartContextInput!, manualCode: String): [ApplicablePromotion!]!
   getBanner(id: ID!): Banner
   getBanners(filter: GetBannersFilter): [Banner!]!
@@ -1583,6 +1596,7 @@ type Query {
   getPromotionAnalytics(promotionId: ID!): PromotionAnalyticsResult!
   getPromotionThresholds(cart: CartContextInput!): [PromotionThreshold!]!
   getPromotionUsage(limit: Int, offset: Int, promotionId: ID!): [PromotionUsage!]!
+  getRecoveryPromotions: [Promotion!]!
   getStoreStatus(url: String): StoreStatus!
   getUserPromoMetadata(userId: ID!): UserPromoMetadata
   getUserPromotions(userId: ID!): [UserPromotion!]!

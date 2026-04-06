@@ -270,6 +270,44 @@ export const yoga = createYoga({
             maxDirectives: { n: 10 },
             maxTokens: { n: 1000 },
         }),
+        // Response-level cache for the public businesses feed.
+        // Skips GraphQL execution (context creation, resolver dispatch, field resolution)
+        // on cache hits. Only caches unauthenticated requests — authenticated users may have
+        // personalised data layered on top.
+        {
+            onExecute({ args, setResultAndStopExecution }) {
+                const isAnonymous = !(args.contextValue as any)?.userData?.userId;
+                if (!isAnonymous) return;
+
+                const isBusinessesQuery = args.document.definitions.some(
+                    (d: any) =>
+                        d.kind === 'OperationDefinition' &&
+                        d.selectionSet?.selections?.some(
+                            (s: any) => s.kind === 'Field' && s.name?.value === 'businesses',
+                        ),
+                );
+                if (!isBusinessesQuery) return;
+
+                return {
+                    async onExecuteDone({ result, setResult }) {
+                        // Only cache single (non-async-iterable) results without errors
+                        if (Symbol.asyncIterator in result) return;
+                        if ((result as any).errors?.length) return;
+                        await cache.set(
+                            cache.keys.businessesResponse(),
+                            result,
+                            cache.TTL.BUSINESSES_RESPONSE,
+                        );
+                    },
+                } as any;
+            },
+            async onParams({ params, setResult }) {
+                // Early-return cached response before execution begins
+                if (!params.query?.includes('businesses')) return;
+                const cached = await cache.get<object>(cache.keys.businessesResponse());
+                if (cached) setResult(cached);
+            },
+        },
     ],
 });
 

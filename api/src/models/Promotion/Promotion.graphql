@@ -47,6 +47,12 @@ type Promotion {
   totalUsageCount: Int!
   totalRevenue: Float!
 
+  # Flags
+  isRecovery: Boolean!
+
+  # For recovery promotions: the order that triggered the compensation
+  orderId: ID
+
   # Creator
   creatorType: PromotionCreatorType!
   creatorId: ID
@@ -161,6 +167,9 @@ input CreatePromotionInput {
   # Optional: Restrict to specific businesses
   eligibleBusinessIds: [ID!]
 
+  # Mark as recovery/compensation — hides from main promotions list
+  isRecovery: Boolean
+
   # Required for delivery-fee promotions (FREE_DELIVERY / SPEND_X_GET_FREE)
   # This is always a FIXED euro amount per order.
   driverPayoutAmount: Float
@@ -170,6 +179,24 @@ input UpdatePromotionInput {
   id: ID!
   name: String
   code: String
+}
+
+input IssueRecoveryPromotionInput {
+  # Discount type and value
+  type: PromotionType!
+  discountValue: Float
+
+  # User(s) to compensate
+  userIds: [ID!]!
+
+  # The order this compensation is for
+  orderId: ID!
+
+  # Human-readable reason (used as promotion name/description internally)
+  reason: String!
+
+  # ISO datetime string; if omitted defaults to 30 days from now
+  expiresAt: String
 }
 
 input AssignPromotionToUserInput {
@@ -197,8 +224,11 @@ input CartItemInput {
 # ============================================
 
 type Query {
-  # Get all promotions (admin)
-  getAllPromotions(isActive: Boolean): [Promotion!]!
+  # Get all promotions (admin). Recovery promotions are excluded by default.
+  getAllPromotions(isActive: Boolean, includeRecovery: Boolean): [Promotion!]!
+
+  # Get all recovery/compensation promotions with their assigned users (admin only)
+  getRecoveryPromotions: [Promotion!]!
   
   # Get single promotion
   getPromotion(id: ID!): Promotion
@@ -257,6 +287,9 @@ type Mutation {
   
   # Remove user assignment
   removeUserFromPromotion(promotionId: ID!, userId: ID!): Boolean!
+
+  # Issue a one-time recovery/compensation promotion for specific users in a single step
+  issueRecoveryPromotion(input: IssueRecoveryPromotionInput!): [UserPromotion!]!
   
   # Mark first order used (called after order created)
   markFirstOrderUsed(userId: ID!): UserPromoMetadata!

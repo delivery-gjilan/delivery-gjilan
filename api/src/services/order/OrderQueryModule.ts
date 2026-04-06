@@ -154,12 +154,7 @@ export class OrderQueryModule {
 
     async getUserUncompletedOrders(userId: string): Promise<Order[]> {
         const userOrders = await this.deps.orderRepository.findUncompletedOrdersByUserId(userId);
-        const orders: Order[] = [];
-        for (const dbOrder of userOrders) {
-            const order = await this.mapping.mapToOrder(dbOrder);
-            orders.push(order);
-        }
-        return orders;
+        return this.mapping.mapOrders(userOrders);
     }
 
     async getOrdersByBusinessId(businessId: string): Promise<Order[]> {
@@ -179,7 +174,7 @@ export class OrderQueryModule {
                 orderBy: (tbl, { desc }) => [desc(tbl.createdAt)],
             });
 
-            return Promise.all(dbOrders.map((o) => this.mapping.mapToOrder(o)));
+            return this.mapping.mapOrders(dbOrders);
         } catch (error) {
             log.error({ err: error, businessId }, 'order:filterByBusiness:error');
             throw error;
@@ -207,7 +202,7 @@ export class OrderQueryModule {
                 orderBy: (tbl, { desc }) => [desc(tbl.createdAt)],
             });
 
-            return Promise.all(dbOrders.map((o) => this.mapping.mapToOrder(o)));
+            return this.mapping.mapOrders(dbOrders);
         } catch (error) {
             log.error({ err: error, businessId, status }, 'order:filterByBusinessAndStatus:error');
             throw error;

@@ -18,6 +18,8 @@ interface Props {
     /** When false, no countdown timer runs (manual pick from pool). Default true. */
     autoCountdown?: boolean;
     onHeightChange?: (h: number) => void;
+    /** When true, shows a "someone else picked it" overlay and blocks interaction. */
+    takenByOther?: boolean;
 }
 
 export function OrderAcceptSheet({
@@ -28,6 +30,7 @@ export function OrderAcceptSheet({
     accepting = false,
     autoCountdown = true,
     onHeightChange,
+    takenByOther = false,
 }: Props) {
     const insets = useSafeAreaInsets();
     const [countdown, setCountdown] = useState(COUNTDOWN_DURATION);
@@ -145,88 +148,73 @@ export function OrderAcceptSheet({
     return (
         <Animated.View style={[styles.root, { transform: [{ translateY: slideY }] }]}>
             <View
-                style={[styles.sheet, { paddingTop: insets.top + 4 }]}
+                style={[styles.sheet, { paddingTop: insets.top + 8 }]}
                 onLayout={(e) => onHeightChange?.(e.nativeEvent.layout.height)}
             >
-                {/* Top accent bar */}
-                <View style={styles.accentLine} />
-
                 {/* Draggable body */}
                 <View {...panResponder.panHandlers} style={styles.dragBody}>
 
-                    {/* â”€â”€ Header: business name + label + countdown â”€â”€ */}
+                    {/* Header: countdown ring + label + business name */}
                     <View style={styles.headerRow}>
-                        <View style={styles.headerLeft}>
-                            <Text style={styles.headerLabel}>NEW ORDER</Text>
-                            <Text style={styles.bizName} numberOfLines={1}>{bizName}</Text>
-                        </View>
-
-                        {autoCountdown && (
+                        {autoCountdown ? (
                             <View style={styles.ringContainer}>
-                                <Svg width={48} height={48} viewBox="0 0 48 48">
+                                <Svg width={52} height={52} viewBox="0 0 52 52">
                                     <Circle
-                                        cx={24} cy={24} r={RING_R}
-                                        stroke="rgba(255,255,255,0.07)"
-                                        strokeWidth={4} fill="none"
+                                        cx={26} cy={26} r={RING_R}
+                                        stroke="#E5E7EB"
+                                        strokeWidth={3.5} fill="none"
                                     />
                                     <Circle
-                                        cx={24} cy={24} r={RING_R}
-                                        stroke={isUrgent ? '#f87171' : '#22d3ee'}
-                                        strokeWidth={4} fill="none"
+                                        cx={26} cy={26} r={RING_R}
+                                        stroke={isUrgent ? '#EF4444' : '#10B981'}
+                                        strokeWidth={3.5} fill="none"
                                         strokeDasharray={`${RING_C} ${RING_C}`}
                                         strokeDashoffset={ringOffset}
                                         strokeLinecap="round"
-                                        rotation="-90" origin="24, 24"
+                                        rotation="-90" origin="26, 26"
                                     />
                                 </Svg>
-                                <Text style={[styles.countdownText, isUrgent && { color: '#f87171' }]}>
+                                <Text style={[styles.countdownText, isUrgent && { color: '#EF4444' }]}>
                                     {countdown}
-                                </Text>
-                            </View>
-                        )}
-                    </View>
-
-                    {/* â”€â”€ Stats row: ETA Â· Earnings Â· Drop-off â”€â”€ */}
-                    <View style={styles.statsRow}>
-                        {/* ETA */}
-                        {etaLabel ? (
-                            <View style={[styles.statChip, etaIsReady ? styles.statChipReady : styles.statChipEta]}>
-                                <Ionicons
-                                    name={etaIsReady ? 'checkmark-circle' : 'time-outline'}
-                                    size={13}
-                                    color={etaIsReady ? '#4ade80' : '#fb923c'}
-                                />
-                                <Text style={[styles.statChipText, { color: etaIsReady ? '#4ade80' : '#fb923c' }]}>
-                                    {etaLabel}
                                 </Text>
                             </View>
                         ) : null}
 
-                        {/* Earnings */}
-                        <View style={[styles.statChip, styles.statChipFee]}>
-                            <Ionicons name="wallet-outline" size={13} color="#22d3ee" />
-                            <View>
-                                <Text style={styles.statChipEarnLabel}>You earn</Text>
-                                <Text style={[styles.statChipText, { color: '#22d3ee' }]}>€{deliveryFee}</Text>
-                            </View>
-                        </View>
-
-                        {/* Drop-off */}
-                        <View style={[styles.statChip, styles.statChipDrop, { flex: 1 }]}>
-                            <Ionicons name="location-outline" size={13} color="#a78bfa" />
-                            <Text style={[styles.statChipText, styles.statChipDropText, { color: '#c4b5fd' }]} numberOfLines={1}>
-                                {shortAddress}
-                            </Text>
+                        <View style={styles.headerTextBlock}>
+                            <Text style={styles.headerLabel}>New Order</Text>
+                            <Text style={styles.bizName} numberOfLines={1}>{bizName}</Text>
                         </View>
                     </View>
 
-                    {/* â”€â”€ Items toggle row â”€â”€ */}
+                    {/* Info row: earnings / ETA / drop-off */}
+                    <View style={styles.infoRow}>
+                        <View style={styles.infoItem}>
+                            <Text style={styles.infoValue}>€{deliveryFee}</Text>
+                            <Text style={styles.infoLabel}>You earn</Text>
+                        </View>
+                        <View style={styles.infoDivider} />
+                        {etaLabel ? (
+                            <>
+                                <View style={styles.infoItem}>
+                                    <Text style={[styles.infoValue, etaIsReady && { color: '#10B981' }]}>{etaLabel}</Text>
+                                    <Text style={styles.infoLabel}>Food status</Text>
+                                </View>
+                                <View style={styles.infoDivider} />
+                            </>
+                        ) : null}
+                        <View style={[styles.infoItem, { flex: 1 }]}>
+                            <Text style={styles.infoValue} numberOfLines={1}>{shortAddress}</Text>
+                            <Text style={styles.infoLabel}>Drop-off</Text>
+                        </View>
+                    </View>
+
+                    {/* Items toggle */}
                     <Pressable
                         style={[styles.itemsToggle, itemsExpanded && styles.itemsToggleOpen]}
                         onPress={() => setItemsExpanded(v => !v)}
                     >
                         <View style={styles.itemsToggleLeft}>
-                            <Ionicons name="bag-handle-outline" size={15} color="#94a3b8" />
+                            <Ionicons name="bag-handle-outline" size={15} color="#6B7280" />
                             <Text style={styles.itemsToggleText}>
                                 {itemCount} {itemCount === 1 ? 'item' : 'items'}
                             </Text>
@@ -234,7 +222,7 @@ export function OrderAcceptSheet({
                         <Ionicons
                             name={itemsExpanded ? 'chevron-up' : 'chevron-down'}
                             size={14}
-                            color="#475569"
+                            color="#9CA3AF"
                         />
                     </Pressable>
 
@@ -258,47 +246,60 @@ export function OrderAcceptSheet({
                     {/* Driver notes */}
                     {!!order.driverNotes && (
                         <View style={styles.notesRow}>
-                            <Ionicons name="warning-outline" size={14} color="#fbbf24" style={{ marginTop: 1 }} />
+                            <Ionicons name="warning-outline" size={14} color="#D97706" style={{ marginTop: 1 }} />
                             <Text style={styles.notesText}>{order.driverNotes}</Text>
                         </View>
                     )}
 
-                    {/* â”€â”€ CTAs â”€â”€ */}
-                    <View style={styles.ctaRow}>
-                        <Pressable onPress={onSkip} style={styles.skipBtn} disabled={accepting}>
-                            <Text style={styles.skipText}>{autoCountdown ? 'Skip' : 'Close'}</Text>
-                        </Pressable>
-
-                        <Pressable
-                            onPress={handleAccept}
-                            disabled={accepting}
-                            style={[styles.acceptBtn, accepting && { opacity: 0.65 }]}
-                        >
-                            {accepting ? (
-                                <ActivityIndicator size={16} color="#0f172a" />
-                            ) : (
-                                <>
-                                    <Ionicons name="checkmark-circle" size={18} color="#0f172a" />
-                                    <Text style={styles.acceptText}>Accept</Text>
-                                </>
-                            )}
-                        </Pressable>
-
-                        {!!onAcceptAndNavigate && (
-                            <Pressable
-                                onPress={handleAcceptAndNavigate}
-                                disabled={accepting}
-                                style={[styles.navBtn, accepting && { opacity: 0.65 }]}
-                            >
-                                <Ionicons name="navigate" size={16} color="#fff" />
-                                <Text style={styles.navBtnText}>Navigate</Text>
-                            </Pressable>
+                    {/* Primary CTA: Accept */}
+                    <Pressable
+                        onPress={handleAccept}
+                        disabled={accepting}
+                        style={[styles.acceptBtn, accepting && { opacity: 0.6 }]}
+                    >
+                        {accepting ? (
+                            <ActivityIndicator size={18} color="#fff" />
+                        ) : (
+                            <>
+                                <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                                <Text style={styles.acceptText}>Accept Order</Text>
+                            </>
                         )}
-                    </View>
+                    </Pressable>
+
+                    {/* Secondary CTA: Accept & Navigate */}
+                    {!!onAcceptAndNavigate && (
+                        <Pressable
+                            onPress={handleAcceptAndNavigate}
+                            disabled={accepting}
+                            style={[styles.navBtn, accepting && { opacity: 0.6 }]}
+                        >
+                            <Ionicons name="navigate-outline" size={16} color="#10B981" />
+                            <Text style={styles.navBtnText}>Accept & Navigate</Text>
+                        </Pressable>
+                    )}
+
+                    {/* Skip / Close link */}
+                    <Pressable onPress={onSkip} style={styles.skipBtn} disabled={accepting} hitSlop={8}>
+                        <Text style={styles.skipText}>{autoCountdown ? 'Skip for now' : 'Close'}</Text>
+                    </Pressable>
                 </View>
 
                 {/* Drag handle */}
                 <View style={styles.handle} />
+
+                {/* “Someone else picked it” overlay */}
+                {takenByOther && (
+                    <View style={styles.takenOverlay}>
+                        <View style={styles.takenIconWrap}>
+                            <Ionicons name="flash" size={28} color="#fbbf24" />
+                        </View>
+                        <Text style={styles.takenTitle}>Order taken</Text>
+                        <Text style={styles.takenSub}>Another driver accepted this order first</Text>
+                        <View style={styles.takenDivider} />
+                        <Text style={styles.takenHint}>Finding you the next one…</Text>
+                    </View>
+                )}
             </View>
         </Animated.View>
     );
@@ -313,143 +314,110 @@ const styles = StyleSheet.create({
         zIndex: 300,
     },
     sheet: {
-        backgroundColor: '#080d18',
-        borderBottomLeftRadius: 28,
-        borderBottomRightRadius: 28,
+        backgroundColor: '#FFFFFF',
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.65,
-        shadowRadius: 24,
-        elevation: 30,
-        overflow: 'hidden',
-    },
-    accentLine: {
-        height: 3,
-        marginHorizontal: 0,
-        backgroundColor: '#22d3ee',
-        opacity: 0.9,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.12,
+        shadowRadius: 20,
+        elevation: 24,
     },
     dragBody: {
-        paddingHorizontal: 16,
-        paddingTop: 12,
+        paddingHorizontal: 20,
+        paddingTop: 4,
+        paddingBottom: 4,
     },
     handle: {
         width: 36,
         height: 4,
-        backgroundColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: '#E5E7EB',
         borderRadius: 2,
         alignSelf: 'center',
-        marginTop: 8,
-        marginBottom: 8,
+        marginTop: 10,
+        marginBottom: 10,
     },
-
-    /* Header */
     headerRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 10,
+        gap: 12,
+        marginBottom: 14,
     },
-    headerLeft: {
+    headerTextBlock: {
         flex: 1,
-        marginRight: 12,
     },
     headerLabel: {
-        color: '#22d3ee',
-        fontSize: 9,
-        fontWeight: '800',
-        letterSpacing: 1.8,
-        textTransform: 'uppercase',
+        color: '#6B7280',
+        fontSize: 11,
+        fontWeight: '600',
+        letterSpacing: 0.4,
         marginBottom: 2,
     },
     bizName: {
-        color: '#f1f5f9',
-        fontSize: 20,
+        color: '#111827',
+        fontSize: 22,
         fontWeight: '800',
-        letterSpacing: -0.3,
+        letterSpacing: -0.4,
     },
     ringContainer: {
-        width: 48,
-        height: 48,
+        width: 52,
+        height: 52,
         alignItems: 'center',
         justifyContent: 'center',
+        flexShrink: 0,
     },
     countdownText: {
         position: 'absolute',
-        color: '#f1f5f9',
-        fontSize: 13,
+        color: '#374151',
+        fontSize: 14,
         fontWeight: '800',
     },
-
-    /* Stats chips row */
-    statsRow: {
-        flexDirection: 'row',
-        gap: 6,
-        marginBottom: 8,
-        flexWrap: 'nowrap',
-        alignItems: 'center',
-    },
-    statChip: {
+    infoRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
-        paddingHorizontal: 9,
-        paddingVertical: 6,
-        borderRadius: 20,
+        backgroundColor: '#F9FAFB',
+        borderRadius: 14,
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        marginBottom: 10,
     },
-    statChipText: {
-        fontSize: 12,
+    infoItem: {
+        alignItems: 'center',
+        gap: 2,
+    },
+    infoValue: {
+        color: '#111827',
+        fontSize: 14,
         fontWeight: '700',
     },
-    statChipEarnLabel: {
-        color: 'rgba(34,211,238,0.55)',
-        fontSize: 8,
-        fontWeight: '700',
+    infoLabel: {
+        color: '#9CA3AF',
+        fontSize: 10,
+        fontWeight: '500',
         textTransform: 'uppercase',
-        letterSpacing: 0.5,
-        lineHeight: 10,
+        letterSpacing: 0.3,
     },
-    statChipEta: {
-        backgroundColor: 'rgba(251,146,60,0.12)',
-        borderWidth: 1,
-        borderColor: 'rgba(251,146,60,0.25)',
+    infoDivider: {
+        width: 1,
+        height: 28,
+        backgroundColor: '#E5E7EB',
+        marginHorizontal: 12,
     },
-    statChipReady: {
-        backgroundColor: 'rgba(74,222,128,0.10)',
-        borderWidth: 1,
-        borderColor: 'rgba(74,222,128,0.25)',
-    },
-    statChipFee: {
-        backgroundColor: 'rgba(34,211,238,0.08)',
-        borderWidth: 1,
-        borderColor: 'rgba(34,211,238,0.18)',
-    },
-    statChipDrop: {
-        backgroundColor: 'rgba(167,139,250,0.08)',
-        borderWidth: 1,
-        borderColor: 'rgba(167,139,250,0.18)',
-        flexShrink: 1,
-    },
-    statChipDropText: {
-        flexShrink: 1,
-    },
-
-    /* Items toggle */
     itemsToggle: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: 'rgba(255,255,255,0.04)',
         borderRadius: 10,
         paddingHorizontal: 12,
-        paddingVertical: 9,
-        marginBottom: 6,
+        paddingVertical: 10,
+        marginBottom: 8,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.06)',
+        borderColor: '#E5E7EB',
+        backgroundColor: '#FAFAFA',
     },
     itemsToggleOpen: {
-        borderColor: 'rgba(255,255,255,0.12)',
-        backgroundColor: 'rgba(255,255,255,0.06)',
+        borderColor: '#D1D5DB',
+        backgroundColor: '#F3F4F6',
     },
     itemsToggleLeft: {
         flexDirection: 'row',
@@ -457,60 +425,56 @@ const styles = StyleSheet.create({
         gap: 7,
     },
     itemsToggleText: {
-        color: '#94a3b8',
+        color: '#374151',
         fontSize: 13,
         fontWeight: '600',
     },
-
-    /* Items expanded */
     itemsList: {
-        backgroundColor: 'rgba(255,255,255,0.03)',
+        backgroundColor: '#F9FAFB',
         borderRadius: 10,
         paddingHorizontal: 12,
         paddingVertical: 4,
         marginBottom: 8,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.06)',
+        borderColor: '#E5E7EB',
     },
     itemRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 7,
+        paddingVertical: 8,
     },
     itemRowBorder: {
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.05)',
+        borderBottomColor: '#F3F4F6',
     },
     itemName: {
-        color: '#cbd5e1',
+        color: '#374151',
         fontSize: 13,
         flex: 1,
     },
     itemQtyBadge: {
-        backgroundColor: 'rgba(255,255,255,0.07)',
+        backgroundColor: '#E5E7EB',
         borderRadius: 6,
         paddingHorizontal: 7,
         paddingVertical: 2,
         marginLeft: 10,
     },
     itemQtyText: {
-        color: '#94a3b8',
+        color: '#6B7280',
         fontSize: 12,
         fontWeight: '700',
     },
     itemsMore: {
-        color: '#475569',
+        color: '#9CA3AF',
         fontSize: 11,
         paddingVertical: 6,
         textAlign: 'center',
     },
-
-    /* Driver notes */
     notesRow: {
-        backgroundColor: 'rgba(251,191,36,0.07)',
+        backgroundColor: '#FFFBEB',
         borderWidth: 1,
-        borderColor: 'rgba(251,191,36,0.16)',
+        borderColor: '#FDE68A',
         borderRadius: 10,
         paddingHorizontal: 12,
         paddingVertical: 8,
@@ -520,72 +484,107 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     notesText: {
-        color: '#fbbf24',
+        color: '#92400E',
         fontSize: 12,
         flex: 1,
         lineHeight: 18,
     },
-
-    /* CTAs */
-    ctaRow: {
+    acceptBtn: {
+        height: 52,
+        borderRadius: 14,
+        backgroundColor: '#10B981',
+        alignItems: 'center',
+        justifyContent: 'center',
         flexDirection: 'row',
         gap: 8,
-        paddingBottom: 6,
-        marginTop: 2,
-    },
-    skipBtn: {
-        width: 64,
-        height: 48,
-        borderRadius: 14,
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
-    },
-    skipText: {
-        color: '#64748b',
-        fontSize: 12,
-        fontWeight: '700',
-    },
-    acceptBtn: {
-        flex: 1,
-        height: 48,
-        borderRadius: 14,
-        backgroundColor: '#22d3ee',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'row',
-        gap: 6,
-        shadowColor: '#22d3ee',
+        marginBottom: 8,
+        shadowColor: '#10B981',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 10,
-        elevation: 8,
+        elevation: 6,
     },
     acceptText: {
-        color: '#0a0f1a',
-        fontSize: 14,
-        fontWeight: '800',
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '700',
     },
     navBtn: {
-        flex: 1,
-        height: 48,
-        borderRadius: 14,
-        backgroundColor: '#8b5cf6',
+        height: 44,
+        borderRadius: 12,
+        borderWidth: 1.5,
+        borderColor: '#10B981',
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'row',
         gap: 6,
-        shadowColor: '#7c3aed',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.35,
-        shadowRadius: 10,
-        elevation: 8,
+        marginBottom: 6,
+        backgroundColor: 'transparent',
     },
     navBtnText: {
-        color: '#fff',
+        color: '#10B981',
         fontSize: 14,
+        fontWeight: '700',
+    },
+    skipBtn: {
+        alignItems: 'center',
+        paddingVertical: 8,
+        marginBottom: 2,
+    },
+    skipText: {
+        color: '#9CA3AF',
+        fontSize: 13,
+        fontWeight: '500',
+    },
+    takenOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(10, 10, 18, 0.96)',
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        zIndex: 10,
+        paddingHorizontal: 32,
+    },
+    takenIconWrap: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: 'rgba(251,191,36,0.12)',
+        borderWidth: 1.5,
+        borderColor: 'rgba(251,191,36,0.3)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 8,
+    },
+    takenTitle: {
+        color: '#fbbf24',
+        fontSize: 22,
         fontWeight: '800',
+        letterSpacing: -0.5,
+    },
+    takenSub: {
+        color: '#94a3b8',
+        fontSize: 14,
+        textAlign: 'center',
+        lineHeight: 20,
+        marginTop: 2,
+    },
+    takenDivider: {
+        width: 40,
+        height: 2,
+        borderRadius: 1,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        marginVertical: 10,
+    },
+    takenHint: {
+        color: '#475569',
+        fontSize: 12,
+        fontWeight: '500',
     },
 });

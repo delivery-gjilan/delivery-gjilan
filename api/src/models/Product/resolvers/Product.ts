@@ -46,12 +46,9 @@ export const Product: ProductResolvers = {
             })) as any;
     },
 
-    variantGroup: async (parent, _args, { db }) => {
+    variantGroup: async (parent, _args, { loaders }) => {
         const groupId = (parent as any).groupId ?? (parent as any).variantGroupId;
         if (!groupId) return null;
-        const { productVariantGroups } = await import('@/database/schema/productVariantGroups');
-        const { eq } = await import('drizzle-orm');
-        const [group] = await db.select().from(productVariantGroups).where(eq(productVariantGroups.id, groupId));
-        return (group ?? null) as any;
+        return loaders.variantGroupByIdLoader.load(groupId) as any;
     },
 };

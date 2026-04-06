@@ -1,4 +1,5 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
+import { cache } from '@/lib/cache';
 
 export const updateBanner: NonNullable<MutationResolvers['updateBanner']> = async (_parent, args, ctx) => {
   const { id, input } = args;
@@ -22,5 +23,6 @@ export const updateBanner: NonNullable<MutationResolvers['updateBanner']> = asyn
 
   const banner = await ctx.bannerRepository.update(id, updateData);
 
+  await cache.invalidateBanners();
   return banner as any;
 };

@@ -1,11 +1,15 @@
 # Settlements & Promotions
 
-<!-- MDS:BL1 | Domain: Business Logic | Updated: 2026-03-19 -->
+<!-- MDS:BL1 | Domain: Business Logic | Updated: 2026-04-06 -->
 <!-- Depends-On: B2, B3, B6 -->
 <!-- Depended-By: O3, O8, O11, M4 -->
 <!-- Nav: Rule/promo changes → update O3 (Notifications campaigns), O8 (Testing preflight). Payment collection → update B2 (Order Creation), M4 (Mobile Audit). -->
 
 ## Recent Updates
+
+- 2026-04-06: Compensation system matured — tracking switched from per-user to **per-order**. `promotions.order_id` column added (migration `0002_add_order_id_to_promotions.sql`); `IssueRecoveryPromotionInput` now requires `orderId`; service stores it on the promo row after creation; the Cancelled Orders page builds a `Set<orderId>` with a legacy fallback (extracts displayId from promo name for promos created before this column existed). `UserPromotion.user` field resolver implemented. Compensations tab on the Promotions page shows: reason, user name + phone, compensation value, usage state (pending/used), expiry. Issue Compensation modal includes a push notification section — toggle (on by default), pre-filled title + body, fires `sendPushNotification` for the user after the promo is issued. `refetchRecovery()` is now awaited before the modal auto-closes so the "Compensated" badge appears immediately.
+
+- 2026-04-06: Recovery/compensation promotion system added. `issueRecoveryPromotion` mutation creates a hidden `SPECIFIC_USERS` promotion with `isRecovery = true`, `maxUsagePerUser = 1`, no promo code. Auto-applies at checkout via `PromotionEngine.checkUserAssignment()`. `getRecoveryPromotions` query (SUPER_ADMIN only) returns recovery promos with `assignedUsers { userId, usageCount, expiresAt, user { firstName, lastName, phoneNumber } }` and `orderId`. Admin Promotions page has a **Compensations** tab. Cancelled Orders page shows a green "Compensated" badge per order (not per user).
 
 - 2026-04-04: `Business.activePromotion` resolver uses subquery-based eligibility (not INNER JOIN) so promotions with no `promotionBusinessEligibility` entries (global promos) appear on all business cards. `BusinessPromotion` type now includes `spendThreshold`. Mobile-customer cards use localized customer-friendly labels for all six promotion types.
 - 2026-03-31: Priority surcharge (opt-in expedited delivery fee) is now stored as a separate `priority_surcharge` column on orders and automatically creates a `DRIVER / RECEIVABLE` settlement for cash orders (`rule_id = null`).

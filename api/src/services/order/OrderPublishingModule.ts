@@ -38,6 +38,8 @@ export class OrderPublishingModule {
     }
 
     async publishAllOrders() {
-        publish(this.deps.pubsub, topics.allOrdersChanged(), { orders: [] });
+        const dbOrders = await this.deps.orderRepository.findUncompleted();
+        const orders = await Promise.all(dbOrders.map((o) => this.mapping.mapToOrder(o)));
+        publish(this.deps.pubsub, topics.allOrdersChanged(), { orders });
     }
 }

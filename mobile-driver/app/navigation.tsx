@@ -1,11 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Linking, Animated, PanResponder, Alert } from 'react-native';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, Animated, Alert } from 'react-native';
+import { PickupSlider } from '@/components/PickupSlider';
+import { DeliverySlider } from '@/components/DeliverySlider';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { MapboxNavigationView } from '@badatgil/expo-mapbox-navigation';
-import { useMutation, useQuery, useSubscription } from '@apollo/client/react';
-import { GET_ORDERS, UPDATE_ORDER_STATUS, DRIVER_NOTIFY_CUSTOMER } from '@/graphql/operations/orders';
+import { useApolloClient, useMutation, useQuery, useSubscription } from '@apollo/client/react';
+import { GET_ORDERS, UPDATE_ORDER_STATUS, DRIVER_NOTIFY_CUSTOMER, ALL_ORDERS_UPDATED } from '@/graphql/operations/orders';
+import { buildNavOrder, orderToPhase } from '@/utils/orderToNavOrder';
 import { GET_MY_DRIVER_METRICS } from '@/graphql/operations/driver';
 import { useNavigationStore } from '@/store/navigationStore';
 import { useAuthStore } from '@/store/authStore';
@@ -15,9 +18,8 @@ import DriverMessageBanner from '@/components/DriverMessageBanner';
 import type { AlertType } from '@/components/DriverMessageBanner';
 import { DRIVER_MESSAGE_RECEIVED_SUB } from '@/graphql/operations/driverMessages';
 import * as Haptics from 'expo-haptics';
-import type { NavigationPhase } from '@/store/navigationStore';
 
-/* ─── Constants ─── */
+/* â”€â”€â”€ Screen constants â”€â”€â”€ */
 const STATUS_COLORS: Record<string, string> = {
     PENDING: '#F59E0B',
     PREPARING: '#F97316',
@@ -31,1057 +33,6 @@ const STATUS_LABELS: Record<string, string> = {
     READY: 'Ready',
     OUT_FOR_DELIVERY: 'Delivering',
 };
-
-/* ─── Slide-to-confirm pickup component ─── */
-const PICKUP_TRACK_H = 62;
-const PICKUP_THUMB = 52;
-
-function PickupSlider({
-    businessName,
-    etaMins,
-    prepMinsLeft,
-    insetBottom,
-    onConfirm,
-    onCancel,
-}: {
-    businessName: string;
-    etaMins: number | null;
-    prepMinsLeft: number | null;
-    insetBottom: number;
-    onConfirm: () => Promise<void>;
-    onCancel: () => void;
-}) {
-    const trackWidth = useRef(0);
-    const translateX = useRef(new Animated.Value(0)).current;
-    const confirmed  = useRef(false);
-    const [done, setDone] = useState(false);
-    const [splashVisible, setSplashVisible] = useState(false);
-
-    // ETA badge idle animation: spring-in → gentle float
-    const etaScale  = useRef(new Animated.Value(0)).current;
-    const etaHoverY = useRef(new Animated.Value(0)).current;
-    useEffect(() => {
-        if (etaMins == null) return;
-        Animated.spring(etaScale, { toValue: 1, useNativeDriver: true, tension: 160, friction: 7 })
-            .start(() => {
-                Animated.loop(
-                    Animated.sequence([
-                        Animated.timing(etaHoverY, { toValue: -5, duration: 900, useNativeDriver: true }),
-                        Animated.timing(etaHoverY, { toValue: 0,  duration: 900, useNativeDriver: true }),
-                    ]),
-                ).start();
-            });
-    }, [etaScale, etaHoverY, etaMins]);
-
-    // Splash card (post-confirm) animations
-    const splashOpacity = useRef(new Animated.Value(0)).current;
-    const splashScale   = useRef(new Animated.Value(0.4)).current;
-    const splashHoverY  = useRef(new Animated.Value(0)).current;
-
-    // 24-piece confetti for the splash — stable identity across renders
-    const splashConfetti = useRef(
-        Array.from({ length: 24 }, (_, i) => ({
-            anim: new Animated.Value(0),
-            x:    (Math.random() - 0.5) * 360,
-            vy:   Math.random() * 280 + 120,
-            color: ['#0ea5e9','#38bdf8','#7dd3fc','#22c55e','#3b82f6','#818cf8','#f59e0b'][i % 7],
-            size: Math.random() * 10 + 5,
-            rotation: Math.random() * 720 - 360,
-            aspect: Math.random() > 0.5 ? 0.45 : 0.9,
-        }))
-    ).current;
-
-    const launchSplash = useCallback(() => {
-        setSplashVisible(true);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        // Stagger confetti burst
-        splashConfetti.forEach((p, i) => {
-            setTimeout(() => {
-                Animated.timing(p.anim, { toValue: 1, duration: 900, useNativeDriver: false }).start();
-            }, i * 28);
-        });
-        // Spring card in, then start hover loop
-        Animated.parallel([
-            Animated.spring(splashScale, { toValue: 1, useNativeDriver: true, tension: 160, friction: 7 }),
-            Animated.timing(splashOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
-        ]).start(() => {
-            Animated.loop(
-                Animated.sequence([
-                    Animated.timing(splashHoverY, { toValue: -8, duration: 850, useNativeDriver: true }),
-                    Animated.timing(splashHoverY, { toValue: 0,  duration: 850, useNativeDriver: true }),
-                ]),
-            ).start();
-        });
-    }, [splashConfetti, splashScale, splashOpacity, splashHoverY]);
-
-    const fillOpacity  = translateX.interpolate({ inputRange: [0, 200], outputRange: [0, 1], extrapolate: 'clamp' });
-    const labelOpacity = translateX.interpolate({ inputRange: [0, 80],  outputRange: [1, 0], extrapolate: 'clamp' });
-
-    const pan = useRef(
-        PanResponder.create({
-            onStartShouldSetPanResponder: () => !confirmed.current,
-            onPanResponderMove: (_, gs) => {
-                const max = trackWidth.current - PICKUP_THUMB - 6;
-                translateX.setValue(Math.max(0, Math.min(gs.dx, max)));
-            },
-            onPanResponderRelease: (_, gs) => {
-                const max = trackWidth.current - PICKUP_THUMB - 6;
-                if (gs.dx >= max * 0.82 && !confirmed.current) {
-                    confirmed.current = true;
-                    setDone(true);
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-                    Animated.timing(translateX, { toValue: max, duration: 120, useNativeDriver: true })
-                        .start(() => {
-                            launchSplash();
-                            // Hold splash for 1.9s then invoke onConfirm (advances route)
-                            setTimeout(async () => { await onConfirm(); }, 1900);
-                        });
-                } else {
-                    Animated.spring(translateX, { toValue: 0, useNativeDriver: true, tension: 80, friction: 12 }).start();
-                }
-            },
-        }),
-    ).current;
-
-    return (
-        <View style={[pickupStyles.panel, { paddingBottom: insetBottom + 16 }]}>
-            <View style={pickupStyles.handle} />
-
-            {/* Header row */}
-            <View style={pickupStyles.header}>
-                <View style={pickupStyles.iconRing}>
-                    <Ionicons name="bag-check-outline" size={22} color="#3b82f6" />
-                </View>
-                <View style={{ flex: 1 }}>
-                    <Text style={pickupStyles.title}>Arrived at Pickup</Text>
-                    <Text style={pickupStyles.sub} numberOfLines={1}>{businessName}</Text>
-                </View>
-                {/* ETA badge to dropoff — springs in then floats */}
-                {etaMins != null && (
-                    <Animated.View
-                        style={[
-                            pickupStyles.etaBadge,
-                            { transform: [{ scale: etaScale }, { translateY: etaHoverY }] },
-                        ]}
-                    >
-                        <Ionicons name="navigate-circle-outline" size={20} color="#0ea5e9" />
-                        <Text style={pickupStyles.etaValue}>{etaMins} min</Text>
-                        <Text style={pickupStyles.etaLabel}>to dropoff</Text>
-                    </Animated.View>
-                )}
-            </View>
-
-                {/* Prep ETA row — shown when food is still being prepared */}
-                {prepMinsLeft != null && (
-                    <View style={pickupStyles.prepRow}>
-                        <Ionicons name="restaurant-outline" size={14} color="#06b6d4" />
-                        <Text style={pickupStyles.prepText}>
-                            {prepMinsLeft === 0
-                                ? 'Food is almost ready — standby'
-                                : `Food ready in ~${prepMinsLeft} min — standby`}
-                        </Text>
-                    </View>
-                )}
-
-            {/* ── Slide-to-confirm track ── */}
-            <View
-                style={pickupStyles.track}
-                onLayout={e => { trackWidth.current = e.nativeEvent.layout.width; }}
-            >
-                <Animated.View style={[pickupStyles.fill, { opacity: fillOpacity }]} />
-                <Animated.Text style={[pickupStyles.trackLabel, { opacity: labelOpacity }]}>
-                    Slide to confirm pickup →
-                </Animated.Text>
-                <Animated.View
-                    style={[pickupStyles.thumb, done && pickupStyles.thumbDone, { transform: [{ translateX }] }]}
-                    {...pan.panHandlers}
-                >
-                    <Ionicons name={done ? 'checkmark' : 'bag-check'} size={26} color="#fff" />
-                </Animated.View>
-            </View>
-
-            {/* Cancel / not yet ready */}
-            {!done && (
-                <Pressable style={pickupStyles.secondary} onPress={onCancel}>
-                    <Text style={pickupStyles.secondaryText}>Cancel navigation</Text>
-                </Pressable>
-            )}
-
-            {/* ── Pickup-confirmed splash overlay ── */}
-            {splashVisible && (
-                <View
-                    pointerEvents="none"
-                    style={[StyleSheet.absoluteFillObject, pickupStyles.splashOverlay]}
-                >
-                    {/* Confetti burst */}
-                    {splashConfetti.map((p, i) => {
-                        const cY     = p.anim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -p.vy, -(p.vy * 0.72)] });
-                        const op     = p.anim.interpolate({ inputRange: [0, 0.15, 0.8, 1], outputRange: [0, 1, 1, 0] });
-                        const rotate = p.anim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', `${p.rotation}deg`] });
-                        return (
-                            <Animated.View
-                                key={i}
-                                style={{
-                                    position: 'absolute',
-                                    width: p.size,
-                                    height: p.size * p.aspect,
-                                    backgroundColor: p.color,
-                                    borderRadius: p.size * 0.25,
-                                    opacity: op,
-                                    transform: [{ translateX: p.x }, { translateY: cY }, { rotate }],
-                                }}
-                            />
-                        );
-                    })}
-
-                    {/* Card */}
-                    <Animated.View
-                        style={[
-                            pickupStyles.splashCard,
-                            {
-                                opacity: splashOpacity,
-                                transform: [{ scale: splashScale }, { translateY: splashHoverY }],
-                            },
-                        ]}
-                    >
-                        <View style={pickupStyles.splashIconRing}>
-                            <Ionicons name="navigate" size={42} color="#fff" />
-                        </View>
-                        <Text style={pickupStyles.splashTitle}>On your way!</Text>
-                        {etaMins != null && (
-                            <View style={pickupStyles.splashBadge}>
-                                <Text style={pickupStyles.splashEtaNum}>{etaMins} min</Text>
-                                <Text style={pickupStyles.splashEtaLabel}>to dropoff</Text>
-                            </View>
-                        )}
-                    </Animated.View>
-                </View>
-            )}
-        </View>
-    );
-}
-
-const pickupStyles = StyleSheet.create({
-    panel: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: '#0a0f1a',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        paddingHorizontal: 20,
-        paddingTop: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -6 },
-        shadowOpacity: 0.5,
-        shadowRadius: 16,
-        elevation: 24,
-        zIndex: 200,
-    },
-    handle: {
-        width: 36,
-        height: 4,
-        borderRadius: 2,
-        backgroundColor: 'rgba(255,255,255,0.12)',
-        alignSelf: 'center',
-        marginBottom: 14,
-    },
-    prepRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        backgroundColor: 'rgba(6,182,212,0.08)',
-        borderRadius: 10,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        marginBottom: 14,
-        borderWidth: 1,
-        borderColor: 'rgba(6,182,212,0.2)',
-    },
-    prepText: {
-        color: '#22d3ee',
-        fontSize: 13,
-        fontWeight: '700',
-        flex: 1,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-        marginBottom: 18,
-    },
-    iconRing: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(59,130,246,0.12)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    title: {
-        color: '#f1f5f9',
-        fontSize: 15,
-        fontWeight: '800',
-    },
-    sub: {
-        color: '#64748b',
-        fontSize: 12,
-        marginTop: 1,
-    },
-    etaBadge: {
-        backgroundColor: '#0ea5e9',
-        borderRadius: 18,
-        paddingHorizontal: 18,
-        paddingVertical: 10,
-        alignItems: 'center',
-        gap: 2,
-        shadowColor: '#0ea5e9',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.75,
-        shadowRadius: 16,
-        elevation: 16,
-    },
-    etaValue: {
-        color: '#fff',
-        fontSize: 26,
-        fontWeight: '900',
-        letterSpacing: 0.5,
-        lineHeight: 28,
-    },
-    etaLabel: {
-        color: 'rgba(255,255,255,0.65)',
-        fontSize: 9,
-        fontWeight: '700',
-        textTransform: 'uppercase',
-        letterSpacing: 0.9,
-    },
-    track: {
-        height: PICKUP_TRACK_H,
-        borderRadius: PICKUP_TRACK_H / 2,
-        backgroundColor: 'rgba(59,130,246,0.10)',
-        borderWidth: 1,
-        borderColor: 'rgba(59,130,246,0.20)',
-        justifyContent: 'center',
-        overflow: 'hidden',
-        position: 'relative',
-    },
-    fill: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: '#3b82f6',
-        borderRadius: PICKUP_TRACK_H / 2,
-    },
-    trackLabel: {
-        color: '#94a3b8',
-        fontSize: 14,
-        fontWeight: '700',
-        textAlign: 'center',
-        letterSpacing: 0.3,
-    },
-    thumb: {
-        position: 'absolute',
-        left: 5,
-        width: PICKUP_THUMB,
-        height: PICKUP_THUMB,
-        borderRadius: PICKUP_THUMB / 2,
-        backgroundColor: '#3b82f6',
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#3b82f6',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.6,
-        shadowRadius: 10,
-        elevation: 8,
-    },
-    thumbDone: {
-        backgroundColor: '#22c55e',
-        shadowColor: '#22c55e',
-    },
-    secondary: {
-        alignItems: 'center',
-        paddingVertical: 14,
-    },
-    secondaryText: {
-        color: '#475569',
-        fontSize: 13,
-        fontWeight: '600',
-    },
-
-    // Pickup-confirmed splash overlay
-    splashOverlay: {
-        backgroundColor: 'rgba(6,9,20,0.90)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 500,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-    },
-    splashCard: {
-        alignItems: 'center',
-        gap: 10,
-    },
-    splashIconRing: {
-        width: 88,
-        height: 88,
-        borderRadius: 44,
-        backgroundColor: '#0ea5e9',
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#0ea5e9',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.7,
-        shadowRadius: 24,
-        elevation: 20,
-        marginBottom: 4,
-    },
-    splashTitle: {
-        color: '#f1f5f9',
-        fontSize: 28,
-        fontWeight: '900',
-        letterSpacing: 0.4,
-    },
-    splashBadge: {
-        backgroundColor: '#0ea5e9',
-        borderRadius: 20,
-        paddingHorizontal: 28,
-        paddingVertical: 14,
-        alignItems: 'center',
-        gap: 3,
-        shadowColor: '#0ea5e9',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.75,
-        shadowRadius: 18,
-        elevation: 18,
-    },
-    splashEtaNum: {
-        color: '#fff',
-        fontSize: 36,
-        fontWeight: '900',
-        letterSpacing: 0.5,
-    },
-    splashEtaLabel: {
-        color: 'rgba(255,255,255,0.60)',
-        fontSize: 11,
-        fontWeight: '700',
-        textTransform: 'uppercase',
-        letterSpacing: 0.9,
-    },
-});
-
-/* ─── Slide-to-confirm delivery component ─── */
-const THUMB = 56;
-const TRACK_H = 62;
-const PING_UNLOCK_S = 180;   // 3 min after I'm Here
-const CANCEL_UNLOCK_S = 600; // 10 min after arrival
-
-const CANCEL_REASONS = [
-    'Customer not responding',
-    'Wrong address',
-    'Customer refused delivery',
-    'Safety concern',
-    'Other',
-];
-
-function DeliverySlider({
-    customerName,
-    customerPhone,
-    arrivedNotifSent,
-    arrivedAt,
-    notifiedAt,
-    businesses,
-    orderPrice,
-    deliveryPrice,
-    totalPrice,
-    insetBottom,
-    onNotify,
-    onPingAgain,
-    onConfirm,
-    onCancel,
-    onDismiss,
-    onSuccessAnimStart,
-}: {
-    customerName: string;
-    customerPhone: string | null;
-    arrivedNotifSent: boolean;
-    arrivedAt: number;
-    notifiedAt: number | null;
-    businesses: any[];
-    orderPrice: number;
-    deliveryPrice: number;
-    totalPrice: number;
-    insetBottom: number;
-    onNotify: () => void;
-    onPingAgain: () => void;
-    onConfirm: () => Promise<void>;
-    onCancel: (reason: string) => void;
-    onDismiss?: () => void;
-    onSuccessAnimStart?: () => void;
-}) {
-    const trackWidth = useRef(0);
-    const cancelTrackWidth = useRef(0);
-    const translateX = useRef(new Animated.Value(0)).current;
-    const cancelTranslateX = useRef(new Animated.Value(0)).current;
-    const confirmed = useRef(false);
-    const cancelConfirmed = useRef(false);
-    const [done, setDone] = useState(false);
-    const [showCancelSheet, setShowCancelSheet] = useState(false);
-    const [selectedReason, setSelectedReason] = useState<string | null>(null);
-
-    // Tick every second to recompute elapsed times reactively
-    const [, setTick] = useState(0);
-    useEffect(() => {
-        const id = setInterval(() => setTick(t => t + 1), 1000);
-        return () => clearInterval(id);
-    }, []);
-
-    const elapsedSinceArrival = Math.floor((Date.now() - arrivedAt) / 1000);
-    const elapsedSinceNotif   = notifiedAt ? Math.floor((Date.now() - notifiedAt) / 1000) : 0;
-    const pingUnlocked   = arrivedNotifSent && elapsedSinceNotif >= PING_UNLOCK_S;
-    const cancelUnlocked = elapsedSinceArrival >= CANCEL_UNLOCK_S;
-    const pingRemaining   = arrivedNotifSent ? Math.max(0, PING_UNLOCK_S - elapsedSinceNotif) : PING_UNLOCK_S;
-    const cancelRemaining = Math.max(0, CANCEL_UNLOCK_S - elapsedSinceArrival);
-    const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-
-    // Delivery slider animations
-    const successOpacity = useRef(new Animated.Value(0)).current;
-    const successScale   = useRef(new Animated.Value(0.4)).current;
-    const fillOpacity    = translateX.interpolate({ inputRange: [0, 200], outputRange: [0, 1], extrapolate: 'clamp' });
-    const labelOpacity   = translateX.interpolate({ inputRange: [0, 80],  outputRange: [1, 0], extrapolate: 'clamp' });
-
-    // Cancel slider animations
-    const cancelFillOpacity  = cancelTranslateX.interpolate({ inputRange: [0, 200], outputRange: [0, 1], extrapolate: 'clamp' });
-    const cancelLabelOpacity = cancelTranslateX.interpolate({ inputRange: [0, 80],  outputRange: [1, 0], extrapolate: 'clamp' });
-
-    const runSuccess = useCallback(async () => {
-        setDone(true);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        onSuccessAnimStart?.();
-        Animated.timing(successOpacity, { toValue: 1, duration: 250, useNativeDriver: true }).start();
-        await new Promise<void>(resolve => setTimeout(resolve, 3200));
-        await onConfirm();
-    }, [onConfirm, onSuccessAnimStart, successOpacity]);
-
-    const deliveryPan = useRef(
-        PanResponder.create({
-            onStartShouldSetPanResponder: () => !confirmed.current,
-            onPanResponderMove: (_, gs) => {
-                const max = trackWidth.current - THUMB - 6;
-                translateX.setValue(Math.max(0, Math.min(gs.dx, max)));
-            },
-            onPanResponderRelease: (_, gs) => {
-                const max = trackWidth.current - THUMB - 6;
-                if (gs.dx >= max * 0.82 && !confirmed.current) {
-                    confirmed.current = true;
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-                    Animated.timing(translateX, { toValue: max, duration: 120, useNativeDriver: true })
-                        .start(() => runSuccess());
-                } else {
-                    Animated.spring(translateX, { toValue: 0, useNativeDriver: true, tension: 80, friction: 12 }).start();
-                }
-            },
-        }),
-    ).current;
-
-    const cancelPan = useRef(
-        PanResponder.create({
-            onStartShouldSetPanResponder: () => !!selectedReason && !cancelConfirmed.current,
-            onPanResponderMove: (_, gs) => {
-                if (!selectedReason) return;
-                const max = cancelTrackWidth.current - THUMB - 6;
-                cancelTranslateX.setValue(Math.max(0, Math.min(gs.dx, max)));
-            },
-            onPanResponderRelease: (_, gs) => {
-                const max = cancelTrackWidth.current - THUMB - 6;
-                if (gs.dx >= max * 0.82 && selectedReason && !cancelConfirmed.current) {
-                    cancelConfirmed.current = true;
-                    Animated.timing(cancelTranslateX, { toValue: max, duration: 120, useNativeDriver: true })
-                        .start(() => onCancel(selectedReason));
-                } else {
-                    Animated.spring(cancelTranslateX, { toValue: 0, useNativeDriver: true, tension: 80, friction: 12 }).start();
-                }
-            },
-        }),
-    ).current;
-
-    return (
-        <View style={[sliderStyles.panel, { paddingBottom: done || showCancelSheet ? insetBottom + 16 : 0 }]}>
-            {!done && (
-                !showCancelSheet ? (
-                    <>
-                        <View style={sliderStyles.handle} />
-
-                        {/* Header */}
-                        <View style={sliderStyles.header}>
-                            {onDismiss && (
-                                <Pressable style={sliderStyles.dismissBtn} onPress={onDismiss} hitSlop={10}>
-                                    <Ionicons name="close" size={18} color="#64748b" />
-                                </Pressable>
-                            )}
-                            <View style={sliderStyles.iconRing}>
-                                <Ionicons name="checkmark-circle-outline" size={22} color="#22c55e" />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={sliderStyles.title}>Arrived at Dropoff</Text>
-                                <Text style={sliderStyles.sub} numberOfLines={1}>{customerName}</Text>
-                            </View>
-                            {!!customerPhone && (
-                                <Pressable
-                                    style={sliderStyles.callBtn}
-                                    onPress={() => Linking.openURL(`tel:${customerPhone}`)}
-                                    hitSlop={8}
-                                >
-                                    <Ionicons name="call-outline" size={17} color="#22d3ee" />
-                                </Pressable>
-                            )}
-                            <Pressable
-                                style={[sliderStyles.notifBtn, arrivedNotifSent && sliderStyles.notifBtnSent]}
-                                disabled={arrivedNotifSent}
-                                onPress={onNotify}
-                            >
-                                <Ionicons
-                                    name={arrivedNotifSent ? 'checkmark-circle' : 'notifications-outline'}
-                                    size={16}
-                                    color={arrivedNotifSent ? '#22c55e' : '#f1f5f9'}
-                                />
-                                <Text style={[sliderStyles.notifText, arrivedNotifSent && { color: '#22c55e' }]}>
-                                    {arrivedNotifSent ? 'Notified' : "I'm Here"}
-                                </Text>
-                            </Pressable>
-                        </View>
-
-                        {/* Order items + pricing */}
-                        {businesses.length > 0 && (
-                            <View style={sliderStyles.itemsSection}>
-                                <ScrollView style={{ maxHeight: 108 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-                                    {businesses.flatMap((b: any) => b.items ?? []).map((item: any, i: number) => (
-                                        <View key={i} style={sliderStyles.itemRow}>
-                                            <Text style={sliderStyles.itemName} numberOfLines={1}>{item.name}</Text>
-                                            <Text style={sliderStyles.itemQty}>×{item.quantity}</Text>
-                                        </View>
-                                    ))}
-                                </ScrollView>
-                                <View style={sliderStyles.pricingRow}>
-                                    <Text style={sliderStyles.pricingLabel}>Subtotal</Text>
-                                    <Text style={sliderStyles.pricingValue}>€{orderPrice.toFixed(2)}</Text>
-                                </View>
-                                <View style={sliderStyles.pricingRow}>
-                                    <Text style={sliderStyles.pricingLabel}>Delivery</Text>
-                                    <Text style={sliderStyles.pricingValue}>€{deliveryPrice.toFixed(2)}</Text>
-                                </View>
-                                <View style={[sliderStyles.pricingRow, sliderStyles.pricingTotal]}>
-                                    <Text style={sliderStyles.pricingTotalLabel}>Total</Text>
-                                    <Text style={sliderStyles.pricingTotalValue}>€{totalPrice.toFixed(2)}</Text>
-                                </View>
-                            </View>
-                        )}
-
-                        {/* Delivery slider track */}
-                        <View
-                            style={sliderStyles.track}
-                            onLayout={(e) => { trackWidth.current = e.nativeEvent.layout.width; }}
-                        >
-                            <Animated.View style={[sliderStyles.fill, { opacity: fillOpacity }]} />
-                            <Animated.Text style={[sliderStyles.trackLabel, { opacity: labelOpacity }]}>
-                                Slide to confirm delivery →
-                            </Animated.Text>
-                            <Animated.View
-                                style={[sliderStyles.thumb, { transform: [{ translateX }] }]}
-                                {...deliveryPan.panHandlers}
-                            >
-                                <Ionicons name="checkmark" size={24} color="#fff" />
-                            </Animated.View>
-                        </View>
-
-                        {/* Trouble row — timed */}
-                        <View style={sliderStyles.troubleRow}>
-                            <Text style={sliderStyles.troubleLabel}>Customer not here?</Text>
-
-                            {/* Ping Again — unlocks 3 min after I'm Here */}
-                            <Pressable
-                                style={[sliderStyles.troubleBtn, !pingUnlocked && sliderStyles.troubleBtnLocked]}
-                                disabled={!pingUnlocked}
-                                onPress={onPingAgain}
-                            >
-                                <Ionicons
-                                    name="notifications-outline"
-                                    size={13}
-                                    color={pingUnlocked ? '#f59e0b' : '#475569'}
-                                />
-                                <Text style={[sliderStyles.troubleBtnText, { color: pingUnlocked ? '#f59e0b' : '#475569' }]}>
-                                    {pingUnlocked
-                                        ? 'Ping Again'
-                                        : (!arrivedNotifSent ? 'Ping' : `Ping ${fmtTime(pingRemaining)}`)}
-                                </Text>
-                            </Pressable>
-
-                            {/* Cancel — unlocks 10 min after arrival */}
-                            <Pressable
-                                style={[
-                                    sliderStyles.troubleBtn,
-                                    sliderStyles.troubleBtnCancel,
-                                    !cancelUnlocked && sliderStyles.troubleBtnLocked,
-                                ]}
-                                disabled={!cancelUnlocked}
-                                onPress={() => setShowCancelSheet(true)}
-                            >
-                                <Ionicons
-                                    name="close-circle-outline"
-                                    size={13}
-                                    color={cancelUnlocked ? '#ef4444' : '#475569'}
-                                />
-                                <Text style={[sliderStyles.troubleBtnText, { color: cancelUnlocked ? '#ef4444' : '#475569' }]}>
-                                    {cancelUnlocked ? 'Cancel Order' : `Cancel ${fmtTime(cancelRemaining)}`}
-                                </Text>
-                            </Pressable>
-                        </View>
-                    </>
-                ) : (
-                    /* ── Cancel sheet ── */
-                    <>
-                        <View style={sliderStyles.handle} />
-                        <View style={sliderStyles.cancelHeader}>
-                            <Pressable onPress={() => setShowCancelSheet(false)} hitSlop={10}>
-                                <Ionicons name="arrow-back" size={20} color="#94a3b8" />
-                            </Pressable>
-                            <Text style={sliderStyles.cancelTitle}>Cancel Order</Text>
-                            <View style={{ width: 20 }} />
-                        </View>
-                        <Text style={sliderStyles.cancelSubtitle}>Select a reason</Text>
-                        <View style={sliderStyles.reasonList}>
-                            {CANCEL_REASONS.map((r) => (
-                                <Pressable
-                                    key={r}
-                                    style={[sliderStyles.reasonRow, selectedReason === r && sliderStyles.reasonRowSelected]}
-                                    onPress={() => setSelectedReason(r)}
-                                >
-                                    <View style={[sliderStyles.reasonDot, selectedReason === r && sliderStyles.reasonDotSelected]} />
-                                    <Text style={[sliderStyles.reasonText, selectedReason === r && { color: '#f1f5f9' }]}>
-                                        {r}
-                                    </Text>
-                                </Pressable>
-                            ))}
-                        </View>
-
-                        {/* Slide-to-cancel track */}
-                        <View
-                            style={[sliderStyles.track, sliderStyles.cancelTrack, !selectedReason && { opacity: 0.35 }]}
-                            onLayout={(e) => { cancelTrackWidth.current = e.nativeEvent.layout.width; }}
-                        >
-                            <Animated.View style={[sliderStyles.fill, sliderStyles.cancelFill, { opacity: cancelFillOpacity }]} />
-                            <Animated.Text style={[sliderStyles.trackLabel, { opacity: cancelLabelOpacity }]}>
-                                {selectedReason ? 'Slide to cancel order →' : 'Select a reason first'}
-                            </Animated.Text>
-                            <Animated.View
-                                style={[sliderStyles.thumb, sliderStyles.cancelThumb, { transform: [{ translateX: cancelTranslateX }] }]}
-                                {...(selectedReason ? cancelPan.panHandlers : {})}
-                            >
-                                <Ionicons name="close" size={22} color="#fff" />
-                            </Animated.View>
-                        </View>
-                    </>
-                )
-            )}
-        </View>
-    );
-}
-
-const sliderStyles = StyleSheet.create({
-    panel: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: '#0a0f1a',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        paddingHorizontal: 20,
-        paddingTop: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -6 },
-        shadowOpacity: 0.5,
-        shadowRadius: 16,
-        elevation: 24,
-        zIndex: 120,
-    },
-    handle: {
-        width: 36,
-        height: 4,
-        borderRadius: 2,
-        backgroundColor: 'rgba(255,255,255,0.12)',
-        alignSelf: 'center',
-        marginBottom: 14,
-    },
-    dismissBtn: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        backgroundColor: 'rgba(255,255,255,0.06)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 4,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-        marginBottom: 18,
-    },
-    iconRing: {
-        width: 42,
-        height: 42,
-        borderRadius: 21,
-        backgroundColor: 'rgba(34,197,94,0.12)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    title: {
-        color: '#f1f5f9',
-        fontSize: 15,
-        fontWeight: '800',
-    },
-    sub: {
-        color: '#64748b',
-        fontSize: 12,
-        marginTop: 1,
-    },
-    notifBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-        borderRadius: 10,
-        backgroundColor: 'rgba(255,255,255,0.07)',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-    },
-    notifBtnSent: {
-        borderColor: 'rgba(34,197,94,0.3)',
-        backgroundColor: 'rgba(34,197,94,0.08)',
-    },
-    notifText: {
-        color: '#f1f5f9',
-        fontSize: 12,
-        fontWeight: '700',
-    },
-    callBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        backgroundColor: 'rgba(34,211,238,0.08)',
-        borderWidth: 1,
-        borderColor: 'rgba(34,211,238,0.2)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 6,
-    },
-    itemsSection: {
-        marginBottom: 12,
-        backgroundColor: 'rgba(255,255,255,0.03)',
-        borderRadius: 12,
-        padding: 10,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.06)',
-    },
-    itemRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 3,
-    },
-    itemName: {
-        color: '#94a3b8',
-        fontSize: 12,
-        flex: 1,
-    },
-    itemQty: {
-        color: '#475569',
-        fontSize: 12,
-        fontWeight: '600',
-        marginLeft: 8,
-    },
-    pricingRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingTop: 5,
-        marginTop: 4,
-        borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: 'rgba(255,255,255,0.06)',
-    },
-    pricingLabel: {
-        color: '#475569',
-        fontSize: 11,
-        fontWeight: '600',
-    },
-    pricingValue: {
-        color: '#94a3b8',
-        fontSize: 11,
-        fontWeight: '700',
-    },
-    pricingTotal: {
-        borderTopColor: 'rgba(255,255,255,0.1)',
-        borderTopWidth: 1,
-        marginTop: 6,
-        paddingTop: 6,
-    },
-    pricingTotalLabel: {
-        color: '#f1f5f9',
-        fontSize: 13,
-        fontWeight: '800',
-    },
-    pricingTotalValue: {
-        color: '#22d3ee',
-        fontSize: 14,
-        fontWeight: '900',
-    },
-    track: {
-        height: TRACK_H,
-        borderRadius: TRACK_H / 2,
-        backgroundColor: 'rgba(255,255,255,0.06)',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
-        justifyContent: 'center',
-        overflow: 'hidden',
-    },
-    fill: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: '#22c55e',
-        borderRadius: TRACK_H / 2,
-    },
-    trackLabel: {
-        color: 'rgba(255,255,255,0.4)',
-        fontSize: 13,
-        fontWeight: '700',
-        textAlign: 'center',
-        letterSpacing: 0.3,
-    },
-    thumb: {
-        position: 'absolute',
-        left: 3,
-        width: THUMB,
-        height: THUMB,
-        borderRadius: THUMB / 2,
-        backgroundColor: '#22c55e',
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#22c55e',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.5,
-        shadowRadius: 10,
-        elevation: 10,
-    },
-    troubleRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginTop: 12,
-        paddingBottom: 16,
-    },
-    troubleLabel: {
-        color: '#475569',
-        fontSize: 11,
-        fontWeight: '600',
-        flex: 1,
-    },
-    troubleBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        paddingHorizontal: 9,
-        paddingVertical: 6,
-        borderRadius: 8,
-        backgroundColor: 'rgba(245,158,11,0.08)',
-        borderWidth: 1,
-        borderColor: 'rgba(245,158,11,0.2)',
-    },
-    troubleBtnCancel: {
-        backgroundColor: 'rgba(239,68,68,0.08)',
-        borderColor: 'rgba(239,68,68,0.2)',
-    },
-    troubleBtnLocked: {
-        backgroundColor: 'rgba(255,255,255,0.04)',
-        borderColor: 'rgba(255,255,255,0.06)',
-    },
-    troubleBtnText: {
-        fontSize: 11,
-        fontWeight: '700',
-    },
-    /* Cancel sheet */
-    cancelHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 4,
-    },
-    cancelTitle: {
-        color: '#f1f5f9',
-        fontSize: 15,
-        fontWeight: '800',
-    },
-    cancelSubtitle: {
-        color: '#64748b',
-        fontSize: 12,
-        marginBottom: 12,
-        textAlign: 'center',
-    },
-    reasonList: {
-        gap: 6,
-        marginBottom: 16,
-    },
-    reasonRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-        paddingVertical: 10,
-        paddingHorizontal: 14,
-        borderRadius: 12,
-        backgroundColor: 'rgba(255,255,255,0.04)',
-        borderWidth: 1,
-        borderColor: 'transparent',
-    },
-    reasonRowSelected: {
-        borderColor: 'rgba(239,68,68,0.35)',
-        backgroundColor: 'rgba(239,68,68,0.07)',
-    },
-    reasonDot: {
-        width: 14,
-        height: 14,
-        borderRadius: 7,
-        borderWidth: 1.5,
-        borderColor: '#475569',
-    },
-    reasonDotSelected: {
-        borderColor: '#ef4444',
-        backgroundColor: '#ef4444',
-    },
-    reasonText: {
-        color: '#64748b',
-        fontSize: 13,
-        fontWeight: '600',
-    },
-    cancelTrack: {
-        borderColor: 'rgba(239,68,68,0.2)',
-        backgroundColor: 'rgba(239,68,68,0.05)',
-    },
-    cancelFill: {
-        backgroundColor: '#ef4444',
-    },
-    cancelThumb: {
-        backgroundColor: '#ef4444',
-        shadowColor: '#ef4444',
-    },
-    successOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(10,15,26,0.96)',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 16,
-        zIndex: 10,
-    },
-});
 
 export default function NavigationScreen() {
     const router = useRouter();
@@ -1139,10 +90,11 @@ export default function NavigationScreen() {
         const id = setInterval(() => setNowTs(Date.now()), 10_000);
         return () => clearInterval(id);
     }, []);
+    const apolloClient = useApolloClient();
     const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS);
     const [driverNotifyCustomer] = useMutation(DRIVER_NOTIFY_CUSTOMER);
 
-    /* ── Store ── */
+    /* â”€â”€ Store â”€â”€ */
     const {
         order,
         phase,
@@ -1159,19 +111,30 @@ export default function NavigationScreen() {
     const isOnline = useAuthStore((state) => state.isOnline);
     const { dispatchModeEnabled } = useStoreStatus();
 
-    /* ── Driver metrics ── */
+    /* â”€â”€ Driver metrics â”€â”€ */
     const { data: metricsData } = useQuery(GET_MY_DRIVER_METRICS, {
         fetchPolicy: 'cache-and-network',
         pollInterval: 60_000,
     });
 
-    /* ── Orders query ── */
+    /* â”€â”€ Orders query â€” updated via subscription; initial load via query â”€â”€ */
     const { data } = useQuery(GET_ORDERS, {
         fetchPolicy: 'cache-and-network',
         nextFetchPolicy: 'cache-first',
     });
 
-    /* ── Filter assigned orders ── */
+    useSubscription(ALL_ORDERS_UPDATED, {
+        skip: !currentDriverId,
+        onData: ({ data: subData }) => {
+            const incomingOrders = (subData.data as any)?.allOrdersUpdated as any[] | undefined;
+            if (incomingOrders === undefined || incomingOrders === null) return;
+            apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
+                return { ...(existing ?? {}), orders: incomingOrders };
+            });
+        },
+    });
+
+    /* â”€â”€ Filter assigned orders â”€â”€ */
     const assignedOrders = useMemo(() => {
         const orders = (data as any)?.orders ?? [];
         return orders.filter((o: any) => {
@@ -1180,8 +143,20 @@ export default function NavigationScreen() {
         });
     }, [data, currentDriverId]);
 
-    /* ── Build coordinates for MapboxNavigationView ── */
-    // Use the stored origin only — the Navigation SDK tracks GPS internally.
+    /* â”€â”€ Guard: if the active order was externally completed/cancelled (admin), exit navigation â”€â”€ */
+    useEffect(() => {
+        const orders = (data as any)?.orders;
+        if (!orders) return; // query not yet resolved
+        if (!order) return;
+        const liveOrder = orders.find((o: any) => o.id === order.id);
+        if (!liveOrder || liveOrder.status === 'DELIVERED' || liveOrder.status === 'CANCELLED') {
+            stopNavigation();
+            router.replace('/(tabs)/drive' as any);
+        }
+    }, [data, order?.id, stopNavigation, router]);
+
+    /* â”€â”€ Build coordinates for MapboxNavigationView â”€â”€ */
+    // Use the stored origin only â€” the Navigation SDK tracks GPS internally.
     // Feeding live GPS updates into coordinates causes the SDK to restart routing.
     const currentOrigin = originLocation;
     const coordinates = useMemo(() => {
@@ -1192,11 +167,11 @@ export default function NavigationScreen() {
         ];
     }, [currentOrigin?.latitude, currentOrigin?.longitude, destination?.latitude, destination?.longitude]);
 
-    /* ── Store for feeding Navigation SDK location to heartbeat ── */
+    /* â”€â”€ Store for feeding Navigation SDK location to heartbeat â”€â”€ */
     const setNavigationLocation = useNavigationLocationStore((state) => state.setLocation);
     const clearNavigationLocation = useNavigationLocationStore((state) => state.clearLocation);
 
-    /* ── Cleanup: clear navigation location and toast timer on unmount ── */
+    /* â”€â”€ Cleanup: clear navigation location and toast timer on unmount â”€â”€ */
     useEffect(() => {
         return () => {
             clearNavigationLocation();
@@ -1204,7 +179,7 @@ export default function NavigationScreen() {
         };
     }, [clearNavigationLocation]);
 
-    /* ── Detect newly assigned orders and show toast ── */
+    /* â”€â”€ Detect newly assigned orders and show toast â”€â”€ */
     useEffect(() => {
         const currentIds = new Set(assignedOrders.map((o: any) => String(o.id)));
         if (prevOrderIdsRef.current.size > 0) {
@@ -1220,7 +195,7 @@ export default function NavigationScreen() {
         prevOrderIdsRef.current = currentIds;
     }, [assignedOrders]);
 
-    /* ── Reset near-end bar when order changes ── */
+    /* â”€â”€ Reset near-end bar when order changes â”€â”€ */
     useEffect(() => {
         setShowNearEndBar(false);
         setNotifManualSent(false);
@@ -1229,7 +204,7 @@ export default function NavigationScreen() {
         setNotifiedAt(null);
     }, [order?.id]);
 
-    /* ── Show near-end bar when < 5 min from dropoff ── */
+    /* â”€â”€ Show near-end bar when < 5 min from dropoff â”€â”€ */
     useEffect(() => {
         if (
             phase === 'to_dropoff' &&
@@ -1241,15 +216,15 @@ export default function NavigationScreen() {
         }
     }, [durationRemainingS, phase, showDeliveryPanel]);
 
-    /* ── Detect when admin reassigns the active navigation order away ── */
+    /* â”€â”€ Detect when admin reassigns the active navigation order away â”€â”€ */
     const reassignedAlertShownRef = useRef(false);
     useEffect(() => {
         if (!order?.id || !isNavigating) return;
         const allOrders = (data as any)?.orders ?? [];
         const rawOrder = allOrders.find((o: any) => o.id === order.id);
-        // If the order is DELIVERED or CANCELLED by us, don't show the alert —
+        // If the order is DELIVERED or CANCELLED by us, don't show the alert â€”
         // the onConfirm / onCancel handlers already call stopNavigation and navigate away.
-        if (!rawOrder) return; // not yet in cache — wait
+        if (!rawOrder) return; // not yet in cache â€” wait
         if (rawOrder.status === 'DELIVERED' || rawOrder.status === 'CANCELLED') return;
         // Only alert if the order was genuinely re-assigned to a different driver
         const reassignedAway = rawOrder.driver?.id && rawOrder.driver.id !== currentDriverId;
@@ -1270,7 +245,7 @@ export default function NavigationScreen() {
         }
     }, [data, order?.id, isNavigating, currentDriverId, clearNavigationLocation, stopNavigation, router]);
 
-    /* ── Auto-notify customer when driver is < 3 min away (to_dropoff only) ── */
+    /* â”€â”€ Auto-notify customer when driver is < 3 min away (to_dropoff only) â”€â”€ */
     useEffect(() => {        if (
             phase !== 'to_dropoff' ||
             durationRemainingS == null ||
@@ -1282,10 +257,10 @@ export default function NavigationScreen() {
         etaNotificationSentRef.current.add(order.id);
 
         driverNotifyCustomer({ variables: { orderId: order.id, kind: 'ETA_LT_3_MIN' } })
-            .catch(() => { /* best-effort — backend will retry on next heartbeat window */ });
+            .catch(() => { /* best-effort â€” backend will retry on next heartbeat window */ });
     }, [durationRemainingS, phase, order?.id, driverNotifyCustomer]);
 
-    /* ── Callbacks ── */
+    /* â”€â”€ Callbacks â”€â”€ */
     const handleRouteProgressChanged = useCallback(
         (event: any) => {
             const eventData = event?.nativeEvent ?? event ?? {};
@@ -1310,7 +285,7 @@ export default function NavigationScreen() {
     const handleCancelNavigation = useCallback(() => {
         clearNavigationLocation(); // Stop providing location to heartbeat
         stopNavigation();
-        router.replace('/(tabs)/map' as any);
+        router.replace('/(tabs)/drive' as any);
     }, [clearNavigationLocation, stopNavigation, router]);
 
     const handleWaypointArrival = useCallback(
@@ -1334,52 +309,20 @@ export default function NavigationScreen() {
     }, [order?.id, driverNotifyCustomer]);
 
     const handleUserOffRoute = useCallback(() => {
-        // SDK handles re-routing automatically — just log for analytics
-        console.log('[Navigation] Driver went off route — SDK is re-routing');
+        // SDK handles re-routing automatically â€” just log for analytics
+        console.log('[Navigation] Driver went off route â€” SDK is re-routing');
     }, []);
 
-    /* ── Switch to different order ── */
+    /* â”€â”€ Switch to different order â”€â”€ */
     const switchToOrder = useCallback((newOrder: any) => {
         if (!currentOrigin) return;
-        
-        const bizLoc = newOrder.businesses?.[0]?.business?.location;
-        const dropLoc = newOrder.dropOffLocation;
-        if (!bizLoc) return;
-
-        const pickup = {
-            latitude: Number(bizLoc.latitude),
-            longitude: Number(bizLoc.longitude),
-            label: newOrder.businesses?.[0]?.business?.name ?? 'Pickup',
-        };
-        const dropoff = dropLoc
-            ? {
-                latitude: Number(dropLoc.latitude),
-                longitude: Number(dropLoc.longitude),
-                label: dropLoc.address ?? 'Drop-off',
-            }
-            : null;
-        const customerName = newOrder.user
-            ? `${newOrder.user.firstName} ${newOrder.user.lastName}`
-            : 'Customer';
-
-        const navOrder = {
-            id: newOrder.id,
-            status: newOrder.status,
-            businessName: newOrder.businesses?.[0]?.business?.name ?? 'Business',
-            customerName,
-            customerPhone: newOrder.user?.phoneNumber ?? null,
-            pickup,
-            dropoff,
-        };
-
-        const newPhase: NavigationPhase =
-            newOrder.status === 'OUT_FOR_DELIVERY' ? 'to_dropoff' : 'to_pickup';
-
+        const navOrder = buildNavOrder(newOrder);
+        if (!navOrder) return;
         const origin = { latitude: currentOrigin.latitude, longitude: currentOrigin.longitude };
-        startNavigation(navOrder, newPhase, origin);
+        startNavigation(navOrder, orderToPhase(newOrder.status), origin);
     }, [currentOrigin, startNavigation]);
 
-    /* ── Mark order as picked up ── */
+    /* â”€â”€ Mark order as picked up â”€â”€ */
     const handleMarkPickedUp = useCallback(async (orderId: string) => {
         setMarkingPickedUpIds(prev => new Set(prev).add(orderId));
         try {
@@ -1389,18 +332,19 @@ export default function NavigationScreen() {
         }
     }, [updateOrderStatus]);
 
-    /* ── Recenter map ── */
+    /* â”€â”€ Recenter map â”€â”€ */
     const handleRecenter = useCallback(() => {
         mapViewRef.current?.recenterMap?.();
     }, []);
 
-    /* ── Guard: if no destination or location yet, show loading state ── */
+    /* â”€â”€ Guard: if no destination or location yet, show loading state â”€â”€ */
     if (!coordinates || !order || !destination) {
+        console.log('[Navigation] guard hit â€” coordinates:', !!coordinates, 'order:', !!order, 'destination:', !!destination, 'originLocation:', !!originLocation);
         return (
             <View style={[styles.container, { backgroundColor: '#000' }]}>
                 <View style={styles.loadingCenter}>
                     <Text style={styles.loadingText}>
-                        {!currentOrigin ? 'Waiting for GPS...' : 'Loading navigation...'}
+                        {!originLocation ? 'Waiting for GPS...' : !order ? 'No active order â€” go back' : 'Loading navigation...'}
                     </Text>
                 </View>
                 <Pressable
@@ -1415,7 +359,7 @@ export default function NavigationScreen() {
 
     return (
         <View style={styles.container}>
-            {/* ═══ Full-screen Mapbox Navigation ═══ */}
+            {/* â•â•â• Full-screen Mapbox Navigation â•â•â• */}
             <MapboxNavigationView
                 ref={mapViewRef}
                 style={styles.navView}
@@ -1441,16 +385,16 @@ export default function NavigationScreen() {
                 onRoutesLoaded={() => console.log('[Navigation] Routes loaded')}
             />
 
-            {/* ═══ Back button ═══ */}
+            {/* â•â•â• Back button â€” returns to map without stopping navigation â•â•â• */}
             <Pressable
                 style={[styles.backBtn, { top: insets.top + 8 }]}
-                onPress={handleCancelNavigation}
+                onPress={() => router.back()}
                 hitSlop={12}
             >
                 <Ionicons name="arrow-back" size={24} color="#fff" />
             </Pressable>
 
-            {/* ═══ Right-side buttons (recenter) ═══ */}
+            {/* â•â•â• Right-side buttons (recenter) â•â•â• */}
             <View style={[styles.rightButtons, { bottom: 180 + insets.bottom }]}>
                 <Pressable
                     style={styles.mapBtn}
@@ -1474,7 +418,7 @@ export default function NavigationScreen() {
                 </Pressable>
             </View>
 
-            {/* ═══ Driver message banner ═══ */}
+            {/* â•â•â• Driver message banner â•â•â• */}
             {navIncomingMessage && (
                 <DriverMessageBanner
                     key={navIncomingMessage.id}
@@ -1486,7 +430,7 @@ export default function NavigationScreen() {
                 />
             )}
 
-            {/* ═══ New order assigned toast ═══ */}
+            {/* â•â•â• New order assigned toast â•â•â• */}
             {newOrderToast && (
                 <View style={[styles.newOrderToast, { top: insets.top + 12 }]}>
                     <Ionicons name="bag-add-outline" size={18} color="#fff" />
@@ -1502,7 +446,7 @@ export default function NavigationScreen() {
                 </View>
             )}
 
-            {/* ═══ Today's earnings floating pill ═══ */}
+            {/* â•â•â• Today's earnings floating pill â•â•â• */}
             {(() => {
                 const metrics = (metricsData as any)?.myDriverMetrics;
                 const net = Number(metrics?.netEarningsToday ?? 0).toFixed(2);
@@ -1510,7 +454,7 @@ export default function NavigationScreen() {
                 return (
                     <View style={[styles.earningsPill, { top: insets.top + 12 }]}>
                         <Ionicons name="wallet-outline" size={14} color="#22c55e" />
-                        <Text style={styles.earningsPillAmount}>€{net}</Text>
+                        <Text style={styles.earningsPillAmount}>â‚¬{net}</Text>
                         <View style={styles.earningsPillDivider} />
                         <Ionicons name="bicycle-outline" size={13} color="#94a3b8" />
                         <Text style={styles.earningsPillCount}>{count}</Text>
@@ -1518,7 +462,7 @@ export default function NavigationScreen() {
                 );
             })()}
 
-            {/* ═══ ETA pill (live from nav SDK) ═══ */}
+            {/* â•â•â• ETA pill (live from nav SDK) â•â•â• */}
             {durationRemainingS != null && !showPickupPanel && !showDeliveryPanel && (
                 <View style={[styles.etaPill, { top: insets.top + 12 }]}>
                     <Ionicons name="time-outline" size={13} color="#38bdf8" />
@@ -1533,7 +477,7 @@ export default function NavigationScreen() {
                 </View>
             )}
 
-            {/* ═══ Order cards bar (bottom) ═══ */}
+            {/* â•â•â• Order cards bar (bottom) â•â•â• */}
             {assignedOrders.length >= 1 && (
                 <View style={[styles.bottomBar, { bottom: insets.bottom + 8 }]}>
                     <ScrollView
@@ -1583,7 +527,7 @@ export default function NavigationScreen() {
                                             ) : null}
                                         </View>
                                         <View style={styles.barEarnings}>
-                                            <Text style={styles.barEarningsText}>€{earnings}</Text>
+                                            <Text style={styles.barEarningsText}>â‚¬{earnings}</Text>
                                         </View>
                                     </View>
 
@@ -1617,7 +561,7 @@ export default function NavigationScreen() {
                                             <Ionicons name="restaurant-outline" size={11} color="#06b6d4" />
                                             <Text style={styles.prepText}>
                                                 {prepMinsLeft === null
-                                                    ? 'Preparing…'
+                                                    ? 'Preparingâ€¦'
                                                     : prepMinsLeft === 0
                                                     ? 'Almost ready'
                                                     : `Ready in ~${prepMinsLeft} min`}
@@ -1631,7 +575,7 @@ export default function NavigationScreen() {
                 </View>
             )}
 
-            {/* ═══ Near-end action bar ═══ */}
+            {/* â•â•â• Near-end action bar â•â•â• */}
             {showNearEndBar && !showPickupPanel && !showDeliveryPanel && (
                 <View style={[styles.nearEndBar, { bottom: (assignedOrders.length > 1 ? 160 : 80) + insets.bottom }]}>
                     {/* Call customer */}
@@ -1647,9 +591,10 @@ export default function NavigationScreen() {
                 </View>
             )}
 
-            {/* ═══ Pickup arrival panel ═══ */}
+            {/* â•â•â• Pickup arrival panel â•â•â• */}
             {showPickupPanel && (() => {
-                const etaMins = durationRemainingS != null ? Math.ceil(durationRemainingS / 60) : null;
+                // durationRemainingS is ~0 at waypoint arrival (we just arrived at pickup).
+                // The dropoff ETA will come from the nav SDK once the next leg loads — pass null for now.
                 // Look up live order data to get prep ETA
                 const liveOrder = assignedOrders.find((o: any) => o.id === order?.id);
                 const pickupPrepMins = (() => {
@@ -1660,7 +605,7 @@ export default function NavigationScreen() {
                 return (
                     <PickupSlider
                         businessName={order?.businessName ?? ''}
-                        etaMins={etaMins}
+                        etaMins={null}
                         prepMinsLeft={pickupPrepMins}
                         insetBottom={insets.bottom}
                         onConfirm={async () => {
@@ -1674,13 +619,13 @@ export default function NavigationScreen() {
                             setShowPickupPanel(false);
                             clearNavigationLocation();
                             stopNavigation();
-                            router.replace('/(tabs)/map' as any);
+                            router.replace('/(tabs)/drive' as any);
                         }}
                     />
                 );
             })()}
 
-            {/* ═══ Full-screen dim veil shown during delivery success animation ═══ */}
+            {/* â•â•â• Full-screen dim veil shown during delivery success animation â•â•â• */}
             {showDeliveryPanel && (
                 <Animated.View
                     pointerEvents="none"
@@ -1695,13 +640,13 @@ export default function NavigationScreen() {
                 />
             )}
 
-            {/* ═══ Success card + confetti ═══ */}
+            {/* â•â•â• Success card + confetti â•â•â• */}
             {showSuccessCard && (
                 <View
                     pointerEvents="none"
                     style={[StyleSheet.absoluteFillObject, { zIndex: 115, alignItems: 'center', justifyContent: 'center' }]}
                 >
-                    {/* Confetti particles — explode from card centre */}
+                    {/* Confetti particles â€” explode from card centre */}
                     {confettiData.map((p, i) => {
                         const cY = p.anim.interpolate({ inputRange: [0, 0.55, 1], outputRange: [0, -p.vy, -(p.vy * 0.72)] });
                         const cX = p.anim.interpolate({ inputRange: [0, 1], outputRange: [0, p.x] });
@@ -1739,14 +684,14 @@ export default function NavigationScreen() {
                         <Text style={styles.successCardTitle}>Delivered!</Text>
                         <View style={styles.successCardBadge}>
                             <Ionicons name="cash" size={26} color="#78350f" />
-                            <Text style={styles.successCardAmount}>+€{successCardPrice.toFixed(2)}</Text>
-                            <Text style={styles.successCardLabel}>delivery earned 🎉</Text>
+                            <Text style={styles.successCardAmount}>+â‚¬{successCardPrice.toFixed(2)}</Text>
+                            <Text style={styles.successCardLabel}>delivery earned ðŸŽ‰</Text>
                         </View>
                     </Animated.View>
                 </View>
             )}
 
-            {/* ═══ Delivery arrival panel ═══ */}
+            {/* â•â•â• Delivery arrival panel â•â•â• */}
             {showDeliveryPanel && (() => {
                 const fo = assignedOrders.find((o: any) => o.id === order?.id);
                 return (
@@ -1776,10 +721,21 @@ export default function NavigationScreen() {
                     }}
                     onDismiss={() => setShowDeliveryPanel(false)}
                     onConfirm={async () => {
+                        const deliveredId = order?.id;
                         try {
-                            await updateOrderStatus({ variables: { id: order?.id, status: 'DELIVERED' } });
-                            await driverNotifyCustomer({ variables: { orderId: order?.id, event: 'DELIVERED' } });
+                            await updateOrderStatus({ variables: { id: deliveredId, status: 'DELIVERED' } });
+                            driverNotifyCustomer({ variables: { orderId: deliveredId, kind: 'DELIVERED' } })
+                                .catch(() => {});
                         } catch { /* navigate home regardless */ }
+                        // Eagerly remove the delivered order from Apollo cache so the
+                        // drive tab doesn't wait for a subscription round-trip to clear it.
+                        if (deliveredId) {
+                            apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
+                                const prev = existing?.orders;
+                                if (!Array.isArray(prev)) return existing;
+                                return { ...existing, orders: prev.filter((o: any) => o.id !== deliveredId) };
+                            });
+                        }
                         // Clean up success animation state before switching
                         setShowSuccessCard(false);
                         mapDimOpacity.setValue(0);
@@ -1795,7 +751,7 @@ export default function NavigationScreen() {
                         if (remaining.length > 0) {
                             switchToOrder(remaining[0]);
                         } else {
-                            router.replace('/(tabs)/map' as any);
+                            router.replace('/(tabs)/drive' as any);
                         }
                     }}
                     onSuccessAnimStart={() => {
@@ -1816,7 +772,7 @@ export default function NavigationScreen() {
                                 Animated.spring(successCardY,       { toValue: 0, tension: 46, friction: 8, useNativeDriver: true }),
                                 Animated.spring(successCardScale,   { toValue: 1, tension: 50, friction: 7, useNativeDriver: true }),
                             ]).start(() => {
-                                // Hover loop on its own value — never touches successCardY so no reset flicker
+                                // Hover loop on its own value â€” never touches successCardY so no reset flicker
                                 Animated.loop(
                                     Animated.sequence([
                                         Animated.timing(successCardHoverY, { toValue: -14, duration: 700, useNativeDriver: true }),
@@ -1852,7 +808,7 @@ export default function NavigationScreen() {
                         if (remaining.length > 0) {
                             switchToOrder(remaining[0]);
                         } else {
-                            router.replace('/(tabs)/map' as any);
+                            router.replace('/(tabs)/drive' as any);
                         }
                     }}
                 />
@@ -1931,7 +887,7 @@ const styles = StyleSheet.create({
         letterSpacing: 0.9,
     },
 
-    /* ── Loading state ── */
+    /* â”€â”€ Loading state â”€â”€ */
     loadingCenter: {
         flex: 1,
         justifyContent: 'center',
@@ -1943,7 +899,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 
-    /* ── Near-end action bar ── */
+    /* â”€â”€ Near-end action bar â”€â”€ */
     nearEndBar: {
         position: 'absolute',
         left: 16,
@@ -1979,7 +935,7 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
 
-    /* ── Arrived notify button (inside delivery panel header) ── */
+    /* â”€â”€ Arrived notify button (inside delivery panel header) â”€â”€ */
     arrivedNotifBtn: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -2007,7 +963,7 @@ const styles = StyleSheet.create({
         padding: 8,
     },
 
-    /* ── Cancel button (loading state) ── */
+    /* â”€â”€ Cancel button (loading state) â”€â”€ */
     cancelBtn: {
         position: 'absolute',
         left: 16,
@@ -2019,7 +975,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
 
-    /* ── Control buttons ── */
+    /* â”€â”€ Control buttons â”€â”€ */
     controlBtn: {
         width: 44,
         height: 44,
@@ -2032,7 +988,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(239,68,68,0.7)',
     },
 
-    /* ── Right-side buttons ── */
+    /* â”€â”€ Right-side buttons â”€â”€ */
     rightButtons: {
         position: 'absolute',
         right: 16,
@@ -2054,7 +1010,7 @@ const styles = StyleSheet.create({
         elevation: 5,
     },
 
-    /* ── Order cards bar ── */
+    /* â”€â”€ Order cards bar â”€â”€ */
     bottomBar: {
         position: 'absolute',
         left: 0,
@@ -2249,7 +1205,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 
-    /* ── New order assigned toast ── */
+    /* â”€â”€ New order assigned toast â”€â”€ */
     newOrderToast: {
         position: 'absolute',
         left: 16,
@@ -2281,7 +1237,7 @@ const styles = StyleSheet.create({
         marginTop: 1,
     },
 
-    /* ── Earnings floating pill ── */
+    /* â”€â”€ Earnings floating pill â”€â”€ */
     earningsPill: {
         position: 'absolute',
         right: 16,
@@ -2318,7 +1274,7 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
 
-    /* ── ETA floating pill ── */
+    /* â”€â”€ ETA floating pill â”€â”€ */
     etaPill: {
         position: 'absolute',
         left: 16,

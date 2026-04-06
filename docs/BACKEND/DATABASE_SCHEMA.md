@@ -103,7 +103,7 @@ npm run db:studio     # open Drizzle Studio at https://local.drizzle.studio
 
 | Table | File | Notes |
 |-------|------|-------|
-| `promotions` | `promotions.ts` | 6 types: FIXED_AMOUNT, PERCENTAGE, FREE_DELIVERY, SPEND_X_GET_FREE, SPEND_X_PERCENT, SPEND_X_FIXED. Soft-delete via `is_deleted`. |
+| `promotions` | `promotions.ts` | 6 types: FIXED_AMOUNT, PERCENTAGE, FREE_DELIVERY, SPEND_X_GET_FREE, SPEND_X_PERCENT, SPEND_X_FIXED. Soft-delete via `is_deleted`. `is_recovery` boolean (default false) marks hidden compensation promos. `order_id` (nullable FK → orders) links recovery promos to the specific cancelled order they were issued for. |
 | `promotion_redemptions` | `promotionRedemptions.ts` | Per-user redemption log. |
 | `promotion_business_eligibility` | `promotionBusinessEligibility.ts` | Restrict promo to specific businesses. |
 | `user_promotions` | `userPromotions.ts` | Assign promos to specific users. |

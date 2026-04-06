@@ -153,7 +153,7 @@ export function useNotifications() {
             // Refresh the orders list when an early-dispatch push arrives so the
             // accept modal appears immediately without requiring a manual app restart.
             const notifType = notification.request.content.data?.type;
-            if (notifType === 'ORDER_READY_POOL') {
+            if (notifType === 'ORDER_READY_POOL' || notifType === 'ORDER_ASSIGNED') {
                 apolloClient
                     .query({ query: GET_ORDERS, fetchPolicy: 'network-only' })
                     .catch(() => null);

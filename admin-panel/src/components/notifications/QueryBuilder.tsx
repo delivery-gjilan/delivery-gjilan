@@ -1,8 +1,6 @@
 ﻿"use client";
 
-import { useState, useCallback, useMemo } from "react";
-import Select from "@/components/ui/Select";
-import Input from "@/components/ui/Input";
+import { useState, useCallback } from "react";
 import { Trash2, GripVertical, ChevronDown, ChevronRight } from "lucide-react";
 
 // â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -81,6 +79,17 @@ const OPERATORS: Record<string, { value: string; label: string }[]> = {
 
 // â”€â”€ Utility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+
+// Group fields by category once at module level (FIELD_DEFINITIONS is static)
+const FIELD_CATEGORIES: Map<string, FieldDef[]> = FIELD_DEFINITIONS.reduce(
+  (map, f) => {
+    const cat = f.category || "Other";
+    if (!map.has(cat)) map.set(cat, []);
+    map.get(cat)!.push(f);
+    return map;
+  },
+  new Map<string, FieldDef[]>(),
+);
 function getFieldDef(fieldValue: string): FieldDef | undefined {
   return FIELD_DEFINITIONS.find((f) => f.value === fieldValue);
 }
@@ -126,17 +135,6 @@ function RuleRow({
   const fieldDef = getFieldDef(rule.field);
   const operators = OPERATORS[fieldDef?.type || "number"] || OPERATORS.number;
 
-  // Group fields by category
-  const categories = useMemo(() => {
-    const cats = new Map<string, FieldDef[]>();
-    FIELD_DEFINITIONS.forEach((f) => {
-      const cat = f.category || "Other";
-      if (!cats.has(cat)) cats.set(cat, []);
-      cats.get(cat)!.push(f);
-    });
-    return cats;
-  }, []);
-
   return (
     <div className="flex items-center gap-0">
       {/* Connector label */}
@@ -165,7 +163,7 @@ function RuleRow({
           }
           className="bg-transparent border-0 text-neutral-200 text-sm focus:outline-none cursor-pointer min-w-[140px]"
         >
-          {Array.from(categories.entries()).map(([cat, fields]) => (
+          {Array.from(FIELD_CATEGORIES.entries()).map(([cat, fields]) => (
             <optgroup key={cat} label={cat}>
               {fields.map((f) => (
                 <option key={f.value} value={f.value} className="bg-[#1a1a1a]">
@@ -403,3 +401,4 @@ export default function QueryBuilder({ value, onChange, className = "" }: QueryB
     </div>
   );
 }
+

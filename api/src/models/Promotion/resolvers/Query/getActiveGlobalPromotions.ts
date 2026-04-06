@@ -2,12 +2,16 @@ import type { QueryResolvers } from './../../../../generated/types.generated';
 import { getDB } from '@/database';
 import { promotions } from '@/database/schema';
 import { and, eq, or, isNull, gt, lte } from 'drizzle-orm';
+import { cache } from '@/lib/cache';
 
 /**
  * Returns currently active promotions visible to all users (ALL_USERS or FIRST_ORDER target).
  * No cart context needed — used for global promo banners on the home / tab layout.
  */
 export const getActiveGlobalPromotions: NonNullable<QueryResolvers['getActiveGlobalPromotions']> = async () => {
+  const cached = await cache.get<ReturnType<typeof mapPromo>[]>(cache.keys.promotions());
+  if (cached) return cached as any;
+
   const db = await getDB();
   const now = new Date().toISOString();
 
@@ -32,7 +36,7 @@ export const getActiveGlobalPromotions: NonNullable<QueryResolvers['getActiveGlo
     return new Date(date).toISOString();
   };
 
-  return promoList.map((promo) => ({
+  const mapPromo = (promo: (typeof promoList)[number]) => ({
     id: promo.id,
     name: promo.name,
     description: promo.description,
@@ -57,5 +61,9 @@ export const getActiveGlobalPromotions: NonNullable<QueryResolvers['getActiveGlo
     totalRevenue: promo.totalRevenue || 0,
     creatorType: promo.creatorType,
     creatorId: promo.creatorId,
-  }));
+  });
+
+  const result = promoList.map(mapPromo);
+  await cache.set(cache.keys.promotions(), result, cache.TTL.PROMOTIONS);
+  return result as any;
 };

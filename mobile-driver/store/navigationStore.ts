@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /* ─── Types ─── */
 export type NavigationPhase = 'to_pickup' | 'to_dropoff';
@@ -41,7 +43,7 @@ interface NavigationState {
     updateProgress: (distance: number, duration: number, fraction: number) => void;
 }
 
-export const useNavigationStore = create<NavigationState>((set, get) => ({
+export const useNavigationStore = create<NavigationState>()(persist((set, get) => ({
     /* ── Initial state ── */
     isNavigating: false,
     phase: 'to_pickup',
@@ -104,4 +106,18 @@ export const useNavigationStore = create<NavigationState>((set, get) => ({
             fractionTraveled: fraction,
         });
     },
+}),
+{
+    name: 'navigation-state',
+    storage: createJSONStorage(() => AsyncStorage),
+    // Only persist the fields needed to resume navigation after a kill.
+    // Progress metrics are runtime-only.
+    partialize: (s) => ({
+        isNavigating: s.isNavigating,
+        phase: s.phase,
+        order: s.order,
+        destination: s.destination,
+        originLocation: s.originLocation,
+        isMuted: s.isMuted,
+    }),
 }));

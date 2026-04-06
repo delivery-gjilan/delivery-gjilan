@@ -2,7 +2,7 @@
 import type { QueryResolvers } from './../../../../generated/types.generated';
 import { getDB } from '@/database';
 import { promotions } from '@/database/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { AppError } from '@/lib/errors';
 
 export const getAllPromotions: NonNullable<QueryResolvers['getAllPromotions']> = async (_parent, args, { userData }) => {
@@ -11,15 +11,18 @@ export const getAllPromotions: NonNullable<QueryResolvers['getAllPromotions']> =
   }
 
   const db = await getDB();
+
+  const conditions = [
+    eq(promotions.isDeleted, false),
+    // Recovery promotions are hidden from the main list unless explicitly requested
+    eq(promotions.isRecovery, args.includeRecovery === true),
+  ];
   
-  let query = db.select().from(promotions).where(eq(promotions.isDeleted, false));
-  
-  // Filter by isActive if provided
   if (args.isActive !== undefined && args.isActive !== null) {
-    query = (query as any).where(eq(promotions.isActive, args.isActive)) as any;
+    conditions.push(eq(promotions.isActive, args.isActive));
   }
   
-  const promoList = await query;
+  const promoList = await db.select().from(promotions).where(and(...conditions));
   
   // Helper to ensure ISO string format
   const toISOString = (date: Date | string | null | undefined): string | null => {
@@ -46,6 +49,7 @@ export const getAllPromotions: NonNullable<QueryResolvers['getAllPromotions']> =
     isStackable: promo.isStackable,
     priority: promo.priority,
     isActive: promo.isActive,
+    isRecovery: promo.isRecovery,
     startsAt: toISOString(promo.startsAt),
     endsAt: toISOString(promo.endsAt),
     createdAt: toISOString(promo.createdAt)!,

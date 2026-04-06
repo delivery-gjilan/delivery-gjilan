@@ -1,6 +1,4 @@
 import type { SettlementRequestResolvers } from './../../../generated/types.generated';
-import { businesses, users, drivers as driversTable } from '@/database/schema';
-import { eq } from 'drizzle-orm';
 
 const normalizeDate = (v: string | Date | null | undefined): Date | null => {
     if (!v) return null;
@@ -12,50 +10,32 @@ const normalizeDate = (v: string | Date | null | undefined): Date | null => {
 export const SettlementRequest: SettlementRequestResolvers = {
     entityType: (req) => (req as any).entityType ?? 'BUSINESS',
 
-    business: async (req, _, { db }) => {
+    business: async (req, _, { loaders }) => {
         if (!req.businessId) return null;
-        const result = await db
-            .select()
-            .from(businesses)
-            .where(eq(businesses.id, req.businessId))
-            .limit(1);
-        return (result[0] as any) ?? null;
+        return loaders.businessByIdLoader.load(req.businessId) as any;
     },
 
-    driver: async (req, _, { db }) => {
+    driver: async (req, _, { db, loaders }) => {
         const driverId = (req as any).driverId;
         if (!driverId) return null;
-        // Join drivers + users to return a User object
+        // Load driver to get its userId, then load the user
+        const { drivers: driversTable } = await import('@/database/schema');
+        const { eq } = await import('drizzle-orm');
         const driverRecord = await db.query.drivers.findFirst({
             where: eq(driversTable.id, driverId),
         });
         if (!driverRecord?.userId) return null;
-        const result = await db
-            .select()
-            .from(users)
-            .where(eq(users.id, driverRecord.userId))
-            .limit(1);
-        return (result[0] as any) ?? null;
+        return loaders.userLoader.load(driverRecord.userId) as any;
     },
 
-    requestedBy: async (req, _, { db }) => {
+    requestedBy: async (req, _, { loaders }) => {
         if (!req.requestedByUserId) return null;
-        const result = await db
-            .select()
-            .from(users)
-            .where(eq(users.id, req.requestedByUserId))
-            .limit(1);
-        return (result[0] as any) ?? null;
+        return loaders.userLoader.load(req.requestedByUserId) as any;
     },
 
-    respondedBy: async (req, _, { db }) => {
+    respondedBy: async (req, _, { loaders }) => {
         if (!req.respondedByUserId) return null;
-        const result = await db
-            .select()
-            .from(users)
-            .where(eq(users.id, req.respondedByUserId))
-            .limit(1);
-        return (result[0] as any) ?? null;
+        return loaders.userLoader.load(req.respondedByUserId) as any;
     },
 
     periodStart: (req) => normalizeDate(req.periodStart),

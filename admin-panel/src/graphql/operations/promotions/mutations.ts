@@ -65,3 +65,17 @@ export const GRANT_FREE_DELIVERY = graphql(`
         grantFreeDelivery(userId: $userId, orderId: $orderId)
     }
 `);
+
+export const ISSUE_RECOVERY_PROMOTION = graphql(`
+    mutation IssueRecoveryPromotion($input: IssueRecoveryPromotionInput!) {
+        issueRecoveryPromotion(input: $input) {
+            id
+            userId
+            promotionId
+            assignedAt
+            expiresAt
+            usageCount
+        }
+    }
+`);
+

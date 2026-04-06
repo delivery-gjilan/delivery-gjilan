@@ -1,6 +1,6 @@
 # Mobile Driver App
 
-<!-- MDS:M8 | Domain: Mobile | Updated: 2026-03-28 -->
+<!-- MDS:M8 | Domain: Mobile | Updated: 2026-05-27 -->
 <!-- Depends-On: A1, B1, B4, B5, B7, BL1 -->
 <!-- Depended-By: M1, O4 -->
 <!-- Nav: Heartbeat changes → also update B4 (Watchdog). Auth changes → also update B5. Subscription shape changes → verify map.tsx and navigation.tsx cache update logic. -->
@@ -24,8 +24,8 @@ mobile-driver/
 │   └── (tabs)/
 │       ├── _layout.tsx         # Tab bar with logout button
 │       ├── home.tsx            # Online/offline toggle
-│       ├── map.tsx             # Live order map with Mapbox
-│       ├── add.tsx             # Earnings & settlements
+│       ├── drive.tsx           # Live order map with Mapbox (renamed from map.tsx)
+│       ├── earnings.tsx        # Earnings & settlements (renamed from add.tsx)
 │       ├── messages.tsx        # Driver ↔ Admin chat, persisted to AsyncStorage
 │       └── profile.tsx         # User info, language toggle
 ├── components/
@@ -257,7 +257,9 @@ The backend uses `isOnline` to determine whether a driver should receive new ord
 
 ---
 
-## Map Screen (`app/(tabs)/map.tsx`)
+## Map Screen (`app/(tabs)/drive.tsx`)
+
+Renamed from `map.tsx`.
 
 The map is the primary operational view. It shows all active/available orders and the driver's live location.
 
@@ -281,9 +283,23 @@ The map is the primary operational view. It shows all active/available orders an
 - Focused order shows route info card (distance km, duration min)
 
 **Navigation launch:**
-- Driver taps "Start Navigation" on an assigned `READY` order
-- `navigationStore.startNavigation(order, 'to_pickup', currentLocation)` is called
-- Router pushes to `navigation` screen (full-screen modal)
+- `PREPARING` order → "Navigate to Pickup" button → `startNavigation(order, 'to_pickup', currentLocation)` → router pushes to `navigation`
+- `READY` order → "Pickup" button (navigate, indigo) starts navigation OR "Arrived" button (green) marks `OUT_FOR_DELIVERY` and starts dropoff navigation
+- `OUT_FOR_DELIVERY` order → "Resume Navigation" button (purple) → `startNavigation(order, 'to_dropoff', currentLocation)` → router pushes to `navigation`
+
+**Order card CTA logic:**
+
+| Order status | Buttons shown |
+|---|---|
+| `PREPARING` | "Navigate to Pickup" (indigo) |
+| `READY` | "Pickup" (navigate, indigo) + "Arrived" (green) side-by-side |
+| `OUT_FOR_DELIVERY` | "Resume Navigation" (purple) |
+
+**Multi-order card (2+ assigned orders):**
+- A `cardStackBehind` shadow view sits behind the card to visually suggest depth
+- Dot pagination indicators render below the card (`dotPager` style) — active dot is wide (`dotActive`), inactive dots are small (`dotInactive`)
+- Swipe left/right on the card cycles through `assignedOrders` (pan responder)
+- Map markers only show for the currently focused order (`isFocused &&` guard on both pickup and dropoff `PointAnnotation`s)
 
 **Dispatch mode gating:**
 When `dispatchModeEnabled` is `true` (broadcast via `storeStatusUpdated` subscription, exposed by `useStoreStatus`):
@@ -292,7 +308,16 @@ When `dispatchModeEnabled` is `true` (broadcast via `storeStatusUpdated` subscri
 - An amber “Admin is dispatching orders” pill appears on the home screen
 
 **Order accept sheet:**
-The `OrderAcceptSheet` is rendered globally in `AppContent` (`_layout.tsx`), not in map.tsx or navigation.tsx. When a driver selects an order from the pool FAB, `map.tsx` calls `useOrderAcceptStore.getState().setPendingOrder(order, false)` directly. Camera-fit runs in a local `useEffect` in `map.tsx` watching `pendingOrder?.id`.
+The `OrderAcceptSheet` is rendered globally in `AppContent` (`_layout.tsx`), not in drive.tsx or navigation.tsx. When a driver selects an order from the pool FAB, `drive.tsx` calls `useOrderAcceptStore.getState().setPendingOrder(order, false)` directly.
+
+**"Order taken" overlay (`takenByOther`):**
+- `orderAcceptStore` has a `takenByOther: boolean` field and `setTakenByOther(v)` action
+- `useGlobalOrderAccept` sets it when the accept mutation returns a conflict error (`already/assigned/taken`) OR when the pending order disappears from `availableOrders` while `currentOrder.driver.id !== currentDriverId` (passive snatch)
+- `_layout.tsx` starts a 2-second timer on `takenByOther`, then calls `setTakenByOther(false)` + `setPendingOrder(null)`
+- `OrderAcceptSheet` renders a dark overlay with a flash icon, "Order taken" title, "Another driver accepted this order first" subtitle, and "Finding you the next one…" hint when `takenByOther` is true
+
+**OrderPoolSheet:**
+Full redesign — business images, left accent bar (green=`READY`, indigo=`PREPARING`), earnings badge with large green value, animated ETA chips, drop-off location chip, cyan circle-arrow CTA button. Sheet header shows teal dot + order count badge.
 
 ---
 
@@ -335,7 +360,7 @@ When a new order is assigned to the driver during active navigation (dispatch mo
 
 ### Real-time Subscription
 
-The navigation screen does not maintain its own `ALL_ORDERS_UPDATED` subscription. The single global subscription in `useGlobalOrderAccept` (mounted at `AppContent`) keeps the Apollo cache updated; `navigation.tsx` reads from the cache via its own `GET_ORDERS` query with `cache-and-network`.
+`navigation.tsx` runs its own `ALL_ORDERS_UPDATED` subscription (`useSubscription`, skipped when `!currentDriverId`) that writes payloads into the Apollo cache. This keeps the displayed order card and multi-order switcher current without relying solely on the global `useGlobalOrderAccept` subscription. `GET_ORDERS` is queried with `cache-first` (no poll interval).
 
 ### Heartbeat Integration
 
@@ -353,7 +378,11 @@ Both phase transitions fire `UPDATE_ORDER_STATUS` mutation:
 - "Picked Up" → status `OUT_FOR_DELIVERY`
 - "Delivered" → status `DELIVERED`
 
-After delivery, `DRIVER_NOTIFY_CUSTOMER` mutation fires with `kind: DELIVERED` to push a notification to the customer.
+After delivery, `DRIVER_NOTIFY_CUSTOMER` mutation fires with `kind: DELIVERED`.
+
+**Post-delivery cache eviction:** After `updateOrderStatus` resolves, the delivered order is immediately removed from `GET_ORDERS` cache via `apolloClient.cache.updateQuery`. This ensures the drive tab removes the card without waiting for a subscription round-trip.
+
+**External delivery detection:** The `ALL_ORDERS_UPDATED` subscription in `navigation.tsx` and the `GET_ORDERS` cache query together detect when the active order is externally completed by an admin. If `order.id` is absent or has status `DELIVERED`/`CANCELLED`, `stopNavigation()` is called and the screen navigates to `/(tabs)/drive`.
 
 ### Navigation Hooks (prepared but not yet integrated)
 
@@ -422,9 +451,9 @@ Driver ↔ Admin real-time chat screen.
 
 ---
 
-## Earnings Screen (`app/(tabs)/add.tsx`)
+## Earnings Screen (`app/(tabs)/earnings.tsx`)
 
-Displays driver settlement history and summary.
+Renamed from `add.tsx`. Displays driver settlement history and summary.
 
 **Period selector:** This Week / This Month / Last Month / All Time
 - Dates computed client-side using `date-fns` (no timezone normalization — city-local context)
@@ -505,7 +534,7 @@ When `dispatchModeEnabled` is `true` and the driver is online, an amber pill is 
 |-------|-----------|-----------|
 | `authStore` | Yes (AsyncStorage) | `token`, `user`, `isAuthenticated`, `isOnline` |
 | `navigationStore` | No | `isNavigating`, `phase`, `order`, `destination`, `durationRemainingS` |
-| `navigationLocationStore` | No | SDK location feed, freshness check (10s max age) || `orderAcceptStore` | No | `pendingOrder`, `autoCountdown`, `accepting`, `skippedIds` (mutate-in-place Set) || `driverLocationOverrideStore` | No | Simulation mode location override |
+| `navigationLocationStore` | No | SDK location feed, freshness check (10s max age) || `orderAcceptStore` | No | `pendingOrder`, `autoCountdown`, `accepting`, `skippedIds` (mutate-in-place Set), `takenByOther` || `driverLocationOverrideStore` | No | Simulation mode location override |
 | `useLocaleStore` | Yes | `languageChoice` ('en' \| 'al') |
 | `useThemeStore` | Yes | `theme` ('light' \| 'dark' \| 'system') |
 
@@ -525,7 +554,7 @@ When `dispatchModeEnabled` is `true` and the driver is online, an amber pill is 
 | `useDriverPttReceiver` | `_layout.tsx` | Agora PTT subscription + engine |
 | `useNotifications` | `_layout.tsx` | FCM token lifecycle |
 | `useStoreStatus` | `_layout.tsx`, `map.tsx`, `home.tsx` | Store banner poll + real-time subscription; exposes `dispatchModeEnabled` |
-| `useGlobalOrderAccept` | `_layout.tsx` | Single `ALL_ORDERS_UPDATED` subscription + capacity-aware auto-present + accept/skip handlers; renders `OrderAcceptSheet` globally |
+| `useGlobalOrderAccept` | `_layout.tsx` | Single `ALL_ORDERS_UPDATED` subscription + capacity-aware auto-present + accept/skip handlers; passive snatch detection (`takenByOther`); renders `OrderAcceptSheet` globally |
 | `useTheme` | Many | Theme token access |
 | `useSyncTheme` | `useAppSetup` | System theme listener |
 | `useTranslations` | Many | i18n strings + language switch |
@@ -563,6 +592,13 @@ Pure computation, no API calls.
 - Algorithm: nearest-vertex walk on polyline + Haversine segment sum + Mapbox speed ratio for ETA
 - Used to derive live `remainingDurationSec` without hitting the Directions API again
 
+### `utils/orderToNavOrder.ts`
+
+Shared mapping utilities used by both `drive.tsx` and `navigation.tsx`:
+
+- `buildNavOrder(order)` → `NavigationOrder | null` — maps a raw Apollo order object to the `NavigationOrder` shape expected by `navigationStore`
+- `orderToPhase(status)` → `'to_pickup' | 'to_dropoff'` — returns `'to_dropoff'` for `OUT_FOR_DELIVERY`, `'to_pickup'` for all other statuses
+
 ### `utils/secureTokenStore.ts`
 
 - Native (iOS/Android): `expo-secure-store` (Keychain / Android Keystore)
@@ -591,7 +627,7 @@ These are documented for pre-refactor awareness. All are non-breaking as-is.
 
 | Issue | Files | Impact |
 |-------|-------|--------|
-| `ALL_ORDERS_UPDATED` cache update logic is copy-pasted verbatim | `map.tsx` + `navigation.tsx` | Two places to update when subscription shape changes |
+| `ALL_ORDERS_UPDATED` cache update logic exists in both `useGlobalOrderAccept` and `navigation.tsx` | `hooks/useGlobalOrderAccept.ts` + `navigation.tsx` | Two places to update when subscription shape changes |
 | Navigation state is managed in both `navigationStore` (Zustand, active) and `useNavigationState` hook (local state machine, unused) | `store/navigationStore.ts` + `hooks/useNavigationState.ts` | The hook is orphaned; navigationStore is the source of truth |
 
 ### Unused Hooks Block

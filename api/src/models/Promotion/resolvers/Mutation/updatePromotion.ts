@@ -3,6 +3,7 @@ import { getDB } from '@/database';
 import { promotions } from '@/database/schema';
 import { eq } from 'drizzle-orm';
 import { AppError } from '@/lib/errors';
+import { cache } from '@/lib/cache';
 
 export const updatePromotion: NonNullable<MutationResolvers['updatePromotion']> = async (_parent, { input }, { userData }) => {
   if (!userData.userId || userData.role !== 'SUPER_ADMIN') {
@@ -34,7 +35,7 @@ export const updatePromotion: NonNullable<MutationResolvers['updatePromotion']> 
     return new Date(date).toISOString();
   };
 
-  return {
+  const result = {
     id: promo.id,
     name: promo.name,
     description: promo.description,
@@ -60,4 +61,7 @@ export const updatePromotion: NonNullable<MutationResolvers['updatePromotion']> 
     creatorType: promo.creatorType,
     creatorId: promo.creatorId,
   };
+
+  await cache.invalidatePromotions();
+  return result;
 };

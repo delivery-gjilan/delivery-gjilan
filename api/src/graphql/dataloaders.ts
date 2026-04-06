@@ -10,8 +10,11 @@ import { options, DbOption } from '@/database/schema/options';
 import { products, DbProduct } from '@/database/schema/products';
 import { orderItems, DbOrderItem } from '@/database/schema/orderItems';
 import { orderItemOptions, DbOrderItemOption } from '@/database/schema/orderItemOptions';
+import { businesses } from '@/database/schema/businesses';
+import { productVariantGroups } from '@/database/schema/productVariantGroups';
 import { PricingService } from '@/services/PricingService';
 import { eq, inArray, and } from 'drizzle-orm';
+import { cache } from '@/lib/cache';
 
 /**
  * Batch-loads users by their IDs.
@@ -96,18 +99,45 @@ export function createOrderPromotionsLoader(db: DbType) {
  */
 export function createOptionGroupsByProductIdLoader(db: DbType) {
     return new DataLoader<string, DbOptionGroup[]>(async (productIds) => {
-        const rows = await db
-            .select()
-            .from(optionGroups)
-            .where(and(inArray(optionGroups.productId, [...productIds]), eq(optionGroups.isDeleted, false)))
-            .orderBy(optionGroups.displayOrder);
-        const map = new Map<string, DbOptionGroup[]>();
-        for (const row of rows) {
-            const arr = map.get(row.productId) ?? [];
-            arr.push(row);
-            map.set(row.productId, arr);
+        // Check Redis for all IDs at once; fall back to DB for misses
+        const cachedEntries = await Promise.all(
+            productIds.map((id) => cache.get<DbOptionGroup[]>(cache.keys.optionGroups(id))),
+        );
+
+        const missIds: string[] = [];
+        const resultMap = new Map<string, DbOptionGroup[]>();
+        for (let i = 0; i < productIds.length; i++) {
+            const hit = cachedEntries[i];
+            if (hit) {
+                resultMap.set(productIds[i], hit);
+            } else {
+                missIds.push(productIds[i]);
+            }
         }
-        return productIds.map((id) => map.get(id) ?? []);
+
+        if (missIds.length > 0) {
+            const rows = await db
+                .select()
+                .from(optionGroups)
+                .where(and(inArray(optionGroups.productId, missIds), eq(optionGroups.isDeleted, false)))
+                .orderBy(optionGroups.displayOrder);
+
+            const dbMap = new Map<string, DbOptionGroup[]>();
+            for (const row of rows) {
+                const arr = dbMap.get(row.productId) ?? [];
+                arr.push(row);
+                dbMap.set(row.productId, arr);
+            }
+            await Promise.all(
+                missIds.map((id) => {
+                    const val = dbMap.get(id) ?? [];
+                    resultMap.set(id, val);
+                    return cache.set(cache.keys.optionGroups(id), val, cache.TTL.OPTION_GROUPS);
+                }),
+            );
+        }
+
+        return productIds.map((id) => resultMap.get(id) ?? []);
     });
 }
 
@@ -117,18 +147,44 @@ export function createOptionGroupsByProductIdLoader(db: DbType) {
  */
 export function createOptionsByOptionGroupIdLoader(db: DbType) {
     return new DataLoader<string, DbOption[]>(async (groupIds) => {
-        const rows = await db
-            .select()
-            .from(options)
-            .where(and(inArray(options.optionGroupId, [...groupIds]), eq(options.isDeleted, false)))
-            .orderBy(options.displayOrder);
-        const map = new Map<string, DbOption[]>();
-        for (const row of rows) {
-            const arr = map.get(row.optionGroupId) ?? [];
-            arr.push(row);
-            map.set(row.optionGroupId, arr);
+        const cachedEntries = await Promise.all(
+            groupIds.map((id) => cache.get<DbOption[]>(cache.keys.options(id))),
+        );
+
+        const missIds: string[] = [];
+        const resultMap = new Map<string, DbOption[]>();
+        for (let i = 0; i < groupIds.length; i++) {
+            const hit = cachedEntries[i];
+            if (hit) {
+                resultMap.set(groupIds[i], hit);
+            } else {
+                missIds.push(groupIds[i]);
+            }
         }
-        return groupIds.map((id) => map.get(id) ?? []);
+
+        if (missIds.length > 0) {
+            const rows = await db
+                .select()
+                .from(options)
+                .where(and(inArray(options.optionGroupId, missIds), eq(options.isDeleted, false)))
+                .orderBy(options.displayOrder);
+
+            const dbMap = new Map<string, DbOption[]>();
+            for (const row of rows) {
+                const arr = dbMap.get(row.optionGroupId) ?? [];
+                arr.push(row);
+                dbMap.set(row.optionGroupId, arr);
+            }
+            await Promise.all(
+                missIds.map((id) => {
+                    const val = dbMap.get(id) ?? [];
+                    resultMap.set(id, val);
+                    return cache.set(cache.keys.options(id), val, cache.TTL.OPTIONS);
+                }),
+            );
+        }
+
+        return groupIds.map((id) => resultMap.get(id) ?? []);
     });
 }
 
@@ -211,6 +267,66 @@ export function createChildItemsByParentOrderItemIdLoader(db: DbType) {
     });
 }
 
+/**
+ * Batch-loads businesses by ID.
+ * Resolves N+1 in Banner.business and SettlementRequest.business field resolvers.
+ */
+export function createBusinessByIdLoader(db: DbType) {
+    return new DataLoader<string, typeof businesses.$inferSelect | null>(async (ids) => {
+        const rows = await db
+            .select()
+            .from(businesses)
+            .where(inArray(businesses.id, [...ids]));
+        const map = new Map(rows.map((r) => [r.id, r]));
+        return ids.map((id) => map.get(id) ?? null);
+    });
+}
+
+/**
+ * Batch-loads products by ID.
+ * Resolves N+1 in Banner.product field resolver.
+ */
+export function createProductByIdLoader(db: DbType) {
+    return new DataLoader<string, DbProduct | null>(async (ids) => {
+        const rows = await db
+            .select()
+            .from(products)
+            .where(and(inArray(products.id, [...ids]), eq(products.isDeleted, false)));
+        const map = new Map(rows.map((r) => [r.id, r]));
+        return ids.map((id) => map.get(id) ?? null);
+    });
+}
+
+/**
+ * Batch-loads promotions by ID.
+ * Resolves N+1 in Banner.promotion field resolver.
+ */
+export function createPromotionByIdLoader(db: DbType) {
+    return new DataLoader<string, typeof promotions.$inferSelect | null>(async (ids) => {
+        const rows = await db
+            .select()
+            .from(promotions)
+            .where(inArray(promotions.id, [...ids]));
+        const map = new Map(rows.map((r) => [r.id, r]));
+        return ids.map((id) => map.get(id) ?? null);
+    });
+}
+
+/**
+ * Batch-loads product variant groups by ID.
+ * Resolves N+1 in Product.variantGroup field resolver.
+ */
+export function createVariantGroupByIdLoader(db: DbType) {
+    return new DataLoader<string, typeof productVariantGroups.$inferSelect | null>(async (ids) => {
+        const rows = await db
+            .select()
+            .from(productVariantGroups)
+            .where(inArray(productVariantGroups.id, [...ids]));
+        const map = new Map(rows.map((r) => [r.id, r]));
+        return ids.map((id) => map.get(id) ?? null);
+    });
+}
+
 export interface DataLoaders {
     userLoader: DataLoader<string, DbUser | null>;
     userBehaviorByUserIdLoader: DataLoader<string, DbUserBehavior | null>;
@@ -222,6 +338,10 @@ export interface DataLoaders {
     effectivePriceByProductIdLoader: DataLoader<string, number>;
     orderItemOptionsByOrderItemIdLoader: DataLoader<string, DbOrderItemOption[]>;
     childItemsByParentOrderItemIdLoader: DataLoader<string, DbOrderItem[]>;
+    businessByIdLoader: DataLoader<string, typeof businesses.$inferSelect | null>;
+    productByIdLoader: DataLoader<string, DbProduct | null>;
+    promotionByIdLoader: DataLoader<string, typeof promotions.$inferSelect | null>;
+    variantGroupByIdLoader: DataLoader<string, typeof productVariantGroups.$inferSelect | null>;
 }
 
 export function createDataLoaders(db: DbType): DataLoaders {
@@ -236,5 +356,9 @@ export function createDataLoaders(db: DbType): DataLoaders {
         effectivePriceByProductIdLoader: createEffectivePriceByProductIdLoader(db),
         orderItemOptionsByOrderItemIdLoader: createOrderItemOptionsByOrderItemIdLoader(db),
         childItemsByParentOrderItemIdLoader: createChildItemsByParentOrderItemIdLoader(db),
+        businessByIdLoader: createBusinessByIdLoader(db),
+        productByIdLoader: createProductByIdLoader(db),
+        promotionByIdLoader: createPromotionByIdLoader(db),
+        variantGroupByIdLoader: createVariantGroupByIdLoader(db),
     };
 }

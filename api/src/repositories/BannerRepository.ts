@@ -1,6 +1,7 @@
 import { DbType } from '@/database';
 import { banners, Banner, NewBanner } from '@/database/schema/banners';
 import { eq, and, asc, lte, gte, or, isNull, sql, type SQL } from 'drizzle-orm';
+import { cache } from '@/lib/cache';
 
 /** NOTE: The banners table has an isDeleted column. All queries MUST filter by isDeleted=false.
  *  Deletions MUST set isDeleted=true instead of removing the row. See SOFT_DELETE_CONVENTION.md. */
@@ -92,6 +93,11 @@ export class BannerRepository {
     }
 
     async findActive(displayContext?: string): Promise<Banner[]> {
+        const cacheContext = displayContext ?? 'ALL';
+        const cacheKey = cache.keys.banners(cacheContext);
+        const cached = await cache.get<Banner[]>(cacheKey);
+        if (cached) return cached;
+
         const now = new Date().toISOString();
         const conditions: SQL[] = [
             eq(banners.isActive, true),
@@ -111,11 +117,14 @@ export class BannerRepository {
             conditions.push(eq(banners.displayContext, 'ALL' as any));
         }
 
-        return this.db
+        const result = await this.db
             .select()
             .from(banners)
             .where(and(...conditions))
             .orderBy(asc(banners.sortOrder));
+
+        await cache.set(cacheKey, result, cache.TTL.BANNERS);
+        return result;
     }
 
     async update(id: string, data: Partial<NewBanner>): Promise<Banner | undefined> {

@@ -4,7 +4,7 @@ import { Business, BusinessDayHours, BusinessDayHoursInput, CreateBusinessInput,
 import { businessValidator } from '@/validators/BusinessValidator';
 import { DbBusiness } from '@/database/schema/businesses';
 import { AppError } from '@/lib/errors';
-import { cache } from '@/lib/cache';
+import { cache, coalesce } from '@/lib/cache';
 
 export class BusinessService {
     constructor(
@@ -111,21 +111,23 @@ export class BusinessService {
             const cached = await cache.get<Business[]>(cache.keys.businesses());
             if (cached) return cached;
 
-            const allBusinesses = await this.businessRepository.findAll();
-            if (allBusinesses.length === 0) return [];
+            const businesses = await coalesce(cache.keys.businesses(), async () => {
+                const allBusinesses = await this.businessRepository.findAll();
+                if (allBusinesses.length === 0) return [];
 
-            const allIds = allBusinesses.map((b) => b.id);
-            const allHours = await this.businessHoursRepository.findByBusinessIds(allIds);
+                const allIds = allBusinesses.map((b) => b.id);
+                const allHours = await this.businessHoursRepository.findByBusinessIds(allIds);
 
-            // Group hours by businessId
-            const hoursByBiz = new Map<string, DbBusinessHours[]>();
-            for (const h of allHours) {
-                const arr = hoursByBiz.get(h.businessId) ?? [];
-                arr.push(h);
-                hoursByBiz.set(h.businessId, arr);
-            }
+                // Group hours by businessId
+                const hoursByBiz = new Map<string, DbBusinessHours[]>();
+                for (const h of allHours) {
+                    const arr = hoursByBiz.get(h.businessId) ?? [];
+                    arr.push(h);
+                    hoursByBiz.set(h.businessId, arr);
+                }
 
-            const businesses = allBusinesses.map((b) => this.mapToBusiness(b, hoursByBiz.get(b.id) ?? []));
+                return allBusinesses.map((b) => this.mapToBusiness(b, hoursByBiz.get(b.id) ?? []));
+            });
 
             await cache.set(cache.keys.businesses(), businesses, cache.TTL.BUSINESSES);
             return businesses;
@@ -184,18 +186,26 @@ export class BusinessService {
     }
 
     async getFeaturedBusinesses(): Promise<Business[]> {
-        const featured = await this.businessRepository.findFeatured();
-        if (featured.length === 0) return [];
+        const cached = await cache.get<Business[]>(cache.keys.featuredBusinesses());
+        if (cached) return cached;
 
-        const ids = featured.map((b) => b.id);
-        const allHours = await this.businessHoursRepository.findByBusinessIds(ids);
-        const hoursByBiz = new Map<string, DbBusinessHours[]>();
-        for (const h of allHours) {
-            const arr = hoursByBiz.get(h.businessId) ?? [];
-            arr.push(h);
-            hoursByBiz.set(h.businessId, arr);
-        }
-        return featured.map((b) => this.mapToBusiness(b, hoursByBiz.get(b.id) ?? []));
+        const result = await coalesce(cache.keys.featuredBusinesses(), async () => {
+            const featured = await this.businessRepository.findFeatured();
+            if (featured.length === 0) return [];
+
+            const ids = featured.map((b) => b.id);
+            const allHours = await this.businessHoursRepository.findByBusinessIds(ids);
+            const hoursByBiz = new Map<string, DbBusinessHours[]>();
+            for (const h of allHours) {
+                const arr = hoursByBiz.get(h.businessId) ?? [];
+                arr.push(h);
+                hoursByBiz.set(h.businessId, arr);
+            }
+            return featured.map((b) => this.mapToBusiness(b, hoursByBiz.get(b.id) ?? []));
+        });
+
+        await cache.set(cache.keys.featuredBusinesses(), result, cache.TTL.FEATURED_BUSINESSES);
+        return result;
     }
 
     async setBusinessFeatured(id: string, isFeatured: boolean, sortOrder: number): Promise<Business> {

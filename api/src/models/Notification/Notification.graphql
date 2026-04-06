@@ -231,7 +231,7 @@ type Mutation {
     registerLiveActivityToken(token: String!, activityId: String!, orderId: ID!): Boolean!
     sendPushNotification(input: SendPushNotificationInput!): SendNotificationResult!
     createCampaign(input: CreateCampaignInput!): NotificationCampaign!
-    sendCampaign(id: ID!): NotificationCampaign!
+    sendCampaign(id: ID!, promotionId: ID): NotificationCampaign!
     deleteCampaign(id: ID!): Boolean!
     trackPushTelemetry(input: TrackPushTelemetryInput!): Boolean!
     businessDeviceHeartbeat(input: BusinessDeviceHeartbeatInput!): Boolean!

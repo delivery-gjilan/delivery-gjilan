@@ -1,21 +1,19 @@
 import React, { useMemo, useCallback, useRef, useState, useEffect } from 'react';
-import { View, Text, Image, StyleSheet, ActivityIndicator, Pressable, Alert, useColorScheme, ScrollView } from 'react-native';
+import { View, Text, Image, StyleSheet, ActivityIndicator, Pressable, Alert, useColorScheme, Animated, PanResponder } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Mapbox from '@rnmapbox/maps';
 
 import { useApolloClient, useMutation, useQuery } from '@apollo/client/react';
 import { GET_ORDERS, UPDATE_ORDER_STATUS } from '@/graphql/operations/orders';
-import { OrderDetailSheet } from '@/components/OrderDetailSheet';
-import { OrderPoolSheet } from '@/components/OrderPoolSheet';
 import { useDriverLocation } from '@/hooks/useDriverLocation';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuthStore } from '@/store/authStore';
 import { useNavigationStore } from '@/store/navigationStore';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
-import type { NavigationPhase } from '@/store/navigationStore';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchRouteGeometry } from '@/utils/mapbox';
+import { buildNavOrder, orderToPhase } from '@/utils/orderToNavOrder';
 import { useOrderAcceptStore } from '@/store/orderAcceptStore';
 import type { Feature, LineString } from 'geojson';
 
@@ -60,8 +58,6 @@ export default function MapScreen() {
     const cameraRef = useRef<Mapbox.Camera>(null);
 
     const [focusedOrderId, setFocusedOrderId] = useState<string | null>(null);
-    const [sheetHeight, setSheetHeight] = useState(0);
-    const sheetHeightRef = useRef(0);
     const isOnline = useAuthStore((state) => state.isOnline);
     const connectionStatus = useAuthStore((state) => state.connectionStatus);
     const { dispatchModeEnabled } = useStoreStatus();
@@ -72,7 +68,9 @@ export default function MapScreen() {
         const id = setInterval(() => setNowTs(Date.now()), 10_000);
         return () => clearInterval(id);
     }, []);
-    const [poolOpen, setPoolOpen] = useState(false);
+    const [currentCardIndex, setCurrentCardIndex] = useState(0);
+    const assignedOrdersLenRef = useRef(0);
+    const readyPulse = useRef(new Animated.Value(1)).current;
     const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS);
     const pendingOrder = useOrderAcceptStore((s) => s.pendingOrder);
     const pendingAutoCountdown = useOrderAcceptStore((s) => s.autoCountdown);
@@ -287,7 +285,7 @@ export default function MapScreen() {
         setFocusedOrderId(order.id);
 
         // Padding: respect the info sheet at top and card bar at bottom
-        const padTop = (sheetHeightRef.current || 0) + 20;
+        const padTop = 20;
         const padBottom = BOTTOM_BAR_HEIGHT + 20;
 
         // OUT_FOR_DELIVERY: show driver + dropoff only
@@ -348,22 +346,10 @@ export default function MapScreen() {
             // Immediately launch turn-by-turn navigation to dropoff
             const order = allMapOrders.find((o: any) => o.id === targetId);
             if (order && location) {
-                const bizLoc = order.businesses?.[0]?.business?.location;
-                const dropLoc = order.dropOffLocation;
-                if (bizLoc) {
-                    const pickup = {
-                        latitude: Number(bizLoc.latitude),
-                        longitude: Number(bizLoc.longitude),
-                        label: order.businesses?.[0]?.business?.name ?? 'Pickup',
-                    };
-                    const dropoff = dropLoc
-                        ? { latitude: Number(dropLoc.latitude), longitude: Number(dropLoc.longitude), label: dropLoc.address ?? 'Drop-off' }
-                        : null;
-                    const customerName = order.user
-                        ? `${order.user.firstName} ${order.user.lastName}`
-                        : 'Customer';
+                const navOrder = buildNavOrder(order);
+                if (navOrder) {
                     startNavigation(
-                        { id: order.id, status: 'OUT_FOR_DELIVERY', businessName: order.businesses?.[0]?.business?.name ?? 'Business', customerName, customerPhone: order.user?.phoneNumber ?? null, pickup, dropoff },
+                        { ...navOrder, status: 'OUT_FOR_DELIVERY' },
                         'to_dropoff',
                         { latitude: location.latitude, longitude: location.longitude },
                     );
@@ -377,40 +363,9 @@ export default function MapScreen() {
         }
     }, [focusedOrder?.id, updateOrderStatus, allMapOrders, location, startNavigation, router]);
 
-    // ── Pool handlers ──
-    const handlePoolOpen = useCallback(() => {
-        setPoolOpen(true);
-        setFocusedOrderId(null);
-    }, []);
-
-    const handlePoolClose = useCallback(() => {
-        setPoolOpen(false);
-    }, []);
-
-    const handlePoolSelectOrder = useCallback((order: any) => {
-        setPoolOpen(false);
-        useOrderAcceptStore.getState().setPendingOrder(order, false);
-        const bizLoc = order.businesses?.[0]?.business?.location;
-        if (!bizLoc || !cameraRef.current) return;
-        if (location) {
-            const lats = [Number(bizLoc.latitude), location.latitude];
-            const lngs = [Number(bizLoc.longitude), location.longitude];
-            const ne: [number, number] = [Math.max(...lngs) + 0.006, Math.max(...lats) + 0.006];
-            const sw: [number, number] = [Math.min(...lngs) - 0.006, Math.min(...lats) - 0.006];
-            cameraRef.current.fitBounds(ne, sw, [80, 20, 420, 20], 900);
-        } else {
-            cameraRef.current.setCamera({
-                centerCoordinate: [Number(bizLoc.longitude), Number(bizLoc.latitude)],
-                zoomLevel: 14.5,
-                animationMode: 'flyTo',
-                animationDuration: 900,
-            });
-        }
-    }, [location]);
-
     // ── Camera fit when global accept sheet auto-presents a new order ──
     useEffect(() => {
-        if (!pendingOrder || !pendingAutoCountdown || poolOpen) return;
+        if (!pendingOrder || !pendingAutoCountdown) return;
         const bizLoc = pendingOrder.businesses?.[0]?.business?.location;
         if (!bizLoc || !cameraRef.current) return;
         if (location) {
@@ -430,45 +385,71 @@ export default function MapScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pendingOrder?.id, pendingAutoCountdown]);
 
+    // ── Card swipe PanResponder ──
+    const swipePanResponder = useRef(
+        PanResponder.create({
+            onMoveShouldSetPanResponder: (_, gs) =>
+                Math.abs(gs.dx) > 8 && Math.abs(gs.dx) > Math.abs(gs.dy) * 1.5,
+            onPanResponderRelease: (_, gs) => {
+                if (gs.dx < -40) {
+                    setCurrentCardIndex(prev => Math.min(prev + 1, assignedOrdersLenRef.current - 1));
+                } else if (gs.dx > 40) {
+                    setCurrentCardIndex(prev => Math.max(prev - 1, 0));
+                }
+            },
+        }),
+    ).current;
+
+    // ── Clamp card index when orders are removed ──
+    useEffect(() => {
+        assignedOrdersLenRef.current = assignedOrders.length;
+        if (assignedOrders.length === 0) {
+            setCurrentCardIndex(0);
+            setFocusedOrderId(null);
+            return;
+        }
+        setCurrentCardIndex(prev => Math.min(prev, assignedOrders.length - 1));
+    }, [assignedOrders.length]);
+
+    // ── Focus camera on the current card's order ──
+    useEffect(() => {
+        if (assignedOrders.length === 0) return;
+        const idx = Math.min(currentCardIndex, assignedOrders.length - 1);
+        const order = assignedOrders[idx];
+        if (order) focusOrder(order);
+    // focusOrder dep intentionally omitted — it changes on every render due to location
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentCardIndex, assignedOrders.length]);
+
+    // ── Pulse animation for READY orders ──
+    useEffect(() => {
+        if (assignedOrders.length === 0) return;
+        const idx = Math.min(currentCardIndex, assignedOrders.length - 1);
+        const order = assignedOrders[idx];
+        if (order?.status === 'READY') {
+            const loop = Animated.loop(
+                Animated.sequence([
+                    Animated.timing(readyPulse, { toValue: 0.25, duration: 650, useNativeDriver: true }),
+                    Animated.timing(readyPulse, { toValue: 1, duration: 650, useNativeDriver: true }),
+                ]),
+            );
+            loop.start();
+            return () => { loop.stop(); readyPulse.setValue(1); };
+        } else {
+            readyPulse.setValue(1);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentCardIndex, assignedOrders.length]);
+
     // ── Launch Mapbox Navigation SDK ──
     const handleStartNavigation = useCallback((targetOrder?: any) => {
         const order = targetOrder ?? focusedOrder;
         if (!order || !location) return;
-        const bizLoc = order.businesses?.[0]?.business?.location;
-        const dropLoc = order.dropOffLocation;
-        if (!bizLoc) return;
-
-        const pickup = {
-            latitude: Number(bizLoc.latitude),
-            longitude: Number(bizLoc.longitude),
-            label: order.businesses?.[0]?.business?.name ?? 'Pickup',
-        };
-        const dropoff = dropLoc
-            ? {
-                latitude: Number(dropLoc.latitude),
-                longitude: Number(dropLoc.longitude),
-                label: dropLoc.address ?? 'Drop-off',
-            }
-            : null;
-        const customerName = order.user
-            ? `${order.user.firstName} ${order.user.lastName}`
-            : 'Customer';
-
-        const navOrder = {
-            id: order.id,
-            status: order.status,
-            businessName: order.businesses?.[0]?.business?.name ?? 'Business',
-            customerName,
-            customerPhone: order.user?.phoneNumber ?? null,
-            pickup,
-            dropoff,
-        };
-
-        const phase: NavigationPhase =
-            order.status === 'OUT_FOR_DELIVERY' ? 'to_dropoff' : 'to_pickup';
+        const navOrder = buildNavOrder(order);
+        if (!navOrder) return;
 
         const origin = { latitude: location.latitude, longitude: location.longitude };
-        startNavigation(navOrder, phase, origin);
+        startNavigation(navOrder, orderToPhase(order.status), origin);
         router.push('/navigation' as any);
     }, [focusedOrder, location, startNavigation, router]);
 
@@ -476,18 +457,6 @@ export default function MapScreen() {
     const initialCenter = useMemo<[number, number]>(() => {
         if (location) return [location.longitude, location.latitude];
         return GJILAN_CENTER;
-    }, []);
-
-    // Dismiss focused order when tapping elsewhere
-    const dismissFocusedOrder = useCallback(() => {
-        setFocusedOrderId(null);
-        setSheetHeight(0);
-        sheetHeightRef.current = 0;
-    }, []);
-
-    const handleSheetHeightChange = useCallback((h: number) => {
-        sheetHeightRef.current = h;
-        setSheetHeight(h);
     }, []);
 
     return (
@@ -500,7 +469,6 @@ export default function MapScreen() {
                 attributionEnabled={false}
                 scaleBarEnabled={false}
                 onTouchEnd={handleMapTouchEnd}
-                onPress={focusedOrderId ? dismissFocusedOrder : undefined}
             >
                 <Mapbox.Camera
                     ref={cameraRef}
@@ -628,8 +596,8 @@ export default function MapScreen() {
 
                     return (
                         <React.Fragment key={order.id}>
-                            {/* Only show pickup pin for orders assigned to me */}
-                            {isAssigned && bizLoc && (
+                            {/* Only show pins for the focused order */}
+                            {isAssigned && isFocused && bizLoc && (
                                 <Mapbox.PointAnnotation
                                     id={`pickup-${order.id}`}
                                     coordinate={[Number(bizLoc.longitude), Number(bizLoc.latitude)]}
@@ -660,7 +628,7 @@ export default function MapScreen() {
                                 </Mapbox.PointAnnotation>
                             )}
 
-                            {isAssigned && dropLoc && (
+                            {isAssigned && isFocused && dropLoc && (
                                 <Mapbox.PointAnnotation
                                     id={`dropoff-${order.id}`}
                                     coordinate={[Number(dropLoc.longitude), Number(dropLoc.latitude)]}
@@ -704,20 +672,6 @@ export default function MapScreen() {
                         </Pressable>
                     );
                 })()}
-                {/* Available orders pool button */}
-                {!dispatchModeEnabled && isOnline && !pendingOrder && availableOrders.length > 0 && (
-                    <Pressable
-                        style={[styles.mapBtn, styles.mapBtnPool]}
-                        onPress={handlePoolOpen}
-                    >
-                        <Ionicons name="layers-outline" size={20} color="#22d3ee" />
-                        {availableOrders.length > 0 && (
-                            <View style={styles.poolBadge}>
-                                <Text style={styles.poolBadgeText}>{availableOrders.length}</Text>
-                            </View>
-                        )}
-                    </Pressable>
-                )}
                 {/* Lock camera button */}
                 <Pressable
                     style={[styles.mapBtn, followDriver && styles.mapBtnActive]}
@@ -758,31 +712,6 @@ export default function MapScreen() {
                 );
             })()}
 
-            {/* ═══ Order detail sheet ═══ */}
-            {focusedOrder && (
-                <OrderDetailSheet
-                    order={focusedOrder}
-                    routeInfo={routeInfo}
-                    previewRouteInfo={previewRouteInfo}
-                    isAssignedToMe={focusedOrder.driver?.id === currentDriverId}
-                    onStartNavigation={handleStartNavigation}
-                    onMarkPickedUp={handleMarkPickedUp}
-                    onClose={dismissFocusedOrder}
-                    onHeightChange={handleSheetHeightChange}
-                />
-            )}
-
-
-
-            {/* ═══ Order Pool Sheet ═══ */}
-            {poolOpen && (
-                <OrderPoolSheet
-                    orders={availableOrders}
-                    onSelectOrder={handlePoolSelectOrder}
-                    onClose={handlePoolClose}
-                />
-            )}
-
             {/* Loading */}
             {loading && !data && (
                 <View style={styles.loadingOverlay}>
@@ -790,137 +719,154 @@ export default function MapScreen() {
                 </View>
             )}
 
-            {/* ═══ Order cards — merged with tab bar ═══ */}
-            {assignedOrders.length > 0 && (
-                <View style={[styles.bottomBar, { bottom: 0 }]}>
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.barContent}
-                    >
-                    {assignedOrders.map((order: any) => {
-                        const statusColor = STATUS_COLORS[order.status] ?? '#6B7280';
-                        const isFocused = order.id === focusedOrderId;
-                        const bizName = order.businesses?.[0]?.business?.name ?? '?';
-                        const initial = bizName.charAt(0).toUpperCase();
-                        const earnings = Number(order.deliveryPrice ?? 0).toFixed(2);
-                        const dropAddress = order.dropOffLocation?.address ?? '';
-                        const shortDrop = dropAddress.split(',')[0] || '';
-                        const isReady = order.status === 'READY';
-                        const isPreparing = order.status === 'PREPARING';
-                        const isPickingUp = markingPickedUpIds.has(order.id);
-                        const prepMinsLeft = (() => {
-                            if (!isPreparing || !order.estimatedReadyAt) return null;
-                            const diff = Math.ceil((new Date(order.estimatedReadyAt).getTime() - nowTs) / 60000);
-                            return diff > 0 ? diff : 0;
-                        })();
+            {/* ═══ Single swipeable active order card ═══ */}
+            {assignedOrders.length > 0 && (() => {
+                const idx = Math.min(currentCardIndex, assignedOrders.length - 1);
+                const order = assignedOrders[idx];
+                const statusColor = STATUS_COLORS[order.status] ?? '#6B7280';
+                const bizName = order.businesses?.[0]?.business?.name ?? '?';
+                const initial = bizName.charAt(0).toUpperCase();
+                const earnings = Number(order.deliveryPrice ?? 0).toFixed(2);
+                const dropAddress = order.dropOffLocation?.address ?? '';
+                const shortDrop = dropAddress.split(',')[0] || '';
+                const isReady = order.status === 'READY';
+                const isPreparing = order.status === 'PREPARING';
+                const isOutForDelivery = order.status === 'OUT_FOR_DELIVERY';
+                const isPickingUp = markingPickedUpIds.has(order.id);
+                const prepMinsLeft = isPreparing && order.estimatedReadyAt
+                    ? Math.max(0, Math.ceil((new Date(order.estimatedReadyAt).getTime() - nowTs) / 60000))
+                    : null;
+                const total = assignedOrders.length;
 
-                        return (
-                            <Pressable
-                                key={order.id}
-                                style={[
-                                    styles.barCard,
-                                    { borderLeftColor: statusColor },
-                                    isFocused && styles.barCardFocused,
-                                ]}
-                                onPress={() => focusOrder(order)}
-                            >
-                                {/* Row 1: avatar + name/address + earnings */}
-                                <View style={styles.barCardTop}>
-                                    <View style={[styles.barAvatar, { backgroundColor: statusColor }]}>
-                                        <Text style={styles.barAvatarText}>{initial}</Text>
-                                    </View>
-                                    <View style={styles.barCardInfo}>
-                                        <Text style={styles.barBizName} numberOfLines={1}>{bizName}</Text>
-                                        {shortDrop ? (
-                                            <Text style={styles.barDropAddress} numberOfLines={1}>{shortDrop}</Text>
-                                        ) : null}
-                                    </View>
-                                    <View style={styles.barEarnings}>
-                                        <Text style={styles.barEarningsText}>€{earnings}</Text>
-                                    </View>
-                                </View>
+                return (
+                    <View style={[styles.singleCardWrap, { bottom: 0 }]}>
+                        {/* Stack depth shadow (visible when 2+ orders) */}
+                        {total > 1 && (
+                            <View style={styles.cardStackBehind} pointerEvents="none" />
+                        )}
 
-                                {/* Row 2: status badge + action buttons (hidden when focused — show info instead) */}
-                                <View style={styles.barCardBottom}>
-                                    <View style={[styles.barStatusBadge, { backgroundColor: statusColor + '22' }]}>
-                                        <View style={[styles.barStatusDot, { backgroundColor: statusColor }]} />
-                                        <Text style={[styles.barStatusText, { color: statusColor }]}>
-                                            {STATUS_LABELS[order.status] ?? order.status}
-                                        </Text>
-                                    </View>
-                                    {!isFocused && (
-                                        <View style={styles.barActions}>
-                                            <Pressable
-                                                style={[styles.barActionBtn, styles.barNavBtn]}
-                                                onPress={() => handleStartNavigation(order)}
-                                            >
-                                                <Ionicons name="navigate-outline" size={16} color="#fff" />
-                                            </Pressable>
-                                        </View>
+                        <View style={styles.singleCard} {...swipePanResponder.panHandlers}>
+                        {/* READY glow border — animated pulse */}
+                        {isReady && (
+                            <Animated.View
+                                style={[styles.readyGlow, { opacity: readyPulse, borderColor: statusColor }]}
+                                pointerEvents="none"
+                            />
+                        )}
+
+                        {/* Order counter — top right */}
+                        {total > 1 && (
+                            <View style={styles.cardCounter}>
+                                <Text style={styles.cardCounterText}>{idx + 1} / {total}</Text>
+                            </View>
+                        )}
+
+                        {/* Header: avatar + biz name/address + earnings */}
+                        <View style={styles.cardHeader}>
+                            <View style={[styles.cardAvatar, { backgroundColor: statusColor }]}>
+                                <Text style={styles.cardAvatarText}>{initial}</Text>
+                            </View>
+                            <View style={styles.cardHeaderInfo}>
+                                <Text style={styles.cardBizName} numberOfLines={1}>{bizName}</Text>
+                                {shortDrop ? (
+                                    <Text style={styles.cardAddress} numberOfLines={1}>{shortDrop}</Text>
+                                ) : null}
+                            </View>
+                            <View style={styles.cardEarningsBadge}>
+                                <Text style={styles.cardEarningsText}>€{earnings}</Text>
+                            </View>
+                        </View>
+
+                        {/* Status + ETA row */}
+                        <View style={styles.cardMidRow}>
+                            <View style={[styles.cardStatusBadge, { backgroundColor: statusColor + '28' }]}>
+                                <View style={[styles.cardStatusDot, { backgroundColor: statusColor }]} />
+                                <Text style={[styles.cardStatusText, { color: statusColor }]}>
+                                    {STATUS_LABELS[order.status] ?? order.status}
+                                </Text>
+                            </View>
+                            {routeInfo && focusedOrderId === order.id && (
+                                <Text style={styles.cardEtaText}>
+                                    {order.status === 'OUT_FOR_DELIVERY'
+                                        ? `~${Math.ceil(routeInfo.durationMin)} min to drop`
+                                        : `~${Math.ceil(routeInfo.durationMin)} min to pickup`}
+                                </Text>
+                            )}
+                            {isPreparing && prepMinsLeft !== null && (
+                                <Text style={styles.cardEtaText}>
+                                    {prepMinsLeft === 0 ? 'Almost ready' : `Ready ~${prepMinsLeft} min`}
+                                </Text>
+                            )}
+                            {/* Swipe hint — only when multiple orders */}
+                            {total > 1 && (
+                                <Text style={styles.cardSwipeHint}>swipe ›</Text>
+                            )}
+                        </View>
+
+                        {/* Primary CTA */}
+                        {isReady ? (
+                            <View style={styles.cardCtaRow}>
+                                <Pressable
+                                    style={[styles.cardCta, styles.cardCtaHalf, { backgroundColor: '#4f46e5' }]}
+                                    onPress={() => handleStartNavigation(order)}
+                                >
+                                    <Ionicons name="navigate" size={18} color="#fff" />
+                                    <Text style={styles.cardCtaText}>Pickup</Text>
+                                </Pressable>
+                                <Pressable
+                                    style={[styles.cardCta, styles.cardCtaHalf, { backgroundColor: '#16a34a' }]}
+                                    onPress={() => handleMarkPickedUp(order.id)}
+                                    disabled={isPickingUp}
+                                >
+                                    {isPickingUp ? (
+                                        <ActivityIndicator size={16} color="#fff" />
+                                    ) : (
+                                        <>
+                                            <Ionicons name="checkmark-circle" size={18} color="#fff" />
+                                            <Text style={styles.cardCtaText}>Arrived</Text>
+                                        </>
                                     )}
-                                </View>
-
-                                {/* When focused: show ETA info only (no action buttons) */}
-                                {isFocused && (
-                                    <View style={styles.focusedEtaRow}>
-                                        {isPreparing && (
-                                            <View style={styles.focusedEtaChip}>
-                                                <Ionicons name="restaurant-outline" size={11} color="#06b6d4" />
-                                                <Text style={[styles.focusedEtaText, { color: '#06b6d4' }]}>
-                                                    {prepMinsLeft === null ? 'Preparing' : prepMinsLeft === 0 ? 'Almost ready' : `Ready ~${prepMinsLeft} min`}
-                                                </Text>
-                                            </View>
-                                        )}
-                                        {routeInfo != null && focusedOrderId === order.id && (
-                                            <View style={styles.focusedEtaChip}>
-                                                <Ionicons name="navigate-outline" size={11} color="#818cf8" />
-                                                <Text style={[styles.focusedEtaText, { color: '#818cf8' }]}>
-                                                    {order.status === 'OUT_FOR_DELIVERY'
-                                                        ? `~${Math.ceil(routeInfo.durationMin)} min to drop`
-                                                        : `~${Math.ceil(routeInfo.durationMin)} min to pickup`}
-                                                </Text>
-                                            </View>
-                                        )}
-                                    </View>
-                                )}
-
-                                {/* Row 3: Arrived at Pickup — only for READY orders when NOT focused */}
-                                {isReady && !isFocused && (
-                                    <Pressable
-                                        style={styles.arrivedBtn}
-                                        onPress={() => handleMarkPickedUp(order.id)}
-                                        disabled={isPickingUp}
-                                    >
-                                        {isPickingUp
-                                            ? <ActivityIndicator size={14} color="#fff" />
-                                            : <>
-                                                <Ionicons name="checkmark-circle" size={14} color="#fff" />
-                                                <Text style={styles.arrivedBtnText}>Arrived at Pickup</Text>
-                                              </>
-                                        }
-                                    </Pressable>
-                                )}
-
-                                {/* Row 3 (alt): Preparing countdown — only when NOT focused */}
-                                {isPreparing && !isFocused && (
-                                    <View style={styles.prepRow}>
-                                        <Ionicons name="restaurant-outline" size={11} color="#06b6d4" />
-                                        <Text style={styles.prepText}>
-                                            {prepMinsLeft === null
-                                                ? 'Preparing…'
-                                                : prepMinsLeft === 0
-                                                ? 'Almost ready'
-                                                : `Ready in ~${prepMinsLeft} min`}
-                                        </Text>
-                                    </View>
-                                )}
+                                </Pressable>
+                            </View>
+                        ) : isOutForDelivery ? (
+                            <Pressable
+                                style={[styles.cardCta, { backgroundColor: '#7c3aed' }]}
+                                onPress={() => handleStartNavigation(order)}
+                            >
+                                <Ionicons name="navigate" size={18} color="#fff" />
+                                <Text style={styles.cardCtaText}>Resume Navigation</Text>
                             </Pressable>
-                        );
-                    })}
-                </ScrollView>
-            </View>
-            )}
+                        ) : (
+                            <Pressable
+                                style={[styles.cardCta, { backgroundColor: '#4f46e5' }]}
+                                onPress={() => handleStartNavigation(order)}
+                            >
+                                <Ionicons name="navigate" size={18} color="#fff" />
+                                <Text style={styles.cardCtaText}>Navigate to Pickup</Text>
+                            </Pressable>
+                        )}
+                    </View>
+                    </View>
+                );
+            })()}
+
+            {/* Dot pager — shown below card when 2+ orders */}
+            {assignedOrders.length > 1 && (() => {
+                const idx = Math.min(currentCardIndex, assignedOrders.length - 1);
+                return (
+                    <View style={[styles.dotPager, { bottom: BOTTOM_BAR_HEIGHT - 24 }]}>
+                        {assignedOrders.map((_: any, i: number) => (
+                            <View
+                                key={i}
+                                style={[
+                                    styles.dot,
+                                    i === idx ? styles.dotActive : styles.dotInactive,
+                                ]}
+                            />
+                        ))}
+                    </View>
+                );
+            })()}
         </View>
     );
 }
@@ -1058,11 +1004,6 @@ const styles = StyleSheet.create({
         borderWidth: 1.5,
         borderColor: '#4285F4',
     },
-    mapBtnPool: {
-        borderWidth: 1.5,
-        borderColor: 'rgba(34,211,238,0.35)',
-        backgroundColor: 'rgba(34,211,238,0.08)',
-    },
     mapBtnArrived: {
         backgroundColor: '#16a34a',
     },
@@ -1083,166 +1024,182 @@ const styles = StyleSheet.create({
         fontWeight: '800',
     },
 
-    /* ── Order cards bar ── */
-    bottomBar: {
+    /* ── Single swipeable active order card ── */
+    /* ── Multi-order card wrap + stack ── */
+    singleCardWrap: {
+        position: 'absolute',
+        left: 12,
+        right: 12,
+    },
+    cardStackBehind: {
+        position: 'absolute',
+        left: 6,
+        right: 6,
+        bottom: -6,
+        height: 20,
+        backgroundColor: 'rgba(10,12,24,0.55)',
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.06)',
+    },
+    singleCard: {
+        position: 'absolute',
+        left: 12,
+        right: 12,
+        backgroundColor: 'rgba(10,12,24,0.93)',
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        padding: 14,
+        gap: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.55,
+        shadowRadius: 16,
+        elevation: 16,
+    },
+    /* ── Dot pager ── */
+    dotPager: {
         position: 'absolute',
         left: 0,
         right: 0,
-        paddingTop: 8,
-        paddingBottom: 8,
-    },
-    barContent: {
-        paddingHorizontal: 12,
-        gap: 10,
         flexDirection: 'row',
-        alignItems: 'stretch',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 6,
     },
-    barCard: {
-        width: 240,
-        borderRadius: 14,
-        backgroundColor: 'rgba(10,12,24,0.88)',
-        borderLeftWidth: 3,
+    dot: {
+        borderRadius: 4,
+    },
+    dotActive: {
+        width: 20,
+        height: 6,
+        backgroundColor: '#e2e8f0',
+    },
+    dotInactive: {
+        width: 6,
+        height: 6,
+        backgroundColor: 'rgba(148,163,184,0.35)',
+    },
+
+    readyGlow: {
+        position: 'absolute',
+        top: 0, left: 0, right: 0, bottom: 0,
+        borderRadius: 20,
+        borderWidth: 2,
+    },
+    cardCounter: {
+        position: 'absolute',
+        top: 10,
+        right: 12,
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        borderRadius: 10,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.09)',
-        padding: 10,
-        gap: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.55,
-        shadowRadius: 12,
-        elevation: 12,
+        borderColor: 'rgba(255,255,255,0.15)',
     },
-    barCardFocused: {
-        backgroundColor: 'rgba(30,27,75,0.92)',
-        borderColor: 'rgba(139,92,246,0.4)',
+    cardCounterText: {
+        color: '#e2e8f0',
+        fontSize: 10,
+        fontWeight: '800',
     },
-    barCardTop: {
+    cardHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 7,
+        gap: 9,
+        paddingRight: 50,
     },
-    barAvatar: {
-        width: 26,
-        height: 26,
-        borderRadius: 13,
+    cardAvatar: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
         flexShrink: 0,
     },
-    barAvatarText: {
-        fontSize: 12,
+    cardAvatarText: {
+        fontSize: 14,
         fontWeight: '800',
         color: '#fff',
     },
-    barCardInfo: {
+    cardHeaderInfo: {
         flex: 1,
         gap: 2,
     },
-    barBizName: {
-        fontSize: 12,
+    cardBizName: {
+        fontSize: 15,
         fontWeight: '700',
-        color: '#e2e8f0',
+        color: '#f1f5f9',
     },
-    barDropAddress: {
-        fontSize: 10,
+    cardAddress: {
+        fontSize: 11,
         color: '#64748b',
     },
-    barEarnings: {
-        backgroundColor: 'rgba(5, 46, 22, 0.9)',
-        borderRadius: 6,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
+    cardEarningsBadge: {
+        backgroundColor: 'rgba(5,46,22,0.9)',
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
         flexShrink: 0,
     },
-    barEarningsText: {
-        fontSize: 11,
+    cardEarningsText: {
+        fontSize: 13,
         fontWeight: '700',
         color: '#22c55e',
     },
-    barCardBottom: {
+    cardMidRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        gap: 8,
+        flexWrap: 'wrap',
     },
-    barStatusBadge: {
+    cardStatusBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
-        borderRadius: 6,
-        paddingHorizontal: 6,
-        paddingVertical: 3,
-    },
-    barStatusDot: {
-        width: 5,
-        height: 5,
-        borderRadius: 2.5,
-    },
-    barStatusText: {
-        fontSize: 10,
-        fontWeight: '700',
-    },
-    barActions: {
-        flexDirection: 'row',
         gap: 5,
-    },
-    barActionBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    barPickupBtn: {
-        backgroundColor: '#16a34a',
-    },
-    barNavBtn: {
-        backgroundColor: '#4f46e5',
-    },
-    arrivedBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 5,
-        backgroundColor: '#16a34a',
         borderRadius: 8,
-        paddingVertical: 7,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
     },
-    arrivedBtnText: {
-        color: '#fff',
+    cardStatusDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+    },
+    cardStatusText: {
         fontSize: 11,
         fontWeight: '700',
     },
-    prepRow: {
+    cardEtaText: {
+        color: '#94a3b8',
+        fontSize: 11,
+        fontWeight: '600',
+    },
+    cardSwipeHint: {
+        color: 'rgba(148,163,184,0.45)',
+        fontSize: 10,
+        fontWeight: '500',
+        marginLeft: 'auto' as any,
+    },
+    cardCta: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 5,
-        backgroundColor: 'rgba(6,182,212,0.1)',
-        borderRadius: 6,
-        paddingHorizontal: 7,
-        paddingVertical: 4,
-        alignSelf: 'flex-start',
+        justifyContent: 'center',
+        gap: 7,
+        borderRadius: 12,
+        paddingVertical: 12,
     },
-    prepText: {
-        color: '#06b6d4',
-        fontSize: 10,
-        fontWeight: '700',
-    },
-    focusedEtaRow: {
+    cardCtaRow: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 5,
+        gap: 8,
     },
-    focusedEtaChip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        backgroundColor: 'rgba(255,255,255,0.06)',
-        borderRadius: 6,
-        paddingHorizontal: 7,
-        paddingVertical: 4,
+    cardCtaHalf: {
+        flex: 1,
     },
-    focusedEtaText: {
-        fontSize: 10,
+    cardCtaText: {
+        color: '#fff',
+        fontSize: 14,
         fontWeight: '700',
     },
 

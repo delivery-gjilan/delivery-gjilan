@@ -84,8 +84,8 @@ export const CREATE_CAMPAIGN = gql`
 `;
 
 export const SEND_CAMPAIGN = gql`
-  mutation SendCampaign($id: ID!) {
-    sendCampaign(id: $id) {
+  mutation SendCampaign($id: ID!, $promotionId: ID) {
+    sendCampaign(id: $id, promotionId: $promotionId) {
       id
       title
       status

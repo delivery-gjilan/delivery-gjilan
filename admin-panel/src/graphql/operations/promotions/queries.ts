@@ -31,33 +31,31 @@ export const GET_PROMOTIONS = graphql(`
     }
 `);
 
-export const GET_PROMOTION = graphql(`
-    query GetPromotion($id: ID!) {
-        getPromotion(id: $id) {
+export const GET_RECOVERY_PROMOTIONS = graphql(`
+    query GetRecoveryPromotions {
+        getRecoveryPromotions {
             id
             name
             description
-            code
             type
-            target
             discountValue
-            maxDiscountCap
-            minOrderAmount
-            spendThreshold
-            thresholdReward
-            maxGlobalUsage
-            currentGlobalUsage
-            maxUsagePerUser
-            isStackable
-            priority
             isActive
-            startsAt
-            endsAt
-            createdAt
-            totalUsageCount
-            totalRevenue
-            creatorType
-            creatorId
+            orderId
+            assignedUsers {
+                userId
+                usageCount
+                expiresAt
+                user {
+                    id
+                    firstName
+                    lastName
+                    phoneNumber
+                    adminNote
+                    flagColor
+                    address
+                    email
+                }
+            }
         }
     }
 `);

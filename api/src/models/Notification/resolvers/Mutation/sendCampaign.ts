@@ -1,11 +1,12 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { UserQueryService } from '@/services/UserQueryService';
+import { PromotionService } from '@/services/PromotionService';
 import { AppError } from '@/lib/errors';
 import type { NotificationPayload } from '@/services/NotificationService';
 
 export const sendCampaign: NonNullable<MutationResolvers['sendCampaign']> = async (
     _parent,
-    { id },
+    { id, promotionId },
     { userData, notificationService, db },
 ) => {
     if (!userData.role || !['SUPER_ADMIN', 'ADMIN'].includes(userData.role)) {
@@ -56,6 +57,12 @@ export const sendCampaign: NonNullable<MutationResolvers['sendCampaign']> = asyn
             failedCount: result.failureCount,
             sentAt: new Date().toISOString(),
         });
+
+        // Optionally assign a promotion to all targeted users
+        if (promotionId && userIds.length > 0) {
+            const promoService = new PromotionService(db);
+            await promoService.assignPromotionToUsers(promotionId, userIds);
+        }
 
         return { ...updated!, sender: null };
     } catch (error) {
