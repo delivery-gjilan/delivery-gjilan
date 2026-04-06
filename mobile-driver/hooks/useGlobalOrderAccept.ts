@@ -245,6 +245,8 @@ export function useGlobalOrderAccept() {
             // Force immediate refetch — bypass debounce — so this order vanishes from the pool right away
             lastOrdersRefreshAt.current = 0;
             void refetch();
+            // Redirect to the map/drive tab so the driver sees their new order immediately
+            router.push('/(tabs)/drive' as any);
         } catch (err: any) {
             const msg = err?.message?.toLowerCase() ?? '';
             console.error('[accept] assignDriverToOrder failed:', err?.message, err?.graphQLErrors);
