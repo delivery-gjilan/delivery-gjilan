@@ -1,8 +1,7 @@
 import { QueryResolvers } from '@/generated/types.generated';
-import { AppContext } from '@/index';
 import { AuditLogRepository } from '@/repositories/AuditLogRepository';
 
-export const Query: QueryResolvers<AppContext> = {
+export const Query: QueryResolvers<any> = {
     auditLogs: async (_, args, { db }) => {
         const repo = new AuditLogRepository(db);
         const { logs, total } = await repo.getAuditLogs({
@@ -11,8 +10,8 @@ export const Query: QueryResolvers<AppContext> = {
             action: args.action as any,
             entityType: args.entityType as any,
             entityId: args.entityId || undefined,
-            startDate: args.startDate || undefined,
-            endDate: args.endDate || undefined,
+            startDate: args.startDate as any || undefined,
+            endDate: args.endDate as any || undefined,
             limit: args.limit || 50,
             offset: args.offset || 0,
         });

@@ -17,7 +17,7 @@ export const deviceTokens: NonNullable<QueryResolvers['deviceTokens']> = async (
     }
 
     if (!targetUserId) {
-        throw AppError.badRequest('User ID is required');
+        throw AppError.badInput('User ID is required');
     }
 
     const tokens = await notificationService.repo.getTokensByUserId(targetUserId);

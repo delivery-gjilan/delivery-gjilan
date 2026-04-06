@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm';
 
 export const createSettlementRequest: NonNullable<
     MutationResolvers['createSettlementRequest']
-> = async (_parent, { businessId, driverId, amount, periodStart, periodEnd, note }, ctx) => {
+> = async (_parent, { businessId, driverId, amount, periodStart, periodEnd, note }, ctx): Promise<any> => {
     const { db, userData, notificationService } = ctx;
 
     if (!userData?.role) {
@@ -54,8 +54,8 @@ export const createSettlementRequest: NonNullable<
         driverId: resolvedDriverId,
         requestedByUserId: userData.userId ?? null,
         amount,
-        periodStart,
-        periodEnd,
+        periodStart: periodStart as any,
+        periodEnd: periodEnd as any,
         note,
     });
 
@@ -75,8 +75,8 @@ export const createSettlementRequest: NonNullable<
                                 type: 'SETTLEMENT_REQUEST',
                                 requestId: request.id,
                                 amount: String(amount),
-                                periodStart,
-                                periodEnd,
+                                periodStart: String(periodStart),
+                                periodEnd: String(periodEnd),
                                 screen: 'finances',
                             },
                             timeSensitive: true,
@@ -97,8 +97,8 @@ export const createSettlementRequest: NonNullable<
                                 type: 'SETTLEMENT_REQUEST',
                                 requestId: request.id,
                                 amount: String(amount),
-                                periodStart,
-                                periodEnd,
+                                periodStart: String(periodStart),
+                                periodEnd: String(periodEnd),
                                 screen: 'finances',
                             },
                             timeSensitive: true,

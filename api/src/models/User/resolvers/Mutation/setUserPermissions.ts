@@ -11,7 +11,7 @@ export const setUserPermissions: NonNullable<MutationResolvers['setUserPermissio
     _parent,
     args,
     context,
-) => {
+): Promise<any> => {
     const { userId, permissions } = args;
     const { role, businessId } = context;
     

@@ -8,7 +8,7 @@ export const deleteDeliveryZone: NonNullable<MutationResolvers['deleteDeliveryZo
     const result = await db
         .delete(deliveryZones)
         .where(eq(deliveryZones.id, id))
-        .returning({ id: deliveryZones.id });
+        .returning();
 
     return result.length > 0;
 };

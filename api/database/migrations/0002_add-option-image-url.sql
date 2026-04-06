@@ -1,1 +1,0 @@
-ALTER TABLE "options" ADD COLUMN "image_url" text;

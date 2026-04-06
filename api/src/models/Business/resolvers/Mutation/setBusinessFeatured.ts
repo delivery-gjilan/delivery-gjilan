@@ -7,7 +7,7 @@ export const setBusinessFeatured: NonNullable<MutationResolvers['setBusinessFeat
     { id, isFeatured, sortOrder },
     { businessService, userData },
 ) => {
-    if (!canManageUsers(userData)) {
+    if (!canManageUsers(userData as any)) {
         throw new GraphQLError('Unauthorized: Only super admins can manage featured businesses', {
             extensions: { code: 'FORBIDDEN' },
         });

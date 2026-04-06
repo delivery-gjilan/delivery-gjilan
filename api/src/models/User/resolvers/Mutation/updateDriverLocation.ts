@@ -7,7 +7,7 @@ export const updateDriverLocation: NonNullable<MutationResolvers['updateDriverLo
         _parent,
         { latitude, longitude },
         { authService, driverService, userData },
-) => {
+): Promise<any> => {
         if (!userData.userId) {
                 throw new GraphQLError('Unauthorized', { extensions: { code: 'UNAUTHORIZED' } });
         }
@@ -28,7 +28,7 @@ export const updateDriverLocation: NonNullable<MutationResolvers['updateDriverLo
         // Publish driver updates for real-time dashboards
         try {
                 const drivers = await authService.authRepository.findDrivers();
-                publish(pubsub, topics.allDriversChanged(), { drivers });
+                publish(pubsub, topics.allDriversChanged(), { drivers } as any);
         } catch (error) {
 		logger.error({ err: error }, 'user:updateDriverLocation publish failed');
         }
@@ -41,5 +41,5 @@ export const updateDriverLocation: NonNullable<MutationResolvers['updateDriverLo
         return {
                 ...user,
                 isOnline: driver.onlinePreference ?? false,
-        };
+        } as any;
 };

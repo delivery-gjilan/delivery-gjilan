@@ -6,7 +6,7 @@ export const settleWithBusiness: NonNullable<MutationResolvers['settleWithBusine
     _parent,
     { businessId, amount, paymentMethod, paymentReference, note },
     { db, userData }
-) => {
+): Promise<any> => {
     if (!userData?.userId) {
         throw new GraphQLError('Unauthorized', { extensions: { code: 'UNAUTHORIZED' } });
     }

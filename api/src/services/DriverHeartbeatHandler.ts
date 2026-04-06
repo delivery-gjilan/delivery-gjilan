@@ -238,7 +238,7 @@ export class DriverHeartbeatHandler {
       if (driverIds.length === 0) return;
       const drivers = await this.authRepository.findDriversByIds(driverIds);
       if (drivers.length === 0) return;
-      publish(pubsub, topics.allDriversChanged(), { drivers });
+      publish(pubsub, topics.allDriversChanged(), { drivers } as any);
     } catch (error) {
       log.error({ err: error }, 'heartbeat:publish:error');
     }

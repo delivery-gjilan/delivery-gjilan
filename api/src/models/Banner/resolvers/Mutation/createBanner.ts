@@ -14,8 +14,8 @@ export const createBanner: NonNullable<MutationResolvers['createBanner']> = asyn
     linkType: input.linkType || null,
     linkTarget: input.linkTarget || null,
     displayContext: input.displayContext || 'HOME',
-    startsAt: input.startsAt || null,
-    endsAt: input.endsAt || null,
+    startsAt: input.startsAt as any || null,
+    endsAt: input.endsAt as any || null,
     sortOrder: input.sortOrder ?? undefined,
     isActive: input.isActive ?? true,
   });

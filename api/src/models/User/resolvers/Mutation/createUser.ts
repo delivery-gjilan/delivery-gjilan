@@ -10,7 +10,7 @@ export const createUser: NonNullable<MutationResolvers['createUser']> = async (_
 
     // SUPER_ADMIN can create any role.
     // BUSINESS_OWNER can only create BUSINESS_EMPLOYEE in their own business.
-    if (!canManageUsers(userData)) {
+    if (!canManageUsers(userData as any)) {
         if (userData.role !== 'BUSINESS_OWNER') {
             throw new GraphQLError('Unauthorized: Only super admins and business owners can create users', {
                 extensions: { code: 'FORBIDDEN' },
@@ -55,7 +55,7 @@ export const createUser: NonNullable<MutationResolvers['createUser']> = async (_
     // If creating a DRIVER user, create their driver profile
     if (input.role === 'DRIVER' && driverService) {
         try {
-            await driverService.createDriverProfile(result.user.id);
+            await driverService.createDriverProfile(result.user.id as string);
         } catch (error) {
             logger.error({ err: error, userId: result.user.id }, 'user:createUser driver profile creation failed');
             // Don't fail the entire request, just log the error
@@ -63,11 +63,11 @@ export const createUser: NonNullable<MutationResolvers['createUser']> = async (_
     }
     
     // Log the action
-    const logger = createAuditLogger(db, context);
-    await logger.log({
+    const auditLogger = createAuditLogger(db, context);
+    await auditLogger.log({
         action: input.role === 'DRIVER' ? 'DRIVER_CREATED' : 'USER_CREATED',
         entityType: 'USER',
-        entityId: result.user.id,
+        entityId: result.user.id as string,
         metadata: { 
             email: input.email, 
             role: input.role,
@@ -79,7 +79,7 @@ export const createUser: NonNullable<MutationResolvers['createUser']> = async (_
 
     return {
         token: result.token,
-        user: toUserParent(result.user),
+        user: toUserParent(result.user as any),
         message: result.message,
     };
 };

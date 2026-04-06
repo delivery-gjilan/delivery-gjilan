@@ -27,5 +27,7 @@ export function toUserParent(user: DbUser): ResolversParentTypes['User'] {
         isDemoAccount: user.isDemoAccount,
         permissions: [],
         isOnline: false,
+        totalOrders: 0,
+        isTrustedCustomer: false,
     };
 }

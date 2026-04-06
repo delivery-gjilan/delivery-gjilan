@@ -7,7 +7,7 @@ async function main() {
     const db = await getDB();
     const migrationsFolder = 'database/migrations';
 
-    await migrate(db, { migrationsFolder });
+    await migrate(db as any, { migrationsFolder });
     console.log('Migrated successfully');
 
     process.exit(0);

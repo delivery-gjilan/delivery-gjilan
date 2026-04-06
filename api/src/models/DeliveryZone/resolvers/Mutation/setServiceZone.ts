@@ -3,7 +3,7 @@ import { getDB } from '@/database';
 import { deliveryZones } from '@/database/schema/deliveryZones';
 import { eq } from 'drizzle-orm';
 
-export const setServiceZone: NonNullable<MutationResolvers['setServiceZone']> = async (_parent, { id }, _ctx) => {
+export const setServiceZone: any = async (_parent, { id }, _ctx): Promise<any> => {
     const db = await getDB();
 
     if (id) {

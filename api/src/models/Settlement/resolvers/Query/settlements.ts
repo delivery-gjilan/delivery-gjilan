@@ -9,7 +9,7 @@ export const settlements: NonNullable<QueryResolvers['settlements']> = async (
     _parent,
     args,
     { db, userData }
-) => {
+): Promise<any> => {
     const repo = new SettlementRepository(db);
     let resolvedArgs = { ...args };
 
@@ -72,5 +72,5 @@ export const settlements: NonNullable<QueryResolvers['settlements']> = async (
         }
     }
 
-    return repo.getSettlements(resolvedArgs);
+    return repo.getSettlements(resolvedArgs as any);
 };

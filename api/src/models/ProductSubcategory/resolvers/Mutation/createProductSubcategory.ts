@@ -6,11 +6,11 @@ export const createProductSubcategory: NonNullable<MutationResolvers['createProd
         { input },
         { productSubcategoryService, productCategoryService },
 ) => {
-        const result = await productSubcategoryService.createProductSubcategory(input);
+        const result = await productSubcategoryService.createProductSubcategory(input as any);
         // Invalidate by categoryId + parent business
-        const category = await productCategoryService.getProductCategory(input.categoryId);
+        const category = await productCategoryService.getProductCategory(input.categoryId as string);
         if (category) {
-                await cache.invalidateSubcategories(category.businessId, input.categoryId);
+                await cache.invalidateSubcategories(category.businessId as string, input.categoryId as string);
         }
-        return result;
+        return result as any;
 };

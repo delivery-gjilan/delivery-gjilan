@@ -16,7 +16,7 @@ export const getAllPromotions: NonNullable<QueryResolvers['getAllPromotions']> =
   
   // Filter by isActive if provided
   if (args.isActive !== undefined && args.isActive !== null) {
-    query = query.where(eq(promotions.isActive, args.isActive)) as any;
+    query = (query as any).where(eq(promotions.isActive, args.isActive)) as any;
   }
   
   const promoList = await query;
@@ -53,5 +53,5 @@ export const getAllPromotions: NonNullable<QueryResolvers['getAllPromotions']> =
     totalRevenue: promo.totalRevenue || 0,
     creatorType: promo.creatorType,
     creatorId: promo.creatorId,
-  }));
+  })) as any;
 };

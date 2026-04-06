@@ -28,6 +28,6 @@ export const driversUpdated: NonNullable<SubscriptionResolvers['driversUpdated']
         context.loaders.driverByUserIdLoader.clear(String(driver.id));
       }
     }
-    return payload.drivers;
+    return payload.drivers as any;
   },
 };

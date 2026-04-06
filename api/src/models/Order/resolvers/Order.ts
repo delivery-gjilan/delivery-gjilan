@@ -14,7 +14,7 @@ export const Order: OrderResolvers = {
         return (parent.businesses ?? []).map(b => b.business.location);
     },
 
-    user: async (parent, _args, { loaders }) => {
+    user: async (parent, _args, { loaders }): Promise<any> => {
         if (!parent.userId) {
             return null;
         }

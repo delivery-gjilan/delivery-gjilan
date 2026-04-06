@@ -6,8 +6,8 @@ export const updateProductCategory: NonNullable<MutationResolvers['updateProduct
     { id, input },
     { productCategoryService },
 ) => {
-    const result = await productCategoryService.updateProductCategory(id, input);
+    const result = await productCategoryService.updateProductCategory(id as string, input);
     // Invalidate the business's categories cache
-    await cache.invalidateCategories(result.businessId);
-    return result;
+    await cache.invalidateCategories(result.businessId as string);
+    return result as any;
 };

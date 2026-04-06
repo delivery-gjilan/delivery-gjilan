@@ -7,5 +7,5 @@ export const settlementPayments: NonNullable<QueryResolvers['settlementPayments'
     { db }
 ) => {
     const repo = new SettlementPaymentRepository(db);
-    return repo.getPayments(args);
+    return repo.getPayments(args as any);
 };

@@ -39,7 +39,7 @@ export const updateDriverLocation: NonNullable<
   // Publish update to subscriptions
   try {
     const drivers = await authService.getDrivers();
-    publish(pubsub, topics.allDriversChanged(), { drivers });
+    publish(pubsub, topics.allDriversChanged(), { drivers } as any);
   } catch (error) {
     logger.error({ err: error }, 'driver:updateDriverLocation publish failed');
   }
@@ -52,5 +52,5 @@ export const updateDriverLocation: NonNullable<
   return {
     ...user,
     isOnline: driver.onlinePreference ?? false,
-  };
+  } as any;
 };

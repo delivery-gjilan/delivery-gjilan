@@ -235,7 +235,7 @@ describe('NotificationService.sendToUser — FCM success', () => {
 
         const repo = makeRepo({ getTokensByUserId: vi.fn().mockResolvedValue(tokens) });
         const svc = new NotificationService(repo as any);
-        await svc.sendToUser('user-2', { title: 'Hi', body: 'Hello' }, 'PROMO');
+        await svc.sendToUser('user-2', { title: 'Hi', body: 'Hello' }, 'PROMO' as any);
 
         expect(repo.createNotification).toHaveBeenCalledWith(
             expect.objectContaining({ userId: 'user-2', title: 'Hi', type: 'PROMO' }),

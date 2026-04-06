@@ -32,8 +32,8 @@ export const driverCashSummary: NonNullable<QueryResolvers['driverCashSummary']>
         eq(ordersTable.status, 'DELIVERED'),
         eq(ordersTable.paymentCollection, 'CASH_TO_DRIVER'),
     ];
-    if (startDate) orderConditions.push(gte(ordersTable.orderDate, startDate));
-    if (endDate) orderConditions.push(lte(ordersTable.orderDate, endDate));
+    if (startDate) orderConditions.push(gte(ordersTable.orderDate, startDate as any));
+    if (endDate) orderConditions.push(lte(ordersTable.orderDate, endDate as any));
 
     const cashResult = await db
         .select({
@@ -57,8 +57,8 @@ export const driverCashSummary: NonNullable<QueryResolvers['driverCashSummary']>
         eq(settlements.driverId, driverId),
         eq(settlements.isSettled, false),
     ];
-    if (startDate) settlementConditions.push(gte(settlements.createdAt, startDate));
-    if (endDate) settlementConditions.push(lte(settlements.createdAt, endDate));
+    if (startDate) settlementConditions.push(gte(settlements.createdAt, startDate as any));
+    if (endDate) settlementConditions.push(lte(settlements.createdAt, endDate as any));
 
     const balanceResult = await db
         .select({

@@ -8,9 +8,9 @@ export const permissions: NonNullable<UserResolvers['permissions']> = async (
 ) => {
     // Get permissions for this user
     const perms = await getUserPermissions({
-        userId: parent.id,
+        userId: String(parent.id),
         role: parent.role as any,
-        businessId: parent.businessId ?? undefined,
+        businessId: parent.businessId ? String(parent.businessId) : undefined,
     });
     
     return perms as any;

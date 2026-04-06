@@ -6,7 +6,7 @@ export const createSettlementRule: NonNullable<MutationResolvers['createSettleme
     _parent,
     { input },
     { db, userData },
-) => {
+): Promise<any> => {
     if (!userData?.userId) {
         throw new GraphQLError('Authentication required', {
             extensions: { code: 'UNAUTHORIZED' },

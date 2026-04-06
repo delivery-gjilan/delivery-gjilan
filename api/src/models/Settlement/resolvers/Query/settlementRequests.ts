@@ -8,7 +8,7 @@ export const settlementRequests: NonNullable<QueryResolvers['settlementRequests'
     _parent,
     { businessId, driverId, entityType, status, limit, offset },
     { db, userData },
-) => {
+): Promise<any> => {
     if (!userData?.role) {
         throw new GraphQLError('Unauthorized', { extensions: { code: 'UNAUTHORIZED' } });
     }

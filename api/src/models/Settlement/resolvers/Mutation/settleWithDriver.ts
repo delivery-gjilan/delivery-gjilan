@@ -8,7 +8,7 @@ export const settleWithDriver: NonNullable<MutationResolvers['settleWithDriver']
     _parent,
     { driverId, amount, paymentMethod, paymentReference, note },
     { db, userData }
-) => {
+): Promise<any> => {
     if (!userData?.userId) {
         throw new GraphQLError('Unauthorized', { extensions: { code: 'UNAUTHORIZED' } });
     }

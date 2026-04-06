@@ -35,6 +35,7 @@ export class ProductService {
             variantGroupId: product.groupId ?? undefined,
             isOffer: product.isOffer ?? false,
             price: Number(product.basePrice), // DB: basePrice → GraphQL: price
+            effectivePrice: Number(product.basePrice),
             markupPrice: product.markupPrice ?? null,
             nightMarkedupPrice: product.nightMarkedupPrice ?? null,
             saleDiscountPercentage: product.saleDiscountPercentage ?? null,
@@ -84,7 +85,7 @@ export class ProductService {
     async getProduct(id: string): Promise<Product | null> {
         const cached = await cache.get<Product>(cache.keys.product(id));
         if (cached) {
-            const isVisible = await this.isBusinessVisible(cached.businessId);
+            const isVisible = await this.isBusinessVisible(cached.businessId as string);
             return isVisible ? cached : null;
         }
 
@@ -120,7 +121,7 @@ export class ProductService {
         const allProducts = await this.getProducts(businessId);
 
         // Batch-query which products have option groups
-        const allProductIds = allProducts.map((p) => p.id);
+        const allProductIds = allProducts.map((p) => p.id) as string[];
         const productsWithOptionGroups = new Set<string>();
         if (this.optionGroupRepository && allProductIds.length > 0) {
             const ids = await this.optionGroupRepository.findDistinctProductIdsWithGroups(allProductIds);
@@ -134,9 +135,9 @@ export class ProductService {
 
         for (const product of allProducts) {
             if (product.variantGroupId) {
-                const group = variantGroupMap.get(product.variantGroupId) ?? [];
+                const group = variantGroupMap.get(product.variantGroupId as string) ?? [];
                 group.push(product);
-                variantGroupMap.set(product.variantGroupId, group);
+                variantGroupMap.set(product.variantGroupId as string, group);
             } else {
                 standaloneProducts.push(product);
             }
@@ -172,7 +173,7 @@ export class ProductService {
                 imageUrl: representative.imageUrl,
                 basePrice,
                 isOffer: representative.isOffer,
-                hasOptionGroups: variants.some((v) => productsWithOptionGroups.has(v.id)),
+                hasOptionGroups: variants.some((v) => productsWithOptionGroups.has(v.id as string)),
                 variants,
                 product: undefined,
             });
@@ -186,7 +187,7 @@ export class ProductService {
                 imageUrl: product.imageUrl,
                 basePrice: product.price, // Product.price maps from DB basePrice
                 isOffer: product.isOffer,
-                hasOptionGroups: productsWithOptionGroups.has(product.id),
+                hasOptionGroups: productsWithOptionGroups.has(product.id as string),
                 variants: [],
                 product,
             });

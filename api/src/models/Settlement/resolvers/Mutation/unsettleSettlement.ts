@@ -6,7 +6,7 @@ export const unsettleSettlement: NonNullable<MutationResolvers['unsettleSettleme
     _parent,
     { settlementId },
     context
-) => {
+): Promise<any> => {
     const { db } = context;
     const repo = new SettlementRepository(db);
     const result = await repo.unsettleSettlement(settlementId);

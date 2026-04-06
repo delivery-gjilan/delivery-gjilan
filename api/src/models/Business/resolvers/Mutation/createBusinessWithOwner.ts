@@ -51,7 +51,7 @@ export const createBusinessWithOwner: NonNullable<MutationResolvers['createBusin
 ) => {
     const { userData, db, businessService, authService } = context;
 
-    if (!canManageBusinesses(userData)) {
+    if (!canManageBusinesses(userData as any)) {
         throw new GraphQLError('Unauthorized: Only super admins can create businesses', {
             extensions: { code: 'FORBIDDEN' },
         });
@@ -74,7 +74,7 @@ export const createBusinessWithOwner: NonNullable<MutationResolvers['createBusin
             .insert(businesses)
             .values({
                 name: validatedBusinessInput.name,
-                description: validatedBusinessInput.description ?? null,
+                description: (validatedBusinessInput as any).description ?? null,
                 phoneNumber: validatedBusinessInput.phoneNumber ?? null,
                 imageUrl: validatedBusinessInput.imageUrl,
                 businessType: validatedBusinessInput.businessType,
@@ -126,7 +126,7 @@ export const createBusinessWithOwner: NonNullable<MutationResolvers['createBusin
     await logger.log({
         action: 'BUSINESS_CREATED',
         entityType: 'BUSINESS',
-        entityId: business.id,
+        entityId: business.id as string,
         metadata: {
             name: business.name,
             businessType: business.businessType,
@@ -138,7 +138,7 @@ export const createBusinessWithOwner: NonNullable<MutationResolvers['createBusin
     await logger.log({
         action: 'USER_CREATED',
         entityType: 'USER',
-        entityId: result.owner.id,
+        entityId: result.owner.id as string,
         metadata: {
             email: normalizedEmail,
             role: 'BUSINESS_OWNER',
@@ -150,7 +150,7 @@ export const createBusinessWithOwner: NonNullable<MutationResolvers['createBusin
     });
 
     return {
-        business,
+        business: business as any,
         owner: toUserParent(result.owner),
     };
 };

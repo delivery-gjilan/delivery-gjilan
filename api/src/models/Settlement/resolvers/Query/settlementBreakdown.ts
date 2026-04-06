@@ -42,8 +42,8 @@ export const settlementBreakdown: NonNullable<QueryResolvers['settlementBreakdow
     if (resolvedBusinessId) conditions.push(eq(settlements.businessId, resolvedBusinessId));
     if (resolvedDriverId) conditions.push(eq(settlements.driverId, resolvedDriverId));
     if (isSettled !== undefined && isSettled !== null) conditions.push(eq(settlements.isSettled, isSettled));
-    if (startDate) conditions.push(gte(settlements.createdAt, startDate));
-    if (endDate) conditions.push(lte(settlements.createdAt, endDate));
+    if (startDate) conditions.push(gte(settlements.createdAt, startDate as any));
+    if (endDate) conditions.push(lte(settlements.createdAt, endDate as any));
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 

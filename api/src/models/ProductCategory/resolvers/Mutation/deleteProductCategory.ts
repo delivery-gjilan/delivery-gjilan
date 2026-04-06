@@ -7,10 +7,10 @@ export const deleteProductCategory: NonNullable<MutationResolvers['deleteProduct
     { productCategoryService },
 ) => {
     // Get the category first to know the businessId for invalidation
-    const category = await productCategoryService.getProductCategory(id);
-    const result = await productCategoryService.deleteProductCategory(id);
+    const category = await productCategoryService.getProductCategory(id as string);
+    const result = await productCategoryService.deleteProductCategory(id as string);
     if (category) {
-        await cache.invalidateCategories(category.businessId);
+        await cache.invalidateCategories(category.businessId as string);
     }
-    return result;
+    return result as any;
 };

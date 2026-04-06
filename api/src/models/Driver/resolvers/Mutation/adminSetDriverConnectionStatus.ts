@@ -39,5 +39,5 @@ export const adminSetDriverConnectionStatus: NonNullable<
     });
   }
 
-  return user;
+  return user as any;
 };

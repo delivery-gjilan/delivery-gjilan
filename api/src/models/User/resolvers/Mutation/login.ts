@@ -7,7 +7,7 @@ export const login: NonNullable<MutationResolvers['login']> = async (_parent, { 
     return {
         token: result.token,
         refreshToken: result.refreshToken ?? null,
-        user: toUserParent(result.user),
+        user: toUserParent(result.user as any),
         message: result.message,
     };
 };

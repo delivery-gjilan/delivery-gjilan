@@ -15,7 +15,7 @@ export const setMyEmailOptOut: NonNullable<MutationResolvers['setMyEmailOptOut']
 
         const updatedUser = await authService.authRepository.updateUser(userData.userId, {
                 emailOptOut: optOut,
-        });
+        } as any);
 
         if (!updatedUser) {
                 throw new GraphQLError('User not found', {

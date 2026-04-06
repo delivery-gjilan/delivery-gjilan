@@ -280,7 +280,7 @@ export class OrderMappingModule {
                     appliesTo: promotion.appliesTo as any,
                     discountAmount: Number(promotion.discountAmount),
                 })),
-            };
+            } as any;
         });
     }
 

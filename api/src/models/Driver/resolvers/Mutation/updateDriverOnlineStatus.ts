@@ -39,7 +39,7 @@ export const updateDriverOnlineStatus: NonNullable<
   // Fetch all drivers and publish update for real-time sync
   try {
     const drivers = await authService.getDrivers();
-    publish(pubsub, topics.allDriversChanged(), { drivers });
+    publish(pubsub, topics.allDriversChanged(), { drivers } as any);
   } catch (error) {
     logger.error({ err: error }, 'driver:updateDriverOnlineStatus publish failed');
   }
@@ -52,5 +52,5 @@ export const updateDriverOnlineStatus: NonNullable<
   return {
     ...user,
     isOnline: driver.onlinePreference ?? false,
-  };
+  } as any;
 };

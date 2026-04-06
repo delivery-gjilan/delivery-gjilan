@@ -1,1 +1,0 @@
-ALTER TABLE "users" ADD COLUMN "email_opt_out" boolean DEFAULT false NOT NULL;

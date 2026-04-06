@@ -89,6 +89,7 @@ let cachedServices: {
     promotionService: PromotionService;
     financialService: FinancialService;
     emailService: EmailService;
+    bannerRepository: BannerRepository;
 } | null = null;
 
 async function getOrCreateServices(db: any) {

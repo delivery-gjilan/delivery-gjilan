@@ -84,7 +84,7 @@ export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus
     bannerMessage: result.bannerMessage,
     bannerType: result.bannerType,
     dispatchModeEnabled: result.dispatchModeEnabled,
-  });
+  } as any);
 
   return result as any;
 };

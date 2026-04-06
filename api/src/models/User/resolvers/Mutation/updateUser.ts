@@ -8,7 +8,7 @@ export const updateUser: NonNullable<MutationResolvers['updateUser']> = async (_
 
     // SUPER_ADMIN can update any user.
     // BUSINESS_OWNER can only update BUSINESS_EMPLOYEE users in their own business.
-    if (!canManageUsers(userData)) {
+    if (!canManageUsers(userData as any)) {
         if (userData.role !== 'BUSINESS_OWNER') {
             throw new GraphQLError('Unauthorized: Only super admins and business owners can update users', {
                 extensions: { code: 'FORBIDDEN' },

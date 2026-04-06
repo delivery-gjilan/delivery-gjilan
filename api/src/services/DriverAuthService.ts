@@ -73,7 +73,7 @@ export class DriverAuthService {
         return { token, refreshToken };
     }
 
-    private buildDriverResponse(user: { id: string; email: string; firstName: string; lastName: string; phoneNumber: string | null }, driver: { onlinePreference: boolean; connectionStatus: string; lastHeartbeatAt: string | null; lastLocationUpdate: string | null; driverLat: number | null; driverLng: number | null }) {
+    private buildDriverResponse(user: { id: string; email: string; firstName: string; lastName: string; phoneNumber: string | null }, driver: { onlinePreference: boolean; connectionStatus: any; lastHeartbeatAt: string | null; lastLocationUpdate: string | null; driverLat: number | null; driverLng: number | null }) {
         return {
             id: user.id,
             email: user.email,

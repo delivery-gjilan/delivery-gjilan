@@ -12,7 +12,7 @@ export const deleteUser: NonNullable<MutationResolvers['deleteUser']> = async (_
 
     // SUPER_ADMIN can delete any user.
     // BUSINESS_OWNER can only delete BUSINESS_EMPLOYEE users in their own business.
-    if (!canManageUsers(userData)) {
+    if (!canManageUsers(userData as any)) {
         if (userData.role !== 'BUSINESS_OWNER') {
             throw new GraphQLError('Unauthorized: Only super admins and business owners can delete users', {
                 extensions: { code: 'FORBIDDEN' },

@@ -4,7 +4,7 @@ import { GraphQLError } from 'graphql';
 
 export const cancelSettlementRequest: NonNullable<
     MutationResolvers['cancelSettlementRequest']
-> = async (_parent, { requestId }, { db, userData }) => {
+> = async (_parent, { requestId }, { db, userData }): Promise<any> => {
     if (!userData?.role) {
         throw new GraphQLError('Unauthorized', { extensions: { code: 'UNAUTHORIZED' } });
     }

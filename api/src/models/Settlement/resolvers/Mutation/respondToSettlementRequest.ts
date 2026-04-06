@@ -8,7 +8,7 @@ import { eq } from 'drizzle-orm';
 
 export const respondToSettlementRequest: NonNullable<
     MutationResolvers['respondToSettlementRequest']
-> = async (_parent, { requestId, action, disputeReason }, ctx) => {
+> = async (_parent, { requestId, action, disputeReason }, ctx): Promise<any> => {
     const { db, userData, notificationService } = ctx;
 
     if (!userData?.userId) {

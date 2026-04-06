@@ -270,7 +270,7 @@ export class AuthRepository {
                     isNull(refreshTokenSessions.revokedAt),
                 ),
             )
-            .returning({ id: refreshTokenSessions.id });
+            .returning();
 
         return updated.length > 0;
     }

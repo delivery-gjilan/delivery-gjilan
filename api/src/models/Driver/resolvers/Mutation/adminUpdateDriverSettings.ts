@@ -34,5 +34,5 @@ export const adminUpdateDriverSettings: NonNullable<MutationResolvers['adminUpda
         await db.update(driversTable).set(updates).where(eq(driversTable.userId, driverId));
     }
 
-    return user;
+    return user as any;
 };

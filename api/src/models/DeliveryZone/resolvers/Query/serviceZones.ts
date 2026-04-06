@@ -3,7 +3,7 @@ import { getDB } from '@/database';
 import { deliveryZones as deliveryZonesTable } from '@/database/schema/deliveryZones';
 import { eq } from 'drizzle-orm';
 
-export const serviceZones: NonNullable<QueryResolvers['serviceZones']> = async (_parent, _arg, _ctx) => {
+export const serviceZones: any = async (_parent, _arg, _ctx): Promise<any> => {
     const db = await getDB();
     const rows = await db
         .select()

@@ -12,10 +12,10 @@ export const Banner: BannerResolvers = {
     const [business] = await db
       .select()
       .from(businesses)
-      .where(eq(businesses.id, parent.businessId))
+      .where(eq(businesses.id, parent.businessId as string))
       .limit(1);
     
-    return business || null;
+    return (business || null) as any;
   },
   
   product: async (parent, _args, _ctx) => {
@@ -24,10 +24,10 @@ export const Banner: BannerResolvers = {
     const [product] = await db
       .select()
       .from(products)
-      .where(eq(products.id, parent.productId))
+      .where(eq(products.id, parent.productId as string))
       .limit(1);
     
-    return product || null;
+    return (product || null) as any;
   },
   
   promotion: async (parent, _args, _ctx) => {
@@ -36,9 +36,9 @@ export const Banner: BannerResolvers = {
     const [promotion] = await db
       .select()
       .from(promotions)
-      .where(eq(promotions.id, parent.promotionId))
+      .where(eq(promotions.id, parent.promotionId as string))
       .limit(1);
     
-    return promotion || null;
+    return (promotion || null) as any;
   },
 };

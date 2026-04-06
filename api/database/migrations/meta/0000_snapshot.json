@@ -1,5 +1,5 @@
 {
-  "id": "6d67f21a-d978-4cb9-84ea-c7a898dd9707",
+  "id": "a40316de-316e-4096-bbac-cad6d6a3bcf7",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -2369,6 +2369,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'en'"
+        },
+        "email_opt_out": {
+          "name": "email_opt_out",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "business_id": {
           "name": "business_id",
@@ -5736,6 +5743,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
+        },
+        "image_url": {
+          "name": "image_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "linked_product_id": {
           "name": "linked_product_id",

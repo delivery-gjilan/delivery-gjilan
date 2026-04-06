@@ -2,7 +2,7 @@ import type { OptionGroupResolvers } from './../../../generated/types.generated'
 
 export const OptionGroup: OptionGroupResolvers = {
     options: async (parent, _args, { loaders }) => {
-        const opts = await loaders.optionsByOptionGroupIdLoader.load(parent.id);
+        const opts = await loaders.optionsByOptionGroupIdLoader.load(parent.id as string);
         return opts.map((o) => ({
             id: o.id,
             optionGroupId: o.optionGroupId,
@@ -11,6 +11,6 @@ export const OptionGroup: OptionGroupResolvers = {
             imageUrl: o.imageUrl ?? undefined,
             linkedProductId: o.linkedProductId ?? undefined,
             displayOrder: o.displayOrder,
-        }));
+        })) as any;
     },
 };

@@ -60,7 +60,7 @@ export const updateProduct: NonNullable<MutationResolvers['updateProduct']> = as
     }
 
     const result = await productService.updateProduct(id, input);
-    await cache.invalidateProducts(result.businessId, result.id);
+    await cache.invalidateProducts(result.businessId as string, result.id as string);
     
     // Determine specific action based on what changed
     let action: any = 'PRODUCT_UPDATED';
@@ -97,5 +97,5 @@ export const updateProduct: NonNullable<MutationResolvers['updateProduct']> = as
         },
     });
     
-    return result;
+    return result as any;
 };

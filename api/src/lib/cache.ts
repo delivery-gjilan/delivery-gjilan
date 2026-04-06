@@ -99,7 +99,7 @@ async function get<T>(key: string): Promise<T | null> {
         const redis = await getClient();
         if (!redis) return null;
         const raw = await redis.get(key);
-        return raw ? (JSON.parse(raw) as T) : null;
+        return raw ? (JSON.parse(raw as string) as T) : null;
     } catch {
         return null;
     }
@@ -133,8 +133,8 @@ async function delPattern(pattern: string): Promise<void> {
         if (!redis) return;
         let cursor = 0;
         do {
-            const result = await redis.scan(cursor, { MATCH: pattern, COUNT: 100 });
-            cursor = result.cursor;
+            const result = await redis.scan(cursor as any, { MATCH: pattern, COUNT: 100 });
+            cursor = result.cursor as any;
             if (result.keys.length > 0) {
                 await (redis as any).del(result.keys);
             }

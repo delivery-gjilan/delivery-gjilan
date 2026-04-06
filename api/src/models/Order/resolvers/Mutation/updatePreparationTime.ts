@@ -9,7 +9,7 @@ import {
     notifyAdminsPrepTimeExtended,
 } from '@/services/orderNotifications';
 import { emitOrderEvent } from '@/repositories/OrderEventRepository';
-import { usersTable } from '@/database/schema';
+import { users as usersTable } from '@/database/schema';
 import { and, inArray, isNull } from 'drizzle-orm';
 import { getDispatchService } from '@/services/driverServices.init';
 import { cache } from '@/lib/cache';
@@ -122,7 +122,7 @@ export const updatePreparationTime: NonNullable<MutationResolvers['updatePrepara
 
         const auditLog = createAuditLogger(db, context);
         await auditLog.log({
-            action: 'ORDER_PREPARATION_TIME_UPDATED',
+            action: 'ORDER_PREPARATION_TIME_UPDATED' as any,
             entityType: 'ORDER',
             entityId: id,
             metadata: {

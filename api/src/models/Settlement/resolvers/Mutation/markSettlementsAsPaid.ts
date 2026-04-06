@@ -7,7 +7,7 @@ export const markSettlementsAsPaid: NonNullable<MutationResolvers['markSettlemen
     _parent,
     { ids },
     context
-) => {
+): Promise<any> => {
     const { db } = context;
     const repo = new SettlementRepository(db);
     const result = await repo.markMultipleAsPaid(ids);

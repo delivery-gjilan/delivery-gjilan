@@ -53,16 +53,16 @@ export const createProduct: NonNullable<MutationResolvers['createProduct']> = as
     }
     
     const result = await productService.createProduct(input);
-    await cache.invalidateProducts(input.businessId, result.id);
+    await cache.invalidateProducts(input.businessId, result.id as string);
     
     // Log the action
     const logger = createAuditLogger(db, context);
     await logger.log({
         action: 'PRODUCT_CREATED',
         entityType: 'PRODUCT',
-        entityId: result.id,
+        entityId: result.id as string,
         metadata: { name: input.name, businessId: input.businessId },
     });
     
-    return result;
+    return result as any;
 };

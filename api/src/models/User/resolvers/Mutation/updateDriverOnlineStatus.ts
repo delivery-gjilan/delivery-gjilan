@@ -7,7 +7,7 @@ export const updateDriverOnlineStatus: NonNullable<MutationResolvers['updateDriv
   _parent,
   { isOnline },
   { authService, driverService, userData }
-) => {
+): Promise<any> => {
   if (!userData.userId) {
     throw new GraphQLError('Unauthorized', { extensions: { code: 'UNAUTHORIZED' } });
   }
@@ -29,7 +29,7 @@ export const updateDriverOnlineStatus: NonNullable<MutationResolvers['updateDriv
   // Fetch all drivers and publish update for real-time sync
   try {
     const drivers = await authService.authRepository.findDrivers();
-    publish(pubsub, topics.allDriversChanged(), { drivers });
+    publish(pubsub, topics.allDriversChanged(), { drivers } as any);
   } catch (error) {
     logger.error({ err: error }, 'user:updateDriverOnlineStatus publish failed');
   }
@@ -41,5 +41,5 @@ export const updateDriverOnlineStatus: NonNullable<MutationResolvers['updateDriv
   return {
     ...user,
     isOnline: driver.onlinePreference ?? false,
-  };
+  } as any;
 };

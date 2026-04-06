@@ -522,7 +522,7 @@ export class SettlementScenarioHarnessService {
         ]);
 
         // Seed settlement rules
-        await this.db.insert(settlementRules).values([
+        await (this.db.insert(settlementRules) as any).values([
             {
                 id: IDS.ruleBusiness10SubtotalId,
                 name: 'Global Business 10% Subtotal',
@@ -530,7 +530,7 @@ export class SettlementScenarioHarnessService {
                 direction: 'RECEIVABLE',
                 amountType: 'PERCENT',
                 amount: '10.00',
-                appliesTo: 'SUBTOTAL',
+                appliesTo: 'SUBTOTAL' as any,
                 businessId: null,
                 promotionId: null,
                 isActive: true,
@@ -545,7 +545,7 @@ export class SettlementScenarioHarnessService {
                 direction: 'PAYABLE',
                 amountType: 'PERCENT',
                 amount: '80.00',
-                appliesTo: 'DELIVERY_FEE',
+                appliesTo: 'DELIVERY_FEE' as any,
                 businessId: null,
                 promotionId: null,
                 isActive: true,
@@ -605,7 +605,7 @@ export class SettlementScenarioHarnessService {
                 direction: 'RECEIVABLE',
                 amountType: 'PERCENT',
                 amount: '20.00',
-                appliesTo: 'DELIVERY_FEE',
+                appliesTo: 'DELIVERY_FEE' as any,
                 businessId: null,
                 promotionId: IDS.promoBusinessFreeDeliveryId,
                 isActive: true,
@@ -1276,7 +1276,7 @@ export class SettlementScenarioHarnessService {
                 orderDate: now,
                 createdAt: now,
                 updatedAt: now,
-            })
+            } as any)
             .returning();
 
         await this.db.insert(orderItems).values(

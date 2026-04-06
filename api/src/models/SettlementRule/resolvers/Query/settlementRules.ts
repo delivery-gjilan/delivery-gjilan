@@ -6,7 +6,7 @@ export const settlementRules: NonNullable<QueryResolvers['settlementRules']> = a
   _parent,
   { filter, limit, offset },
   { db, userData },
-) => {
+): Promise<any> => {
   if (!userData?.userId) {
     throw new GraphQLError('Authentication required', {
       extensions: { code: 'UNAUTHORIZED' },

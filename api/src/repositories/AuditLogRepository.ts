@@ -1,4 +1,4 @@
-import { Database } from '@/database';
+import { DbType } from '@/database';
 import { auditLogs } from '@/database/schema';
 import { eq, and, gte, lte, sql, desc } from 'drizzle-orm';
 import { DbAuditLog, NewDbAuditLog, ActionType, EntityType, ActorType } from '@/database/schema/auditLogs';
@@ -27,7 +27,7 @@ export interface CreateAuditLogInput {
 }
 
 export class AuditLogRepository {
-    constructor(private db: Database) {}
+    constructor(private db: DbType) {}
 
     /**
      * Create a new audit log entry

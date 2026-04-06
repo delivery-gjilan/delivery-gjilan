@@ -61,5 +61,5 @@ export const settlementSummary: NonNullable<QueryResolvers['settlementSummary']>
         }
     }
 
-    return repo.getSettlementSummary(resolvedArgs);
+    return repo.getSettlementSummary(resolvedArgs as any);
 };

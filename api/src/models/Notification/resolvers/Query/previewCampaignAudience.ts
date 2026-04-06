@@ -6,7 +6,7 @@ export const previewCampaignAudience: NonNullable<QueryResolvers['previewCampaig
     _parent,
     { query },
     { userData, db, authService },
-) => {
+): Promise<any> => {
     if (!userData.role || !['SUPER_ADMIN', 'ADMIN'].includes(userData.role)) {
         throw AppError.forbidden('Only admins can preview audiences');
     }

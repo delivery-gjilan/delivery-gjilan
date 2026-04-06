@@ -2,7 +2,7 @@ import type { QueryResolvers } from './../../../../generated/types.generated';
 import { SettlementRuleRepository } from '@/repositories/SettlementRuleRepository';
 import { GraphQLError } from 'graphql';
 
-export const settlementRule: NonNullable<QueryResolvers['settlementRule']> = async (_parent, { id }, { db, userData }) => {
+export const settlementRule: NonNullable<QueryResolvers['settlementRule']> = async (_parent, { id }, { db, userData }): Promise<any> => {
   if (!userData?.userId) {
     throw new GraphQLError('Authentication required', {
       extensions: { code: 'UNAUTHORIZED' },

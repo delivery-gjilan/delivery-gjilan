@@ -4,7 +4,7 @@ import { users } from '@/database/schema/users';
 import { eq } from 'drizzle-orm';
 
 export const Referral: ReferralResolvers = {
-    referredUser: async (parent) => {
+    referredUser: async (parent): Promise<any> => {
         if (!parent.referredUserId) {
             return null;
         }
@@ -13,7 +13,7 @@ export const Referral: ReferralResolvers = {
         const [user] = await db
             .select()
             .from(users)
-            .where(eq(users.id, parent.referredUserId))
+            .where(eq(users.id, parent.referredUserId as string))
             .limit(1);
 
         if (!user) {

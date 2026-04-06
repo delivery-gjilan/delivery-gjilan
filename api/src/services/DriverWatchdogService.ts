@@ -196,7 +196,7 @@ export class DriverWatchdogService {
       if (userIds.length === 0) return;
       const drivers = await this.authRepository.findDriversByIds(userIds);
       if (drivers.length === 0) return;
-      publish(pubsub, topics.allDriversChanged(), { drivers });
+      publish(pubsub, topics.allDriversChanged(), { drivers } as any);
     } catch (error) {
       log.error({ err: error }, 'watchdog:publish:error');
     }

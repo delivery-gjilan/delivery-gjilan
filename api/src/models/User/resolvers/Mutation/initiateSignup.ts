@@ -15,7 +15,7 @@ export const initiateSignup: NonNullable<MutationResolvers['initiateSignup']> = 
     );
     return {
         token: result.token,
-        user: toUserParent(result.user),
+        user: toUserParent(result.user as any),
         message: result.message,
     };
 };

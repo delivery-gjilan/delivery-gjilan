@@ -7,7 +7,7 @@ export const getStoreStatus: NonNullable<QueryResolvers['getStoreStatus']> = asy
   _parent,
   _args,
   _ctx
-) => {
+): Promise<any> => {
   const db = await getDB();
 
   // Get the store settings (single row with id 'default')

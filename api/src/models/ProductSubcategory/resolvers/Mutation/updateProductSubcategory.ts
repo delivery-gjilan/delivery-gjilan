@@ -6,10 +6,10 @@ export const updateProductSubcategory: NonNullable<MutationResolvers['updateProd
         { id, input },
         { productSubcategoryService },
 ) => {
-        const result = await productSubcategoryService.updateProductSubcategory(id, input);
+        const result = await productSubcategoryService.updateProductSubcategory(id as string, input);
         // Invalidate by categoryId
-        await cache.invalidateSubcategories('', result.categoryId);
+        await cache.invalidateSubcategories('', result.categoryId as string);
         // Also invalidate the by-business pattern
         await cache.delPattern('cache:subcategories:*');
-        return result;
+        return result as any;
 };

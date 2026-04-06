@@ -27,5 +27,5 @@ export const adminUpdateDriverLocation: NonNullable<MutationResolvers['adminUpda
     return {
         ...user,
         isOnline: onlinePreference,
-    };
+    } as any;
 };

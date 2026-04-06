@@ -98,7 +98,7 @@ export class AuthService {
 
         return {
             token,
-            user: verifiedUser ?? user,
+            user: (verifiedUser ?? user) as any,
             message: 'Account created. Please add your phone number.',
         };
     }
@@ -237,7 +237,7 @@ export class AuthService {
         return {
             token,
             refreshToken,
-            user,
+            user: user as any,
             message: 'Login successful',
         };
     }
@@ -382,7 +382,7 @@ export class AuthService {
 
         return {
             token,
-            user,
+            user: user as any,
             message: `User created successfully as ${role}`,
         };
     }

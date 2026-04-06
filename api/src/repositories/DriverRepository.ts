@@ -92,7 +92,7 @@ export class DriverRepository {
   ): Promise<DbDriver | undefined> {
     const now = new Date().toISOString();
     
-    const updateData: Partial<NewDbDriver> & { lastHeartbeatAt: string; connectionStatus: DriverConnectionStatusType; disconnectedAt: null } = {
+    const updateData: any = {
       lastHeartbeatAt: now,
       connectionStatus: 'CONNECTED',
       disconnectedAt: null,
@@ -159,7 +159,7 @@ export class DriverRepository {
     status: DriverConnectionStatusType,
     setDisconnectedAt: boolean = false
   ): Promise<DbDriver | undefined> {
-    const updateData: Partial<NewDbDriver> = {
+    const updateData: any = {
       connectionStatus: status,
     };
 

@@ -4,7 +4,7 @@ import { createAuditLogger } from '@/services/AuditLogger';
 
 export const markSettlementAsPartiallyPaid: NonNullable<
         MutationResolvers['markSettlementAsPartiallyPaid']
-> = async (_parent, { settlementId, amount }, context) => {
+> = async (_parent, { settlementId, amount }, context): Promise<any> => {
         const { db } = context;
         const repo = new SettlementRepository(db);
         const result = await repo.markAsPartiallyPaid(settlementId, amount);

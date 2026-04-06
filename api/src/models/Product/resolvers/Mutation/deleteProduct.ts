@@ -55,7 +55,7 @@ export const deleteProduct: NonNullable<MutationResolvers['deleteProduct']> = as
 
     const result = await productService.deleteProduct(id);
     if (product?.businessId) {
-        await cache.invalidateProducts(product.businessId, id);
+        await cache.invalidateProducts(product.businessId as string, id as string);
     }
     
     // Log the action
@@ -69,5 +69,5 @@ export const deleteProduct: NonNullable<MutationResolvers['deleteProduct']> = as
         });
     }
     
-    return result;
+    return result as any;
 };

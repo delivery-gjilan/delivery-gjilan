@@ -6,11 +6,11 @@ export const Product: ProductResolvers = {
     },
 
     effectivePrice: async (parent, _args, { loaders }) => {
-        return loaders.effectivePriceByProductIdLoader.load(parent.id);
+        return loaders.effectivePriceByProductIdLoader.load(parent.id as string);
     },
 
     optionGroups: async (parent, _args, { loaders }) => {
-        const groups = await loaders.optionGroupsByProductIdLoader.load(parent.id);
+        const groups = await loaders.optionGroupsByProductIdLoader.load(parent.id as string);
         return groups.map((g) => ({
             id: g.id,
             productId: g.productId,
@@ -19,7 +19,7 @@ export const Product: ProductResolvers = {
             maxSelections: g.maxSelections,
             displayOrder: g.displayOrder,
             options: [], // resolved by OptionGroup.options field resolver
-        }));
+        })) as any;
     },
 
     variants: async (parent, _args, { loaders }) => {
@@ -43,7 +43,7 @@ export const Product: ProductResolvers = {
                 updatedAt: v.updatedAt ?? new Date().toISOString(),
                 isOnSale: v.isOnSale ?? false,
                 isAvailable: v.isAvailable ?? true,
-            }));
+            })) as any;
     },
 
     variantGroup: async (parent, _args, { db }) => {
@@ -52,6 +52,6 @@ export const Product: ProductResolvers = {
         const { productVariantGroups } = await import('@/database/schema/productVariantGroups');
         const { eq } = await import('drizzle-orm');
         const [group] = await db.select().from(productVariantGroups).where(eq(productVariantGroups.id, groupId));
-        return group ?? null;
+        return (group ?? null) as any;
     },
 };

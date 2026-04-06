@@ -1,27 +1,28 @@
 {
-    "compilerOptions": {
-        "esModuleInterop": true,
-        "skipLibCheck": true,
-        "target": "ESNext",
-        "verbatimModuleSyntax": false,
-        "allowJs": true,
-        "resolveJsonModule": true,
-        "moduleDetection": "force",
-        "strict": false,
-        "noUncheckedIndexedAccess": false,
-        "moduleResolution": "Bundler",
-        "module": "ESNext",
-        "noEmit": true,
-        "lib": ["ESNext"],
-        "paths": {
-            "@/*": ["./src/*"],
-            "@/database/*": ["./database/*"],
-            "@/database": ["./database"],
-            "@generated/*": ["./src/generated/*"],
-            "@lib/*": ["./src/lib/*"]
-        },
-        "typeRoots": ["./node_modules/@types", "./src/types"]
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "target": "ESNext",
+    "verbatimModuleSyntax": false,
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "moduleDetection": "force",
+    "strict": false,
+    "noUncheckedIndexedAccess": false,
+    "moduleResolution": "Bundler",
+    "module": "ESNext",
+    "noEmit": false,      // changed
+    "outDir": "./dist",   // added
+    "lib": ["ESNext"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@/database/*": ["./database/*"],
+      "@/database": ["./database"],
+      "@generated/*": ["./src/generated/*"],
+      "@lib/*": ["./src/lib/*"]
     },
-    "include": ["src/**/*", "database", "drizzle.config.ts"],
-    "exclude": ["node_modules", "**/*.spec.ts", "src/generated", "database/seed.ts"]
+    "typeRoots": ["./node_modules/@types", "./src/types"]
+  },
+  "include": ["src/**/*", "database", "drizzle.config.ts"],
+  "exclude": ["node_modules", "**/*.spec.ts", "src/generated", "database/seed.ts"]
 }

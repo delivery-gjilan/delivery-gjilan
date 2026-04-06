@@ -4,7 +4,7 @@ import { deliveryPricingTiers } from '@/database/schema/deliveryPricingTiers';
 import { deliveryZones } from '@/database/schema/deliveryZones';
 import { asc, eq } from 'drizzle-orm';
 
-export const deliveryPricingConfig: NonNullable<QueryResolvers['deliveryPricingConfig']> = async (_parent, _arg, _ctx) => {
+export const deliveryPricingConfig: NonNullable<QueryResolvers['deliveryPricingConfig']> = async (_parent, _arg, _ctx): Promise<any> => {
     const db = await getDB();
 
     // Fetch all active zones

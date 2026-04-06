@@ -3,9 +3,9 @@ import { pubsub, subscribe, topics } from '@/lib/pubsub';
 import type { StoreStatusPayload } from '@/lib/pubsub';
 
 export const storeStatusUpdated: NonNullable<SubscriptionResolvers['storeStatusUpdated']> = {
-  subscribe: () => {
+  subscribe: (() => {
     return subscribe(pubsub, topics.storeStatusChanged());
-  },
+  }) as any,
   resolve: (payload: StoreStatusPayload) => {
     return {
       isStoreClosed: payload.isStoreClosed,
@@ -13,6 +13,7 @@ export const storeStatusUpdated: NonNullable<SubscriptionResolvers['storeStatusU
       bannerEnabled: payload.bannerEnabled,
       bannerMessage: payload.bannerMessage ?? null,
       bannerType: (payload.bannerType || 'INFO').toUpperCase() as any,
+      dispatchModeEnabled: (payload as any).dispatchModeEnabled ?? false,
     };
   },
 };

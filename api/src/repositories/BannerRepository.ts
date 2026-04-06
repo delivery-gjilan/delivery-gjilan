@@ -79,8 +79,8 @@ export class BannerRepository {
         if (filter?.includeScheduled) {
             const now = new Date().toISOString();
             conditions.push(
-                or(isNull(banners.startsAt), lte(banners.startsAt, now)) as SQL,
-                or(isNull(banners.endsAt), gte(banners.endsAt, now)) as SQL,
+                or(isNull(banners.startsAt), lte(banners.startsAt, now as any)) as SQL,
+                or(isNull(banners.endsAt), gte(banners.endsAt, now as any)) as SQL,
             );
         }
 
@@ -96,8 +96,8 @@ export class BannerRepository {
         const conditions: SQL[] = [
             eq(banners.isActive, true),
             eq(banners.isDeleted, false),
-            or(isNull(banners.startsAt), lte(banners.startsAt, now)) as SQL,
-            or(isNull(banners.endsAt), gte(banners.endsAt, now)) as SQL,
+            or(isNull(banners.startsAt), lte(banners.startsAt, now as any)) as SQL,
+            or(isNull(banners.endsAt), gte(banners.endsAt, now as any)) as SQL,
         ];
 
         if (displayContext) {
